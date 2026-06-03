@@ -104,6 +104,12 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
       // the doc instance changes (i.e. an edit landed).
       private _lines: string[] = [];
       private _linesDoc: Text | null = null;
+      // Gutter width is a layout read (offsetWidth); cache it and only
+      // re-measure on the requestMeasure path (geometry/viewport changes),
+      // so the synchronous scroll handler never forces layout. The gutter
+      // only resizes on those same events (e.g. line-number digit count),
+      // so the cached value is current between refreshes.
+      private _gutterWidth = 0;
 
       constructor(readonly view: EditorView) {
         this.overlay = document.createElement("div");
@@ -160,7 +166,14 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
       refresh(): void {
         this.view.requestMeasure({
           key: STICKY_MEASURE_KEY,
-          read: (view) => this.measure(view),
+          read: (view) => {
+            // Safe to read layout here (measure phase) — refresh runs on
+            // geometry/viewport/doc changes, which is when the gutter can
+            // resize. The scroll handler then reuses the cached width.
+            const gutterEl = view.dom.querySelector<HTMLElement>(".cm-gutters");
+            this._gutterWidth = gutterEl ? gutterEl.offsetWidth : 0;
+            return this.measure(view);
+          },
           write: (measured, view) => this.applyMeasured(measured, view),
         });
       }
@@ -171,8 +184,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         const rowHeight = view.defaultLineHeight;
         const block = view.lineBlockAtHeight(scrollTop);
         const topLine = view.state.doc.lineAt(block.from);
-        const gutterEl = view.dom.querySelector<HTMLElement>(".cm-gutters");
-        const gutterWidth = gutterEl ? gutterEl.offsetWidth : 0;
+        const gutterWidth = this._gutterWidth;
         const lines = this.lines(view);
         const scope = computeStickyScope(lines, topLine.number);
         if (isScopeOpener(lines, topLine.number)) {
