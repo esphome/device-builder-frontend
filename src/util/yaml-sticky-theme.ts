@@ -44,7 +44,9 @@ export function buildStickyTheme(background: string): Extension {
       background: "rgba(127, 127, 127, 0.12)",
     },
     ".cm-esphome-sticky-line:focus-visible": {
-      outline: "2px solid #0b5cad",
+      // Brand focus ring via the WebAwesome token (matches the lambda
+      // editor's CodeMirror outline); literal fallback for older themes.
+      outline: "2px solid var(--wa-color-brand-fill-loud, #0b5cad)",
       outlineOffset: "-2px",
     },
     ".cm-esphome-sticky-num": {
