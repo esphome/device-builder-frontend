@@ -377,6 +377,37 @@ describe("findScopeExitLine", () => {
     );
     expect(findScopeExitLine(lines, 1, 2)).toBe(3);
   });
+
+  it("returns the EOF sentinel when the exit is past searchTo (off-screen)", () => {
+    // The sticky overlay only cares about an exit within the rendered
+    // viewport; bounding the scan with searchTo lets a far-below exit
+    // read as off-screen (lines.length + 1) without scanning to it.
+    const lines = fromYaml(
+      [
+        "sensor:", //        1   indent 0  ← opener
+        "  - a: 1", //       2   indent 2
+        "  - b: 2", //       3   indent 2
+        "  - c: 3", //       4   indent 2
+        "other:", //         5   indent 0  ← real exit, but below searchTo
+      ].join("\n")
+    );
+    // Unbounded: real exit at line 5.
+    expect(findScopeExitLine(lines, 1, 0)).toBe(5);
+    // Bounded to line 3: exit not within window → off-screen sentinel.
+    expect(findScopeExitLine(lines, 1, 0, 1, 3)).toBe(lines.length + 1);
+  });
+
+  it("skips lines before searchFrom (exit known to be at/after it)", () => {
+    const lines = fromYaml(
+      [
+        "sensor:", //        1   indent 0  ← opener (far above)
+        "  - a: 1", //       2
+        "  - b: 2", //       3   ← top visible line (searchFrom)
+        "light:", //         4   indent 0  ← exit
+      ].join("\n")
+    );
+    expect(findScopeExitLine(lines, 1, 0, 3, lines.length)).toBe(4);
+  });
 });
 
 /**

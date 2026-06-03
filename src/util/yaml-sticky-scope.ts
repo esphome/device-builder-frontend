@@ -23,12 +23,31 @@ function structuralStripped(raw: string): string | null {
   return stripped.trim() ? stripped : null;
 }
 
+/**
+ * First line (1-indexed) at or below ``openerLine`` whose indent is
+ * ``<= openerIndent`` — i.e. where the opener's scope ends. Returns
+ * ``lines.length + 1`` when the scope runs to EOF.
+ *
+ * ``searchFrom`` / ``searchTo`` bound the scan (both 1-indexed, inclusive)
+ * for the sticky overlay's hot path: the caller knows the exit can only
+ * fall at/after the top visible line (an ancestor encloses it, so no exit
+ * lies between the opener and there) and only *matters* while it's within
+ * the rendered viewport (an off-screen exit drives no slide-out). When no
+ * exit is found within the bounded window, ``lines.length + 1`` is
+ * returned — the caller treats that as "off-screen", which is correct
+ * since any real exit below the window can't be near the viewport top.
+ * The defaults scan the whole document (unbounded, original behaviour).
+ */
 export function findScopeExitLine(
   lines: string[],
   openerLine: number,
-  openerIndent: number
+  openerIndent: number,
+  searchFrom = openerLine + 1,
+  searchTo = lines.length
 ): number {
-  for (let i = openerLine; i < lines.length; i++) {
+  const from = Math.max(openerLine, searchFrom - 1);
+  const to = Math.min(lines.length, searchTo);
+  for (let i = from; i < to; i++) {
     const stripped = structuralStripped(lines[i]);
     if (!stripped) continue;
     if (indentOf(stripped) <= openerIndent) return i + 1;

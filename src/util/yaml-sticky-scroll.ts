@@ -195,8 +195,20 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
             text: lines[topLine.number - 1],
           });
         }
+        // Bound the exit scan to the rendered viewport: an exit can only
+        // fall at/after ``topLine`` (every scope here encloses it) and only
+        // drives a slide-out while within the viewport, so an exit below
+        // the last rendered line is "off-screen" → no slide. Caps the
+        // per-row scan at O(viewport) instead of O(doc).
+        const bottomLine = view.state.doc.lineAt(view.viewport.to).number;
         const exitYs: number[] = scope.map((s) => {
-          const exitLine = findScopeExitLine(lines, s.lineNumber, s.indent);
+          const exitLine = findScopeExitLine(
+            lines,
+            s.lineNumber,
+            s.indent,
+            topLine.number,
+            bottomLine
+          );
           if (exitLine > lines.length) return Number.POSITIVE_INFINITY;
           const cm6Line = view.state.doc.line(exitLine);
           return view.lineBlockAt(cm6Line.from).top;
