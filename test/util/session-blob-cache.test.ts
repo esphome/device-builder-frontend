@@ -77,6 +77,29 @@ describe("createSessionBlobCache", () => {
     expect(onNotify).toHaveBeenCalledTimes(1);
   });
 
+  it("normalizes a synchronous throw in the fetcher into the failure path", async () => {
+    // no fallback → rejects (not a sync throw out of fetch())
+    const cache = createSessionBlobCache<string[]>({
+      name: "t",
+      fetch: () => {
+        throw new Error("sync boom");
+      },
+    });
+    await expect(cache.fetch(API)).rejects.toThrow("sync boom");
+    expect(cache.getCached()).toBeUndefined();
+
+    // with fallback → the sync throw is caught and the fallback is cached
+    const withFallback = createSessionBlobCache<string[]>({
+      name: "t",
+      fetch: () => {
+        throw new Error("sync boom");
+      },
+      fallback: () => ["fallback"],
+    });
+    await expect(withFallback.fetch(API)).resolves.toEqual(["fallback"]);
+    expect(withFallback.getCached()).toEqual(["fallback"]);
+  });
+
   it("isolates a throwing listener from others and from the fetch promise", async () => {
     const fetch = vi.fn(async () => ["a"]);
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});

@@ -81,8 +81,17 @@ export function createSessionBlobCache<T, A extends unknown[] = []>(
       if (existing) return existing;
 
       const gen = generation;
-      const promise = opts
-        .fetch(api, ...args)
+      // Call the fetcher eagerly (callers rely on the request firing
+      // synchronously), but funnel a synchronous throw into a rejection so
+      // it flows through the fallback / rethrow path below rather than
+      // escaping fetch() directly.
+      let started: Promise<T>;
+      try {
+        started = opts.fetch(api, ...args);
+      } catch (err) {
+        started = Promise.reject(err);
+      }
+      const promise = started
         .then((value) => {
           if (gen === generation) {
             cache.set(key, value);
