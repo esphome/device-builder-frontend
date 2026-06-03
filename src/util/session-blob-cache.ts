@@ -1,4 +1,4 @@
-import type { ESPHomeAPI } from "../api/index.js";
+import type { ESPHomeAPI } from "../api/esphome-api.js";
 
 /**
  * A fetch-once session cache for a whole immutable payload, keyed by a
@@ -51,6 +51,11 @@ export function createSessionBlobCache<T, A extends unknown[] = []>(
   const cache = new Map<string, T>();
   const inflight = new Map<string, Promise<T>>();
   const listeners = new Set<() => void>();
+  // Bumped by reset(); a fetch captures it at call time so a stale
+  // promise that resolves after a reset no-ops its cache write / notify
+  // (it still resolves the original callers) instead of repopulating a
+  // reset cache or notifying listeners added since.
+  let generation = 0;
 
   // Isolate each listener so a throwing subscriber can't reject the fetch
   // promise (the cache is already populated here) or skip later listeners.
@@ -75,20 +80,25 @@ export function createSessionBlobCache<T, A extends unknown[] = []>(
       const existing = inflight.get(key);
       if (existing) return existing;
 
+      const gen = generation;
       const promise = opts
         .fetch(api, ...args)
         .then((value) => {
-          cache.set(key, value);
-          inflight.delete(key);
-          notify();
+          if (gen === generation) {
+            cache.set(key, value);
+            inflight.delete(key);
+            notify();
+          }
           return value;
         })
         .catch((err: unknown) => {
-          inflight.delete(key);
+          if (gen === generation) inflight.delete(key);
           if (opts.fallback === undefined) throw err;
           const value = opts.fallback(err);
-          cache.set(key, value);
-          notify();
+          if (gen === generation) {
+            cache.set(key, value);
+            notify();
+          }
           return value;
         });
       inflight.set(key, promise);
@@ -108,6 +118,7 @@ export function createSessionBlobCache<T, A extends unknown[] = []>(
     },
 
     reset(): void {
+      generation += 1;
       cache.clear();
       inflight.clear();
       listeners.clear();

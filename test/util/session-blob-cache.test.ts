@@ -120,4 +120,26 @@ describe("createSessionBlobCache", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(onNotify).toHaveBeenCalledTimes(1); // only the pre-reset fetch
   });
+
+  it("a fetch resolving after reset() no-ops its cache write and notify", async () => {
+    let release!: (v: string[]) => void;
+    const fetch = vi.fn(
+      () =>
+        new Promise<string[]>((resolve) => {
+          release = resolve;
+        })
+    );
+    const cache = createSessionBlobCache<string[]>({ name: "t", fetch });
+
+    const pending = cache.fetch(API); // in-flight
+    cache.reset();
+    const lateListener = vi.fn();
+    cache.subscribe(lateListener); // subscribed after the reset
+
+    release(["stale"]);
+    await expect(pending).resolves.toEqual(["stale"]); // caller still resolves
+    // ...but the post-reset cache stays empty and the late listener is untouched.
+    expect(cache.getCached()).toBeUndefined();
+    expect(lateListener).not.toHaveBeenCalled();
+  });
 });
