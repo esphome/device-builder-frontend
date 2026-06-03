@@ -41,7 +41,13 @@ const CATALOG: CatalogIndex = {
         name: "ESPHome Core",
         description: "Core firmware configuration.",
         docs_url: "https://esphome.io/components/esphome",
-        config_entries: [field({ key: "name" })],
+        config_entries: [
+          field({
+            key: "name",
+            description: "The node name.",
+            help_link: "https://esphome.io/components/esphome#name",
+          }),
+        ],
       }),
     ],
   ]),
@@ -115,9 +121,17 @@ describe("resolveHoverTarget", () => {
     );
   });
 
-  it("suppresses a visible catalog config_entry (form documents it)", async () => {
-    expect(await hover('esphome:\n  name: "x"\n', "name")).toBeNull();
-    expect(vi.mocked(schema.getConfigVarDocsAtPath)).not.toHaveBeenCalled();
+  it("shows schema docs for a config-entry field (full parity)", async () => {
+    vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue("Schema name docs.");
+    const target = await hover('esphome:\n  name: "x"\n', "name");
+    expect(target?.description).toBe("Schema name docs.");
+  });
+
+  it("falls back to the catalog field description when the schema has none", async () => {
+    // getConfigVarDocsAtPath defaults to null in beforeEach.
+    const target = await hover('esphome:\n  name: "x"\n', "name");
+    expect(target?.description).toBe("The node name.");
+    expect(target?.docsUrl).toBe("https://esphome.io/components/esphome#name");
   });
 
   it("always shows a top-level component description", async () => {

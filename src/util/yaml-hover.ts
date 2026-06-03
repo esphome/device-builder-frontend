@@ -1,22 +1,17 @@
 /**
  * Schema-driven hover docs for the ESPHome YAML editor.
  *
- * The structured editor panel already documents a component's visible
- * ``config_entries`` (and the component header), so a hover that repeats
- * those is noise. This resolver instead surfaces docs for the keys that
- * only exist in raw YAML — resolving against the full schema bundle
- * (``schema.esphome.io`` via ``esphome-schema.ts``) and *suppressing*
- * anything the form already shows:
+ * Full parity with the legacy editor's hover: every YAML token that maps
+ * to something documented gets a tooltip. Docs come from the full schema
+ * bundle (``schema.esphome.io`` via ``esphome-schema.ts``), with the
+ * component catalog as the fallback:
  *
- *   - enum values (``device_class: garage_door`` → that option's meaning)
- *   - automation actions / triggers (``on_press:``, ``logger.log`` — the
- *     backend strips these from ``config_entries``)
+ *   - top-level component keys → catalog description
+ *   - enum values (``device_class: garage_door``) → that option's meaning
+ *   - automation actions / triggers (``on_press:``, ``logger.log``)
  *   - registry/filter list entries (``sensor.filters`` members)
- *   - deeply-nested schema keys not in the curated catalog
- *
- * Top-level component keys always show their catalog description; nested
- * keys the structured editor already documents (visible ``config_entries``)
- * resolve to ``null`` (no tooltip).
+ *   - any config key, nested or not → schema docs, else its catalog
+ *     ``config_entry`` description
  */
 import type { EditorState } from "@codemirror/state";
 import { hoverTooltip, type Tooltip } from "@codemirror/view";
@@ -109,19 +104,25 @@ function findConfigEntry(entries: ConfigEntry[], key: string): ConfigEntry | und
   return undefined;
 }
 
-/** True when *key* is a visible (non-hidden) catalog field of *comp* —
- *  i.e. the structured editor already documents it, so hover should not. */
-function formDocuments(comp: ComponentCatalogEntry | undefined, key: string): boolean {
-  if (!comp) return false;
-  const entry = findConfigEntry(comp.config_entries ?? [], key);
-  return !!entry && !entry.hidden;
+/** Catalog field description + docs link — the fallback for keys the
+ *  schema walk doesn't carry docs for. */
+function fieldTarget(
+  entry: ConfigEntry,
+  owner: ComponentCatalogEntry | undefined
+): HoverTarget | null {
+  const docsUrl = entry.help_link || owner?.docs_url || null;
+  if (!entry.description && !docsUrl) return null;
+  return {
+    description: entry.description || null,
+    docsUrl,
+    docsTitle: owner?.name || null,
+  };
 }
 
 /**
- * Resolve schema docs for the YAML token under *pos*, or ``null`` when
- * nothing applies (or the structured editor already documents it).
- * Reuses the completion source's context helpers so hover and completion
- * agree on structure.
+ * Resolve hover docs for the YAML token under *pos*, or ``null`` when
+ * nothing maps. Reuses the completion source's context helpers so hover
+ * and completion agree on structure.
  */
 export async function resolveHoverTarget(
   state: EditorState,
@@ -198,16 +199,22 @@ export async function resolveHoverTarget(
     }
   }
 
-  // 5. Nested / plain key. Suppress what the structured editor documents:
-  //    top-level component keys and visible catalog config_entries.
+  // 5. Nested / plain key. Full parity with the legacy editor — every
+  //    key gets docs: the schema walk first, then the catalog field
+  //    description for keys the schema doesn't carry docs for.
   const path = getKeyPath(state, pos);
-  if (indent === 0 || path.length <= 1 || !topLevelKey) return null;
+  if (path.length <= 1 || !topLevelKey) return null;
   const { bundle, componentKey } = bundleFor(topLevelKey, platformValue);
-  const comp = catalog.byId.get(componentKey) ?? catalog.byId.get(topLevelKey);
-  if (formDocuments(comp, key)) return null;
-  return docsTarget(
-    await getConfigVarDocsAtPath(api, bundle, componentKey, path.slice(1))
+  const schemaDocs = await getConfigVarDocsAtPath(
+    api,
+    bundle,
+    componentKey,
+    path.slice(1)
   );
+  if (schemaDocs) return docsTarget(schemaDocs);
+  const comp = catalog.byId.get(componentKey) ?? catalog.byId.get(topLevelKey);
+  const entry = comp ? findConfigEntry(comp.config_entries ?? [], key) : undefined;
+  return entry ? fieldTarget(entry, comp) : null;
 }
 
 /** Build the tooltip DOM: Markdown description + optional "See also" link. */
