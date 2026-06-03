@@ -100,6 +100,7 @@ export function makeRenderCtx(
     errorAt: () => null,
     emitChange: vi.fn(),
     toggleNested: vi.fn(),
+    seedNestedOpen: vi.fn(),
     requestAddComponent: vi.fn(),
     scopeValues: () => ({}),
     filterRenderable: (entries) => entries,

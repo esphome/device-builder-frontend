@@ -81,6 +81,7 @@ function makeCtx(values: Record<string, unknown>): CtxStub {
     errorAt: () => null,
     emitChange,
     toggleNested: () => {},
+    seedNestedOpen: () => {},
     requestAddComponent: () => {},
     scopeValues: () => ({}),
     filterRenderable,

@@ -375,11 +375,16 @@ export function findFieldLine(
         if (s.trim() && indentOf(s) === baseIndent && RE_LIST_ITEM.test(s))
           dashes.push(i);
       }
-      const itemLo = dashes[Number(seg)];
-      if (itemLo === undefined) return null;
-      if (rest.length === 0) return itemLo + 1;
-      const itemHi = Number(seg) + 1 < dashes.length ? dashes[Number(seg) + 1] - 1 : hi;
-      return descend(itemLo, itemHi, listItemChildIndent(lines[itemLo]), rest);
+      // A numeric segment is a list index only where this level actually has
+      // dash items; with none it's a literal numeric mapping key (a ``0:``
+      // substitution), so fall through to the key match below.
+      if (dashes.length) {
+        const itemLo = dashes[Number(seg)];
+        if (itemLo === undefined) return null;
+        if (rest.length === 0) return itemLo + 1;
+        const itemHi = Number(seg) + 1 < dashes.length ? dashes[Number(seg) + 1] - 1 : hi;
+        return descend(itemLo, itemHi, listItemChildIndent(lines[itemLo]), rest);
+      }
     }
     for (let i = lo; i <= hi; i++) {
       const s = stripComment(lines[i]);

@@ -96,6 +96,9 @@ export interface RenderCtx {
   errorAt: (path: string[]) => ValidationError | null;
   emitChange: (path: string[], value: unknown) => void;
   toggleNested: (key: string) => void;
+  /** Open *key* once as a default (e.g. a pin disclosure with long-form
+   *  values), without overriding a later explicit user collapse. */
+  seedNestedOpen: (key: string) => void;
   requestAddComponent: (domain: string) => void;
   scopeValues: (path: string[]) => Record<string, unknown>;
   filterRenderable: (

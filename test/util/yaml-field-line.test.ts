@@ -84,6 +84,13 @@ describe("findFieldLine", () => {
     expect(findFieldLine(yaml, section, ["areas", "0", "name_add_mac"])).toBeNull();
   });
 
+  it("resolves a numeric mapping key instead of reading it as a list index", () => {
+    const yaml = ["substitutions:", "  0: zero", "  name: x", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(findFieldLine(yaml, section, ["substitutions", "0"])).toBe(2);
+    expect(findFieldLine(yaml, section, ["substitutions", "name"])).toBe(3);
+  });
+
   it("targets the correct instance among duplicates", () => {
     const yaml = [
       "binary_sensor:",

@@ -162,6 +162,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @state()
   private _nestedOpenSections: Set<string> = new Set();
 
+  /** Keys already default-opened by ``_seedNestedOpen`` so the seed fires
+   *  once and a later user collapse isn't re-overridden. */
+  private _seededNestedOpen: Set<string> = new Set();
+
   /** Last field flashed + when, so the same field isn't re-pulsed within
    *  10s as the cursor moves around inside it. */
   private _lastFlashKey?: string;
@@ -679,6 +683,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       errorAt: (path) => this.errors.get(path.join(".")) ?? null,
       emitChange: (path, value) => this._emitChange(path, value),
       toggleNested: (key) => this._toggleNested(key),
+      seedNestedOpen: (key) => this._seedNestedOpen(key),
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
@@ -758,6 +763,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const next = new Set(this._nestedOpenSections);
     next.add(key);
     this._nestedOpenSections = next;
+  }
+
+  /**
+   * Open *key* once as a default (honoring a later user collapse). Mutates
+   * in place so seeding mid-render schedules no update; the seeded marker
+   * keeps it to one shot.
+   */
+  private _seedNestedOpen(key: string) {
+    if (this.requiredOnly || this._seededNestedOpen.has(key)) return;
+    this._seededNestedOpen.add(key);
+    this._nestedOpenSections.add(key);
   }
 
   /**

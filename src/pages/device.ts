@@ -147,9 +147,12 @@ export class ESPHomePageDevice extends LitElement {
 
   /** Form-relative path of the last focused field, and whether its YAML
    *  line wasn't found yet (a just-added value whose debounced write is
-   *  pending) — drives a one-shot re-resolve on the next YAML update. */
+   *  pending) — drives a one-shot re-resolve on the next YAML update.
+   *  ``_pendingFieldSection`` pins the section it was queued for so a
+   *  navigation away cancels the retry instead of resolving in the wrong one. */
   private _focusedFieldPath?: string[];
   private _pendingFieldLine = false;
+  private _pendingFieldSection?: { section: string | null; fromLine?: number };
 
   /** Per-page navigation stack — each entry is a section the user
    *  visited *before* the current one, ordered oldest-first. The
@@ -1105,7 +1108,7 @@ export class ESPHomePageDevice extends LitElement {
   private _onYamlCursorLine(e: CustomEvent<{ line: number; path?: string[] }>) {
     // The user is driving from the YAML pane now — drop any pending
     // form-field retry so it can't re-highlight after they've moved on.
-    this._pendingFieldLine = false;
+    this._clearPendingFieldLine();
     const match = sectionAtLine(this._yaml, e.detail.line);
     if (!match) return;
     // Drop the top-level key to get the form-relative path. LIST_SECTIONS
@@ -1113,7 +1116,10 @@ export class ESPHomePageDevice extends LitElement {
     // section key, so keep it. (MAP sections like substitutions render at
     // an empty path, so their fields are section-relative — slice as usual.)
     const full = e.detail.path ?? [];
-    const rel = full.length > 0 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
+    // LIST_SECTIONS (globals) key fields under the section key, so keep it —
+    // but only with a child segment; a bare ``["globals"]`` header reduces
+    // to [] (a non-field line), not a whole-section field highlight.
+    const rel = full.length > 1 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
     const sectionKey = sectionKeyOf(match);
     if (
       sectionKey === this._selectedSection &&
@@ -1168,23 +1174,42 @@ export class ESPHomePageDevice extends LitElement {
     const path = (this._focusedFieldPath = e.detail.path);
     if (!path.length) return;
     const { section, found } = this._highlightFieldLine(path);
-    this._pendingFieldLine = !found;
-    // No line yet: a value the user just set (icon, a new id) writes to YAML
-    // on a debounce, so the line appears on a later update; highlight the
-    // whole section meanwhile, and the retry upgrades to the exact line.
-    if (!found && section) {
-      this._highlightRange = { fromLine: section.fromLine, toLine: section.toLine };
-      this._scrollToHighlight = true;
+    if (found) {
+      this._clearPendingFieldLine();
+      return;
     }
+    // Line not written yet (just-set icon / new id, debounced): highlight the
+    // whole section meanwhile and queue a retry scoped to this section.
+    this._pendingFieldLine = true;
+    this._pendingFieldSection = {
+      section: this._selectedSection,
+      fromLine: this._selectedFromLine,
+    };
+    this._highlightRange = section
+      ? { fromLine: section.fromLine, toLine: section.toLine }
+      : null;
+    this._scrollToHighlight = section !== undefined;
   }
 
   /** Once the pending field's YAML line exists (debounced write landed),
-   *  upgrade the highlight from the whole section to that line. */
+   *  upgrade the highlight to that line — unless the user navigated away. */
   private _retryPendingFieldLine() {
     if (!this._pendingFieldLine || !this._focusedFieldPath?.length) return;
-    if (this._highlightFieldLine(this._focusedFieldPath).found) {
-      this._pendingFieldLine = false;
+    if (
+      this._pendingFieldSection?.section !== this._selectedSection ||
+      this._pendingFieldSection?.fromLine !== this._selectedFromLine
+    ) {
+      this._clearPendingFieldLine();
+      return;
     }
+    if (this._highlightFieldLine(this._focusedFieldPath).found) {
+      this._clearPendingFieldLine();
+    }
+  }
+
+  private _clearPendingFieldLine() {
+    this._pendingFieldLine = false;
+    this._pendingFieldSection = undefined;
   }
 
   private _onYamlHighlight(

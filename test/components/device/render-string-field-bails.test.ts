@@ -50,6 +50,7 @@ function makeCtx(values: Record<string, unknown>): {
     errorAt: () => null,
     emitChange,
     toggleNested: () => {},
+    seedNestedOpen: () => {},
     requestAddComponent: () => {},
     scopeValues: () => ({}),
     filterRenderable: (entries) => entries,
