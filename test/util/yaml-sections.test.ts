@@ -798,6 +798,80 @@ describe("parseYamlAutomations", () => {
     expect(entry.id).toBe("my_sun");
     expect(entry.parentKey).toBe("sun");
   });
+
+  it("emits component_action keys for *_action config fields", () => {
+    const yaml = `cover:
+  - platform: feedback
+    id: my_gate
+    open_action:
+      - switch.turn_on: relay_open
+    close_action:
+      - switch.turn_on: relay_close
+    stop_action:
+      - switch.turn_on: relay_stop
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_action:")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_action:my_gate:open_action",
+      "automation:component_action:my_gate:close_action",
+      "automation:component_action:my_gate:stop_action",
+    ]);
+    expect(items[0].actionField).toBe("open_action");
+    expect(items[0].id).toBe("my_gate");
+  });
+
+  it("uses the positional id for an id-less action-field instance", () => {
+    const yaml = `cover:
+  - platform: feedback
+    open_action:
+      - switch.turn_on: relay_open
+`;
+    const [item] = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_action:")
+    );
+    expect(item.key).toBe("automation:component_action:cover_0:open_action");
+  });
+
+  it("does not emit component_action for api actions, on_*, or nested *_action", () => {
+    // api.actions: is `actions:` (no _action suffix); on_press is a trigger;
+    // a `*_action`-named key nested inside an if's `then:` is deeper than the
+    // instance child indent and belongs to that automation's tree.
+    const yaml = `api:
+  actions:
+    - action: start
+      then:
+        - logger.log: go
+binary_sensor:
+  - platform: gpio
+    id: btn
+    on_press:
+      - if:
+          then:
+            - some_action:
+                - logger.log: nested
+`;
+    const actionRows = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_action:")
+    );
+    expect(actionRows).toEqual([]);
+  });
+
+  it("emits one trigger and one action field on the same instance", () => {
+    const yaml = `cover:
+  - platform: feedback
+    id: gate
+    on_open:
+      - logger.log: opened
+    open_action:
+      - switch.turn_on: relay_open
+`;
+    const keys = parseYamlAutomations(yaml).map((s) => s.key);
+    expect(keys).toContain("automation:component_action:gate:open_action");
+    // on_open is a trigger row (component_on), kept distinct from the action field.
+    expect(keys.some((k) => k.startsWith("automation:component_on:gate:"))).toBe(true);
+  });
 });
 
 describe("instanceComponentId", () => {

@@ -114,6 +114,8 @@ export function sectionKeyFromLocation(loc: AutomationLocation): string {
       return loc.index === undefined
         ? `automation:component_on:${loc.component_id}:${loc.trigger}`
         : `automation:component_on:${loc.component_id}:${loc.trigger}:${loc.index}`;
+    case "component_action":
+      return `automation:component_action:${loc.component_id}:${loc.field}`;
     case "script":
       return `automation:script:${loc.id}`;
     case "interval":
@@ -195,6 +197,12 @@ export function locationFromSectionKey(key: string): AutomationLocation | null {
       }
       return { kind: "component_on", component_id: parts[2], trigger: parts[3] };
     }
+    case "component_action":
+      // `automation:component_action:<component_id>:<field>` — both are
+      // colon-free tokens (id is `[a-z0-9_]`, field is `*_action`).
+      return parts.length >= 4 && parts[2] && parts[3]
+        ? { kind: "component_action", component_id: parts[2], field: parts[3] }
+        : null;
     case "script":
       return parts[2] ? { kind: "script", id: parts[2] } : null;
     case "interval": {

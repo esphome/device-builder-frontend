@@ -48,6 +48,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { actionFieldLabel } from "../../../util/action-field-label.js";
 import {
   fetchComponent,
   getCachedComponent,
@@ -752,6 +753,9 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (trigger && (loc?.kind === "device_on" || loc?.kind === "component_on")) {
       return trigger.name;
     }
+    if (loc?.kind === "component_action") {
+      return actionFieldLabel(loc.field);
+    }
     return this._localize("device.automation_header_title_static");
   }
 
@@ -769,7 +773,7 @@ export class ESPHomeAutomationEditor extends LitElement {
   private _renderIdentityFields(_activeTrigger: AutomationTrigger | null) {
     const loc = this.location;
     if (!loc) return nothing;
-    if (loc.kind !== "component_on") return nothing;
+    if (loc.kind !== "component_on" && loc.kind !== "component_action") return nothing;
     const targetValue = this._targetMetadataValue(loc);
     return html`<div class="field">
       <label class="field-label"> ${this._localize("device.automation_target")} </label>
@@ -789,7 +793,8 @@ export class ESPHomeAutomationEditor extends LitElement {
     switch (loc.kind) {
       case "device_on":
         return this._localize("device.automation_target_device");
-      case "component_on": {
+      case "component_on":
+      case "component_action": {
         const device = this._available?.devices.find((d) => d.id === loc.component_id);
         if (!device) return loc.component_id;
         const label = device.name ?? device.id;

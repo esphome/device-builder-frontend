@@ -37,6 +37,10 @@ import {
  * fallback only sees what the regex catches, but it's load-bearing
  * for keystroke-time UI responsiveness.
  */
+/** A component action-list config field (``open_action:`` …) at some
+ *  indent. Group 1 is the indent, group 2 the field key. */
+const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
+
 export function parseYamlAutomations(yaml: string): YamlSection[] {
   const lines = yaml.split("\n");
   // Memoised on `yaml`, so resolving an id-less host's positional id is
@@ -125,6 +129,35 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
       fromLine,
       toLine,
       eventKey: eventName,
+    });
+  }
+
+  // Component action-list config fields (``open_action:`` …). These are
+  // ``type: trigger`` config fields whose value is a bare action list —
+  // editable as trigger-less automations, parallel to the inline ``on_*``
+  // pass above. Matched by the ``*_action`` suffix and gated to a direct
+  // child of a component instance, so an ``on_*`` key (different suffix)
+  // and a ``*_action`` nested inside another action body (deeper indent,
+  // edited within that automation's tree) are both excluded.
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(_COMPONENT_ACTION_FIELD_RE);
+    if (!match) continue;
+    const indent = match[1].length;
+    const field = match[2];
+    const fromLine = i + 1;
+    const host = smallestContainingSection(sections, fromLine);
+    if (!host || indent !== listItemChildIndent(lines[host.fromLine - 1] ?? "")) continue;
+    const componentId = instanceComponentId(sections, host);
+    if (!componentId) continue;
+    const labelHead = host.name || componentId;
+    automations.push({
+      key: `automation:component_action:${componentId}:${field}`,
+      displayLabel: `${labelHead} → ${field}`,
+      fromLine,
+      toLine: _findBlockEnd(lines, i, indent),
+      id: componentId,
+      parentKey: host.parentKey ?? host.key,
+      actionField: field,
     });
   }
 

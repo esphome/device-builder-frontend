@@ -37,6 +37,13 @@ export interface YamlSection {
    */
   eventKey?: string;
   /**
+   * Component action-list field name (``open_action``) for a
+   * ``component_action`` automation row. Kept distinct from
+   * ``eventKey`` (a trigger key) so the trigger table and
+   * ``_triggerLabel`` don't sweep these in — these have no trigger.
+   */
+  actionField?: string;
+  /**
    * Free-form metadata payload — currently used to surface the
    * ``interval: 60s`` time on an interval entry so the navigator
    * can show "Every 60s" instead of "interval #1". Optional for

@@ -43,7 +43,12 @@ import { automationEditorStyles } from "./automation-editor.styles.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 
-type TargetKind = AutomationLocation["kind"];
+// ``component_action`` is excluded: those fields (cover ``open_action`` …)
+// belong to a component's own config and are edited via the section
+// editor's action-fields surface, never created through this picker.
+// The automation editor still HANDLES a pre-existing component_action
+// location; the picker just doesn't offer it as an add target.
+type TargetKind = Exclude<AutomationLocation["kind"], "component_action">;
 
 /**
  * Kinds the user can pick when creating an automation from the
@@ -95,7 +100,12 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   protected render() {
-    const kind = this.value?.kind ?? "device_on";
+    // component_action never reaches this add-mode picker (it's edited
+    // from the section editor); fall back so the type stays a TargetKind.
+    const kind: TargetKind =
+      this.value && this.value.kind !== "component_action"
+        ? this.value.kind
+        : "device_on";
     return html`
       <div class="ae-section">
         <label class="ae-section-label" id="target-kind-label"

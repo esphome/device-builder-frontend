@@ -481,17 +481,20 @@ export class ESPHomeConfigEntryForm extends LitElement {
       case ConfigEntryType.ICON:
         return renderIconField(entry, path, ctx);
       case ConfigEntryType.TRIGGER:
-        // Schema-extraction normally strips ``then:`` from
-        // ``config_entries`` so a TRIGGER never reaches here; a
-        // surfaced one means the recursive action list is meant to
-        // be edited via the automation editor tree, not as a form
-        // field. Render a disabled placeholder so the user is told
-        // why the field is inert.
+        // A component action-list config field (cover ``open_action`` …):
+        // a bare action list edited in the automation editor, not inline.
+        // The form knows only the field key, so emit ``edit-action-field``
+        // and let the section host resolve the component instance and
+        // route to the automation editor.
         return html`<div class="field" data-field-key=${fieldKeyAttr(path)}>
           ${labelFor(entry, ctx)}
-          <p class="trigger-placeholder" role="status">
-            ${ctx.localize("device.automation_trigger_field_placeholder")}
-          </p>
+          <button
+            type="button"
+            class="edit-actions-button"
+            @click=${() => this._emitEditActionField(entry.key)}
+          >
+            ${ctx.localize("device.automation_action_field_edit")}
+          </button>
         </div>`;
       default:
         return renderStringField(entry, "text", path, ctx);
@@ -566,6 +569,19 @@ export class ESPHomeConfigEntryForm extends LitElement {
     this.dispatchEvent(
       new CustomEvent<ConfigEntryValueChange>("value-change", {
         detail: { path, value },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  /** A TRIGGER (action-list) field's "Edit actions" was clicked. The
+   *  host resolves the component instance and routes to the automation
+   *  editor — the form only knows the field key. */
+  private _emitEditActionField(field: string) {
+    this.dispatchEvent(
+      new CustomEvent<{ field: string }>("edit-action-field", {
+        detail: { field },
         bubbles: true,
         composed: true,
       })

@@ -655,16 +655,26 @@ export const configEntryFormStyles = css`
     opacity: 0.6;
   }
 
-  /* TRIGGER placeholder — appears only when an action_list field
-     leaks through the schema-extraction pass and reaches the form
-     instead of the automation editor tree. */
-  .trigger-placeholder {
-    margin: 0;
-    padding: var(--wa-space-s);
-    border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
-    border-radius: var(--wa-border-radius-s);
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-2xs);
-    font-style: italic;
+  /* TRIGGER (action-list) field — a button that opens the automation
+     editor for the field's bare action list (cover open_action, …),
+     since the actions can't be edited inline as a single value. */
+  .edit-actions-button {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    border: 1px solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-raised, transparent);
+    color: var(--wa-color-text-normal);
+    font-family: inherit;
+    font-size: var(--wa-font-size-s);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .edit-actions-button:hover {
+    background: var(--wa-color-surface-lowered);
   }
 `;

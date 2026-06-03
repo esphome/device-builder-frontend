@@ -39,6 +39,13 @@ describe("sectionKeyFromLocation", () => {
         index: 1,
       })
     ).toBe("automation:component_on:my_time:on_time:1");
+    expect(
+      sectionKeyFromLocation({
+        kind: "component_action",
+        component_id: "my_gate",
+        field: "open_action",
+      })
+    ).toBe("automation:component_action:my_gate:open_action");
     expect(sectionKeyFromLocation({ kind: "script", id: "my_alarm" })).toBe(
       "automation:script:my_alarm"
     );
@@ -75,6 +82,7 @@ describe("locationFromSectionKey", () => {
   it("rejects malformed keys", () => {
     expect(locationFromSectionKey("automation:device_on:")).toBeNull();
     expect(locationFromSectionKey("automation:component_on:my_button")).toBeNull();
+    expect(locationFromSectionKey("automation:component_action:my_gate")).toBeNull();
     expect(locationFromSectionKey("automation:interval:notanumber")).toBeNull();
     expect(locationFromSectionKey("automation:api_action:")).toBeNull();
   });
@@ -104,6 +112,10 @@ describe("locationFromSectionKey", () => {
     [
       "automation:component_on:my_time:on_time:1",
       { kind: "component_on", component_id: "my_time", trigger: "on_time", index: 1 },
+    ],
+    [
+      "automation:component_action:my_gate:open_action",
+      { kind: "component_action", component_id: "my_gate", field: "open_action" },
     ],
     ["automation:script:my_alarm", { kind: "script", id: "my_alarm" }],
     ["automation:interval:2", { kind: "interval", index: 2 }],

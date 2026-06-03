@@ -10,12 +10,12 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { AutomationLocation } from "../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { actionFieldLabel } from "../../util/action-field-label.js";
 import { withBase } from "../../util/base-path.js";
 import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
@@ -30,7 +30,11 @@ import {
   type YamlSection,
 } from "../../util/yaml-sections.js";
 import { renderAdvancedToggle } from "./advanced-toggle.js";
-import { applyYamlDiff } from "./automation-editor/serialise.js";
+import {
+  applyYamlDiff,
+  locationFromSectionKey,
+  sectionKeyFromLocation,
+} from "./automation-editor/serialise.js";
 import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
 
@@ -44,6 +48,7 @@ import "./add-automation-dialog.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
+import "./device-section-automation-list.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import {
   flushDraft,
@@ -107,21 +112,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state() _dirty = false;
   @state() _error = "";
 
-  /** Inline delete in flight against the api-actions list. Disables
-   *  the table while we wait so the user can't fire a second delete
-   *  before the first applies. */
-  @state() _deletingApiAction = "";
-
-  /** Inline delete in flight against the per-component triggers
-   *  list. Same role as ``_deletingApiAction`` (and same table-wide
-   *  lock — one delete at a time, all rows disabled while it's in
-   *  flight) but for the ``component_on`` / ``device_on`` shortcut
-   *  surface. Held as the trigger's stable section key
-   *  (``automation:component_on:<id>:on_press`` or
-   *  ``automation:device_on:on_boot``) so the value is informative
-   *  for debugging / future per-row spinner UI; the lock itself is
-   *  the empty / non-empty boolean. */
-  @state() _deletingTrigger = "";
+  /** Stable section key of the manage-list row whose inline delete is
+   *  in flight (api action, trigger, or component action field). One
+   *  delete at a time across every list — the table locks all rows
+   *  while it's non-empty so a second delete can't race the first. */
+  @state() _deletingRow = "";
 
   // Custom / external component the backend catalog doesn't describe —
   // synthetic empty-entries _config triggers the YAML-only notice; subtitle
@@ -370,7 +365,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               </div>
             </div>
             ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
-            ${this._renderActionsRow(canDelete)}`
+            ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
         : html`
             <esphome-config-entry-form
               .entries=${renderEntries}
@@ -383,6 +378,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .presentComponents=${this._presentComponents}
               ?show-advanced=${showAdvanced}
               @value-change=${this._onValueChange}
+              @edit-action-field=${this._onEditActionField}
             ></esphome-config-entry-form>
             ${hasAdvanced
               ? renderAdvancedToggle(showAdvanced, this._localize, (show) =>
@@ -421,66 +417,26 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   /**
    * Inline manage-list of api_action entries. Rendered only for the
-   * api section; surfaces existing actions as a flat table with
-   * edit (route to the inline editor) and delete (splice via the
-   * backend) per row. Hidden entirely when no actions are
-   * declared — the `+ Add API action` button next to Delete is
-   * the entry point in that case.
+   * api section, through the shared automation-list component (one
+   * surface for api actions, triggers, and component action fields).
    */
   private _renderApiActionsTable() {
     if (this.sectionKey !== "api") return nothing;
-    const items = parseYamlAutomations(this.yaml).filter((s) =>
-      s.key.startsWith("automation:api_action:")
-    );
-    // One delete is in flight at a time; lock the whole table so
-    // the user can't fire a second delete (or jump into the editor
-    // on a sibling row) before the first round-trip settles.
-    const locked = this._deletingApiAction !== "";
-    return html`<div class="api-actions-table">
-      <div class="api-actions-header">
-        <h4 class="api-actions-title">
-          ${this._localize("device.api_actions_list_title")}
-        </h4>
-        <button type="button" class="api-actions-add" @click=${this._onOpenAddApiAction}>
-          <wa-icon library="mdi" name="plus"></wa-icon>
-          ${this._localize("device.add_api_action")}
-        </button>
-      </div>
-      ${items.length === 0
-        ? html`<p class="api-actions-empty" role="status">
-            ${this._localize("device.api_actions_list_empty")}
-          </p>`
-        : html`<ul class="api-actions-rows">
-            ${items.map(
-              (item) =>
-                html`<li class="api-actions-row">
-                  <span class="api-actions-name">${item.id}</span>
-                  <div class="api-actions-row-buttons">
-                    <button
-                      type="button"
-                      class="api-actions-row-edit"
-                      aria-label=${this._localize("device.api_actions_list_edit")}
-                      title=${this._localize("device.api_actions_list_edit")}
-                      ?disabled=${locked}
-                      @click=${() => this._onEditApiAction(item.key)}
-                    >
-                      <wa-icon library="mdi" name="pencil"></wa-icon>
-                    </button>
-                    <button
-                      type="button"
-                      class="api-actions-row-delete"
-                      aria-label=${this._localize("device.api_actions_list_delete")}
-                      title=${this._localize("device.api_actions_list_delete")}
-                      ?disabled=${locked}
-                      @click=${() => this._onDeleteApiAction(item.id ?? "")}
-                    >
-                      <wa-icon library="mdi" name="delete"></wa-icon>
-                    </button>
-                  </div>
-                </li>`
-            )}
-          </ul>`}
-    </div>`;
+    const rows = parseYamlAutomations(this.yaml)
+      .filter((s) => s.key.startsWith("automation:api_action:"))
+      .map((s) => ({ key: s.key, label: s.id ?? "" }));
+    return html`<esphome-section-automation-list
+      .heading=${this._localize("device.api_actions_list_title")}
+      .rows=${rows}
+      add-label=${this._localize("device.add_api_action")}
+      empty-text=${this._localize("device.api_actions_list_empty")}
+      edit-label=${this._localize("device.api_actions_list_edit")}
+      delete-label=${this._localize("device.api_actions_list_delete")}
+      busy-key=${this._deletingRow}
+      @add=${this._onOpenAddApiAction}
+      @edit=${this._onEditRow}
+      @delete=${this._onDeleteRow}
+    ></esphome-section-automation-list>`;
   }
 
   private _renderActionsRow(canDelete: boolean) {
@@ -517,30 +473,38 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
   };
 
-  private _onEditApiAction(sectionKey: string) {
+  /** Edit any manage-list row: route the navigator to its stable
+   *  section key. Shared by api actions, triggers, and action fields —
+   *  every row carries its ``automation:…`` key. */
+  private _onEditRow = (e: CustomEvent<{ key: string }>) => {
+    e.stopPropagation();
     this.dispatchEvent(
       new CustomEvent<{ sectionKey: string }>("section-select", {
-        detail: { sectionKey },
+        detail: { sectionKey: e.detail.key },
         bubbles: true,
         composed: true,
       })
     );
-  }
+  };
 
   /**
-   * Delete an api_action inline. Uses the same backend path as the
-   * api-action-editor's delete (`deleteAutomation` → apply the
-   * returned diff → ``updateConfig``). Surfaces failures as a
-   * toast; on success the YAML rolls forward via ``yaml-updated``
-   * and the table re-renders against the new draft.
+   * Delete any manage-list row inline. The row key IS a stable
+   * ``automation:…`` section key, so ``locationFromSectionKey`` decodes
+   * the right ``AutomationLocation`` for api actions, triggers, and
+   * component action fields alike — one backend path
+   * (``deleteAutomation`` → apply diff → ``updateConfig``) for all three.
+   * One delete at a time; ``_deletingRow`` locks the lists meanwhile.
    */
-  private async _onDeleteApiAction(actionName: string) {
-    if (!this._api || !actionName || this._deletingApiAction) return;
-    this._deletingApiAction = actionName;
+  private _onDeleteRow = async (e: CustomEvent<{ key: string }>) => {
+    e.stopPropagation();
+    const key = e.detail.key;
+    const location = locationFromSectionKey(key);
+    if (!this._api || !location || this._deletingRow) return;
+    this._deletingRow = key;
     try {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
-        { kind: "api_action", action_name: actionName },
+        location,
         this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
@@ -562,9 +526,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         richColors: true,
       });
     } finally {
-      this._deletingApiAction = "";
+      this._deletingRow = "";
     }
-  }
+  };
 
   /**
    * Target for the per-section "+ Add automation" / triggers-list
@@ -579,8 +543,32 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     | { kind: "component_on"; componentId: string } {
     if (SHORTCUT_HIDE_KEYS.has(this.sectionKey)) return null;
     if (this.sectionKey === "esphome") return { kind: "device_on" };
-    // A configured component (list item or flat singleton), matched by
-    // section key and biased to the resolved fromLine for multi-instance.
+    const matched = this._resolveComponentMatch();
+    if (matched === null) return null;
+    // Only host automations where the section actually has triggers
+    // (mirrors the backend's ``_component_trigger_domains`` gate), so a
+    // trigger-less component like ``web_server:`` shows no panel. Check the
+    // bare domain and the qualified ``<domain>.<platform>``, since a
+    // trigger may be scoped to either (``switch`` vs ``output.slow_pwm``).
+    const scopes = [matched.match.parentKey ?? matched.match.key, this.sectionKey];
+    if (!this._triggerCatalog.hasTriggersFor(scopes)) return null;
+    return {
+      kind: "component_on",
+      componentId: instanceComponentId(matched.sections, matched.match),
+    };
+  }
+
+  /**
+   * The configured component instance this section edits, matched by
+   * section key and biased to the resolved fromLine for multi-instance
+   * domains. ``null`` for non-component sections. Shared by the
+   * triggers shortcut, the action-fields list, and the in-form
+   * "Edit actions" routing so all three attribute the same id.
+   */
+  private _resolveComponentMatch(): {
+    sections: YamlSection[];
+    match: YamlSection;
+  } | null {
     const sections = parseYamlTopLevelSections(this.yaml);
     const candidates = sections.filter((s) => sectionKeyOf(s) === this.sectionKey);
     if (candidates.length === 0) return null;
@@ -588,80 +576,70 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       this._resolvedFromLine !== undefined
         ? (candidates.find((s) => s.fromLine === this._resolvedFromLine) ?? candidates[0])
         : candidates[0];
-    // Only host automations where the section actually has triggers
-    // (mirrors the backend's ``_component_trigger_domains`` gate), so a
-    // trigger-less component like ``web_server:`` shows no panel. Check the
-    // bare domain and the qualified ``<domain>.<platform>``, since a
-    // trigger may be scoped to either (``switch`` vs ``output.slow_pwm``).
-    const scopes = [match.parentKey ?? match.key, this.sectionKey];
-    if (!this._triggerCatalog.hasTriggersFor(scopes)) return null;
-    return { kind: "component_on", componentId: instanceComponentId(sections, match) };
+    return { sections, match };
+  }
+
+  /** Addressable id of the component instance this section edits, or null. */
+  private _resolveComponentId(): string | null {
+    const matched = this._resolveComponentMatch();
+    return matched === null ? null : instanceComponentId(matched.sections, matched.match);
   }
 
   /**
    * Inline manage-list of inline trigger automations for the current
-   * section. Parallels ``_renderApiActionsTable`` — same row UI,
-   * same edit/delete affordances — but scoped to ``component_on``
-   * triggers on a component instance (filtered by ``id``) or
-   * ``device_on`` triggers under the ``esphome:`` block.
+   * section — ``component_on`` triggers on a component instance
+   * (filtered by ``id``) or ``device_on`` triggers under ``esphome:``.
+   * Rendered through the shared automation-list component.
    */
   private _renderTriggersTable() {
     const target = this._shortcutTarget();
     if (target === null) return nothing;
-    const items = parseYamlAutomations(this.yaml).filter((s) => {
-      if (!s.eventKey) return false;
-      if (target.kind === "device_on") return s.parentKey === "esphome";
-      return s.id === target.componentId;
-    });
-    const locked = this._deletingTrigger !== "";
-    const title =
+    const rows = parseYamlAutomations(this.yaml)
+      .filter((s) => {
+        if (!s.eventKey) return false;
+        if (target.kind === "device_on") return s.parentKey === "esphome";
+        return s.id === target.componentId;
+      })
+      .map((s) => ({ key: s.key, label: this._triggerLabel(s) }));
+    const heading =
       target.kind === "device_on"
         ? this._localize("device.automations_list_title_device")
         : this._localize("device.automations_list_title");
-    return html`<div class="api-actions-table">
-      <div class="api-actions-header">
-        <h4 class="api-actions-title">${title}</h4>
-        <button type="button" class="api-actions-add" @click=${this._onOpenAddAutomation}>
-          <wa-icon library="mdi" name="plus"></wa-icon>
-          ${this._localize("device.add_automation")}
-        </button>
-      </div>
-      ${items.length === 0
-        ? html`<p class="api-actions-empty" role="status">
-            ${this._localize("device.automations_list_empty")}
-          </p>`
-        : html`<ul class="api-actions-rows">
-            ${items.map(
-              (item) =>
-                html`<li class="api-actions-row">
-                  <span class="api-actions-name">${this._triggerLabel(item)}</span>
-                  <div class="api-actions-row-buttons">
-                    <button
-                      type="button"
-                      class="api-actions-row-edit"
-                      aria-label=${this._localize("device.automations_list_edit")}
-                      title=${this._localize("device.automations_list_edit")}
-                      ?disabled=${locked}
-                      @click=${() => this._onEditTrigger(item.key)}
-                    >
-                      <wa-icon library="mdi" name="pencil"></wa-icon>
-                    </button>
-                    <button
-                      type="button"
-                      class="api-actions-row-delete"
-                      aria-label=${this._localize("device.automations_list_delete")}
-                      title=${this._localize("device.automations_list_delete")}
-                      ?disabled=${locked}
-                      @click=${() =>
-                        this._onDeleteTrigger(target, item.eventKey ?? "", item.key)}
-                    >
-                      <wa-icon library="mdi" name="delete"></wa-icon>
-                    </button>
-                  </div>
-                </li>`
-            )}
-          </ul>`}
-    </div>`;
+    return html`<esphome-section-automation-list
+      .heading=${heading}
+      .rows=${rows}
+      add-label=${this._localize("device.add_automation")}
+      empty-text=${this._localize("device.automations_list_empty")}
+      edit-label=${this._localize("device.automations_list_edit")}
+      delete-label=${this._localize("device.automations_list_delete")}
+      busy-key=${this._deletingRow}
+      @add=${this._onOpenAddAutomation}
+      @edit=${this._onEditRow}
+      @delete=${this._onDeleteRow}
+    ></esphome-section-automation-list>`;
+  }
+
+  /**
+   * Inline manage-list of component action-list config fields (cover
+   * ``open_action`` / ``close_action`` / …) for the current instance.
+   * No add affordance — the fields are fixed by the platform — so the
+   * shared list renders nothing when the instance declares none.
+   */
+  private _renderActionFieldsTable() {
+    const componentId = this._resolveComponentId();
+    if (componentId === null) return nothing;
+    const rows = parseYamlAutomations(this.yaml)
+      .filter((s) => s.actionField !== undefined && s.id === componentId)
+      .map((s) => ({ key: s.key, label: actionFieldLabel(s.actionField ?? "") }));
+    return html`<esphome-section-automation-list
+      .heading=${this._localize("device.action_fields_list_title")}
+      .rows=${rows}
+      edit-label=${this._localize("device.action_fields_list_edit")}
+      delete-label=${this._localize("device.action_fields_list_delete")}
+      busy-key=${this._deletingRow}
+      @edit=${this._onEditRow}
+      @delete=${this._onDeleteRow}
+    ></esphome-section-automation-list>`;
   }
 
   /** Pretty trigger label for an automations-list row, resolved from
@@ -714,7 +692,21 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
   };
 
-  private _onEditTrigger(sectionKey: string) {
+  /**
+   * Route an in-form "Edit actions" click (from a ``TRIGGER`` config
+   * field like cover ``open_action``) to the automation editor. The
+   * form knows only the field key; resolve this instance's component id
+   * and build the ``component_action`` section key here.
+   */
+  private _onEditActionField = (e: CustomEvent<{ field: string }>) => {
+    e.stopPropagation();
+    const componentId = this._resolveComponentId();
+    if (componentId === null) return;
+    const sectionKey = sectionKeyFromLocation({
+      kind: "component_action",
+      component_id: componentId,
+      field: e.detail.field,
+    });
     this.dispatchEvent(
       new CustomEvent<{ sectionKey: string }>("section-select", {
         detail: { sectionKey },
@@ -722,58 +714,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         composed: true,
       })
     );
-  }
-
-  /**
-   * Delete a ``component_on`` / ``device_on`` trigger inline. Same
-   * backend path as the automation editor's delete: ``deleteAutomation``
-   * → apply the returned diff → ``updateConfig``. Toasts on failure;
-   * on success the YAML rolls forward via ``yaml-updated`` and the
-   * table re-renders against the new draft.
-   */
-  private async _onDeleteTrigger(
-    target: { kind: "device_on" } | { kind: "component_on"; componentId: string },
-    trigger: string,
-    rowKey: string
-  ) {
-    if (!this._api || !trigger || this._deletingTrigger) return;
-    this._deletingTrigger = rowKey;
-    try {
-      const location: AutomationLocation =
-        target.kind === "device_on"
-          ? { kind: "device_on", trigger }
-          : {
-              kind: "component_on",
-              component_id: target.componentId,
-              trigger,
-            };
-      const { yaml_diff } = await this._api.deleteAutomation(
-        this.configuration,
-        location,
-        this.yaml
-      );
-      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
-      await this._api.updateConfig(this.configuration, newYaml);
-      this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-updated", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_save_error");
-      toast.error(this._localize("device.automation_save_error"), {
-        description: msg,
-        richColors: true,
-      });
-    } finally {
-      this._deletingTrigger = "";
-    }
-  }
+  };
 }
 
 /**
