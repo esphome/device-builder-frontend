@@ -1,6 +1,7 @@
 import { parseYamlAutomations } from "./yaml-automations.js";
 import {
   _clearYamlSectionsMemo,
+  findFieldLine,
   instanceComponentId,
   parseYamlTopLevelSections,
   smallestContainingSection,
@@ -14,6 +15,7 @@ import {
 // unaffected.
 export {
   _clearYamlSectionsMemo,
+  findFieldLine,
   instanceComponentId,
   parseYamlAutomations,
   parseYamlTopLevelSections,

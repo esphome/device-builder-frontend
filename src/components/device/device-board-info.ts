@@ -87,6 +87,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   @property({ type: Number })
   selectedFromLine?: number;
 
+  /** Instance-relative field path to scroll into view, from the YAML cursor. */
+  @property({ attribute: false })
+  focusFieldPath?: string[];
+
   @query("esphome-device-section-config")
   private _sectionConfig!: ESPHomeDeviceSectionConfig;
 
@@ -331,6 +335,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
       .configuration=${this.configuration}
       .sectionKey=${key}
       .fromLine=${this.selectedFromLine}
+      .focusFieldPath=${this.focusFieldPath}
       .yaml=${this.yaml}
       .board=${this.board}
       .boardName=${this.board?.name ?? ""}

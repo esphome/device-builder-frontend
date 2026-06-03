@@ -8,10 +8,22 @@ import { basicSetup, EditorView } from "codemirror";
 import { css, html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import { apiContext, darkModeContext } from "../context/index.js";
+import type { LocalizeFunc } from "../common/localize.js";
+import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { getKeyPath } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
-import { vscodeDark, vscodeLight } from "../util/yaml-editor-theme.js";
+import {
+  darkHighlight,
+  EDITOR_BG_DARK,
+  EDITOR_BG_LIGHT,
+  EDITOR_FONT_FAMILY,
+  EDITOR_FONT_SIZE,
+  lightHighlight,
+  vscodeDark,
+  vscodeLight,
+} from "../util/yaml-editor-theme.js";
+import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
@@ -21,6 +33,7 @@ import {
   sensitiveValueMaskExtension,
   setRevealSensitiveEffect,
 } from "../util/yaml-sensitive-mask.js";
+import { yamlStickyScroll } from "../util/yaml-sticky-scroll.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 
@@ -40,8 +53,19 @@ const highlightField = StateField.define<DecorationSet>({
         if (!effect.value) return Decoration.none;
         const { fromLine, toLine } = effect.value;
         const doc = tr.state.doc;
-        const from = doc.line(Math.max(1, fromLine)).from;
-        const to = doc.line(Math.min(doc.lines, toLine)).to;
+        const lo = Math.max(1, fromLine);
+        const hi = Math.min(doc.lines, toLine);
+        // Single-line field highlight: a line decoration covers the whole line
+        // regardless of content, so it doesn't lag behind text typed into the
+        // line from the form. Multi-line section highlight: one mark spanning
+        // the block, instead of a decoration per line for a large section.
+        if (lo === hi) {
+          return Decoration.set([
+            Decoration.line({ class: "cm-esphome-highlight" }).range(doc.line(lo).from),
+          ]);
+        }
+        const from = doc.line(lo).from;
+        const to = doc.line(hi).to;
         return Decoration.set([
           Decoration.mark({ class: "cm-esphome-highlight" }).range(from, to),
         ]);
@@ -61,6 +85,10 @@ export class ESPHomeYamlEditor extends LitElement {
   @consume({ context: apiContext })
   @state()
   private _api?: ESPHomeAPI;
+
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
 
   @property() value = "";
 
@@ -129,13 +157,19 @@ export class ESPHomeYamlEditor extends LitElement {
       keymap.of([indentWithTab]),
       highlightField,
       sensitiveValueMaskExtension(this.revealSensitive, this.maskAllValues),
+      yamlStickyScroll({
+        highlightStyle: this._darkMode ? darkHighlight : lightHighlight,
+        background: this._darkMode ? EDITOR_BG_DARK : EDITOR_BG_LIGHT,
+        jumpToLineLabel: (line) =>
+          this._localize("yaml_editor.sticky_jump_to_line", { line: String(line) }),
+      }),
       EditorView.theme({
         "&": { height: "100%" },
         ".cm-scroller": {
           overflow: "auto",
-          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontFamily: EDITOR_FONT_FAMILY,
           fontVariantLigatures: "none",
-          fontSize: "13px",
+          fontSize: EDITOR_FONT_SIZE,
         },
         ".cm-esphome-highlight": {
           background: this._darkMode
@@ -288,6 +322,39 @@ export class ESPHomeYamlEditor extends LitElement {
           color: this._darkMode ? "#9aa0a6" : "#5e6772",
           marginTop: "4px",
         },
+        // ─── Hover docs tooltip ─────────────────────────────────────
+        ".cm-tooltip.cm-tooltip-hover": {
+          background: this._darkMode ? "#1f1f23" : "#ffffff",
+          border: this._darkMode ? "1px solid #3a3a44" : "1px solid #e1e4e8",
+          borderRadius: "8px",
+          boxShadow: this._darkMode
+            ? "0 8px 24px rgba(0,0,0,0.5)"
+            : "0 8px 24px rgba(0,0,0,0.12)",
+          maxWidth: "460px",
+        },
+        ".cm-esphome-hover": {
+          padding: "10px 14px",
+          fontSize: "12.5px",
+          lineHeight: "1.5",
+          color: this._darkMode ? "#f0f0f5" : "#1a1a1a",
+        },
+        ".cm-esphome-hover p:last-child": {
+          marginBottom: "0",
+        },
+        ".cm-esphome-hover .cm-esphome-info-meta": {
+          fontStyle: "italic",
+        },
+        ".cm-esphome-info .md-code, .cm-esphome-hover .md-code": {
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontSize: "0.92em",
+          padding: "1px 4px",
+          borderRadius: "4px",
+          background: this._darkMode ? "#2a2a32" : "#f0f1f3",
+        },
+        ".cm-esphome-info .md-link, .cm-esphome-hover .md-link": {
+          color: this._darkMode ? "#7fc4ff" : "#0b5cad",
+          textDecoration: "underline",
+        },
       }),
       EditorView.updateListener.of((update) => {
         // LOAD-BEARING ORDER: `yaml-change` MUST be dispatched
@@ -323,9 +390,12 @@ export class ESPHomeYamlEditor extends LitElement {
           const line = update.state.doc.lineAt(head).number;
           if (line !== this._lastReportedCursorLine) {
             this._lastReportedCursorLine = line;
+            // Full key path; the page derives the form-relative path
+            // (it knows whether the section keys fields under its key).
+            const path = getKeyPath(update.state, head);
             this.dispatchEvent(
               new CustomEvent("yaml-cursor-line", {
-                detail: { line },
+                detail: { line, path },
                 bubbles: true,
                 composed: true,
               })
@@ -364,6 +434,10 @@ export class ESPHomeYamlEditor extends LitElement {
           maxRenderedOptions: 60,
         })
       );
+      // Catalog-backed hover docs (description + "See also" link).
+      extensions.push(
+        createYamlHoverTooltip(this._api, () => this._localize("device.see_also"))
+      );
     }
 
     return extensions;
@@ -392,8 +466,11 @@ export class ESPHomeYamlEditor extends LitElement {
     const pos = this._view.state.doc.line(
       Math.min(line, this._view.state.doc.lines)
     ).from;
+    // ``nearest`` scrolls only when the line is outside the viewport, so a
+    // structured-editor field highlight doesn't jolt the YAML pane when the
+    // line is already visible.
     this._view.dispatch({
-      effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
+      effects: EditorView.scrollIntoView(pos, { y: "nearest", yMargin: 50 }),
     });
   }
 

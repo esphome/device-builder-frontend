@@ -34,10 +34,17 @@ import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { LIST_SECTIONS } from "../util/section-entry-overrides.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
 import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
-import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
+import {
+  findFieldLine,
+  parseYamlTopLevelSections,
+  sectionAtLine,
+  sectionKeyOf,
+  type YamlSection,
+} from "../util/yaml-sections.js";
 import { summarizeValidation } from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
 
@@ -132,6 +139,20 @@ export class ESPHomePageDevice extends LitElement {
 
   @state()
   private _selectedFromLine?: number = this._readUrlLine();
+
+  /** Instance-relative field path the YAML cursor is on, for the form to
+   *  scroll into view; empty on a section header / non-field line. */
+  @state()
+  private _focusFieldPath?: string[];
+
+  /** Form-relative path of the last focused field, and whether its YAML
+   *  line wasn't found yet (a just-added value whose debounced write is
+   *  pending) — drives a one-shot re-resolve on the next YAML update.
+   *  ``_pendingFieldSection`` pins the section it was queued for so a
+   *  navigation away cancels the retry instead of resolving in the wrong one. */
+  private _focusedFieldPath?: string[];
+  private _pendingFieldLine = false;
+  private _pendingFieldSection?: { section: string | null; fromLine?: number };
 
   /** Per-page navigation stack — each entry is a section the user
    *  visited *before* the current one, ordered oldest-first. The
@@ -843,6 +864,7 @@ export class ESPHomePageDevice extends LitElement {
           @section-select=${this._onSectionSelect}
           @section-mount=${this._onSectionMount}
           @section-unmount=${this._onSectionUnmount}
+          @field-focus=${this._onFieldFocus}
           @dirty-change=${this._onSectionDirtyChange}
           @nav-section-show=${this._onNavSectionShow}
           @nav-collapse=${this._onNavCollapse}
@@ -864,6 +886,7 @@ export class ESPHomePageDevice extends LitElement {
             .configuration=${this.id}
             .selectedSection=${this._selectedSection}
             .selectedFromLine=${this._selectedFromLine}
+            .focusFieldPath=${this._focusFieldPath}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
             ?hasUnsavedEdits=${this._isDirty}
@@ -1049,6 +1072,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onYamlChange(e: CustomEvent<{ value: string }>) {
     this._yaml = e.detail.value;
+    this._retryPendingFieldLine();
   }
 
   /**
@@ -1081,21 +1105,111 @@ export class ESPHomePageDevice extends LitElement {
    * `if` blocks in `yaml-editor.ts:_buildExtensions`'s
    * `updateListener`.
    */
-  private _onYamlCursorLine(e: CustomEvent<{ line: number }>) {
+  private _onYamlCursorLine(e: CustomEvent<{ line: number; path?: string[] }>) {
+    // The user is driving from the YAML pane now — drop any pending
+    // form-field retry so it can't re-highlight after they've moved on.
+    this._clearPendingFieldLine();
     const match = sectionAtLine(this._yaml, e.detail.line);
     if (!match) return;
+    // Drop the top-level key to get the form-relative path. LIST_SECTIONS
+    // (globals) are the exception: their form keys fields under the
+    // section key, so keep it. (MAP sections like substitutions render at
+    // an empty path, so their fields are section-relative — slice as usual.)
+    const full = e.detail.path ?? [];
+    // LIST_SECTIONS (globals) key fields under the section key, so keep it —
+    // but only with a child segment; a bare ``["globals"]`` header reduces
+    // to [] (a non-field line), not a whole-section field highlight.
+    const rel = full.length > 1 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
     const sectionKey = sectionKeyOf(match);
     if (
       sectionKey === this._selectedSection &&
       match.fromLine === this._selectedFromLine
     ) {
+      // Same section: update the field target directly for intra-section
+      // moves (the switch below would early-return and freeze it).
+      this._focusFieldPath = rel;
       return;
     }
+    // Cross-section: set the field path only when the switch actually
+    // applies, so a guard veto (unsaved edits) can't point the old
+    // section's form at a path meant for the new one.
     this._guardSectionSwitch(() => {
       this._selectedSection = sectionKey;
       this._selectedFromLine = match.fromLine;
+      this._focusFieldPath = rel;
       this._updateUrl();
     });
+  }
+
+  /** The YamlSection backing the current selection, resolved by line
+   *  (exact instance) then by key (single-instance / unset line). */
+  private _focusedSection(): YamlSection | undefined {
+    if (!this._selectedSection) return undefined;
+    const sections = parseYamlTopLevelSections(this._yaml);
+    return (
+      (this._selectedFromLine !== undefined
+        ? sections.find((s) => s.fromLine === this._selectedFromLine)
+        : undefined) ?? sections.find((s) => sectionKeyOf(s) === this._selectedSection)
+    );
+  }
+
+  /** Resolve *path* in the current section and highlight just its YAML line.
+   *  Returns the section used (so callers can fall back to its range) and
+   *  whether the exact line was found and highlighted. */
+  private _highlightFieldLine(path: string[]): {
+    section?: YamlSection;
+    found: boolean;
+  } {
+    const section = this._focusedSection();
+    const line = section ? findFieldLine(this._yaml, section, path) : null;
+    if (line !== null) {
+      this._highlightRange = { fromLine: line, toLine: line };
+      this._scrollToHighlight = true;
+    }
+    return { section, found: line !== null };
+  }
+
+  /** Form field focused → highlight just that field's YAML line. */
+  private _onFieldFocus(e: CustomEvent<{ path: string[] }>) {
+    const path = (this._focusedFieldPath = e.detail.path);
+    if (!path.length) return;
+    const { section, found } = this._highlightFieldLine(path);
+    if (found) {
+      this._clearPendingFieldLine();
+      return;
+    }
+    // Line not written yet (just-set icon / new id, debounced): highlight the
+    // whole section meanwhile and queue a retry scoped to this section.
+    this._pendingFieldLine = true;
+    this._pendingFieldSection = {
+      section: this._selectedSection,
+      fromLine: this._selectedFromLine,
+    };
+    this._highlightRange = section
+      ? { fromLine: section.fromLine, toLine: section.toLine }
+      : null;
+    this._scrollToHighlight = section !== undefined;
+  }
+
+  /** Once the pending field's YAML line exists (debounced write landed),
+   *  upgrade the highlight to that line — unless the user navigated away. */
+  private _retryPendingFieldLine() {
+    if (!this._pendingFieldLine || !this._focusedFieldPath?.length) return;
+    if (
+      this._pendingFieldSection?.section !== this._selectedSection ||
+      this._pendingFieldSection?.fromLine !== this._selectedFromLine
+    ) {
+      this._clearPendingFieldLine();
+      return;
+    }
+    if (this._highlightFieldLine(this._focusedFieldPath).found) {
+      this._clearPendingFieldLine();
+    }
+  }
+
+  private _clearPendingFieldLine() {
+    this._pendingFieldLine = false;
+    this._pendingFieldSection = undefined;
   }
 
   private _onYamlHighlight(
@@ -1127,6 +1241,7 @@ export class ESPHomePageDevice extends LitElement {
      * stays put so the right-pane Save button activates and the
      * user sees the buffer is dirty. */
     this._yaml = e.detail.yaml;
+    this._retryPendingFieldLine();
   }
 
   private _onSectionSelect(

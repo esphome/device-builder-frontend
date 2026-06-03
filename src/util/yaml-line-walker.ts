@@ -3,15 +3,16 @@
  * ``yaml-ast.ts`` when partial / unparseable input means the
  * Lezer parse tree can't answer a structural question.
  *
- * These look only at the raw text of individual lines, so they're
- * insulated from the editor state and can be exercised in unit
- * tests without an ``EditorState`` mock. The completion source's
- * ``resolveCompletionContext`` prefers the AST answer and falls
- * back to these for the corner cases where the AST is silent.
+ * The multi-line walkers read lines off CodeMirror's ``Text``
+ * (``doc.line(n)``), scanning only the bounded range around the cursor —
+ * never the whole document. The completion source prefers the AST answer
+ * and falls back to these where the parse tree is silent.
  *
  * Anything structural that needs to span multiple lines belongs
  * in ``yaml-ast.ts``; anything single-line-text-shape stays here.
  */
+
+import type { Text } from "@codemirror/state";
 
 // ─── Shared regex constants ─────────────────────────────────────────
 
@@ -77,12 +78,12 @@ export interface ParentKey {
  * the cursor.
  */
 export function findParentKey(
-  lines: string[],
+  doc: Text,
   lineIdx: number,
   belowIndent: number
 ): ParentKey | null {
   for (let i = lineIdx - 1; i >= 0; i--) {
-    const stripped = stripComment(lines[i]);
+    const stripped = stripComment(doc.line(i + 1).text);
     if (!stripped.trim()) continue;
     const ind = indentOf(stripped);
     if (ind >= belowIndent) continue;
@@ -93,9 +94,9 @@ export function findParentKey(
 }
 
 /** Walk back from *lineIdx* to the first column-0 ``key:`` line. */
-export function findTopLevelBlock(lines: string[], lineIdx: number): string | null {
+export function findTopLevelBlock(doc: Text, lineIdx: number): string | null {
   for (let i = lineIdx - 1; i >= 0; i--) {
-    const stripped = stripComment(lines[i]);
+    const stripped = stripComment(doc.line(i + 1).text);
     if (!stripped.trim()) continue;
     if (indentOf(stripped) !== 0) continue;
     const m = stripped.match(RE_TOP_LEVEL_KEY);
@@ -118,7 +119,7 @@ export function findTopLevelBlock(lines: string[], lineIdx: number): string | nu
  * the parse tree doesn't yet have the structure.
  */
 export function readPlatformSibling(
-  lines: string[],
+  doc: Text,
   lineIdx: number,
   indent: number
 ): string | null {
@@ -130,7 +131,7 @@ export function readPlatformSibling(
   // the walker stops at the immediate enclosing block and misses
   // the outer platform declaration entirely.
   for (let i = lineIdx - 1; i >= 0; i--) {
-    const raw = lines[i];
+    const raw = doc.line(i + 1).text;
     const stripped = stripComment(raw);
     if (!stripped.trim()) continue;
     const ind = indentOf(stripped);
@@ -144,7 +145,7 @@ export function readPlatformSibling(
   // top-of-block, then forward-scan for the ``platform:`` sibling.
   let topOfBlock = lineIdx;
   for (let i = lineIdx - 1; i >= 0; i--) {
-    const raw = lines[i];
+    const raw = doc.line(i + 1).text;
     const stripped = stripComment(raw);
     if (!stripped.trim()) continue;
     const ind = indentOf(stripped);
@@ -154,8 +155,8 @@ export function readPlatformSibling(
       if (/^\s*-\s/.test(raw)) break;
     }
   }
-  for (let i = topOfBlock; i < lines.length; i++) {
-    const stripped = stripComment(lines[i]);
+  for (let i = topOfBlock; i < doc.lines; i++) {
+    const stripped = stripComment(doc.line(i + 1).text);
     if (!stripped.trim()) continue;
     const ind = indentOf(stripped);
     if (i !== topOfBlock && ind < indent) break;

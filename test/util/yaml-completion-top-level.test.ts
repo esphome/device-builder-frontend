@@ -278,8 +278,9 @@ describe("createYamlCompletionSource (auto-fire at value position)", () => {
     _resetSchemaCacheForTests();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string, init?: RequestInit) => {
-        if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      vi.fn(async (url: string) => {
+        // Version probe (GET ``<version>/esphome.json``) — any 200 resolves it.
+        if (url.endsWith("/esphome.json")) return new Response("{}", { status: 200 });
         if (url.includes("uptime.json")) {
           return new Response(
             JSON.stringify({

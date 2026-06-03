@@ -650,6 +650,7 @@
     "field_locked_by_board": "Set by the board",
     "bundle_step_progress": "Step {current} of {total} — Adding {name}",
     "docs": "Docs",
+    "see_also": "See also:",
     "advanced_options": "Advanced options",
     "show_advanced": "Show advanced settings",
     "enable_entity": "Enable {name}",
@@ -932,6 +933,9 @@
     "placeholder": "Search YAML content…",
     "no_match_yaml_preview": "Try YAML search — found {count} match across your configs",
     "no_match_yaml_preview_plural": "Try YAML search — found {count} matches across your configs"
+  },
+  "yaml_editor": {
+    "sticky_jump_to_line": "Jump to line {line}"
   },
   "settings": {
     "title": "Settings",

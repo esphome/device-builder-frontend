@@ -11,6 +11,7 @@ export const configEntryFormStyles = css`
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-2xs);
+    border-radius: var(--wa-border-radius-m);
   }
 
   .field-label {

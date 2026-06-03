@@ -15,7 +15,20 @@ import { tags as t } from "@lezer/highlight";
  * them red, which reads as an error to anyone used to VSCode).
  */
 
-const DARK_BG = "#1e1e1e";
+/** Editor typography — shared so the sticky-scroll overlay
+ *  (``yaml-sticky-theme.ts``) renders with identical metrics to the
+ *  editor content. The overlay's slide math is driven by the editor's
+ *  measured ``defaultLineHeight``, so a font mismatch would misalign
+ *  the pinned rows; keeping one source of truth prevents that drift. */
+export const EDITOR_FONT_FAMILY = '"JetBrains Mono", "Fira Code", monospace';
+export const EDITOR_FONT_SIZE = "13px";
+
+/** Editor background per mode — shared so the sticky-scroll overlay
+ *  paints the same colour as the editor it floats over. */
+export const EDITOR_BG_DARK = "#1e1e1e";
+export const EDITOR_BG_LIGHT = "#ffffff";
+
+const DARK_BG = EDITOR_BG_DARK;
 const DARK_FG = "#d4d4d4";
 const DARK_GUTTER_FG = "#858585";
 const DARK_SELECTION = "#264f78";
@@ -25,7 +38,7 @@ const DARK_ACTIVE_LINE = "#2a2d2e";
 const DARK_ACTIVE_LINE_TINT = "#ffffff0a";
 const DARK_CURSOR = "#aeafad";
 
-const LIGHT_BG = "#ffffff";
+const LIGHT_BG = EDITOR_BG_LIGHT;
 const LIGHT_FG = "#1f2328";
 const LIGHT_GUTTER_FG = "#6e7781";
 const LIGHT_SELECTION = "#add6ff";
@@ -35,7 +48,7 @@ const LIGHT_ACTIVE_LINE = "#f6f8fa";
 const LIGHT_ACTIVE_LINE_TINT = "#0000000a";
 const LIGHT_CURSOR = "#1f2328";
 
-const darkHighlight = HighlightStyle.define([
+export const darkHighlight = HighlightStyle.define([
   { tag: t.keyword, color: "#569cd6" },
   { tag: t.string, color: "#98c379" },
   { tag: t.special(t.string), color: "#98c379" },
@@ -61,7 +74,7 @@ const darkHighlight = HighlightStyle.define([
   { tag: t.content, color: DARK_FG },
 ]);
 
-const lightHighlight = HighlightStyle.define([
+export const lightHighlight = HighlightStyle.define([
   { tag: t.keyword, color: "#a626a4" },
   { tag: t.string, color: "#50a14f" },
   { tag: t.special(t.string), color: "#50a14f" },
