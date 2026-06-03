@@ -43,6 +43,7 @@ import {
   parseYamlTopLevelSections,
   sectionAtLine,
   sectionKeyOf,
+  type YamlSection,
 } from "../util/yaml-sections.js";
 import { summarizeValidation } from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
@@ -143,6 +144,12 @@ export class ESPHomePageDevice extends LitElement {
    *  scroll into view; empty on a section header / non-field line. */
   @state()
   private _focusFieldPath?: string[];
+
+  /** Form-relative path of the last focused field, and whether its YAML
+   *  line wasn't found yet (a just-added value whose debounced write is
+   *  pending) — drives a one-shot re-resolve on the next YAML update. */
+  private _focusedFieldPath?: string[];
+  private _pendingFieldLine = false;
 
   /** Per-page navigation stack — each entry is a section the user
    *  visited *before* the current one, ordered oldest-first. The
@@ -1062,6 +1069,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onYamlChange(e: CustomEvent<{ value: string }>) {
     this._yaml = e.detail.value;
+    this._retryPendingFieldLine();
   }
 
   /**
@@ -1095,6 +1103,9 @@ export class ESPHomePageDevice extends LitElement {
    * `updateListener`.
    */
   private _onYamlCursorLine(e: CustomEvent<{ line: number; path?: string[] }>) {
+    // The user is driving from the YAML pane now — drop any pending
+    // form-field retry so it can't re-highlight after they've moved on.
+    this._pendingFieldLine = false;
     const match = sectionAtLine(this._yaml, e.detail.line);
     if (!match) return;
     // Drop the top-level key to get the form-relative path — except for
@@ -1125,26 +1136,47 @@ export class ESPHomePageDevice extends LitElement {
     });
   }
 
-  /** Form field focused → highlight just that field's YAML line, falling
-   *  back to the whole section when the field has no YAML line yet (an
-   *  optional/empty field) so a stale single-line highlight can't linger. */
-  private _onFieldFocus(e: CustomEvent<{ path: string[] }>) {
-    const path = e.detail.path;
-    if (!path?.length || !this._selectedSection) return;
-    // Prefer the exact instance via fromLine; fall back to the section
-    // key (``_selectedFromLine`` is unset for sections reached through a
-    // section-select that carried no line, e.g. single-instance blocks).
+  /** The YamlSection backing the current selection, resolved by line
+   *  (exact instance) then by key (single-instance / unset line). */
+  private _focusedSection(): YamlSection | undefined {
+    if (!this._selectedSection) return undefined;
     const sections = parseYamlTopLevelSections(this._yaml);
-    const section =
+    return (
       (this._selectedFromLine !== undefined
         ? sections.find((s) => s.fromLine === this._selectedFromLine)
-        : undefined) ?? sections.find((s) => sectionKeyOf(s) === this._selectedSection);
-    if (!section) return;
+        : undefined) ?? sections.find((s) => sectionKeyOf(s) === this._selectedSection)
+    );
+  }
+
+  /** Form field focused → highlight just that field's YAML line. */
+  private _onFieldFocus(e: CustomEvent<{ path: string[] }>) {
+    this._focusedFieldPath = e.detail.path;
+    const path = this._focusedFieldPath;
+    const section = path?.length ? this._focusedSection() : undefined;
+    if (!section || !path) return;
     const line = findFieldLine(this._yaml, section, path);
+    // No line yet → highlight the section and flag a retry: a value the
+    // user just set (icon, a new id) writes to YAML on a debounce, so the
+    // line appears on a later update — _retryPendingFieldLine upgrades to
+    // the exact line then.
+    this._pendingFieldLine = line === null;
     this._highlightRange =
       line !== null
         ? { fromLine: line, toLine: line }
         : { fromLine: section.fromLine, toLine: section.toLine };
+    this._scrollToHighlight = true;
+  }
+
+  /** Once the pending field's YAML line exists (debounced write landed),
+   *  upgrade the highlight from the whole section to that line. */
+  private _retryPendingFieldLine() {
+    const path = this._focusedFieldPath;
+    if (!this._pendingFieldLine || !path?.length) return;
+    const section = this._focusedSection();
+    const line = section ? findFieldLine(this._yaml, section, path) : null;
+    if (line === null) return; // still not written; wait for the next update
+    this._pendingFieldLine = false;
+    this._highlightRange = { fromLine: line, toLine: line };
     this._scrollToHighlight = true;
   }
 
@@ -1177,6 +1209,7 @@ export class ESPHomePageDevice extends LitElement {
      * stays put so the right-pane Save button activates and the
      * user sees the buffer is dirty. */
     this._yaml = e.detail.yaml;
+    this._retryPendingFieldLine();
   }
 
   private _onSectionSelect(
