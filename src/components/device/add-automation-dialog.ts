@@ -18,9 +18,8 @@
  * new section.
  */
 import { consume } from "@lit/context";
-import { mdiClose } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../api/index.js";
@@ -37,7 +36,6 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { renderMarkdown } from "../../util/markdown.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
@@ -49,13 +47,11 @@ import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/seria
  *  to?" framing doesn't apply to them. */
 export type AddAutomationKind = "device_on" | "component_on" | "interval";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-
-registerMdiIcons({ close: mdiClose });
+import "../base-dialog.js";
 
 type TargetKind = AddAutomationKind;
 
@@ -77,8 +73,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state() private _open = false;
 
   @state() private _kind: TargetKind = "device_on";
   @state() private _componentId = "";
@@ -129,9 +124,16 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     this._intervalValue = "";
     this._intervalUnit = "s";
     this._error = "";
-    this._dialog.open = true;
+    this._open = true;
     void this._loadAvailable();
   }
+
+  // esphome-base-dialog never flips its own open on a user-driven close
+  // (Escape / X / outside-click); the host owns _open here. The busy gate
+  // (?busy=_saving) blocks dismissal while an upsert is in flight.
+  private _onRequestClose = () => {
+    this._open = false;
+  };
 
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
@@ -151,13 +153,18 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           name: this.boardName,
         })
       : this._localize("device.add_automation");
-    return html`<wa-dialog light-dismiss label=${title}>
+    return html`<esphome-base-dialog
+      ?open=${this._open}
+      ?busy=${this._saving}
+      .label=${title}
+      @request-close=${this._onRequestClose}
+    >
       ${this._loading && !this._available
         ? html`<div style="text-align: center; padding: 32px;">
             <wa-spinner></wa-spinner>
           </div>`
         : this._renderForm()}
-    </wa-dialog>`;
+    </esphome-base-dialog>`;
   }
 
   private _renderForm() {
@@ -431,7 +438,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         this.yaml
       );
       this._dispatchAdded(location, yaml_diff);
-      this._dialog.open = false;
+      this._open = false;
     } catch (err) {
       const msg =
         err instanceof Error
