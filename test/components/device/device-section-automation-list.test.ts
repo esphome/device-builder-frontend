@@ -41,6 +41,18 @@ describe("esphome-section-automation-list", () => {
     expect(el.shadowRoot?.querySelector(".empty")?.textContent).toContain("Nothing yet");
   });
 
+  it("omits the empty placeholder when addable but emptyText is absent", async () => {
+    const el = await mount({
+      rows: [],
+      addLabel: "Add",
+      editLabel: "Edit",
+      deleteLabel: "Delete",
+    });
+    // Header + Add still render, but no blank dashed box / ARIA status.
+    expect(el.shadowRoot?.querySelector(".add")).not.toBeNull();
+    expect(el.shadowRoot?.querySelector(".empty")).toBeNull();
+  });
+
   it("emits edit / delete with the row key", async () => {
     const el = await mount({ rows: ROWS, editLabel: "Edit", deleteLabel: "Delete" });
     const events: Array<[string, string]> = [];

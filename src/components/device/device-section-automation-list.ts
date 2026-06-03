@@ -30,7 +30,9 @@ export interface AutomationListRow {
  * Rendering rules:
  * - No rows and no ``addLabel`` → renders nothing (an empty, add-less
  *   table is noise; component action fields use this).
- * - No rows but an ``addLabel`` → shows ``emptyText`` under the header.
+ * - No rows but an ``addLabel`` → header + Add button; the empty-state
+ *   placeholder shows only when ``emptyText`` is provided (otherwise the
+ *   empty region renders nothing — no blank box / ARIA status).
  * - ``busyKey`` non-empty locks every row (one delete in flight at a
  *   time) so a second delete or a mid-flight edit can't race it.
  */
@@ -76,7 +78,11 @@ export class ESPHomeSectionAutomationList extends LitElement {
           : nothing}
       </div>
       ${this.rows.length === 0
-        ? html`<p class="empty" role="status">${this.emptyText ?? ""}</p>`
+        ? // Only paint the placeholder when there's copy for it — a blank
+          // dashed box + empty ARIA status would just be noise otherwise.
+          this.emptyText !== undefined
+          ? html`<p class="empty" role="status">${this.emptyText}</p>`
+          : nothing
         : html`<ul class="rows">
             ${this.rows.map(
               (row) =>
