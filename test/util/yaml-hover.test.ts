@@ -3,7 +3,7 @@ import { EditorState } from "@codemirror/state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../../src/api/types/components.js";
-import type { ConfigEntry } from "../../src/api/types/config-entries.js";
+import { ConfigEntryType, type ConfigEntry } from "../../src/api/types/config-entries.js";
 import * as schema from "../../src/util/esphome-schema.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import type { CatalogIndex } from "../../src/util/yaml-completion.js";
@@ -13,6 +13,7 @@ import { resolveHoverTarget } from "../../src/util/yaml-hover.js";
 // (bundleFor consumers, parse helpers) real.
 vi.mock("../../src/util/esphome-schema.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/util/esphome-schema.js")>()),
+  getComponentDocs: vi.fn(),
   getConfigVarValueOptions: vi.fn(),
   getActions: vi.fn(),
   getTriggerKeys: vi.fn(),
@@ -44,6 +45,7 @@ const CATALOG: CatalogIndex = {
         config_entries: [
           field({
             key: "name",
+            type: ConfigEntryType.STRING,
             description: "The node name.",
             help_link: "https://esphome.io/components/esphome#name",
           }),
@@ -64,7 +66,11 @@ const CATALOG: CatalogIndex = {
             key: "pin",
             description: "The pin to monitor.",
             config_entries: [
-              field({ key: "inverted", description: "Invert the level." }),
+              field({
+                key: "inverted",
+                type: ConfigEntryType.BOOLEAN,
+                description: "Invert the level.",
+              }),
             ],
           }),
         ],
@@ -91,6 +97,7 @@ function hover(doc: string, token: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(schema.getComponentDocs).mockResolvedValue(null);
   vi.mocked(schema.getConfigVarValueOptions).mockResolvedValue([]);
   vi.mocked(schema.getActions).mockResolvedValue([]);
   vi.mocked(schema.getTriggerKeys).mockResolvedValue([]);
@@ -147,10 +154,10 @@ describe("resolveHoverTarget", () => {
     expect(target?.description).toBe("Schema name docs.");
   });
 
-  it("falls back to the catalog field description when the schema has none", async () => {
+  it("falls back to the catalog field description (with type prefix) when the schema has none", async () => {
     // getConfigVarDocsAtPath defaults to null in beforeEach.
     const target = await hover('esphome:\n  name: "x"\n', "name");
-    expect(target?.description).toBe("The node name.");
+    expect(target?.description).toBe("**string**: The node name.");
     expect(target?.docsUrl).toBe("https://esphome.io/components/esphome#name");
   });
 
@@ -172,7 +179,17 @@ describe("resolveHoverTarget", () => {
     // must key the platform as binary_sensor.gpio, not gpio.binary_sensor.
     const doc = "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: false\n";
     const target = await hover(doc, "inverted");
-    expect(target?.description).toBe("Invert the level.");
+    expect(target?.description).toBe("**boolean**: Invert the level.");
+  });
+
+  it("shows a bare-domain description from the schema core docs", async () => {
+    vi.mocked(schema.getComponentDocs).mockResolvedValue(
+      "With ESPHome you can use different types of binary sensors."
+    );
+    const target = await hover("binary_sensor:\n  - platform: gpio\n", "binary_sensor");
+    expect(target?.description).toBe(
+      "With ESPHome you can use different types of binary sensors."
+    );
   });
 
   it("returns null on a comment line", async () => {

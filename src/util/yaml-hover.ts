@@ -21,6 +21,7 @@ import type { ComponentCatalogEntry } from "../api/types/components.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import {
   getActions,
+  getComponentDocs,
   getConfigVarDocsAtPath,
   getConfigVarValueOptions,
   getRegistryEntries,
@@ -105,7 +106,9 @@ function findConfigEntry(entries: ConfigEntry[], key: string): ConfigEntry | und
 }
 
 /** Catalog field description + docs link — the fallback for keys the
- *  schema walk doesn't carry docs for. */
+ *  schema walk doesn't carry docs for. Prefixes the field type in bold
+ *  (``**string**: …``) to match the legacy editor, whose schema-sourced
+ *  docs carry that prefix verbatim. */
 function fieldTarget(
   entry: ConfigEntry,
   owner: ComponentCatalogEntry | undefined
@@ -113,7 +116,7 @@ function fieldTarget(
   const docsUrl = entry.help_link || owner?.docs_url || null;
   if (!entry.description && !docsUrl) return null;
   return {
-    description: entry.description || null,
+    description: entry.description ? `**${entry.type}**: ${entry.description}` : null,
     docsUrl,
     docsTitle: owner?.name || null,
   };
@@ -140,10 +143,12 @@ export async function resolveHoverTarget(
   const lineIdx = line.number - 1;
   const allLines = state.doc.toString().split("\n");
 
-  // Top-level component key → its catalog description. Always shown
-  // (even though the structured editor documents it) so a hover
-  // confirms what a block is at a glance.
+  // Top-level component / domain key → its docs. Prefer the schema's
+  // core component/platform docs (covers bare domains like
+  // ``binary_sensor:`` the catalog lacks), falling back to the catalog.
   if (indent === 0) {
+    const schemaDocs = await getComponentDocs(api, key);
+    if (schemaDocs) return docsTarget(schemaDocs);
     const c = catalog.byId.get(key);
     return c ? componentTarget(c) : null;
   }

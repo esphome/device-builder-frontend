@@ -270,6 +270,23 @@ export function fetchBundle(api: ESPHomeAPI, name: string): Promise<SchemaBundle
 }
 
 /**
+ * Component/domain docs for a top-level key, read from
+ * ``esphome.json``'s ``core.components`` / ``core.platforms`` maps —
+ * the same source the legacy dashboard hovered. Covers single-instance
+ * components (``esphome``, ``wifi``) *and* bare platform-group domains
+ * (``binary_sensor``, ``button``) the flattened catalog doesn't carry.
+ * Returns ``null`` when the bundle fails to load or the key is absent.
+ */
+export async function getComponentDocs(
+  api: ESPHomeAPI,
+  name: string
+): Promise<string | null> {
+  const core = (await fetchBundle(api, "esphome"))?.core;
+  if (!core) return null;
+  return core.components?.[name]?.docs ?? core.platforms?.[name]?.docs ?? null;
+}
+
+/**
  * Read the trigger keys (``on_boot``, ``on_press``, …) for a
  * component. Walks the schema's ``extends`` chain so triggers
  * inherited from a shared parent schema (e.g.

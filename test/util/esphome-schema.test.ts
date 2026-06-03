@@ -3,6 +3,7 @@ import {
   _resetSchemaCacheForTests,
   fetchBundle,
   getActions,
+  getComponentDocs,
   getConfigVarDocsAtPath,
   getConfigVarKeys,
   getConfigVarValueOptions,
@@ -990,6 +991,27 @@ describe("getRegistryEntryKeys", () => {
       "delay"
     );
     expect(keys.map((k) => k.key)).toEqual(["time"]);
+  });
+});
+
+describe("getComponentDocs", () => {
+  it("reads docs from core.components and core.platforms", async () => {
+    const BUNDLE = {
+      core: {
+        components: { wifi: { docs: "Wi-Fi docs." } },
+        platforms: { binary_sensor: { docs: "Binary sensor docs." } },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(BUNDLE), { status: 200 });
+      throw new Error(`unexpected ${url}`);
+    });
+    expect(await getComponentDocs(makeApi() as never, "wifi")).toBe("Wi-Fi docs.");
+    expect(await getComponentDocs(makeApi() as never, "binary_sensor")).toBe(
+      "Binary sensor docs."
+    );
+    expect(await getComponentDocs(makeApi() as never, "nope")).toBeNull();
   });
 });
 
