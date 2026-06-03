@@ -145,6 +145,23 @@ describe("resolveHoverTarget — gated to YAML-only components", () => {
     expect(target?.docsUrl).toBe("https://esphome.io/components/ethernet");
   });
 
+  it("does not throw when the component body omits config_entries", async () => {
+    // ethernet's real body has no `config_entries` key at all (not [] —
+    // absent). The gate must optional-chain it, not crash the hover.
+    vi.mocked(fetchComponent).mockResolvedValue({
+      id: "ethernet",
+      name: "Ethernet",
+    } as unknown as ComponentCatalogEntry);
+    const target = await hover("ethernet:\n  type: W5500\n", "ethernet");
+    expect(target?.description).toBe("Wired networking for the node.");
+  });
+
+  it("fails open (shows the hover) when the component fetch rejects", async () => {
+    vi.mocked(fetchComponent).mockRejectedValue(new Error("offline"));
+    const target = await hover("ethernet:\n  type: W5500\n", "ethernet");
+    expect(target?.description).toBe("Wired networking for the node.");
+  });
+
   it("walks the schema for a nested key in a YAML-only component", async () => {
     vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue("The Ethernet chip type.");
     const target = await hover("ethernet:\n  type: W5500\n", "type");

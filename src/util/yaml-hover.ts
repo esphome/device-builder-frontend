@@ -136,8 +136,15 @@ async function isYamlOnlyComponent(
   platformValue: string | null
 ): Promise<boolean> {
   const componentId = platformValue ? `${topLevelKey}.${platformValue}` : topLevelKey;
-  const comp = await fetchComponent(api, componentId);
-  return isYamlOnlySection(topLevelKey, comp?.config_entries.length ?? 0);
+  let comp: ComponentCatalogEntry | null;
+  try {
+    comp = await fetchComponent(api, componentId);
+  } catch {
+    return true; // can't tell → leave the hover on rather than break it
+  }
+  // `config_entries` is absent (not just empty) on form-less components
+  // like ethernet — optional-chain both so the gate can't throw.
+  return isYamlOnlySection(topLevelKey, comp?.config_entries?.length ?? 0);
 }
 
 /**
