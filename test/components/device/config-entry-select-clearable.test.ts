@@ -14,12 +14,12 @@ const OPTIONAL: ConfigValueOption[] = [
   { value: "energy", label: "energy" },
   { value: "", label: "(none)" },
   { value: "power", label: "power" },
-] as never;
+];
 
 const REQUIRED: ConfigValueOption[] = [
   { value: "a", label: "a" },
   { value: "b", label: "b" },
-] as never;
+];
 
 function selectFor(options: ConfigValueOption[], value: string) {
   const entry = makeEntry(ConfigEntryType.SELECT, { options });

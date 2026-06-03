@@ -415,7 +415,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
           ?disabled=${disabled}
           placeholder=${String(entry.default_value ?? "")}
           @change=${(e: Event) =>
-            ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
+            ctx.emitChange(path, (e.target as unknown as { value: string }).value)}
         >
           ${entry.suggestions.map((s) => {
             const v = String(s);
@@ -471,7 +471,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         .withClear=${clearable}
         placeholder=${placeholder}
         @change=${(e: Event) =>
-          ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
+          ctx.emitChange(path, (e.target as unknown as { value: string }).value)}
       >
         ${clearable
           ? html`<wa-icon slot="clear-icon" library="mdi" name="close"></wa-icon>`
