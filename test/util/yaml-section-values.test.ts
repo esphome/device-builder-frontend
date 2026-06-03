@@ -431,6 +431,26 @@ describe("updateSectionInYaml — trailing comments / blank lines", () => {
     expect(twice).toBe(once);
     expect(once).toContain("# note");
   });
+
+  it("does not treat a block-scalar `#` body line as a trailing comment", () => {
+    // A `#`-prefixed line inside a `|` block scalar is literal text,
+    // not a comment. It's indented deeper than the section's children,
+    // so the trim must break there (not preserve it outside the
+    // splice) — otherwise the serializer re-emits it AND the kept tail
+    // retains it, duplicating the line.
+    const before = [
+      "mqtt:",
+      "  topic: foo",
+      "  log_format: |",
+      "    # not a comment, literal text in the block",
+      "sensor:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "mqtt", 1);
+    const after = updateSectionInYaml(before, "mqtt", values, 1);
+    expect(after).toBe(before);
+    expect(after.match(/# not a comment/g)).toHaveLength(1);
+  });
 });
 
 describe("removeSectionFromYaml — multi-item list", () => {
