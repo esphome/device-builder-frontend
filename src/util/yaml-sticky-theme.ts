@@ -26,11 +26,16 @@ export function buildStickyTheme(background: string): Extension {
       },
     },
     ".cm-esphome-sticky-line": {
+      // Absolutely positioned: the plugin sets each row's ``top`` (the
+      // bottom row slides via Monaco's lastLineRelativePosition), and the
+      // overlay's ``overflow: hidden`` clips a sliding row cleanly.
       display: "flex",
       flexDirection: "row",
       cursor: "pointer",
       whiteSpace: "pre",
-      position: "relative",
+      position: "absolute",
+      left: "0",
+      right: "0",
       background: "inherit",
       height: "var(--esphome-sticky-row-h)",
       lineHeight: "var(--esphome-sticky-row-h)",

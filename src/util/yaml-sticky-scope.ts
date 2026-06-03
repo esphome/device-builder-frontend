@@ -56,39 +56,6 @@ export function findScopeExitLine(
 }
 
 /**
- * True when ``lineNumber`` (1-indexed) is a "scope opener" — the
- * next non-blank, non-banner-comment line below it is at a
- * strictly deeper indent, meaning the line below lives INSIDE
- * the line's block.
- *
- * Used by the sticky-scroll overlay to drive the slide-in
- * animation for the topmost rendered line: when that line is a
- * scope opener, the overlay appends it as the deepest row and
- * runs a one-row-height slide-in window as ``scrollTop`` traverses
- * the opener's own line height. Without this, a brand-new scope
- * row would pop in abruptly the instant ``lineBlockAtHeight``
- * advances past the opener — the body content visibly jumping
- * by one row to make room for the freshly-added pin.
- *
- * Mirrors the blank-line / banner-comment skip policy used
- * everywhere else in this file, so the "scope opener" reading
- * agrees with what ``computeStickyScope`` and
- * ``findScopeExitLine`` would walk.
- */
-export function isScopeOpener(lines: string[], lineNumber: number): boolean {
-  if (lineNumber < 1 || lineNumber > lines.length) return false;
-  const stripped = structuralStripped(lines[lineNumber - 1]);
-  if (!stripped) return false;
-  const myIndent = indentOf(stripped);
-  for (let i = lineNumber; i < lines.length; i++) {
-    const nextStripped = structuralStripped(lines[i]);
-    if (!nextStripped) continue;
-    return indentOf(nextStripped) > myIndent;
-  }
-  return false;
-}
-
-/**
  * Returns the ordered chain of enclosing-scope ANCESTORS for
  * ``topVisibleLine`` (1-indexed). The result is outermost-first:
  * the column-0 top-level key at index 0, then progressively
@@ -143,18 +110,16 @@ export function computeStickyScope(
     targetIndent = indentOf(topStripped);
     walkFrom = topVisibleLine - 2;
   } else {
-    // Blank / banner — anchor to the NEXT meaningful line below (the
-    // content being scrolled into), excluding it, so the chain reflects
-    // the upcoming scope rather than the one being left. Anchoring
-    // backward instead kept a deeper scope pinned one line too long
-    // across a boundary — e.g. a column-0 ``#`` comment between a
-    // nested block and a shallower sibling left the nested key pinned
-    // when the sibling was already on screen.
-    let next = topVisibleLine + 1;
-    while (next <= lines.length && !structuralStripped(lines[next - 1])) next++;
-    if (next > lines.length) return [];
-    targetIndent = indentOf(stripComment(lines[next - 1]));
-    walkFrom = next - 2;
+    // Blank / banner — adopt the indent of the most recent meaningful
+    // line above. The sticky overlay's scope walk probes this function
+    // at the bottom of its growing row stack, so a blank probe should
+    // resolve to the scope it sits inside (the line above it), letting
+    // the walk descend correctly into nested blocks.
+    let prev = topVisibleLine - 1;
+    while (prev > 0 && !structuralStripped(lines[prev - 1])) prev--;
+    if (prev === 0) return [];
+    targetIndent = indentOf(stripComment(lines[prev - 1]));
+    walkFrom = prev - 2;
   }
 
   const scope: StickyScopeLine[] = [];

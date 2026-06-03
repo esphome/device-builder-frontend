@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   computeStickyScope,
   findScopeExitLine,
-  isScopeOpener,
 } from "../../src/util/yaml-sticky-scope.js";
 
 /**
@@ -195,11 +194,12 @@ describe("computeStickyScope", () => {
     expect(scope.map((s) => s.lineNumber)).toEqual([5]);
   });
 
-  it("anchors a blank top-visible line to the next meaningful line below", () => {
-    // When the topmost visible line is blank, the walker adopts the
-    // indent of the NEXT meaningful line (the content being scrolled
-    // into), not the previous one — so a deeper scope is dropped as
-    // soon as the boundary blank reaches the top, rather than lingering.
+  it("starts the walk from indent of a blank top-visible line", () => {
+    // A blank top-visible line adopts the indent of the most recent
+    // meaningful line above it, so the chain stays stable as scrollTop
+    // crosses a blank inside a scope. (Boundary handling — dropping a
+    // finished scope as the next sibling arrives — is the overlay's job
+    // in ``measure()`` via the Monaco slide, not this text walker.)
     const lines = fromYaml(
       [
         "sensor:", //                  1
@@ -210,32 +210,9 @@ describe("computeStickyScope", () => {
       ].join("\n")
     );
     const scope = computeStickyScope(lines, 4);
-    // Next meaningful line is 5 (``- platform: bme280``, indent 2) — a
-    // sibling of the dht item. Its only ancestor is ``sensor:`` (1);
-    // the dht ``- platform`` (2) is a sibling, not an ancestor, so it
-    // is NOT pinned across the gap between the two list items.
-    expect(scope.map((s) => s.lineNumber)).toEqual([1]);
-  });
-
-  it("drops a nested scope at a column-0 comment before a shallower sibling", () => {
-    // Regression: a ``#``-at-column-0 comment (read as a banner) sitting
-    // between a nested block and a shallower sibling must not keep the
-    // nested key pinned once the sibling is what's on screen.
-    const lines = fromYaml(
-      [
-        "switch:", //                  1   indent 0
-        "  - platform: gpio", //       2   indent 2  (list item)
-        "    pin:", //                 3   indent 4  (nested key)
-        "      number: 0", //          4   indent 6
-        "#      inverted: true", //    5   column-0 comment
-        "    name: Open", //           6   indent 4  (sibling of pin:)
-      ].join("\n")
-    );
-    // On the comment line, anchor forward to ``name:`` (6, indent 4):
-    // its ancestors are switch (1) and the list item (2) — not pin (3).
-    expect(computeStickyScope(lines, 5).map((s) => s.lineNumber)).toEqual([1, 2]);
-    // And on ``name:`` itself, same result (pin already dropped).
-    expect(computeStickyScope(lines, 6).map((s) => s.lineNumber)).toEqual([1, 2]);
+    // Previous meaningful line is 3 (indent 4); its strictly-less-indented
+    // ancestors are the dht ``- platform`` (2) and ``sensor:`` (1).
+    expect(scope.map((s) => s.lineNumber)).toEqual([1, 2]);
   });
 
   it("returns empty for out-of-range top visible lines", () => {
@@ -424,119 +401,5 @@ describe("findScopeExitLine", () => {
       ].join("\n")
     );
     expect(findScopeExitLine(lines, 1, 0, 3, lines.length)).toBe(4);
-  });
-});
-
-/**
- * Slide-in companion to ``computeStickyScope`` — drives the
- * pixel-tracked appearance of a fresh sticky row as the topmost
- * rendered line crosses its own line height. Without the
- * predicate, a sibling-to-sibling transition would smoothly
- * slide-out the old row but then POP in the new one — the
- * visible asymmetry that reads as "imperfect timing" to the
- * user.
- */
-describe("isScopeOpener", () => {
-  it("returns true when the next line is at a deeper indent", () => {
-    // ``sensor:`` (indent 0) is a scope opener — its body line
-    // ``- platform: dht`` is at indent 2, strictly deeper.
-    const lines = fromYaml(
-      [
-        "sensor:", //                  1   indent 0
-        "  - platform: dht", //        2   indent 2
-      ].join("\n")
-    );
-    expect(isScopeOpener(lines, 1)).toBe(true);
-  });
-
-  it("returns false for a leaf line at the same indent as its next", () => {
-    // ``name: x`` (indent 2) is a leaf — the next line is the
-    // next sibling at the SAME indent, not a deeper child.
-    const lines = fromYaml(
-      [
-        "esphome:", //                 1
-        "  name: x", //                2   indent 2  ← leaf
-        "  build_path: ./build", //    3   indent 2 (sibling, same indent)
-      ].join("\n")
-    );
-    expect(isScopeOpener(lines, 2)).toBe(false);
-  });
-
-  it("returns false for a top-level leaf", () => {
-    // ``wifi:`` here has no children — next non-blank is the
-    // next top-level key at the same indent. Not an opener.
-    const lines = fromYaml(
-      [
-        "esphome:", //                 1
-        "  name: x", //                2
-        "wifi:", //                    3   indent 0  ← leaf
-        "logger:", //                  4   indent 0
-      ].join("\n")
-    );
-    expect(isScopeOpener(lines, 3)).toBe(false);
-  });
-
-  it("skips blank lines when looking for the next meaningful line", () => {
-    // A stray blank between the opener and its body shouldn't
-    // change the answer — ``sensor:`` is still an opener even
-    // with a blank between it and its first body line.
-    const lines = fromYaml(
-      [
-        "sensor:", //                  1   indent 0
-        "", //                         2   blank
-        "  - platform: dht", //        3   indent 2
-      ].join("\n")
-    );
-    expect(isScopeOpener(lines, 1)).toBe(true);
-  });
-
-  it("skips column-0 banner comments when looking for the next line", () => {
-    // ``## --- ##`` banners between sections shouldn't be
-    // treated as the "next line" for opener detection — they
-    // decorate the next section, not the surrounding scope.
-    const lines = fromYaml(
-      [
-        "esphome:", //                 1   indent 0
-        "## ----------- ##", //        2   column-0 banner
-        "  name: x", //                3   indent 2  ← real next
-      ].join("\n")
-    );
-    expect(isScopeOpener(lines, 1)).toBe(true);
-  });
-
-  it("returns false at EOF when there's no next line", () => {
-    // No subsequent line exists, so we can't claim the line
-    // "opens" anything. Defensive — guards the slide-in append
-    // from running for the last line of a doc.
-    const lines = fromYaml(
-      [
-        "esphome:", //                 1
-        "  name: x", //                2   ← last meaningful line
-      ].join("\n")
-    );
-    expect(isScopeOpener(lines, 2)).toBe(false);
-  });
-
-  it("returns false for blank and banner lines themselves", () => {
-    // A blank or banner-comment ``lineNumber`` isn't itself a
-    // meaningful line — it can't be a "scope opener" because
-    // it doesn't open anything (it's not part of any scope).
-    const lines = fromYaml(
-      [
-        "esphome:", //                 1
-        "", //                         2   blank
-        "## comment ##", //            3   banner
-        "  name: x", //                4
-      ].join("\n")
-    );
-    expect(isScopeOpener(lines, 2)).toBe(false);
-    expect(isScopeOpener(lines, 3)).toBe(false);
-  });
-
-  it("returns false for out-of-range line numbers", () => {
-    const lines = fromYaml("esphome:\n  name: x\n");
-    expect(isScopeOpener(lines, 0)).toBe(false);
-    expect(isScopeOpener(lines, -1)).toBe(false);
-    expect(isScopeOpener(lines, 9999)).toBe(false);
   });
 });

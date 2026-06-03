@@ -43,12 +43,10 @@ import {
   type PluginValue,
   type ViewUpdate,
 } from "@codemirror/view";
-import { indentOf, stripComment } from "./yaml-line-walker.js";
 import { createStickyRow, patchStickyRow } from "./yaml-sticky-render.js";
 import {
   computeStickyScope,
   findScopeExitLine,
-  isScopeOpener,
   type StickyScopeLine,
 } from "./yaml-sticky-scope.js";
 import { buildStickyTheme } from "./yaml-sticky-theme.js";
@@ -68,10 +66,10 @@ interface StickyScrollState extends PluginValue {
 
 interface MeasureResult {
   scope: StickyScopeLine[];
+  /** Offset (<= 0) applied to the bottom row so it slides out as its
+   *  scope ends — Monaco's ``lastLineRelativePosition``. */
+  lastLineRelativePosition: number;
   gutterWidth: number;
-  exitYs: number[];
-  slideInYs: number[];
-  scrollTop: number;
   rowHeight: number;
 }
 
@@ -182,89 +180,76 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         if (view.contentHeight <= 0) return null;
         const scrollTop = view.scrollDOM.scrollTop;
         const rowHeight = view.defaultLineHeight;
-        const block = view.lineBlockAtHeight(scrollTop);
-        const topLine = view.state.doc.lineAt(block.from);
-        const gutterWidth = this._gutterWidth;
+        const doc = view.state.doc;
         const lines = this.lines(view);
-        const scope = computeStickyScope(lines, topLine.number);
-        if (isScopeOpener(lines, topLine.number)) {
-          const stripped = stripComment(lines[topLine.number - 1]);
-          scope.push({
-            lineNumber: topLine.number,
-            indent: indentOf(stripped),
-            text: lines[topLine.number - 1],
-          });
-        }
-        // Bound the exit scan to the rendered viewport: an exit can only
-        // fall at/after ``topLine`` (every scope here encloses it) and only
-        // drives a slide-out while within the viewport, so an exit below
-        // the last rendered line is "off-screen" → no slide. Caps the
-        // per-row scan at O(viewport) instead of O(doc).
-        const bottomLine = view.state.doc.lineAt(view.viewport.to).number;
-        const exitYs: number[] = scope.map((s) => {
-          const exitLine = findScopeExitLine(
+        const topLine = doc.lineAt(view.lineBlockAtHeight(scrollTop).from);
+        const bottomLine = doc.lineAt(view.viewport.to).number;
+
+        // Faithful port of VS Code / Monaco ``findScrollWidgetState`` — the
+        // battle-tested algorithm the legacy (Monaco-based) dashboard used.
+        // Candidate scopes are the chain enclosing the line at ``scrollTop``
+        // (outermost first). A scope at nesting ``depth`` occupies stack
+        // slot ``[(depth-1)*H, depth*H]`` from the overlay top. Relative to
+        // ``scrollTop``: a scope is fully pinned while its slot bottom sits
+        // between its header line's bottom and its end line's bottom; the
+        // deepest scope whose slot top has entered its end line is sliding
+        // out and drives ``lastLineRelativePosition`` (<= 0 — it pulls the
+        // bottom row up as the scope ends, so a finished scope slides away
+        // instead of lingering behind the overlay).
+        const candidates = computeStickyScope(lines, topLine.number);
+        const topOf = (n: number) => view.lineBlockAt(doc.line(n).from).top - scrollTop;
+        const bottomOf = (n: number) =>
+          view.lineBlockAt(doc.line(n).from).bottom - scrollTop;
+        const scope: StickyScopeLine[] = [];
+        let lastLineRelativePosition = 0;
+        for (let i = 0; i < candidates.length; i++) {
+          const cand = candidates[i];
+          const start = cand.lineNumber;
+          // Last line of the scope (1-indexed). Bounded to the rendered
+          // viewport: a scope ending off-screen never slides, so clamping
+          // its end to the last rendered line keeps the conditions correct
+          // while capping the scan at O(viewport).
+          const endExclusive = findScopeExitLine(
             lines,
-            s.lineNumber,
-            s.indent,
-            topLine.number,
+            start,
+            cand.indent,
+            start + 1,
             bottomLine
           );
-          if (exitLine > lines.length) return Number.POSITIVE_INFINITY;
-          const cm6Line = view.state.doc.line(exitLine);
-          return view.lineBlockAt(cm6Line.from).top;
-        });
-        // The line at ``scrollTop`` sits behind the overlay, so its scope
-        // can include levels that have actually ended within the rows
-        // stacked above the first *visible* line. Drop any ancestor whose
-        // exit is at/above the bottom of its own row (``scrollTop +
-        // (i+1)*rowHeight``): deeper scopes end first, so this trims the
-        // pinned chain down to what encloses the visible content (e.g. a
-        // sibling ``pin:`` is dropped once ``name:`` is on screen). The
-        // threshold is fixed per row, so there's no count↔height feedback
-        // loop — the trim is stable.
-        let keep = scope.length;
-        for (let i = 0; i < scope.length; i++) {
-          if (exitYs[i] <= scrollTop + (i + 1) * rowHeight) {
-            keep = i;
+          const end = Math.min(endExclusive - 1, doc.lines);
+          if (end - start <= 0) continue;
+          const depth = i + 1;
+          const topOfSlot = (depth - 1) * rowHeight;
+          const bottomOfSlot = depth * rowHeight;
+          const bottomOfHeaderLine = bottomOf(start);
+          const topOfEndLine = topOf(end);
+          const bottomOfEndLine = bottomOf(end);
+          if (topOfSlot > topOfEndLine && topOfSlot <= bottomOfEndLine) {
+            scope.push(cand);
+            lastLineRelativePosition = bottomOfEndLine - bottomOfSlot;
             break;
+          } else if (
+            bottomOfSlot > bottomOfHeaderLine &&
+            bottomOfSlot <= bottomOfEndLine
+          ) {
+            scope.push(cand);
           }
         }
-        if (keep < scope.length) {
-          scope.length = keep;
-          exitYs.length = keep;
-        }
 
-        const slideInYs: number[] = scope.map(() => Number.NEGATIVE_INFINITY);
-        const lastIdx = scope.length - 1;
-        if (
-          lastIdx >= 0 &&
-          scope[lastIdx].lineNumber === topLine.number &&
-          topLine.number < view.state.doc.lines
-        ) {
-          const bodyLine = view.state.doc.line(topLine.number + 1);
-          slideInYs[lastIdx] = view.lineBlockAt(bodyLine.from).top;
-        }
         return {
           scope,
-          gutterWidth,
-          exitYs,
-          slideInYs,
-          scrollTop,
+          lastLineRelativePosition,
+          gutterWidth: this._gutterWidth,
           rowHeight,
         };
       }
 
       private applyMeasured(measured: MeasureResult | null, view: EditorView): void {
-        if (!measured) {
+        if (!measured || measured.scope.length === 0) {
           this.setEmpty();
           return;
         }
-        const { scope, gutterWidth, exitYs, slideInYs, scrollTop, rowHeight } = measured;
-
-        if (scope.length === 0) {
-          this.setEmpty();
-          return;
-        }
+        const { scope, lastLineRelativePosition, gutterWidth, rowHeight } = measured;
 
         const scopeKey = `${gutterWidth}|${scope
           .map((l) => `${l.lineNumber}:${l.text}`)
@@ -273,50 +258,28 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
           this._renderedKey = scopeKey;
           this.render(scope, gutterWidth, view);
         }
-        this.applyShifts(scope, exitYs, slideInYs, scrollTop, rowHeight);
-      }
 
-      private applyShifts(
-        scope: StickyScopeLine[],
-        exitYs: number[],
-        slideInYs: number[],
-        scrollTop: number,
-        rowHeight: number
-      ): void {
-        // Pin each overlay row to the editor's measured line height so
-        // the rendered rows are exactly as tall as the math assumes (#4).
+        // Each row is absolutely positioned at ``i*rowHeight``; the last
+        // (deepest) row is offset by ``lastLineRelativePosition`` so it
+        // slides up as its scope ends, tucking behind the row above it
+        // (outer rows keep a higher z-index). The overlay clips to match,
+        // so the sliding row is never left partially readable at rest.
         this.overlay.style.setProperty("--esphome-sticky-row-h", `${rowHeight}px`);
-        let cumulativeShift = 0;
-        let totalShift = 0;
+        const lastIdx = scope.length - 1;
         for (let i = 0; i < scope.length; i++) {
           const row = this.overlay.children[i] as HTMLDivElement | undefined;
-
           if (!row) continue;
-          const exitY = exitYs[i];
-          const slideInY = slideInYs[i];
-          const slideOutShift = Math.round(
-            Math.max(0, Math.min(rowHeight, rowHeight - (exitY - scrollTop)))
-          );
-          const slideInShift = Math.round(
-            Math.max(0, Math.min(rowHeight, slideInY - scrollTop))
-          );
-          const ownTopShift = slideInShift > 0 && slideOutShift === 0 ? 0 : slideOutShift;
-          const translateAmount = cumulativeShift + ownTopShift;
-          const transform =
-            translateAmount > 0 ? `translateY(-${translateAmount}px)` : "";
-          if (row.style.transform !== transform) {
-            row.style.transform = transform;
-          }
-          cumulativeShift += ownTopShift;
-          totalShift += ownTopShift + slideInShift;
-
+          const offset = i === lastIdx ? lastLineRelativePosition : 0;
+          const topStr = `${i * rowHeight + offset}px`;
+          if (row.style.top !== topStr) row.style.top = topStr;
           const z = String(scope.length - i);
-          if (row.style.zIndex !== z) {
-            row.style.zIndex = z;
-          }
+          if (row.style.zIndex !== z) row.style.zIndex = z;
         }
 
-        const targetHeight = Math.max(0, scope.length * rowHeight - totalShift);
+        const targetHeight = Math.max(
+          0,
+          scope.length * rowHeight + lastLineRelativePosition
+        );
         const heightStr = `${targetHeight}px`;
         if (this.overlay.style.height !== heightStr) {
           this.overlay.style.height = heightStr;
@@ -391,18 +354,11 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         if (lineNum > state.doc.lines) return;
         const line = state.doc.line(lineNum);
 
-        const linesText = this.lines(this.view);
-        const predictedScope = computeStickyScope(linesText, lineNum);
-        // ``measure()`` also pins the clicked line itself when it's a
-        // scope opener, so count that extra row or the target lands
-        // partly behind the overlay (#7).
-        const predictedCount =
-          predictedScope.length + (isScopeOpener(linesText, lineNum) ? 1 : 0);
-        // Use the editor's stable measured line height. Dividing the
-        // post-shift overlay height by the row count underestimates it
-        // mid-transition and skews the margin (#3).
-        const rowHeight = this.view.defaultLineHeight;
-        const predictedHeight = predictedCount * rowHeight;
+        const predictedScope = computeStickyScope(this.lines(this.view), lineNum);
+        // Reserve room for the overlay that will pin at the destination so
+        // the target lands below it; row height is the editor's stable
+        // measured line height.
+        const predictedHeight = predictedScope.length * this.view.defaultLineHeight;
 
         // Clamp to >= 0: jumping from a deeper (taller) scope to a
         // shallower one makes the predicted overlay shorter than the
