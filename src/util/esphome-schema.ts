@@ -623,6 +623,11 @@ export async function getConfigVarDocsAtPath(
     }
     return null;
   })();
+  // Don't memoize a transient failure — evict on rejection so the next
+  // hover retries instead of replaying a rejected promise forever.
+  promise.catch(() => {
+    if (configVarDocsCache.get(cacheKey) === promise) configVarDocsCache.delete(cacheKey);
+  });
   configVarDocsCache.set(cacheKey, promise);
   return promise;
 }

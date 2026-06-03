@@ -135,13 +135,8 @@ async function isYamlOnlyComponent(
   platformValue: string | null
 ): Promise<boolean> {
   const componentId = platformValue ? `${topLevelKey}.${platformValue}` : topLevelKey;
-  let comp: ComponentCatalogEntry | null;
-  try {
-    comp = await fetchComponent(api, componentId);
-  } catch {
-    return true; // fetch failed → leave the hover on
-  }
-  // `config_entries` is absent (not []) on form-less components.
+  const comp = await fetchComponent(api, componentId);
+  // `config_entries` is absent (not []) on form-less components like ethernet.
   return isYamlOnlySection(topLevelKey, comp?.config_entries?.length ?? 0);
 }
 
@@ -306,13 +301,16 @@ export function createYamlHoverTooltip(api: ESPHomeAPI, getSeeAlsoLabel: () => s
       if (inComment(view.state, pos)) return null;
       const word = view.state.wordAt(pos);
       if (!word) return null;
-      let catalog: CatalogIndex;
+      let target: HoverTarget | null;
       try {
-        catalog = await loadCatalog(api);
-      } catch {
+        const catalog = await loadCatalog(api);
+        target = await resolveHoverTarget(view.state, pos, api, catalog);
+      } catch (err) {
+        // Any catalog/schema fetch failure degrades to no tooltip; log it so
+        // a real outage (loadCatalog is shared with completion) is visible.
+        console.debug("[yaml-hover] failed to resolve hover docs:", err);
         return null;
       }
-      const target = await resolveHoverTarget(view.state, pos, api, catalog);
       if (!target) return null;
       return {
         pos: word.from,
