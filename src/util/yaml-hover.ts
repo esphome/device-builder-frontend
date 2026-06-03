@@ -324,6 +324,6 @@ export function createYamlHoverTooltip(api: ESPHomeAPI, getSeeAlsoLabel: () => s
     // Only a deliberate pause triggers the tooltip — the 300ms default
     // fires on an incidental pointer rest while editing, which reads as
     // noise. Hide it the moment the doc changes (the user resumed typing).
-    { hideOnChange: true, hoverTime: 700 }
+    { hideOnChange: true, hoverTime: 500 }
   );
 }
