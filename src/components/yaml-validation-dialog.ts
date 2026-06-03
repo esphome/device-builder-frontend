@@ -1,17 +1,16 @@
 import { consume } from "@lit/context";
 import { mdiAlertOutline } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./base-dialog.js";
 
 registerMdiIcons({ "alert-outline": mdiAlertOutline });
 
@@ -51,15 +50,13 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   /** First error's message, used as a hint under the count. */
   @property() firstErrorMessage = "";
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state() private _open = false;
 
   static styles = [
     espHomeStyles,
     modalDialogStyles,
-    dialogCloseButtonStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 480px;
       }
 
@@ -110,13 +107,21 @@ export class ESPHomeYamlValidationDialog extends LitElement {
 
   open() {
     this._resolvedExit = null;
-    this._dialog.open = true;
+    this._open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  // esphome-base-dialog never mutates its own open on a user-driven close
+  // (Escape / X / outside-click); the host owns flipping _open here, else a
+  // re-render re-asserts ?open and the dialog can't dismiss. Teardown +
+  // cancel-on-dismiss stay in _onAfterHide.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
 
   protected render() {
     const messageKey =
@@ -128,10 +133,11 @@ export class ESPHomeYamlValidationDialog extends LitElement {
     });
     const canGoToError = this.firstErrorLine > 0;
     return html`
-      <wa-dialog
-        label=${this._localize("device.yaml_invalid_title")}
-        light-dismiss
-        @wa-after-hide=${this._onAfterHide}
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("device.yaml_invalid_title")}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onAfterHide}
       >
         <div class="body">
           <div class="icon-wrap">
@@ -155,7 +161,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
             ${this._localize("device.yaml_invalid_save_anyway")}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -179,6 +185,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   }
 
   private _onAfterHide() {
+    this._open = false;
     this._enter.set(false);
     if (this._resolvedExit === null) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
