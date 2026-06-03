@@ -6,8 +6,9 @@
 //                                                pull locales from the latest GitHub release
 //
 // The base language (en.json) is the in-repo source of truth: `upload`
-// adds its keys to Lokalise, `download` writes every other locale back
-// into src/translations/ and never touches en.json.
+// pushes its keys to Lokalise, adding new keys and updating the English
+// copy of existing keys (other locales are untouched); `download` writes
+// every other locale back into src/translations/ and never touches en.json.
 //
 // `download --source release` needs no Lokalise token: it reads the
 // `translations.zip` asset the release workflow attaches to the latest
@@ -125,9 +126,12 @@ class LokaliseClient {
       convert_placeholders: false,
       // Keys use manual _singular/_plural suffixes, not ICU plurals.
       detect_icu_plurals: false,
-      // Never clobber translator edits to existing keys on upload — an
-      // upload only adds new keys and leaves the rest untouched.
-      replace_modified: false,
+      // Push reworded English copy for existing keys, not just new keys —
+      // en.json is the source of truth for the base language. Only the
+      // English file is uploaded (lang_iso: en), so this updates English
+      // translations only and never clobbers translator edits in other
+      // locales, which aren't part of this upload.
+      replace_modified: true,
       // When set, keys absent from the uploaded base file are deleted from
       // the project. Off by default; opt in via `upload --cleanup`.
       cleanup_mode: opts.cleanupMode ?? false,

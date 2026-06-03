@@ -1,15 +1,19 @@
 name: Upload translations
 
 # Push the English source strings to Lokalise whenever en.json lands on
-# main, so translators always see the latest keys. Only new keys are
-# added; existing translations are left untouched (see
-# build-scripts/translations.ts).
+# main, so translators always see the latest keys. New keys are added and
+# the English copy of existing keys is updated; keys removed from en.json
+# are left in the project (so a moved key keeps its translations for reuse)
+# and translated locales are left untouched (see build-scripts/translations.ts).
 
 on:
   push:
     branches: [main]
     paths:
       - "src/translations/en.json"
+      - "build-scripts/translations.ts"
+      - "build-scripts/translations-lib.ts"
+      - ".github/workflows/translations-upload.yml"
   workflow_dispatch:
 
 permissions:
