@@ -374,6 +374,65 @@ describe("updateSectionInYaml — list item with inline key", () => {
   });
 });
 
+describe("updateSectionInYaml — trailing comments / blank lines", () => {
+  it("keeps a trailing comment block when toggling a nested value", () => {
+    // Reported bug: flipping `active` wiped the commented-out block
+    // between this section and the next.
+    const before = [
+      "esp32_ble_tracker:",
+      "  scan_parameters:",
+      "    active: false",
+      "# Bluetooth LED blinks when receiving Bluetooth advertising",
+      "#  on_ble_advertise:",
+      "#    then:",
+      "#      - output.turn_on: bluetooth_led",
+      "",
+      "",
+      "bluetooth_proxy:",
+      "",
+    ].join("\n");
+    const after = updateSectionInYaml(
+      before,
+      "esp32_ble_tracker",
+      { scan_parameters: { active: true } },
+      1
+    );
+    expect(after).toContain("active: true");
+    expect(after).toContain(
+      "# Bluetooth LED blinks when receiving Bluetooth advertising"
+    );
+    expect(after).toContain("#      - output.turn_on: bluetooth_led");
+    expect(after).toContain("bluetooth_proxy:");
+  });
+
+  it("still saves a section followed immediately by the next key", () => {
+    // No trailing run: the trim must not eat the section's last line.
+    const before = "wifi:\n  ssid: x\nlogger:\n";
+    const after = updateSectionInYaml(before, "wifi", { ssid: "y" }, 1);
+    expect(after).toContain("ssid: y");
+    expect(after).not.toContain("ssid: x");
+    expect(after).toContain("logger:");
+  });
+
+  it("keeps comments when the section body is comment-only", () => {
+    // Exercises the `> start + 1` guard: header replaced, comments kept.
+    const before = "wifi:\n  # configure later\n  # see docs\nlogger:\n";
+    const after = updateSectionInYaml(before, "wifi", { ssid: "y" }, 1);
+    expect(after).toContain("ssid: y");
+    expect(after).toContain("# configure later");
+    expect(after).toContain("# see docs");
+  });
+
+  it("is stable across repeated saves", () => {
+    // Same update twice yields an identical string, no drift.
+    const before = "wifi:\n  ssid: x\n# note\n\nlogger:\n";
+    const once = updateSectionInYaml(before, "wifi", { ssid: "y" }, 1);
+    const twice = updateSectionInYaml(once, "wifi", { ssid: "y" }, 1);
+    expect(twice).toBe(once);
+    expect(once).toContain("# note");
+  });
+});
+
 describe("removeSectionFromYaml — multi-item list", () => {
   // Pins the splice contract that surfaced the
   // wrong-section-deleted bug. The bug itself was at the

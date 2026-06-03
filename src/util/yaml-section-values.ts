@@ -160,6 +160,8 @@ const listItemRegexFor = (dashIndent: string) => new RegExp(`^${dashIndent}-\\s+
  * line-by-line serializer. Skipping them here just keeps comments
  * from corrupting the structural read.
  */
+const isCommentLine = (line: string): boolean => line.trim().startsWith("#");
+
 const isBlankOrCommentLine = (line: string): boolean => {
   const trimmed = line.trim();
   return trimmed === "" || trimmed.startsWith("#");
@@ -995,6 +997,20 @@ export function updateSectionInYaml(
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
+  // The range runs to the next top-level key, swallowing trailing
+  // comments the splice would then wipe. If the trailing run holds a
+  // comment, stop the splice before it so those lines survive. Gating
+  // on a comment leaves pure-blank runs (incl. the terminal newline)
+  // to the normal splice, keeping block-scalar round-trips identical.
+  // (`> start + 1` keeps the header line in the splice.)
+  let runStart = end;
+  let trailingHasComment = false;
+  while (runStart > start + 1 && isBlankOrCommentLine(lines[runStart - 1])) {
+    if (isCommentLine(lines[runStart - 1])) trailingHasComment = true;
+    runStart--;
+  }
+  const spliceEnd = trailingHasComment ? runStart : end;
+
   // Top-level list-bodied section (globals): re-emit through the
   // mapping serializer's array branch — { sectionKey: array } yields
   // `sectionKey:` plus the dash items at the section's child indent.
@@ -1015,7 +1031,7 @@ export function updateSectionInYaml(
         indentStep: options.indentStep ?? (childIndent || ESPHOME_YAML_INDENT),
       }
     );
-    lines.splice(start, end - start, ...block);
+    lines.splice(start, spliceEnd - start, ...block);
     return lines.join("\n");
   }
 
@@ -1120,7 +1136,7 @@ export function updateSectionInYaml(
       indentStep: options.indentStep ?? detectedStep,
     }),
   ];
-  lines.splice(start, end - start, ...newLines);
+  lines.splice(start, spliceEnd - start, ...newLines);
   return lines.join("\n");
 }
 
