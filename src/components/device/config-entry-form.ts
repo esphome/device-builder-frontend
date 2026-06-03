@@ -163,6 +163,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  exists, while a later value edit doesn't re-scroll a consumed one. */
   private _scrolledFocusKey?: string;
 
+  /** Field with focus (last ``focusin``). A ``change`` fires on blur, so it
+   *  must match this to highlight — else leaving A for B re-points at A. */
+  private _focusedFieldKey?: string;
+
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
    * picked before typing a numeric value. Keyed by dotted path.
@@ -265,9 +269,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   /** Field focused or changed → tell the page which field, to highlight its
    *  YAML line. ``change`` covers selects / switches whose click doesn't
-   *  reliably surface a focusin. Walks ``composedPath`` (not ``closest``)
-   *  so a field whose ``data-field-key`` lives inside a nested renderer's
-   *  shadow root — the pin / registry-list editors — is still found. */
+   *  reliably surface a focusin, but a ``change`` fires on *blur* — so when
+   *  moving from field A to B it can land after B's ``focusin`` and re-point
+   *  the highlight at A. Gate ``change`` to the field that holds focus (the
+   *  last ``focusin``). Walks ``composedPath`` (not ``closest``) so a field
+   *  whose ``data-field-key`` lives inside a nested renderer's shadow root —
+   *  the pin / registry-list editors — is still found. */
   private _onFieldInteraction = (e: Event) => {
     const el = e
       .composedPath()
@@ -278,6 +285,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (!el) return;
     const path = parseFieldKey(el.getAttribute("data-field-key") ?? "");
     if (!path.length) return;
+    const key = path.join(" ");
+    if (e.type === "focusin") this._focusedFieldKey = key;
+    else if (key !== this._focusedFieldKey) return;
     this.dispatchEvent(
       new CustomEvent<{ path: string[] }>("field-focus", {
         detail: { path },
