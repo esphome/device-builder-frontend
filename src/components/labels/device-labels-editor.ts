@@ -3,9 +3,9 @@
  *
  * In-drawer affordance is intentionally minimal: a chip row with
  * per-chip × buttons plus a single "Edit labels" trigger. The
- * full assignment / create UI lives behind that trigger in a
- * ``<wa-dialog>`` so the drawer stays scannable when a device
- * carries a long list of labels.
+ * full assignment / create UI lives behind that trigger in an
+ * ``<esphome-base-dialog>`` so the drawer stays scannable when a
+ * device carries a long list of labels.
  *
  * The dialog body has three parts: a search input, a catalog list
  * where each row is a checkbox toggling the device's assignment
@@ -44,8 +44,8 @@ import "./label-form.js";
 import type { ESPHomeLabelForm } from "./label-form.js";
 import { labelsListStyles } from "./labels-list-styles.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../base-dialog.js";
 
 registerMdiIcons({
   check: mdiCheck,
@@ -104,8 +104,8 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
    *  state non-deterministic on overlapping requests. */
   private _saveChain: Promise<unknown> = Promise.resolve();
 
-  @query("wa-dialog")
-  private _dialog?: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   @query("esphome-label-form")
   private _createForm?: ESPHomeLabelForm;
@@ -201,32 +201,28 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
       /* ─── Dialog ──────────────────────────────────────────── */
 
-      wa-dialog {
+      esphome-base-dialog {
         --width: 480px;
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
+      esphome-base-dialog::part(close-button__base) {
         background: transparent;
         border: none;
         box-shadow: none;
       }
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l) var(--wa-space-l);
-      }
-
-      wa-dialog::part(footer) {
-        display: none;
       }
 
       /* Cap the list height for the in-drawer editor (the bulk
@@ -246,20 +242,25 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   ];
 
   protected willUpdate(changed: Map<string, unknown>) {
-    if (changed.has("device")) {
-      // Reset transient state when the drawer swaps to a different
-      // device; otherwise a half-typed "create" form would persist
-      // into the next device's editor and a still-pending save
-      // chained against the previous device would gate this one's
-      // ``_saving`` indicator until that promise settled.
-      if (this._dialog) this._dialog.open = false;
+    if (!changed.has("device")) return;
+    const prev = changed.get("device") as ConfiguredDevice | undefined;
+    // A same-device prop update — the ``DEVICE_UPDATED`` push that lands
+    // after our own ``set_labels`` — now carries the saved labels, so drop
+    // the optimistic override and trust the prop. Crucially, DON'T close the
+    // dialog: the user is mid-edit and toggling more labels, and each toggle
+    // round-trips through this same push.
+    this._optimisticLabels = null;
+    // Only a real swap to a *different* device tears down the transient edit
+    // state and closes the dialog; otherwise a half-typed "create" form would
+    // persist into the next device's editor and a still-pending save chained
+    // against the previous device would gate this one's ``_saving`` indicator.
+    if (prev !== undefined && prev.configuration !== this.device.configuration) {
+      this._open = false;
       this._createForm?.collapse();
-      this._optimisticLabels = null;
       this._saving = false;
       this._saveChain = Promise.resolve();
-      // Drop any in-flight create snapshot so a late
-      // ``label-created`` arriving after the swap is ignored rather
-      // than misapplied to the new device.
+      // Drop any in-flight create snapshot so a late ``label-created``
+      // arriving after the swap is ignored rather than misapplied.
       this._pendingCreateConfig = null;
     }
   }
@@ -309,10 +310,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   private _renderDialog() {
     const assignedSet = new Set(this._currentLabelIds);
     return html`
-      <wa-dialog
-        label=${this._localize("dashboard.labels_dialog_title")}
-        light-dismiss
-        @wa-after-hide=${this._onDialogClose}
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("dashboard.labels_dialog_title")}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onDialogClose}
       >
         <div
           class="options"
@@ -348,7 +350,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
             @label-created=${this._onCreateResolved}
           ></esphome-label-form>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -369,10 +371,17 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
   private _openDialog = () => {
     this._createForm?.collapse();
-    if (this._dialog) this._dialog.open = true;
+    this._open = true;
+  };
+
+  // esphome-base-dialog never flips its own open on a user-driven close
+  // (Escape / X / outside-click); the host owns _open here.
+  private _onRequestClose = () => {
+    this._open = false;
   };
 
   private _onDialogClose = () => {
+    this._open = false;
     this._createForm?.collapse();
   };
 
