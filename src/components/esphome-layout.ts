@@ -9,6 +9,7 @@ import {
   serverVersionContext,
   versionContext,
 } from "../context/index.js";
+import { MOBILE_BREAKPOINT } from "../styles/breakpoints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { stripBase, withBase } from "../util/base-path.js";
 import { navigate } from "../util/navigation.js";
@@ -73,13 +74,23 @@ export class ESPHomeLayout extends LitElement {
       :host {
         display: block;
         min-height: 100%;
+        /* Single content inset for the header and the page slotted below,
+           so the logo / title line up with the toolbar and cards. The
+           dashboard page and the device-table inherit it through the slot;
+           trims on mobile to match the tighter body gutter. */
+        --content-gutter: var(--wa-space-l);
+      }
+      @media (max-width: ${MOBILE_BREAKPOINT}px) {
+        :host {
+          --content-gutter: var(--wa-space-s);
+        }
       }
 
       .app-header {
         display: flex;
         align-items: center;
         gap: var(--wa-space-m);
-        padding: 0 var(--wa-space-s);
+        padding: 0 var(--content-gutter);
         background: var(--esphome-primary);
         height: var(--esphome-header-height);
         box-sizing: border-box;

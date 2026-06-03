@@ -1,5 +1,5 @@
 import { APIError } from "../../api/api-error.js";
-import { type FirmwareJob, JobStatus } from "../../api/types/firmware-jobs.js";
+import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
@@ -36,15 +36,23 @@ export async function detachStream(host: ESPHomeCommandDialog): Promise<void> {
   }
 }
 
-export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
-  await detachStream(host);
-  host._jobId = "";
+// Reset the per-run state a fresh attach starts from: the output buffer,
+// status banner, and the failure flags that gate the reset/validation hints.
+// Shared by every entry point that reuses the singleton dialog for a new run.
+export function resetRunState(host: ESPHomeCommandDialog): void {
   host._state = "running";
   host._lines = [];
   host._resetPendingLines();
   host._statusMessage = "";
   host._userStopped = false;
   host._failedDuringValidate = false;
+  host._installMissingUpload = false;
+}
+
+export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
+  await detachStream(host);
+  host._jobId = "";
+  resetRunState(host);
   // Clear primed snapshots so a Retry that picks a different source can't
   // leak the prior job's REMOTE label into renderBuildFailureSuggestion
   // before the new _jobs context update lands. open() already clears these
@@ -134,10 +142,13 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
     return;
   }
 
+  primeAndFollow(host, job);
+}
+
+// Prime status + source so the overlay paints on the first frame, then follow.
+// Leaves _commandType to the caller (the install chain relies on it).
+function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   host._jobId = job.job_id;
-  // Prime from the API response so the queued overlay shows immediately;
-  // the matching job_queued event lands in firmwareJobsContext shortly after
-  // and the getter prefers that live value going forward.
   host._jobStatus = job.status;
   host._primedSource = {
     source: job.source,
@@ -162,6 +173,41 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       host._flushPendingLines();
       const result = data as unknown as { status: string; exit_code: number | null };
       const success = result.status === JobStatus.COMPLETED;
+
+      // On a successful install COMPILE, follow its dependent UPLOAD so success
+      // reflects the flash (#1131). Gate on the finished job being the COMPILE
+      // so the upload's own completion falls straight through to success.
+      const finished = host._jobs.get(jobId);
+      if (
+        success &&
+        host._commandType === "install" &&
+        finished?.job_type === JobType.COMPILE
+      ) {
+        // The held UPLOAD is created at install time (#1131); its job_queued is
+        // ordered ahead of this compile's job_completed on the shared WS, so it
+        // is normally already in _jobs. A miss is therefore a real backend gap,
+        // not a still-arriving event for a legitimately-running install.
+        const upload = [...host._jobs.values()].find(
+          (j) => j.job_type === JobType.UPLOAD && j.depends_on === jobId
+        );
+        if (upload) {
+          // primeAndFollow re-primes the source snapshot from the upload (the
+          // local flash) so the remote-builder sub-line doesn't linger on the
+          // compile's receiver while the upload runs.
+          primeAndFollow(host, upload);
+          return;
+        }
+        // No upload step — the device was never flashed, so don't report success.
+        console.warn("install compile succeeded but no dependent upload for job", jobId);
+        host._state = "error";
+        host._statusMessage = host._localize("command.install_failed");
+        // The compile succeeded, so the clean/reset build-failure hint is
+        // misleading here — suppress it.
+        host._installMissingUpload = true;
+        host._jobId = "";
+        return;
+      }
+
       host._state = success ? "success" : "error";
       host._statusMessage = host._localize(
         success
@@ -254,7 +300,13 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
       }
     }
     const job = await host._api.firmwareInstall(configuration, port, true);
-    host.followJob(job, host.name);
+    // Keep _commandType "install": the public followJob would derive "compile"
+    // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
+    // attempt and reset the run state (the public followJob did this), then
+    // re-attach via primeAndFollow.
+    await detachStream(host);
+    resetRunState(host);
+    primeAndFollow(host, job);
   } catch (err) {
     host._state = "error";
     host._statusMessage = host._localize("command.force_local_failed");

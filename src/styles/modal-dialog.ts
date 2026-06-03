@@ -47,21 +47,28 @@
 import { css } from "lit";
 
 export const modalDialogStyles = css`
-  wa-dialog::part(header) {
+  /* Dual selectors so this one shared fragment styles both the raw
+     <wa-dialog> modals and the ones migrated onto <esphome-base-dialog>
+     (its parts are re-exported under the same names). #39 */
+  wa-dialog::part(header),
+  esphome-base-dialog::part(header) {
     padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
   }
 
-  wa-dialog::part(title) {
+  wa-dialog::part(title),
+  esphome-base-dialog::part(title) {
     font-size: var(--wa-font-size-m);
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
   }
 
-  wa-dialog::part(body) {
+  wa-dialog::part(body),
+  esphome-base-dialog::part(body) {
     padding: 0 var(--wa-space-l);
   }
 
-  wa-dialog::part(footer) {
+  wa-dialog::part(footer),
+  esphome-base-dialog::part(footer) {
     display: none;
   }
 

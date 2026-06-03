@@ -37,6 +37,12 @@ export type LogsSession =
     }
   | { readonly kind: "dead" };
 
+/** Sentinel ``ota`` port for the network / OTA log source (as opposed to a
+ *  server serial device path like ``/dev/cu.usbserial-110``). Both run through
+ *  the backend ``logs`` WS subscription and so share the ``ota`` session kind;
+ *  the port is what tells them apart. */
+export const OTA_PORT = "OTA";
+
 /** Whether the streaming dot / Stop button should show (vs. the Start button). */
 export const isStreaming = (s: LogsSession): boolean =>
   (s.kind === "ota" && s.streamId !== null) ||
@@ -50,3 +56,11 @@ export const isPassive = (s: LogsSession): boolean =>
 /** A live Web Serial port is held — the only state where Reset Device can fire
  *  and the port can be torn down. */
 export const hasSerialPort = (s: LogsSession): boolean => s.kind === "serial";
+
+/** Whether the States toggle applies. Device states arrive only over the API /
+ *  network connection, so the toggle (which sets the backend ``--no-states``
+ *  flag) is meaningful only for the OTA source. Server serial shares the
+ *  ``ota`` kind but carries a device path instead of the ``OTA`` sentinel, so
+ *  it's excluded — toggling states there is a no-op (#539). */
+export const isOtaNetwork = (s: LogsSession): boolean =>
+  s.kind === "ota" && s.port === OTA_PORT;

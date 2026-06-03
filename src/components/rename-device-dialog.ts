@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
@@ -9,7 +9,7 @@ import { getDeviceNameWarning, validateDeviceName } from "../util/config-validat
 import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
+import "./base-dialog.js";
 
 @customElement("esphome-rename-device-dialog")
 export class ESPHomeRenameDeviceDialog extends LitElement {
@@ -23,39 +23,35 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
   @state()
   private _value = "";
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   static styles = [
     espHomeStyles,
     inputStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 420px;
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
+      esphome-base-dialog::part(close-button__base) {
         background: transparent;
         border: none;
         box-shadow: none;
       }
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
-      }
-
-      wa-dialog::part(footer) {
-        display: none;
       }
 
       .field {
@@ -142,13 +138,21 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
     this.deviceName = name;
     this._value = name;
     this._resolved = false;
-    this._dialog.open = true;
+    this._open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  // Flip the reactive flag on the initiating close so a re-render can't
+  // re-assert ?open mid-hide; teardown (the EnterController unbind) stays
+  // in after-hide. esphome-base-dialog never mutates its own open in
+  // response to user actions, so the host owns flipping _open here.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
 
   private _onAfterHide = (): void => {
     this._enter.set(false);
@@ -166,10 +170,11 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
     const canSubmit = !unchanged && !err;
 
     return html`
-      <wa-dialog
-        label=${this._localize("dashboard.action_rename_title")}
-        light-dismiss
-        @wa-after-hide=${this._onAfterHide}
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("dashboard.action_rename_title")}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onAfterHide}
       >
         <div class="field">
           <label>${this._localize("dashboard.action_rename_label")}</label>
@@ -201,7 +206,7 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
             ${this._localize("dashboard.action_rename_confirm")}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 

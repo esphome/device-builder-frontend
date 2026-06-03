@@ -2,6 +2,10 @@ const { createRspackConfig } = require("./rspack.cjs");
 const { RspackDevServer } = require("@rspack/dev-server");
 const rspack = require("@rspack/core");
 
+// Refresh the language manifest from whatever locales are present so the
+// picker reflects them in dev. localize.ts statically imports the manifest.
+require("./gen-language-manifest.cjs").generate();
+
 const config = createRspackConfig({ isProdBuild: false });
 
 // Honor PORT from the environment so harnesses (including Claude

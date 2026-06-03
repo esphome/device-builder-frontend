@@ -114,9 +114,12 @@ export const tableLayoutStyles = css`
     /* Horizontal margin draws from the shared --content-gutter token
        (defined on the dashboard host, inherited here), so the table
        outline trims on mobile in lockstep with the .controls strip
-       and the card view's grid. The bottom margin is a separate
-       vertical step, trimmed in the @media block below. #41 */
-    margin: 0 var(--content-gutter) var(--wa-space-l);
+       and the card view's grid. No bottom margin: the dashboard host is
+       sized calc(100dvh - header - footer), so the table outline already
+       ends exactly at the fixed footer's top edge — leaving just the
+       footer's height between the table and the page bottom, identical on
+       desktop and mobile. */
+    margin: 0 var(--content-gutter);
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-l);
     overflow: hidden;
@@ -361,10 +364,6 @@ export const tableLayoutStyles = css`
      default sort applies, and a row tap still opens the drawer with
      full detail. #41 */
   @media (max-width: ${MOBILE_BREAKPOINT}px) {
-    .table-wrap {
-      margin-bottom: var(--wa-space-s);
-    }
-
     /* Vertical scroll only; the horizontal-overflow shadows are moot. */
     .table-scroll {
       background: none;

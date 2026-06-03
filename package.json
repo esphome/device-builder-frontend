@@ -4,14 +4,20 @@
   "description": "Frontend for ESPHome Dashboard",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "node build-scripts/dev-server.cjs",
     "build": "node build-scripts/build.cjs",
-    "lint": "tsc --noEmit",
+    "gen:languages": "node build-scripts/gen-language-manifest.cjs",
+    "lint": "node build-scripts/gen-language-manifest.cjs && tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",
+    "translations:upload": "node build-scripts/translations.ts upload",
+    "translations:download": "node build-scripts/translations.ts download",
     "prepare": "husky"
   },
   "dependencies": {
@@ -37,6 +43,7 @@
     "@swc/helpers": "0.5.23",
     "@types/node": "25.9.1",
     "@types/w3c-web-serial": "^1.0.8",
+    "fflate": "^0.8.3",
     "happy-dom": "^20.9.0",
     "husky": "^9.1.7",
     "prettier": "3.8.3",

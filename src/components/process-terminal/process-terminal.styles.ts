@@ -102,6 +102,26 @@ export const termButtonStyles = css`
   .toolbar-slot {
     display: contents;
   }
+
+  /* On narrow viewports collapse labelled icon buttons to icon-only so the
+     toolbar stays on one row instead of wrapping (#542 follow-up). The label
+     is visually hidden, not removed, so it still names the button for screen
+     readers; the title attribute keeps the tooltip. Icon-less buttons (e.g.
+     the command dialog's text-only Close) have no wa-icon, so they keep their
+     label and are never left empty. */
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    .term-btn:has(wa-icon) .term-btn__label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  }
 `;
 
 /**
@@ -176,6 +196,12 @@ export const processTerminalStyles = css`
     flex-wrap: wrap;
     gap: var(--wa-space-xs);
     padding: 6px var(--wa-space-m);
+    /* On the full-screen mobile sheet the side padding widens (see
+       fillTerminalOnMobile) so the end buttons (States / Stop) clear the
+       phone's curved corners; everywhere else it falls back to the flat
+       padding above, so the windowed / card terminal is byte-identical. */
+    padding-left: var(--process-terminal-toolbar-pad-x, var(--wa-space-m));
+    padding-right: var(--process-terminal-toolbar-pad-x, var(--wa-space-m));
     background: var(--term-bg-alt);
     border-top: 1px solid var(--term-border);
   }
@@ -300,5 +326,12 @@ export const fillTerminal = css`
 export const fillTerminalOnMobile = css`
   @media (max-width: ${MOBILE_BREAKPOINT}px) {
     ${fillTerminal}
+    /* The dialog is edge-to-edge here, so the toolbar's end buttons sit in the
+       phone's curved bottom corners. Widen the side padding to pull them in;
+       the var inherits into the terminal's shadow DOM where the toolbar reads
+       it. Uniform across devices, no viewport-fit / safe-area dependency. */
+    esphome-process-terminal {
+      --process-terminal-toolbar-pad-x: 20px;
+    }
   }
 `;

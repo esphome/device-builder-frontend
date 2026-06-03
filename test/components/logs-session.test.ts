@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   hasSerialPort,
+  isOtaNetwork,
   isPassive,
   isStreaming,
+  OTA_PORT,
   type LogsSession,
 } from "../../src/components/logs-session.js";
 
@@ -53,6 +55,23 @@ describe("logs-session selectors", () => {
       { kind: "idle" },
     ] as LogsSession[]) {
       expect(hasSerialPort(s)).toBe(false);
+    }
+  });
+
+  it("isOtaNetwork: only the OTA sentinel port, not a server serial path", () => {
+    expect(isOtaNetwork({ kind: "ota", port: OTA_PORT, streamId: "s1" })).toBe(true);
+    expect(isOtaNetwork({ kind: "ota", port: OTA_PORT, streamId: null })).toBe(true);
+    // Server serial rides the same `ota` kind but carries a device path (#539).
+    expect(
+      isOtaNetwork({ kind: "ota", port: "/dev/cu.usbserial-110", streamId: "s1" })
+    ).toBe(false);
+    for (const s of [
+      { kind: "serial", port: fakePort, cancel: noop, paused: false },
+      { kind: "reconnecting", paused: false },
+      { kind: "dead" },
+      { kind: "idle" },
+    ] as LogsSession[]) {
+      expect(isOtaNetwork(s)).toBe(false);
     }
   });
 });

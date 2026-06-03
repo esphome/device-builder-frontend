@@ -8,7 +8,14 @@ export const dashboardStyles = css`
     flex-direction: column;
     position: relative;
     box-sizing: border-box;
+    /* vh fallback then dvh: on mobile 100vh is the large viewport, which
+       makes this fixed-height (internal-scroll) container taller than the
+       visible area — the pagination row and the fixed footer drop below
+       the fold and the page over-scrolls. dvh tracks the visible viewport
+       so the table fills exactly header→footer and the inner .table-scroll
+       still scrolls. Matches the vh/dvh pairing in device-styles.ts. */
     height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
+    height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
     /* Single source of truth for the floating Create-device button's
        footprint. --fab-bottom is the gap between the FAB and the
@@ -33,13 +40,10 @@ export const dashboardStyles = css`
        dashboard host, so both toolbars resolve identical values and
        can't drift on mobile. Mobile override is in the @media block. */
     --toolbar-pad-top: var(--wa-space-l);
-    /* Horizontal content gutter shared by every full-width region in
-       both views: the toolbar (.toolbar / .controls), the card grid,
-       the YAML hit list, the table outline (.table-wrap), and the
-       table count row. Full on desktop, tightened on mobile in the
-       @media block below. Defined on the host so the device-table
-       shadow inherits it, keeping card and table views aligned. #41 */
-    --content-gutter: var(--wa-space-l);
+    /* --content-gutter (the horizontal inset shared by the toolbar, card
+       grid, YAML hit list, table outline, and count row) is defined once on
+       esphome-layout's :host and inherited here, so the header and the body
+       share one gutter. The device-table shadow inherits it too. #41 */
     /* Inter-row gap inside the toolbar. Card view's .toolbar and the
        table view's .toolbar-stack both use it, and the table count
        row mirrors it as padding-top, so the rows line up identically
@@ -72,12 +76,10 @@ export const dashboardStyles = css`
       padding-top: var(--wa-space-l);
     }
 
-    /* Tighten the shared gutters on mobile. Every full-width region
-       in both views inherits these, so the card and table layouts
-       stay in lockstep at narrow widths. #41 */
+    /* Tighten the toolbar's top padding on mobile (the --content-gutter
+       mobile trim lives on esphome-layout now, inherited here). #41 */
     :host {
       --toolbar-pad-top: var(--wa-space-s);
-      --content-gutter: var(--wa-space-s);
     }
   }
 
@@ -295,9 +297,7 @@ export const dashboardStyles = css`
     row-gap: var(--wa-space-xs);
   }
 
-  /* Facet pills cluster inline with the view-toggle. flex-wrap
-     lets pills flow onto a second row of their own if too many
-     accumulate (large fleets with several areas / platforms). */
+  /* Wraps the Filters-menu button in the toolbar control strip. */
   .filter-group {
     display: inline-flex;
     align-items: center;
@@ -306,43 +306,6 @@ export const dashboardStyles = css`
     row-gap: var(--wa-space-2xs);
     flex-shrink: 1;
     min-width: 0;
-  }
-
-  /* Trailing "Clear filters" action on the desktop facet row. Shares the
-     toolbar control height so the strip stays aligned, but stays quiet
-     (borderless, muted) so it doesn't read as another facet pill. */
-  .filter-clear {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: var(--esphome-control-height);
-    padding: 0 10px;
-    border: none;
-    border-radius: var(--wa-border-radius-m);
-    background: transparent;
-    color: var(--wa-color-text-quiet);
-    font-family: inherit;
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-semibold, 600);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition:
-      background-color 0.12s,
-      color 0.12s;
-  }
-
-  .filter-clear wa-icon {
-    font-size: 16px;
-  }
-
-  .filter-clear:hover {
-    color: var(--esphome-primary);
-    background: var(--esphome-tint);
-  }
-
-  .filter-clear:focus-visible {
-    outline: none;
-    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   /* The <form role="search"> wrapper is what suppresses Chrome's
@@ -391,10 +354,39 @@ export const dashboardStyles = css`
      the placeholder. */
   .search-wrap .search-input {
     padding-left: 36px;
+    /* Room for the clear (×); mirrors the 36px leading-icon inset. */
+    padding-right: 36px;
     /* Share the toolbar control height so the search box matches the
        view-toggle / facet pills beside it (the input's default is the
        taller --wa-form-control-height). */
     min-height: var(--esphome-control-height);
+  }
+
+  /* Hide the native type="search" × so it doesn't double our own. */
+  .search-wrap .search-input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  /* Our clear control — shown only when a query is present. */
+  .search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--wa-color-text-quiet);
+    z-index: 1;
+  }
+
+  .search-clear:hover {
+    color: var(--wa-color-text-normal);
   }
 
   /* Decorative leading icon — magnifier in device mode, code-braces

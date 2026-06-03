@@ -2,6 +2,7 @@ import toast from "sonner-js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
+import { OTA_PORT } from "../components/logs-session.js";
 
 /**
  * Detail shape of the cancelable ``request-show-logs-after-install``
@@ -184,6 +185,6 @@ export async function handlePostInstallShowLogs(
        re-enumeration window) and starts reading. */
     await attachSerialLogStream(webSerialPort, logsDialog, localize);
   } else {
-    logsDialog.open(port ?? "OTA", { onBackToInstall: reopenInstall });
+    logsDialog.open(port ?? OTA_PORT, { onBackToInstall: reopenInstall });
   }
 }

@@ -39,7 +39,7 @@ export function renderTermButton(opts: TermButtonOpts): TemplateResult {
     @click=${opts.onClick}
   >
     ${opts.icon ? html`<wa-icon library="mdi" name=${opts.icon}></wa-icon>` : nothing}
-    ${opts.label ?? nothing}
+    ${opts.label ? html`<span class="term-btn__label">${opts.label}</span>` : nothing}
   </button>`;
 }
 

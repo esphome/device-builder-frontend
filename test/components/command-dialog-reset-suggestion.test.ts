@@ -18,6 +18,7 @@ import {
 } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import { renderResetSuggestion } from "../../src/components/command-dialog/renderers.js";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import {
   expectFallbackToLocal,
   expectLocalSuggestion,
@@ -28,30 +29,12 @@ import {
 } from "./_reset-suggestion-helpers.js";
 
 function fakeJob(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
-  return {
-    job_id: "job-1",
-    configuration: "kitchen.yaml",
+  return makeFirmwareJob({
     job_type: JobType.INSTALL,
     status: JobStatus.FAILED,
-    created_at: "2026-01-01T00:00:00Z",
-    started_at: null,
-    completed_at: null,
-    exit_code: null,
-    output: [],
     error: "",
-    port: "OTA",
-    new_name: "",
-    progress: null,
-    source: JobSource.LOCAL,
-    source_pin_sha256: "",
-    source_label: "",
-    source_esphome_version: "",
-    remote_peer: "",
-    remote_peer_label: "",
-    device_name: "",
-    device_friendly_name: "",
     ...overrides,
-  };
+  });
 }
 
 interface Host {
@@ -59,6 +42,7 @@ interface Host {
   _userStopped: boolean;
   _commandType: string;
   _failedDuringValidate: boolean;
+  _installMissingUpload: boolean;
   _jobId: string;
   _jobs: Map<string, FirmwareJob>;
   _primedSource: {
@@ -78,6 +62,7 @@ function baseHost(overrides: Partial<Host> = {}): Host {
     _userStopped: false,
     _commandType: "install",
     _failedDuringValidate: false,
+    _installMissingUpload: false,
     _jobId: "job-1",
     _jobs: new Map(),
     _primedSource: null,
@@ -105,6 +90,12 @@ describe("renderResetSuggestion — local build", () => {
     // primed snapshot — the renderer must not assume REMOTE.
     const host = baseHost({ _jobs: new Map(), _primedSource: null });
     expectFallbackToLocal(render(host), host);
+  });
+
+  it("renders nothing when the install compile succeeded but had no upload", () => {
+    // The compile was fine; clean/reset wouldn't help a missing upload step.
+    const host = baseHost({ _installMissingUpload: true });
+    expectNoSuggestion(render(host));
   });
 });
 

@@ -186,7 +186,13 @@ export class ESPHomeApp extends LitElement {
     css`
       :host {
         display: block;
+        /* vh fallback first, then dvh so mobile browsers track the
+           dynamic (visible) viewport. Bare 100vh resolves to the large
+           viewport (dynamic toolbar hidden), so the root over-scrolls and
+           the fixed footer is pushed below the visible fold. Matches the
+           vh/dvh pairing in device-styles.ts / dialog-mobile.ts. */
         height: 100vh;
+        height: 100dvh;
         width: 100vw;
         overflow-y: auto;
         background: var(--wa-color-surface-default, #f8f9fa);

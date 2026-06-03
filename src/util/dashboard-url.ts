@@ -12,6 +12,8 @@
  *  - ``areas``     — comma-separated area names
  *  - ``platforms`` — comma-separated target_platform values
  *  - ``states``    — comma-separated DeviceState values
+ *  - ``updates``   — comma-separated update-status buckets
+ *                    (``update_available`` / ``modified``; AND semantics)
  *  - ``view``      — ``table`` (omitted for the cards default)
  *  - ``yaml``      — ``1`` (omitted for the device-search default)
  *
@@ -35,6 +37,7 @@ export interface DashboardUrlState {
   areas?: string[];
   platforms?: string[];
   states?: string[];
+  updates?: string[];
   view?: DashboardView;
   yaml?: boolean;
 }
@@ -72,6 +75,7 @@ export function readDashboardUrl(): DashboardUrlState {
     areas: fromCsv(p.get("areas")),
     platforms: fromCsv(p.get("platforms")),
     states: fromCsv(p.get("states")),
+    updates: fromCsv(p.get("updates")),
     view,
     yaml: p.get("yaml") === "1" ? true : undefined,
   };
@@ -88,6 +92,7 @@ export function writeDashboardUrl(state: DashboardUrlState): void {
   set("areas", toCsv(state.areas));
   set("platforms", toCsv(state.platforms));
   set("states", toCsv(state.states));
+  set("updates", toCsv(state.updates));
   set("view", state.view === DashboardView.TABLE ? "table" : undefined);
   set("yaml", state.yaml ? "1" : undefined);
   // ``replaceState`` keeps the back button clean — we don't want a

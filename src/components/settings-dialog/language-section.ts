@@ -3,7 +3,7 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { LanguageChoice, LocalizeFunc } from "../../common/localize.js";
-import { LANGUAGES, readStoredLocale } from "../../common/localize.js";
+import { LANGUAGES, languageLabel, readStoredLocale } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -34,7 +34,7 @@ export class ESPHomeSettingsLanguage extends LitElement {
           ${LANGUAGES.map(
             (l) => html`
               <wa-option value=${l.value}
-                >${l.flag} ${this._localize(l.labelKey)}</wa-option
+                >${l.flag} ${languageLabel(l, this._localize)}</wa-option
               >
             `
           )}

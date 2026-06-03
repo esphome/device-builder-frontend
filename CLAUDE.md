@@ -51,9 +51,10 @@ Practical consequences:
   will catch a frontend PR that consumes a command nobody added
   on the backend side.
 - **Old translation keys**: when removing a `_localize("foo")`
-  call site, also delete the key from `src/translations/*.json`.
-  No legacy keys retained "in case some downstream uses them":
-  there is no downstream.
+  call site, also delete the key from `en.json` (the only
+  committed locale; the rest live in Lokalise). No legacy keys
+  retained "in case some downstream uses them": there is no
+  downstream.
 
 A real failure path (WS dropped, server bug, validation rejection)
 still warrants a `try/catch` with revert + toast for
@@ -156,24 +157,33 @@ on failure assign the previous value back and surface a
 
 ## Localization
 
-- `src/translations/en.json` is the source-of-truth English copy.
-  Other locales (`fr.json`, `nl.json`, ...) overlay on top with
-  English fallback for missing keys.
-- **Add new keys to every translation file at the same time.**
-  When you add a key to `en.json`, add a real translation to
-  `fr.json` and `nl.json` in the same PR. The library falls back
-  to English when a key is missing, which means a partially-
-  translated UI silently mixes English strings into French / Dutch
-  pages, which is worse than just shipping a less-polished
-  translation. Native speakers can refine later, but having the
-  keys in place is the load-bearing concern. Don't ship a PR that
-  adds an English key without the matching translations.
-- Don't write English copy verbatim into `fr.json` as a
-  placeholder; do an actual translation, even if it's
-  approximate. The fallback machinery already handles missing
-  keys; an English string copied into `fr.json` reads to a French
-  user as "this dashboard claims to be French but isn't,"
-  which is worse than the missing-key fallback.
+Non-English locales live in [Lokalise](https://lokalise.com/),
+**not in the repo** — they're gitignored and pulled at build time
+(`npm run translations:download`). See [README → "Translations"](README.md#translations)
+for the full flow. The load-bearing rules:
+
+- `src/translations/en.json` is the source-of-truth English copy
+  and the **only committed translation file**. The runtime overlays
+  each downloaded locale on the English base with per-key English
+  fallback, so an untranslated key just shows English.
+- **Add new copy to `en.json` only.** That's the whole job in this
+  repo. The `translations-upload.yml` workflow pushes new English
+  keys to Lokalise on merge to `main`; translators fill in the
+  other locales there. There is no `fr.json` / `nl.json` to edit
+  in a PR.
+- **Don't hand-edit any non-English locale file.** They aren't in
+  the tree, and a local copy is a throwaway Lokalise download that
+  the next `translations:download` overwrites — edits there never
+  reach users. Translations change in Lokalise, not in a PR.
+- When you remove a `_localize("foo")` call site, delete the key
+  from `en.json` at the same time (the next `upload --cleanup`
+  prunes it from Lokalise). No legacy keys retained.
+- The language picker is data-driven: each locale's autonym +
+  flag come from its file's top-level `language` / `flag` keys,
+  surfaced via a generated manifest
+  (`build-scripts/gen-language-manifest.cjs`, gitignored output).
+  Message bodies load lazily, one chunk per locale; adding a
+  locale needs no code change.
 - Use the `_localize(key)` pattern from
   `src/common/localize.ts` consumed via `localizeContext`. Don't
   hardcode user-facing strings.
@@ -220,13 +230,11 @@ on failure assign the previous value back and surface a
   `_localize("foo")` call site without removing the key from
   `en.json` leaves dead translations that have to be cleaned up
   later. Delete keys at the same time you remove the call.
-- **Skipping `fr.json` / `nl.json` when adding new keys.** If a
-  PR adds a key to `en.json` but not the other locale files, the
-  fallback machinery silently shows the English string to
-  French / Dutch users. The polished-but-mixed-language UI is
-  worse than a slightly-rough but consistently-localized one.
-  Always add real translations to every locale file when adding
-  new copy.
+- **Hand-editing locale files other than `en.json`.** They're
+  gitignored Lokalise downloads, absent from the tree, and the
+  next `translations:download` clobbers them — edits never reach
+  users. Add new copy to `en.json`; the upload workflow pushes it
+  to Lokalise and translators take it from there.
 
 ## Useful entry points
 
@@ -247,15 +255,11 @@ on failure assign the previous value back and surface a
 - **Don't add `Co-Authored-By: Claude` to commits.**
 - **Don't probe for feature support** before using a backend
   command.
-- **Don't ship a PR that adds new keys to `en.json` without
-  matching real translations in `fr.json` and `nl.json`.** The
-  fallback machinery hides the gap by silently rendering English
-  in the non-English UI; the result reads worse to a non-English
-  user than a slightly-rough translation would.
-- **Don't write English placeholders into non-English locale
-  files** as a workaround. The fallback already does that
-  silently; an explicit English string in `fr.json` is just an
-  unflagged shipping bug.
+- **Don't hand-edit `fr.json` / `nl.json` or any non-English
+  locale file.** They're gitignored Lokalise downloads, absent
+  from the tree, and overwritten by the next
+  `translations:download` — changes never reach users. Add new
+  copy to `en.json`; translators handle the rest in Lokalise.
 - **Don't introduce new global singletons** for state that two
   components both need; use Lit context.
 - **Don't reorder existing public Lit element APIs** (props,

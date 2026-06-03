@@ -1,10 +1,5 @@
-// @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  activeLocale,
-  clearStoredLocale,
-  defaultLocalize,
-} from "../../src/common/localize.js";
+import { describe, expect, it } from "vitest";
+import { defaultLocalize, matchLocale } from "../../src/common/localize.js";
 
 describe("defaultLocalize", () => {
   it("resolves a top-level string key", () => {
@@ -53,71 +48,54 @@ describe("defaultLocalize", () => {
   });
 });
 
-describe("activeLocale (browser detection fallback)", () => {
-  let originalLanguage: PropertyDescriptor | undefined;
-
-  beforeEach(() => {
-    clearStoredLocale();
-    originalLanguage = Object.getOwnPropertyDescriptor(navigator, "language");
-  });
-
-  afterEach(() => {
-    clearStoredLocale();
-    if (originalLanguage !== undefined) {
-      Object.defineProperty(navigator, "language", originalLanguage);
-    } else {
-      // ``navigator.language`` lives on the prototype by default,
-      // so the previous descriptor was ``undefined``. Drop the
-      // own-property override we installed via ``setLanguage`` so
-      // the next test reads through to the prototype again and
-      // doesn't observe the previous stub.
-      delete (navigator as { language?: string }).language;
-    }
-  });
-
-  const setLanguage = (value: string): void => {
-    Object.defineProperty(navigator, "language", {
-      configurable: true,
-      get: () => value,
-    });
-  };
+describe("matchLocale (browser tag resolution)", () => {
+  // The candidate list mirrors a fully-downloaded bundle. At runtime
+  // it comes from whatever translation files the build shipped; here we
+  // pin it so the matching logic is exercised independent of which JSON
+  // files happen to be present in the working tree.
+  const CANDIDATES = ["en", "fr", "nl", "hu", "zh-CN"] as const;
 
   it("matches exact supported locale codes (zh-CN)", () => {
-    setLanguage("zh-CN");
-    expect(activeLocale()).toBe("zh-CN");
+    expect(matchLocale("zh-CN", CANDIDATES)).toBe("zh-CN");
   });
 
   it("matches case-insensitive variants of the locale tag", () => {
     // BCP 47 tags are case-insensitive; a browser may report any
     // casing. The canonical ``zh-CN`` is still what we return.
-    setLanguage("zh-cn");
-    expect(activeLocale()).toBe("zh-CN");
+    expect(matchLocale("zh-cn", CANDIDATES)).toBe("zh-CN");
+  });
+
+  it("matches underscore-separated candidates against a hyphenated tag", () => {
+    // Lokalise filenames may use underscores (`zh_CN`); a browser reports
+    // BCP 47 hyphens (`zh-CN`). Matching is separator-agnostic and returns
+    // the candidate verbatim (the discovery layer canonicalizes stems, but
+    // matchLocale itself must stay underscore-tolerant).
+    expect(matchLocale("zh-CN", ["en", "zh_CN"])).toBe("zh_CN");
+  });
+
+  it("matches an underscore-separated browser tag against hyphenated candidates", () => {
+    expect(matchLocale("zh_CN", CANDIDATES)).toBe("zh-CN");
   });
 
   it("falls back to language prefix for regional variants (fr-CA)", () => {
-    setLanguage("fr-CA");
-    expect(activeLocale()).toBe("fr");
+    expect(matchLocale("fr-CA", CANDIDATES)).toBe("fr");
   });
 
   it("falls back to language prefix for nl-BE", () => {
-    setLanguage("nl-BE");
-    expect(activeLocale()).toBe("nl");
+    expect(matchLocale("nl-BE", CANDIDATES)).toBe("nl");
   });
 
-  it("falls back to en for zh-TW since zh is not a supported prefix", () => {
+  it("returns null for zh-TW since zh is not a candidate prefix", () => {
     // Regression guard: zh-CN must not capture zh-TW / zh-HK / zh-MO /
     // zh-SG via a bare `zh` prefix entry that doesn't exist.
-    setLanguage("zh-TW");
-    expect(activeLocale()).toBe("en");
+    expect(matchLocale("zh-TW", CANDIDATES)).toBeNull();
   });
 
-  it("falls back to en for unsupported languages", () => {
-    setLanguage("de-DE");
-    expect(activeLocale()).toBe("en");
+  it("returns null for unsupported languages", () => {
+    expect(matchLocale("de-DE", CANDIDATES)).toBeNull();
   });
 
   it("matches exact base language (fr)", () => {
-    setLanguage("fr");
-    expect(activeLocale()).toBe("fr");
+    expect(matchLocale("fr", CANDIDATES)).toBe("fr");
   });
 });

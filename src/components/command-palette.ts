@@ -15,7 +15,7 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LanguageChoice, LocalizeFunc } from "../common/localize.js";
-import { LANGUAGES } from "../common/localize.js";
+import { LANGUAGES, languageLabel } from "../common/localize.js";
 import {
   apiContext,
   devicesContext,
@@ -244,7 +244,7 @@ export class ESPHomeCommandPalette extends LitElement {
     const languages: CommandAction[] = LANGUAGES.map((l) => ({
       id: `language.${l.value}`,
       group: languageGroup,
-      label: t(l.labelKey),
+      label: languageLabel(l, t),
       flag: l.flag,
       keywords: ["language", "locale", l.value],
       run: () => this._setLanguage(l.value),

@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
@@ -9,7 +9,7 @@ import { getDeviceNameWarning, validateDeviceName } from "../util/config-validat
 import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
+import "./base-dialog.js";
 
 /**
  * Clone-device dialog. Two inputs:
@@ -44,39 +44,35 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
   @state()
   private _friendlyName = "";
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   static styles = [
     espHomeStyles,
     inputStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 460px;
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
+      esphome-base-dialog::part(close-button__base) {
         background: transparent;
         border: none;
         box-shadow: none;
       }
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
-      }
-
-      wa-dialog::part(footer) {
-        display: none;
       }
 
       .field {
@@ -167,13 +163,21 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     this._name = "";
     this._friendlyName = "";
     this._resolved = false;
-    this._dialog.open = true;
+    this._open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  // Flip the reactive flag on the initiating close so a re-render can't
+  // re-assert ?open mid-hide; teardown (the EnterController unbind) stays
+  // in after-hide. esphome-base-dialog never mutates its own open in
+  // response to user actions, so the host owns flipping _open here.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
 
   private _onAfterHide = (): void => {
     this._enter.set(false);
@@ -197,10 +201,13 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     const canSubmit = trimmedName.length > 0 && !err;
 
     return html`
-      <wa-dialog
-        label=${this._localize("dashboard.action_clone_title", { name: this.sourceName })}
-        light-dismiss
-        @wa-after-hide=${this._onAfterHide}
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("dashboard.action_clone_title", {
+          name: this.sourceName,
+        })}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onAfterHide}
       >
         <div class="field">
           <label for="clone-new-name"
@@ -255,7 +262,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
             ${this._localize("dashboard.action_clone_confirm")}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 

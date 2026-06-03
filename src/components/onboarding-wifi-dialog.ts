@@ -14,8 +14,8 @@ import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { type PasswordInputValueChange } from "./device/password-input-event.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./base-dialog.js";
 import "./device/password-input.js";
 
 registerMdiIcons({ wifi: mdiWifi });
@@ -62,8 +62,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @state()
   private _error: string | null = null;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   @query("#onboarding-ssid")
   private _ssidInput?: HTMLInputElement;
@@ -92,14 +92,14 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._saving = false;
     this._error = null;
     this._exitedExplicitly = false;
-    this._dialog.open = true;
+    this._open = true;
     this._enter.set(true);
     // autofocus is unreliable for a shadow-DOM input shown after first paint.
     void this.updateComplete.then(() => this._ssidInput?.focus());
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
 
   static styles = [
@@ -107,7 +107,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     inputStyles,
     dialogActionButtonStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 480px;
       }
 
@@ -190,10 +190,12 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog
-        label=${this._localize("onboarding.wifi.title")}
-        @wa-request-close=${this._onRequestClose}
-        @wa-after-hide=${this._onAfterHide}
+      <esphome-base-dialog
+        ?open=${this._open}
+        ?busy=${this._saving}
+        .label=${this._localize("onboarding.wifi.title")}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onAfterHide}
       >
         <div class="body">
           <p class="intro">
@@ -272,7 +274,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               : this._localize("onboarding.wifi.save")}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -363,18 +365,16 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   /**
-   * Block close requests while a save / decline is in flight. The
-   * X / Escape / backdrop-click would otherwise hide the dialog
-   * before the network round-trip resolves; a failed save would
-   * then route through ``_onAfterHide`` → session-dismiss with
-   * the user never seeing the inline error. Same pattern as
-   * ``adopt-dialog`` (``_onRequestClose`` + ``e.preventDefault()``
-   * gate on its ``_busy`` flag).
+   * Flip the reactive flag on the initiating close so a re-render
+   * can't re-assert ?open mid-hide; teardown stays in after-hide.
+   * The save / decline veto is handled by esphome-base-dialog's busy
+   * gate (``?busy=${this._saving}``): while saving it absorbs the
+   * X / Escape / backdrop-click and never emits request-close, so
+   * this handler only runs once the round-trip has resolved — the
+   * dialog can't hide before the user sees an inline save error.
    */
-  private _onRequestClose = (e: Event) => {
-    if (this._saving) {
-      e.preventDefault();
-    }
+  private _onRequestClose = (): void => {
+    this._open = false;
   };
 
   /**

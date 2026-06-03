@@ -17,6 +17,7 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
@@ -24,7 +25,9 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
   type LogsSession,
+  OTA_PORT,
   hasSerialPort,
+  isOtaNetwork,
   isPassive,
   isStreaming,
 } from "./logs-session.js";
@@ -119,6 +122,7 @@ export class ESPHomeLogsDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    primaryDialogHeaderStyles,
     termTokens,
     termButtonStyles,
     logsDialogStyles,
@@ -136,7 +140,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  public open(port = "OTA", options: { onBackToInstall?: () => void } = {}) {
+  public open(port = OTA_PORT, options: { onBackToInstall?: () => void } = {}) {
     this._beginSession(options.onBackToInstall);
     this._reconnect = null;
     this._session = { kind: "ota", port, streamId: null };
@@ -295,7 +299,9 @@ export class ESPHomeLogsDialog extends LitElement {
                 title=${this._localize("dashboard.logs_back_to_install_tooltip")}
               >
                 <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                ${this._localize("dashboard.logs_back_to_install")}
+                <span class="term-btn__label"
+                  >${this._localize("dashboard.logs_back_to_install")}</span
+                >
               </button>`
             : ""}
           <div class="toolbar-slot" slot="toolbar-right">
@@ -307,13 +313,17 @@ export class ESPHomeLogsDialog extends LitElement {
                   disabled: !hasSerialPort(s),
                   onClick: this._onResetDevice,
                 })
-              : renderTermToggle({
-                  active: this._showStates,
-                  onClick: this._toggleShowStates,
-                  icon: "pulse",
-                  label: this._localize("dashboard.logs_states"),
-                  title: toggleLabel,
-                })}
+              : isOtaNetwork(s)
+                ? // States arrive only over the network/API connection, so the
+                  // toggle is hidden for a server serial source (#539).
+                  renderTermToggle({
+                    active: this._showStates,
+                    onClick: this._toggleShowStates,
+                    icon: "pulse",
+                    label: this._localize("dashboard.logs_states"),
+                    title: toggleLabel,
+                  })
+                : ""}
             <!-- Kept inline: the expand-btn class drives the mobile hide rule. -->
             <button
               type="button"

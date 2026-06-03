@@ -14,18 +14,7 @@ export const installMethodDialogStyles = css`
     --width: 460px;
   }
 
-  esphome-base-dialog::part(header) {
-    background: var(--esphome-primary);
-    padding: 0 var(--wa-space-m);
-    height: 40px;
-    box-sizing: border-box;
-  }
-
-  esphome-base-dialog::part(title) {
-    color: var(--esphome-on-primary);
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
-  }
+  /* Primary header bar comes from primaryDialogHeaderStyles (shared). */
 
   /* Close-button styling is bundled in
      <esphome-base-dialog> via dialogCloseButtonStyles,

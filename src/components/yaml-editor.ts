@@ -1,5 +1,5 @@
 import { autocompletion } from "@codemirror/autocomplete";
-import { indentWithTab } from "@codemirror/commands";
+import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
@@ -17,7 +17,10 @@ import {
   vscodeDark,
   vscodeLight,
 } from "../util/yaml-editor-theme.js";
-import { createBackendYamlLinter } from "../util/yaml-lint-backend.js";
+import {
+  createBackendYamlLinter,
+  lintErrorLineGutter,
+} from "../util/yaml-lint-backend.js";
 import type { YamlSection } from "../util/yaml-sections.js";
 import {
   sensitiveValueMaskExtension,
@@ -26,6 +29,11 @@ import {
 import { yamlStickyScroll } from "../util/yaml-sticky-scroll.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
+
+// `#` must be percent-encoded (`%23`) inside a data-URI background-image.
+const errorDot = (fill: string, stroke: string): string =>
+  `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">` +
+  `<circle cx="20" cy="20" r="14" fill="${fill}" stroke="${stroke}" stroke-width="6"/></svg>')`;
 
 // Module-level singletons so they survive editor rebuilds
 const setHighlight = StateEffect.define<HighlightRange | null>();
@@ -144,7 +152,7 @@ export class ESPHomeYamlEditor extends LitElement {
             ? "rgba(99, 179, 237, 0.2)"
             : "rgba(59, 130, 246, 0.1)",
         },
-        // ─── Diagnostics: red wavy underline only (no gutter pill) ──
+        // ─── Diagnostics: red wavy underline + gutter marker ────────
         ".cm-lintRange-error": {
           backgroundImage: this._darkMode
             ? 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 3"><path d="M0 3 L1.5 0 L3 3 L4.5 0 L6 3" fill="none" stroke="%23ff6b6b" stroke-width="0.9" stroke-linecap="round"/></svg>\')'
@@ -172,6 +180,7 @@ export class ESPHomeYamlEditor extends LitElement {
           color: this._darkMode ? "#f0f0f5" : "#1a1a1a",
           fontFamily: "inherit",
           fontSize: "12.5px",
+          fontWeight: "500",
           lineHeight: "1.5",
         },
         ".cm-diagnostic + .cm-diagnostic": {
@@ -185,6 +194,17 @@ export class ESPHomeYamlEditor extends LitElement {
         },
         ".cm-diagnostic-info": {
           borderLeftColor: this._darkMode ? "#4dabf7" : "#0b5cad",
+        },
+        // A red dot replaces the line number on error lines — no separate
+        // lint gutter, so an error never reflows the editor.
+        ".cm-lineNumbers .cm-gutterElement.cm-lint-error-line": {
+          color: "transparent",
+          backgroundImage: this._darkMode
+            ? errorDot("%23ff6b6b", "%23d92d20")
+            : errorDot("%23d92d20", "%23a51d12"),
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "right 3px center",
+          backgroundSize: "0.7em",
         },
         // ─── Autocompletion popup ───────────────────────────────────
         ".cm-tooltip.cm-tooltip-autocomplete": {
@@ -327,12 +347,22 @@ export class ESPHomeYamlEditor extends LitElement {
     ];
 
     if (this._api && this.configuration) {
-      // Backend lint — wavy underlines only, no gutter pill.
+      // `lintErrorLineGutter` reads the linter's diagnostics, so it must be
+      // wired after `createBackendYamlLinter`.
       extensions.push(
         createBackendYamlLinter({
           api: this._api,
           getConfiguration: () => this.configuration,
-        })
+          onResult: (errors, configuration) =>
+            this.dispatchEvent(
+              new CustomEvent("yaml-diagnostics", {
+                detail: { errors, configuration },
+                bubbles: true,
+                composed: true,
+              })
+            ),
+        }),
+        lintErrorLineGutter
       );
       // Schema-driven completion off the components catalog.
       extensions.push(
@@ -358,10 +388,23 @@ export class ESPHomeYamlEditor extends LitElement {
       parent: this._container,
     });
 
-    // Apply any pending highlight after mount
-    if (this.highlightRange) {
-      this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
-    }
+    // Remount paths in updated() return before the highlightRange
+    // branch, so re-apply a pending highlight (+ scroll) here.
+    if (this.highlightRange) this._applyHighlight();
+  }
+
+  /** Set (or clear) the highlight mark and scroll it into view. */
+  private _applyHighlight() {
+    if (!this._view) return;
+    this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
+    if (!this.highlightRange || !this.scrollToHighlight) return;
+    const line = Math.max(1, this.highlightRange.fromLine);
+    const pos = this._view.state.doc.line(
+      Math.min(line, this._view.state.doc.lines)
+    ).from;
+    this._view.dispatch({
+      effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
+    });
   }
 
   /**
@@ -427,6 +470,14 @@ export class ESPHomeYamlEditor extends LitElement {
 
     if (changed.has("value") && this._view) {
       const current = this._view.state.doc.toString();
+      // First population of a never-edited editor: remount so the async
+      // value is the undo baseline, else Ctrl+Z unwinds to blank (#1150).
+      // The undoDepth gate keeps later external repopulates (after the
+      // user edits/clears) undoable.
+      if (current === "" && this.value !== "" && undoDepth(this._view.state) === 0) {
+        this._remountEditor();
+        return;
+      }
       if (current !== this.value) {
         // Same-document patch (section-editor save, …).
         //
@@ -492,16 +543,7 @@ export class ESPHomeYamlEditor extends LitElement {
     }
 
     if (changed.has("highlightRange") && this._view) {
-      this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
-      if (this.highlightRange && this.scrollToHighlight) {
-        const line = Math.max(1, this.highlightRange.fromLine);
-        const pos = this._view.state.doc.line(
-          Math.min(line, this._view.state.doc.lines)
-        ).from;
-        this._view.dispatch({
-          effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
-        });
-      }
+      this._applyHighlight();
     }
 
     if (changed.has("revealSensitive") && this._view) {
