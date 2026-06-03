@@ -146,8 +146,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property({ attribute: false })
   presentComponents: Set<string> = new Set();
 
+  /** Instance-relative field path to scroll into view, from the YAML cursor. */
+  @property({ attribute: false })
+  focusFieldPath?: string[];
+
   @state()
   private _nestedOpenSections: Set<string> = new Set();
+
+  /** Pending scroll target; survives the re-render that opening a
+   *  collapsed ancestor group triggers. */
+  private _pendingScrollPath?: string[];
 
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
@@ -237,9 +245,56 @@ export class ESPHomeConfigEntryForm extends LitElement {
     }
   }
 
+  connectedCallback() {
+    super.connectedCallback();
+    this.addEventListener("focusin", this._onFocusIn);
+  }
+
+  disconnectedCallback() {
+    this.removeEventListener("focusin", this._onFocusIn);
+    super.disconnectedCallback();
+  }
+
+  /** Field focused → tell the page which field, to highlight its YAML line. */
+  private _onFocusIn = (e: Event) => {
+    const el = (e.target as HTMLElement | null)?.closest?.("[data-field-key]");
+    if (!el) return;
+    const path = parseFieldKey(el.getAttribute("data-field-key") ?? "");
+    if (!path.length) return;
+    this.dispatchEvent(
+      new CustomEvent<{ path: string[] }>("field-focus", {
+        detail: { path },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
+    if (changed.has("focusFieldPath") && this.focusFieldPath?.length) {
+      this._pendingScrollPath = this.focusFieldPath;
+      // Open collapsed ancestor groups so the field is in the DOM to find.
+      for (let i = 1; i < this.focusFieldPath.length; i++) {
+        this.openNested(this.focusFieldPath.slice(0, i).join("."));
+      }
+    }
+    if (this._pendingScrollPath) this._scrollPendingFieldIntoView();
+  }
+
+  /** Scroll the pending field into view once it's in the DOM; clears it. */
+  private _scrollPendingFieldIntoView() {
+    const path = this._pendingScrollPath;
+    if (!path || !this.shadowRoot) return;
+    const fields = this.shadowRoot.querySelectorAll<HTMLElement>("[data-field-key]");
+    const target = Array.from(fields).find((f) => {
+      const p = parseFieldKey(f.getAttribute("data-field-key") ?? "");
+      return p.length === path.length && p.every((k, i) => k === path[i]);
+    });
+    if (!target) return;
+    this._pendingScrollPath = undefined;
+    target.scrollIntoView({ block: "nearest" });
   }
 
   private async _syncSelectValues() {

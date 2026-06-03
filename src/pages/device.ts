@@ -37,7 +37,12 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
 import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
-import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
+import {
+  findFieldLine,
+  parseYamlTopLevelSections,
+  sectionAtLine,
+  sectionKeyOf,
+} from "../util/yaml-sections.js";
 import { summarizeValidation } from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
 
@@ -132,6 +137,11 @@ export class ESPHomePageDevice extends LitElement {
 
   @state()
   private _selectedFromLine?: number = this._readUrlLine();
+
+  /** Instance-relative field path the YAML cursor is on, for the form to
+   *  scroll into view; empty on a section header / non-field line. */
+  @state()
+  private _focusFieldPath?: string[];
 
   /** Per-page navigation stack — each entry is a section the user
    *  visited *before* the current one, ordered oldest-first. The
@@ -843,6 +853,7 @@ export class ESPHomePageDevice extends LitElement {
           @section-select=${this._onSectionSelect}
           @section-mount=${this._onSectionMount}
           @section-unmount=${this._onSectionUnmount}
+          @field-focus=${this._onFieldFocus}
           @dirty-change=${this._onSectionDirtyChange}
           @nav-section-show=${this._onNavSectionShow}
           @nav-collapse=${this._onNavCollapse}
@@ -864,6 +875,7 @@ export class ESPHomePageDevice extends LitElement {
             .configuration=${this.id}
             .selectedSection=${this._selectedSection}
             .selectedFromLine=${this._selectedFromLine}
+            .focusFieldPath=${this._focusFieldPath}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
             ?hasUnsavedEdits=${this._isDirty}
@@ -1081,7 +1093,10 @@ export class ESPHomePageDevice extends LitElement {
    * `if` blocks in `yaml-editor.ts:_buildExtensions`'s
    * `updateListener`.
    */
-  private _onYamlCursorLine(e: CustomEvent<{ line: number }>) {
+  private _onYamlCursorLine(e: CustomEvent<{ line: number; path?: string[] }>) {
+    // Set before the section early-return below, or moving between fields
+    // in the same section wouldn't update the form's scroll target.
+    this._focusFieldPath = e.detail.path;
     const match = sectionAtLine(this._yaml, e.detail.line);
     if (!match) return;
     const sectionKey = sectionKeyOf(match);
@@ -1096,6 +1111,21 @@ export class ESPHomePageDevice extends LitElement {
       this._selectedFromLine = match.fromLine;
       this._updateUrl();
     });
+  }
+
+  /** Form field focused → highlight just that field's YAML line (leaves
+   *  the section highlight when the field can't be located). */
+  private _onFieldFocus(e: CustomEvent<{ path: string[] }>) {
+    const path = e.detail.path;
+    if (!path?.length || this._selectedFromLine === undefined) return;
+    const section = parseYamlTopLevelSections(this._yaml).find(
+      (s) => s.fromLine === this._selectedFromLine
+    );
+    if (!section) return;
+    const line = findFieldLine(this._yaml, section, path);
+    if (line === null) return;
+    this._highlightRange = { fromLine: line, toLine: line };
+    this._scrollToHighlight = true;
   }
 
   private _onYamlHighlight(

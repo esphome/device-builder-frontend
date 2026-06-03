@@ -12,6 +12,7 @@
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
+import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 
 export interface YamlSection {
   key: string;
@@ -316,4 +317,46 @@ export function listItemChildIndent(dashLine: string): number {
   if (inline !== undefined) return inline;
   const dashIndent = dashLine.match(/^ */)?.[0].length ?? 0;
   return dashIndent + ESPHOME_YAML_INDENT.length;
+}
+
+/**
+ * 1-indexed YAML line of the instance-relative field *relPath* within
+ * *section* (``["pin","number"]`` → the nested ``number:`` line), or
+ * ``null`` so callers fall back to the whole-section range.
+ */
+export function findFieldLine(
+  yaml: string,
+  section: YamlSection,
+  relPath: string[]
+): number | null {
+  if (relPath.length === 0) return null;
+  const lines = yaml.split("\n");
+  const start = section.fromLine - 1;
+  const end = Math.min(section.toLine - 1, lines.length - 1);
+  if (start < 0 || start >= lines.length) return null;
+  const header = lines[start];
+  const isList = /^\s*-\s/.test(header);
+  // A list item's inline key (``- platform: gpio``) is a direct child, so
+  // the header line is measured at the child indent, not its dash column.
+  const childIndent = isList
+    ? listItemChildIndent(header)
+    : indentOf(header) + ESPHOME_YAML_INDENT.length;
+  const stack: { indent: number; key: string }[] = [];
+  for (let i = start; i <= end; i++) {
+    const stripped = stripComment(lines[i]);
+    if (!stripped.trim()) continue;
+    const m = stripped.match(RE_PAIR_LINE);
+    if (!m) continue;
+    const indent = i === start && isList ? childIndent : indentOf(stripped);
+    if (indent < childIndent) continue;
+    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    stack.push({ indent, key: m[1] });
+    if (
+      stack.length === relPath.length &&
+      stack.every((s, idx) => s.key === relPath[idx])
+    ) {
+      return i + 1;
+    }
+  }
+  return null;
 }

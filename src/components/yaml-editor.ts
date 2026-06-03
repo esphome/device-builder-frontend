@@ -10,6 +10,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { apiContext, darkModeContext } from "../context/index.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { getKeyPath } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { vscodeDark, vscodeLight } from "../util/yaml-editor-theme.js";
 import { createBackendYamlLinter } from "../util/yaml-lint-backend.js";
@@ -303,9 +304,12 @@ export class ESPHomeYamlEditor extends LitElement {
           const line = update.state.doc.lineAt(head).number;
           if (line !== this._lastReportedCursorLine) {
             this._lastReportedCursorLine = line;
+            // Instance-relative field path (drop the top-level key) so the
+            // page can scroll the matching form field into view.
+            const path = getKeyPath(update.state, head).slice(1);
             this.dispatchEvent(
               new CustomEvent("yaml-cursor-line", {
-                detail: { line },
+                detail: { line, path },
                 bubbles: true,
                 composed: true,
               })

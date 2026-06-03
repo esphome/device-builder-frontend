@@ -172,6 +172,22 @@ export function getTopLevelKey(state: EditorState, pos: number): string | null {
 }
 
 /**
+ * Key chain from the top-level mapping down to the pair enclosing
+ * *pos*. List-item wrappers add no key, so ``slice(1)`` is the field
+ * path relative to the component instance (the form's ``data-field-key``).
+ */
+export function getKeyPath(state: EditorState, pos: number): string[] {
+  const keys: string[] = [];
+  let cur = findEnclosingPair(syntaxTree(state).resolveInner(pos, -1));
+  while (cur) {
+    const k = getPairKey(state, cur);
+    if (k) keys.push(k);
+    cur = findEnclosingPair(cur.parent?.parent ?? null);
+  }
+  return keys.reverse();
+}
+
+/**
  * Read the ``platform:`` value of the enclosing list-item, if any
  * (``binary_sensor: - platform: gpio`` → ``"gpio"``). Returns
  * ``null`` when the cursor isn't inside a list-item that declares

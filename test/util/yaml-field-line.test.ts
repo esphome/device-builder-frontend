@@ -1,0 +1,68 @@
+import { describe, expect, it } from "vitest";
+import {
+  _clearYamlSectionsMemo,
+  findFieldLine,
+  parseYamlTopLevelSections,
+  type YamlSection,
+} from "../../src/util/yaml-sections-core.js";
+
+function sectionAt(yaml: string, fromLine: number): YamlSection {
+  _clearYamlSectionsMemo();
+  const s = parseYamlTopLevelSections(yaml).find((x) => x.fromLine === fromLine);
+  if (!s) throw new Error(`no section at line ${fromLine}`);
+  return s;
+}
+
+const LIST_YAML = [
+  "binary_sensor:",
+  "  - platform: gpio",
+  "    name: Pan Water",
+  "    device_class: moisture",
+  "    pin:",
+  "      number: GPIO33",
+  "      mode: INPUT_PULLUP",
+  "",
+].join("\n");
+
+describe("findFieldLine", () => {
+  it("locates a top-level field inside a list item", () => {
+    const section = sectionAt(LIST_YAML, 2); // `- platform: gpio`
+    expect(findFieldLine(LIST_YAML, section, ["name"])).toBe(3);
+    expect(findFieldLine(LIST_YAML, section, ["device_class"])).toBe(4);
+    expect(findFieldLine(LIST_YAML, section, ["platform"])).toBe(2);
+  });
+
+  it("locates a nested field", () => {
+    const section = sectionAt(LIST_YAML, 2);
+    expect(findFieldLine(LIST_YAML, section, ["pin"])).toBe(5);
+    expect(findFieldLine(LIST_YAML, section, ["pin", "number"])).toBe(6);
+    expect(findFieldLine(LIST_YAML, section, ["pin", "mode"])).toBe(7);
+  });
+
+  it("returns null for an unresolved path", () => {
+    const section = sectionAt(LIST_YAML, 2);
+    expect(findFieldLine(LIST_YAML, section, ["nope"])).toBeNull();
+    expect(findFieldLine(LIST_YAML, section, [])).toBeNull();
+  });
+
+  it("locates a field in a flat (non-list) section", () => {
+    const yaml = ["wifi:", "  ssid: x", "  ap:", "    ssid: y", ""].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(findFieldLine(yaml, section, ["ssid"])).toBe(2);
+    expect(findFieldLine(yaml, section, ["ap"])).toBe(3);
+    expect(findFieldLine(yaml, section, ["ap", "ssid"])).toBe(4);
+  });
+
+  it("targets the correct instance among duplicates", () => {
+    const yaml = [
+      "binary_sensor:",
+      "  - platform: gpio",
+      "    name: First",
+      "  - platform: gpio",
+      "    name: Second",
+      "",
+    ].join("\n");
+    const second = sectionAt(yaml, 4); // the second `- platform: gpio`
+    expect(findFieldLine(yaml, second, ["name"])).toBe(5);
+  });
+});
