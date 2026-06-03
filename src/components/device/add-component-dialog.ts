@@ -151,8 +151,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
   static styles = [
     espHomeStyles,
     fullscreenMobileDialog("esphome-base-dialog"),
-    // Shared primary header + back button (also used by create-config and the
-    // command dialog) — see dialog-chrome.ts.
+    // Shared primary header + back button (also used by create-config) —
+    // see dialog-chrome.ts.
     primaryHeaderDialogStyles,
     addComponentDialogStyles,
   ];

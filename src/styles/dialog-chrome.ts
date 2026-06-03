@@ -57,8 +57,10 @@ export const quietCloseButtonStyles = css`
 /**
  * Branded "wizard" header: a compact primary-colored bar, a flush 40×40
  * close button, and a back button slotted into ``esphome-base-dialog``'s
- * ``header-prefix``. Shared by the create-config wizard, the add-component
- * dialog, and the command dialog. The back button is a plain
+ * ``header-prefix``. Shared by the create-config wizard and the add-component
+ * dialog. (The process-terminal dialogs — command / firmware-install / logs —
+ * have a similar bar but a monospace title and a terminal body, so they're
+ * intentionally not folded in here; see #600.) The back button is a plain
  * ``<button class="back-button" slot="header-prefix">`` in the consumer's
  * own light DOM, so the ``.back-button`` rule styles it directly.
  */
