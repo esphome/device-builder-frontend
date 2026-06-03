@@ -399,7 +399,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
       const p = this._pathOf(el);
       if (p.length === path.length && p.every((k, i) => k === path[i])) return el;
     }
+    // Only custom elements (hyphenated tag) carry a shadow root, so skip the
+    // plain-element subtree and recurse just into those.
     for (const el of root.querySelectorAll<HTMLElement>("*")) {
+      if (!el.localName.includes("-")) continue;
       const sr = (el as HTMLElement & { shadowRoot: ShadowRoot | null }).shadowRoot;
       const found = sr ? this._findFieldElement(sr, path) : null;
       if (found) return found;
