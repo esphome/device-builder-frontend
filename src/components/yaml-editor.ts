@@ -1,7 +1,7 @@
 import { autocompletion } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
-import { EditorState, StateEffect, StateField, type Range } from "@codemirror/state";
+import { EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
 import { consume } from "@lit/context";
 import { basicSetup, EditorView } from "codemirror";
@@ -45,16 +45,20 @@ const highlightField = StateField.define<DecorationSet>({
         const doc = tr.state.doc;
         const lo = Math.max(1, fromLine);
         const hi = Math.min(doc.lines, toLine);
-        // Per-line decorations (not one end-anchored mark): a line class
-        // covers the whole line regardless of content, so the highlight
-        // doesn't lag behind text typed into the line from the form.
-        const decos: Range<Decoration>[] = [];
-        for (let ln = lo; ln <= hi; ln++) {
-          decos.push(
-            Decoration.line({ class: "cm-esphome-highlight" }).range(doc.line(ln).from)
-          );
+        // Single-line field highlight: a line decoration covers the whole line
+        // regardless of content, so it doesn't lag behind text typed into the
+        // line from the form. Multi-line section highlight: one mark spanning
+        // the block, instead of a decoration per line for a large section.
+        if (lo === hi) {
+          return Decoration.set([
+            Decoration.line({ class: "cm-esphome-highlight" }).range(doc.line(lo).from),
+          ]);
         }
-        return Decoration.set(decos);
+        const from = doc.line(lo).from;
+        const to = doc.line(hi).to;
+        return Decoration.set([
+          Decoration.mark({ class: "cm-esphome-highlight" }).range(from, to),
+        ]);
       }
     }
     return deco.map(tr.changes);
