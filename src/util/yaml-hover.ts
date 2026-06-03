@@ -19,6 +19,8 @@ import { html, nothing, render } from "lit";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
+import { isYamlOnlySection } from "../components/device/yaml-only-sections.js";
+import { fetchComponent } from "./component-name-cache.js";
 import {
   getActions,
   getComponentDocs,
@@ -123,6 +125,22 @@ function fieldTarget(
 }
 
 /**
+ * True when the structured editor can't render a form for the component —
+ * it has no ``config_entries`` (e.g. ``ethernet``) or is an always-YAML
+ * section (``packages`` / ``external_components``). Mirrors the structured
+ * editor's own ``isYamlOnlySection`` so hover and form stay in lockstep.
+ */
+async function isYamlOnlyComponent(
+  api: ESPHomeAPI,
+  topLevelKey: string,
+  platformValue: string | null
+): Promise<boolean> {
+  const componentId = platformValue ? `${topLevelKey}.${platformValue}` : topLevelKey;
+  const comp = await fetchComponent(api, componentId);
+  return isYamlOnlySection(topLevelKey, comp?.config_entries.length ?? 0);
+}
+
+/**
  * Resolve hover docs for the YAML token under *pos*, or ``null`` when
  * nothing maps. Reuses the completion source's context helpers so hover
  * and completion agree on structure.
@@ -143,6 +161,26 @@ export async function resolveHoverTarget(
   const lineIdx = line.number - 1;
   const allLines = state.doc.toString().split("\n");
 
+  // Resolve the top-level component (and platform, for platform lists)
+  // up front so we can gate the whole hover on it.
+  const bundleCtx = indent === 0 ? null : resolveBundleContext(state, pos);
+  const topLevelKey =
+    indent === 0 ? key : (bundleCtx?.topLevelKey ?? findTopLevelBlock(allLines, lineIdx));
+  const platformValue =
+    indent === 0
+      ? null
+      : bundleCtx
+        ? bundleCtx.platformValue
+        : readPlatformSibling(allLines, lineIdx, indent);
+
+  // Only document what the structured editor can't render a form for —
+  // components with no config_entries (e.g. ethernet) or the always-YAML
+  // sections (packages / external_components). The form already documents
+  // everything else on screen, so a tooltip there would just duplicate it.
+  if (topLevelKey && !(await isYamlOnlyComponent(api, topLevelKey, platformValue))) {
+    return null;
+  }
+
   // Top-level component / domain key → its docs. Prefer the schema's
   // core component/platform docs (covers bare domains like
   // ``binary_sensor:`` the catalog lacks), falling back to the catalog.
@@ -152,12 +190,6 @@ export async function resolveHoverTarget(
     const c = catalog.byId.get(key);
     return c ? componentTarget(c) : null;
   }
-
-  const bundleCtx = resolveBundleContext(state, pos);
-  const topLevelKey = bundleCtx?.topLevelKey ?? findTopLevelBlock(allLines, lineIdx);
-  const platformValue = bundleCtx
-    ? bundleCtx.platformValue
-    : readPlatformSibling(allLines, lineIdx, indent);
 
   // Pointer over the value (right of the first colon) with a value present.
   const colInLine = pos - line.from;

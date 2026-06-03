@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../../src/api/types/components.js";
 import { ConfigEntryType, type ConfigEntry } from "../../src/api/types/config-entries.js";
+import { fetchComponent } from "../../src/util/component-name-cache.js";
 import * as schema from "../../src/util/esphome-schema.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import type { CatalogIndex } from "../../src/util/yaml-completion.js";
@@ -22,6 +23,12 @@ vi.mock("../../src/util/esphome-schema.js", async (importOriginal) => ({
   getConfigVarDocsAtPath: vi.fn(),
 }));
 
+// The hover gate reads each component's `config_entries` to decide whether
+// the structured editor already renders a form for it.
+vi.mock("../../src/util/component-name-cache.js", () => ({
+  fetchComponent: vi.fn(),
+}));
+
 function comp(c: Partial<ComponentCatalogEntry>): ComponentCatalogEntry {
   return { config_entries: [], ...c } as unknown as ComponentCatalogEntry;
 }
@@ -29,49 +36,33 @@ function field(f: Partial<ConfigEntry>): ConfigEntry {
   return f as unknown as ConfigEntry;
 }
 
-// Only `esphome` is in the catalog (with a visible `name` field) so the
-// suppression path has something to match; everything else is schema-only.
+// Components the structured editor renders a form for (non-empty
+// `config_entries`). Everything else resolves as YAML-only → hover shown.
+const FORM_BACKED: Record<string, ConfigEntry[]> = {
+  esphome: [field({ key: "name" })],
+  wifi: [field({ key: "ssid" })],
+  "binary_sensor.gpio": [field({ key: "pin" })],
+};
+
+// The slim catalog passed to the resolver — used for component / field
+// descriptions once a token clears the gate. `ethernet` is YAML-only.
 const CATALOG: CatalogIndex = {
   components: [],
   byCategory: new Map(),
   byId: new Map<string, ComponentCatalogEntry>([
     [
-      "esphome",
+      "ethernet",
       comp({
-        id: "esphome",
-        name: "ESPHome Core",
-        description: "Core firmware configuration.",
-        docs_url: "https://esphome.io/components/esphome",
+        id: "ethernet",
+        name: "Ethernet",
+        description: "Wired networking for the node.",
+        docs_url: "https://esphome.io/components/ethernet",
         config_entries: [
           field({
-            key: "name",
+            key: "type",
             type: ConfigEntryType.STRING,
-            description: "The node name.",
-            help_link: "https://esphome.io/components/esphome#name",
-          }),
-        ],
-      }),
-    ],
-    // Platform component — keyed `<domain>.<stem>` (the reverse of the
-    // schema bundle's componentKey) to pin the catalog-fallback lookup.
-    [
-      "binary_sensor.gpio",
-      comp({
-        id: "binary_sensor.gpio",
-        name: "GPIO Binary Sensor",
-        description: "A binary sensor on a GPIO pin.",
-        docs_url: "https://esphome.io/components/binary_sensor/gpio",
-        config_entries: [
-          field({
-            key: "pin",
-            description: "The pin to monitor.",
-            config_entries: [
-              field({
-                key: "inverted",
-                type: ConfigEntryType.BOOLEAN,
-                description: "Invert the level.",
-              }),
-            ],
+            description: "The Ethernet chip type.",
+            help_link: "https://esphome.io/components/ethernet#type",
           }),
         ],
       }),
@@ -104,85 +95,75 @@ beforeEach(() => {
   vi.mocked(schema.getRegistryEntries).mockResolvedValue([]);
   vi.mocked(schema.lookupRegistryRef).mockResolvedValue(null);
   vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue(null);
+  vi.mocked(fetchComponent).mockImplementation((_api, id) =>
+    Promise.resolve(comp({ id, config_entries: FORM_BACKED[id] ?? [] }))
+  );
 });
 
-describe("resolveHoverTarget", () => {
-  it("shows enum value docs when hovering a value", async () => {
+describe("resolveHoverTarget — gated to YAML-only components", () => {
+  it("returns null on a comment line", async () => {
+    expect(await hover("# just a comment\nethernet:\n", "comment")).toBeNull();
+  });
+
+  // ─── Suppressed: the structured editor already documents these ───
+
+  it("suppresses a top-level component that has a form", async () => {
+    expect(await hover("wifi:\n  ssid: x\n", "wifi")).toBeNull();
+  });
+
+  it("suppresses a nested key inside a form-backed platform component", async () => {
+    const doc = "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: false\n";
+    expect(await hover(doc, "inverted")).toBeNull();
+  });
+
+  it("suppresses an enum value inside a form-backed component", async () => {
     vi.mocked(schema.getConfigVarValueOptions).mockResolvedValue([
       { value: "garage_door", docs: "Garage door class." },
     ]);
-    const doc = "binary_sensor:\n  - platform: template\n    device_class: garage_door\n";
-    const target = await hover(doc, "garage_door");
-    expect(target?.description).toBe("Garage door class.");
+    const doc = "binary_sensor:\n  - platform: gpio\n    device_class: garage_door\n";
+    expect(await hover(doc, "garage_door")).toBeNull();
   });
 
-  it("shows action docs inside an automation body", async () => {
+  it("suppresses a platform value for a form-backed platform component", async () => {
+    const doc = "binary_sensor:\n  - platform: gpio\n    name: x\n";
+    expect(await hover(doc, "gpio")).toBeNull();
+  });
+
+  it("suppresses an automation action inside a form-backed component", async () => {
     vi.mocked(schema.getActions).mockResolvedValue([
       { key: "logger.log", docs: "Log a message." },
     ]);
     const doc = 'esphome:\n  on_boot:\n    then:\n      - logger.log: "hi"\n';
-    const target = await hover(doc, "logger.log");
-    expect(target?.description).toBe("Log a message.");
+    expect(await hover(doc, "logger.log")).toBeNull();
   });
 
-  it("shows trigger docs for an on_* key", async () => {
-    vi.mocked(schema.getTriggerKeys).mockResolvedValue([
-      { key: "on_press", docs: "Pressed." },
-    ]);
-    const doc =
-      "binary_sensor:\n  - platform: gpio\n    on_press:\n      - logger.log: x\n";
-    const target = await hover(doc, "on_press");
-    expect(target?.description).toBe("Pressed.");
+  // ─── Shown: components the structured editor can't render a form for ───
+
+  it("shows the component description for a YAML-only component", async () => {
+    const target = await hover("ethernet:\n  type: W5500\n", "ethernet");
+    expect(target?.description).toBe("Wired networking for the node.");
+    expect(target?.docsUrl).toBe("https://esphome.io/components/ethernet");
   });
 
-  it("walks the schema for a deeply-nested key", async () => {
-    vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue("Scan actively.");
-    const doc = "esp32_ble_tracker:\n  scan_parameters:\n    active: false\n";
-    const target = await hover(doc, "active");
-    expect(target?.description).toBe("Scan actively.");
+  it("walks the schema for a nested key in a YAML-only component", async () => {
+    vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue("The Ethernet chip type.");
+    const target = await hover("ethernet:\n  type: W5500\n", "type");
+    expect(target?.description).toBe("The Ethernet chip type.");
     expect(vi.mocked(schema.getConfigVarDocsAtPath)).toHaveBeenCalledWith(
       API,
-      "esp32_ble_tracker",
-      "esp32_ble_tracker",
-      ["scan_parameters", "active"]
+      "ethernet",
+      "ethernet",
+      ["type"]
     );
   });
 
-  it("shows schema docs for a config-entry field (full parity)", async () => {
-    vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue("Schema name docs.");
-    const target = await hover('esphome:\n  name: "x"\n', "name");
-    expect(target?.description).toBe("Schema name docs.");
+  it("falls back to the catalog field description for a YAML-only component", async () => {
+    const target = await hover("ethernet:\n  type: W5500\n", "type");
+    expect(target?.description).toBe("**string**: The Ethernet chip type.");
+    expect(target?.docsUrl).toBe("https://esphome.io/components/ethernet#type");
   });
 
-  it("falls back to the catalog field description (with type prefix) when the schema has none", async () => {
-    // getConfigVarDocsAtPath defaults to null in beforeEach.
-    const target = await hover('esphome:\n  name: "x"\n', "name");
-    expect(target?.description).toBe("**string**: The node name.");
-    expect(target?.docsUrl).toBe("https://esphome.io/components/esphome#name");
-  });
-
-  it("always shows a top-level component description", async () => {
-    const target = await hover('esphome:\n  name: "x"\n', "esphome");
-    expect(target?.description).toBe("Core firmware configuration.");
-    expect(target?.docsUrl).toBe("https://esphome.io/components/esphome");
-  });
-
-  it("shows the platform component description for platform: <value>", async () => {
-    const doc = "binary_sensor:\n  - platform: gpio\n    name: x\n";
-    const target = await hover(doc, "gpio");
-    expect(target?.description).toBe("A binary sensor on a GPIO pin.");
-    expect(target?.docsUrl).toBe("https://esphome.io/components/binary_sensor/gpio");
-  });
-
-  it("falls back to the catalog for a nested platform field (correct <domain>.<stem> id)", async () => {
-    // Schema walk returns null (default mock) → catalog fallback, which
-    // must key the platform as binary_sensor.gpio, not gpio.binary_sensor.
-    const doc = "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: false\n";
-    const target = await hover(doc, "inverted");
-    expect(target?.description).toBe("**boolean**: Invert the level.");
-  });
-
-  it("shows a bare-domain description from the schema core docs", async () => {
+  it("shows a bare-domain description for a platform domain with no form", async () => {
     vi.mocked(schema.getComponentDocs).mockResolvedValue(
       "With ESPHome you can use different types of binary sensors."
     );
@@ -190,15 +171,5 @@ describe("resolveHoverTarget", () => {
     expect(target?.description).toBe(
       "With ESPHome you can use different types of binary sensors."
     );
-  });
-
-  it("returns null on a comment line", async () => {
-    expect(await hover("# just a comment\nesphome:\n", "comment")).toBeNull();
-  });
-
-  it("returns null when the schema has no docs for the key", async () => {
-    expect(
-      await hover("esp32_ble_tracker:\n  scan_parameters:\n    active: false\n", "active")
-    ).toBeNull();
   });
 });
