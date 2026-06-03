@@ -243,19 +243,22 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.addEventListener("focusin", this._onFocusIn);
+    this.addEventListener("focusin", this._onFieldInteraction);
+    this.addEventListener("change", this._onFieldInteraction);
   }
 
   disconnectedCallback() {
-    this.removeEventListener("focusin", this._onFocusIn);
+    this.removeEventListener("focusin", this._onFieldInteraction);
+    this.removeEventListener("change", this._onFieldInteraction);
     super.disconnectedCallback();
   }
 
-  /** Field focused → tell the page which field, to highlight its YAML line.
-   *  Walks ``composedPath`` (not ``closest``) so a field whose
-   *  ``data-field-key`` lives inside a nested renderer's shadow root — the
-   *  pin / registry-list editors — is still found. */
-  private _onFocusIn = (e: Event) => {
+  /** Field focused or changed → tell the page which field, to highlight its
+   *  YAML line. ``change`` covers selects / switches whose click doesn't
+   *  reliably surface a focusin. Walks ``composedPath`` (not ``closest``)
+   *  so a field whose ``data-field-key`` lives inside a nested renderer's
+   *  shadow root — the pin / registry-list editors — is still found. */
+  private _onFieldInteraction = (e: Event) => {
     const el = e
       .composedPath()
       .find(
@@ -277,7 +280,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
-    if (changed.has("focusFieldPath") && this.focusFieldPath?.length) {
+    // Re-attempt on ``entries`` too: switching sections loads the new
+    // form's entries asynchronously, so the field isn't in the DOM yet
+    // on the ``focusFieldPath`` change alone. (``entries`` only changes
+    // on a section switch, not on value edits, so this won't scroll
+    // unbidden mid-editing.)
+    if (
+      (changed.has("focusFieldPath") || changed.has("entries")) &&
+      this.focusFieldPath?.length
+    ) {
       void this._scrollToFocusField(this.focusFieldPath);
     }
   }

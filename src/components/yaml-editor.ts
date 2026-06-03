@@ -396,8 +396,11 @@ export class ESPHomeYamlEditor extends LitElement {
     const pos = this._view.state.doc.line(
       Math.min(line, this._view.state.doc.lines)
     ).from;
+    // ``nearest`` scrolls only when the line is outside the viewport, so a
+    // structured-editor field highlight doesn't jolt the YAML pane when the
+    // line is already visible.
     this._view.dispatch({
-      effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
+      effects: EditorView.scrollIntoView(pos, { y: "nearest", yMargin: 50 }),
     });
   }
 
