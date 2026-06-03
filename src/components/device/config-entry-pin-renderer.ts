@@ -133,10 +133,16 @@ function renderPinOptions(
   // it's one flat list (no false "this is special" framing).
   const splitByCapability = supported.length > 0 && other.length > 0;
   const features = (entry.pin_features ?? []).map((f) => f.toUpperCase()).join(", ");
+  // The group label + divider are a sighted-only contrast cue. ``wa-select``
+  // only navigates ``<wa-option>`` children, so a screen reader would
+  // otherwise announce these as stray, contextless text mid-list (there's no
+  // wa-optgroup to carry real grouping). Hide them from the a11y tree; each
+  // option still conveys its own state (reserved → ``disabled``, in-use /
+  // conflict → ``title``), so no per-option context is lost.
   const header = (key: string, withDivider: boolean) =>
     html`${withDivider
-        ? html`<wa-divider class="pin-group-divider"></wa-divider>`
-        : nothing} <small class="pin-group-label">${key}</small>`;
+        ? html`<wa-divider class="pin-group-divider" aria-hidden="true"></wa-divider>`
+        : nothing} <small class="pin-group-label" aria-hidden="true">${key}</small>`;
   return html`
     ${splitByCapability && features
       ? header(ctx.localize("device.pin_group_supports", { features }), false)
@@ -209,7 +215,9 @@ export function renderPinField(
   const invalid = ctx.errorAt(path) !== null;
   // Show every board pin; a pin that doesn't match the field's required
   // features (or direction) isn't hidden — it's grouped under "Other pins"
-  // with a warning, and stays selectable (issue #1012). Hiding it is too
+  // and stays selectable (issue #1012). Only a direction conflict
+  // (input-only pin on an output field) or an in-use pin is warned; a
+  // merely-missing capability is grouped, not warned. Hiding it is too
   // harsh for unusual boards and "I know what I'm doing" workflows.
   let visible = ctx.board.pins;
   // A featured-component preset can narrow the pin set further — e.g.
