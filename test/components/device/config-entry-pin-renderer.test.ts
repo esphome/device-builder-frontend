@@ -131,6 +131,24 @@ describe("renderPinField nRF52 pin values", () => {
     expect(option.value).toBe("P0.27");
     expect(option["?selected"]).toBe(true);
   });
+
+  it("writes the P0.x form to path.number on a long-form value", () => {
+    // Long-form pin block on nRF52: the picker must write the P0.x value form
+    // into `number:` (ESPHome's nRF52 validator accepts it; `GPIOn` it rejects).
+    const ctx = makeRenderCtx(
+      { pin: { number: "P0.27", mode: { pullup: true } } },
+      { board: nrf52Board() }
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    const select = findTemplatesByAnchor(result, "<wa-select")[0];
+    const onChange = extractAttributeBindings(select)["@change"] as (e: Event) => void;
+    onChange({ target: { value: "P1.1" } } as never);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "number"], "P1.1");
+  });
 });
 
 describe("renderPinField wa-select binding", () => {
