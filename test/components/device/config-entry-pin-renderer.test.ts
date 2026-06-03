@@ -177,6 +177,23 @@ describe("renderPinField long-form Advanced disclosure", () => {
     expect(ctx.renderEntry).not.toHaveBeenCalled();
   });
 
+  it("declares the gated path prefix so cursor-nav can reveal collapsed fields", () => {
+    const ctx = makeRenderCtx({ pin: 0 });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx
+    );
+    const disclosure = findTemplatesByAnchor(result, 'class="pin-advanced"')[0];
+    const bindings = extractAttributeBindings(disclosure);
+    expect(bindings["data-reveal-for"]).toBe('["pin"]');
+    expect(bindings["data-field-key"]).toBe("pin:pin-advanced");
+  });
+
   it("renders the long-form children when the disclosure is open", () => {
     // Toggle is keyed on `${path}:pin-advanced`; populating the
     // open-set simulates the user having clicked open.

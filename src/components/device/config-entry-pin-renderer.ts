@@ -313,7 +313,11 @@ function renderPinAdvanced(
   };
 
   return html`
-    <div class="pin-advanced" data-field-key="${advancedKey}">
+    <div
+      class="pin-advanced"
+      data-field-key="${advancedKey}"
+      data-reveal-for="${fieldKeyAttr(path)}"
+    >
       <button
         type="button"
         class="pin-advanced-toggle"
