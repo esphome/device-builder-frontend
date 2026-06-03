@@ -294,6 +294,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
           n instanceof HTMLElement && n.hasAttribute("data-field-key")
       );
     if (!el) return;
+    // Only real field paths (JSON arrays from ``fieldKeyAttr``) map to a YAML
+    // line. Synthetic disclosure keys like ``pin:pin-advanced`` would strand
+    // the page in a doomed pending-field-line retry — skip them.
+    const attr = el.getAttribute("data-field-key") ?? "";
+    if (!attr.startsWith("[")) return;
     const path = this._pathOf(el);
     if (!path.length) return;
     const { emit, focusedKey } = decideFieldFocus(

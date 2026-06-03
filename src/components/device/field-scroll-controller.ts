@@ -6,6 +6,9 @@ import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js"
  *  the cap stops an unbounded shadow-DOM walk for a never-rendered path. */
 const MAX_TRIES = 3;
 
+/** Class that runs the one-shot glow; defined in ``config-entry-form.styles``. */
+const FLASH_CLASS = "field--highlight";
+
 /** The form surface this helper drives. */
 export interface FieldScrollHost {
   shadowRoot: ShadowRoot | null;
@@ -28,6 +31,10 @@ export class FieldScrollController {
   /** ``focusFieldPath`` already scrolled to; a later value edit doesn't
    *  re-scroll a consumed target. */
   private _scrolledKey?: string;
+  /** Last target key seen — ``focusFieldPath`` is a fresh array on every
+   *  cursor-line move, so the retry budget resets on value change, not
+   *  reference change (else the same field re-scrolls on each move). */
+  private _lastFocusKey?: string;
   private _tries = 0;
 
   constructor(private readonly host: FieldScrollHost) {}
@@ -35,31 +42,34 @@ export class FieldScrollController {
   /** Call from the host's ``updated``: (re)attempt the scroll when the target
    *  or its surrounding data changed and it hasn't been reached yet. */
   maybeScroll(changed: PropertyValues): void {
-    // A new cursor target hasn't been scrolled to yet; reset the retry budget.
-    if (changed.has("focusFieldPath")) {
+    const fp = this.host.focusFieldPath;
+    const key = fp?.length ? fieldKeyAttr(fp) : undefined;
+    if (key !== this._lastFocusKey) {
+      this._lastFocusKey = key;
       this._scrolledKey = undefined;
       this._tries = 0;
     }
-    const fp = this.host.focusFieldPath;
     if (
       fp?.length &&
-      this._scrolledKey !== fieldKeyAttr(fp) &&
+      key &&
+      this._scrolledKey !== key &&
       this._tries < MAX_TRIES &&
       (changed.has("focusFieldPath") || changed.has("entries") || changed.has("values"))
     ) {
       this._tries++;
-      void this._scrollTo(fp);
+      void this._scrollTo(fp, key);
     }
   }
 
-  private async _scrollTo(path: string[]): Promise<void> {
+  private async _scrollTo(path: string[], key: string): Promise<void> {
     const { host } = this;
     if (!host.shadowRoot) return;
     for (let i = 1; i < path.length; i++) {
       host.openNested(path.slice(0, i).join("."));
     }
     await host.updateComplete; // let any opened group render
-    if (host.focusFieldPath !== path) return; // superseded by a newer move
+    const cur = host.focusFieldPath;
+    if (!cur || fieldKeyAttr(cur) !== key) return; // superseded by a newer move
     // Try the exact field, then progressively shorter prefixes: a
     // list-of-maps field (globals / filter items, whose form paths carry
     // a synthetic index the YAML path lacks) at least scrolls its
@@ -77,11 +87,18 @@ export class FieldScrollController {
       if (key !== this._lastFlashKey || now - this._lastFlashAt > 10_000) {
         this._lastFlashKey = key;
         this._lastFlashAt = now;
-        target.classList.remove("field--highlight");
+        target.classList.remove(FLASH_CLASS);
         void target.offsetWidth;
-        target.classList.add("field--highlight");
+        target.classList.add(FLASH_CLASS);
+        // Drop the class once the one-shot glow ends so it isn't left on the
+        // element (and can't linger across a re-render).
+        target.addEventListener(
+          "animationend",
+          () => target.classList.remove(FLASH_CLASS),
+          { once: true }
+        );
       }
-      this._scrolledKey = fieldKeyAttr(path);
+      this._scrolledKey = key;
       return;
     }
   }
