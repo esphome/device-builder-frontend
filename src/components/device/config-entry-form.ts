@@ -251,9 +251,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
     super.disconnectedCallback();
   }
 
-  /** Field focused → tell the page which field, to highlight its YAML line. */
+  /** Field focused → tell the page which field, to highlight its YAML line.
+   *  Walks ``composedPath`` (not ``closest``) so a field whose
+   *  ``data-field-key`` lives inside a nested renderer's shadow root — the
+   *  pin / registry-list editors — is still found. */
   private _onFocusIn = (e: Event) => {
-    const el = (e.target as HTMLElement | null)?.closest?.("[data-field-key]");
+    const el = e
+      .composedPath()
+      .find(
+        (n): n is HTMLElement =>
+          n instanceof HTMLElement && n.hasAttribute("data-field-key")
+      );
     if (!el) return;
     const path = parseFieldKey(el.getAttribute("data-field-key") ?? "");
     if (!path.length) return;
