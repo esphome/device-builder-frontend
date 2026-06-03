@@ -125,10 +125,9 @@ function fieldTarget(
 }
 
 /**
- * True when the structured editor can't render a form for the component —
- * it has no ``config_entries`` (e.g. ``ethernet``) or is an always-YAML
- * section (``packages`` / ``external_components``). Mirrors the structured
- * editor's own ``isYamlOnlySection`` so hover and form stay in lockstep.
+ * True when the structured editor has no form for the component (no
+ * ``config_entries`` like ``ethernet``, or an always-YAML section). Same
+ * check the structured editor uses, so hover and form stay in sync.
  */
 async function isYamlOnlyComponent(
   api: ESPHomeAPI,
@@ -140,10 +139,9 @@ async function isYamlOnlyComponent(
   try {
     comp = await fetchComponent(api, componentId);
   } catch {
-    return true; // can't tell → leave the hover on rather than break it
+    return true; // fetch failed → leave the hover on
   }
-  // `config_entries` is absent (not just empty) on form-less components
-  // like ethernet — optional-chain both so the gate can't throw.
+  // `config_entries` is absent (not []) on form-less components.
   return isYamlOnlySection(topLevelKey, comp?.config_entries?.length ?? 0);
 }
 
@@ -168,22 +166,13 @@ export async function resolveHoverTarget(
   const lineIdx = line.number - 1;
   const allLines = state.doc.toString().split("\n");
 
-  // Resolve the top-level component (and platform, for platform lists)
-  // up front so we can gate the whole hover on it.
-  const bundleCtx = indent === 0 ? null : resolveBundleContext(state, pos);
-  const topLevelKey =
-    indent === 0 ? key : (bundleCtx?.topLevelKey ?? findTopLevelBlock(allLines, lineIdx));
-  const platformValue =
-    indent === 0
-      ? null
-      : bundleCtx
-        ? bundleCtx.platformValue
-        : readPlatformSibling(allLines, lineIdx, indent);
+  const bundleCtx = resolveBundleContext(state, pos);
+  const topLevelKey = bundleCtx?.topLevelKey ?? findTopLevelBlock(allLines, lineIdx);
+  const platformValue = bundleCtx
+    ? bundleCtx.platformValue
+    : readPlatformSibling(allLines, lineIdx, indent);
 
-  // Only document what the structured editor can't render a form for —
-  // components with no config_entries (e.g. ethernet) or the always-YAML
-  // sections (packages / external_components). The form already documents
-  // everything else on screen, so a tooltip there would just duplicate it.
+  // Don't duplicate the structured editor: skip components it can form-edit.
   if (topLevelKey && !(await isYamlOnlyComponent(api, topLevelKey, platformValue))) {
     return null;
   }

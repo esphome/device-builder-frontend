@@ -215,11 +215,8 @@ async function resolveVersion(api: ESPHomeAPI): Promise<string> {
  * schema-driven extras when ``null``.
  */
 export function fetchBundle(api: ESPHomeAPI, name: string): Promise<SchemaBundle | null> {
-  // "core" is a component *inside* esphome.json (the core actions /
-  // conditions live at ``esphome.json[core]``), not a bundle of its own.
-  // A "core.*" registry ref would otherwise fetch a nonexistent core.json
-  // and 404. The ``bundle["core"]`` lookups still resolve against
-  // esphome.json.
+  // "core" lives inside esphome.json (no core.json exists); a "core.*"
+  // registry ref would otherwise 404. `bundle["core"]` still resolves.
   if (name === "core") name = "esphome";
   // First-line dedupe: concurrent callers asking for the same
   // bundle name (before we know the version) share one promise.
