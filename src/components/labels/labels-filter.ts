@@ -41,8 +41,8 @@ import { facetStyles } from "../facets/facet-styles.js";
 import "./label-form.js";
 import { labelsFilterStyles } from "./labels-filter.styles.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../base-dialog.js";
 
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,
@@ -167,12 +167,12 @@ export class ESPHomeLabelsFilter extends LitElement {
 
   private _renderCreateDialog() {
     return html`
-      <wa-dialog
+      <esphome-base-dialog
         class="create-dialog"
         ?open=${this._createOpen}
-        light-dismiss
-        label=${this._localize("dashboard.labels_create")}
-        @wa-after-hide=${this._onCreateDialogHide}
+        .label=${this._localize("dashboard.labels_create")}
+        @request-close=${this._closeCreateDialog}
+        @after-hide=${this._onCreateDialogHide}
       >
         <esphome-label-form
           .existingNames=${this._catalog.map((l) => l.name)}
@@ -181,7 +181,7 @@ export class ESPHomeLabelsFilter extends LitElement {
           @label-created=${this._onLabelCreated}
           @editing-cancel=${this._closeCreateDialog}
         ></esphome-label-form>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -200,9 +200,8 @@ export class ESPHomeLabelsFilter extends LitElement {
   };
 
   private _onCreateDialogHide = () => {
-    // ``light-dismiss`` and the form's own Cancel/Esc paths both
-    // funnel through ``wa-after-hide``. Mirror our state back so
-    // the next open call is clean.
+    // Light-dismiss / Escape / the form's Cancel all funnel through the
+    // wrapper's after-hide. Mirror our state back so the next open is clean.
     this._createOpen = false;
   };
 
