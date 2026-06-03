@@ -79,4 +79,42 @@ describe("add-component-dialog preserves the editor draft (#1146)", () => {
       undefined
     );
   });
+
+  it("configless direct-add still merges the draft and closes the dialog", async () => {
+    const dialog = new ESPHomeAddComponentDialog();
+    const addComponent = vi.fn().mockResolvedValue({ yaml: "MERGED" });
+    // No `_returnTo` / bundle state → the navigate-and-close branch runs,
+    // exercising the draft-merge of the direct-add path through
+    // `_submitComponent`. `notify` defaults false so this stays a pure
+    // logic test (the toast is covered in -configless.test.ts).
+    Object.assign(dialog as unknown as Record<string, unknown>, {
+      _api: { addComponent },
+      _selected: { id: "async_tcp", name: "Async TCP" },
+      _open: true,
+    });
+    dialog.configuration = "foo.yaml";
+    dialog.yaml = "esphome:\n  name: foo\n";
+
+    const seen: Array<{ type: string }> = [];
+    dialog.addEventListener("yaml-draft", (e) => seen.push({ type: e.type }));
+
+    await (
+      dialog as unknown as {
+        _submitComponent: (
+          fields: Record<string, unknown>,
+          notify?: boolean
+        ) => Promise<void>;
+      }
+    )._submitComponent({});
+
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "async_tcp", fields: {} },
+      "esphome:\n  name: foo\n"
+    );
+    expect(seen).toEqual([{ type: "yaml-draft" }]);
+    // Navigate-and-close branch ran: dialog closed, selection cleared.
+    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
+  });
 });

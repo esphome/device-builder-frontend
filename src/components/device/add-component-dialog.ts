@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose, mdiPackageVariantClosed } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
@@ -12,6 +13,7 @@ import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
+import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
   matchesDepDomain,
@@ -320,6 +322,23 @@ export class ESPHomeAddComponentDialog extends LitElement {
     }
     this._selected = result.entry;
     this._submitError = "";
+    // Skip the empty form and add directly only when there is genuinely
+    // nothing to show: no config fields AND no missing top-level
+    // dependencies. A configless component can still require other
+    // components (e.g. `captive_portal` needs `wifi`), in which case the
+    // form's deps banner guides the user, so keep showing it. The empty
+    // schema makes the fields payload provably `{}` (no defaults, id, or
+    // pins to seed); on the rare API failure `_submitComponent` toasts
+    // the error (see its catch) since there's no form surface for it.
+    if (result.entry.config_entries.length === 0) {
+      const present = parseTopLevelComponents(this.yaml);
+      const hasMissingDeps = (result.entry.dependencies ?? []).some(
+        (d) => !present.has(d)
+      );
+      if (!hasMissingDeps) {
+        await this._submitComponent({}, /* notify */ true);
+      }
+    }
   }
 
   /**
@@ -402,8 +421,20 @@ export class ESPHomeAddComponentDialog extends LitElement {
     return navigateToDep(this as unknown as DepNavHost, e.detail.domain);
   }
 
-  private async _onFormSubmit(e: CustomEvent<{ fields: Record<string, unknown> }>) {
+  private _onFormSubmit(e: CustomEvent<{ fields: Record<string, unknown> }>) {
     e.stopPropagation();
+    return this._submitComponent(e.detail.fields);
+  }
+
+  /**
+   * Add the selected component with ``fields`` and run the post-add
+   * routing (dep-detour restore, bundle advance, or navigate-and-close).
+   * Shared by the form-submit and configless direct-add paths.
+   *
+   * ``notify`` toasts on a successful close — the configless path has no
+   * form Add-click to confirm the add otherwise.
+   */
+  private async _submitComponent(fields: Record<string, unknown>, notify = false) {
     if (!this._selected || !this.configuration || this._submitting) return;
     this._submitting = true;
     this._submitError = "";
@@ -421,7 +452,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this.configuration,
         {
           component_id: this._selected.id,
-          fields: e.detail.fields,
+          fields,
         },
         this.yaml || undefined
       );
@@ -460,7 +491,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // id when the just-added component matches what the dep-nav
         // asked for (defends against the user picking off-domain in
         // the catalog fallback).
-        const newId = e.detail.fields["id"];
+        const newId = fields["id"];
         if (
           depDomain &&
           typeof newId === "string" &&
@@ -501,7 +532,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // `light.binary` whose `output:` field has to point at it — and
         // without this prefill the user has to re-pick the id they just
         // typed in the previous step from a dropdown.
-        const justAddedId = e.detail.fields["id"];
+        const justAddedId = fields["id"];
         const justAddedDomain = this._selected.category;
         if (typeof justAddedId === "string" && justAddedDomain) {
           this._prefillReference = {
@@ -524,7 +555,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // leave the previous selection alone than navigate somewhere
         // wrong.
         const componentId = this._selected.id;
-        const newId = e.detail.fields["id"];
+        const componentName = this._selected.name;
+        const newId = fields["id"];
         const target = findAddedSection(
           yaml,
           componentId,
@@ -542,10 +574,24 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this._open = false;
         this._selected = null;
         this._resetDetourState();
+        // Configless add skipped the form, so the close is the only
+        // signal the add happened — toast to confirm.
+        if (notify) {
+          toast.success(
+            this._localize("device.component_added", { name: componentName }),
+            { richColors: true }
+          );
+        }
       }
     } catch (err) {
       this._submitError =
         err instanceof Error ? err.message : this._localize("device.add_component_error");
+      // The configless path (notify) has no form fields, so `_submitError`
+      // would land in an otherwise-empty form view where it's easy to
+      // miss — toast it too so the failure can't read as a silent no-op.
+      if (notify) {
+        toast.error(this._submitError, { richColors: true });
+      }
     } finally {
       this._submitting = false;
     }

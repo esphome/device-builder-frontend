@@ -646,6 +646,7 @@
     "search_components_placeholder": "Search components…",
     "no_components_found": "No components found",
     "add_component_action": "Add",
+    "component_added": "Added {name}",
     "featured_bundle_badge": "Bundle",
     "field_locked_by_board": "Set by the board",
     "bundle_step_progress": "Step {current} of {total} — Adding {name}",
