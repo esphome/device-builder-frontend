@@ -3,6 +3,7 @@ import {
   mdiArrowLeft,
   mdiCheckboxMultipleMarkedOutline,
   mdiClipboardTextSearchOutline,
+  mdiCloseCircle,
   mdiCodeBraces,
   mdiMagnify,
   mdiPlus,
@@ -140,6 +141,7 @@ registerMdiIcons({
   "arrow-left": mdiArrowLeft,
   "checkbox-multiple-marked-outline": mdiCheckboxMultipleMarkedOutline,
   "clipboard-text-search-outline": mdiClipboardTextSearchOutline,
+  "close-circle": mdiCloseCircle,
   "code-braces": mdiCodeBraces,
   magnify: mdiMagnify,
   plus: mdiPlus,
@@ -565,8 +567,8 @@ export class ESPHomePageDashboard extends LitElement {
     );
   }
 
-  /** Drives the Filters-button badge. Search is excluded; its own box
-   *  stays visible, so its active state is already obvious. */
+  /** Drives the Filters-button badge — facets only. A lone search isn't
+   *  a menu pill, so it clears from the search box's own × instead. */
   get _activeFacetCount(): number {
     return (
       this._selectedLabels.length +
@@ -576,6 +578,14 @@ export class ESPHomePageDashboard extends LitElement {
       this._selectedUpdateStatus.length
     );
   }
+
+  /** Clear just the search box (facets untouched) and refocus it so the
+   *  user can retype. Wired to the in-input × control (#1160). */
+  _clearSearch = () => {
+    this._search = "";
+    this._syncYamlSearch();
+    this._searchInputEl?.focus();
+  };
 
   /** Wipe search + every facet selection in one shot. Wired to the
    *  empty-state's "Clear filters" button, which only renders when

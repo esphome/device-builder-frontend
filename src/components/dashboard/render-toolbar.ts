@@ -1,4 +1,4 @@
-import { html, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { DashboardView } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { renderFacets } from "./render-facets.js";
@@ -73,6 +73,9 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
   const placeholder = host._yamlMode
     ? host._localize("yaml_search.placeholder")
     : host._localize("dashboard.search_placeholder");
+  // trim() to match _hasActiveFilters: a whitespace-only query filters
+  // nothing, so don't offer to clear it.
+  const hasQuery = host._search.trim().length > 0;
   // Decorative leading magnifier — the YAML-mode toggle lives as a
   // third option in the view-toggle radio group, not in here.
   return html`<div class="search-wrap">
@@ -106,6 +109,16 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
         @keydown=${host._onSearchKeyDown}
       />
     </form>
+    ${hasQuery
+      ? html`<button
+          class="search-clear"
+          type="button"
+          aria-label=${host._localize("dashboard.search_clear")}
+          @click=${host._clearSearch}
+        >
+          <wa-icon library="mdi" name="close-circle" aria-hidden="true"></wa-icon>
+        </button>`
+      : nothing}
   </div>`;
 }
 

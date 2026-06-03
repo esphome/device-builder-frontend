@@ -120,9 +120,8 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
       : nothing}
   `;
 
-  // Badge / "Clear all" track facet selections only; a lone active
-  // search term is cleared from the search box's own clear control,
-  // not surfaced here.
+  // Badge counts facet selections only; a lone search term isn't a menu
+  // pill, so it's cleared from the search box's own × instead (#1160).
   return html`
     <div class="filter-group">
       <esphome-filters-menu
