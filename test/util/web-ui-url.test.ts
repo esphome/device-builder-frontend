@@ -43,6 +43,22 @@ describe("safeWebUiUrl", () => {
     expect(safeWebUiUrl("http:\\\\user@evil.com")).toBe("");
   });
 
+  it("rejects userinfo smuggled past the guard with control chars in the scheme", () => {
+    // The WHATWG URL parser silently strips ASCII tab/CR/LF from
+    // anywhere in the input, so ``ht\ntp://device.local@evil.com``
+    // parses as a valid http URL with host ``evil.com``. The control
+    // char shifts the scheme's raw length out of sync with the parsed
+    // ``protocol``, so a naive ``url.slice(protocol.length)`` reads the
+    // authority from the wrong offset and never sees the ``@`` —
+    // letting an attacker origin through the userinfo guard.
+    expect(safeWebUiUrl("ht\ntp://device.local@evil.com")).toBe("");
+    expect(safeWebUiUrl("ht\ttp://device.local@evil.com")).toBe("");
+    expect(safeWebUiUrl("http\n://device.local@evil.com")).toBe("");
+    expect(safeWebUiUrl("h\rttp://user@evil.com")).toBe("");
+    // A control char inside the authority itself must also be caught.
+    expect(safeWebUiUrl("http://device.local\t@evil.com")).toBe("");
+  });
+
   it("allows a legitimate @ in the path or query", () => {
     // The authority guard must not over-reject a ``@`` that appears
     // after the host (path/query/fragment), where it's just data.
