@@ -32,6 +32,17 @@ describe("safeWebUiUrl", () => {
     expect(safeWebUiUrl("http://device.local@evil.com")).toBe("");
     expect(safeWebUiUrl("http://1.2.3.4@evil.com:6053")).toBe("");
     expect(safeWebUiUrl("https://user:pass@evil.com")).toBe("");
+    // Empty-userinfo variants still parse with host=evil.com.
+    expect(safeWebUiUrl("http://@evil.com")).toBe("");
+    expect(safeWebUiUrl("http://:@evil.com")).toBe("");
+  });
+
+  it("allows a legitimate @ in the path or query", () => {
+    // The authority guard must not over-reject a ``@`` that appears
+    // after the host (path/query/fragment), where it's just data.
+    expect(safeWebUiUrl("http://kitchen.local/p?u=a@b")).toBe(
+      "http://kitchen.local/p?u=a@b"
+    );
   });
 
   it("rejects malformed URLs", () => {
@@ -112,6 +123,8 @@ describe("buildWebUiUrl", () => {
     expect(buildWebUiUrl(_device({ web_port: 80, address: "1.2.3.4@evil.com" }))).toBe(
       ""
     );
+    // Empty-userinfo smuggling: ``@evil.com`` builds ``http://@evil.com``.
+    expect(buildWebUiUrl(_device({ web_port: 80, address: "@evil.com" }))).toBe("");
   });
 
   it("leaves IPv4 and hostnames unbracketed", () => {
