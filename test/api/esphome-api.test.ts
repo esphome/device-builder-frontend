@@ -1999,6 +1999,7 @@ describe("ESPHomeAPI — console-debug redaction", () => {
   afterEach(() => {
     uninstallMockWebSocket();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   const debugText = (spy: ReturnType<typeof vi.spyOn>): string =>
