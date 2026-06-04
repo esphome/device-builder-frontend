@@ -39,7 +39,8 @@ const RE_LEADING_WHITESPACE = /^( *)/;
  */
 function buildEntryInfo(entry: ConfigEntry): () => HTMLElement | null {
   return () => {
-    if (!entry.description && !entry.default_value && !entry.range) return null;
+    const hasDefault = entry.default_value !== null && entry.default_value !== undefined;
+    if (!entry.description && !hasDefault && !entry.range) return null;
     const dom = document.createElement("div");
     dom.className = "cm-esphome-info";
     if (entry.description) {
@@ -47,7 +48,7 @@ function buildEntryInfo(entry: ConfigEntry): () => HTMLElement | null {
       p.textContent = entry.description;
       dom.appendChild(p);
     }
-    if (entry.default_value !== null && entry.default_value !== undefined) {
+    if (hasDefault) {
       const def = document.createElement("div");
       def.className = "cm-esphome-info-meta";
       def.textContent = `Default: ${String(entry.default_value)}`;
