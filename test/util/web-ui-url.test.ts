@@ -59,6 +59,16 @@ describe("safeWebUiUrl", () => {
     expect(safeWebUiUrl("http://device.local\t@evil.com")).toBe("");
   });
 
+  it("rejects userinfo smuggled past the guard with leading C0/space", () => {
+    // The parser also trims leading/trailing C0 control chars and
+    // spaces (U+0000–U+0020) before computing ``protocol``, so a
+    // leading space desyncs the raw-string authority slice the same
+    // way an interior control char does. Sanitizing those keeps the
+    // slice aligned and the ``@`` guard intact.
+    expect(safeWebUiUrl(" http://device.local@evil.com")).toBe("");
+    expect(safeWebUiUrl("\x00http://device.local@evil.com")).toBe("");
+  });
+
   it("allows a legitimate @ in the path or query", () => {
     // The authority guard must not over-reject a ``@`` that appears
     // after the host (path/query/fragment), where it's just data.
