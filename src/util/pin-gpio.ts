@@ -26,7 +26,7 @@
  *
  * Every form is globally unambiguous, so parsing doesn't need the platform:
  * bare "P{n}" is bk72xx only, "PA{n}" is port A (rtl87xx + ln882x, same
- * trailing -> GPIO rule), "PB{n}" is ln882x only, "P{p}.{p}" is nRF52 only.
+ * trailing -> GPIO rule), "PB{n}" is ln882x only, "P{port}.{pin}" is nRF52 only.
  * That's why the platform key in the YAML (mandatory — a platformless config
  * is invalid) doesn't need to be threaded in here.
  */
@@ -92,10 +92,11 @@ export function parsePinGpio(s: unknown): number | null {
 
 /**
  * Format a GPIO number as the pin value ESPHome's platform validator
- * accepts. ESP / rtl87xx take "GPIOn"; nRF52's validator rejects that and
- * wants port.pin notation ("P0.27", "P1.1") — port*32 + pin; BK72xx wants
- * the bare "P{n}" form ("P23"), where the LibreTiny pin index is the
- * number.
+ * accepts. "GPIOn" is the default — taken by esp / esp8266 / rp2040 /
+ * rtl87xx / ln882x (their validators all accept it). Two exceptions:
+ * nRF52's validator rejects "GPIOn" and wants port.pin notation ("P0.27",
+ * "P1.1") — port*32 + pin; BK72xx writes the bare "P{n}" form ("P23"), the
+ * convention its configs use, where the LibreTiny pin index is the number.
  */
 export function formatPinValue(gpio: number, platform: string | undefined): string {
   if (platform === "nrf52") return `P${Math.floor(gpio / 32)}.${gpio % 32}`;
