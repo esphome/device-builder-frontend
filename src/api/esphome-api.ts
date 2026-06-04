@@ -761,9 +761,10 @@ export class ESPHomeAPI {
     return this.sendCommand<WizardResponse>("devices/create", args);
   }
 
-  /** Update device metadata. */
+  /** Update device metadata. Keyed by `configuration` (the YAML filename),
+   *  since a device's ESPHome name can differ from its filename stem. */
   async updateDevice(args: {
-    name: string;
+    configuration: string;
     friendly_name?: string;
     comment?: string;
     board_id?: string;

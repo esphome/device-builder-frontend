@@ -525,7 +525,10 @@ export class ESPHomePageDevice extends LitElement {
       return;
     }
     try {
-      await this._api.updateDevice({ name: device.name, board_id: boardId });
+      await this._api.updateDevice({
+        configuration: device.configuration,
+        board_id: boardId,
+      });
       await this._loadYaml();
       toast.success(this._localize("device.change_board_success"), { richColors: true });
     } catch (err) {
