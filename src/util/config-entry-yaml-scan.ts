@@ -100,12 +100,37 @@ const pinKeyEquals = (a: PinKey, b: PinKey) =>
   a.excludeToLine === b.excludeToLine;
 const pinMemo = createScanMemo<PinKey, Map<number, string>>(pinKeyEquals);
 
+// Keys whose values are free-form human text. `scanPinGpios` is
+// deliberately value-context-agnostic (it's shared with the pin picker,
+// which only ever sees real pin values), so a token like "P0.5" or "PA02"
+// sitting in a device name reads as a pin to it. In a name/comment that's
+// prose, not a pin reference — counting it produces a phantom used-pin and
+// a spurious cross-section conflict warning. Skip these keys' lines.
+const FREETEXT_PIN_KEYS = new Set(["name", "friendly_name", "comment"]);
+
+// Leading `key:` of an indented (or list-item) mapping line.
+const LINE_KEY_RE = /^\s*(?:-\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
+
+/**
+ * Strip a YAML inline comment. A `#` begins a comment only at line start
+ * or when preceded by whitespace (so `http://x#y` keeps its `#`). Pin
+ * values never contain `#`, so cutting here can't drop a real pin token —
+ * but it does keep a `# spare PA02` trailing comment from registering a
+ * phantom pin.
+ */
+function stripInlineComment(line: string): string {
+  const m = line.match(/(^|\s)#/);
+  return m === null ? line : line.slice(0, (m.index ?? 0) + m[1].length);
+}
+
 /**
  * Map every pin reference in the YAML to the top-level domain that
  * owns it (e.g. `{ 4: "switch", 5: "binary_sensor" }`). Pin tokens are
  * matched across every platform form (`GPIOn`, bk72xx `P{n}`, rtl87xx
  * `PA{n}`, nRF52 `P{port}.{pin}`) via `scanPinGpios`, so conflict
  * warnings fire for LibreTiny / nRF52 configs too, not just ESP ones.
+ * Free-text keys (`name`/`comment`) and inline `#` comments are excluded
+ * first, so a pin-shaped token in prose doesn't register as a used pin.
  * When `excludeFromLine` / `excludeToLine` are provided the lines
  * in that (inclusive) 1-indexed range are skipped — used by the
  * section editor so a pin selector doesn't flag the user's *own*
@@ -147,7 +172,9 @@ export function findUsedPins(
       continue;
     }
     if (!currentDomain) continue;
-    for (const num of scanPinGpios(line)) {
+    const keyMatch = line.match(LINE_KEY_RE);
+    if (keyMatch && FREETEXT_PIN_KEYS.has(keyMatch[1].toLowerCase())) continue;
+    for (const num of scanPinGpios(stripInlineComment(line))) {
       if (!used.has(num)) used.set(num, currentDomain);
     }
   }
