@@ -24,6 +24,16 @@ describe("safeWebUiUrl", () => {
     expect(safeWebUiUrl("file:///etc/passwd")).toBe("");
   });
 
+  it("rejects URLs carrying userinfo (host-spoofing via @)", () => {
+    // ``http://device.local@evil.com`` parses as a valid http URL
+    // whose host is ``evil.com`` — the leading segment is a username.
+    // A hostile device announcement could use this to point the
+    // "Visit Web UI" link at an attacker origin.
+    expect(safeWebUiUrl("http://device.local@evil.com")).toBe("");
+    expect(safeWebUiUrl("http://1.2.3.4@evil.com:6053")).toBe("");
+    expect(safeWebUiUrl("https://user:pass@evil.com")).toBe("");
+  });
+
   it("rejects malformed URLs", () => {
     expect(safeWebUiUrl("not a url")).toBe("");
     expect(safeWebUiUrl("://kitchen.local")).toBe("");
@@ -94,6 +104,14 @@ describe("buildWebUiUrl", () => {
         })
       )
     ).toBe("http://[2001:470:59ca:991:de54:75ff:fec7:cc0]:8080");
+  });
+
+  it("returns empty string when the address smuggles a userinfo @", () => {
+    // A hostile mDNS address like ``1.2.3.4@evil.com`` would otherwise
+    // build ``http://1.2.3.4@evil.com`` — a link to evil.com.
+    expect(buildWebUiUrl(_device({ web_port: 80, address: "1.2.3.4@evil.com" }))).toBe(
+      ""
+    );
   });
 
   it("leaves IPv4 and hostnames unbracketed", () => {

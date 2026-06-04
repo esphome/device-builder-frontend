@@ -10,6 +10,14 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
  * when the user clicks the resulting ``<a href>``. ``new URL``
  * rejects malformed input; the protocol check covers the rest.
  *
+ * Userinfo is also rejected: ``http://device.local@evil.com`` parses
+ * as a valid ``http:`` URL whose *host* is ``evil.com`` (the part
+ * before ``@`` is a username), so it would slip past the protocol
+ * check and send the user to an attacker-controlled origin while
+ * looking like it points at the device. The same hostile-device-data
+ * threat the protocol check defends against applies here, so a URL
+ * carrying a username or password is treated as unsafe.
+ *
  * The original string is returned verbatim (rather than
  * ``parsed.toString()``) so callers keep the terse form
  * ``http://host:22`` instead of the WHATWG-canonicalised
@@ -20,6 +28,7 @@ export function safeWebUiUrl(url: string): string {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    if (parsed.username || parsed.password) return "";
     return url;
   } catch {
     return "";
