@@ -16,6 +16,8 @@
  * collapses the worst case (paste a multi-thousand-line config,
  * type into a field) from O(N) per keystroke to O(1).
  */
+import { scanPinGpios } from "./pin-gpio.js";
+
 /**
  * Single-entry memo for the YAML scans. The hot path is the
  * form re-rendering on every keystroke into the YAML pane:
@@ -99,8 +101,11 @@ const pinKeyEquals = (a: PinKey, b: PinKey) =>
 const pinMemo = createScanMemo<PinKey, Map<number, string>>(pinKeyEquals);
 
 /**
- * Map every `GPIO<n>` reference in the YAML to the top-level
- * domain that owns it (e.g. `{ 4: "switch", 5: "binary_sensor" }`).
+ * Map every pin reference in the YAML to the top-level domain that
+ * owns it (e.g. `{ 4: "switch", 5: "binary_sensor" }`). Pin tokens are
+ * matched across every platform form (`GPIOn`, bk72xx `P{n}`, rtl87xx
+ * `PA{n}`, nRF52 `P{port}.{pin}`) via `scanPinGpios`, so conflict
+ * warnings fire for LibreTiny / nRF52 configs too, not just ESP ones.
  * When `excludeFromLine` / `excludeToLine` are provided the lines
  * in that (inclusive) 1-indexed range are skipped — used by the
  * section editor so a pin selector doesn't flag the user's *own*
@@ -141,11 +146,9 @@ export function findUsedPins(
     ) {
       continue;
     }
-    for (const m of line.matchAll(/GPIO(\d+)/g)) {
-      const num = parseInt(m[1], 10);
-      if (!Number.isNaN(num) && !used.has(num) && currentDomain) {
-        used.set(num, currentDomain);
-      }
+    if (!currentDomain) continue;
+    for (const num of scanPinGpios(line)) {
+      if (!used.has(num)) used.set(num, currentDomain);
     }
   }
   pinMemo.set(probe, used);

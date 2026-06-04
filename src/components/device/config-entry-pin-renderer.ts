@@ -11,6 +11,7 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType, PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import { formatPinValue, parsePinGpio } from "../../util/pin-gpio.js";
 import { expandPinModeShorthand } from "../../util/pin-mode.js";
 import {
   effectiveDisabled,
@@ -23,59 +24,11 @@ import {
 import { renderNestedField } from "./config-entry-renderers/nested.js";
 import { renderBooleanField } from "./config-entry-renderers/primitives.js";
 
-// Bare int / "GPIOn" form (esp / esp8266 / rp2040 / ln882x).
-const GPIO_PIN_RE = /^\s*(?:GPIO)?(\d+)\s*$/i;
-// nRF52 "P{port}.{pin}" form.
-const NRF52_PIN_RE = /^\s*P(\d+)\.(\d+)\s*$/i;
-// BK72xx (LibreTiny / Beken) "P{n}" form — bare P + number, no dot.
-const BK72XX_PIN_RE = /^\s*P(\d+)\s*$/i;
-
-/**
- * Parse a pin reference into a GPIO number. Used both for the field's
- * current value and for individual `suggestions` entries. Featured
- * manifests write pins as bare ints (`12`), string forms (`"GPIO12"`,
- * `"gpio12"`), nRF52 port.pin notation (`"P0.27"`, `"P1.1"`), or — for
- * fields whose locked preset needs the long-form ESPHome pin block — an
- * object like
- * `{ number: 0, mode: { input: true, pullup: true }, inverted: true }`
- * (Sonoff Basic's front-panel button is the canonical example: the pin
- * is occupied + inverted + needs the internal pull-up, all baked into
- * the preset). Returns `null` for anything we can't parse — the caller
- * drops those entries rather than letting a typo blank the dropdown.
- */
-export function parsePinGpio(s: unknown): number | null {
-  if (typeof s === "number" && Number.isFinite(s)) return s;
-  if (typeof s === "string") {
-    const m = s.match(GPIO_PIN_RE);
-    if (m) return Number(m[1]);
-    // nRF52 port.pin notation, e.g. "P0.27" -> 27, "P1.1" -> 33. Each port has
-    // 32 pins, so reject pin >= 32 ("P0.33") rather than normalize it to a
-    // different valid-looking pin (which would silently rewrite the YAML).
-    const p = s.match(NRF52_PIN_RE);
-    if (p && Number(p[2]) < 32) return Number(p[1]) * 32 + Number(p[2]);
-    // BK72xx "P{n}" form (e.g. "P23" -> 23). Tried after the nRF52 match so
-    // the dotted "P0.27" form is never swallowed by this no-dot pattern; the
-    // letter-port rtl87xx form ("PA00") won't match either.
-    const bk = s.match(BK72XX_PIN_RE);
-    if (bk) return Number(bk[1]);
-  }
-  if (s !== null && typeof s === "object" && !Array.isArray(s)) {
-    return parsePinGpio((s as Record<string, unknown>).number);
-  }
-  return null;
-}
-
-/**
- * Format a GPIO number as the pin value ESPHome's platform validator
- * accepts. ESP take "GPIOn"; nRF52's validator rejects that and wants
- * port.pin notation ("P0.27", "P1.1") — port*32 + pin; BK72xx wants the
- * bare "P{n}" form ("P23"), where the LibreTiny pin index is the number.
- */
-export function formatPinValue(gpio: number, platform: string | undefined): string {
-  if (platform === "nrf52") return `P${Math.floor(gpio / 32)}.${gpio % 32}`;
-  if (platform === "bk72xx") return `P${gpio}`;
-  return `GPIO${gpio}`;
-}
+// `parsePinGpio` / `formatPinValue` moved to `util/pin-gpio.ts` so the YAML
+// used-pin scanner shares the same platform pin-format rules. Re-exported
+// here to keep this module's long-standing public surface (and its tests)
+// pointing at the renderer.
+export { formatPinValue, parsePinGpio };
 
 interface PinOptionView {
   optValue: string;

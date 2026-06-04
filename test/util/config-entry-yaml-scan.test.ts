@@ -40,6 +40,49 @@ describe("findUsedPins", () => {
     expect(map.has(5)).toBe(false);
   });
 
+  it("detects non-GPIOn pin forms (bk72xx, rtl87xx, ln882x, nRF52)", () => {
+    // Conflict warnings must fire for LibreTiny / nRF52 configs, whose pins
+    // aren't written "GPIOn": bk72xx "P{n}", port-A "PA{n}", ln882x port-B
+    // "PB{n}" (16+n), nRF52 "P{port}.{pin}".
+    const config = [
+      "switch:",
+      "  - platform: gpio",
+      "    pin: P23", // bk72xx -> 23
+      "light:",
+      "  - platform: status_led",
+      "    pin:",
+      "      number: PA02", // port A -> 2
+      "output:",
+      "  - platform: gpio",
+      "    pin: PB03", // ln882x port B -> 19
+      "sensor:",
+      "  - platform: gpio",
+      "    pin: P1.1", // nRF52 -> 33
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.get(23)).toBe("switch");
+    expect(map.get(2)).toBe("light");
+    expect(map.get(19)).toBe("output");
+    expect(map.get(33)).toBe("sensor");
+  });
+
+  it("does not mistake P-prefixed words for bare P{n} pins", () => {
+    // `\b` boundaries keep "P5" inside ordinary identifiers / words from
+    // registering as a used pin — only standalone pin tokens count.
+    const config = [
+      "sensor:",
+      "  - platform: adc",
+      "    name: STEP5 PUMP7 voltage", // not pins
+      "    id: relay_p9", // not a pin
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.has(5)).toBe(false);
+    expect(map.has(7)).toBe(false);
+    expect(map.has(9)).toBe(false);
+  });
+
   it("returns an empty map for empty yaml", () => {
     expect(findUsedPins("").size).toBe(0);
   });

@@ -52,8 +52,26 @@ describe("parsePinGpio", () => {
     expect(parsePinGpio("P6")).toBe(6);
     expect(parsePinGpio("  p7 ")).toBe(7);
     expect(parsePinGpio("P0")).toBe(0);
-    // A letter-port rtl87xx pin must not parse as a BK72xx pin.
-    expect(parsePinGpio("PA0")).toBeNull();
+  });
+
+  it("accepts LibreTiny port-A PA{n} notation", () => {
+    // rtl87xx (single-port) and ln882x port A both map "PA{n}" -> n; "PA02" ->
+    // 2, padding cosmetic.
+    expect(parsePinGpio("PA02")).toBe(2);
+    expect(parsePinGpio("PA18")).toBe(18);
+    expect(parsePinGpio("PA0")).toBe(0);
+    expect(parsePinGpio("  pa3 ")).toBe(3);
+    // A bk72xx "P{n}" pin (no port letter) still parses on its own branch.
+    expect(parsePinGpio("P23")).toBe(23);
+  });
+
+  it("accepts ln882x port-B PB{n} notation (GPIO 16+n)", () => {
+    // ln882x splits GPIOs into two ports of 16: port A is 0-15, port B is
+    // 16-31, so "PB03" -> 19. No other platform uses a "PB" form.
+    expect(parsePinGpio("PB03")).toBe(19);
+    expect(parsePinGpio("PB9")).toBe(25);
+    expect(parsePinGpio("PB0")).toBe(16);
+    expect(parsePinGpio("  pb5 ")).toBe(21);
   });
 
   it("rejects an out-of-range nRF52 pin part", () => {
@@ -109,6 +127,14 @@ describe("formatPinValue", () => {
     expect(formatPinValue(27, "nrf52")).toBe("P0.27");
     expect(formatPinValue(33, "nrf52")).toBe("P1.1");
     expect(formatPinValue(48, "nrf52")).toBe("P1.16");
+  });
+
+  it("uses GPIOn for rtl87xx", () => {
+    // ESPHome's rtl87xx validator accepts "GPIOn" (strips to the numeric pin),
+    // and the board manifest labels rtl87xx pins "GPIOn", so the picker writes
+    // that form even though the user may have typed "PA02".
+    expect(formatPinValue(2, "rtl87xx")).toBe("GPIO2");
+    expect(formatPinValue(18, "rtl87xx")).toBe("GPIO18");
   });
 });
 
@@ -224,6 +250,47 @@ describe("renderPinField BK72xx pin values", () => {
     const option = findElementBindings(result, "wa-option")[0];
     expect(option.value).toBe("P23");
     expect(option["?selected"]).toBe(true);
+  });
+});
+
+describe("renderPinField rtl87xx pin values", () => {
+  // ESPHome's rtl87xx (LibreTiny / Realtek) pins are written "PA{n}". The
+  // renderer must parse that form (or the dropdown renders blank); rtl87xx's
+  // validator accepts "GPIOn" too, and the board manifest labels its pins
+  // "GPIOn", so the picker keeps writing that form.
+  const rtl87xxBoard = () =>
+    makeTestBoard({
+      pins: [makeBoardPin(2, { label: "GPIO2", features: ["input"] })],
+      overrides: {
+        esphome: { platform: "rtl87xx", board: "generic-rtl8720cf-2mb-992k" } as never,
+      },
+    });
+
+  it("matches the active option for a PA{n} value", () => {
+    // The reported bug: an output with `pin: PA02` rendered a blank Pin
+    // dropdown because "PA02" failed to parse.
+    const ctx = makeRenderCtx({ pin: "PA02" }, { board: rtl87xxBoard() });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    const option = findElementBindings(result, "wa-option")[0];
+    expect(option.value).toBe("GPIO2");
+    expect(option["?selected"]).toBe(true);
+  });
+
+  it("writes the GPIOn value for rtl87xx", () => {
+    const ctx = makeRenderCtx({ pin: undefined }, { board: rtl87xxBoard() });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    const select = findTemplatesByAnchor(result, "<wa-select")[0];
+    const onChange = extractAttributeBindings(select)["@change"] as (e: Event) => void;
+    onChange({ target: { value: "GPIO2" } } as never);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "GPIO2");
   });
 });
 
