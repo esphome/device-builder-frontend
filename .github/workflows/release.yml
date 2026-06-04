@@ -83,7 +83,7 @@ jobs:
     permissions:
       contents: read    # actions/checkout uses the implicit GITHUB_TOKEN
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -136,7 +136,7 @@ jobs:
     permissions:
       contents: read    # actions/checkout uses the implicit GITHUB_TOKEN
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           # Tag doesn't exist yet — it's created when the draft release
           # is published. Build from the SHA the workflow ran on, which
@@ -218,7 +218,7 @@ jobs:
           client-id: ${{ vars.ESPHOME_GITHUB_APP_CLIENT_ID }}
           private-key: ${{ secrets.ESPHOME_GITHUB_APP_PRIVATE_KEY }}
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
@@ -362,7 +362,7 @@ jobs:
           permission-issues: write
 
       - name: Checkout backend
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ${{ env.BACKEND_REPO }}
           token: ${{ steps.app-token.outputs.token }}
