@@ -57,6 +57,13 @@ describe("safeWebUiUrl", () => {
     expect(safeWebUiUrl("h\rttp://user@evil.com")).toBe("");
     // A control char inside the authority itself must also be caught.
     expect(safeWebUiUrl("http://device.local\t@evil.com")).toBe("");
+    // ASCII form feed (U+000C) is NOT in the parser's interior
+    // strip set (only tab/CR/LF are), so unlike those it can't desync
+    // the slice: an interior form feed in the scheme is an invalid
+    // scheme char that makes ``new URL`` throw, and one in the
+    // authority stays in the slice so the ``@`` guard still fires.
+    expect(safeWebUiUrl("ht\ftp://device.local@evil.com")).toBe("");
+    expect(safeWebUiUrl("http://device.local\f@evil.com")).toBe("");
   });
 
   it("rejects userinfo smuggled past the guard with leading C0/space", () => {
@@ -67,6 +74,9 @@ describe("safeWebUiUrl", () => {
     // slice aligned and the ``@`` guard intact.
     expect(safeWebUiUrl(" http://device.local@evil.com")).toBe("");
     expect(safeWebUiUrl("\x00http://device.local@evil.com")).toBe("");
+    // Form feed (U+000C) is a C0 control, so a leading one is trimmed
+    // by both the parser and ``cleaned`` and the slice stays aligned.
+    expect(safeWebUiUrl("\fhttp://device.local@evil.com")).toBe("");
   });
 
   it("allows a legitimate @ in the path or query", () => {
