@@ -90,13 +90,7 @@ python3 -m build --wheel
 
 ### Contributing translations
 
-Translations are crowd-sourced through Lokalise — **no coding or GitHub account required**. To help translate the dashboard into your language:
-
-1. Open the project's public signup link and join: <https://app.lokalise.com/public/974668436a17ffd6803f51.79180045/>
-2. Pick your language and start translating. Only **native speakers** should submit translations; proofreading existing work is just as valuable, even for a language that looks "complete".
-3. **Don't translate proper nouns** like `ESPHome`, `ESPHome Device Builder`, or `Home Assistant`, and leave `{placeholder}` tokens (e.g. `{count}`) exactly as they are — the words around a token can be reordered, but the token itself must stay verbatim.
-
-Don't see your language? It has to be added to the project once before it shows up — request it in the [Discord language thread](https://discord.com/channels/429907082951524364/1511452603391938705) and someone will add it. Translated strings ship with the next release; any key a translator hasn't filled in yet falls back to English automatically.
+Translations are crowd-sourced through Lokalise — **no coding or GitHub account required**. See the [ESPHome translations guide](https://developers.esphome.io/contributing/translations/) for how to join the project, pick your language, and start translating.
 
 ### How it works
 
