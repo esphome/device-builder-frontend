@@ -70,7 +70,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   board: BoardCatalogEntry | null = null;
 
   /** Interchangeable boards (same PlatformIO target), current board
-   *  excluded; empty keeps the "Wrong board?" link hidden. */
+   *  excluded; empty keeps the "Change board" link hidden. */
   @state()
   private _alternateBoards: BoardCatalogEntry[] = [];
 
@@ -272,7 +272,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
                         class="board-change-link"
                         @click=${this._openChangeBoard}
                       >
-                        ${this._localize("device.wrong_board")}
+                        ${this._localize("device.change_board_link")}
                       </button>`
                     : nothing}
                 </div>

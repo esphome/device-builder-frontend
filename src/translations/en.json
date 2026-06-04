@@ -614,7 +614,7 @@
     "yaml_invalid_go_to_error": "Go to error",
     "yaml_invalid_save_anyway": "Save anyway",
     "more_info": "More info",
-    "wrong_board": "Wrong board?",
+    "change_board_link": "Change board",
     "change_board_title": "Change board",
     "change_board_desc": "Pick the board that matches your hardware. These are all built on the same chip as {name}, so they're interchangeable.",
     "change_board_generic_tag": "Generic",
