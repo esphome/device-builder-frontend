@@ -71,9 +71,7 @@ export const deviceBoardInfoStyles = css`
     text-decoration: none;
   }
 
-  /* Sits next to "More info"; styled to read as a sibling link even
-     though it's a <button> (it opens the change-board picker rather
-     than navigating). Only rendered when the board has alternates. */
+  /* A <button> styled to read as a sibling link to "More info". */
   .board-change-link {
     display: inline-flex;
     align-items: center;

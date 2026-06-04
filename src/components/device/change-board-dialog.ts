@@ -18,18 +18,9 @@ import "../base-dialog.js";
 const FALLBACK_BOARD_IMAGE = "/assets/board/default.svg";
 
 /**
- * "Wrong board?" picker. Lists the boards interchangeable with the
- * device's current one — every catalog entry on the same PlatformIO
- * target (the generic fallback plus the curated vendor products) — and
- * lets the user swap to the one matching their hardware. This is the
- * recovery path for devices the board-id re-derivation auto-migrated
- * onto a generic board (issue #615).
- *
- * The host (``<esphome-device-board-info>``) binds ``.currentBoard`` and
- * ``.boards`` (the alternates, current board already excluded) and opens
- * the dialog imperatively via ``open()``. On selection the dialog closes
- * and emits a bubbling ``select-board`` event with ``{ boardId }``; the
- * page handler performs the actual ``devices/update``.
+ * Picker for swapping a device's board to an interchangeable one. Bind
+ * `.currentBoard` and `.boards`, open via `open()`; emits a bubbling
+ * `select-board` with `{ boardId }` on selection.
  */
 @customElement("esphome-change-board-dialog")
 export class ESPHomeChangeBoardDialog extends LitElement {

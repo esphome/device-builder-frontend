@@ -1,10 +1,6 @@
 import { css } from "lit";
 
-/**
- * Styles for ``<esphome-change-board-dialog>`` — a compact list of the
- * boards interchangeable with the device's current one. Kept in a sibling
- * file so the component stays focused on behaviour.
- */
+/** Styles for `<esphome-change-board-dialog>`. */
 export const changeBoardDialogStyles = css`
   esphome-base-dialog {
     --width: 480px;

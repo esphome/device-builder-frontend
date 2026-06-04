@@ -69,15 +69,12 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
-  /** Boards interchangeable with the current one (same PlatformIO
-   *  target), with the current board itself filtered out — the swap
-   *  targets the "Wrong board?" picker offers. Empty when the board has
-   *  no alternates, which is when the link stays hidden. */
+  /** Interchangeable boards (same PlatformIO target), current board
+   *  excluded; empty keeps the "Wrong board?" link hidden. */
   @state()
   private _alternateBoards: BoardCatalogEntry[] = [];
 
-  /** Board id the alternates were last fetched for — guards against a
-   *  stale in-flight response overwriting a newer board's alternates. */
+  /** Board id `_alternateBoards` was fetched for; guards a stale response. */
   private _alternatesForBoardId: string | null = null;
 
   @property()
@@ -206,11 +203,8 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   };
 
   /**
-   * Fetch the boards interchangeable with the current one so the
-   * "Wrong board?" link can appear when alternates exist. Filters out
-   * the current board (the backend includes it) and guards against a
-   * stale in-flight response from a previous board clobbering a newer
-   * one — `board` changes whenever the page resolves a new `board_id`.
+   * Fetch the current board's interchangeable alternates (excluding
+   * itself); guards against a stale response for a previous board.
    */
   private async _refreshAlternateBoards() {
     const board = this.board;
@@ -236,11 +230,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     this._changeBoardDialog?.open();
   };
 
-  /**
-   * The picker selected a board. Re-emit as a page-level `change-board`
-   * so the device page owns the `devices/update` write + YAML reload —
-   * this component only renders the entry point.
-   */
+  /** Re-emit the picker's selection as a page-level `change-board`. */
   private _onSelectBoard = (e: CustomEvent<{ boardId: string }>) => {
     e.stopPropagation();
     this.dispatchEvent(

@@ -1266,13 +1266,8 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Boards interchangeable with this one — every catalog entry built on
-   * the same PlatformIO target. The alternates the "wrong board?" picker
-   * lets the user switch the device to. Includes `boardId` itself; the
-   * caller filters it out. Empty when the board has no siblings.
-   *
-   * Returns the same slim `PagedBoardsResponse` envelope as `getBoards`
-   * (one page, the whole set), so it shares the same hydration path.
+   * Boards interchangeable with this one (same PlatformIO target);
+   * includes `boardId` itself.
    */
   async getCompatibleBoards(boardId: string): Promise<BoardCatalogEntry[]> {
     const response = await this.sendCommand<PagedBoardsResponse>(

@@ -511,19 +511,15 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   /**
-   * Swap the device's board to the alternate picked in the "Wrong board?"
-   * dialog. `devices/update` rewrites the YAML `board:` and flags the pick
-   * as user-set (so the re-derivation won't heal it back), then we reload
-   * the YAML pane to show the rewrite. The board header refreshes on its
-   * own: the backend's `DEVICE_UPDATED` event updates the devices context,
-   * which re-fires the board fetch in `updated()`.
+   * Swap the device's board to the picked alternate, then reload the YAML
+   * pane (`devices/update` rewrote `board:`). The header refreshes itself
+   * via the `DEVICE_UPDATED` event.
    */
   private _onChangeBoard = async (e: CustomEvent<{ boardId: string }>) => {
     const boardId = e.detail?.boardId;
     const device = this._device;
     if (!boardId || !device || boardId === device.board_id) return;
-    // A board swap rewrites the file server-side; reloading the YAML
-    // afterwards would discard unsaved edits, so refuse while dirty.
+    // Reloading YAML after the swap would discard unsaved edits.
     if (this._isDirty) {
       toast.error(this._localize("device.change_board_unsaved"), { richColors: true });
       return;
