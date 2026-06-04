@@ -53,8 +53,9 @@ export function buildStickyTheme(background: string): Extension {
       flex: "0 0 auto",
       boxSizing: "border-box",
       textAlign: "right",
-      // paddingRight is per-row inline (yaml-sticky-render); paddingLeft
-      // mirrors CM's gutter cell inset (padding 0 3px 0 5px).
+      // Both paddings are set per-row inline (yaml-sticky-render) from the
+      // gutter cell's measured inset; this 5px is only the pre-measure
+      // fallback for the first paint.
       paddingLeft: "5px",
       opacity: "0.65",
       userSelect: "none",

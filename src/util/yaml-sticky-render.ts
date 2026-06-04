@@ -4,15 +4,26 @@ import type { Tree } from "@lezer/common";
 import { highlightTree } from "@lezer/highlight";
 import type { StickyScopeLine } from "./yaml-sticky-scope.js";
 
+/** Live measurements of the editor's line-number gutter, read from the real
+ *  DOM in the plugin's measure phase so the overlay tracks whatever inset CM
+ *  (or a custom theme) actually renders, rather than a hard-coded constant. */
+export interface GutterMetrics {
+  /** Full ``.cm-gutters`` width (line numbers + the fold gutter basicSetup
+   *  mounts to their right). */
+  width: number;
+  /** Line-number column width alone, narrower than ``width``. */
+  lineNumberWidth: number;
+  /** Computed left/right padding of a real line-number gutter cell. */
+  padLeft: number;
+  padRight: number;
+}
+
 /** Right inset that lands the full-gutters-wide num span's glyph on the
- *  line-number column's right edge: past the fold gutter, plus CM's 3px
- *  cell inset (gutter cells use padding 0 3px 0 5px). */
-export function stickyNumPaddingRight(
-  gutterWidth: number,
-  lineNumberWidth: number
-): number {
-  if (gutterWidth <= 0 || lineNumberWidth <= 0) return 8; // pre-measure fallback
-  return gutterWidth - lineNumberWidth + 3;
+ *  line-number column's right edge: past the fold gutter, plus the gutter
+ *  cell's own right padding (measured, so a CM/theme change can't drift it). */
+export function stickyNumPaddingRight(m: GutterMetrics): number {
+  if (m.width <= 0 || m.lineNumberWidth <= 0) return 8; // pre-measure fallback
+  return m.width - m.lineNumberWidth + m.padRight;
 }
 
 export function createStickyRow(): HTMLDivElement {
@@ -35,8 +46,7 @@ export function createStickyRow(): HTMLDivElement {
 export function patchStickyRow(
   row: HTMLDivElement,
   sticky: StickyScopeLine,
-  gutterWidth: number,
-  lineNumberWidth: number,
+  gutter: GutterMetrics,
   tree: Tree,
   state: EditorState,
   highlightStyle: HighlightStyle,
@@ -53,10 +63,14 @@ export function patchStickyRow(
   }
 
   const num = row.firstElementChild as HTMLSpanElement;
-  const widthStr = gutterWidth > 0 ? `${gutterWidth}px` : "";
+  const widthStr = gutter.width > 0 ? `${gutter.width}px` : "";
   if (num.style.width !== widthStr) num.style.width = widthStr;
-  const padRightStr = `${stickyNumPaddingRight(gutterWidth, lineNumberWidth)}px`;
+  const padRightStr = `${stickyNumPaddingRight(gutter)}px`;
   if (num.style.paddingRight !== padRightStr) num.style.paddingRight = padRightStr;
+  // Mirror the gutter cell's measured left inset; empty before the first
+  // measure leaves the theme's fallback in place.
+  const padLeftStr = gutter.padLeft > 0 ? `${gutter.padLeft}px` : "";
+  if (num.style.paddingLeft !== padLeftStr) num.style.paddingLeft = padLeftStr;
   if (num.textContent !== lineStr) num.textContent = lineStr;
 
   // Re-run the (relatively costly) syntax highlighting only when the row
