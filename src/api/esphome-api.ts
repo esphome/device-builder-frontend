@@ -92,15 +92,17 @@ function redactForLog(payload: unknown): unknown {
     obj.result && typeof obj.result === "object"
       ? (obj.result as Record<string, unknown>)
       : null;
-  const isAuth =
+  // True for any frame carrying a secret to mask — not just auth/*
+  // traffic. The auth/login *response* carries the fresh token under
+  // ``result`` with no ``command`` field, and other commands (e.g.
+  // ``firmware/download_token``) also return ``{result:{token}}``;
+  // all of them should have their secrets redacted before logging.
+  const containsSecret =
     (command !== null && command.startsWith("auth")) ||
     "token" in obj ||
     "password" in obj ||
-    // The auth/login *response* carries the fresh token under
-    // ``result`` with no ``command`` field, so the checks above miss
-    // it — detect the nested secret so it gets redacted too.
     (result !== null && ("token" in result || "password" in result));
-  if (!isAuth) return payload;
+  if (!containsSecret) return payload;
   const clone: Record<string, unknown> = { ...obj };
   if ("token" in clone) clone.token = "<redacted>";
   if ("password" in clone) clone.password = "<redacted>";
