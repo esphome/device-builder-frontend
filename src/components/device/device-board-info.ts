@@ -222,7 +222,13 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
       this._alternateBoards = all.filter((b) => b.id !== board.id);
     } catch (e) {
       console.error("Failed to load compatible boards:", e);
-      if (this._alternatesForBoardId === board.id) this._alternateBoards = [];
+      // Clear the marker so a later re-assignment of the same board id
+      // retries, rather than the link staying hidden after one transient
+      // miss (the guard above would otherwise short-circuit forever).
+      if (this._alternatesForBoardId === board.id) {
+        this._alternatesForBoardId = null;
+        this._alternateBoards = [];
+      }
     }
   }
 
