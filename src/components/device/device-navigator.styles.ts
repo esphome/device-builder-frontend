@@ -199,7 +199,7 @@ export const deviceNavigatorStyles = css`
 
   .action-item div {
     display: flex;
-    flex-direction: wrap;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--wa-space-2xs);
   }
