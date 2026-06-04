@@ -88,12 +88,22 @@ function redactForLog(payload: unknown): unknown {
   if (payload === null || typeof payload !== "object") return payload;
   const obj = payload as Record<string, unknown>;
   const command = typeof obj.command === "string" ? obj.command : null;
+  const result =
+    obj.result && typeof obj.result === "object"
+      ? (obj.result as Record<string, unknown>)
+      : null;
   const isAuth =
     (command !== null && command.startsWith("auth")) ||
     "token" in obj ||
-    "password" in obj;
+    "password" in obj ||
+    // The auth/login *response* carries the fresh token under
+    // ``result`` with no ``command`` field, so the checks above miss
+    // it — detect the nested secret so it gets redacted too.
+    (result !== null && ("token" in result || "password" in result));
   if (!isAuth) return payload;
   const clone: Record<string, unknown> = { ...obj };
+  if ("token" in clone) clone.token = "<redacted>";
+  if ("password" in clone) clone.password = "<redacted>";
   if (clone.args && typeof clone.args === "object") {
     const args = clone.args as Record<string, unknown>;
     const safeArgs: Record<string, unknown> = { ...args };
@@ -101,11 +111,11 @@ function redactForLog(payload: unknown): unknown {
     if ("password" in safeArgs) safeArgs.password = "<redacted>";
     clone.args = safeArgs;
   }
-  if (clone.result && typeof clone.result === "object") {
-    const result = clone.result as Record<string, unknown>;
-    if ("token" in result) {
-      clone.result = { ...result, token: "<redacted>" };
-    }
+  if (result !== null) {
+    const safeResult: Record<string, unknown> = { ...result };
+    if ("token" in safeResult) safeResult.token = "<redacted>";
+    if ("password" in safeResult) safeResult.password = "<redacted>";
+    clone.result = safeResult;
   }
   return clone;
 }
