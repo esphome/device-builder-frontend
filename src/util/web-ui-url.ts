@@ -21,7 +21,13 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
  * because empty userinfo (``http://@evil.com`` / ``http://:@evil.com``)
  * parses with both empty yet still points ``host`` at the attacker.
  * Slicing the authority off the raw string keeps a legitimate ``@``
- * in a path/query/fragment from being rejected.
+ * in a path/query/fragment from being rejected. The slice strips the
+ * scheme via the parsed ``protocol`` (not a literal ``://``) and
+ * collapses leading slashes/backslashes, so the abbreviated special-
+ * scheme authority forms the WHATWG parser still accepts —
+ * ``http:/user@evil.com``, ``http:user@evil.com``,
+ * ``http:\\user@evil.com`` (all parse with host ``evil.com``) — are
+ * caught too, not just the canonical ``http://…@…``.
  *
  * The original string is returned verbatim (rather than
  * ``parsed.toString()``) so callers keep the terse form
@@ -33,7 +39,10 @@ export function safeWebUiUrl(url: string): string {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
-    const authority = url.slice(url.indexOf("://") + 3).split(/[/?#]/, 1)[0];
+    const authority = url
+      .slice(parsed.protocol.length)
+      .replace(/^[/\\]+/, "")
+      .split(/[/?#\\]/, 1)[0];
     if (authority.includes("@")) return "";
     return url;
   } catch {

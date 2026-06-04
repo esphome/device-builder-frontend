@@ -35,6 +35,12 @@ describe("safeWebUiUrl", () => {
     // Empty-userinfo variants still parse with host=evil.com.
     expect(safeWebUiUrl("http://@evil.com")).toBe("");
     expect(safeWebUiUrl("http://:@evil.com")).toBe("");
+    // Abbreviated authority forms the WHATWG parser still accepts:
+    // fewer-than-two slashes (and backslashes) after the scheme all
+    // parse with host=evil.com, so the slice can't key off ``://``.
+    expect(safeWebUiUrl("http:/user@evil.com")).toBe("");
+    expect(safeWebUiUrl("http:user@evil.com")).toBe("");
+    expect(safeWebUiUrl("http:\\\\user@evil.com")).toBe("");
   });
 
   it("allows a legitimate @ in the path or query", () => {
