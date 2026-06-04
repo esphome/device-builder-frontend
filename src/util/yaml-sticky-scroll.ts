@@ -70,6 +70,9 @@ interface MeasureResult {
    *  scope ends — Monaco's ``lastLineRelativePosition``. */
   lastLineRelativePosition: number;
   gutterWidth: number;
+  /** Line-number column width; narrower than ``gutterWidth`` (fold gutter to
+   *  its right). Right-aligns the pinned number to the real gutter. */
+  lineNumberWidth: number;
   rowHeight: number;
 }
 
@@ -108,6 +111,9 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
       // only resizes on those same events (e.g. line-number digit count),
       // so the cached value is current between refreshes.
       private _gutterWidth = 0;
+      // Line-number column width alone (narrower than _gutterWidth: the fold
+      // gutter sits to its right). The pinned number aligns to this edge.
+      private _lineNumberWidth = 0;
 
       constructor(readonly view: EditorView) {
         this.overlay = document.createElement("div");
@@ -170,6 +176,8 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
             // resize. The scroll handler then reuses the cached width.
             const gutterEl = view.dom.querySelector<HTMLElement>(".cm-gutters");
             this._gutterWidth = gutterEl ? gutterEl.offsetWidth : 0;
+            const lnEl = view.dom.querySelector<HTMLElement>(".cm-lineNumbers");
+            this._lineNumberWidth = lnEl ? lnEl.offsetWidth : 0;
             return this.measure(view);
           },
           write: (measured, view) => this.applyMeasured(measured, view),
@@ -240,6 +248,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
           scope,
           lastLineRelativePosition,
           gutterWidth: this._gutterWidth,
+          lineNumberWidth: this._lineNumberWidth,
           rowHeight,
         };
       }
@@ -249,14 +258,20 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
           this.setEmpty();
           return;
         }
-        const { scope, lastLineRelativePosition, gutterWidth, rowHeight } = measured;
+        const {
+          scope,
+          lastLineRelativePosition,
+          gutterWidth,
+          lineNumberWidth,
+          rowHeight,
+        } = measured;
 
-        const scopeKey = `${gutterWidth}|${scope
+        const scopeKey = `${gutterWidth}|${lineNumberWidth}|${scope
           .map((l) => `${l.lineNumber}:${l.text}`)
           .join("\n")}`;
         if (scopeKey !== this._renderedKey) {
           this._renderedKey = scopeKey;
-          this.render(scope, gutterWidth, view);
+          this.render(scope, gutterWidth, lineNumberWidth, view);
         }
 
         // Each row is absolutely positioned at ``i*rowHeight``; the last
@@ -309,6 +324,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
       private render(
         scope: StickyScopeLine[],
         gutterWidth: number,
+        lineNumberWidth: number,
         view: EditorView
       ): void {
         const tree = syntaxTree(view.state);
@@ -323,6 +339,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
             row,
             sticky,
             gutterWidth,
+            lineNumberWidth,
             tree,
             view.state,
             highlightStyle,

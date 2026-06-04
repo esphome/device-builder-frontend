@@ -4,6 +4,17 @@ import type { Tree } from "@lezer/common";
 import { highlightTree } from "@lezer/highlight";
 import type { StickyScopeLine } from "./yaml-sticky-scope.js";
 
+/** Right inset that lands the full-gutters-wide num span's glyph on the
+ *  line-number column's right edge: past the fold gutter, plus CM's 3px
+ *  cell inset (gutter cells use padding 0 3px 0 5px). */
+export function stickyNumPaddingRight(
+  gutterWidth: number,
+  lineNumberWidth: number
+): number {
+  if (gutterWidth <= 0 || lineNumberWidth <= 0) return 8; // pre-measure fallback
+  return gutterWidth - lineNumberWidth + 3;
+}
+
 export function createStickyRow(): HTMLDivElement {
   const row = document.createElement("div");
   row.className = "cm-esphome-sticky-line";
@@ -25,6 +36,7 @@ export function patchStickyRow(
   row: HTMLDivElement,
   sticky: StickyScopeLine,
   gutterWidth: number,
+  lineNumberWidth: number,
   tree: Tree,
   state: EditorState,
   highlightStyle: HighlightStyle,
@@ -43,6 +55,8 @@ export function patchStickyRow(
   const num = row.firstElementChild as HTMLSpanElement;
   const widthStr = gutterWidth > 0 ? `${gutterWidth}px` : "";
   if (num.style.width !== widthStr) num.style.width = widthStr;
+  const padRightStr = `${stickyNumPaddingRight(gutterWidth, lineNumberWidth)}px`;
+  if (num.style.paddingRight !== padRightStr) num.style.paddingRight = padRightStr;
   if (num.textContent !== lineStr) num.textContent = lineStr;
 
   // Re-run the (relatively costly) syntax highlighting only when the row
