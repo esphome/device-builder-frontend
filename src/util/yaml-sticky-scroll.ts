@@ -43,7 +43,11 @@ import {
   type PluginValue,
   type ViewUpdate,
 } from "@codemirror/view";
-import { createStickyRow, patchStickyRow } from "./yaml-sticky-render.js";
+import {
+  createStickyRow,
+  patchStickyRow,
+  type GutterMetrics,
+} from "./yaml-sticky-render.js";
 import {
   computeStickyScope,
   findScopeExitLine,
@@ -69,7 +73,7 @@ interface MeasureResult {
   /** Offset (<= 0) applied to the bottom row so it slides out as its
    *  scope ends — Monaco's ``lastLineRelativePosition``. */
   lastLineRelativePosition: number;
-  gutterWidth: number;
+  gutter: GutterMetrics;
   rowHeight: number;
 }
 
@@ -102,12 +106,18 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
       // the doc instance changes (i.e. an edit landed).
       private _lines: string[] = [];
       private _linesDoc: Text | null = null;
-      // Gutter width is a layout read (offsetWidth); cache it and only
-      // re-measure on the requestMeasure path (geometry/viewport changes),
-      // so the synchronous scroll handler never forces layout. The gutter
-      // only resizes on those same events (e.g. line-number digit count),
-      // so the cached value is current between refreshes.
-      private _gutterWidth = 0;
+      // Gutter geometry is a layout read (offsetWidth / getComputedStyle);
+      // cache it and only re-measure on the requestMeasure path
+      // (geometry/viewport changes), so the synchronous scroll handler never
+      // forces layout. The gutter only resizes on those same events (e.g.
+      // line-number digit count), so the cached value is current between
+      // refreshes.
+      private _gutter: GutterMetrics = {
+        width: 0,
+        lineNumberWidth: 0,
+        padLeft: 0,
+        padRight: 0,
+      };
 
       constructor(readonly view: EditorView) {
         this.overlay = document.createElement("div");
@@ -169,7 +179,18 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
             // geometry/viewport/doc changes, which is when the gutter can
             // resize. The scroll handler then reuses the cached width.
             const gutterEl = view.dom.querySelector<HTMLElement>(".cm-gutters");
-            this._gutterWidth = gutterEl ? gutterEl.offsetWidth : 0;
+            const lnEl = view.dom.querySelector<HTMLElement>(".cm-lineNumbers");
+            // Read the cell's actual padding rather than hard-coding CM's
+            // ``0 3px 0 5px`` default, so a CM bump or custom gutter theme
+            // can't drift the pinned number off the real gutter.
+            const cell = lnEl?.querySelector<HTMLElement>(".cm-gutterElement");
+            const cs = cell ? getComputedStyle(cell) : null;
+            this._gutter = {
+              width: gutterEl ? gutterEl.offsetWidth : 0,
+              lineNumberWidth: lnEl ? lnEl.offsetWidth : 0,
+              padLeft: cs ? parseFloat(cs.paddingLeft) || 0 : 0,
+              padRight: cs ? parseFloat(cs.paddingRight) || 0 : 0,
+            };
             return this.measure(view);
           },
           write: (measured, view) => this.applyMeasured(measured, view),
@@ -239,7 +260,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         return {
           scope,
           lastLineRelativePosition,
-          gutterWidth: this._gutterWidth,
+          gutter: this._gutter,
           rowHeight,
         };
       }
@@ -249,14 +270,15 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
           this.setEmpty();
           return;
         }
-        const { scope, lastLineRelativePosition, gutterWidth, rowHeight } = measured;
+        const { scope, lastLineRelativePosition, gutter, rowHeight } = measured;
 
-        const scopeKey = `${gutterWidth}|${scope
+        const { width, lineNumberWidth, padLeft, padRight } = gutter;
+        const scopeKey = `${width}|${lineNumberWidth}|${padLeft}|${padRight}|${scope
           .map((l) => `${l.lineNumber}:${l.text}`)
           .join("\n")}`;
         if (scopeKey !== this._renderedKey) {
           this._renderedKey = scopeKey;
-          this.render(scope, gutterWidth, view);
+          this.render(scope, gutter, view);
         }
 
         // Each row is absolutely positioned at ``i*rowHeight``; the last
@@ -308,7 +330,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
 
       private render(
         scope: StickyScopeLine[],
-        gutterWidth: number,
+        gutter: GutterMetrics,
         view: EditorView
       ): void {
         const tree = syntaxTree(view.state);
@@ -322,7 +344,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
           patchStickyRow(
             row,
             sticky,
-            gutterWidth,
+            gutter,
             tree,
             view.state,
             highlightStyle,

@@ -19,7 +19,7 @@ export function buildStickyTheme(background: string): Extension {
       fontFamily: EDITOR_FONT_FAMILY,
       fontSize: EDITOR_FONT_SIZE,
       background,
-      boxShadow: "0 1px 0 rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.08)",
+      boxShadow: "0 2px 0 rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.08)",
       overflow: "hidden",
       "&:empty": {
         display: "none",
@@ -53,8 +53,10 @@ export function buildStickyTheme(background: string): Extension {
       flex: "0 0 auto",
       boxSizing: "border-box",
       textAlign: "right",
-      paddingRight: "8px",
-      paddingLeft: "8px",
+      // Both paddings are set per-row inline (yaml-sticky-render) from the
+      // gutter cell's measured inset; this 5px is only the pre-measure
+      // fallback for the first paint.
+      paddingLeft: "5px",
       opacity: "0.65",
       userSelect: "none",
     },

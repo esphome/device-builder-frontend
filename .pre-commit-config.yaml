@@ -18,3 +18,14 @@ repos:
       - id: check-json
       - id: mixed-line-ending
         args: [--fix=lf]
+  - repo: local
+    hooks:
+      # A literal NUL byte makes git treat a text file as binary, so its
+      # diff renders as "Binary files differ" and the change can't be
+      # reviewed (this happened once in yaml-sticky-render.ts). pygrep is
+      # pure-Python, so it runs in pre-commit.ci's Node-less sandbox.
+      - id: forbid-nul-bytes
+        name: forbid NUL bytes in source files
+        language: pygrep
+        entry: "\\x00"
+        types: [text]
