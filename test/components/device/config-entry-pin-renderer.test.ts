@@ -45,6 +45,17 @@ describe("parsePinGpio", () => {
     expect(parsePinGpio("p1.16")).toBe(48);
   });
 
+  it("accepts BK72xx P{n} notation", () => {
+    // ESPHome's BK72xx (LibreTiny) validator writes pins as bare "P{n}",
+    // where the number is the LibreTiny pin index — "P23" -> 23.
+    expect(parsePinGpio("P23")).toBe(23);
+    expect(parsePinGpio("P6")).toBe(6);
+    expect(parsePinGpio("  p7 ")).toBe(7);
+    expect(parsePinGpio("P0")).toBe(0);
+    // A letter-port rtl87xx pin must not parse as a BK72xx pin.
+    expect(parsePinGpio("PA0")).toBeNull();
+  });
+
   it("rejects an out-of-range nRF52 pin part", () => {
     // Each port has 32 pins (0-31); "P0.33" must not normalize to P1.1 (33) —
     // that would silently rewrite the YAML to a different valid-looking pin.
@@ -81,10 +92,17 @@ describe("parsePinGpio", () => {
 });
 
 describe("formatPinValue", () => {
-  it("uses GPIOn for ESP / LibreTiny", () => {
+  it("uses GPIOn for ESP", () => {
     expect(formatPinValue(12, "esp32")).toBe("GPIO12");
-    expect(formatPinValue(5, "bk72xx")).toBe("GPIO5");
+    expect(formatPinValue(5, "esp8266")).toBe("GPIO5");
     expect(formatPinValue(0, undefined)).toBe("GPIO0");
+  });
+
+  it("uses P{n} for BK72xx", () => {
+    // ESPHome's BK72xx validator wants the bare "P{n}" form, not "GPIOn".
+    expect(formatPinValue(5, "bk72xx")).toBe("P5");
+    expect(formatPinValue(23, "bk72xx")).toBe("P23");
+    expect(formatPinValue(0, "bk72xx")).toBe("P0");
   });
 
   it("uses P{port}.{pin} for nRF52", () => {
@@ -148,6 +166,64 @@ describe("renderPinField nRF52 pin values", () => {
     const onChange = extractAttributeBindings(select)["@change"] as (e: Event) => void;
     onChange({ target: { value: "P1.1" } } as never);
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "number"], "P1.1");
+  });
+});
+
+describe("renderPinField BK72xx pin values", () => {
+  // ESPHome's BK72xx (LibreTiny) pins are written as bare "P{n}". The
+  // renderer must parse that form (or the dropdown renders blank) and emit
+  // it back so the editor writes valid YAML.
+  const bk72xxBoard = () =>
+    makeTestBoard({
+      pins: [makeBoardPin(23, { label: "P23", features: ["input"] })],
+      overrides: {
+        esphome: { platform: "bk72xx", board: "generic-bk7231n-qfn32-tuya" } as never,
+      },
+    });
+
+  it("writes the P{n} value, not GPIOn", () => {
+    const ctx = makeRenderCtx({ pin: undefined }, { board: bk72xxBoard() });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    const option = findElementBindings(result, "wa-option")[0];
+    expect(option.value).toBe("P23");
+
+    const select = findTemplatesByAnchor(result, "<wa-select")[0];
+    const onChange = extractAttributeBindings(select)["@change"] as (e: Event) => void;
+    onChange({ target: { value: "P23" } } as never);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "P23");
+  });
+
+  it("matches the active option for a P{n} value", () => {
+    const ctx = makeRenderCtx({ pin: "P23" }, { board: bk72xxBoard() });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    const option = findElementBindings(result, "wa-option")[0];
+    expect(option.value).toBe("P23");
+    expect(option["?selected"]).toBe(true);
+  });
+
+  it("matches the active option for a long-form P{n} value", () => {
+    // The reported bug: a binary_sensor with `pin: { number: P23 }` rendered
+    // a blank Pin dropdown because the long-form `P23` failed to parse.
+    const ctx = makeRenderCtx(
+      { pin: { number: "P23", inverted: true } },
+      { board: bk72xxBoard() }
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    const option = findElementBindings(result, "wa-option")[0];
+    expect(option.value).toBe("P23");
+    expect(option["?selected"]).toBe(true);
   });
 });
 

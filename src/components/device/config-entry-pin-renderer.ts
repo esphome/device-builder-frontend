@@ -23,10 +23,12 @@ import {
 import { renderNestedField } from "./config-entry-renderers/nested.js";
 import { renderBooleanField } from "./config-entry-renderers/primitives.js";
 
-// Bare int / "GPIOn" form (esp / esp8266 / rp2040 / libretiny).
+// Bare int / "GPIOn" form (esp / esp8266 / rp2040 / ln882x).
 const GPIO_PIN_RE = /^\s*(?:GPIO)?(\d+)\s*$/i;
 // nRF52 "P{port}.{pin}" form.
 const NRF52_PIN_RE = /^\s*P(\d+)\.(\d+)\s*$/i;
+// BK72xx (LibreTiny / Beken) "P{n}" form — bare P + number, no dot.
+const BK72XX_PIN_RE = /^\s*P(\d+)\s*$/i;
 
 /**
  * Parse a pin reference into a GPIO number. Used both for the field's
@@ -51,6 +53,11 @@ export function parsePinGpio(s: unknown): number | null {
     // different valid-looking pin (which would silently rewrite the YAML).
     const p = s.match(NRF52_PIN_RE);
     if (p && Number(p[2]) < 32) return Number(p[1]) * 32 + Number(p[2]);
+    // BK72xx "P{n}" form (e.g. "P23" -> 23). Tried after the nRF52 match so
+    // the dotted "P0.27" form is never swallowed by this no-dot pattern; the
+    // letter-port rtl87xx form ("PA00") won't match either.
+    const bk = s.match(BK72XX_PIN_RE);
+    if (bk) return Number(bk[1]);
   }
   if (s !== null && typeof s === "object" && !Array.isArray(s)) {
     return parsePinGpio((s as Record<string, unknown>).number);
@@ -60,11 +67,13 @@ export function parsePinGpio(s: unknown): number | null {
 
 /**
  * Format a GPIO number as the pin value ESPHome's platform validator
- * accepts. ESP/LibreTiny take "GPIOn"; nRF52's validator rejects that
- * and wants port.pin notation ("P0.27", "P1.1") — port*32 + pin.
+ * accepts. ESP take "GPIOn"; nRF52's validator rejects that and wants
+ * port.pin notation ("P0.27", "P1.1") — port*32 + pin; BK72xx wants the
+ * bare "P{n}" form ("P23"), where the LibreTiny pin index is the number.
  */
 export function formatPinValue(gpio: number, platform: string | undefined): string {
   if (platform === "nrf52") return `P${Math.floor(gpio / 32)}.${gpio % 32}`;
+  if (platform === "bk72xx") return `P${gpio}`;
   return `GPIO${gpio}`;
 }
 
