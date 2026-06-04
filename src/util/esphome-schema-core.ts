@@ -193,8 +193,9 @@ export function _resetCoreSchemaCachesForTests() {
  * the legacy ``setSchemaVersion`` behaviour: the dashboard's
  * reported ``esphome_version`` is the authoritative answer, but if
  * that build hasn't published a schema yet we fall back to ``dev``
- * (the rolling latest). Probes the host with a HEAD on
- * ``esphome.json`` to confirm.
+ * (the rolling latest). Probes the host with a GET on
+ * ``esphome.json`` to confirm (GET, not HEAD — see the inline
+ * note on CDN/CORS cache poisoning below).
  *
  * On any failure (offline / CSP / DNS), the promise is *evicted*
  * so the next caller retries — no permanent stuck-on-``dev``
