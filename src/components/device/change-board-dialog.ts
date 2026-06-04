@@ -70,7 +70,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
             name: this.currentBoard?.name ?? "",
           })}
         </p>
-        <div class="board-list" role="list">
+        <div class="board-list">
           ${this.boards.map((board) => this._renderBoard(board))}
         </div>
         <div class="actions">
@@ -84,12 +84,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
 
   private _renderBoard(board: BoardCatalogEntry) {
     return html`
-      <button
-        type="button"
-        class="board-row"
-        role="listitem"
-        @click=${() => this._select(board)}
-      >
+      <button type="button" class="board-row" @click=${() => this._select(board)}>
         <img
           class="board-thumb"
           src=${boardImageUrl(board)}
