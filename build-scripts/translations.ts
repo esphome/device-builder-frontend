@@ -60,9 +60,10 @@ const translationPath = (locale: string): string =>
 // so the only extra dependency is `fflate` for unzipping downloads.
 const API_BASE = "https://api.lokalise.com/api2";
 
-// File upload is asynchronous: the endpoint returns a process id and the
-// work happens in the background. Poll the process until it leaves the
-// queued/running state, with a ceiling so a stuck process can't hang CI.
+// Both file upload and (async) export are asynchronous: the endpoint
+// returns a process id and the work happens in the background. Poll the
+// process until it leaves the queued/running state, with a ceiling so a
+// stuck process can't hang CI.
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 300_000;
 
@@ -150,6 +151,8 @@ class LokaliseClient {
     return this.waitForProcess(processId);
   }
 
+  // Poll a queued process (upload or async export) until it finishes and
+  // return the finished process payload.
   private async waitForProcess(processId: string): Promise<Record<string, unknown>> {
     const deadline = Date.now() + POLL_TIMEOUT_MS;
     for (;;) {
@@ -163,12 +166,12 @@ class LokaliseClient {
       }
       if (status === "failed" || status === "cancelled") {
         throw new LokaliseError(
-          `Upload process ${processId} ${status}: ${JSON.stringify(process)}`
+          `Lokalise process ${processId} ${status}: ${JSON.stringify(process)}`
         );
       }
       if (Date.now() > deadline) {
         throw new LokaliseError(
-          `Upload process ${processId} timed out (last status: ${status}).`
+          `Lokalise process ${processId} timed out (last status: ${status}).`
         );
       }
       await sleep(POLL_INTERVAL_MS);
@@ -177,6 +180,13 @@ class LokaliseClient {
 
   // Request an export bundle for every language in the project and
   // return its download URL.
+  //
+  // The project outgrew Lokalise's synchronous files/download endpoint,
+  // which now rejects the export with HTTP 413 ("Project too big for sync
+  // export. Please use our async export endpoint instead."). The async
+  // endpoint (files/async-download) returns a process id instead of a
+  // bundle URL directly; the URL lands in the finished process's
+  // details.download_url, reachable through the same poller as upload.
   async downloadBundleUrl(exportSort = "first_added"): Promise<string> {
     const payload = {
       format: "json",
@@ -193,17 +203,26 @@ class LokaliseClient {
       // No filter_langs: export whatever languages the project has, so
       // adding a locale in Lokalise round-trips with no code change.
     };
-    const result = await this.request<{ bundle_url?: string }>(
+    const result = await this.request<{ process_id?: string }>(
       "POST",
-      "files/download",
+      "files/async-download",
       payload
     );
-    if (!result.bundle_url) {
+    const processId = result.process_id;
+    if (!processId) {
       throw new LokaliseError(
-        `Download did not return a bundle url: ${JSON.stringify(result)}`
+        `Async download did not return a process id: ${JSON.stringify(result)}`
       );
     }
-    return result.bundle_url;
+    const process = await this.waitForProcess(processId);
+    const details = process.details as { download_url?: string } | undefined;
+    const bundleUrl = details?.download_url;
+    if (!bundleUrl) {
+      throw new LokaliseError(
+        `Async download process ${processId} finished without a download_url: ${JSON.stringify(process)}`
+      );
+    }
+    return bundleUrl;
   }
 }
 
