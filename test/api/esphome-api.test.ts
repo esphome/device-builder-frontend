@@ -2060,3 +2060,71 @@ describe("ESPHomeAPI — firmware download (HTTP)", () => {
     ).rejects.toThrow(/404/);
   });
 });
+
+describe("ESPHomeAPI — console-debug redaction", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+    stubLocalStorage();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const debugText = (spy: ReturnType<typeof vi.spyOn>): string =>
+    spy.mock.calls.map((c) => JSON.stringify(c)).join("\n");
+
+  it("redacts the password in a logged auth/login frame", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.login({ username: "admin", password: "hunter2" });
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      result: { token: "t", expires_at: 1 },
+    });
+    await pending;
+
+    const text = debugText(debugSpy);
+    expect(text).not.toContain("hunter2");
+    expect(text).toContain("<redacted>");
+  });
+
+  it("redacts the fresh token in a received auth/login result", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.login({ token: "old-token" });
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      result: { token: "fresh-secret-token", expires_at: 9999 },
+    });
+    await pending;
+
+    // The result-bearing response has no ``command`` field, so the
+    // redactor must spot the nested ``result.token``.
+    const text = debugText(debugSpy);
+    expect(text).not.toContain("fresh-secret-token");
+    expect(text).toContain("<redacted>");
+  });
+
+  it("leaves non-auth command traffic untouched", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.sendCommand("ping", { foo: "bar" });
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({ message_id: sent.message_id, result: { ok: true } });
+    await pending;
+
+    const text = debugText(debugSpy);
+    expect(text).toContain("bar");
+    expect(text).not.toContain("<redacted>");
+  });
+});

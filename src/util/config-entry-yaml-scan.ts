@@ -100,12 +100,58 @@ const pinKeyEquals = (a: PinKey, b: PinKey) =>
   a.excludeToLine === b.excludeToLine;
 const pinMemo = createScanMemo<PinKey, Map<number, string>>(pinKeyEquals);
 
+// Keys whose values are free-form human text. `scanPinGpios` is
+// deliberately value-context-agnostic (it's shared with the pin picker,
+// which only ever sees real pin values), so a token like "P0.5" or "PA02"
+// sitting in a device name reads as a pin to it. In a name/comment that's
+// prose, not a pin reference — counting it produces a phantom used-pin and
+// a spurious cross-section conflict warning. Skip these keys' lines.
+const FREETEXT_PIN_KEYS = new Set(["name", "friendly_name", "comment"]);
+
+// Leading `key:` of an indented (or list-item) mapping line. Captures the
+// leading indentation (group 1) and the key (group 2) so a block-scalar
+// value under a free-text key can be skipped by indentation.
+const LINE_KEY_RE = /^(\s*)(?:-\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
+
+// A `key:` whose value is a block scalar (`|` / `>`, with optional chomping
+// `+`/`-` and explicit-indent digit, plus an optional trailing comment).
+// Its continuation lines are more-indented prose, scanned via indentation.
+const BLOCK_SCALAR_RE = /:\s*[|>][+-]?\d*\s*(?:#.*)?$/;
+
+// Leading-whitespace width of a line (block-scalar indentation threshold).
+const indentWidth = (line: string): number => line.length - line.trimStart().length;
+
+/**
+ * Strip a YAML inline comment. A `#` begins a comment only at line start
+ * or when preceded by whitespace (so `http://x#y` keeps its `#`). Pin
+ * values never contain `#`, so cutting here can't drop a real pin token —
+ * but it does keep a `# spare PA02` trailing comment from registering a
+ * phantom pin.
+ *
+ * This is intentionally NOT quote-aware: a `#` inside a quoted scalar
+ * (`id: "x # GPIO5"`) is treated as a comment start and truncated. That's
+ * fine here — the strip is false-positive-only, and a pin-shaped token
+ * buried in a quoted comment-like tail was already a phantom match before
+ * this strip existed. Real pin values are never quoted-with-`#`, so quote
+ * tracking (single vs double, escapes, flow scalars) would add complexity
+ * for a case that can't surface a real conflict. Don't "fix" it.
+ */
+function stripInlineComment(line: string): string {
+  const m = line.match(/(^|\s)#/);
+  return m === null ? line : line.slice(0, (m.index ?? 0) + m[1].length);
+}
+
 /**
  * Map every pin reference in the YAML to the top-level domain that
  * owns it (e.g. `{ 4: "switch", 5: "binary_sensor" }`). Pin tokens are
  * matched across every platform form (`GPIOn`, bk72xx `P{n}`, rtl87xx
  * `PA{n}`, nRF52 `P{port}.{pin}`) via `scanPinGpios`, so conflict
  * warnings fire for LibreTiny / nRF52 configs too, not just ESP ones.
+ * Free-text keys (`name`/`comment`) and inline `#` comments are excluded
+ * first, so a pin-shaped token in prose doesn't register as a used pin.
+ * The free-text skip also covers a block scalar (`comment: >` / `comment: |`):
+ * its more-indented continuation lines are skipped by indentation, so a
+ * pin-shaped token in multi-line prose doesn't register either.
  * When `excludeFromLine` / `excludeToLine` are provided the lines
  * in that (inclusive) 1-indexed range are skipped — used by the
  * section editor so a pin selector doesn't flag the user's *own*
@@ -130,11 +176,15 @@ export function findUsedPins(
   }
   const lines = yaml.split("\n");
   let currentDomain = "";
+  // Indentation of an open free-text block scalar; continuation lines
+  // indented deeper than this are prose and skipped. -1 when none is open.
+  let blockScalarIndent = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const topMatch = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*):/);
     if (topMatch) {
       currentDomain = topMatch[1];
+      blockScalarIndent = -1;
       continue;
     }
     const lineNo = i + 1;
@@ -147,7 +197,19 @@ export function findUsedPins(
       continue;
     }
     if (!currentDomain) continue;
-    for (const num of scanPinGpios(line)) {
+    // Inside an open free-text block scalar: skip blank lines and any line
+    // indented deeper than the key. A non-blank line at/under the key indent
+    // ends the block.
+    if (blockScalarIndent >= 0) {
+      if (line.trim() === "" || indentWidth(line) > blockScalarIndent) continue;
+      blockScalarIndent = -1;
+    }
+    const keyMatch = line.match(LINE_KEY_RE);
+    if (keyMatch && FREETEXT_PIN_KEYS.has(keyMatch[2].toLowerCase())) {
+      if (BLOCK_SCALAR_RE.test(line)) blockScalarIndent = keyMatch[1].length;
+      continue;
+    }
+    for (const num of scanPinGpios(stripInlineComment(line))) {
       if (!used.has(num)) used.set(num, currentDomain);
     }
   }

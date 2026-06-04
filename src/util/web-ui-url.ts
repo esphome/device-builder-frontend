@@ -29,22 +29,42 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
  * ``http:\\user@evil.com`` (all parse with host ``evil.com``) — are
  * caught too, not just the canonical ``http://…@…``.
  *
- * The original string is returned verbatim (rather than
- * ``parsed.toString()``) so callers keep the terse form
- * ``http://host:22`` instead of the WHATWG-canonicalised
- * ``http://host:22/``.
+ * The string is returned with ASCII tab/CR/LF stripped and
+ * leading/trailing C0 control characters and spaces trimmed (but
+ * otherwise un-canonicalised, rather than ``parsed.toString()``) so
+ * callers keep the terse form ``http://host:22`` instead of the
+ * WHATWG-canonicalised ``http://host:22/``.
+ *
+ * One subtlety: the WHATWG URL parser silently strips ASCII tab, CR,
+ * and LF from *anywhere* in the input and trims leading/trailing C0
+ * control characters and spaces (U+0000–U+0020) *before* computing
+ * ``parsed.protocol``, so ``ht\ntp://device.local@evil.com`` and
+ * ``  http://device.local@evil.com`` both parse cleanly with host
+ * ``evil.com``. If we sliced the authority off the *raw* string, those
+ * stripped/trimmed characters would desync the raw scheme length from
+ * ``parsed.protocol`` and the slice would read from the wrong offset —
+ * missing the ``@`` and waving the spoof through. We therefore run the
+ * authority check (and slice) against the same sanitized string the
+ * parser saw, and return *that* sanitized form so the href a caller
+ * renders can't smuggle the stripped chars back in.
  */
 export function safeWebUiUrl(url: string): string {
   if (!url) return "";
+  // Mirror the WHATWG parser, which trims leading/trailing C0
+  // controls + spaces and removes ASCII tab/CR/LF everywhere, so our
+  // raw-string authority slice lines up with what `new URL` saw.
+  const cleaned = url
+    .replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "")
+    .replace(/[\t\r\n]/g, "");
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(cleaned);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
-    const authority = url
+    const authority = cleaned
       .slice(parsed.protocol.length)
       .replace(/^[/\\]+/, "")
       .split(/[/?#\\]/, 1)[0];
     if (authority.includes("@")) return "";
-    return url;
+    return cleaned;
   } catch {
     return "";
   }
