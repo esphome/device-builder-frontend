@@ -71,6 +71,28 @@ export const deviceBoardInfoStyles = css`
     text-decoration: none;
   }
 
+  /* Sits next to "More info"; styled to read as a sibling link even
+     though it's a <button> (it opens the change-board picker rather
+     than navigating). Only rendered when the board has alternates. */
+  .board-change-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    font-size: var(--wa-font-size-xs);
+    font-family: inherit;
+    color: var(--esphome-primary);
+    text-decoration: underline;
+    margin-left: 10px;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
+  .board-change-link:hover {
+    text-decoration: none;
+  }
+
   .board-description {
     margin: 0;
     font-size: var(--wa-font-size-xs);

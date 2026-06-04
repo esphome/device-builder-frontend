@@ -1715,6 +1715,76 @@ describe("ESPHomeAPI — getComponentBodies", () => {
   });
 });
 
+describe("ESPHomeAPI — getCompatibleBoards", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``boards/get_compatible_boards`` with board_id and hydrates the slim results", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getCompatibleBoards("generic-esp32c3");
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+
+    expect(sent.command).toBe("boards/get_compatible_boards");
+    expect(sent.args).toEqual({ board_id: "generic-esp32c3" });
+
+    // Same slim PagedBoardsResponse envelope as getBoards (no hardware /
+    // pins / images on the entries); the wrapper unwraps + hydrates so
+    // consumers get the defaulted shape.
+    ws.receive({
+      message_id: sent.message_id,
+      result: {
+        total: 2,
+        offset: 0,
+        limit: 2,
+        boards: [
+          {
+            id: "seeed-xiao-esp32c3",
+            name: "Seeed XIAO ESP32-C3",
+            esphome: { platform: "esp32", board: "esp32-c3-devkitm-1" },
+          },
+          {
+            id: "generic-esp32c3",
+            name: "Generic ESP32-C3",
+            esphome: { platform: "esp32", board: "esp32-c3-devkitm-1" },
+          },
+        ],
+      },
+    });
+
+    const boards = await pending;
+    expect(boards.map((b) => b.id)).toEqual(["seeed-xiao-esp32c3", "generic-esp32c3"]);
+    // hydrateBoard fills the body-only fields the slim entry omitted.
+    expect(boards[0].pins).toEqual([]);
+    expect(boards[0].tags).toEqual([]);
+    expect(boards[0].images).toEqual([]);
+    expect(boards[0].hardware.flash_size).toBeNull();
+  });
+
+  it("returns an empty list when the backend has no siblings", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getCompatibleBoards("m5stack-cores3");
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      result: { total: 0, offset: 0, limit: 0, boards: [] },
+    });
+
+    await expect(pending).resolves.toEqual([]);
+  });
+});
+
 describe("ESPHomeAPI — automations parse / upsert / delete", () => {
   beforeEach(() => {
     installMockWebSocket();

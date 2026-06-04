@@ -510,6 +510,34 @@ export class ESPHomePageDevice extends LitElement {
     this._justCreated = false;
   };
 
+  /**
+   * Swap the device's board to the alternate picked in the "Wrong board?"
+   * dialog. `devices/update` rewrites the YAML `board:` and flags the pick
+   * as user-set (so the re-derivation won't heal it back), then we reload
+   * the YAML pane to show the rewrite. The board header refreshes on its
+   * own: the backend's `DEVICE_UPDATED` event updates the devices context,
+   * which re-fires the board fetch in `updated()`.
+   */
+  private _onChangeBoard = async (e: CustomEvent<{ boardId: string }>) => {
+    const boardId = e.detail?.boardId;
+    const device = this._device;
+    if (!boardId || !device || boardId === device.board_id) return;
+    // A board swap rewrites the file server-side; reloading the YAML
+    // afterwards would discard unsaved edits, so refuse while dirty.
+    if (this._isDirty) {
+      toast.error(this._localize("device.change_board_unsaved"), { richColors: true });
+      return;
+    }
+    try {
+      await this._api.updateDevice({ name: device.name, board_id: boardId });
+      await this._loadYaml();
+      toast.success(this._localize("device.change_board_success"), { richColors: true });
+    } catch (err) {
+      console.error("Failed to change board:", err);
+      toast.error(this._localize("device.change_board_error"), { richColors: true });
+    }
+  };
+
   private async _loadPreferences() {
     // Editor layout stored locally (not in backend preferences)
     const savedLayout = localStorage.getItem("esphome-editor-layout");
@@ -889,6 +917,7 @@ export class ESPHomePageDevice extends LitElement {
             .focusFieldPath=${this._focusFieldPath}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
+            @change-board=${this._onChangeBoard}
             ?hasUnsavedEdits=${this._isDirty}
             ?hasPendingChanges=${this._device?.has_pending_changes === true}
             ?hasUpdateAvailable=${this._device?.update_available === true}

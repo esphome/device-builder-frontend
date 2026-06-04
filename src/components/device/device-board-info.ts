@@ -11,9 +11,10 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -24,6 +25,7 @@ import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
 import type { ESPHomeApiActionEditor } from "./automation-editor/api-action-editor.js";
 import type { ESPHomeAutomationEditor } from "./automation-editor/automation-editor.js";
 import type { ESPHomeScriptEditor } from "./automation-editor/script-editor.js";
+import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
 import { deviceBoardInfoStyles } from "./device-board-info.styles.js";
 import type { ESPHomeDeviceSectionConfig } from "./device-section-config.js";
@@ -38,6 +40,7 @@ import "./automation-editor/api-action-editor.js";
 import "./automation-editor/automation-editor.js";
 import "./automation-editor/script-editor.js";
 import { locationFromSectionKey } from "./automation-editor/serialise.js";
+import "./change-board-dialog.js";
 import "./device-section-config.js";
 
 registerMdiIcons({
@@ -60,8 +63,22 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  @consume({ context: apiContext })
+  private _api!: ESPHomeAPI;
+
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
+
+  /** Boards interchangeable with the current one (same PlatformIO
+   *  target), with the current board itself filtered out — the swap
+   *  targets the "Wrong board?" picker offers. Empty when the board has
+   *  no alternates, which is when the link stays hidden. */
+  @state()
+  private _alternateBoards: BoardCatalogEntry[] = [];
+
+  /** Board id the alternates were last fetched for — guards against a
+   *  stale in-flight response overwriting a newer board's alternates. */
+  private _alternatesForBoardId: string | null = null;
 
   @property()
   yaml = "";
@@ -117,9 +134,15 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   @query("esphome-add-config-dialog")
   private _addConfigDialog!: ESPHomeAddConfigDialog;
 
+  @query("esphome-change-board-dialog")
+  private _changeBoardDialog!: ESPHomeChangeBoardDialog;
+
   private _reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   updated(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has("board")) {
+      this._refreshAlternateBoards();
+    }
     // Coalesce typing in the YAML editor pane to one
     // `reload()` per debounce window, but bypass the debounce
     // on the empty-to-populated transition (page-load arrival,
@@ -182,6 +205,53 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     this._addComponentDialog?.openWithSearch(detail.domain);
   };
 
+  /**
+   * Fetch the boards interchangeable with the current one so the
+   * "Wrong board?" link can appear when alternates exist. Filters out
+   * the current board (the backend includes it) and guards against a
+   * stale in-flight response from a previous board clobbering a newer
+   * one — `board` changes whenever the page resolves a new `board_id`.
+   */
+  private async _refreshAlternateBoards() {
+    const board = this.board;
+    if (!board) {
+      this._alternatesForBoardId = null;
+      this._alternateBoards = [];
+      return;
+    }
+    if (board.id === this._alternatesForBoardId) return;
+    this._alternatesForBoardId = board.id;
+    this._alternateBoards = [];
+    try {
+      const all = await this._api.getCompatibleBoards(board.id);
+      if (this._alternatesForBoardId !== board.id) return;
+      this._alternateBoards = all.filter((b) => b.id !== board.id);
+    } catch (e) {
+      console.error("Failed to load compatible boards:", e);
+      if (this._alternatesForBoardId === board.id) this._alternateBoards = [];
+    }
+  }
+
+  private _openChangeBoard = () => {
+    this._changeBoardDialog?.open();
+  };
+
+  /**
+   * The picker selected a board. Re-emit as a page-level `change-board`
+   * so the device page owns the `devices/update` write + YAML reload —
+   * this component only renders the entry point.
+   */
+  private _onSelectBoard = (e: CustomEvent<{ boardId: string }>) => {
+    e.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent("change-board", {
+        detail: e.detail,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
   static styles = [espHomeStyles, deviceBoardInfoStyles];
 
   protected render() {
@@ -206,6 +276,15 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
                     ${this._localize("device.more_info")}
                     <wa-icon library="mdi" name="open-in-new"></wa-icon>
                   </a>
+                  ${this._alternateBoards.length > 0
+                    ? html`<button
+                        type="button"
+                        class="board-change-link"
+                        @click=${this._openChangeBoard}
+                      >
+                        ${this._localize("device.wrong_board")}
+                      </button>`
+                    : nothing}
                 </div>
                 <p class="board-description">${renderMarkdown(board.description)}</p>
               </div>
@@ -268,6 +347,11 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .board=${board}
         .yaml=${this.yaml}
       ></esphome-add-automation-dialog>
+      <esphome-change-board-dialog
+        .currentBoard=${board}
+        .boards=${this._alternateBoards}
+        @select-board=${this._onSelectBoard}
+      ></esphome-change-board-dialog>
     `;
   }
 
