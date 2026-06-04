@@ -33,18 +33,31 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
  * ``parsed.toString()``) so callers keep the terse form
  * ``http://host:22`` instead of the WHATWG-canonicalised
  * ``http://host:22/``.
+ *
+ * One subtlety: the WHATWG URL parser silently strips ASCII tab, CR,
+ * and LF from *anywhere* in the input, so ``ht\ntp://device.local@evil.com``
+ * parses cleanly with host ``evil.com``. If we sliced the authority off
+ * the *raw* string, that control char would desync the raw scheme length
+ * from ``parsed.protocol`` and the slice would read from the wrong
+ * offset — missing the ``@`` and waving the spoof through. We therefore
+ * run the authority check (and slice) against the same control-char-free
+ * string the parser saw, and return *that* sanitized form so the href a
+ * caller renders can't smuggle the stripped chars back in.
  */
 export function safeWebUiUrl(url: string): string {
   if (!url) return "";
+  // Mirror the WHATWG parser, which removes ASCII tab/CR/LF everywhere,
+  // so our raw-string authority slice lines up with what `new URL` saw.
+  const cleaned = url.replace(/[\t\r\n]/g, "");
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(cleaned);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
-    const authority = url
+    const authority = cleaned
       .slice(parsed.protocol.length)
       .replace(/^[/\\]+/, "")
       .split(/[/?#\\]/, 1)[0];
     if (authority.includes("@")) return "";
-    return url;
+    return cleaned;
   } catch {
     return "";
   }
