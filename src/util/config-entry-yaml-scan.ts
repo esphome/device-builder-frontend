@@ -139,6 +139,10 @@ function stripInlineComment(line: string): string {
  * warnings fire for LibreTiny / nRF52 configs too, not just ESP ones.
  * Free-text keys (`name`/`comment`) and inline `#` comments are excluded
  * first, so a pin-shaped token in prose doesn't register as a used pin.
+ * Known gap: the free-text skip is single-line, so the continuation
+ * lines of a multi-line block scalar (`comment: >` / `comment: |`) are
+ * not covered — a pin-shaped token there still registers. This is
+ * false-positive-only and block scalars in these keys are uncommon.
  * When `excludeFromLine` / `excludeToLine` are provided the lines
  * in that (inclusive) 1-indexed range are skipped — used by the
  * section editor so a pin selector doesn't flag the user's *own*
