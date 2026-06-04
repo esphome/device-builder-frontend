@@ -117,6 +117,14 @@ const LINE_KEY_RE = /^\s*(?:-\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
  * values never contain `#`, so cutting here can't drop a real pin token —
  * but it does keep a `# spare PA02` trailing comment from registering a
  * phantom pin.
+ *
+ * This is intentionally NOT quote-aware: a `#` inside a quoted scalar
+ * (`id: "x # GPIO5"`) is treated as a comment start and truncated. That's
+ * fine here — the strip is false-positive-only, and a pin-shaped token
+ * buried in a quoted comment-like tail was already a phantom match before
+ * this strip existed. Real pin values are never quoted-with-`#`, so quote
+ * tracking (single vs double, escapes, flow scalars) would add complexity
+ * for a case that can't surface a real conflict. Don't "fix" it.
  */
 function stripInlineComment(line: string): string {
   const m = line.match(/(^|\s)#/);
