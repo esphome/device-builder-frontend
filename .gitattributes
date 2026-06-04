@@ -1,0 +1,8 @@
+# TypeScript/JavaScript sources are always text. Force a textual diff so a
+# stray control byte (e.g. a NUL, which makes git treat a file as binary)
+# can't flip a source file to an unreviewable "Binary files differ" diff.
+*.ts diff
+*.tsx diff
+*.js diff
+*.cjs diff
+*.mjs diff
