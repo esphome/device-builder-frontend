@@ -16,7 +16,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { actionFieldLabel } from "../../util/action-field-label.js";
-import { withBase } from "../../util/base-path.js";
+import { defaultBoardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -267,14 +267,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
   }
 
-  private _onImageError(e: Event) {
-    const img = e.target as HTMLImageElement;
-    const fallback = withBase("/assets/board/default.svg");
-    if (img.src !== window.location.origin + fallback && !img.src.endsWith(fallback)) {
-      img.src = fallback;
-    }
-  }
-
   private _onShowYamlEditor() {
     this.dispatchEvent(
       new CustomEvent("show-yaml-editor", { bubbles: true, composed: true })
@@ -344,10 +336,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           ? nothing
           : html`<div class="section-image">
               <img
-                src=${this._config.image_url || withBase("/assets/board/default.svg")}
+                src=${this._config.image_url || defaultBoardImageUrl()}
                 alt=${this._config.title}
                 referrerpolicy="no-referrer"
-                @error=${this._onImageError}
+                @error=${onBoardImageError}
               />
             </div>`}
       </div>

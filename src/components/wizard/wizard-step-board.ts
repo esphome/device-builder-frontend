@@ -17,7 +17,7 @@ import type { SerialPort } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { withBase } from "../../util/base-path.js";
+import { boardImageUrl } from "../../util/board-image.js";
 import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -277,8 +277,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
   }
 
   private _renderFeatured(board: BoardCatalogEntry) {
-    const imageUrl =
-      board.images.length > 0 ? board.images[0] : withBase("/assets/board/default.svg");
+    const imageUrl = boardImageUrl(board);
     return html`
       <div class="featured-card">
         <img class="featured-image" src=${imageUrl} alt=${board.name} />
@@ -317,8 +316,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
   }
 
   private _renderBoardCard(board: BoardCatalogEntry, expanded: boolean) {
-    const imageUrl =
-      board.images.length > 0 ? board.images[0] : withBase("/assets/board/default.svg");
+    const imageUrl = boardImageUrl(board);
     return html`
       <article class="board-card ${expanded ? "board-card--expanded" : ""}">
         <div class="board-card-header">
