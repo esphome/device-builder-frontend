@@ -16,7 +16,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { withBase } from "../../util/base-path.js";
+import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
@@ -280,10 +280,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
               </div>
               <div class="board-image">
                 <img
-                  src=${this._boardImageUrl(board)}
+                  src=${boardImageUrl(board)}
                   alt=${board.name}
                   referrerpolicy="no-referrer"
-                  @error=${this._onImageError}
+                  @error=${onBoardImageError}
                 />
               </div>
             </div>
@@ -494,19 +494,6 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         composed: true,
       })
     );
-  }
-
-  private _boardImageUrl(board: BoardCatalogEntry): string {
-    if (board.images.length > 0) return board.images[0];
-    return withBase("/assets/board/default.svg");
-  }
-
-  private _onImageError(e: Event) {
-    const img = e.target as HTMLImageElement;
-    const fallback = withBase("/assets/board/default.svg");
-    if (img.src !== window.location.origin + fallback && !img.src.endsWith(fallback)) {
-      img.src = fallback;
-    }
   }
 }
 

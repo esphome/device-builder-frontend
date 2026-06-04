@@ -9,13 +9,11 @@ import {
   quietCloseButtonStyles,
 } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { withBase } from "../../util/base-path.js";
+import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { changeBoardDialogStyles } from "./change-board-dialog.styles.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "../base-dialog.js";
-
-const FALLBACK_BOARD_IMAGE = "/assets/board/default.svg";
 
 /**
  * Picker for swapping a device's board to an interchangeable one. Bind
@@ -94,10 +92,10 @@ export class ESPHomeChangeBoardDialog extends LitElement {
       >
         <img
           class="board-thumb"
-          src=${this._boardImageUrl(board)}
+          src=${boardImageUrl(board)}
           alt=${board.name}
           referrerpolicy="no-referrer"
-          @error=${this._onImageError}
+          @error=${onBoardImageError}
         />
         <div class="board-meta">
           <span class="board-name">${board.name}</span>
@@ -112,19 +110,6 @@ export class ESPHomeChangeBoardDialog extends LitElement {
           : nothing}
       </button>
     `;
-  }
-
-  private _boardImageUrl(board: BoardCatalogEntry): string {
-    if (board.images.length > 0) return board.images[0];
-    return withBase(FALLBACK_BOARD_IMAGE);
-  }
-
-  private _onImageError(e: Event) {
-    const img = e.target as HTMLImageElement;
-    const fallback = withBase(FALLBACK_BOARD_IMAGE);
-    if (img.src !== window.location.origin + fallback && !img.src.endsWith(fallback)) {
-      img.src = fallback;
-    }
   }
 
   private _select(board: BoardCatalogEntry) {
