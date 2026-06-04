@@ -129,6 +129,28 @@ describe("findUsedPins", () => {
     expect(map.get(23)).toBe("switch");
   });
 
+  it("ignores pin-shaped tokens in multi-line block-scalar free-text values", () => {
+    // A `comment: |` / `comment: >` block scalar carries prose on its
+    // more-indented continuation lines. Those tokens are part of the same
+    // false-positive class as single-line free-text values and must not
+    // register as used pins. A real pin on the next sibling key (back at the
+    // mapping indent) still counts, so the skip ends at the block's end.
+    const config = [
+      "switch:",
+      "  - platform: gpio",
+      "    comment: |",
+      "      wired to P0.5 originally", // P0.5 -> would be pin 5
+      "      then moved, see PA02 note", // PA02 -> would be pin 2
+      "",
+      "    pin: GPIO7", // real pin, after the block scalar
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.get(7)).toBe("switch");
+    expect(map.has(5)).toBe(false);
+    expect(map.has(2)).toBe(false);
+  });
+
   it("returns an empty map for empty yaml", () => {
     expect(findUsedPins("").size).toBe(0);
   });
