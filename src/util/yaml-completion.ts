@@ -242,41 +242,55 @@ export async function resolveAvailableEntries(
   platformValue: string | null,
   topLevelKey: string | null
 ): Promise<ConfigEntry[]> {
-  // Special case: cursor is nested under a list-item header
-  // (``- platform: template`` → parentKey="platform"). The form
-  // fields the user wants live on the dotted catalog id
-  // ``<domain>.<platformValue>`` (e.g. ``binary_sensor.template``).
-  // Short-circuit either way — even on a miss, falling through
-  // would call ``fetchComponent(api, "platform")`` which 404s
-  // and poisons the session-scoped cache for the lifetime of
-  // the page (unlikely to matter today, but the failure mode
-  // would be silent if a real ``platform`` component ever
-  // shipped).
+  // The slim ``getComponents`` index carries no ``config_entries``
+  // (those hydrate lazily through ``components/get_component_bodies``),
+  // so the catalog tells us only *which* ids exist — never their
+  // fields. Hydrate the body for an id known to the index; return
+  // ``[]`` for unknown ids so we never fetch ``platform`` (or any
+  // non-component key) and poison the session cache with a 404.
+  // Tolerate fetch failures silently: ``BatchedCache`` rejects on a
+  // transport error or a mid-flight ``_clearComponentCache()``, and the
+  // completion source isn't wrapped — an unguarded throw here would drop
+  // the whole popup instead of degrading to no suggestions.
+  const entriesFor = async (id: string): Promise<ConfigEntry[]> => {
+    if (!catalog.byId.has(id)) return [];
+    try {
+      const body = await fetchComponent(api, id);
+      return body?.config_entries ?? [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Cursor nested under a list-item header (``- platform: template``
+  // → parentKey="platform"). The form fields live on the dotted
+  // catalog id ``<domain>.<platformValue>`` (``binary_sensor.template``).
   if (parentKey === "platform") {
     if (!topLevelKey || !platformValue) return [];
-    const dotted = catalog.byId.get(`${topLevelKey}.${platformValue}`);
-    return dotted ? dotted.config_entries : [];
+    return entriesFor(`${topLevelKey}.${platformValue}`);
   }
-  const directHit = catalog.byId.get(parentKey);
-  if (directHit) {
-    // We have a top-level component directly. If it categorizes platforms
-    // (i.e. its sub_entries describe a platform-style mapping) and a
-    // platform value is set, merge platform fields in.
+  if (catalog.byId.has(parentKey)) {
+    // Top-level component directly. If a platform value is set, merge
+    // the platform implementation's fields in (the catalog keys
+    // per-platform entries as ``<domain>.<stem>``). Resolve the merge
+    // id up front so both bodies register before the microtask flush
+    // and batch into a single ``get_component_bodies`` round trip.
+    let mergeId: string | null = null;
     if (platformValue) {
-      const platformComp = catalog.byId.get(platformValue);
-      if (platformComp) {
-        return [...directHit.config_entries, ...platformComp.config_entries];
-      }
-      // Try the dotted lookup — the catalog keys per-platform
-      // entries as ``<domain>.<stem>``.
-      if (topLevelKey) {
-        const dotted = catalog.byId.get(`${topLevelKey}.${platformValue}`);
-        if (dotted) {
-          return [...directHit.config_entries, ...dotted.config_entries];
-        }
+      if (catalog.byId.has(platformValue)) {
+        mergeId = platformValue;
+      } else if (topLevelKey && catalog.byId.has(`${topLevelKey}.${platformValue}`)) {
+        mergeId = `${topLevelKey}.${platformValue}`;
       }
     }
-    return directHit.config_entries;
+    if (mergeId) {
+      const [own, extra] = await Promise.all([
+        entriesFor(parentKey),
+        entriesFor(mergeId),
+      ]);
+      return [...own, ...extra];
+    }
+    return entriesFor(parentKey);
   }
   // No direct hit — try fetching the component (handles aliases the
   // catalog list call doesn't return). Routes through the session-
@@ -285,7 +299,7 @@ export async function resolveAvailableEntries(
   // silently.
   try {
     const comp = await fetchComponent(api, parentKey);
-    if (comp) return comp.config_entries;
+    if (comp) return comp.config_entries ?? [];
   } catch {
     /* ignore */
   }
