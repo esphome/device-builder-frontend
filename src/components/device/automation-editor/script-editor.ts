@@ -35,6 +35,7 @@ import type {
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
@@ -382,7 +383,7 @@ export class ESPHomeScriptEditor extends LitElement {
     const title = comp?.name ?? this._localize("device.script_header_title_static");
     const descText =
       comp?.description ?? this._localize("device.script_header_description");
-    const docsUrl = comp?.docs_url ?? "https://esphome.io/components/script.html";
+    const docsUrl = comp?.docs_url ?? `${ESPHOME_DOCS_BASE}/components/script.html`;
     const imageUrl = comp?.image_url ?? "";
     return html`<div class="ae-header">
       <div class="ae-header-text">

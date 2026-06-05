@@ -14,6 +14,7 @@ import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { SerialPort } from "../../api/types/system.js";
+import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -48,6 +49,9 @@ registerMdiIcons({
   plus: mdiPlus,
   "usb-port": mdiUsbPort,
 });
+
+// "I don't know what board I have" guide on the docs site (device-builder-frontend#114).
+const UNDERSTANDING_BOARDS_DOCS_URL = `${ESPHOME_DOCS_BASE}/guides/understanding_boards/`;
 
 @customElement("esphome-wizard-step-board")
 export class ESPHomeWizardStepBoard extends LitElement {
@@ -241,9 +245,14 @@ export class ESPHomeWizardStepBoard extends LitElement {
                 <wa-icon library="mdi" name="usb-port"></wa-icon>
                 ${this._localize("wizard.connect_your_board")}
               </button>
-              <button class="helper-link" type="button">
+              <a
+                class="helper-link"
+                href=${UNDERSTANDING_BOARDS_DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 ${this._localize("wizard.dont_know_board")}
-              </button>
+              </a>
             </div>
           `}
 

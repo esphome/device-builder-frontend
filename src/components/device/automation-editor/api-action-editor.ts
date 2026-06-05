@@ -34,6 +34,7 @@ import type {
   AvailableAutomations,
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
+import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
@@ -59,7 +60,7 @@ registerMdiIcons({
 /** ESPHome's docs page for the api component (which hosts
  *  ``api.actions:``). Linked from the header so the user lands on
  *  the right docs page from a single click. */
-const API_DOCS_URL = "https://esphome.io/components/api.html";
+const API_DOCS_URL = `${ESPHOME_DOCS_BASE}/components/api.html`;
 
 /** ``AutomationLocation`` variant for ``api.actions:`` entries —
  *  pulled out as a local alias because the api-action editor only
