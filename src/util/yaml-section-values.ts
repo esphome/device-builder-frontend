@@ -8,6 +8,7 @@
  */
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { isPlainObject } from "./nested-values.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import {
   formatYamlScalar,
@@ -723,7 +724,45 @@ export function parseYamlSectionValues(
   sectionKey: string,
   fromLine?: number
 ): Record<string, unknown> {
-  const lines = yaml.split("\n");
+  return parseSectionCore(yaml.split("\n"), sectionKey, fromLine).values;
+}
+
+/**
+ * A top-level key's source-line span within a section body. Both
+ * fields are 0-indexed into the section's lines array; ``[start, end)``
+ * is half-open. ``leadStart <= start`` extends over the contiguous
+ * blank / standalone-comment run that visually precedes the key, so a
+ * verbatim copy carries that key's own comments with it.
+ */
+interface KeySpan {
+  start: number;
+  end: number;
+  leadStart: number;
+}
+
+interface ParsedSection {
+  values: Record<string, unknown>;
+  // One span per top-level key, in file order. The inline-on-dash key
+  // (list items) is intentionally absent — it lives on the section
+  // header line, which `updateSectionInYaml` owns directly.
+  spans: Map<string, KeySpan>;
+  childIndent: string;
+  isListItem: boolean;
+  // 0-indexed section header / leading-dash line.
+  startIdx: number;
+}
+
+/**
+ * Parse a section into values plus each top-level key's source-line
+ * span, so `updateSectionInYaml` can copy untouched keys back verbatim
+ * rather than re-serialize the whole section (#1227). Spans are built
+ * in the value-parse walk so the two can't drift.
+ */
+function parseSectionCore(
+  lines: string[],
+  sectionKey: string,
+  fromLine?: number
+): ParsedSection {
   // Null-prototype map so a YAML key like `__proto__` /
   // `constructor` / `prototype` lands as a normal own property
   // instead of mutating the inherited prototype chain — defends
@@ -738,8 +777,15 @@ export function parseYamlSectionValues(
   // would now throw. Use `Object.prototype.hasOwnProperty.call` if
   // you need that check on a downstream consumer.
   const values: Record<string, unknown> = Object.create(null);
+  const spans = new Map<string, KeySpan>();
+  // leadStart is finalised by the post-loop pass below.
+  const recordSpan = (key: string, start: number, end: number): void => {
+    spans.set(key, { start, end, leadStart: start });
+  };
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
-  if (startIdx < 0) return values;
+  if (startIdx < 0) {
+    return { values, spans, childIndent: "", isListItem: false, startIdx };
+  }
 
   const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
   // Detect the indent the user actually picked for this
@@ -756,12 +802,15 @@ export function parseYamlSectionValues(
     const peek = _skipBlankAndCommentLines(lines, startIdx + 1);
     if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {
       values[sectionKey] = parseListBlock(lines, startIdx + 1, childIndent).value;
-      return values;
+      // No per-key spans — `updateSectionInYaml` re-emits this whole
+      // list through its dedicated LIST_SECTIONS branch.
+      return { values, spans, childIndent, isListItem, startIdx };
     }
   }
 
   // List-item form: the first child key may sit on the same line as
-  // the leading dash (e.g. `  - platform: gpio\n    pin: 4`).
+  // the leading dash (e.g. `  - platform: gpio\n    pin: 4`). No span
+  // is recorded — it rides on the dash line.
   if (isListItem) {
     const firstMatch = lines[startIdx].match(LIST_ITEM_INLINE_KEY_RE);
     if (firstMatch) {
@@ -808,6 +857,7 @@ export function parseYamlSectionValues(
     if (BLOCK_SCALAR_INLINE_RE.test(raw)) {
       const { endIdx } = _scanValueBlock(lines, i + 1, childIndent);
       values[key] = new YamlRawValue(lines.slice(i + 1, endIdx), raw);
+      recordSpan(key, i, endIdx);
       i = endIdx - 1;
       continue;
     }
@@ -825,6 +875,7 @@ export function parseYamlSectionValues(
         );
         if (!isEmptyScalarList) {
           values[key] = value;
+          recordSpan(key, i, endIdx);
           i = endIdx - 1;
         }
         continue;
@@ -837,6 +888,7 @@ export function parseYamlSectionValues(
         const result = parseNestedBlock(lines, i + 1, peekLead);
         if (Object.keys(result.values).length > 0) {
           values[key] = result.values;
+          recordSpan(key, i, result.endIdx);
         }
         i = result.endIdx - 1;
       }
@@ -845,12 +897,50 @@ export function parseYamlSectionValues(
 
     if (raw.startsWith("[") && raw.endsWith("]")) {
       values[key] = parseFlowList(raw);
+      recordSpan(key, i, i + 1);
       continue;
     }
     values[key] = parseScalar(raw);
+    recordSpan(key, i, i + 1);
   }
 
-  return values;
+  // A multi-line value's scanners skip trailing blank / sibling-level
+  // comment lines, so the recorded `end` can swallow a comment that
+  // really leads the NEXT key — and editing this key would then drop
+  // it. Pull the trailing run off the span so it folds into the next
+  // key's leadStart below. Only when the run actually holds a comment:
+  // a pure-blank run (the file's trailing newline, a `|+` keep) stays
+  // with the value so byte-identical no-op saves don't lose it. The
+  // indent guard keeps deeper block-scalar literal text in the value
+  // (#1227).
+  for (const span of spans.values()) {
+    const low = span.start + 1;
+    let runStart = span.end;
+    let hasComment = false;
+    while (
+      runStart > low &&
+      isBlankOrCommentLine(lines[runStart - 1]) &&
+      _leadingIndent(lines[runStart - 1]).length <= childIndent.length
+    ) {
+      runStart--;
+      if (isCommentLine(lines[runStart])) hasComment = true;
+    }
+    if (hasComment) span.end = runStart;
+  }
+
+  // Extend each span back over the blank/comment run directly above it
+  // (bounded by the previous key's trimmed end), so leadStart/end
+  // partition the body — a verbatim copy then neither drops nor
+  // double-counts an inter-key comment.
+  let prevEnd = startIdx + 1;
+  for (const span of spans.values()) {
+    let lead = span.start;
+    while (lead > prevEnd && isBlankOrCommentLine(lines[lead - 1])) lead--;
+    span.leadStart = lead;
+    prevEnd = span.end;
+  }
+
+  return { values, spans, childIndent, isListItem, startIdx };
 }
 
 /** Recursively parse a nested YAML block at the given indent. */
@@ -1046,11 +1136,17 @@ export function updateSectionInYaml(
     return lines.join("\n");
   }
 
+  // Re-parse the original to recover each key's source-line span and
+  // on-disk value — the diff below needs both.
+  const parsed = parseSectionCore(lines, sectionKey, fromLine);
+
   // `childIndent` (detected above) also matches the user's existing
   // indent step on save, so 4-space (or other consistent) YAML isn't
   // re-emitted with a mixed 2-space slice.
-  let toSerialize = values;
   let dashLine = lines[start];
+  // Keys carried inline on the list-item dash are represented by
+  // `dashLine`, not the body — the per-key loop skips them.
+  const inlineKeys = new Set<string>();
   if (isListItem) {
     // List items can carry a key/value inline with the dash
     // (`- platform: esphome`). `parseYamlSectionValues` reads
@@ -1068,11 +1164,11 @@ export function updateSectionInYaml(
     //   1. inline key absent from form: dash kept as-is, body
     //      emitted normally. Original behaviour.
     //   2. form value is an inline-able scalar (string / number
-    //      / boolean): rewrite the dash to carry the form's
-    //      value, drop the key from the body. Handles the
-    //      empty-inline (`- platform:`), stale-inline (form
-    //      picked a different value), and trailing-comment
-    //      (`- platform: # ...`) cases uniformly.
+    //      / boolean): the dash carries it (skipped from the
+    //      body). Unchanged → kept byte-for-byte so a trailing
+    //      `# comment` survives; changed → rewritten from the
+    //      form's value. Also handles the empty-inline
+    //      (`- platform:`) and stale-inline cases.
     //   3. form value is non-scalar (object / array / null /
     //      undefined): collapse the dash to bare `-` and let
     //      the body serializer emit the inline key at the
@@ -1098,28 +1194,25 @@ export function updateSectionInYaml(
       // inline content. (`Object.prototype.hasOwnProperty.call`
       // rather than `Object.hasOwn` for tsconfig-target reach.)
       if (Object.prototype.hasOwnProperty.call(values, inlineKey)) {
-        // Single regex captures both the indentation up to the
-        // dash and the trailing whitespace before the inline
-        // key — `dashPrefix` (with the trailing space) is what
-        // the rewrite path needs, and the indent alone is what
-        // the bare-dash path needs.
-        //
-        // The match always succeeds in this branch: we entered
-        // it via `LIST_ITEM_INLINE_KEY_RE`, which requires `\s+`
-        // both before and after the dash, so `\s+-\s+` is
-        // already true of `dashLine`. The non-null assertion
-        // makes that invariant local.
-        const dashPrefixMatch = dashLine.match(/^(\s+)-(\s+)/)!;
-        const dashIndent = dashPrefixMatch[1];
-        const dashPrefix = `${dashIndent}-${dashPrefixMatch[2]}`;
         if (_isInlinableScalar(values[inlineKey])) {
-          dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(values[inlineKey])}`;
-          const { [inlineKey]: _omit, ...rest } = values;
-          toSerialize = rest;
+          inlineKeys.add(inlineKey);
+          // Only rewrite the dash when the form changed the inline
+          // value; an unchanged value stays byte-for-byte so its
+          // trailing comment / original quoting survive.
+          if (!yamlValueEqual(values[inlineKey], parsed.values[inlineKey])) {
+            // The match always succeeds here: we entered via
+            // `LIST_ITEM_INLINE_KEY_RE`, which requires `\s+` both
+            // before and after the dash. The non-null assertion
+            // makes that invariant local.
+            const dashPrefixMatch = dashLine.match(/^(\s+)-(\s+)/)!;
+            const dashPrefix = `${dashPrefixMatch[1]}-${dashPrefixMatch[2]}`;
+            dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(values[inlineKey])}`;
+          }
         } else {
           // Non-scalar form value: drop the inline key from the
           // dash and let the body serializer emit everything,
           // including the now-non-inline key.
+          const dashIndent = (dashLine.match(/^(\s+)-/) ?? ["", ""])[1];
           dashLine = `${dashIndent}-`;
         }
       }
@@ -1137,15 +1230,63 @@ export function updateSectionInYaml(
   // valid-and-readable even when the surrounding file uses a
   // different step elsewhere.
   const detectedStep = !isListItem && childIndent ? childIndent : ESPHOME_YAML_INDENT;
-  const newLines = [
-    dashLine,
-    ...serializeYamlValues(toSerialize, childIndent, {
-      ...options,
-      indentStep: options.indentStep ?? detectedStep,
-    }),
-  ];
+  const serializeOptions = { ...options, indentStep: options.indentStep ?? detectedStep };
+
+  // Splice only what changed (#1227): untouched keys keep their source
+  // lines byte-for-byte; the rest re-serialize through the normal path.
+  const bodyLines: string[] = [];
+  for (const [key, val] of Object.entries(values)) {
+    if (inlineKeys.has(key)) continue;
+    const span = parsed.spans.get(key);
+    if (span && yamlValueEqual(val, parsed.values[key])) {
+      bodyLines.push(...lines.slice(span.leadStart, span.end));
+      continue;
+    }
+    // Changed / added key. Keep any standalone-comment run that led the
+    // original key — the value line below reformats, the comment stays.
+    if (span) bodyLines.push(...lines.slice(span.leadStart, span.start));
+    bodyLines.push(...serializeYamlValues({ [key]: val }, childIndent, serializeOptions));
+  }
+
+  const newLines = [dashLine, ...bodyLines];
   lines.splice(start, spliceEnd - start, ...newLines);
   return lines.join("\n");
+}
+
+/**
+ * Structural equality for the value shapes the section parser emits —
+ * primitives, null, null-prototype mappings, ``string[]`` / ``Record[]``
+ * arrays, and ``YamlRawValue`` (compared by header + body lines so an
+ * untouched lambda stays verbatim). Not a general deep-equal; the
+ * exotic shapes (Map / Set / Date / function) never reach here.
+ */
+function yamlValueEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a instanceof YamlRawValue || b instanceof YamlRawValue) {
+    return (
+      a instanceof YamlRawValue &&
+      b instanceof YamlRawValue &&
+      a.inlineHeader === b.inlineHeader &&
+      a.lines.length === b.lines.length &&
+      a.lines.every((line, i) => line === b.lines[i])
+    );
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((item, i) => yamlValueEqual(item, b[i]))
+    );
+  }
+  if (isPlainObject(a) && isPlainObject(b)) {
+    const ak = Object.keys(a);
+    if (ak.length !== Object.keys(b).length) return false;
+    return ak.every(
+      (k) => Object.prototype.hasOwnProperty.call(b, k) && yamlValueEqual(a[k], b[k])
+    );
+  }
+  return false;
 }
 
 /**

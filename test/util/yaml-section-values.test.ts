@@ -905,6 +905,198 @@ ${lambdaBlock}
   });
 });
 
+describe("updateSectionInYaml — preserves untouched field byte layout (#1227)", () => {
+  // A single-field edit re-serialized the WHOLE section, so untouched
+  // siblings lost their byte layout: inline-comment scalars got quoted,
+  // standalone comments shifted, lambda bodies re-indented. The
+  // diff-and-splice writer copies unchanged keys' lines verbatim and
+  // only re-serializes the keys the form actually changed.
+
+  it("keeps a sibling's inline-comment scalar byte-identical", () => {
+    // Headline repro: `internal: true #hides from list` must NOT become
+    // `internal: "true #hides from list"` when an unrelated field edits.
+    const before = [
+      "wifi:",
+      "  ssid: home",
+      "  internal: true #hides from list",
+      "logger:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.ssid = "office";
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain("\n  internal: true #hides from list\n");
+    expect(after).not.toContain('internal: "true #hides from list"');
+    expect(after).toContain("ssid: office");
+  });
+
+  it("keeps a sibling lambda block byte-identical and un-duplicated", () => {
+    const before = [
+      "display:",
+      "  lambda: |-",
+      '    it.printf(0, 0, "hello");',
+      "  update_interval: 1s",
+      "sensor:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "display", 1);
+    values.update_interval = "5s";
+    const after = updateSectionInYaml(before, "display", values, 1);
+    expect(after).toContain('  lambda: |-\n    it.printf(0, 0, "hello");\n');
+    expect(after.match(/lambda:/g)).toHaveLength(1);
+    expect(after).toContain("update_interval: 5s");
+  });
+
+  it("keeps a standalone comment between siblings in place", () => {
+    const before = [
+      "wifi:",
+      "  ssid: home",
+      "  # keep me",
+      "  password: secret",
+      "logger:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.ssid = "office";
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain("\n  # keep me\n  password: secret\n");
+  });
+
+  it("reformats only the edited field, keeping a standalone comment above it", () => {
+    const before = [
+      "wifi:",
+      "  ssid: home",
+      "  # toggles list visibility",
+      "  internal: true #hides from list",
+      "logger:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    // Edit the commented field itself: the value line is allowed to
+    // reformat (its trailing comment drops), but the standalone comment
+    // above it and the untouched sibling survive.
+    values.internal = false;
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain("  # toggles list visibility\n  internal: false");
+    expect(after).toContain("\n  ssid: home\n");
+  });
+
+  it("interleaves a changed key between two unchanged keys correctly", () => {
+    const before = [
+      "wifi:",
+      "  ssid: home #primary",
+      "  power_save_mode: none",
+      "  fast_connect: true #saves boot time",
+      "logger:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.power_save_mode = "light";
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    // Both commented siblings stay byte-identical; the middle key changed.
+    expect(after).toContain("  ssid: home #primary\n");
+    expect(after).toContain("  fast_connect: true #saves boot time\n");
+    expect(after).toContain("power_save_mode: light");
+    expect(after).not.toContain('"home #primary"');
+    expect(after).not.toContain('"true #saves boot time"');
+  });
+
+  it("is stable across repeated saves on a commented section", () => {
+    const before = [
+      "wifi:",
+      "  ssid: home",
+      "  internal: true #hides from list",
+      "logger:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.ssid = "office";
+    const once = updateSectionInYaml(before, "wifi", values, 1);
+    const twiceValues = parseYamlSectionValues(once, "wifi", 1);
+    const twice = updateSectionInYaml(once, "wifi", twiceValues, 1);
+    expect(twice).toBe(once);
+  });
+
+  it("keeps a list item's commented inline dash key byte-identical", () => {
+    const before = [
+      "ota:",
+      "  - platform: esphome #default backend",
+      "    password: oldpass",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "ota.esphome", 2);
+    values.password = "newpass";
+    const after = updateSectionInYaml(before, "ota.esphome", values, 2);
+    expect(after).toContain("  - platform: esphome #default backend\n");
+    expect(after).not.toContain('"esphome #default backend"');
+    expect(after).toContain("password: newpass");
+    expect(after.match(/platform:/g)).toHaveLength(1);
+  });
+
+  it("keeps an unchanged nested-mapping sibling byte-identical", () => {
+    // Exercises the deep-equal object branch on the verbatim path: an
+    // untouched nested map (with its own deep inline comment) survives
+    // a sibling scalar edit.
+    const before = [
+      "api:",
+      "  reboot_timeout: 0s",
+      "  encryption:",
+      "    key: abc123 #shared with HA",
+      "logger:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "api", 1);
+    values.reboot_timeout = "30s";
+    const after = updateSectionInYaml(before, "api", values, 1);
+    expect(after).toContain("  encryption:\n    key: abc123 #shared with HA\n");
+    expect(after).not.toContain('"abc123 #shared with HA"');
+    expect(after).toContain("reboot_timeout: 30s");
+  });
+
+  it("keeps an unchanged list sibling with a commented item byte-identical", () => {
+    // Exercises the array-equality branch on the verbatim path, and
+    // guards a regression: re-serializing the list would quote the
+    // commented item (`- homenet #primary` → `- "homenet #primary"`).
+    const before = [
+      "wifi:",
+      "  ssid: home",
+      "  networks:",
+      "    - homenet #primary",
+      "    - guestnet",
+      "logger:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.ssid = "office";
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain("  networks:\n    - homenet #primary\n    - guestnet\n");
+    expect(after).not.toContain('"homenet #primary"');
+    expect(after).toContain("ssid: office");
+  });
+
+  it("keeps an inter-key comment when editing the multi-line value above it", () => {
+    // Copilot review: a block scalar's span absorbs the trailing
+    // sibling-level comment the scanner skipped, so editing that key
+    // used to drop the comment. The span-trim folds it into the next
+    // key's leadStart instead.
+    const before = [
+      "display:",
+      "  lambda: |-",
+      "    old_code();",
+      "  # between siblings",
+      "  update_interval: 5s",
+      "sensor:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "display", 1);
+    values.lambda = { _lambda: "new_code();" };
+    const after = updateSectionInYaml(before, "display", values, 1);
+    expect(after).toContain("  # between siblings\n  update_interval: 5s\n");
+    expect(after).toContain("new_code();");
+    expect(after).not.toContain("old_code();");
+  });
+});
+
 describe("serializeYamlValues — single-key null-value list items", () => {
   // The polymorphic carve-out in serializeListItem is in the
   // shared helper, so it affects every list-of-mapping consumer,
