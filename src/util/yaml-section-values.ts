@@ -300,6 +300,35 @@ const stripQuotes = (s: string): string => {
   return s;
 };
 
+/**
+ * Split a scalar's raw text into its value and a trailing inline
+ * comment (``true #hides`` → ``{ value: "true", comment: " #hides" }``).
+ * A ``#`` only starts a comment when it's whitespace-preceded and
+ * outside quotes — ``Bedroom#2`` and ``"a # b"`` keep the ``#`` in the
+ * value. ``comment`` retains its leading whitespace (``""`` when none)
+ * so the serializer can re-append it verbatim.
+ */
+const splitInlineComment = (raw: string): { value: string; comment: string } => {
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === '"' && !inSingle) inDouble = !inDouble;
+    else if (c === "'" && !inDouble) inSingle = !inSingle;
+    else if (
+      c === "#" &&
+      !inSingle &&
+      !inDouble &&
+      (raw[i - 1] === " " || raw[i - 1] === "\t")
+    ) {
+      let ws = i;
+      while (ws > 0 && (raw[ws - 1] === " " || raw[ws - 1] === "\t")) ws--;
+      return { value: raw.slice(0, ws), comment: raw.slice(ws) };
+    }
+  }
+  return { value: raw, comment: "" };
+};
+
 // Quoting in YAML is the explicit "treat me as a string" signal —
 // ``key: "on"`` must stay the literal ``"on"`` even though ``on`` is
 // a truthy spelling. Detect the quotes BEFORE stripping so we only
@@ -307,10 +336,13 @@ const stripQuotes = (s: string): string => {
 // field that happens to hold ``"on"`` / ``"yes"`` would silently
 // flip to boolean ``true`` on round-trip.
 const parseScalar = (raw: string): unknown => {
+  // Strip a trailing inline comment so a boolean/number field coerces
+  // and the form value isn't polluted with `# ...` text (#1235).
+  const { value: scalar } = splitInlineComment(raw);
   const wasQuoted =
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith("'") && raw.endsWith("'"));
-  const v = stripQuotes(raw);
+    (scalar.startsWith('"') && scalar.endsWith('"')) ||
+    (scalar.startsWith("'") && scalar.endsWith("'"));
+  const v = stripQuotes(scalar);
   if (!wasQuoted) {
     const bool = parseYamlBoolean(v);
     if (bool !== null) return bool;
@@ -758,13 +790,14 @@ function parseSectionCore(
   // you need that check on a downstream consumer.
   const values: Record<string, unknown> = Object.create(null);
   const spans = new Map<string, KeySpan>();
+  const comments = new Map<string, string>();
   // leadStart is finalised by the post-loop pass below.
   const recordSpan = (key: string, start: number, end: number): void => {
     spans.set(key, { start, end, leadStart: start });
   };
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) {
-    return { values, spans, childIndent: "", isListItem: false, startIdx };
+    return { values, spans, comments, childIndent: "", isListItem: false, startIdx };
   }
 
   const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
@@ -784,7 +817,7 @@ function parseSectionCore(
       values[sectionKey] = parseListBlock(lines, startIdx + 1, childIndent).value;
       // No per-key spans — `updateSectionInYaml` re-emits this whole
       // list through its dedicated LIST_SECTIONS branch.
-      return { values, spans, childIndent, isListItem, startIdx };
+      return { values, spans, comments, childIndent, isListItem, startIdx };
     }
   }
 
@@ -795,7 +828,11 @@ function parseSectionCore(
     const firstMatch = lines[startIdx].match(LIST_ITEM_INLINE_KEY_RE);
     if (firstMatch) {
       const raw = firstMatch[2].trim();
-      if (raw !== "") values[firstMatch[1]] = parseScalar(raw);
+      if (raw !== "") {
+        const { comment } = splitInlineComment(raw);
+        if (comment) comments.set(firstMatch[1], comment);
+        values[firstMatch[1]] = parseScalar(raw);
+      }
     }
   }
 
@@ -875,12 +912,17 @@ function parseSectionCore(
       continue;
     }
 
-    if (raw.startsWith("[") && raw.endsWith("]")) {
-      values[key] = parseFlowList(raw);
+    // Split a trailing inline comment off before the flow-list test
+    // (`[a, b] # c` doesn't end with `]`) and before scalar parsing,
+    // and record it so an edit can re-append it (#1235).
+    const { value: scalar, comment } = splitInlineComment(raw);
+    if (comment) comments.set(key, comment);
+    if (scalar.startsWith("[") && scalar.endsWith("]")) {
+      values[key] = parseFlowList(scalar);
       recordSpan(key, i, i + 1);
       continue;
     }
-    values[key] = parseScalar(raw);
+    values[key] = parseScalar(scalar);
     recordSpan(key, i, i + 1);
   }
 
@@ -920,7 +962,7 @@ function parseSectionCore(
     prevEnd = span.end;
   }
 
-  return { values, spans, childIndent, isListItem, startIdx };
+  return { values, spans, comments, childIndent, isListItem, startIdx };
 }
 
 /** Recursively parse a nested YAML block at the given indent. */
@@ -1186,7 +1228,8 @@ export function updateSectionInYaml(
             // makes that invariant local.
             const dashPrefixMatch = dashLine.match(/^(\s+)-(\s+)/)!;
             const dashPrefix = `${dashPrefixMatch[1]}-${dashPrefixMatch[2]}`;
-            dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(values[inlineKey])}`;
+            const comment = parsed.comments.get(inlineKey) ?? "";
+            dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(values[inlineKey])}${comment}`;
           }
         } else {
           // Non-scalar form value: drop the inline key from the
