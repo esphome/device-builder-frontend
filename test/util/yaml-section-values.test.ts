@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { LIST_SECTIONS } from "../../src/util/section-entry-overrides.js";
+import { LIST_ITEM_START_RE } from "../../src/util/yaml-section-lexer.js";
 import {
   findSectionStart,
-  LIST_ITEM_START_RE,
   parseYamlSectionValues,
+} from "../../src/util/yaml-section-reader.js";
+import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";

@@ -7,10 +7,11 @@
  * read and write — not as a general YAML parser.
  *
  * This module is the mutation facade: ``findSectionRange`` /
- * ``updateSectionInYaml`` / ``removeSectionFromYaml`` live here, and
- * the read API (``parseYamlSectionValues`` / ``findSectionStart`` /
- * ``LIST_ITEM_START_RE``) is re-exported from the reader/lexer layers
- * so existing consumers import from this module unchanged.
+ * ``updateSectionInYaml`` / ``removeSectionFromYaml`` live here. The
+ * read API (``parseYamlSectionValues`` / ``findSectionStart``) lives
+ * in ``yaml-section-reader``; the shared regexes
+ * (``LIST_ITEM_START_RE`` etc.) live in ``yaml-section-lexer``.
+ * Consumers import each symbol from its owning layer directly.
  */
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
@@ -29,11 +30,6 @@ import {
   serializeYamlValues,
   type SerializeYamlOptions,
 } from "./yaml-serialize.js";
-
-// Re-export the public read API so existing consumers' imports from
-// this module keep working unchanged after the layer split.
-export { parseYamlSectionValues } from "./yaml-section-reader.js";
-export { findSectionStart, LIST_ITEM_START_RE };
 
 /**
  * Find the 0-indexed line range [start, end) for a section.

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { parseYamlSectionValues } from "../../src/util/yaml-section-values.js";
+import { parseYamlSectionValues } from "../../src/util/yaml-section-reader.js";
 import {
   _clearYamlSectionsMemo,
   categorizeSections,
