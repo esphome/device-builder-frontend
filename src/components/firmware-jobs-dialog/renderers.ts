@@ -154,6 +154,14 @@ function renderSourceLine(
       </div>
     `;
   }
+  // No server bound yet: the compile is waiting for one to free up.
+  if (job.source === JobSource.REMOTE_PENDING) {
+    return html`
+      <div class="job-source">
+        ${host._localize("firmware_jobs.waiting_for_build_server")}
+      </div>
+    `;
+  }
   if (job.remote_peer) {
     const peer = job.remote_peer_label || job.remote_peer;
     return html`

@@ -39,10 +39,13 @@ export type RemoteBuildSubmitTarget = JobType.COMPILE | JobType.UPLOAD;
  *  receiver ran and the offloader fetched the artifacts from. The
  *  install dialog reads ``FirmwareJob.source_label`` to render a
  *  "Building on {receiver_label}" sub-line when ``source ===
- *  REMOTE``. */
+ *  REMOTE``. ``REMOTE_PENDING`` is the transient before dispatch: a
+ *  compile that will run on a paired server, but whose server is
+ *  chosen when one frees, so ``source_label`` is still empty. */
 export enum JobSource {
   LOCAL = "local",
   REMOTE = "remote",
+  REMOTE_PENDING = "remote_pending",
 }
 
 export interface FirmwareJob {

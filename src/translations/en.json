@@ -1252,6 +1252,7 @@
     "time_started": "started {time}",
     "time_finished": "finished {time}",
     "building_on": "Building on {label}",
+    "waiting_for_build_server": "Waiting for a build server",
     "submitted_by": "from {label}"
   }
 }
