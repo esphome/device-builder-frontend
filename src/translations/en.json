@@ -1153,7 +1153,7 @@
     "remote_build_rotate_already_in_progress": "Another rotation is already running on this dashboard. Wait for it to finish before retrying.",
     "remote_build_rotate_failed": "Could not rotate the identity.",
     "build_server_pairing_requests_heading": "Pairing requests",
-    "build_server_pairing_requests_desc": "Senders that have asked to pair with this dashboard. Open Review to compare the fingerprint with what the sending dashboard shows and decide.",
+    "build_server_pairing_requests_desc": "Senders that have asked to pair with this dashboard. Open Review to compare the fingerprint shown on the sending dashboard, then accept or reject.",
     "build_server_pairing_requests_loading": "Loading pairing requests…",
     "build_server_pairing_requests_empty": "No pairing requests yet.",
     "build_server_pairing_window_open": "Open",
