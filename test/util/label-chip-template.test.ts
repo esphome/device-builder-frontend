@@ -119,7 +119,10 @@ describe("renderLabelChip", () => {
     const container = renderInto(renderLabelChip(label("a", "Kitchen", "#dc2626")));
     const style = container.querySelector(".label-chip")?.getAttribute("style") ?? "";
     expect(style).toContain("background");
-    expect(style).toContain("color");
+    // Match the foreground `color:` segment specifically — a bare
+    // `toContain("color")` is satisfied by `border-color` and wouldn't
+    // catch the foreground color being dropped.
+    expect(style).toMatch(/(^|;)color:/);
   });
 });
 
