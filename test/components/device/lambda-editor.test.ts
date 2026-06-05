@@ -40,6 +40,32 @@ describe("lambda-editor lambda-change emission", () => {
     expect(el["_view"]!.state.doc.toString()).toBe("return 2;");
   });
 
+  it("does not emit while mounting with an initial value", async () => {
+    const el = new ESPHomeLambdaEditor();
+    el.value = "return 1;";
+    const onChange = vi.fn();
+    // Listen *before* the first render so the initial value-sync is observed.
+    el.addEventListener("lambda-change", onChange);
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(el["_view"]!.state.doc.toString()).toBe("return 1;");
+  });
+
+  it("stays silent across repeated programmatic syncs (feedback loop)", async () => {
+    const el = await mount("return 1;");
+    const onChange = vi.fn();
+    el.addEventListener("lambda-change", onChange);
+
+    for (const v of ["return 2;", "return 3;", "return 4;"]) {
+      el.value = v;
+      await el.updateComplete;
+    }
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("emits exactly once on a user edit", async () => {
     const el = await mount("return 1;");
     const onChange = vi.fn();
@@ -54,5 +80,25 @@ describe("lambda-editor lambda-change emission", () => {
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange.mock.calls[0][0].detail).toEqual({ value: "return 42;" });
+  });
+
+  it("suppresses a programmatic sync that follows a user edit", async () => {
+    const el = await mount("return 1;");
+    const onChange = vi.fn();
+    el.addEventListener("lambda-change", onChange);
+
+    // User types...
+    const view = el["_view"]!;
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: "return 42;" },
+    });
+    await el.updateComplete;
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    // ...then the owner echoes a fresh value back through the prop: no emit.
+    el.value = "return 99;";
+    await el.updateComplete;
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(view.state.doc.toString()).toBe("return 99;");
   });
 });
