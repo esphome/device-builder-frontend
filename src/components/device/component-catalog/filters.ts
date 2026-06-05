@@ -8,6 +8,7 @@ import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
 } from "../../../util/yaml-serialize.js";
+import { categoryChipLabel } from "../component-card-category-label.js";
 import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 
 // Two filters applied client-side:
@@ -82,19 +83,20 @@ export function buildCategories(
   const visibleTotal = excluded.size
     ? sortableCats.reduce((sum, c) => sum + c.count, 0)
     : host._total;
-  // Resolve labels first, then sort alphabetically by display text — the
-  // backend sorts by count which doesn't help discovery.
+  // Derive category labels deterministically from the id (the same
+  // `categoryChipLabel` the card chip uses) rather than a translation table.
+  // Categories map directly to YAML keys, so a half-translated panel reads
+  // worse than consistent English — and a per-category i18n table drifts out
+  // of step with the chip as new categories ship from the sync script
+  // (device-builder-frontend#636). Sort alphabetically by the resulting label;
+  // the backend sorts by count, which doesn't help discovery.
   const collator = new Intl.Collator(undefined, { sensitivity: "base" });
   const sortedCats = sortableCats
-    .map((cat) => {
-      const key = `device.component_category_${cat.id}`;
-      const translated = localize(key);
-      return {
-        id: cat.id,
-        label: translated !== key ? translated : cat.name,
-        count: cat.count,
-      };
-    })
+    .map((cat) => ({
+      id: cat.id,
+      label: categoryChipLabel(cat.id),
+      count: cat.count,
+    }))
     .sort((a, b) => collator.compare(a.label, b.label));
   const cats: CategoryEntry[] = [];
   if (featuredBadge > 0) {
