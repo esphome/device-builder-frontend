@@ -313,6 +313,13 @@ const splitInlineComment = (raw: string): { value: string; comment: string } => 
   let inDouble = false;
   for (let i = 0; i < raw.length; i++) {
     const c = raw[i];
+    // Backslash escapes the next char inside a double-quoted scalar
+    // (`"a \" # b"`), so it can't desync the quote tracker. Single
+    // quotes escape via `''`, which the toggle already handles.
+    if (c === "\\" && inDouble) {
+      i++;
+      continue;
+    }
     if (c === '"' && !inSingle) inDouble = !inDouble;
     else if (c === "'" && !inDouble) inSingle = !inSingle;
     else if (

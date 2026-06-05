@@ -1154,6 +1154,14 @@ describe("inline comments on scalar values (#1235)", () => {
     expect(v.domain).toBe("x");
   });
 
+  it("does not desync on an escaped quote inside a double-quoted scalar", () => {
+    // `\"` must not flip the in-quote tracker, or the following `#`
+    // would be wrongly split off as a comment.
+    const yaml = ["wifi:", '  ssid: "a \\" # b"', ""].join("\n");
+    const v = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(v.ssid).toBe('a \\" # b');
+  });
+
   it("re-appends the inline comment when the field is edited", () => {
     const before = [
       "sensor:",
