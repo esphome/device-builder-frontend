@@ -115,14 +115,19 @@ describe("renderLabelChip", () => {
     expect(container.querySelector(".label-chip")?.hasAttribute("title")).toBe(false);
   });
 
-  it("applies a non-empty inline style derived from the label color", () => {
+  it("applies an inline style derived from the label color", () => {
     const container = renderInto(renderLabelChip(label("a", "Kitchen", "#dc2626")));
     const style = container.querySelector(".label-chip")?.getAttribute("style") ?? "";
-    expect(style).toContain("background");
-    // Match the foreground `color:` segment specifically — a bare
+    // Pin the actual contract: the provided hex is the chip background,
+    // not a neutral fallback. A bare `toContain("background")` would
+    // also pass for the neutral palette (or an empty value).
+    expect(style).toMatch(/(^|;)background:\s*#dc2626/);
+    // Foreground `color:` segment specifically — a bare
     // `toContain("color")` is satisfied by `border-color` and wouldn't
     // catch the foreground color being dropped.
     expect(style).toMatch(/(^|;)color:/);
+    // Border is derived from the same hue, so it carries the hex too.
+    expect(style).toMatch(/border-color:[^;]*#dc2626/);
   });
 });
 
