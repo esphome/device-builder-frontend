@@ -4,6 +4,7 @@ import { indentUnit } from "@codemirror/language";
 import { EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
 import { consume } from "@lit/context";
+import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { basicSetup, EditorView } from "codemirror";
 import { css, html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -159,6 +160,19 @@ export class ESPHomeYamlEditor extends LitElement {
       esphomeYaml(),
       indentUnit.of(ESPHOME_YAML_INDENT),
       keymap.of([indentWithTab]),
+      // Vertical indentation guides. The default 'fullScope' markerType
+      // carries the guide through blank lines inside a block, matching the
+      // legacy editor's column lines.
+      indentationMarkers({
+        thickness: 1,
+        highlightActiveBlock: true,
+        colors: {
+          light: "#e3e3e8",
+          activeLight: "#c0c0cc",
+          dark: "#33333b",
+          activeDark: "#50505c",
+        },
+      }),
       highlightField,
       sensitiveValueMaskExtension(this.revealSensitive, this.maskAllValues),
       yamlStickyScroll({
