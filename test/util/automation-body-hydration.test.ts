@@ -18,7 +18,7 @@
  *  - ``tallyOutcome`` — folds an outcome into a tally, mapping ``ok``
  *    to ``succeeded`` and every other tag to its like-named field.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { AutomationCatalogBody } from "../../src/api/types/automations.js";
 import type { ConfigEntry } from "../../src/api/types/config-entries.js";
@@ -45,6 +45,10 @@ const makeApi = () => ({}) as ESPHomeAPI;
 // A hydratable entry mirrors the ``_Hydratable`` shape the util
 // accepts: an id + a mutable ``config_entries`` array.
 const hydratable = (id: string) => ({ id, config_entries: [] as ConfigEntry[] });
+
+// Restore any console spies even when an assertion throws mid-test, so
+// a silenced ``console.warn`` can't leak into later tests in this file.
+afterEach(() => vi.restoreAllMocks());
 
 describe("hydrateEntryConfigEntries", () => {
   it("populates config_entries from the fetched body and returns ok", async () => {
@@ -114,7 +118,6 @@ describe("hydrateEntryConfigEntries", () => {
     const msg = String(warn.mock.calls[0][0]);
     expect(msg).toContain("conditions/gone");
     expect(msg).toContain("no body returned");
-    warn.mockRestore();
   });
 
   it("tags a body without config_entries as missingField and warns", async () => {
@@ -139,7 +142,6 @@ describe("hydrateEntryConfigEntries", () => {
     const msg = String(warn.mock.calls[0][0]);
     expect(msg).toContain("filters/weird");
     expect(msg).toContain("body shape missing config_entries");
-    warn.mockRestore();
   });
 
   it("clones an empty config_entries list to a distinct empty array", async () => {
