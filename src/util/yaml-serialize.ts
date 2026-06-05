@@ -16,6 +16,7 @@
 import { isLambdaValue } from "../api/types/automations.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject } from "./nested-values.js";
+import { escapeYamlDoubleQuoted, hasEscapeWorthyChar } from "./yaml-escape.js";
 
 /**
  * Wrap a ``LambdaValue`` sentinel (``{_lambda: "<body>"}``) as a
@@ -257,6 +258,28 @@ function serializeListItem(
         lines.push(...emitYamlRawValueLines(k, prefix, raw));
         return;
       }
+      if (Array.isArray(v)) {
+        // A list nested inside a list item (e.g. ``extras[].glyphs``).
+        // Without this branch the array falls through to the scalar
+        // tail and ``String(array)`` collapses it to a bare,
+        // comma-joined value (device-builder#1232). Scalar lists emit
+        // flow-style ``[a, b]`` — a block list under a list-item key
+        // makes the structured parser (``_parseItemSubKeys``) bail to an
+        // opaque ``YamlRawValue``, so the field would stop round-tripping.
+        if (v.length === 0) return;
+        const scalarItems = v.every(
+          (it) => !isPlainObject(it) && !Array.isArray(it) && !isLambdaValue(it)
+        );
+        if (scalarItems) {
+          lines.push(`${prefix}${k}: [${v.map(formatYamlFlowScalar).join(", ")}]`);
+          return;
+        }
+        lines.push(`${prefix}${k}:`);
+        for (const sub of v) {
+          lines.push(...serializeListItem(sub, childIndent, options));
+        }
+        return;
+      }
       if (isPlainObject(v)) {
         // Polymorphic single-key item with nested params (effects
         // with overrides, filters with overrides — #941). Emit the
@@ -466,6 +489,7 @@ function yamlNeedsQuoting(s: string): boolean {
     /^[-\s'"]/.test(s) ||
     /\s$/.test(s) ||
     /[\n\r\t]/.test(s) ||
+    hasEscapeWorthyChar(s) ||
     YAML_BOOL.test(s) ||
     YAML_INT.test(s) ||
     YAML_FLOAT.test(s) ||
@@ -474,15 +498,13 @@ function yamlNeedsQuoting(s: string): boolean {
   );
 }
 
-/** Wrap *s* in double quotes, escaping backslashes and control chars. */
+/**
+ * Wrap *s* in double quotes, escaping backslashes, control chars, and
+ * escape-worthy code points (control / Private-Use) so an MDI glyph
+ * round-trips as ``"\U000F058F"`` instead of a bare invalid backslash.
+ */
 function yamlDoubleQuote(s: string): string {
-  const escaped = s
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
-  return `"${escaped}"`;
+  return `"${escapeYamlDoubleQuoted(s)}"`;
 }
 
 /** Format a single scalar value, quoting when needed. */
@@ -491,6 +513,16 @@ export function formatYamlScalar(v: unknown): string {
   if (typeof v === "number") return String(v);
   const s = String(v);
   return yamlNeedsQuoting(s) ? yamlDoubleQuote(s) : s;
+}
+
+/**
+ * Format a scalar for inside a ``[ ... ]`` flow list. A flow indicator
+ * (``,`` ``[`` ``]`` ``{`` ``}``) must be quoted on top of
+ * ``formatYamlScalar``'s rules, or the list mis-splits.
+ */
+function formatYamlFlowScalar(v: unknown): string {
+  if (typeof v === "string" && /[,[\]{}]/.test(v)) return yamlDoubleQuote(v);
+  return formatYamlScalar(v);
 }
 
 // ESPHome's YAML loader accepts the YAML 1.1 truthy/falsy spellings

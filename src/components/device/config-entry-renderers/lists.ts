@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
+import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
@@ -82,13 +83,21 @@ export function renderMultiValueField(
   path: string[],
   ctx: RenderCtx
 ) {
-  const items: string[] = readArrayAt(ctx, path).map((v) => String(v));
+  // Show escape-worthy code points (control / Private-Use, e.g. MDI font
+  // glyphs) as ``\U…`` so an otherwise-invisible value is editable, and
+  // decode on input (device-builder#1232). Escaping is unconditional so
+  // display and input stay a true inverse: a value that merely looks like
+  // an escape (``C:\x41bc``) shows with its backslash doubled and decodes
+  // back unchanged, rather than being rewritten on a no-op edit. Decoding
+  // must stay unconditional too — a freshly added row is empty, so a typed
+  // ``\U…`` has to decode without a prior escape-worthy value to gate on.
+  const items: string[] = readArrayAt(ctx, path).map((v) => escapeForInput(String(v)));
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => "");
   const updateAt = (idx: number, value: string) => {
     const current = [...readArrayAt(ctx, path)];
-    current[idx] = value;
+    current[idx] = unescapeForInput(value);
     ctx.emitChange(path, current);
   };
 

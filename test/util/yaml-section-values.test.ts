@@ -97,6 +97,59 @@ describe("parseYamlSectionValues — permissive key alphabet", () => {
   });
 });
 
+describe("parseYamlSectionValues — font glyph unicode escapes", () => {
+  // device-builder#1232: ``extras[].glyphs`` is a flow list of
+  // double-quoted unicode escapes (Material Design Icon glyphs). It must
+  // load as an array of the real code points — not a scalar string — and
+  // round-trip back to the same quoted flow list.
+  const MDI_A = String.fromCodePoint(0xf058f);
+  const MDI_B = String.fromCodePoint(0xf0f19);
+  const fontYaml = [
+    "font:",
+    '  - file: "gfonts://Roboto"',
+    "    id: roboto",
+    '    size: "30"',
+    "    extras:",
+    "      - file: fonts/materialdesignicons-webfont.ttf",
+    '        glyphs: ["\\U000F058F","\\U000F0F19"]',
+    "",
+  ].join("\n");
+
+  it("parses the nested flow list into decoded glyph code points", () => {
+    const values = parseYamlSectionValues(
+      fontYaml,
+      "font",
+      firstListItemLine(fontYaml, "font")
+    );
+    expect(values.extras).toEqual([
+      {
+        file: "fonts/materialdesignicons-webfont.ttf",
+        glyphs: [MDI_A, MDI_B],
+      },
+    ]);
+  });
+
+  it("round-trips through serialize back to the quoted flow list", () => {
+    const values = parseYamlSectionValues(
+      fontYaml,
+      "font",
+      firstListItemLine(fontYaml, "font")
+    );
+    const itemLines = serializeYamlValues(values, "");
+    expect(itemLines.join("\n")).toContain('glyphs: ["\\U000F058F", "\\U000F0F19"]');
+    // Re-wrap the serialized fields as a font list item and re-parse:
+    // the glyphs survive as the same code points.
+    const wrapped =
+      "font:\n" + itemLines.map((l, i) => (i === 0 ? `  - ${l}` : `    ${l}`)).join("\n");
+    const reparsed = parseYamlSectionValues(
+      wrapped,
+      "font",
+      firstListItemLine(wrapped, "font")
+    );
+    expect((reparsed.extras as { glyphs: string[] }[])[0].glyphs).toEqual([MDI_A, MDI_B]);
+  });
+});
+
 describe("parseYamlSectionValues — prototype pollution defense", () => {
   // YAML keys like `__proto__` / `constructor` / `prototype`
   // would otherwise hit the corresponding setter on
@@ -1160,6 +1213,12 @@ describe("inline comments on scalar values (#1235)", () => {
     const yaml = ["wifi:", '  ssid: "a \\" # b"', ""].join("\n");
     const v = parseYamlSectionValues(yaml, "wifi", 1);
     expect(v.ssid).toBe('a \\" # b');
+  });
+
+  it("decodes the YAML single-quote escape ('' -> ')", () => {
+    const yaml = ["wifi:", "  ssid: 'a''b'", ""].join("\n");
+    const v = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(v.ssid).toBe("a'b");
   });
 
   it("re-appends the inline comment when the field is edited", () => {
@@ -2247,5 +2306,21 @@ describe("LIST_SECTIONS is membership-driven, not hardcoded to globals", () => {
   it("parses as a flat mapping (no item array) when NOT a member", () => {
     const parsed = parseYamlSectionValues(FIXTURE, KEY);
     expect(parsed[KEY]).toBeUndefined();
+  });
+});
+
+describe("parseYamlSectionValues — flow list with comma-containing items", () => {
+  it("reads a quoted element that contains a comma as one item", () => {
+    const yaml = 'x:\n  items: ["a,b", c]\n';
+    const values = parseYamlSectionValues(yaml, "x");
+    expect(values.items).toEqual(["a,b", "c"]);
+  });
+
+  it("parses a flow list followed by a trailing comment", () => {
+    // ``glyphs: [...] # note`` is valid YAML; without comment tolerance it
+    // reads as a scalar and the multi_value field renders empty (#647).
+    const yaml = 'x:\n  items: ["a", "b"] # keep these\n';
+    const values = parseYamlSectionValues(yaml, "x");
+    expect(values.items).toEqual(["a", "b"]);
   });
 });

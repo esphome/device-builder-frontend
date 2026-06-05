@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatYamlScalar } from "../../src/util/yaml-serialize.js";
+import { formatYamlScalar, serializeYamlValues } from "../../src/util/yaml-serialize.js";
+
+// A Material Design Icon glyph (Plane-15 Private Use Area).
+const MDI_A = String.fromCodePoint(0xf058f);
+const MDI_B = String.fromCodePoint(0xf0f19);
 
 // When formatYamlScalar quotes a value it must escape backslashes and
 // control characters the same way the backend _quote helper does, so a
@@ -73,5 +77,56 @@ describe("formatYamlScalar quotes values a YAML loader would re-type", () => {
     "0.0.0.0",
   ])("leaves %j bare", (value) => {
     expect(formatYamlScalar(value)).toBe(value);
+  });
+});
+
+describe("formatYamlScalar escapes Private-Use glyphs", () => {
+  it("quotes and \\U-escapes an MDI glyph", () => {
+    expect(formatYamlScalar(MDI_A)).toBe('"\\U000F058F"');
+  });
+
+  it("keeps an ordinary accented string bare", () => {
+    expect(formatYamlScalar("Café")).toBe("Café");
+  });
+});
+
+describe("serializeYamlValues — array nested in a list item", () => {
+  it("emits a scalar array as a flow list, not a bare scalar", () => {
+    // ``extras[].glyphs`` — without the list-item Array branch the array
+    // collapses to a bare ``glyphs: \U000F058F`` (device-builder#1232).
+    const out = serializeYamlValues(
+      { extras: [{ file: "icons.ttf", glyphs: [MDI_A, MDI_B] }] },
+      ""
+    ).join("\n");
+    expect(out).toContain('glyphs: ["\\U000F058F", "\\U000F0F19"]');
+    expect(out).not.toContain("glyphs: \\U000F058F");
+  });
+
+  it("skips an empty nested array", () => {
+    const out = serializeYamlValues(
+      { extras: [{ file: "icons.ttf", glyphs: [] }] },
+      ""
+    ).join("\n");
+    expect(out).not.toContain("glyphs");
+  });
+
+  it("quotes a comma-containing item in a nested flow list", () => {
+    // formatYamlFlowScalar quotes flow indicators; the quote-aware parser
+    // reads it back as one element (device-builder#647 review).
+    const out = serializeYamlValues({ extras: [{ items: ["a,b", "c"] }] }, "").join("\n");
+    expect(out).toContain('items: ["a,b", c]');
+  });
+
+  it("emits an array of objects nested in a list item as a block list", () => {
+    // Non-scalar nested arrays use the block fallback (the structured
+    // parser reads this back as an opaque block; the form never produces
+    // this shape, so it is best-effort emission, not a round-trip path).
+    const out = serializeYamlValues(
+      { outer: [{ name: "x", items: [{ a: 1 }, { b: 2 }] }] },
+      ""
+    ).join("\n");
+    expect(out).toBe(
+      ["outer:", "  - name: x", "    items:", "      - a: 1", "      - b: 2"].join("\n")
+    );
   });
 });

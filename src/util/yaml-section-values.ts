@@ -447,6 +447,14 @@ const parseFlatMappingField = (
   // field) round-trip through the section editor instead of
   // falling back to YamlRawValue. #941.
   if (raw === "") return { key, value: null };
+  // Flow list inside a list-item mapping (``extras[].glyphs:
+  // ["\U000F058F", ...]``). Strip a trailing comment first so the
+  // ``[...]`` test fires; without this the array reads as a scalar string
+  // and the multi_value field renders empty (device-builder#1232).
+  const { value: scalar } = splitInlineComment(raw);
+  if (scalar.startsWith("[") && scalar.endsWith("]")) {
+    return { key, value: parseFlowList(scalar) };
+  }
   return { key, value: parseScalar(raw) };
 };
 

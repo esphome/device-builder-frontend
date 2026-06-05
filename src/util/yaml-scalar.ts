@@ -6,11 +6,17 @@
  * keep growing.
  */
 
+import { splitTopLevelCommas } from "./split-top-level-commas.js";
+import { unescapeYamlDoubleQuoted } from "./yaml-escape.js";
 import { parseYamlBoolean } from "./yaml-serialize.js";
 
 export const stripQuotes = (s: string): string => {
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+  if (s.startsWith('"') && s.endsWith('"')) {
     return s.slice(1, -1);
+  }
+  if (s.startsWith("'") && s.endsWith("'")) {
+    // YAML single-quote escape: a doubled `''` is a literal `'`.
+    return s.slice(1, -1).replace(/''/g, "'");
   }
   return s;
 };
@@ -75,5 +81,15 @@ export const parseScalar = (raw: string): unknown => {
 export const parseFlowList = (raw: string): string[] => {
   const inner = raw.slice(1, -1).trim();
   if (inner === "") return [];
-  return inner.split(",").map((p) => stripQuotes(p.trim()));
+  // Quote-aware split: a quoted element may itself contain a comma (the
+  // serializer quotes such scalars), which a plain ``split(",")`` would
+  // fracture into extra items. Double-quoted elements are unescaped so a
+  // font glyph like ``\U000F058F`` becomes the real code point, not the
+  // literal backslash text (device-builder#1232).
+  return splitTopLevelCommas(inner).map((p) => {
+    const t = p.trim();
+    return t.length >= 2 && t.startsWith('"') && t.endsWith('"')
+      ? unescapeYamlDoubleQuoted(t.slice(1, -1))
+      : stripQuotes(t);
+  });
 };
