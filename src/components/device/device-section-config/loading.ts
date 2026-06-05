@@ -1,7 +1,7 @@
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { fetchComponent } from "../../../util/component-name-cache.js";
 import { normalizeHexValues } from "../../../util/hex-int.js";
-import { parseYamlSectionValues } from "../../../util/yaml-section-values.js";
+import { parseYamlSectionValues } from "../../../util/yaml-section-reader.js";
 import { resolveCurrentFromLine } from "../../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../../util/yaml-serialize.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
