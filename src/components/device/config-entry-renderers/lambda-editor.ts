@@ -146,9 +146,11 @@ export class ESPHomeLambdaEditor extends LitElement {
           EditorView.updateListener.of((update) => {
             // Skip programmatic ``value``-prop syncs (tagged ``externalSync``);
             // only a real user edit should emit ``lambda-change`` (#1223).
+            // Presence check, not truthiness, so the marker reads as "this is
+            // a sync" regardless of the annotation's payload.
             if (
               update.docChanged &&
-              !update.transactions.some((tr) => tr.annotation(externalSync))
+              !update.transactions.some((tr) => tr.annotation(externalSync) !== undefined)
             ) {
               const value = update.state.doc.toString();
               this.dispatchEvent(
