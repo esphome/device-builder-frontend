@@ -209,10 +209,12 @@ export class ESPHomeComponentCatalog extends LitElement {
         />
         ${!this._loading
           ? html`<span class="result-count"
-              >${visible.length + bundles.length} of ${this._total + bundles.length}
-              components</span
+              >${this._localize("device.components_count", {
+                visible: visible.length + bundles.length,
+                total: this._total + bundles.length,
+              })}</span
             >`
-          : ""}
+          : nothing}
         <div class="grid-scroll">
           <div class="components-grid">
             ${this._loading

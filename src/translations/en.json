@@ -642,6 +642,7 @@
     "component_category_featured": "Recommended",
     "search_components_placeholder": "Search components…",
     "no_components_found": "No components found",
+    "components_count": "{visible} of {total} components",
     "add_component_action": "Add",
     "component_added": "Added {name}",
     "featured_bundle_badge": "Bundle",
