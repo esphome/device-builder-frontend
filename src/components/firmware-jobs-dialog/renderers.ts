@@ -138,7 +138,9 @@ function renderRowAction(
 // doesn't churn if the pairing is later renamed. Symmetric receiver-side
 // rendering: when remote_peer is set, the job was submitted from another
 // dashboard's offloader.
-function renderSourceLine(
+// Exported for unit testing of the per-source row line (building-on /
+// waiting-for-server / submitted-by).
+export function renderSourceLine(
   host: ESPHomeFirmwareJobsDialog,
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
