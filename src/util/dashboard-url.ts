@@ -62,6 +62,9 @@ function fromCsv(raw: string | null): string[] | undefined {
 
 function toCsv(arr: readonly string[] | undefined): string | undefined {
   if (!arr || arr.length === 0) return undefined;
+  // ``encodeURIComponent`` escapes a comma to ``%2C``, so the ``,`` join
+  // separator is unambiguous and ``fromCsv``'s ``split(",")`` is safe even
+  // for a label/filter value that itself contains a comma (#650).
   return arr.map((s) => encodeURIComponent(s)).join(",");
 }
 

@@ -1357,6 +1357,10 @@ export class ESPHomePageDevice extends LitElement {
   private _readUrlSections(): number[] {
     const raw = new URLSearchParams(window.location.search).get("open");
     if (!raw) return [];
+    // Section indices are numeric, so a value can never contain a comma —
+    // ``split(",")`` is safe. ``map(Number)`` then ``filter(!isNaN)``
+    // discards non-numeric fragments; an empty fragment coerces to ``0``
+    // (a valid index), not ``NaN`` (#650).
     return raw
       .split(",")
       .map(Number)

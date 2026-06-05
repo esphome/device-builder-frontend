@@ -236,6 +236,9 @@ export class ESPHomeLabelForm extends LitElement {
     const raw = this._localize("dashboard.labels_suggestions");
     if (!raw || raw === "dashboard.labels_suggestions") return [];
     const taken = new Set(this.existingNames.map((n) => n.toLowerCase()));
+    // The translation is a comma-separated list of suggested label names;
+    // the comma is the format's separator, so a name can't contain one. A
+    // plain ``split(",")`` is correct here (#650).
     return raw
       .split(",")
       .map((s) => s.trim())
