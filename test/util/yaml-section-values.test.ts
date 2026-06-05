@@ -1095,6 +1095,27 @@ describe("updateSectionInYaml — preserves untouched field byte layout (#1227)"
     expect(after).toContain("new_code();");
     expect(after).not.toContain("old_code();");
   });
+
+  it("appends a form-added key without disturbing commented siblings", () => {
+    // Exercises the added-key arm of the splice loop (no source span →
+    // serialize fresh): the new key appends while every existing
+    // commented sibling stays byte-identical.
+    const before = [
+      "wifi:",
+      "  ssid: home #primary",
+      "  password: secret #wpa2",
+      "logger:",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.fast_connect = true;
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain("  ssid: home #primary\n");
+    expect(after).toContain("  password: secret #wpa2\n");
+    expect(after).not.toContain('"home #primary"');
+    expect(after).not.toContain('"secret #wpa2"');
+    expect(after).toContain("fast_connect: true");
+  });
 });
 
 describe("serializeYamlValues — single-key null-value list items", () => {
