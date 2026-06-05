@@ -8,8 +8,13 @@
  */
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
-import { isPlainObject } from "./nested-values.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
+import {
+  buildSplicedBody,
+  yamlValueEqual,
+  type KeySpan,
+  type ParsedSection,
+} from "./yaml-section-splice.js";
 import {
   formatYamlScalar,
   parseYamlBoolean,
@@ -728,31 +733,6 @@ export function parseYamlSectionValues(
 }
 
 /**
- * A top-level key's source-line span within a section body. Both
- * fields are 0-indexed into the section's lines array; ``[start, end)``
- * is half-open. ``leadStart <= start`` extends over the contiguous
- * blank / standalone-comment run that visually precedes the key, so a
- * verbatim copy carries that key's own comments with it.
- */
-interface KeySpan {
-  start: number;
-  end: number;
-  leadStart: number;
-}
-
-interface ParsedSection {
-  values: Record<string, unknown>;
-  // One span per top-level key, in file order. The inline-on-dash key
-  // (list items) is intentionally absent — it lives on the section
-  // header line, which `updateSectionInYaml` owns directly.
-  spans: Map<string, KeySpan>;
-  childIndent: string;
-  isListItem: boolean;
-  // 0-indexed section header / leading-dash line.
-  startIdx: number;
-}
-
-/**
  * Parse a section into values plus each top-level key's source-line
  * span, so `updateSectionInYaml` can copy untouched keys back verbatim
  * rather than re-serialize the whole section (#1227). Spans are built
@@ -1234,59 +1214,12 @@ export function updateSectionInYaml(
 
   // Splice only what changed (#1227): untouched keys keep their source
   // lines byte-for-byte; the rest re-serialize through the normal path.
-  const bodyLines: string[] = [];
-  for (const [key, val] of Object.entries(values)) {
-    if (inlineKeys.has(key)) continue;
-    const span = parsed.spans.get(key);
-    if (span && yamlValueEqual(val, parsed.values[key])) {
-      bodyLines.push(...lines.slice(span.leadStart, span.end));
-      continue;
-    }
-    // Changed / added key. Keep any standalone-comment run that led the
-    // original key — the value line below reformats, the comment stays.
-    if (span) bodyLines.push(...lines.slice(span.leadStart, span.start));
-    bodyLines.push(...serializeYamlValues({ [key]: val }, childIndent, serializeOptions));
-  }
-
-  const newLines = [dashLine, ...bodyLines];
+  const newLines = [
+    dashLine,
+    ...buildSplicedBody(lines, parsed, values, inlineKeys, childIndent, serializeOptions),
+  ];
   lines.splice(start, spliceEnd - start, ...newLines);
   return lines.join("\n");
-}
-
-/**
- * Structural equality for the value shapes the section parser emits —
- * primitives, null, null-prototype mappings, ``string[]`` / ``Record[]``
- * arrays, and ``YamlRawValue`` (compared by header + body lines so an
- * untouched lambda stays verbatim). Not a general deep-equal; the
- * exotic shapes (Map / Set / Date / function) never reach here.
- */
-function yamlValueEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a instanceof YamlRawValue || b instanceof YamlRawValue) {
-    return (
-      a instanceof YamlRawValue &&
-      b instanceof YamlRawValue &&
-      a.inlineHeader === b.inlineHeader &&
-      a.lines.length === b.lines.length &&
-      a.lines.every((line, i) => line === b.lines[i])
-    );
-  }
-  if (Array.isArray(a) || Array.isArray(b)) {
-    return (
-      Array.isArray(a) &&
-      Array.isArray(b) &&
-      a.length === b.length &&
-      a.every((item, i) => yamlValueEqual(item, b[i]))
-    );
-  }
-  if (isPlainObject(a) && isPlainObject(b)) {
-    const ak = Object.keys(a);
-    if (ak.length !== Object.keys(b).length) return false;
-    return ak.every(
-      (k) => Object.prototype.hasOwnProperty.call(b, k) && yamlValueEqual(a[k], b[k])
-    );
-  }
-  return false;
 }
 
 /**
