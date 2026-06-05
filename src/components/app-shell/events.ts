@@ -259,10 +259,8 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       break;
     }
     case DeviceEventType.OFFLOADER_PAIRING_ADDED: {
-      // request_pair created a row in another tab. The issuing tab
-      // already seeded it from the command response; a connected tab
-      // builds it here from the event's full PairingSummary. null map =
-      // snapshot not seeded — the next initial_state reseed carries it.
+      // Non-issuing tab builds the row from the event's full PairingSummary.
+      // null map = snapshot not yet seeded; initial_state reseed carries it.
       if (host._buildOffloadPairings === null) break;
       const evt = data as OffloaderPairingAddedEventData;
       const next = new Map(host._buildOffloadPairings);

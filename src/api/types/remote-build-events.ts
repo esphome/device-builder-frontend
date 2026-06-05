@@ -94,14 +94,8 @@ export interface OffloaderPairStatusChangedEventData {
 }
 
 /**
- * Data payload for the ``offloader_pairing_added`` event.
- *
- * Fires from ``remote_build/request_pair`` when a pairing row is
- * created (or re-created on a re-pair). Carries the full
- * ``PairingSummary`` so a connected tab that didn't issue the
- * command builds the row from the event alone —
- * ``OFFLOADER_PAIR_STATUS_CHANGED`` only marks later flips of an
- * already-known row.
+ * Data payload for the ``offloader_pairing_added`` event. Carries the
+ * full ``PairingSummary`` on create so a connected tab builds the row.
  */
 export type OffloaderPairingAddedEventData = PairingSummary;
 

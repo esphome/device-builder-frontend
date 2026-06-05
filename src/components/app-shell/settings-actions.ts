@@ -150,9 +150,7 @@ export function onPairRequestSent(
   host: ESPHomeApp,
   e: CustomEvent<{ summary: PairingSummary }>
 ): void {
-  // Seed the row locally from the command response for instant feedback.
-  // The backend also fires OFFLOADER_PAIRING_ADDED on the stream so other
-  // connected tabs build it; this tab's set is the same row, idempotent.
+  // Seed locally for instant feedback; OFFLOADER_PAIRING_ADDED writes the same row.
   const summary = e.detail.summary;
   const next = new Map(host._buildOffloadPairings ?? []);
   next.set(summary.pin_sha256, summary);
