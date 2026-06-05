@@ -138,7 +138,9 @@ function renderRowAction(
 // doesn't churn if the pairing is later renamed. Symmetric receiver-side
 // rendering: when remote_peer is set, the job was submitted from another
 // dashboard's offloader.
-function renderSourceLine(
+// Exported for unit testing of the per-source row line (building-on /
+// waiting-for-server / submitted-by).
+export function renderSourceLine(
   host: ESPHomeFirmwareJobsDialog,
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
@@ -151,6 +153,14 @@ function renderSourceLine(
         ${host._localize("firmware_jobs.building_on", {
           label: display,
         })}
+      </div>
+    `;
+  }
+  // No server bound yet: the compile is waiting for one to free up.
+  if (job.source === JobSource.REMOTE_PENDING) {
+    return html`
+      <div class="job-source">
+        ${host._localize("firmware_jobs.waiting_for_build_server")}
       </div>
     `;
   }

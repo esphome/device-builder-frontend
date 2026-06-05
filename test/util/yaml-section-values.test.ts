@@ -1118,6 +1118,93 @@ describe("updateSectionInYaml — preserves untouched field byte layout (#1227)"
   });
 });
 
+describe("inline comments on scalar values (#1235)", () => {
+  // The parser used to fold a trailing `# comment` into the scalar's
+  // form value, breaking boolean coercion and showing comment text in
+  // the field. Strip it at parse, and re-append it when the field is
+  // edited so the comment survives.
+
+  it("strips the inline comment from the form value", () => {
+    const yaml = [
+      "sensor:",
+      "  - platform: template",
+      "    name: T",
+      "    internal: true #hides from list",
+      "    update_interval: never  # update via trigger",
+      "",
+    ].join("\n");
+    const v = parseYamlSectionValues(yaml, "sensor.template", 2);
+    // Boolean field coerces (was the string "true #hides from list").
+    expect(v.internal).toBe(true);
+    expect(v.update_interval).toBe("never");
+    expect(v.name).toBe("T");
+  });
+
+  it("keeps a `#` that is not a comment (no preceding space / quoted)", () => {
+    const yaml = [
+      "wifi:",
+      "  ssid: Bedroom#2",
+      '  password: "a # b"',
+      '  domain: "x" # real comment',
+      "",
+    ].join("\n");
+    const v = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(v.ssid).toBe("Bedroom#2");
+    expect(v.password).toBe("a # b");
+    expect(v.domain).toBe("x");
+  });
+
+  it("does not desync on an escaped quote inside a double-quoted scalar", () => {
+    // `\"` must not flip the in-quote tracker, or the following `#`
+    // would be wrongly split off as a comment.
+    const yaml = ["wifi:", '  ssid: "a \\" # b"', ""].join("\n");
+    const v = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(v.ssid).toBe('a \\" # b');
+  });
+
+  it("re-appends the inline comment when the field is edited", () => {
+    const before = [
+      "sensor:",
+      "  - platform: template",
+      "    internal: true #hides from list",
+      "    update_interval: never  # update via trigger",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "sensor.template", 2);
+    values.internal = false;
+    values.update_interval = "60s";
+    const after = updateSectionInYaml(before, "sensor.template", values, 2);
+    expect(after).toContain("    internal: false #hides from list\n");
+    // Original 2-space separator before the comment is preserved.
+    expect(after).toContain("    update_interval: 60s  # update via trigger");
+  });
+
+  it("keeps the inline comment on an unchanged field (verbatim)", () => {
+    const before = [
+      "sensor:",
+      "  - platform: template",
+      "    name: Old",
+      "    internal: true #hides from list",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "sensor.template", 2);
+    values.name = "New";
+    const after = updateSectionInYaml(before, "sensor.template", values, 2);
+    expect(after).toContain("    internal: true #hides from list");
+    expect(after).not.toContain('"true #hides from list"');
+    expect(after).toContain("name: New");
+  });
+
+  it("re-appends the inline comment on a changed list-item dash key", () => {
+    const before = ["ota:", "  - platform: esphome #default backend", ""].join("\n");
+    const values = parseYamlSectionValues(before, "ota.esphome", 2);
+    expect(values.platform).toBe("esphome");
+    values.platform = "http_request";
+    const after = updateSectionInYaml(before, "ota.esphome", values, 2);
+    expect(after).toContain("  - platform: http_request #default backend");
+  });
+});
+
 describe("serializeYamlValues — single-key null-value list items", () => {
   // The polymorphic carve-out in serializeListItem is in the
   // shared helper, so it affects every list-of-mapping consumer,
