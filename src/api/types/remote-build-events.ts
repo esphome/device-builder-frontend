@@ -5,7 +5,11 @@
  */
 import type { VersionMatchPolicy } from "./event-subscription.js";
 import { JobStatus, JobStream } from "./firmware-jobs.js";
-import type { PairingWindowState, RemoteBuildPeer } from "./remote-build.js";
+import type {
+  PairingSummary,
+  PairingWindowState,
+  RemoteBuildPeer,
+} from "./remote-build.js";
 
 /**
  * Data payload for the ``remote_build_pair_request_received`` event.
@@ -88,6 +92,12 @@ export interface OffloaderPairStatusChangedEventData {
   pin_sha256: string;
   status: "approved" | "removed";
 }
+
+/**
+ * Data payload for the ``offloader_pairing_added`` event. Carries the
+ * full ``PairingSummary`` on create so a connected tab builds the row.
+ */
+export type OffloaderPairingAddedEventData = PairingSummary;
 
 /**
  * Data payload for the ``offloader_remote_builds_toggled`` event

@@ -13,6 +13,7 @@ import type {
   OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
+  OffloaderPairingAddedEventData,
   OffloaderPairingEnabledChangedEventData,
   OffloaderPairPeerRevokedEventData,
   OffloaderPairPinMismatchEventData,
@@ -255,6 +256,16 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         connected: false,
         last_connect_error: "",
       });
+      break;
+    }
+    case DeviceEventType.OFFLOADER_PAIRING_ADDED: {
+      // Non-issuing tab builds the row from the event's full PairingSummary.
+      // null map = snapshot not yet seeded; initial_state reseed carries it.
+      if (host._buildOffloadPairings === null) break;
+      const evt = data as OffloaderPairingAddedEventData;
+      const next = new Map(host._buildOffloadPairings);
+      next.set(evt.pin_sha256, evt);
+      host._buildOffloadPairings = next;
       break;
     }
     case DeviceEventType.OFFLOADER_PEER_LINK_OPENED: {

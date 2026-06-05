@@ -8,12 +8,17 @@
  * mixed-language overlay; reusing it here keeps the highlighting
  * consistent between the two surfaces.
  *
- * Emits ``lambda-change`` with ``{ value: string }`` on every doc edit.
+ * Emits ``lambda-change`` with ``{ value: string }`` on every *user* doc
+ * edit. Programmatic ``value``-prop syncs (see ``updated``) are tagged with
+ * the ``externalSync`` annotation and skipped — otherwise re-pointing a
+ * reused editor at a new field's body (e.g. a section switch driven by the
+ * YAML pane's cursor) would echo a spurious ``lambda-change`` and dirty the
+ * form with no user edit (#1223).
  */
 import { indentWithTab } from "@codemirror/commands";
 import { cpp } from "@codemirror/lang-cpp";
 import { indentUnit } from "@codemirror/language";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import { keymap } from "@codemirror/view";
 import { consume } from "@lit/context";
 import { basicSetup, EditorView } from "codemirror";
@@ -22,6 +27,11 @@ import { customElement, property, query, state } from "lit/decorators.js";
 
 import { darkModeContext } from "../../../context/index.js";
 import { vscodeDark, vscodeLight } from "../../../util/yaml-editor-theme.js";
+
+/** Marks the doc change that syncs the external ``value`` prop into the
+ *  view, so the update listener can tell it apart from a user edit and
+ *  not echo it back as a ``lambda-change``. */
+const externalSync = Annotation.define<boolean>();
 
 @customElement("esphome-lambda-editor")
 export class ESPHomeLambdaEditor extends LitElement {
@@ -107,6 +117,7 @@ export class ESPHomeLambdaEditor extends LitElement {
       if (current !== this.value) {
         this._view.dispatch({
           changes: { from: 0, to: current.length, insert: this.value },
+          annotations: externalSync.of(true),
         });
       }
     }
@@ -133,7 +144,14 @@ export class ESPHomeLambdaEditor extends LitElement {
             "&": { height: "100%" },
           }),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
+            // Skip programmatic ``value``-prop syncs (tagged ``externalSync``);
+            // only a real user edit should emit ``lambda-change`` (#1223).
+            // Presence check, not truthiness, so the marker reads as "this is
+            // a sync" regardless of the annotation's payload.
+            if (
+              update.docChanged &&
+              !update.transactions.some((tr) => tr.annotation(externalSync) !== undefined)
+            ) {
               const value = update.state.doc.toString();
               this.dispatchEvent(
                 new CustomEvent("lambda-change", {

@@ -48,6 +48,10 @@ export enum DeviceEventType {
   // fires from the offloader's pair-status listener task and from
   // ``remote_build/unpair``.
   OFFLOADER_PAIR_STATUS_CHANGED = "offloader_pair_status_changed",
+  // Offloader pairing row created by ``remote_build/request_pair``;
+  // OFFLOADER_PAIR_STATUS_CHANGED only flips an already-known row, so
+  // this event is what lets a second connected tab build the new row.
+  OFFLOADER_PAIRING_ADDED = "offloader_pairing_added",
   // Receiver-side peer-link session lifecycle. Fired by the
   // receiver's ``register_peer_link_session`` /
   // ``unregister_peer_link_session`` hooks when a 5a-2 offloader
