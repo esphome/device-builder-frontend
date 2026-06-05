@@ -28,6 +28,16 @@ export const EDITOR_FONT_SIZE = "13px";
 export const EDITOR_BG_DARK = "#1e1e1e";
 export const EDITOR_BG_LIGHT = "#ffffff";
 
+/** Indentation-guide line colours per mode, with a brighter variant for
+ *  the cursor's active block. Subtle hairlines against the editor
+ *  backgrounds above. */
+export const INDENT_GUIDE_COLORS = {
+  light: "#e3e3e8",
+  activeLight: "#c0c0cc",
+  dark: "#33333b",
+  activeDark: "#50505c",
+} as const;
+
 const DARK_BG = EDITOR_BG_DARK;
 const DARK_FG = "#d4d4d4";
 const DARK_GUTTER_FG = "#858585";

@@ -20,6 +20,7 @@ import {
   EDITOR_BG_LIGHT,
   EDITOR_FONT_FAMILY,
   EDITOR_FONT_SIZE,
+  INDENT_GUIDE_COLORS,
   lightHighlight,
   vscodeDark,
   vscodeLight,
@@ -160,18 +161,15 @@ export class ESPHomeYamlEditor extends LitElement {
       esphomeYaml(),
       indentUnit.of(ESPHOME_YAML_INDENT),
       keymap.of([indentWithTab]),
-      // Vertical indentation guides. The default 'fullScope' markerType
-      // carries the guide through blank lines inside a block, matching the
-      // legacy editor's column lines.
+      // Vertical indentation guides. 'fullScope' carries the guide through
+      // blank lines inside a block, matching the legacy editor's column
+      // lines; pinned explicitly so a dependency default change can't alter
+      // it.
       indentationMarkers({
         thickness: 1,
         highlightActiveBlock: true,
-        colors: {
-          light: "#e3e3e8",
-          activeLight: "#c0c0cc",
-          dark: "#33333b",
-          activeDark: "#50505c",
-        },
+        markerType: "fullScope",
+        colors: INDENT_GUIDE_COLORS,
       }),
       highlightField,
       sensitiveValueMaskExtension(this.revealSensitive, this.maskAllValues),
