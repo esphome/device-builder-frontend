@@ -7,6 +7,7 @@ import type { ESPHomeAPI } from "../../src/api/index.js";
 import { ComponentCategory } from "../../src/api/types/components.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import { _clearComponentCache } from "../../src/util/component-name-cache.js";
+import { _clearScanMemos } from "../../src/util/config-entry-yaml-scan.js";
 import { _resetSchemaCacheForTests } from "../../src/util/esphome-schema.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import { createYamlCompletionSource } from "../../src/util/yaml-completion.js";
@@ -56,6 +57,7 @@ async function complete(yaml: string) {
 describe("createYamlCompletionSource (ID-reference completion)", () => {
   beforeEach(() => {
     _clearComponentCache();
+    _clearScanMemos();
     _resetSchemaCacheForTests();
     // Schema-bundle fallback (the path declaring-``id`` falls through to)
     // must not hit the network — return an empty bundle so it yields no
