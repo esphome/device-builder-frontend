@@ -5,6 +5,7 @@ import {
   type ComponentCatalogEntry,
   ComponentCategory,
 } from "../../src/api/types/components.js";
+import { _clearComponentCache } from "../../src/util/component-name-cache.js";
 import { _resetSchemaCacheForTests } from "../../src/util/esphome-schema.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import {
@@ -15,6 +16,7 @@ import {
   platformValueCompletion,
 } from "../../src/util/yaml-completion.js";
 import { makeComponentEntry } from "./_make-component-entry.js";
+import { makeConfigEntry } from "./_make-config-entry.js";
 
 type CatalogIndex = Parameters<typeof buildTopLevelCompletions>[0];
 
@@ -145,8 +147,10 @@ describe("platform-list fallback", () => {
 });
 
 describe("resolveAvailableEntries (platform-merged)", () => {
-  // Re-import here so the test is self-contained when this file
-  // is read in isolation.
+  // The component-body cache is module-global and caches misses, so a
+  // resolved/missed id leaks between tests without this.
+  beforeEach(() => _clearComponentCache());
+
   it("looks up the dotted id when parentKey is the literal 'platform' keyword", async () => {
     // User scenario: cursor is at ``    nam`` under
     // ``binary_sensor:\n  - platform: template\n``. The indent
@@ -178,8 +182,17 @@ describe("resolveAvailableEntries (platform-merged)", () => {
       ],
     };
     const c = catalog([platformEntry]);
+    // ``resolveAvailableEntries`` hydrates ``config_entries`` through
+    // ``getComponentBodies`` (the slim index carries none); serve the
+    // body for the dotted id the lookup resolves to.
     const fakeApi = {
       getComponent: async () => null,
+      getComponentBodies: async (ids: string[]) =>
+        Object.fromEntries(
+          ids
+            .filter((id) => id === "binary_sensor.template")
+            .map((id) => [id, platformEntry])
+        ),
     } as never;
     const out = await (resolveAvailableEntries as unknown as Function)(
       fakeApi,
@@ -189,6 +202,33 @@ describe("resolveAvailableEntries (platform-merged)", () => {
       "binary_sensor" // topLevelKey from AST
     );
     expect(out.map((e: { key: string }) => e.key)).toContain("name");
+  });
+
+  it("hydrates config_entries via getComponentBodies when the index is slim", async () => {
+    // The production ``getComponents`` index carries no
+    // ``config_entries`` — they hydrate lazily through
+    // ``getComponentBodies``. ``resolveAvailableEntries`` must use that
+    // path, not read ``config_entries`` off the slim catalog entry
+    // (which is ``undefined`` and threw on ``.filter`` / ``.find``).
+    const { resolveAvailableEntries } = await import("../../src/util/yaml-completion.js");
+    const slim = entry("wifi", ComponentCategory.CORE); // no config_entries
+    const body = {
+      ...slim,
+      config_entries: [makeConfigEntry({ key: "ssid" })],
+    };
+    const c = catalog([slim]);
+    const fakeApi = {
+      getComponentBodies: async (ids: string[]) =>
+        Object.fromEntries(ids.filter((id) => id === "wifi").map((id) => [id, body])),
+    } as never;
+    const out = await (resolveAvailableEntries as unknown as Function)(
+      fakeApi,
+      c,
+      "wifi",
+      null,
+      null
+    );
+    expect(out.map((e: { key: string }) => e.key)).toContain("ssid");
   });
 });
 
@@ -275,6 +315,7 @@ describe("createYamlCompletionSource (auto-fire at value position)", () => {
   // even when ``explicit === false``, so CodeMirror's
   // implicit-completion path opens the popup automatically.
   beforeEach(() => {
+    _clearComponentCache();
     _resetSchemaCacheForTests();
     vi.stubGlobal(
       "fetch",
@@ -365,6 +406,14 @@ describe("createYamlCompletionSource (auto-fire at value position)", () => {
           },
         ],
       }),
+      // Body hydration returns empty ``config_entries`` so the
+      // schema-bundle fallback (the mocked fetch) supplies the enum.
+      getComponentBodies: async (ids: string[]) =>
+        Object.fromEntries(
+          ids
+            .filter((id) => id === "sensor.uptime")
+            .map((id) => [id, { id, config_entries: [] }])
+        ),
       getVersion: async () => ({
         server_version: "0.0.0",
         esphome_version: "2026.5.0",
