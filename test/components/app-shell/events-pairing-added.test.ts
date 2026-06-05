@@ -43,4 +43,30 @@ describe("handleEvent OFFLOADER_PAIRING_ADDED", () => {
 
     expect(host._buildOffloadPairings).toBeNull();
   });
+
+  it("preserves existing pairings when a new row is inserted", () => {
+    const existing = makeSummary("0".repeat(64));
+    const host: Host = {
+      _buildOffloadPairings: new Map([[existing.pin_sha256, existing]]),
+    };
+    const added = makeSummary("a".repeat(64));
+
+    dispatch(host, added);
+
+    expect(host._buildOffloadPairings?.size).toBe(2);
+    expect(host._buildOffloadPairings?.get("0".repeat(64))).toEqual(existing);
+    expect(host._buildOffloadPairings?.get("a".repeat(64))).toEqual(added);
+  });
+
+  it("is idempotent when the row already exists (issuing tab)", () => {
+    const summary = makeSummary("a".repeat(64));
+    const host: Host = {
+      _buildOffloadPairings: new Map([[summary.pin_sha256, summary]]),
+    };
+
+    dispatch(host, summary);
+
+    expect(host._buildOffloadPairings?.size).toBe(1);
+    expect(host._buildOffloadPairings?.get("a".repeat(64))).toEqual(summary);
+  });
 });
