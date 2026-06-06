@@ -122,6 +122,25 @@ describe("esphome-secret-reveal", () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  it("copies a legitimately empty secret value", async () => {
+    const el = await mount({ value: "" });
+    buttons(el)[1].click();
+    await tick();
+    expect(copySpy).toHaveBeenCalledWith("");
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it("does nothing on reveal/copy when no value source is set", async () => {
+    const el = await mount({}); // no value, no resolve
+    buttons(el)[0].click();
+    await tick();
+    await el.updateComplete;
+    expect(valueText(el)).toBe(MASK); // can't reveal nothing
+    buttons(el)[1].click();
+    await tick();
+    expect(copySpy).not.toHaveBeenCalled();
+  });
+
   it("re-masks when resetKey changes (no value leak across targets)", async () => {
     const el = await mount({ value: "first" });
     buttons(el)[0].click();

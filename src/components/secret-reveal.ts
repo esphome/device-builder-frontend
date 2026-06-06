@@ -125,7 +125,7 @@ export class ESPHomeSecretReveal extends LitElement {
    *  error) or the target changed while the resolve was in flight. */
   private async _ensureValue(): Promise<string | null> {
     if (this._value !== undefined) return this._value;
-    if (!this.resolve) return "";
+    if (!this.resolve) return null; // no value source — nothing to reveal/copy
     const token = this._token;
     this._busy = true;
     try {
@@ -157,8 +157,9 @@ export class ESPHomeSecretReveal extends LitElement {
   };
 
   private _onCopy = async (): Promise<void> => {
+    // `!== null` not truthiness, so a legitimately empty secret still copies.
     const value = await this._ensureValue();
-    if (value && (await copyToClipboard(value))) {
+    if (value !== null && (await copyToClipboard(value))) {
       toast.success(this._localize("device.secret_reveal_copied"), { richColors: true });
     }
   };
