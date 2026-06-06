@@ -85,6 +85,8 @@ export function makeRenderCtx(
     sectionKey: "",
     board: options.board ?? makeTestBoard(),
     requiredOnly: false,
+    showAdvanced: false,
+    presentComponents: new Set<string>(),
     nestedOpenSections: new Set<string>(),
     getAt: (path: string[]) => {
       let cur: unknown = values;

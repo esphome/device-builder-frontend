@@ -31,6 +31,8 @@ function makeCtx(
     sectionKey,
     board: null,
     requiredOnly: false,
+    showAdvanced: false,
+    presentComponents: new Set(),
     nestedOpenSections: new Set(),
     getAt: (path) => getIn(values, path),
     errorAt: () => null,

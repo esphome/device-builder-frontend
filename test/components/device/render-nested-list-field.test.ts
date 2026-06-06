@@ -76,6 +76,8 @@ function makeCtx(values: Record<string, unknown>): CtxStub {
     sectionKey: "",
     board: null,
     requiredOnly: false,
+    showAdvanced: false,
+    presentComponents: new Set(),
     nestedOpenSections: new Set(),
     getAt: (path: string[]) => getIn(values, path),
     errorAt: () => null,

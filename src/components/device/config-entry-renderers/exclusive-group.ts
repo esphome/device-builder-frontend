@@ -1,6 +1,5 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
-import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import {
   fieldKeyAttr,
   labelFor,
@@ -13,7 +12,13 @@ import {
 // member's fields. ESPHome accepts exactly one, so only the selected
 // member's key stays in the values dict.
 export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx) {
-  const present = members.filter((m) => hasSerializableValue(ctx.getAt([m.key])));
+  // Membership is value presence, not serializable content: the freshly
+  // picked member is scaffolded with {} (which hasSerializableValue would
+  // reject), while a cleared member is left as undefined by emitChange.
+  const present = members.filter((m) => {
+    const value = ctx.getAt([m.key]);
+    return value !== undefined && value !== null;
+  });
   const selectedKey = present[0]?.key ?? "";
   const selected = members.find((m) => m.key === selectedKey);
   const disabled = ctx.disabled;
@@ -57,7 +62,9 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
             ${ctx.localize("device.exclusive_group_conflict")}
           </p>`
         : nothing}
-      ${selected ? renderChildEntries(selected, [selected.key], ctx) : nothing}
+      ${selected
+        ? renderChildEntries(selected, [selected.key], ctx, { includeAdvanced: true })
+        : nothing}
     </div>
   `;
 }

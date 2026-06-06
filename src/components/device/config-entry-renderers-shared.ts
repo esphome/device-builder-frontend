@@ -23,6 +23,7 @@ import {
   recommendedSecretKeys,
 } from "../../util/secret-eligibility.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
+import { filterRenderable } from "./config-entry-render-filter.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
 import type { PasswordInputValueChange } from "./password-input.js";
 // Type-only — the `<esphome-secret-picker>` element is registered by the
@@ -119,6 +120,13 @@ export interface RenderCtx {
    *  checkboxes per external provider; absent provider / native pin → all flags. */
   pinRegistryModes?: Record<string, string[]>;
   requiredOnly: boolean;
+  /** Whether the section's advanced fields are shown. Read by
+   *  ``renderChildEntries({ includeAdvanced })`` so an exclusive-group's
+   *  chosen member can reveal all its fields regardless of the toggle. */
+  showAdvanced: boolean;
+  /** Top-level component keys present in the YAML — for the
+   *  ``depends_on_component`` visibility predicate when filtering directly. */
+  presentComponents: Set<string>;
   nestedOpenSections: Set<string>;
   getAt: (path: string[]) => unknown;
   errorAt: (path: string[]) => ValidationError | null;
@@ -460,9 +468,23 @@ function renderSuggestionSelect(
 
 // Filter a nested entry's children and render each at its scoped path.
 // Shared by the collapsible nested renderer and the exclusive-group
-// dropdown so both scope and recurse the same way.
-export function renderChildEntries(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
-  return ctx
-    .filterRenderable(entry.config_entries ?? [], ctx.scopeValues(path))
-    .map((child) => ctx.renderEntry(child, [...path, child.key]));
+// dropdown so both scope and recurse the same way. ``includeAdvanced``
+// forces advanced children visible — an exclusive-group member's fields
+// must all show once it's picked, since there's no per-member toggle.
+export function renderChildEntries(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  opts: { includeAdvanced?: boolean } = {}
+) {
+  const values = ctx.scopeValues(path);
+  const children = opts.includeAdvanced
+    ? filterRenderable(entry.config_entries ?? [], values, {
+        requiredOnly: ctx.requiredOnly,
+        showAdvanced: true,
+        presentComponents: ctx.presentComponents,
+        targetPlatform: ctx.board?.esphome.platform ?? null,
+      })
+    : ctx.filterRenderable(entry.config_entries ?? [], values);
+  return children.map((child) => ctx.renderEntry(child, [...path, child.key]));
 }

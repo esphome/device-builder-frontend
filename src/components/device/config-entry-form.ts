@@ -612,6 +612,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       board: this.board,
       pinRegistryModes: getCachedPinRegistryModes(),
       requiredOnly: this.requiredOnly,
+      showAdvanced: this.showAdvanced,
+      presentComponents: this.presentComponents,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),
       errorAt: (path) => this.errors.get(path.join(".")) ?? null,

@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderExclusiveGroupField } from "../../../src/components/device/config-entry-renderers.js";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 function members() {
@@ -55,6 +56,26 @@ describe("renderExclusiveGroupField", () => {
 
     expect(emitChange).toHaveBeenCalledWith(["raw"], undefined);
     expect(emitChange).toHaveBeenCalledWith(["nec"], {});
+  });
+
+  it("keeps a freshly-scaffolded member selected", () => {
+    // onChange writes {} for the picked member; it must stay selected even
+    // though it has no serializable content yet (else the dropdown snaps
+    // back to the placeholder and hides its fields).
+    const ctx = makeRenderCtx({ nec: {} });
+    expect(selectedValues(renderExclusiveGroupField(members(), ctx))).toEqual(["nec"]);
+  });
+
+  it("ignores a cleared member left as undefined", () => {
+    const ctx = makeRenderCtx({ nec: {}, raw: undefined });
+    expect(selectedValues(renderExclusiveGroupField(members(), ctx))).toEqual(["nec"]);
+  });
+
+  it("warns when more than one member is set", () => {
+    const ctx = makeRenderCtx({ raw: { code: "x" }, nec: { address: 1 } });
+    const tpl = renderExclusiveGroupField(members(), ctx);
+    const note = findTemplatesByAnchor(tpl, "exclusive-group-conflict");
+    expect(note.length).toBe(1);
   });
 
   it("defaults to the placeholder when nothing is set", () => {
