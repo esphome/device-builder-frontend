@@ -4,22 +4,22 @@ import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import {
   fieldKeyAttr,
   labelFor,
+  renderChildEntries,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
-// Renders a set of mutually-exclusive sibling entries (backend
-// `exclusive_group`, e.g. a remote_receiver binary_sensor's protocols)
-// as one pick-one dropdown plus the chosen member's fields. ESPHome
-// accepts exactly one, so the form must too: only the selected member's
-// key stays in the values dict.
+// Renders entries sharing a backend exclusive_group (a remote_receiver
+// binary_sensor's protocols) as one pick-one dropdown plus the chosen
+// member's fields. ESPHome accepts exactly one, so only the selected
+// member's key stays in the values dict.
 export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx) {
   const present = members.filter((m) => hasSerializableValue(ctx.getAt([m.key])));
   const selectedKey = present[0]?.key ?? "";
   const selected = members.find((m) => m.key === selectedKey);
   const disabled = ctx.disabled;
 
-  // Switching protocols clears every other member so the YAML keeps a
-  // single key; scaffold the chosen one with {} so its fields render.
+  // Clear every other member so the YAML keeps a single key; scaffold the
+  // chosen one with {} so its fields render.
   const onChange = (newKey: string) => {
     for (const m of members) {
       if (m.key !== newKey) ctx.emitChange([m.key], undefined);
@@ -27,15 +27,9 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
     if (newKey) ctx.emitChange([newKey], {});
   };
 
-  // Render the selected member's children directly (not as a collapsible
-  // group): the dropdown already names the choice, and a freshly
-  // scaffolded {} wouldn't auto-expand.
-  const fields = selected
-    ? ctx
-        .filterRenderable(selected.config_entries ?? [], ctx.scopeValues([selected.key]))
-        .map((child) => ctx.renderEntry(child, [selected.key, child.key]))
-    : nothing;
-
+  // data-no-value-sync: the select's value is derived (which member is
+  // present), not a YAML path, so the form syncs it via the selected
+  // option rather than a path lookup.
   return html`
     <div class="field" data-field-key=${fieldKeyAttr([members[0].key])}>
       <label class="field-label">
@@ -63,7 +57,7 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
             ${ctx.localize("device.exclusive_group_conflict")}
           </p>`
         : nothing}
-      ${fields}
+      ${selected ? renderChildEntries(selected, [selected.key], ctx) : nothing}
     </div>
   `;
 }

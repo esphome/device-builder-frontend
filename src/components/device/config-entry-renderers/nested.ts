@@ -7,6 +7,7 @@ import {
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,
+  renderChildEntries,
   renderFieldError,
   renderHelpLink,
   renderLabel,
@@ -59,10 +60,6 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   if (hasSerializableValue(raw)) ctx.seedNestedOpen(key);
   const inSet = ctx.nestedOpenSections.has(key);
   const isOpen = ctx.requiredOnly ? !inSet : inSet;
-  const renderableChildren = ctx.filterRenderable(
-    entry.config_entries ?? [],
-    ctx.scopeValues(path)
-  );
   // Optional entity sub-readings (a debug component's per-metric sensors,
   // a DHT's temperature/humidity, …) are only written to YAML once their
   // group holds a value, so an untouched one is silently "off". Give those
@@ -111,11 +108,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
         ? html`<p class="nested-desc">${renderMarkdown(entry.description)}</p>`
         : nothing}
       ${isOpen
-        ? html`<div class="nested-fields">
-            ${renderableChildren.map((child) =>
-              ctx.renderEntry(child, [...path, child.key])
-            )}
-          </div>`
+        ? html`<div class="nested-fields">${renderChildEntries(entry, path, ctx)}</div>`
         : nothing}
     </div>
   `;

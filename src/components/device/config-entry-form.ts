@@ -247,7 +247,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   protected render() {
     const ctx = this._buildCtx();
-    // Pull mutually-exclusive entries (backend ``exclusive_group``, e.g.
+    // Pull mutually-exclusive entries (backend exclusive_group, e.g.
     // remote_receiver protocols) out of the normal flow: they render as
     // one pick-one dropdown that always shows, independent of the
     // advanced toggle the rest of the fields obey.

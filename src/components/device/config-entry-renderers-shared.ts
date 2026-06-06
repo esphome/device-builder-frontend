@@ -457,3 +457,12 @@ function renderSuggestionSelect(
     </div>
   `;
 }
+
+// Filter a nested entry's children and render each at its scoped path.
+// Shared by the collapsible nested renderer and the exclusive-group
+// dropdown so both scope and recurse the same way.
+export function renderChildEntries(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
+  return ctx
+    .filterRenderable(entry.config_entries ?? [], ctx.scopeValues(path))
+    .map((child) => ctx.renderEntry(child, [...path, child.key]));
+}
