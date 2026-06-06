@@ -1221,6 +1221,18 @@
     "save_error": "Failed to save secrets",
     "reveal_values": "Reveal values",
     "hide_values": "Hide values",
+    "layout_label": "Editor layout",
+    "layout_form": "Form",
+    "layout_split": "Split",
+    "layout_yaml": "YAML",
+    "add_secret": "Add secret",
+    "key_placeholder": "Name",
+    "value_placeholder": "Value",
+    "remove_secret": "Remove secret",
+    "advanced_badge": "Advanced — edit in YAML",
+    "empty": "No secrets yet. Add one below or switch to YAML.",
+    "invalid_key": "Names may use letters, numbers, dots, dashes and underscores, and can't start with a number.",
+    "duplicate_key": "A secret with this name already exists.",
     "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n"
   },
   "auth": {

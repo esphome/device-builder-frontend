@@ -1,6 +1,13 @@
 import { consume } from "@lit/context";
-import { mdiContentSave, mdiEye, mdiEyeOff } from "@mdi/js";
-import { css, html, LitElement } from "lit";
+import {
+  mdiContentSave,
+  mdiDockLeft,
+  mdiDockRight,
+  mdiEye,
+  mdiEyeOff,
+  mdiViewSplitHorizontal,
+} from "@mdi/js";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { apiErrorDetails } from "../api/api-error.js";
@@ -14,15 +21,24 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../components/secrets/secrets-structured-editor.js";
 import "../components/yaml-editor.js";
 
 registerMdiIcons({
   "content-save": mdiContentSave,
+  "dock-left": mdiDockLeft,
+  "dock-right": mdiDockRight,
   eye: mdiEye,
   "eye-off": mdiEyeOff,
+  "view-split": mdiViewSplitHorizontal,
 });
 
 const SECRETS_FILE = "secrets.yaml";
+
+type SecretsLayout = "form" | "split" | "yaml";
+
+const LAYOUT_STORAGE_KEY = "esphome-secrets-layout";
+const LAYOUTS: readonly SecretsLayout[] = ["form", "split", "yaml"];
 
 @customElement("esphome-page-secrets")
 export class ESPHomePageSecrets extends LitElement {
@@ -51,13 +67,29 @@ export class ESPHomePageSecrets extends LitElement {
   @state()
   private _revealSensitive = false;
 
+  // Persisted form | split | yaml choice; defaults to the structured
+  // form on first visit since raw YAML is beyond many users.
+  @state()
+  private _layout: SecretsLayout = "form";
+
   async connectedCallback() {
     super.connectedCallback();
+    this._layout = this._readStoredLayout();
     window.addEventListener(
       "secrets-saved",
       this._onExternalSecretsSaved as EventListener
     );
     await this._loadFromServer();
+  }
+
+  private _readStoredLayout(): SecretsLayout {
+    const stored = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    return LAYOUTS.includes(stored as SecretsLayout) ? (stored as SecretsLayout) : "form";
+  }
+
+  private _setLayout(layout: SecretsLayout) {
+    this._layout = layout;
+    localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
   }
 
   disconnectedCallback() {
@@ -220,6 +252,103 @@ export class ESPHomePageSecrets extends LitElement {
         font-size: 16px;
       }
 
+      .layout-toggle {
+        display: inline-flex;
+        align-items: center;
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-m);
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .layout-toggle button {
+        border: none;
+        background: transparent;
+        color: var(--wa-color-text-quiet);
+        padding: 6px 10px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .layout-toggle button + button {
+        border-left: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+
+      .layout-toggle button[aria-pressed="true"] {
+        background: var(--esphome-tint);
+        color: var(--esphome-primary);
+      }
+
+      .layout-toggle wa-icon {
+        font-size: 18px;
+      }
+
+      .editor-layout {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        gap: 0;
+      }
+
+      .editor-layout--split {
+        grid-template-columns: 1fr 1px 1fr;
+      }
+
+      .editor-layout--form,
+      .editor-layout--yaml {
+        grid-template-columns: 1fr;
+      }
+
+      .editor-pane {
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .editor-pane > * {
+        flex: 1;
+        min-height: 0;
+      }
+
+      /* Reserve room below the form so its last row clears the floating
+         Save button overlaying the card's bottom-right. */
+      .editor-pane--form {
+        overflow-y: auto;
+        padding: var(--wa-space-m);
+        padding-bottom: calc(var(--wa-space-m) * 2 + 2.25rem);
+      }
+
+      .editor-layout--yaml .editor-pane--form,
+      .editor-layout--form .editor-pane--yaml {
+        display: none;
+      }
+
+      .pane-divider {
+        background: var(--wa-color-surface-border);
+        width: 1px;
+        align-self: stretch;
+      }
+
+      @media (max-width: 900px) {
+        .layout-toggle .split-btn {
+          display: none;
+        }
+
+        /* No room for two panes — collapse split to the friendlier
+           structured form and hide the YAML pane. */
+        .editor-layout--split {
+          grid-template-columns: 1fr;
+        }
+
+        .editor-layout--split .editor-pane--yaml,
+        .editor-layout--split .pane-divider {
+          display: none;
+        }
+      }
+
       .loading {
         flex: 1;
         display: flex;
@@ -241,6 +370,37 @@ export class ESPHomePageSecrets extends LitElement {
           <div class="page-title">
             <h1>${this._localize("secrets.title")}</h1>
             <p>${this._localize("secrets.desc")}</p>
+          </div>
+          <div
+            class="layout-toggle"
+            role="group"
+            aria-label=${this._localize("secrets.layout_label")}
+          >
+            <button
+              type="button"
+              aria-pressed=${this._layout === "form"}
+              title=${this._localize("secrets.layout_form")}
+              @click=${() => this._setLayout("form")}
+            >
+              <wa-icon library="mdi" name="dock-left"></wa-icon>
+            </button>
+            <button
+              type="button"
+              class="split-btn"
+              aria-pressed=${this._layout === "split"}
+              title=${this._localize("secrets.layout_split")}
+              @click=${() => this._setLayout("split")}
+            >
+              <wa-icon library="mdi" name="view-split"></wa-icon>
+            </button>
+            <button
+              type="button"
+              aria-pressed=${this._layout === "yaml"}
+              title=${this._localize("secrets.layout_yaml")}
+              @click=${() => this._setLayout("yaml")}
+            >
+              <wa-icon library="mdi" name="dock-right"></wa-icon>
+            </button>
           </div>
           <button
             type="button"
@@ -272,14 +432,26 @@ export class ESPHomePageSecrets extends LitElement {
                     ? this._localize("secrets.saving")
                     : this._localize("secrets.save")}
                 </button>
-                <esphome-yaml-editor
-                  .value=${this._yaml}
-                  .maskAllValues=${true}
-                  .revealSensitive=${this._revealSensitive}
-                  @yaml-change=${(e: CustomEvent) => {
-                    this._yaml = e.detail.value;
-                  }}
-                ></esphome-yaml-editor>
+                <div class=${`editor-layout editor-layout--${this._layout}`}>
+                  <div class="editor-pane editor-pane--form">
+                    <esphome-secrets-structured-editor
+                      .value=${this._yaml}
+                      .revealSensitive=${this._revealSensitive}
+                      @yaml-change=${this._onYamlChange}
+                    ></esphome-secrets-structured-editor>
+                  </div>
+                  ${this._layout === "split"
+                    ? html`<div class="pane-divider"></div>`
+                    : nothing}
+                  <div class="editor-pane editor-pane--yaml">
+                    <esphome-yaml-editor
+                      .value=${this._yaml}
+                      .maskAllValues=${true}
+                      .revealSensitive=${this._revealSensitive}
+                      @yaml-change=${this._onYamlChange}
+                    ></esphome-yaml-editor>
+                  </div>
+                </div>
               `
             : html`<div class="loading"><wa-spinner></wa-spinner></div>`}
         </div>
@@ -290,6 +462,12 @@ export class ESPHomePageSecrets extends LitElement {
   private _toggleRevealSensitive() {
     this._revealSensitive = !this._revealSensitive;
   }
+
+  // Both panes are views over the same buffer, so either editor's
+  // change advances ``_yaml`` and the other pane re-renders from it.
+  private _onYamlChange = (e: CustomEvent<{ value: string }>) => {
+    this._yaml = e.detail.value;
+  };
 
   private async _save() {
     // Optimistic update: dirty-state UI flips back to "saved"

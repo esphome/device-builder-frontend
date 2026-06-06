@@ -1,0 +1,135 @@
+import { describe, expect, test } from "vitest";
+
+import {
+  addSecret,
+  isValidSecretKey,
+  parseSecretsEntries,
+  removeSecret,
+  renameSecretKey,
+  setSecretValue,
+} from "../../src/util/secrets-entries.js";
+
+describe("parseSecretsEntries", () => {
+  test("parses simple name: value scalars as editable", () => {
+    const entries = parseSecretsEntries("wifi_ssid: home\nwifi_password: hunter2\n");
+    expect(entries).toEqual([
+      { key: "wifi_ssid", value: "home", line: 0, editable: true },
+      { key: "wifi_password", value: "hunter2", line: 1, editable: true },
+    ]);
+  });
+
+  test("strips quotes from the display value", () => {
+    const entries = parseSecretsEntries("api_key: \"a b c\"\nother: 'x'\n");
+    expect(entries[0].value).toBe("a b c");
+    expect(entries[1].value).toBe("x");
+    expect(entries.every((e) => e.editable)).toBe(true);
+  });
+
+  test("ignores a trailing inline comment in the value", () => {
+    const [entry] = parseSecretsEntries("wifi_ssid: home # primary AP\n");
+    expect(entry.value).toBe("home");
+    expect(entry.editable).toBe(true);
+  });
+
+  test("a bare key with no value is an editable empty scalar", () => {
+    const [entry] = parseSecretsEntries("wifi_password:\n");
+    expect(entry).toMatchObject({ key: "wifi_password", value: "", editable: true });
+  });
+
+  test("tagged values are advanced (read-only)", () => {
+    const entries = parseSecretsEntries(
+      "ssid: !secret real_ssid\nca: !include ca.yaml\n"
+    );
+    expect(entries.map((e) => e.editable)).toEqual([false, false]);
+  });
+
+  test("anchors, block scalars and flow collections are advanced", () => {
+    const entries = parseSecretsEntries(
+      "anchor: &a value\nblock: |\n  multi\n  line\nflow: [a, b]\n"
+    );
+    expect(entries.map((e) => [e.key, e.editable])).toEqual([
+      ["anchor", false],
+      ["block", false],
+      ["flow", false],
+    ]);
+  });
+
+  test("a key with a nested mapping is advanced", () => {
+    const entries = parseSecretsEntries("group:\n  inner: 1\nflat: 2\n");
+    expect(entries).toEqual([
+      { key: "group", value: "", line: 0, editable: false },
+      { key: "flat", value: "2", line: 2, editable: true },
+    ]);
+  });
+
+  test("comments and blank lines are skipped, not parsed as entries", () => {
+    const entries = parseSecretsEntries("# header\n\nwifi_ssid: home\n");
+    expect(entries).toEqual([
+      { key: "wifi_ssid", value: "home", line: 2, editable: true },
+    ]);
+  });
+
+  test("key:value with no space after the colon is not an entry", () => {
+    expect(parseSecretsEntries("notakey:value\n")).toEqual([]);
+  });
+});
+
+describe("splice operations preserve the rest of the document", () => {
+  test("setSecretValue rewrites only the value, keeping the trailing comment", () => {
+    const yaml = "# header\nwifi_ssid: home # AP\nca: !include ca.yaml\n";
+    const out = setSecretValue(yaml, 1, "office");
+    expect(out).toBe("# header\nwifi_ssid: office # AP\nca: !include ca.yaml\n");
+  });
+
+  test("setSecretValue quotes a value that needs quoting", () => {
+    const out = setSecretValue("k: v\n", 0, "a: b");
+    expect(out).toBe('k: "a: b"\n');
+  });
+
+  test("renameSecretKey keeps the value and comment byte-for-byte", () => {
+    const out = renameSecretKey("wifi_ssid: home # AP\n", 0, "ap_ssid");
+    expect(out).toBe("ap_ssid: home # AP\n");
+  });
+
+  test("addSecret appends a new line", () => {
+    expect(addSecret("wifi_ssid: home\n", "api_key", "abc")).toBe(
+      "wifi_ssid: home\napi_key: abc\n"
+    );
+  });
+
+  test("addSecret inserts a separator when the buffer lacks a trailing newline", () => {
+    expect(addSecret("wifi_ssid: home", "api_key", "abc")).toBe(
+      "wifi_ssid: home\napi_key: abc\n"
+    );
+  });
+
+  test("addSecret on an empty buffer just writes the entry", () => {
+    expect(addSecret("", "api_key", "abc")).toBe("api_key: abc\n");
+  });
+
+  test("removeSecret drops the line and leaves the rest intact", () => {
+    const yaml = "# header\nwifi_ssid: home\nca: !include ca.yaml\n";
+    expect(removeSecret(yaml, 1)).toBe("# header\nca: !include ca.yaml\n");
+  });
+
+  test("a tagged value survives an edit to a sibling row", () => {
+    const yaml = "ssid: !secret real\nwifi_password: old\n";
+    expect(setSecretValue(yaml, 1, "new")).toBe(
+      "ssid: !secret real\nwifi_password: new\n"
+    );
+  });
+});
+
+describe("isValidSecretKey", () => {
+  test("accepts identifier-like keys", () => {
+    expect(isValidSecretKey("wifi_ssid")).toBe(true);
+    expect(isValidSecretKey("api.key-1")).toBe(true);
+  });
+
+  test("rejects empty, spaced, or symbol-led keys", () => {
+    expect(isValidSecretKey("")).toBe(false);
+    expect(isValidSecretKey("has space")).toBe(false);
+    expect(isValidSecretKey("1leading")).toBe(false);
+    expect(isValidSecretKey("<<")).toBe(false);
+  });
+});

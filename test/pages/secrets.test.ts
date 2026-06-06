@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import toast from "sonner-js";
 
@@ -27,6 +27,10 @@ interface PageView {
   _savedYaml: string;
   _saving: boolean;
   _api: ESPHomeAPI;
+  _layout: "form" | "split" | "yaml";
+  _readStoredLayout(): "form" | "split" | "yaml";
+  _setLayout(layout: "form" | "split" | "yaml"): void;
+  _onYamlChange(e: CustomEvent<{ value: string }>): void;
   _save(): Promise<void>;
   render(): unknown;
 }
@@ -283,5 +287,53 @@ describe("esphome-page-secrets save toast ordering", () => {
     window.removeEventListener("secrets-saved", onSaved);
 
     expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe("esphome-page-secrets layout persistence", () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  test("defaults to the structured form when nothing is stored", () => {
+    expect(makePage()._readStoredLayout()).toBe("form");
+  });
+
+  test("falls back to form for an unrecognized stored value", () => {
+    localStorage.setItem("esphome-secrets-layout", "bogus");
+    expect(makePage()._readStoredLayout()).toBe("form");
+  });
+
+  test("reads a stored valid layout", () => {
+    localStorage.setItem("esphome-secrets-layout", "split");
+    expect(makePage()._readStoredLayout()).toBe("split");
+  });
+
+  test("_setLayout updates state and persists the choice", () => {
+    const page = makePage();
+    page._setLayout("yaml");
+    expect(page._layout).toBe("yaml");
+    expect(localStorage.getItem("esphome-secrets-layout")).toBe("yaml");
+  });
+
+  test("both panes bind the same buffer and either change advances it", () => {
+    const page = makePage({
+      _loaded: true,
+      _layout: "split",
+      _yaml: "wifi_ssid: home\n",
+    });
+    const editors = findTemplatesByAnchor(
+      page.render(),
+      "<esphome-secrets-structured-editor"
+    );
+    const yaml = findTemplatesByAnchor(page.render(), "<esphome-yaml-editor");
+    expect(editors).toHaveLength(1);
+    expect(yaml).toHaveLength(1);
+    expect(extractAttributeBindings(editors[0])[".value"]).toBe("wifi_ssid: home\n");
+    expect(extractAttributeBindings(yaml[0])[".value"]).toBe("wifi_ssid: home\n");
+
+    page._onYamlChange(
+      new CustomEvent("yaml-change", { detail: { value: "wifi_ssid: office\n" } })
+    );
+    expect(page._yaml).toBe("wifi_ssid: office\n");
   });
 });
