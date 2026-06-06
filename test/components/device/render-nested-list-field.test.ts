@@ -26,8 +26,8 @@ import {
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderNestedListField } from "../../../src/components/device/config-entry-renderers.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { getIn } from "../../../src/util/nested-values.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
+import { makeRenderCtx } from "./_renderer-fixtures.js";
 
 function makeListEntry(): ConfigEntry {
   return makeConfigEntry({
@@ -68,33 +68,10 @@ function makeCtx(values: Record<string, unknown>): CtxStub {
   const renderEntry = vi.fn(() => "<rendered>");
   const emitChange = vi.fn();
   const filterRenderable = vi.fn((entries: ConfigEntry[]) => entries);
-  const ctx: RenderCtx = {
-    localize: (key) => key,
-    disabled: false,
-    yaml: "",
-    fromLine: undefined,
-    sectionKey: "",
+  const ctx = makeRenderCtx(values, {
     board: null,
-    requiredOnly: false,
-    showAdvanced: false,
-    presentComponents: new Set(),
-    nestedOpenSections: new Set(),
-    getAt: (path: string[]) => getIn(values, path),
-    errorAt: () => null,
-    emitChange,
-    toggleNested: () => {},
-    seedNestedOpen: () => {},
-    requestAddComponent: () => {},
-    scopeValues: () => ({}),
-    filterRenderable,
-    renderEntry,
-    getPendingUnit: () => undefined,
-    setPendingUnit: () => {},
-    getEditingMagnitude: () => undefined,
-    setEditingMagnitude: () => {},
-    clearEditingMagnitude: () => {},
-    stashOwner: {},
-  };
+    overrides: { emitChange, renderEntry, filterRenderable },
+  });
   return { ctx, renderEntry, emitChange, filterRenderable };
 }
 

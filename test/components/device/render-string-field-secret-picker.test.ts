@@ -12,7 +12,7 @@ import {
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { getIn } from "../../../src/util/nested-values.js";
+import { makeRenderCtx } from "./_renderer-fixtures.js";
 
 function makeEntry(key: string): ConfigEntry {
   return makeConfigEntry({ key, type: ConfigEntryType.STRING, label: key });
@@ -23,33 +23,10 @@ function makeCtx(
   values: Record<string, unknown> = {}
 ): { ctx: RenderCtx; emitChange: ReturnType<typeof vi.fn> } {
   const emitChange = vi.fn();
-  const ctx: RenderCtx = {
-    localize: (key) => key,
-    disabled: false,
-    yaml: "",
-    fromLine: undefined,
-    sectionKey,
+  const ctx = makeRenderCtx(values, {
     board: null,
-    requiredOnly: false,
-    showAdvanced: false,
-    presentComponents: new Set(),
-    nestedOpenSections: new Set(),
-    getAt: (path) => getIn(values, path),
-    errorAt: () => null,
-    emitChange,
-    toggleNested: () => {},
-    seedNestedOpen: () => {},
-    requestAddComponent: () => {},
-    scopeValues: () => ({}),
-    filterRenderable: (entries) => entries,
-    renderEntry: () => "<rendered>",
-    getPendingUnit: () => undefined,
-    setPendingUnit: () => {},
-    getEditingMagnitude: () => undefined,
-    setEditingMagnitude: () => {},
-    clearEditingMagnitude: () => {},
-    stashOwner: {},
-  };
+    overrides: { sectionKey, emitChange, renderEntry: () => "<rendered>" },
+  });
   return { ctx, emitChange };
 }
 

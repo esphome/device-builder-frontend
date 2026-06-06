@@ -27,6 +27,7 @@ import {
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderMapField } from "../../../src/components/device/config-entry-renderers.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
+import { makeRenderCtx } from "./_renderer-fixtures.js";
 
 function makeMapEntry(): ConfigEntry {
   return makeConfigEntry({
@@ -63,42 +64,22 @@ function collectHandlers(values: unknown[]): Array<(...args: unknown[]) => unkno
 function makeCtx(values: Record<string, unknown>): CtxStub {
   const renderEntry = vi.fn(() => "<rendered>");
   const emitChange = vi.fn();
-  const ctx: RenderCtx = {
-    localize: (key) => key,
-    disabled: false,
-    yaml: "",
-    fromLine: undefined,
-    sectionKey: "",
-    board: null,
-    requiredOnly: false,
-    showAdvanced: false,
-    presentComponents: new Set(),
-    nestedOpenSections: new Set(),
-    getAt: (path: string[]) => {
-      let cur: unknown = values;
-      for (const k of path) {
-        if (cur === null || typeof cur !== "object" || Array.isArray(cur)) {
-          return undefined;
-        }
-        cur = (cur as Record<string, unknown>)[k];
+  // Array-rejecting getAt: a map binds to mappings only, so a list
+  // landing at the path must read as absent, not be indexed into.
+  const getAt = (path: string[]) => {
+    let cur: unknown = values;
+    for (const k of path) {
+      if (cur === null || typeof cur !== "object" || Array.isArray(cur)) {
+        return undefined;
       }
-      return cur;
-    },
-    errorAt: () => null,
-    emitChange: emitChange,
-    toggleNested: () => {},
-    seedNestedOpen: () => {},
-    requestAddComponent: () => {},
-    scopeValues: () => ({}),
-    filterRenderable: (entries) => entries,
-    renderEntry: renderEntry,
-    getPendingUnit: () => undefined,
-    setPendingUnit: () => {},
-    getEditingMagnitude: () => undefined,
-    setEditingMagnitude: () => {},
-    clearEditingMagnitude: () => {},
-    stashOwner: {},
+      cur = (cur as Record<string, unknown>)[k];
+    }
+    return cur;
   };
+  const ctx = makeRenderCtx(values, {
+    board: null,
+    overrides: { emitChange, renderEntry, getAt },
+  });
   return { ctx, renderEntry, emitChange };
 }
 

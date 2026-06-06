@@ -22,8 +22,8 @@ import {
   renderTimePeriodField,
 } from "../../../src/components/device/config-entry-renderers/primitives.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { getIn } from "../../../src/util/nested-values.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
+import { makeRenderCtx } from "./_renderer-fixtures.js";
 
 function makeStringEntry(): ConfigEntry {
   return makeConfigEntry({
@@ -38,33 +38,10 @@ function makeCtx(values: Record<string, unknown>): {
   emitChange: ReturnType<typeof vi.fn>;
 } {
   const emitChange = vi.fn();
-  const ctx: RenderCtx = {
-    localize: (key) => key,
-    disabled: false,
-    yaml: "",
-    fromLine: undefined,
-    sectionKey: "",
+  const ctx = makeRenderCtx(values, {
     board: null,
-    requiredOnly: false,
-    showAdvanced: false,
-    presentComponents: new Set(),
-    nestedOpenSections: new Set(),
-    getAt: (path: string[]) => getIn(values, path),
-    errorAt: () => null,
-    emitChange,
-    toggleNested: () => {},
-    seedNestedOpen: () => {},
-    requestAddComponent: () => {},
-    scopeValues: () => ({}),
-    filterRenderable: (entries) => entries,
-    renderEntry: () => "<rendered>",
-    getPendingUnit: () => undefined,
-    setPendingUnit: () => {},
-    getEditingMagnitude: () => undefined,
-    setEditingMagnitude: () => {},
-    clearEditingMagnitude: () => {},
-    stashOwner: {},
-  };
+    overrides: { emitChange, renderEntry: () => "<rendered>" },
+  });
   return { ctx, emitChange };
 }
 
