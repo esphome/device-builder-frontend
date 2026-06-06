@@ -27,6 +27,16 @@ export function firstSelectableTarget(
   return devices.find(isSelectableTarget);
 }
 
+/** *container* plus its direct sub-entities, for scoping a picker to one
+ *  multi-entity component; the full list when no container is given. */
+export function scopeToContainer(
+  devices: AvailableComponentInstance[],
+  container?: AvailableComponentInstance
+): AvailableComponentInstance[] {
+  if (!container) return devices;
+  return devices.filter((d) => d.id === container.id || d.parent_id === container.id);
+}
+
 /** Component-level triggers valid for *device*, matched on its bare or
  *  qualified domain; empty when *device* is absent or a container. */
 export function triggersForComponent(

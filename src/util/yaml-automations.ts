@@ -263,10 +263,8 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
   return automations;
 }
 
-/** The ided sub-entity block enclosing the handler at ``handlerIdx``: walk
- *  up to the nearest mapping-key line at ``childIndent`` (the ``temperature:``
- *  header), then read that block's ``id`` / ``name``. ``null`` when the
- *  handler isn't inside an ided sub-block (so it stays unscoped). */
+/** The ided sub-entity block (``temperature:`` / ``humidity:``) enclosing the
+ *  handler at ``handlerIdx``, or ``null`` when it isn't inside one. */
 function _subEntity(
   lines: string[],
   handlerIdx: number,
@@ -459,8 +457,7 @@ function _readKeyOnLine(lines: string[], fromLine: number, key: string): string 
   for (let i = fromLine; i < lines.length; i++) {
     const line = lines[i];
     if (line.trim() === "") continue;
-    const lineIndent = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
-    if (lineIndent <= dashIndent) break;
+    if (lineIndent(line) <= dashIndent) break;
     const kv = line.match(siblingRe);
     if (kv) return kv[1];
   }

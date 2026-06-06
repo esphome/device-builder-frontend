@@ -41,6 +41,7 @@ import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
 import {
   firstSelectableTarget,
+  scopeToContainer,
   triggersForComponent,
 } from "./automation-editor/component-targets.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
@@ -258,12 +259,9 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   }
 
   private _renderComponentRow(container?: AvailableComponentInstance) {
-    const all = this._available?.devices ?? [];
     // Scope the picker to one container's sub-entities when launched from
     // that component's section; otherwise offer every configured instance.
-    const devices = container
-      ? all.filter((d) => d.id === container.id || d.parent_id === container.id)
-      : all;
+    const devices = scopeToContainer(this._available?.devices ?? [], container);
     return html`<esphome-component-target-picker
       .devices=${devices}
       .value=${this._componentId}

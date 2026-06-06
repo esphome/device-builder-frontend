@@ -1,9 +1,7 @@
 /**
- * Single-select radiogroup over configured component instances. A
- * multi-entity platform (``sensor: - platform: aht10``) renders as a
- * non-selectable group header followed by its sub-entity rows; plain (and
- * orphan-sub) instances are standalone rows. Emits ``component-change``
- * with the picked instance id. Controlled via the ``value`` property.
+ * Single-select radiogroup over configured component instances: a
+ * multi-entity platform renders as a group header with its sub-entity rows.
+ * Emits ``component-change`` with the picked id; controlled via ``value``.
  */
 import { consume } from "@lit/context";
 import { html, LitElement } from "lit";
