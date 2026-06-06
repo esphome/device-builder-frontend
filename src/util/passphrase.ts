@@ -12,6 +12,8 @@
  * predictable.
  */
 export async function generatePassphrase(words = 4): Promise<string> {
+  // Guard against a non-positive count yielding an empty (insecure) credential.
+  const count = Math.max(1, Math.trunc(words));
   const { PASSPHRASE_WORDS } = await import("./passphrase-words.js");
   const n = PASSPHRASE_WORDS.length;
   // Largest multiple of `n` that fits in a uint32; values at or above it are
@@ -19,7 +21,7 @@ export async function generatePassphrase(words = 4): Promise<string> {
   const limit = Math.floor(0x1_0000_0000 / n) * n;
   const buf = new Uint32Array(1);
   const picked: string[] = [];
-  while (picked.length < words) {
+  while (picked.length < count) {
     crypto.getRandomValues(buf);
     if (buf[0] >= limit) continue;
     picked.push(PASSPHRASE_WORDS[buf[0] % n]);

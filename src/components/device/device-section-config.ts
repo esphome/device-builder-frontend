@@ -60,7 +60,8 @@ import {
   loadConfig,
   type SectionConfigResponse,
 } from "./device-section-config/loading.js";
-import "./security-notice.js";
+// The value import (isSecuritySection) already executes the module, registering
+// the <esphome-security-notice> element — no separate side-effect import needed.
 import { isSecuritySection, type ApplySecuritySecretsDetail } from "./security-notice.js";
 
 registerMdiIcons({

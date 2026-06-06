@@ -34,6 +34,11 @@ describe("generatePassphrase", () => {
     );
   });
 
+  it("clamps a non-positive count to a single word (never empty)", async () => {
+    expect(await generatePassphrase(0)).toMatch(/^[a-z]+$/);
+    expect(await generatePassphrase(-3)).toMatch(/^[a-z]+$/);
+  });
+
   it("uses the EFF long wordlist (7772 unambiguous words)", () => {
     expect(PASSPHRASE_WORDS).toHaveLength(7772);
     expect(new Set(PASSPHRASE_WORDS).size).toBe(PASSPHRASE_WORDS.length);
