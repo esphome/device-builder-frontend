@@ -5,7 +5,7 @@
  * unaffected; import from there or from here directly.
  */
 
-import { endsBlockAtIndent } from "./yaml-section-lexer.js";
+import { endsBlockAtIndent, isBlankOrCommentLine } from "./yaml-section-lexer.js";
 import {
   instanceComponentId,
   lineIndent,
@@ -92,27 +92,9 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
       continue;
     }
 
-    // A direct ``on_*`` child scopes to the host; a deeper handler scopes to
-    // a nested sub-entity block (``sensor[i].temperature.on_value``) when that
-    // block carries its own id, else it's ``unscoped``.
-    let componentId: string | null = null;
-    let parentComponentId: string | undefined;
-    let displayName: string | undefined;
-    if (host) {
-      const childIndent = listItemChildIndent(lines[host.fromLine - 1] ?? "");
-      if (indent === childIndent) {
-        componentId = instanceComponentId(sections, host);
-        displayName = host.name ?? undefined;
-      } else if (indent > childIndent) {
-        const sub = _subEntity(lines, i, childIndent);
-        if (sub) {
-          componentId = sub.id;
-          displayName = sub.name;
-          parentComponentId = instanceComponentId(sections, host);
-        }
-      }
-    }
-    if (host && componentId) {
+    const scope = host ? _resolveHandlerScope(lines, sections, host, i, indent) : null;
+    if (host && scope) {
+      const { componentId, displayName, parentComponentId } = scope;
       const labelHead = displayName || componentId;
       const base = {
         id: componentId,
@@ -269,6 +251,36 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
   return automations;
 }
 
+/** Resolve a ``component_on`` handler to its target: the host instance for a
+ *  direct child, or the host's ided sub-entity for a deeper handler. ``null``
+ *  when no addressable target. */
+function _resolveHandlerScope(
+  lines: string[],
+  sections: YamlSection[],
+  host: YamlSection,
+  handlerIdx: number,
+  indent: number
+): { componentId: string; displayName?: string; parentComponentId?: string } | null {
+  const childIndent = listItemChildIndent(lines[host.fromLine - 1] ?? "");
+  if (indent === childIndent) {
+    return {
+      componentId: instanceComponentId(sections, host),
+      displayName: host.name ?? undefined,
+    };
+  }
+  if (indent > childIndent) {
+    const sub = _subEntity(lines, handlerIdx, childIndent);
+    if (sub) {
+      return {
+        componentId: sub.id,
+        displayName: sub.name,
+        parentComponentId: instanceComponentId(sections, host),
+      };
+    }
+  }
+  return null;
+}
+
 /** The ided sub-entity block (``temperature:`` / ``humidity:``) enclosing the
  *  handler at ``handlerIdx``, or ``null`` when it isn't inside one. */
 function _subEntity(
@@ -276,10 +288,9 @@ function _subEntity(
   handlerIdx: number,
   childIndent: number
 ): { id: string; name?: string } | null {
-  const skip = (l: string): boolean => l.trim() === "" || l.trim().startsWith("#");
   let headerIdx = -1;
   for (let j = handlerIdx - 1; j >= 0; j--) {
-    if (skip(lines[j])) continue;
+    if (isBlankOrCommentLine(lines[j])) continue;
     const ind = lineIndent(lines[j]);
     if (ind < childIndent) return null; // left the instance's children
     if (ind === childIndent) {
@@ -294,7 +305,7 @@ function _subEntity(
   let name: string | undefined;
   let subChildIndent = -1;
   for (let k = headerIdx + 1; k < lines.length; k++) {
-    if (skip(lines[k])) continue;
+    if (isBlankOrCommentLine(lines[k])) continue;
     const ind = lineIndent(lines[k]);
     if (ind <= childIndent) break; // end of the sub-block
     if (subChildIndent === -1) subChildIndent = ind; // the block's own field level

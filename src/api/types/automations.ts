@@ -280,11 +280,9 @@ export interface AvailableComponentInstance {
   id: string;
   /** The configured ``name:`` value, if any (purely for display). */
   name?: string;
-  /** True for a multi-entity platform container (``sensor: - platform:
-   *  aht10``). Entity triggers belong on its sub-entities, not on it,
-   *  so the picker offers it as a non-selectable group header. */
+  /** True for a multi-entity platform container; its sub-entities carry the
+   *  triggers, so the picker shows it as a non-selectable header. */
   is_entity_container?: boolean;
-  /** Set on a sub-entity instance to the owning container's id, so the
-   *  picker can group it under that container. */
+  /** A sub-entity's owning container id, for grouping it under that container. */
   parent_id?: string;
 }
