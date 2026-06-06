@@ -103,20 +103,21 @@ export interface OnboardingStep {
  * ``src/util/onboarding-gate.ts`` (``shouldAutoShowOnboarding``)
  * with unit-test coverage of every branch.
  *
- * Manual entry via the ``Set up Wi-Fi…`` kebab item bypasses
- * both the version-bump gate and the session-dismiss flag —
- * the click IS the explicit "I want to do this now" signal —
- * but is itself only visible when ``isOnboardingPending`` is
- * true (so the user never sees the entry when there's nothing
- * to do).
+ * Manual entry via the Wi-Fi kebab item bypasses both the
+ * version-bump gate and the session-dismiss flag — the click IS
+ * the explicit "I want to do this now" signal. The entry is
+ * ALWAYS visible so a user can rotate already-configured
+ * credentials without hand-editing ``secrets.yaml``;
+ * ``isOnboardingPending`` only selects its wording (``Set up
+ * Wi-Fi`` when nothing is configured yet vs ``Change Wi-Fi
+ * credentials`` once it is), it no longer gates visibility.
  *
- * Step status also drives the kebab entry's visibility
- * directly. It's computed from live on-disk state on every
+ * That label is computed from live on-disk state on every
  * server-side ``get_state`` call — never persisted — and the
  * dashboard re-fetches on (re)connect AND on every
  * ``secrets-saved`` event, so an in-app save (wizard or
- * Secrets editor) updates the entry in real time and an
- * out-of-band ``secrets.yaml`` edit clears it no later than
+ * Secrets editor) updates the wording in real time and an
+ * out-of-band ``secrets.yaml`` edit flips it no later than
  * the next WS reconnect.
  */
 export interface OnboardingState {

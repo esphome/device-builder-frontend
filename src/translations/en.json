@@ -866,6 +866,7 @@
   },
   "onboarding": {
     "menu_item_setup_wifi": "Set up Wi-Fi",
+    "menu_item_change_wifi": "Change Wi-Fi credentials",
     "wifi": {
       "title": "Set up Wi-Fi credentials",
       "intro": "Your devices use these to join your network. They're stored once in secrets.yaml and shared across every config you create.",

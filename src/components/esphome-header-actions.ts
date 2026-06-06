@@ -71,14 +71,14 @@ export class ESPHomeHeaderActions extends LitElement {
 
   /** True when onboarding still has work to do (currently:
    *  Wi-Fi step pending — data-derived from ``secrets.yaml``).
-   *  Gates a dedicated ``Set up Wi-Fi…`` kebab entry so a user
-   *  who declined the wizard with "I don't use Wi-Fi" — or who
-   *  cleared the credentials by hand from the Secrets editor —
-   *  still has a one-click re-entry into the wizard. The entry
-   *  appears / disappears in real time as ``secrets.yaml``
-   *  changes (the app-shell re-fetches the snapshot on every
-   *  ``secrets-saved`` event). Owned by the app shell, threaded
-   *  via context. */
+   *  The Wi-Fi kebab entry is ALWAYS shown (so a user can rotate
+   *  credentials without hand-editing ``secrets.yaml``); this flag
+   *  only selects the entry's wording — ``Set up Wi-Fi`` when
+   *  nothing is configured yet vs ``Change Wi-Fi credentials`` once
+   *  it is. It tracks ``secrets.yaml`` in real time (the app-shell
+   *  re-fetches the snapshot on every ``secrets-saved`` event), so
+   *  the label flips the moment credentials are saved or cleared.
+   *  Owned by the app shell, threaded via context. */
   @consume({ context: onboardingPendingContext, subscribe: true })
   @state()
   private _onboardingPending = false;
@@ -322,20 +322,20 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
                 <span class="menu-item-label">${this._localize("layout.secrets")}</span>
               </div>
-              ${this._onboardingPending
-                ? html`<div
-                    class="menu-item"
-                    role="menuitem"
-                    tabindex="0"
-                    @click=${this._openOnboarding}
-                    @keydown=${this._onMenuItemKeydown}
-                  >
-                    <wa-icon library="mdi" name="wifi-cog"></wa-icon>
-                    <span class="menu-item-label"
-                      >${this._localize("onboarding.menu_item_setup_wifi")}</span
-                    >
-                  </div>`
-                : nothing}
+              <div
+                class="menu-item"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openOnboarding}
+                @keydown=${this._onMenuItemKeydown}
+              >
+                <wa-icon library="mdi" name="wifi-cog"></wa-icon>
+                <span class="menu-item-label"
+                  >${this._onboardingPending
+                    ? this._localize("onboarding.menu_item_setup_wifi")
+                    : this._localize("onboarding.menu_item_change_wifi")}</span
+                >
+              </div>
               <div
                 class="menu-item"
                 role="menuitem"
@@ -463,11 +463,11 @@ export class ESPHomeHeaderActions extends LitElement {
     navigate("/secrets");
   }
 
-  /** Re-launches the onboarding wizard on demand. The kebab item
-   *  is gated on ``_onboardingPending`` (data-derived from
-   *  ``secrets.yaml``), so it appears only when there's actually
-   *  something to onboard — a user who declined "I don't use Wi-Fi"
-   *  earlier sees the entry and can change their mind. */
+  /** Opens the Wi-Fi credentials dialog on demand. The kebab item
+   *  is always present (its label tracks ``_onboardingPending`` —
+   *  setup vs change), so a user can both complete first-run setup
+   *  and rotate already-configured credentials without ever
+   *  hand-editing ``secrets.yaml``. */
   private _openOnboarding() {
     this._close();
     this.dispatchEvent(
