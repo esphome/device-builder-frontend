@@ -3,6 +3,7 @@ import {
   isSecretEligible,
   recommendedSecretKeys,
   secretValueFromYaml,
+  visibleSecretKeys,
   withoutForeignDeviceSecrets,
 } from "../../src/util/secret-eligibility.js";
 import { formatYamlScalar } from "../../src/util/yaml-serialize.js";
@@ -109,6 +110,63 @@ describe("withoutForeignDeviceSecrets", () => {
     expect(withoutForeignDeviceSecrets(["myapp__token"], "kitchen", devices)).toEqual([
       "myapp__token",
     ]);
+  });
+});
+
+describe("visibleSecretKeys", () => {
+  const keys = [
+    "wifi_ssid",
+    "wifi_password",
+    "kitchen__encryption_key",
+    "kitchen__ota_password",
+    "porch__encryption_key",
+    "x_secret",
+  ];
+
+  it("drops wifi_* on a non-WiFi field, keeps the device's own + unscoped", () => {
+    expect(
+      visibleSecretKeys(keys, ["kitchen__encryption_key"], "kitchen", [
+        "kitchen",
+        "porch",
+      ])
+    ).toEqual(["kitchen__encryption_key", "kitchen__ota_password", "x_secret"]);
+  });
+
+  it("keeps wifi_ssid on the WiFi SSID field but not wifi_password", () => {
+    expect(
+      visibleSecretKeys(keys, ["wifi_ssid"], "kitchen", ["kitchen", "porch"])
+    ).toEqual([
+      "wifi_ssid",
+      "kitchen__encryption_key",
+      "kitchen__ota_password",
+      "x_secret",
+    ]);
+  });
+
+  it("still hides other devices' per-device secrets", () => {
+    expect(
+      visibleSecretKeys(keys, ["wifi_ssid"], "kitchen", ["kitchen", "porch"])
+    ).not.toContain("porch__encryption_key");
+  });
+
+  it("keeps a kept key (e.g. the selected value) even if field-bound", () => {
+    // The picker passes recommended + selectedKey as `keep`, so the currently
+    // referenced secret stays listed even on a field it's not recommended for.
+    expect(
+      visibleSecretKeys(["wifi_password", "x"], ["wifi_password"], "kitchen", ["kitchen"])
+    ).toContain("wifi_password");
+  });
+
+  it("keeps a kept key even if it's another device's per-device secret", () => {
+    // The selected value is always listed, even past the foreign-device filter.
+    expect(
+      visibleSecretKeys(
+        ["porch__encryption_key", "x"],
+        ["porch__encryption_key"],
+        "kitchen",
+        ["kitchen", "porch"]
+      )
+    ).toContain("porch__encryption_key");
   });
 });
 

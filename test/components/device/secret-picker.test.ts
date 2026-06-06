@@ -70,10 +70,10 @@ afterEach(() => {
 
 describe("esphome-secret-picker", () => {
   it("renders one item per cached key plus the create action", async () => {
-    const el = await mount(["wifi_ssid", "wifi_password"]);
+    const el = await mount(["secret_a", "secret_b"]);
     const values = items(el).map((i) => i.getAttribute("value"));
-    expect(values).toContain("wifi_ssid");
-    expect(values).toContain("wifi_password");
+    expect(values).toContain("secret_a");
+    expect(values).toContain("secret_b");
     // The last item is the create action.
     expect(el.shadowRoot!.querySelector(".create")).not.toBeNull();
   });
@@ -150,7 +150,7 @@ describe("esphome-secret-picker", () => {
     const el = await mount([
       "kitchen__encryption_key",
       "porch__encryption_key",
-      "wifi_ssid",
+      "x_secret",
     ]);
     (el as unknown as { _devices: { name: string }[] })._devices = [
       { name: "kitchen" },
@@ -161,8 +161,28 @@ describe("esphome-secret-picker", () => {
 
     const values = items(el).map((i) => i.getAttribute("value"));
     expect(values).toContain("kitchen__encryption_key");
-    expect(values).toContain("wifi_ssid");
+    expect(values).toContain("x_secret");
     expect(values).not.toContain("porch__encryption_key");
+  });
+
+  it("hides wifi_* secrets on a non-WiFi field, shows them on a WiFi field", async () => {
+    const el = await mount(["wifi_ssid", "wifi_password", "kitchen__encryption_key"]);
+    el.deviceName = "kitchen";
+
+    // Non-WiFi field (encryption key recommended) → no wifi_* offered.
+    el.recommendedKeys = ["kitchen__encryption_key"];
+    await el.updateComplete;
+    let values = items(el).map((i) => i.getAttribute("value"));
+    expect(values).not.toContain("wifi_ssid");
+    expect(values).not.toContain("wifi_password");
+    expect(values).toContain("kitchen__encryption_key");
+
+    // WiFi SSID field → wifi_ssid offered (recommended), wifi_password not.
+    el.recommendedKeys = ["wifi_ssid"];
+    await el.updateComplete;
+    values = items(el).map((i) => i.getAttribute("value"));
+    expect(values).toContain("wifi_ssid");
+    expect(values).not.toContain("wifi_password");
   });
 
   it("groups recommended keys above the rest", async () => {
@@ -174,7 +194,7 @@ describe("esphome-secret-picker", () => {
       l.textContent!.trim()
     );
     expect(labels).toEqual([
-      "device.secret_picker_recommended",
+      "device.secret_picker_related",
       "device.secret_picker_shared",
     ]);
   });

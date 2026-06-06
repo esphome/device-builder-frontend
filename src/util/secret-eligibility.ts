@@ -12,6 +12,12 @@ const SHARED: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   wifi: { ssid: "wifi_ssid", password: "wifi_password" },
 };
 
+/** Field-bound shared secret names (``wifi_ssid``, ``wifi_password``) — each
+ *  belongs to one specific field and shouldn't be offered on the others. */
+const FIELD_BOUND_SHARED = new Set(
+  Object.values(SHARED).flatMap((m) => Object.values(m))
+);
+
 /** Per-device base names for the well-known credential fields, joined to the
  *  hostname as ``<hostname>__<base>``. Keyed by ``sectionKey`` then key. */
 const DEVICE_BASE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -57,6 +63,35 @@ export function withoutForeignDeviceSecrets(
     const i = k.indexOf("__");
     return i <= 0 || !others.has(k.slice(0, i));
   });
+}
+
+/**
+ * The secrets to show in a field's picker. Drops other devices' per-device
+ * secrets (via :func:`withoutForeignDeviceSecrets`) and field-bound shared
+ * secrets (``wifi_ssid`` / ``wifi_password``) that aren't relevant to *this*
+ * field — so a WiFi SSID field still offers ``wifi_ssid`` but an OTA password
+ * or encryption-key field doesn't.
+ *
+ * *keep* is the set that's never field-filtered: the field's recommendations
+ * plus its currently-selected key (so the active value is always listed).
+ */
+export function visibleSecretKeys(
+  keys: readonly string[],
+  keep: readonly string[],
+  currentHostname: string,
+  allDeviceNames: readonly string[]
+): string[] {
+  const kept = new Set(keep.filter(Boolean));
+  // `kept` is exempt from BOTH filters (foreign-device and field-bound), so the
+  // currently-selected value is always listed even in the (unreachable-via-UI)
+  // case where it's another device's per-device secret. Filter the original
+  // list so order is preserved.
+  const afterForeign = new Set(
+    withoutForeignDeviceSecrets(keys, currentHostname, allDeviceNames)
+  );
+  return keys.filter(
+    (k) => kept.has(k) || (afterForeign.has(k) && !FIELD_BOUND_SHARED.has(k))
+  );
 }
 
 /** Per-device key forms, most-preferred first. A double underscore joins the

@@ -690,7 +690,7 @@
     "secret_picker_aria": "Pick a stored secret for {field}",
     "secret_picker_create": "Create new secret…",
     "secret_picker_empty": "No secrets yet",
-    "secret_picker_recommended": "Recommended",
+    "secret_picker_related": "Related",
     "secret_picker_shared": "Shared secrets",
     "secret_picker_manual": "Enter a value manually",
     "secret_picker_manual_error": "Couldn't read the stored secret",
