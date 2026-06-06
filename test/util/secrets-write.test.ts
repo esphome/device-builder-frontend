@@ -1,0 +1,70 @@
+/**
+ * @vitest-environment happy-dom
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import { ensureSecretInYaml } from "../../src/util/secrets-write.js";
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+describe("ensureSecretInYaml", () => {
+  it("appends a new key and dispatches secrets-saved", async () => {
+    const api = {
+      getConfig: vi.fn(async () => "wifi_ssid: x\n"),
+      updateConfig: vi.fn(async () => {}),
+    } as unknown as ESPHomeAPI;
+    const saved = vi.fn();
+    window.addEventListener("secrets-saved", saved as EventListener);
+
+    const result = await ensureSecretInYaml(api, "kitchen__encryption_key", "oQ3==");
+
+    expect(result).toEqual({ created: true });
+    const [file, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(file).toBe("secrets.yaml");
+    expect(content).toContain("wifi_ssid: x");
+    expect(content).toContain("kitchen__encryption_key: oQ3==");
+    await tick();
+    expect(saved).toHaveBeenCalled();
+    window.removeEventListener("secrets-saved", saved as EventListener);
+  });
+
+  it("leaves an existing key untouched and writes nothing", async () => {
+    const api = {
+      getConfig: vi.fn(async () => "kitchen__encryption_key: existing\n"),
+      updateConfig: vi.fn(async () => {}),
+    } as unknown as ESPHomeAPI;
+
+    const result = await ensureSecretInYaml(api, "kitchen__encryption_key", "new");
+
+    expect(result).toEqual({ created: false });
+    expect(api.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it("rejects and never writes when the read fails", async () => {
+    const api = {
+      getConfig: vi.fn(async () => {
+        throw new Error("ws blip");
+      }),
+      updateConfig: vi.fn(async () => {}),
+    } as unknown as ESPHomeAPI;
+
+    await expect(ensureSecretInYaml(api, "k", "v")).rejects.toThrow();
+    expect(api.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it("quotes a value that needs quoting via formatYamlScalar", async () => {
+    const api = {
+      getConfig: vi.fn(async () => ""),
+      updateConfig: vi.fn(async () => {}),
+    } as unknown as ESPHomeAPI;
+
+    await ensureSecretInYaml(api, "k", "a: b # c");
+
+    const [, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(content).toBe('k: "a: b # c"\n');
+  });
+});

@@ -33,6 +33,32 @@ function slug(s: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
+/**
+ * Drop per-device secrets (``<host>__<base>``) scoped to a device *other* than
+ * *currentHostname*. Shared keys (``wifi_ssid``) and unscoped names are kept;
+ * only keys whose ``__`` prefix matches another known device's hostname are
+ * removed — so the picker doesn't offer one device's encryption key on another.
+ */
+export function withoutForeignDeviceSecrets(
+  keys: readonly string[],
+  currentHostname: string,
+  allDeviceNames: readonly string[]
+): string[] {
+  const current = slug(currentHostname);
+  // Without the current host we can't tell ours from theirs — don't filter, or
+  // we'd hide the current device's own keys (and the migrate target) during the
+  // brief window before the device name resolves.
+  if (!current) return [...keys];
+  const others = new Set(
+    allDeviceNames.map((n) => slug(n)).filter((h) => h && h !== current)
+  );
+  if (others.size === 0) return [...keys];
+  return keys.filter((k) => {
+    const i = k.indexOf("__");
+    return i <= 0 || !others.has(k.slice(0, i));
+  });
+}
+
 /** Per-device key forms, most-preferred first. A double underscore joins the
  *  hostname and base so a device name that itself contains an underscore
  *  (``my_device``) stays unambiguous; the single-underscore form is kept too

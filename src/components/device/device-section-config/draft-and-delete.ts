@@ -80,6 +80,21 @@ export function onValueChange(
   host._scheduleDraftFlush();
 }
 
+/** Point `api.encryption.key` at a generated secret (from the api-encryption
+ *  notice) in the unsaved draft and flush it into the YAML buffer. */
+export function applyEncryptionKey(
+  host: ESPHomeDeviceSectionConfig,
+  secretKey: string
+): void {
+  host._values = setIn(host._values, ["encryption", "key"], `!secret ${secretKey}`);
+  host._setDirty(true);
+  if (host._draftTimer) {
+    clearTimeout(host._draftTimer);
+    host._draftTimer = null;
+  }
+  flushDraft(host);
+}
+
 export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promise<void> {
   if (!host._config) return;
   const fromLine = resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine);

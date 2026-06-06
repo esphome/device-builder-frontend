@@ -32,6 +32,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { type ValidationError } from "../../util/config-validation.js";
+import { resolveDeviceName } from "../../util/device-name.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   fetchPinRegistryModes,
@@ -591,9 +592,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       yaml: this.yaml,
       fromLine: this.fromLine,
       sectionKey: this.sectionKey,
-      deviceName: this.configuration
-        ? (this._devices.find((d) => d.configuration === this.configuration)?.name ?? "")
-        : "",
+      deviceName: resolveDeviceName(this._devices, this.configuration),
       board: this.board,
       pinRegistryModes: getCachedPinRegistryModes(),
       requiredOnly: this.requiredOnly,

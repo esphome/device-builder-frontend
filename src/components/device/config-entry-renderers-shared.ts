@@ -349,6 +349,7 @@ export function renderStringField(
         .fieldLabel=${labelFor(entry, ctx)}
         .selectedKey=${selectedKey ?? ""}
         .value=${value}
+        .deviceName=${ctx.deviceName ?? ""}
         .recommendedKeys=${recommendedKeys}
         @secret-selected=${(e: CustomEvent<SecretSelectedDetail>) =>
           ctx.emitChange(path, e.detail.value)}

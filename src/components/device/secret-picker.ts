@@ -19,17 +19,21 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, localizeContext } from "../../context/index.js";
+import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { navigate } from "../../util/navigation.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { secretValueFromYaml } from "../../util/secret-eligibility.js";
+import {
+  secretValueFromYaml,
+  withoutForeignDeviceSecrets,
+} from "../../util/secret-eligibility.js";
 import {
   fetchSecretKeys,
   getCachedSecretKeys,
   subscribeSecretKeys,
 } from "../../util/secrets-cache.js";
-import { formatYamlScalar } from "../../util/yaml-serialize.js";
+import { ensureSecretInYaml } from "../../util/secrets-write.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/dropdown-item/dropdown-item.js";
@@ -69,9 +73,19 @@ export class ESPHomeSecretPicker extends LitElement {
   @state()
   private _api?: ESPHomeAPI;
 
+  /** Configured devices — used to hide other devices' per-device secrets. */
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  private _devices: ConfiguredDevice[] = [];
+
   /** Disable the trigger (mirrors the field's effective-disabled state). */
   @property({ type: Boolean })
   disabled = false;
+
+  /** This device's resolved node name, so other devices' `<host>__…` secrets
+   *  are filtered out of the list. */
+  @property({ attribute: "device-name" })
+  deviceName = "";
 
   /** Span the row instead of hugging its content — set when the field is in
    *  secret mode (no manual input beside it). */
@@ -269,11 +283,18 @@ export class ESPHomeSecretPicker extends LitElement {
 
   protected render() {
     const selected = this.selectedKey !== "";
+    // Hide per-device secrets that belong to other devices (migrate/_keys
+    // membership still use the full unfiltered list).
+    const keys = withoutForeignDeviceSecrets(
+      this._keys,
+      this.deviceName,
+      this._devices.map((d) => d.name)
+    );
     // Set membership so grouping stays linear as the secrets list grows.
-    const keySet = new Set(this._keys);
+    const keySet = new Set(keys);
     const recommendedSet = new Set(this.recommendedKeys);
     const recommended = this.recommendedKeys.filter((k) => keySet.has(k));
-    const others = this._keys.filter((k) => !recommendedSet.has(k));
+    const others = keys.filter((k) => !recommendedSet.has(k));
     return html`
       <wa-dropdown @wa-select=${this._onSelect}>
         <button
@@ -309,12 +330,12 @@ export class ESPHomeSecretPicker extends LitElement {
               ${recommended.map((k) => this._renderKeyItem(k))}
               ${others.length
                 ? html`<small class="group-label" aria-hidden="true"
-                    >${this._localize("device.secret_picker_other")}</small
+                    >${this._localize("device.secret_picker_shared")}</small
                   >`
                 : nothing}`
           : nothing}
         ${others.map((k) => this._renderKeyItem(k))}
-        ${this._keys.length
+        ${keys.length
           ? nothing
           : html`<wa-dropdown-item class="empty" disabled role="status"
               >${this._localize("device.secret_picker_empty")}</wa-dropdown-item
@@ -406,34 +427,20 @@ export class ESPHomeSecretPicker extends LitElement {
     const key = this._migrateTarget;
     if (!this._api || !key || !this.value) return;
     try {
-      // Read the existing file first. Do NOT swallow a read failure into ""
-      // here: if the read transiently fails while the file actually has
-      // content, writing just the new key would wipe every other secret.
-      // Abort (error toast) instead.
-      const current = await this._api.getConfig(SECRETS_FILE);
-      // The cache that gated `_canMigrate` may be stale; if the freshly-read
-      // file already defines the key (e.g. created in another tab), point at it
-      // instead of appending a duplicate top-level mapping key. Its value may
-      // differ from what the user typed, so say "linked" rather than "saved".
-      if (secretValueFromYaml(current, key) !== null) {
-        toast.info(this._localize("device.secret_picker_linked", { key }), {
-          richColors: true,
-        });
-        this._emit(`!secret ${key}`);
-        return;
-      }
-      const body = current.replace(/\s+$/, "");
-      const updated = `${body ? `${body}\n` : ""}${key}: ${formatYamlScalar(this.value)}\n`;
-      await this._api.updateConfig(SECRETS_FILE, updated);
-      // Refresh every picker's key list and flip onboarding badges.
-      window.dispatchEvent(
-        new CustomEvent("secrets-saved", { detail: { source: this } })
+      const { created } = await ensureSecretInYaml(this._api, key, this.value);
+      // `created` false = the key already existed (cache was stale / created in
+      // another tab); its value may differ from what the user typed, so say
+      // "linked" rather than "saved".
+      toast[created ? "success" : "info"](
+        this._localize(
+          created ? "device.secret_picker_migrated" : "device.secret_picker_linked",
+          { key }
+        ),
+        { richColors: true }
       );
-      toast.success(this._localize("device.secret_picker_migrated", { key }), {
-        richColors: true,
-      });
       this._emit(`!secret ${key}`);
-    } catch {
+    } catch (err) {
+      console.error("Secret migration failed", err);
       toast.error(this._localize("device.secret_picker_migrate_error"), {
         richColors: true,
       });

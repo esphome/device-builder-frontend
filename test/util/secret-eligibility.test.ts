@@ -3,6 +3,7 @@ import {
   isSecretEligible,
   recommendedSecretKeys,
   secretValueFromYaml,
+  withoutForeignDeviceSecrets,
 } from "../../src/util/secret-eligibility.js";
 import { formatYamlScalar } from "../../src/util/yaml-serialize.js";
 
@@ -61,6 +62,53 @@ describe("recommendedSecretKeys", () => {
 
   it("recommends nothing for a non-concealed unknown field", () => {
     expect(recommendedSecretKeys("sensor", "name", "kitchen", false)).toEqual([]);
+  });
+});
+
+describe("withoutForeignDeviceSecrets", () => {
+  const keys = [
+    "kitchen__encryption_key",
+    "porch__encryption_key",
+    "bw15__ota_password",
+    "wifi_ssid",
+    "wifi_password",
+    "j",
+  ];
+  const devices = ["kitchen", "porch", "bw15"];
+
+  it("hides other devices' per-device secrets, keeps this device's + shared", () => {
+    expect(withoutForeignDeviceSecrets(keys, "kitchen", devices)).toEqual([
+      "kitchen__encryption_key",
+      "wifi_ssid",
+      "wifi_password",
+      "j",
+    ]);
+  });
+
+  it("slugs the hostname so a hyphenated name matches its secret prefix", () => {
+    expect(
+      withoutForeignDeviceSecrets(
+        ["apollo_r_pro_1_eth_5938e0__encryption_key", "kitchen__encryption_key"],
+        "apollo-r-pro-1-eth-5938e0",
+        ["apollo-r-pro-1-eth-5938e0", "kitchen"]
+      )
+    ).toEqual(["apollo_r_pro_1_eth_5938e0__encryption_key"]);
+  });
+
+  it("keeps everything when there are no other devices", () => {
+    expect(withoutForeignDeviceSecrets(keys, "kitchen", ["kitchen"])).toEqual(keys);
+  });
+
+  it("does not filter when the current hostname is unresolved (empty)", () => {
+    // Before the device name resolves, hiding all <host>__ keys would blank out
+    // the current device's own secrets — so return everything unfiltered.
+    expect(withoutForeignDeviceSecrets(keys, "", devices)).toEqual(keys);
+  });
+
+  it("keeps a __ secret whose prefix isn't a known device", () => {
+    expect(withoutForeignDeviceSecrets(["myapp__token"], "kitchen", devices)).toEqual([
+      "myapp__token",
+    ]);
   });
 });
 

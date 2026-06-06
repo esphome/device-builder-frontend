@@ -146,6 +146,25 @@ describe("esphome-secret-picker", () => {
     );
   });
 
+  it("hides other devices' per-device secrets from the list", async () => {
+    const el = await mount([
+      "kitchen__encryption_key",
+      "porch__encryption_key",
+      "wifi_ssid",
+    ]);
+    (el as unknown as { _devices: { name: string }[] })._devices = [
+      { name: "kitchen" },
+      { name: "porch" },
+    ];
+    el.deviceName = "kitchen";
+    await el.updateComplete;
+
+    const values = items(el).map((i) => i.getAttribute("value"));
+    expect(values).toContain("kitchen__encryption_key");
+    expect(values).toContain("wifi_ssid");
+    expect(values).not.toContain("porch__encryption_key");
+  });
+
   it("groups recommended keys above the rest", async () => {
     const el = await mount(["other_secret", "wifi_ssid"]);
     el.recommendedKeys = ["wifi_ssid"];
@@ -156,7 +175,7 @@ describe("esphome-secret-picker", () => {
     );
     expect(labels).toEqual([
       "device.secret_picker_recommended",
-      "device.secret_picker_other",
+      "device.secret_picker_shared",
     ]);
   });
 

@@ -46,11 +46,14 @@ import "./add-api-action-dialog.js";
 import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
 import "./add-automation-dialog.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
+import "./api-encryption-notice.js";
+import type { ApplyEncryptionKeyDetail } from "./api-encryption-notice.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import "./device-section-automation-list.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import {
+  applyEncryptionKey,
   flushDraft,
   onDeleteConfirmed,
   onValueChange,
@@ -278,6 +281,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private _onDeleteConfirmed = () => onDeleteConfirmed(this);
 
+  private _onApplyEncryptionKey = (e: CustomEvent<ApplyEncryptionKeyDetail>) =>
+    applyEncryptionKey(this, e.detail.secretKey);
+
   protected render() {
     if (this._loading) {
       return html`<div class="loading"><wa-spinner></wa-spinner></div>`;
@@ -362,6 +368,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
             ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
         : html`
+            ${this.sectionKey === "api"
+              ? html`<esphome-api-encryption-notice
+                  .yaml=${this.yaml}
+                  .configuration=${this.configuration}
+                  .fromLine=${this._resolvedFromLine}
+                  @apply-encryption-key=${this._onApplyEncryptionKey}
+                ></esphome-api-encryption-notice>`
+              : nothing}
             <esphome-config-entry-form
               .entries=${renderEntries}
               .values=${this._values}
