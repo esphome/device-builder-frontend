@@ -23,6 +23,7 @@ build/
 # swap such as .secrets.yaml.swp can hold unsaved buffer contents,
 # including secrets, so the whole range must be ignored.
 *.sw[a-p]
+*.swo
 *~
 .claude/*
 !.claude/skills/
@@ -40,6 +41,4 @@ build/
 /*.yml
 !/.pre-commit-config.yaml
 
-# Editor swap/backup files — a vim swap of a secrets file would leak
-# credentials, and `.swp` slips past the `*.yaml` rule above.
 *.swo
