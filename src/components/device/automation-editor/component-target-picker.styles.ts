@@ -48,7 +48,10 @@ export const componentTargetPickerStyles = css`
     letter-spacing: 0.04em;
     margin: var(--wa-space-s) var(--wa-space-2xs) var(--wa-space-2xs);
   }
-  .component-group:first-child {
+  /* Trim the leading gap only when a group is the very first row (each
+     group now sits in its own wrap, so :first-child on the header would
+     match every group). */
+  .component-group-wrap:first-child .component-group {
     margin-top: var(--wa-space-2xs);
   }
   .component-group-id {
