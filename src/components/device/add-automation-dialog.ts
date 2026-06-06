@@ -39,6 +39,11 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
+import {
+  firstSelectableTarget,
+  selectableTargets,
+  triggersForComponent,
+} from "./automation-editor/component-targets.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
 
 /** Kinds the wizard can produce. Mirrors a subset of
@@ -231,7 +236,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     // non-selectable group header; its sub-entities (and plain instances)
     // are the selectable rows. Picking the container would write entity
     // triggers under the platform item, which is invalid.
-    const selectable = devices.filter((d) => !d.is_entity_container);
+    const selectable = selectableTargets(devices);
     if (selectable.length === 0) {
       return html`<p class="error">
         ${this._localize("device.automation_target_no_components")}
@@ -371,18 +376,12 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       return all.filter((t) => t.is_device_level && !takenDeviceTriggers.has(t.id));
     }
     if (this._kind === "component_on") {
-      if (!this._componentId) return [];
       const device = this._available?.devices.find((d) => d.id === this._componentId);
-      if (!device || device.is_entity_container) return [];
-      const [domain] = device.component_id.split(".");
       // A component's inline ``on_*:`` fires once, so hide triggers that
       // already have a handler here; repeatable ones stay offerable.
       const takenComponentTriggers = this._existingComponentTriggers(this._componentId);
-      return all.filter(
-        (t) =>
-          !t.is_device_level &&
-          (t.applies_to.includes(device.component_id) || t.applies_to.includes(domain)) &&
-          (!takenComponentTriggers.has(this._bareTrigger(t.id)) || t.repeatable)
+      return triggersForComponent(all, device).filter(
+        (t) => !takenComponentTriggers.has(this._bareTrigger(t.id)) || t.repeatable
       );
     }
     return [];
@@ -431,7 +430,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       const devices = this._available?.devices ?? [];
       // A container isn't selectable (entity triggers go on its
       // sub-entities); default to the first real target.
-      this._componentId = devices.find((d) => !d.is_entity_container)?.id ?? "";
+      this._componentId = firstSelectableTarget(devices)?.id ?? "";
     } else {
       this._componentId = "";
     }

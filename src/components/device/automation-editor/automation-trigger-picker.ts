@@ -34,6 +34,7 @@ import { renderMarkdown } from "../../../util/markdown.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import { triggersForComponent } from "./component-targets.js";
 import { applyParamChange } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -148,19 +149,10 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
     if (this.target.kind === "component_on") {
       const componentId = this.target.component_id;
       const device = this.devices.find((d) => d.id === componentId);
-      // A multi-entity container holds no entity triggers of its own —
-      // those belong on its sub-entities.
-      if (!device || device.is_entity_container) return [];
-      // Match either the bare domain (``binary_sensor``) or the
-      // domain.platform tuple (``binary_sensor.gpio``); the backend
-      // emits triggers under both shapes and the catalog dictates
-      // which one wins.
-      const [domain] = device.component_id.split(".");
-      return this.triggers.filter(
-        (t) =>
-          !t.is_device_level &&
-          (t.applies_to.includes(device.component_id) || t.applies_to.includes(domain))
-      );
+      // Matches either the bare domain (``binary_sensor``) or the
+      // domain.platform tuple; a multi-entity container yields none (its
+      // triggers belong on its sub-entities).
+      return triggersForComponent(this.triggers, device);
     }
     return [];
   }

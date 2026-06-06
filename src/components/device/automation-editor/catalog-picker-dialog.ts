@@ -49,6 +49,7 @@ import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { selectableTargets } from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../../base-dialog.js";
@@ -409,18 +410,16 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         ${this._localize("device.automation_pick_no_targets")}
       </p>`;
     }
-    const sections = this.devices
-      // A multi-entity container isn't itself a referenceable entity — its
-      // sub-entities are surfaced as their own instances.
-      .filter((device) => !device.is_entity_container)
-      .map((device) => {
-        const [domain] = device.component_id.split(".");
-        const matching = items.filter((i) => {
-          if (!("domain" in i)) return false;
-          return i.domain === domain || i.domain === device.component_id;
-        });
-        return { device, matching };
+    // A multi-entity container isn't itself a referenceable entity — its
+    // sub-entities are surfaced as their own instances.
+    const sections = selectableTargets(this.devices).map((device) => {
+      const [domain] = device.component_id.split(".");
+      const matching = items.filter((i) => {
+        if (!("domain" in i)) return false;
+        return i.domain === domain || i.domain === device.component_id;
       });
+      return { device, matching };
+    });
     const nonEmpty = sections.filter((s) => s.matching.length > 0);
     if (nonEmpty.length === 0) {
       return html`<p class="picker-empty">
