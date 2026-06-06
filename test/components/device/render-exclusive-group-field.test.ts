@@ -128,6 +128,14 @@ describe("renderExclusiveGroupField", () => {
     expect(opts).toContain("esp8266only");
   });
 
+  it("associates the select with its label via aria-labelledby", () => {
+    const tpl = renderExclusiveGroupField(members(), makeRenderCtx({}));
+    const select = findElementBindings(tpl, "wa-select")[0];
+    const label = findElementBindings(tpl, "label")[0];
+    expect(typeof label["id"]).toBe("string");
+    expect(select["aria-labelledby"]).toBe(label["id"]);
+  });
+
   it("treats an explicit null member as present", () => {
     // A hand-written ``raw:`` parses to null; the key exists, so the
     // protocol is selected (only undefined means cleared/absent).

@@ -80,14 +80,19 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
   // data-no-value-sync: the select's value is derived (which member is
   // present), not a YAML path, so the form syncs it via the selected
   // option rather than a path lookup.
+  // Give the select an accessible name: associate the visible label via
+  // aria-labelledby (string-attribute form) so screen readers announce
+  // "Type" with the combobox.
+  const labelId = `exclusive-group-${members[0].key}`;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(selected ? [selected.key] : [])}>
-      <label class="field-label">
+      <label class="field-label" id=${labelId}>
         ${ctx.localize("device.exclusive_group_label")}
         <span class="required">*</span>
       </label>
       <wa-select
         data-no-value-sync
+        aria-labelledby=${labelId}
         ?disabled=${disabled}
         @change=${(e: Event) => {
           const value = (e.target as unknown as { value: string }).value;
