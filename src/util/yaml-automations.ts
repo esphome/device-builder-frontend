@@ -257,7 +257,9 @@ function _findBlockEnd(lines: string[], startIdx: number, indent: number): numbe
     if (trimmed === "" || trimmed.startsWith("#")) continue;
     const lineIndent = (lines[j].match(/^(\s*)/) ?? ["", ""])[1].length;
     if (lineIndent < indent) return j;
-    if (lineIndent === indent && !/^\s*-\s/.test(lines[j])) return j;
+    // A bare ``-`` (value on the next line) is still a list item, so
+    // match end-of-line too — mirrors ``LIST_ITEM_START_RE``.
+    if (lineIndent === indent && !/^\s*-(\s|$)/.test(lines[j])) return j;
   }
   return lines.length;
 }
