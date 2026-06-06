@@ -54,11 +54,12 @@ export class ESPHomeSecretReveal extends LitElement {
   private _token = 0;
 
   protected willUpdate(changed: PropertyValues): void {
+    // Re-mask and invalidate any in-flight resolve when the target changes.
     if (changed.has("value") || changed.has("resolve") || changed.has("resetKey")) {
       this._revealed = false;
       this._resolved = undefined;
       this._busy = false;
-      this._token++; // invalidate any resolve in flight for the previous target
+      this._token++;
     }
   }
 
@@ -129,15 +130,13 @@ export class ESPHomeSecretReveal extends LitElement {
     this._busy = true;
     try {
       const value = await this.resolve();
-      if (token !== this._token) return null; // target changed mid-flight — drop it
-      // `null` = absent or a swallowed failure — don't cache, so the next click
-      // can re-fetch (the resolver surfaces its own error toast). Only cache a
-      // genuine value (an empty string is a legitimate value to cache).
+      if (token !== this._token) return null; // target changed mid-flight
+      // Don't cache an absent/failed (null) resolve, so a later click retries.
       if (value === null) return null;
       this._resolved = value;
       return value;
     } catch {
-      return null; // resolver threw; leave uncached so a retry can re-fetch
+      return null; // leave uncached so a retry can re-fetch
     } finally {
       if (token === this._token) this._busy = false;
     }
@@ -149,12 +148,11 @@ export class ESPHomeSecretReveal extends LitElement {
       return;
     }
     if (this._value !== undefined) {
-      this._revealed = true; // known value — reveal immediately
+      this._revealed = true;
       return;
     }
     void this._ensureValue().then((value) => {
-      // null = failed or stale (target changed) — leave it masked.
-      if (value !== null) this._revealed = true;
+      if (value !== null) this._revealed = true; // null = failed/stale → stay masked
     });
   };
 

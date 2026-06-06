@@ -202,7 +202,7 @@ export class ESPHomeSecurityNotice extends LitElement {
       if (l.trim() === "" || l.trimStart().startsWith("#")) continue;
       if (TOP_LEVEL_KEY_START_RE.test(l)) break; // next top-level section
       const indent = l.length - l.trimStart().length;
-      if (childIndent === null) childIndent = indent; // first child sets the level
+      if (childIndent === null) childIndent = indent;
       if (indent < childIndent) break; // dedent — left this block (e.g. next list item)
       if (indent !== childIndent) continue; // deeper-nested key, not a direct child
       if (marker.test(l.trimStart())) return true;
@@ -238,8 +238,6 @@ export class ESPHomeSecurityNotice extends LitElement {
           composed: true,
         })
       );
-      // The values are now in secrets.yaml + the draft; the user can reveal them
-      // inline from the field's secret picker.
       toast.success(this._localize("device.security_applied"), { richColors: true });
     } catch (err) {
       // ensureSecretInYaml aborts (throws) on a read failure rather than
