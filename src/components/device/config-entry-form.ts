@@ -40,7 +40,11 @@ import {
   subscribePinRegistryModes,
 } from "../../util/pin-registry-modes-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
+import {
+  _isStructuralType,
+  filterRenderable,
+  renderFilterOptions,
+} from "./config-entry-render-filter.js";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
 import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";
@@ -237,13 +241,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _filterRenderable = (
     entries: ConfigEntry[],
     values: Record<string, unknown>
-  ): ConfigEntry[] =>
-    filterRenderable(entries, values, {
-      requiredOnly: this.requiredOnly,
-      showAdvanced: this.showAdvanced,
-      presentComponents: this.presentComponents,
-      targetPlatform: this.board?.esphome.platform ?? null,
-    });
+  ): ConfigEntry[] => filterRenderable(entries, values, renderFilterOptions(this));
 
   protected render() {
     const ctx = this._buildCtx();

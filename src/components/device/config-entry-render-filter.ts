@@ -21,6 +21,7 @@
  * locally.
  */
 
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
@@ -81,6 +82,31 @@ export interface RenderFilterOptions {
    * add-component dialog when no board is selected yet.
    */
   targetPlatform?: string | null;
+}
+
+/** The form-level inputs to ``filterRenderable``. Both the form element
+ *  and a ``RenderCtx`` satisfy this structurally, so the options object is
+ *  built in one place and can't drift between the two call sites. */
+export interface RenderFilterSource {
+  requiredOnly: boolean;
+  showAdvanced: boolean;
+  presentComponents: Set<string>;
+  board: BoardCatalogEntry | null;
+}
+
+/** Build ``RenderFilterOptions`` from a *source*, with optional overrides
+ *  (the exclusive-group dropdown forces ``showAdvanced``). */
+export function renderFilterOptions(
+  source: RenderFilterSource,
+  overrides: Partial<RenderFilterOptions> = {}
+): RenderFilterOptions {
+  return {
+    requiredOnly: source.requiredOnly,
+    showAdvanced: source.showAdvanced,
+    presentComponents: source.presentComponents,
+    targetPlatform: source.board?.esphome.platform ?? null,
+    ...overrides,
+  };
 }
 
 /**

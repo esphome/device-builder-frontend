@@ -23,7 +23,7 @@ import {
   recommendedSecretKeys,
 } from "../../util/secret-eligibility.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
-import { filterRenderable } from "./config-entry-render-filter.js";
+import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
 import type { PasswordInputValueChange } from "./password-input.js";
 // Type-only — the `<esphome-secret-picker>` element is registered by the
@@ -479,12 +479,11 @@ export function renderChildEntries(
 ) {
   const values = ctx.scopeValues(path);
   const children = opts.includeAdvanced
-    ? filterRenderable(entry.config_entries ?? [], values, {
-        requiredOnly: ctx.requiredOnly,
-        showAdvanced: true,
-        presentComponents: ctx.presentComponents,
-        targetPlatform: ctx.board?.esphome.platform ?? null,
-      })
+    ? filterRenderable(
+        entry.config_entries ?? [],
+        values,
+        renderFilterOptions(ctx, { showAdvanced: true })
+      )
     : ctx.filterRenderable(entry.config_entries ?? [], values);
   return children.map((child) => ctx.renderEntry(child, [...path, child.key]));
 }
