@@ -3,6 +3,7 @@ import { mdiContentSave, mdiEye, mdiEyeOff } from "@mdi/js";
 import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
+import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
@@ -307,7 +308,9 @@ export class ESPHomePageSecrets extends LitElement {
     // sequence the device editor fixed under issue #436.
     let saved = true;
     // Backend rejection detail (e.g. the secrets.yaml parse error with
-    // line/column) so the failure toast can name what's wrong.
+    // line/column) so the failure toast can name what's wrong. Read the
+    // structured APIError.details, not Error.message, which is prefixed
+    // with the internal error_code.
     let errorDetail = "";
     try {
       await this._api.updateConfig(SECRETS_FILE, this._yaml);
@@ -320,7 +323,7 @@ export class ESPHomePageSecrets extends LitElement {
       if (!msg.includes("timed out")) {
         saved = false;
         this._savedYaml = previousSaved;
-        errorDetail = msg;
+        errorDetail = apiErrorDetails(e);
       }
     } finally {
       this._saving = false;

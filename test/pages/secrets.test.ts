@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import toast from "sonner-js";
 
+import { APIError } from "../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { ESPHomePageSecrets } from "../../src/pages/secrets.js";
 import {
@@ -164,7 +165,7 @@ describe("esphome-page-secrets save toast ordering", () => {
     expect(page._savedYaml).toBe("wifi_password: old\n");
   });
 
-  test("_save() surfaces the backend rejection message in the error toast", async () => {
+  test("_save() surfaces the backend rejection detail without the error_code prefix", async () => {
     vi.mocked(toast.success).mockClear();
     vi.mocked(toast.error).mockClear();
     const page = makePage({
@@ -174,8 +175,10 @@ describe("esphome-page-secrets save toast ordering", () => {
     });
     const detail =
       "refusing to save invalid secrets.yaml: could not find expected ':' at line 2, column 1";
+    // Real updateConfig() failures are APIError, whose user-facing text
+    // lives in .details while .message carries the internal error_code.
     page._api = {
-      updateConfig: vi.fn().mockRejectedValue(new Error(detail)),
+      updateConfig: vi.fn().mockRejectedValue(new APIError("invalid_request", detail)),
     } as unknown as ESPHomeAPI;
 
     await page._save();
@@ -183,6 +186,7 @@ describe("esphome-page-secrets save toast ordering", () => {
     expect(toast.error).toHaveBeenCalledTimes(1);
     const [message] = vi.mocked(toast.error).mock.calls[0];
     expect(message).toContain(detail);
+    expect(message).not.toContain("invalid_request");
   });
 
   test("_save() toasts success and fires secrets-saved only after the write resolves", async () => {
