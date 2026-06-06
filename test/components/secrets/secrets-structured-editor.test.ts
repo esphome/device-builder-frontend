@@ -168,6 +168,21 @@ describe("esphome-secrets-structured-editor", () => {
     expect(view._addOpen).toBe(false);
   });
 
+  test("a synchronous double confirm adds the secret only once", async () => {
+    const el = await mount("wifi_ssid: home\n");
+    const view = el as unknown as AddView;
+    const seen: string[] = [];
+    el.addEventListener("yaml-change", (e) =>
+      seen.push((e as CustomEvent<{ value: string }>).detail.value)
+    );
+    view._openAdd();
+    view._addName = "api_key";
+    view._addValue = "abc";
+    view._confirmAdd();
+    view._confirmAdd(); // second sync dispatch must bail on the one-shot guard
+    expect(seen).toEqual(["wifi_ssid: home\napi_key: abc\n"]);
+  });
+
   test("Enter with a duplicate name shows the error and adds nothing", async () => {
     const el = await mount("wifi_ssid: home\n");
     const captured = onChange(el);

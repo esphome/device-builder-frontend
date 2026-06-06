@@ -349,6 +349,11 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
   // Create the secret in one shot from the dialog fields, prefixing the key
   // with ``<device>__`` when a device was chosen so it lands in that group.
   private _confirmAdd = () => {
+    // One-shot: honor confirmOnEnter's "self-guard against repeat" contract.
+    // On success _addOpen flips false, so a synchronous second dispatch bails
+    // here before it can double-add against the still-stale this.value. The
+    // error path leaves _addOpen true so the user can resubmit after fixing.
+    if (!this._addOpen) return;
     const error = this._addKeyError();
     if (error) {
       this._addError = error;

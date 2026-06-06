@@ -141,7 +141,12 @@ export class ESPHomeBaseDialog extends LitElement {
    *  :class:`EnterController` already skips Enter on
    *  buttons/links/textareas/selects and mid-IME composition. The callback
    *  must self-guard against repeat/invalid — a held Enter can re-fire until
-   *  ``open`` flips false. */
+   *  ``open`` flips false.
+   *
+   *  Don't set this on a dialog that opens a *nested* dialog while it stays
+   *  open: the listener is window-level and the controllers claim Enter in
+   *  open order, not z-order, so a stacked inner dialog wouldn't reliably win
+   *  the Enter (see :class:`EnterController`). */
   @property({ attribute: false }) confirmOnEnter?: () => void;
 
   /** Whether a consumer has slotted footer content. Gates the
