@@ -157,7 +157,12 @@ describe("esphome-secrets-structured-editor", () => {
     view._addValue = "abc";
     // A plain Enter from a neutral element bubbles to the window listener.
     document.body.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true })
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      })
     );
     expect(captured.value).toBe("wifi_ssid: home\napi_key: abc\n");
     expect(view._addOpen).toBe(false);
@@ -173,7 +178,12 @@ describe("esphome-secrets-structured-editor", () => {
     await (dialog as unknown as { updateComplete: Promise<unknown> }).updateComplete;
     view._addName = "wifi_ssid";
     document.body.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true })
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      })
     );
     expect(captured.value).toBeNull();
     expect(view._addOpen).toBe(true);

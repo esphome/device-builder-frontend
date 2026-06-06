@@ -28,7 +28,12 @@ afterEach(() => {
 
 function pressEnter(): void {
   document.body.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true })
+    new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    })
   );
 }
 
