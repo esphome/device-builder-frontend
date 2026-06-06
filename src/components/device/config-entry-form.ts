@@ -55,6 +55,7 @@ import {
   fieldRendererStyles,
   labelFor,
   renderBooleanField,
+  renderExclusiveGroupField,
   renderFloatWithUnitField,
   renderIconField,
   renderIdReferenceField,
@@ -246,13 +247,28 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   protected render() {
     const ctx = this._buildCtx();
-    const visible = this._filterRenderable(this.entries, this.values);
+    // Pull mutually-exclusive entries (backend ``exclusive_group``, e.g.
+    // remote_receiver protocols) out of the normal flow: they render as
+    // one pick-one dropdown that always shows, independent of the
+    // advanced toggle the rest of the fields obey.
+    const exclusiveGroups = new Map<string, ConfigEntry[]>();
+    for (const entry of this.entries) {
+      if (entry.exclusive_group) {
+        const group = exclusiveGroups.get(entry.exclusive_group) ?? [];
+        group.push(entry);
+        exclusiveGroups.set(entry.exclusive_group, group);
+      }
+    }
+    const rest = this.entries.filter((entry) => !entry.exclusive_group);
+    const visible = this._filterRenderable(rest, this.values);
     // An empty key means "this entry IS the whole values dict" —
     // used by top-level user-keyed sections (substitutions:) where
     // the component itself is the map. Pass ``[]`` so the entry's
     // renderer sees the values dict directly via ``ctx.getAt([])``.
     return html`${visible.map((entry) =>
       this._renderEntry(entry, entry.key ? [entry.key] : [], ctx)
+    )}${[...exclusiveGroups.values()].map((members) =>
+      renderExclusiveGroupField(members, ctx)
     )}`;
   }
 

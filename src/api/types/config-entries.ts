@@ -111,6 +111,12 @@ export interface ConfigEntry {
   multi_value: boolean;
   /** When True accepts either a literal value OR a !lambda block. */
   templatable: boolean;
+  /**
+   * Sibling entries sharing a non-null value are mutually exclusive:
+   * exactly one may be set (e.g. a remote_receiver binary_sensor's
+   * protocol). The form renders them as one pick-one dropdown.
+   */
+  exclusive_group?: string | null;
 
   // === featured-component overlays ===
   /**
