@@ -511,7 +511,7 @@
     "create_new_desc": "A guided process to get you started with a starter kit or any other ESP boards",
     "advanced_options": "Advanced set up options",
     "import_file": "Import from file",
-    "import_file_desc": "Use an existing ESPHome configuration (.yaml) or a bundle (.tar.gz).",
+    "import_file_desc": "Use an existing ESPHome configuration (.yaml) or a bundle.",
     "empty_config": "Empty Configuration",
     "empty_config_desc": "For manually writing or pasting a configuration.",
     "drop_yaml": "You can also drag and drop a .yaml file or a bundle here",

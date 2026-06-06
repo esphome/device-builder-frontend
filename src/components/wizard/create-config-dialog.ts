@@ -450,6 +450,10 @@ export class ESPHomeCreateConfigDialog extends LitElement {
    *  confirm re-enters here with the chosen `overwrite` paths (the cached
    *  base64 is reused so the file isn't re-read). */
   private async _importBundleFlow(overwrite?: string[]): Promise<void> {
+    // The resolve-conflicts step re-enters here directly, bypassing
+    // _createImportedDevice's guard, so a double-click on Import would
+    // otherwise fire two parallel import_bundle commands.
+    if (this._submitting) return;
     if (!this._importFile) return;
     this._resetCreateErrors();
 

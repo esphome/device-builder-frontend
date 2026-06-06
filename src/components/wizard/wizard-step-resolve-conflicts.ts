@@ -90,17 +90,21 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
       <p class="intro">${this._localize("wizard.import_bundle_conflicts_desc")}</p>
 
       <div class="files">
-        ${this.conflicts.map((path) => {
+        ${this.conflicts.map((path, i) => {
+          // Index-based id: a tar path can contain spaces or other
+          // characters that aren't valid in an HTML id, which would
+          // break the label-to-input association.
+          const id = `cf-${i}`;
           const overwrite = this._overwrite.has(path);
           return html`
             <div class="file-row">
               <input
-                id=${`cf-${path}`}
+                id=${id}
                 type="checkbox"
                 .checked=${overwrite}
                 @change=${() => this._toggle(path)}
               />
-              <label for=${`cf-${path}`}>${path}</label>
+              <label for=${id}>${path}</label>
               <span class="state">
                 ${overwrite
                   ? this._localize("wizard.import_bundle_overwrite")

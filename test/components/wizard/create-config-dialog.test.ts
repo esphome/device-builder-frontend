@@ -267,4 +267,30 @@ describe("create-config-dialog bundle import", () => {
     // Same cached bytes re-sent; the file isn't re-read.
     expect(secondArg.file_content_b64).toBe(firstB64);
   });
+
+  it("ignores a second Import click while a resolve submit is in flight", async () => {
+    const inflight = deferred<{ status: string }>();
+    const importBundle = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: "conflicts",
+        configuration: "device.yaml",
+        conflicts: ["device.yaml"],
+        has_secrets: false,
+        esphome_version: "2026.6.0",
+      })
+      .mockReturnValueOnce(inflight.promise);
+    const el = await mount({ importBundle });
+
+    emitImport(el, bundleFile());
+    await flush();
+    await el.updateComplete;
+
+    emitResolve(el, ["device.yaml"]);
+    emitResolve(el, ["device.yaml"]); // double-click while first is in flight
+    await flush();
+
+    // Initial conflicts call + one resolve call; the double-click is dropped.
+    expect(importBundle).toHaveBeenCalledTimes(2);
+  });
 });
