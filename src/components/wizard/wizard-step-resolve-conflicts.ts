@@ -3,6 +3,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 
 /** Lets the user choose which bundle files overwrite the ones already on
@@ -26,6 +27,7 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
 
   static styles = [
     espHomeStyles,
+    dialogActionButtonStyles,
     css`
       :host {
         display: block;
@@ -80,32 +82,6 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
         justify-content: flex-end;
         gap: var(--wa-space-s);
       }
-
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 0 14px;
-        height: 36px;
-        box-sizing: border-box;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        border-radius: var(--wa-border-radius-m);
-        cursor: pointer;
-        border: var(--wa-border-width-s) solid transparent;
-      }
-
-      .btn-cancel {
-        background: var(--wa-color-surface-raised);
-        border-color: var(--wa-color-surface-border);
-        color: var(--wa-color-text-normal);
-      }
-
-      .btn-next {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
     `,
   ];
 
@@ -142,10 +118,10 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
         : nothing}
 
       <div class="actions">
-        <button class="btn btn-cancel" @click=${this._cancel}>
+        <button class="btn btn--cancel" @click=${this._cancel}>
           ${this._localize("wizard.cancel")}
         </button>
-        <button class="btn btn-next" @click=${this._confirm}>
+        <button class="btn btn--primary" @click=${this._confirm}>
           ${this._localize("wizard.import_bundle_button")}
         </button>
       </div>
