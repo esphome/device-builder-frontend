@@ -28,8 +28,9 @@ import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, localizeContext } from "../../context/index.js";
+import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { type ValidationError } from "../../util/config-validation.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
@@ -72,6 +73,7 @@ import {
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
 import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
 import "./password-input.js";
+import "./secret-picker.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
@@ -99,6 +101,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @consume({ context: apiContext, subscribe: true })
   @state()
   private _api?: ESPHomeAPI;
+
+  /** Configured devices — resolves this device's backend node name (the
+   *  hostname for per-device secret keys) from ``configuration``. */
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  private _devices: ConfiguredDevice[] = [];
 
   private _unsubPinRegistryModes?: () => void;
   private _pinRegistryModesKicked = false;
@@ -157,6 +165,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  preview, etc.). */
   @property({ attribute: "section-key" })
   sectionKey = "";
+
+  /** Device configuration id being edited; used to resolve the device's
+   *  backend node name for per-device secret keys. Empty outside a device
+   *  context (the add-component preview). */
+  @property()
+  configuration = "";
 
   /** Top-level component keys present in the YAML — drives the
    *  `depends_on_component` visibility predicate. */
@@ -577,6 +591,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
       yaml: this.yaml,
       fromLine: this.fromLine,
       sectionKey: this.sectionKey,
+      deviceName: this.configuration
+        ? (this._devices.find((d) => d.configuration === this.configuration)?.name ?? "")
+        : "",
       board: this.board,
       pinRegistryModes: getCachedPinRegistryModes(),
       requiredOnly: this.requiredOnly,

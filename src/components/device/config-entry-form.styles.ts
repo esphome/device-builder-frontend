@@ -48,8 +48,29 @@ export const configEntryFormStyles = css`
 
   .field-description + input,
   .field-description + textarea,
-  .field-description + wa-select {
+  .field-description + wa-select,
+  /* Secret-eligible fields wrap the control in .field-input-row, or replace
+     it with the picker in secret mode — keep the same post-description gap. */
+  .field-description + .field-input-row,
+  .field-description + esphome-secret-picker {
     margin-top: 8px;
+  }
+
+  /* Stacks a string/password input above its inline secret picker (only
+     emitted for secret-eligible fields with a literal value). Stacked, not
+     side-by-side, so the input keeps full width — a side-by-side picker
+     squeezes the input and its value collides with the password reveal eye. */
+  .field-input-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--wa-space-2xs);
+  }
+
+  .field-input-row > input,
+  .field-input-row > esphome-password-input {
+    align-self: stretch;
+    min-width: 0;
   }
 
   /* Hint shown below a string/password input when the value is a

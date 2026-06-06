@@ -18,9 +18,18 @@ import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
+import {
+  isSecretEligible,
+  recommendedSecretKeys,
+} from "../../util/secret-eligibility.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
 import type { PasswordInputValueChange } from "./password-input.js";
+// Type-only — the `<esphome-secret-picker>` element is registered by the
+// form host (`config-entry-form.ts`). Keeping this module free of the
+// element's DOM-dependent side-effect import lets the renderer unit tests
+// run under the lightweight node environment.
+import type { SecretSelectedDetail } from "./secret-picker.js";
 
 /** Stylesheets every element that hosts ``ctx.renderEntry`` output
  *  needs in its shadow root: field shell, input styling, and the
@@ -71,6 +80,11 @@ export const parseFieldKey = (attr: string): string[] => {
  *  values that point at the secrets store. */
 const SECRET_REF_RE = /^!secret\s+(\S+)\s*$/;
 
+/** The key a `!secret <key>` value points at, or ``null`` if not a ref. */
+export function secretRefKey(value: string): string | null {
+  return value.match(SECRET_REF_RE)?.[1] ?? null;
+}
+
 /** Render a small "Using stored secret: <name>" hint when the value
  *  is a `!secret <key>` reference. Returns `nothing` otherwise so
  *  callers can drop it inline without conditional wrapping. */
@@ -95,6 +109,11 @@ export interface RenderCtx {
    *  scope its picker against ``applies_to`` so a sensor's filter
    *  dropdown doesn't offer binary_sensor filters. */
   sectionKey: string;
+  /** Backend-resolved ESPHome node name (substitutions already expanded) for
+   *  the device being edited; the hostname for per-device secret keys
+   *  (``<hostname>__ota_password``). Empty outside a device context (e.g. the
+   *  add-component preview). */
+  deviceName?: string;
   board: BoardCatalogEntry | null;
   /** ``{provider_key: [allowed_mode_flags]}`` scoping the long-form pin Mode
    *  checkboxes per external provider; absent provider / native pin → all flags. */
@@ -299,6 +318,45 @@ export function renderStringField(
   const invalid = ctx.errorAt(path) !== null;
   const placeholder = String(entry.default_value ?? "");
   const disabled = effectiveDisabled(entry, ctx);
+  // Inline `!secret` picker for concealed fields (password inputs) plus
+  // the non-concealed exceptions in the allowlist (WiFi SSID).
+  const secretEligible =
+    inputType === "password" || isSecretEligible(ctx.sectionKey, entry.key);
+  const selectedKey = secretRefKey(value);
+  // When the field references a secret, the picker IS the field: hide the
+  // (meaningless, masked) manual input and let the picker span the row.
+  // The user reverts to a typed value via the picker's "manual" action.
+  const secretMode = secretEligible && selectedKey !== null;
+  const recommendedKeys = secretEligible
+    ? recommendedSecretKeys(
+        ctx.sectionKey,
+        entry.key,
+        ctx.deviceName ?? "",
+        inputType === "password"
+      )
+    : [];
+  const secretPicker = secretEligible
+    ? html`<esphome-secret-picker
+        ?full=${secretMode}
+        .disabled=${disabled}
+        .fieldLabel=${labelFor(entry, ctx)}
+        .selectedKey=${selectedKey ?? ""}
+        .value=${value}
+        .recommendedKeys=${recommendedKeys}
+        @secret-selected=${(e: CustomEvent<SecretSelectedDetail>) =>
+          ctx.emitChange(path, e.detail.value)}
+      ></esphome-secret-picker>`
+    : nothing;
+  // Wrap an input with the picker beside it, or swap it out entirely in
+  // secret mode. Plain input when the field isn't secret-eligible.
+  const withPicker = (input: unknown) =>
+    !secretEligible
+      ? input
+      : secretMode
+        ? secretPicker
+        : html`<div class="field-input-row">${input}${secretPicker}</div>`;
+  // Picker doubles as the secret indicator; only the no-picker path hints.
+  const secretHint = secretPicker === nothing ? renderSecretHint(value, ctx) : nothing;
   // When the entry carries a closed list of `suggestions`, render a
   // strict <wa-select> regardless of the underlying inputType — used
   // by featured components to pin the field to one of a few values
@@ -310,33 +368,33 @@ export function renderStringField(
   // reveal/hide toggle. Keeping the show-state inside the component
   // means the form's re-renders don't blow it away.
   if (inputType === "password") {
+    const passwordInput = html`<esphome-password-input
+      .value=${value}
+      .invalid=${invalid}
+      .disabled=${disabled}
+      .placeholder=${placeholder}
+      @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) =>
+        ctx.emitChange(path, e.detail.value)}
+    ></esphome-password-input>`;
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
-        ${renderLabel(entry, ctx)}
-        <esphome-password-input
-          .value=${value}
-          .invalid=${invalid}
-          .disabled=${disabled}
-          .placeholder=${placeholder}
-          @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) =>
-            ctx.emitChange(path, e.detail.value)}
-        ></esphome-password-input>
-        ${renderSecretHint(value, ctx)} ${renderFieldError(path, ctx)}
+        ${renderLabel(entry, ctx)} ${withPicker(passwordInput)} ${secretHint}
+        ${renderFieldError(path, ctx)}
       </div>
     `;
   }
+  const textInput = html`<input
+    type=${inputType}
+    class=${invalid ? "invalid" : ""}
+    .value=${value}
+    ?disabled=${disabled}
+    placeholder=${placeholder}
+    @input=${(e: Event) => ctx.emitChange(path, (e.target as HTMLInputElement).value)}
+  />`;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)}
-      <input
-        type=${inputType}
-        class=${invalid ? "invalid" : ""}
-        .value=${value}
-        ?disabled=${disabled}
-        placeholder=${placeholder}
-        @input=${(e: Event) => ctx.emitChange(path, (e.target as HTMLInputElement).value)}
-      />
-      ${renderSecretHint(value, ctx)} ${renderFieldError(path, ctx)}
+      ${renderLabel(entry, ctx)} ${withPicker(textInput)} ${secretHint}
+      ${renderFieldError(path, ctx)}
     </div>
   `;
 }

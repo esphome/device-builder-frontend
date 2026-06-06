@@ -1,0 +1,107 @@
+import { unescapeYamlDoubleQuoted } from "./yaml-escape.js";
+import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
+
+/**
+ * Fields whose secret is shared across every device — the WiFi credentials —
+ * use a fixed, non-scoped key. This doubles as the picker-eligibility
+ * allowlist for non-concealed fields (WiFi SSID is plain text, so it isn't
+ * caught by the renderer's password-input check). Keyed by ``sectionKey``
+ * then ``entry.key``.
+ */
+const SHARED: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  wifi: { ssid: "wifi_ssid", password: "wifi_password" },
+};
+
+/** Per-device base names for the well-known credential fields, joined to the
+ *  hostname as ``<hostname>__<base>``. Keyed by ``sectionKey`` then key. */
+const DEVICE_BASE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  ota: { password: "ota_password" },
+  api: { key: "encryption_key" },
+};
+
+/** True when a non-concealed *key* under *sectionKey* still wants the picker. */
+export function isSecretEligible(sectionKey: string, key: string): boolean {
+  return SHARED[sectionKey]?.[key] !== undefined;
+}
+
+/** Lowercase + collapse anything outside ``[a-z0-9_]`` so a hostname or
+ *  field name is safe to embed in a secret key. */
+function slug(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/** Per-device key forms, most-preferred first. A double underscore joins the
+ *  hostname and base so a device name that itself contains an underscore
+ *  (``my_device``) stays unambiguous; the single-underscore form is kept too
+ *  so secrets created before this convention still surface as recommended. */
+function scoped(host: string, base: string): string[] {
+  return [`${host}__${base}`, `${host}_${base}`];
+}
+
+/**
+ * Recommended ``secrets.yaml`` key names for a field, most-preferred first.
+ * Used to surface a "Recommended" group at the top of the picker and as the
+ * target when migrating an inline value into a secret. ``[]`` when nothing
+ * sensible can be recommended (no hostname for a per-device field).
+ *
+ * - WiFi SSID / password → the shared ``wifi_ssid`` / ``wifi_password``.
+ * - Known per-device fields → ``<hostname>__ota_password`` /
+ *   ``<hostname>__encryption_key`` (plus the single-underscore back-compat
+ *   form).
+ * - Any other concealed field → ``<hostname>__<section>_<key>``.
+ *
+ * *hostname* is the backend-resolved ESPHome node name (substitutions already
+ * expanded), threaded through the render context.
+ */
+export function recommendedSecretKeys(
+  sectionKey: string,
+  key: string,
+  hostname: string,
+  concealed: boolean
+): string[] {
+  const shared = SHARED[sectionKey]?.[key];
+  if (shared) return [shared];
+
+  const host = slug(hostname);
+  if (!host) return [];
+
+  const base = DEVICE_BASE[sectionKey]?.[key];
+  if (base) return scoped(host, base);
+
+  // Generic per-device fallback for any other concealed credential field.
+  if (concealed) {
+    const tail = slug(`${sectionKey}_${key}`);
+    return tail ? scoped(host, tail) : [];
+  }
+  return [];
+}
+
+/** The literal value of a top-level ``key`` in a flat ``secrets.yaml``, or
+ *  ``null`` when the key isn't found. Used to inline a secret's value back
+ *  into a field when the user reverts to a manually typed value. */
+export function secretValueFromYaml(yaml: string, key: string): string | null {
+  for (const line of yaml.split("\n")) {
+    // Top-level `key: value` only — skip indentation, blanks, and comments.
+    if (!line || line[0] === " " || line[0] === "\t" || line[0] === "#") continue;
+    // The mapping separator is the first `:` followed by whitespace or EOL,
+    // so a key (or value) that itself contains a colon doesn't mis-match.
+    const colon = line.search(/:(\s|$)/);
+    if (colon < 0 || line.slice(0, colon).trim() !== key) continue;
+    const rhs = splitInlineComment(line.slice(colon + 1)).value.trim();
+    // A double-quoted scalar (what `formatYamlScalar` emits when escaping) must
+    // be unescaped to invert the write — `parseScalar`/`stripQuotes` only slice
+    // the quotes, so a value containing `"` or `\` would otherwise round-trip
+    // corrupted (migrate → manual-revert).
+    if (rhs.length >= 2 && rhs.startsWith('"') && rhs.endsWith('"')) {
+      return unescapeYamlDoubleQuoted(rhs.slice(1, -1));
+    }
+    // Plain or single-quoted: strip quotes WITHOUT YAML type coercion — a
+    // secret is an opaque string, so a hand-written `ota_pw: yes` must stay
+    // "yes", not be coerced to "true" by parseScalar.
+    return stripQuotes(rhs);
+  }
+  return null;
+}
