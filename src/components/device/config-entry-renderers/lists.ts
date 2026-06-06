@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
@@ -100,13 +101,27 @@ export function renderMultiValueField(
   // back unchanged, rather than being rewritten on a no-op edit. Decoding
   // must stay unconditional too — a freshly added row is empty, so a typed
   // ``\U…`` has to decode without a prior escape-worthy value to gate on.
-  const items: string[] = raw.map((v) => escapeForInput(String(v)));
+  // INTEGER / FLOAT lists (modbus custom_command, sync_value, lcd user
+  // characters data, ...) get number inputs and coerce each item back to a
+  // number on edit, so the YAML serializer emits them unquoted; numeric
+  // items are plain stringified numbers and skip the glyph escaping above.
+  const numeric =
+    entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT;
+  const items: string[] = numeric
+    ? raw.map((v) => String(v ?? ""))
+    : raw.map((v) => escapeForInput(String(v)));
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => "");
   const updateAt = (idx: number, value: string) => {
     const current = [...readArrayAt(ctx, path)];
-    current[idx] = unescapeForInput(value);
+    // Empty stays "" so a half-typed or cleared row round-trips instead of
+    // becoming NaN, matching the single-value number renderer.
+    current[idx] = numeric
+      ? value === ""
+        ? ""
+        : Number(value)
+      : unescapeForInput(value);
     ctx.emitChange(path, current);
   };
 
@@ -117,7 +132,12 @@ export function renderMultiValueField(
         (item, i) => html`
           <div class="multi-row">
             <input
-              type="text"
+              type=${numeric ? "number" : "text"}
+              step=${numeric
+                ? entry.type === ConfigEntryType.FLOAT
+                  ? "any"
+                  : "1"
+                : nothing}
               class="multi-input ${invalid ? "invalid" : ""}"
               .value=${item}
               ?disabled=${disabled}
