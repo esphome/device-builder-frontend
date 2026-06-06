@@ -41,7 +41,6 @@ import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
 import {
   firstSelectableTarget,
-  selectableTargets,
   triggersForComponent,
 } from "./automation-editor/component-targets.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
@@ -232,19 +231,11 @@ export class ESPHomeAddAutomationDialog extends LitElement {
 
   private _renderComponentRow() {
     const devices = this._available?.devices ?? [];
-    // A multi-entity platform (``sensor: - platform: aht10``) is a
-    // non-selectable group header; its sub-entities (and plain instances)
-    // are the selectable rows. Picking the container would write entity
-    // triggers under the platform item, which is invalid.
-    const selectable = selectableTargets(devices);
-    if (selectable.length === 0) {
-      return html`<p class="error">
-        ${this._localize("device.automation_target_no_components")}
-      </p>`;
-    }
-    // Render order = the selectable rows top-to-bottom; drives roving
-    // tabindex and arrow-key navigation across the radiogroup.
-    const order = selectable.map((d) => d.id);
+    // Build the render plan in DOM order: a multi-entity platform
+    // (``sensor: - platform: aht10``) becomes a non-selectable group header
+    // followed by its sub-entity rows; plain (and orphan-sub) instances are
+    // standalone rows. ``order`` is the flat row sequence in render order, so
+    // roving tabindex and arrow-key nav always track the visible rows.
     const containerIds = new Set(
       devices.filter((d) => d.is_entity_container).map((d) => d.id)
     );
@@ -254,6 +245,30 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       const list = subsByParent.get(d.parent_id) ?? [];
       list.push(d);
       subsByParent.set(d.parent_id, list);
+    }
+    type Group = {
+      header: AvailableComponentInstance;
+      subs: AvailableComponentInstance[];
+    };
+    const plan: (AvailableComponentInstance | Group)[] = [];
+    const order: string[] = [];
+    for (const d of devices) {
+      if (d.is_entity_container) {
+        const subs = subsByParent.get(d.id) ?? [];
+        if (subs.length === 0) continue;
+        plan.push({ header: d, subs });
+        order.push(...subs.map((s) => s.id));
+      } else if (!(d.parent_id && containerIds.has(d.parent_id))) {
+        // A sub-entity whose container is present renders under it (above); an
+        // orphan (parent not in the list) falls through to a plain row.
+        plan.push(d);
+        order.push(d.id);
+      }
+    }
+    if (order.length === 0) {
+      return html`<p class="error">
+        ${this._localize("device.automation_target_no_components")}
+      </p>`;
     }
     return html`<div class="field">
       <label class="field-label" id="component-label">
@@ -265,27 +280,20 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         aria-labelledby="component-label"
         @keydown=${(e: KeyboardEvent) => this._onComponentListKeydown(e, order)}
       >
-        ${devices.map((d) => {
-          if (d.is_entity_container) {
-            const subs = subsByParent.get(d.id) ?? [];
-            if (subs.length === 0) return nothing;
-            const headerId = `component-group-${d.id}`;
-            return html`<div
-              class="component-group-wrap"
-              role="group"
-              aria-labelledby=${headerId}
-            >
-              <p class="component-group" id=${headerId}>
-                ${d.name ?? d.id}
-                <span class="component-group-id">(${d.component_id})</span>
-              </p>
-              ${subs.map((s) => this._renderComponentChoice(s, order))}
-            </div>`;
-          }
-          // A sub-entity whose container is present renders under it (above);
-          // an orphan (parent not in the list) falls through to a plain row.
-          if (d.parent_id && containerIds.has(d.parent_id)) return nothing;
-          return this._renderComponentChoice(d, order);
+        ${plan.map((item) => {
+          if (!("header" in item)) return this._renderComponentChoice(item, order);
+          const headerId = `component-group-${item.header.id}`;
+          return html`<div
+            class="component-group-wrap"
+            role="group"
+            aria-labelledby=${headerId}
+          >
+            <p class="component-group" id=${headerId}>
+              ${item.header.name ?? item.header.id}
+              <span class="component-group-id">(${item.header.component_id})</span>
+            </p>
+            ${item.subs.map((s) => this._renderComponentChoice(s, order))}
+          </div>`;
         })}
       </div>
     </div>`;
