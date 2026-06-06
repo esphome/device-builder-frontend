@@ -287,9 +287,15 @@ function _subEntity(
   if (headerIdx === -1) return null;
   let id: string | null = null;
   let name: string | undefined;
+  let subChildIndent = -1;
   for (let k = headerIdx + 1; k < lines.length; k++) {
     if (skip(lines[k])) continue;
-    if (lineIndent(lines[k]) <= childIndent) break; // end of the sub-block
+    const ind = lineIndent(lines[k]);
+    if (ind <= childIndent) break; // end of the sub-block
+    if (subChildIndent === -1) subChildIndent = ind; // the block's own field level
+    // Only the block's direct fields are its id/name; deeper lines are the
+    // handler body (a nested ``id:`` there must not retarget the automation).
+    if (ind !== subChildIndent) continue;
     id = readInstanceScalar(lines[k], "id") ?? id;
     name = readInstanceScalar(lines[k], "name") ?? name;
   }

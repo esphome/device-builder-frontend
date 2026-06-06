@@ -484,6 +484,28 @@ describe("parseYamlAutomations", () => {
     expect(items[0].parentKey).toBe("sensor");
   });
 
+  it("ignores a nested id: in the handler body when scoping a sub-entity", () => {
+    // A globals.set action inside the handler carries its own id: at a deeper
+    // indent; it must not retarget the automation away from the sub-sensor.
+    const yaml = `sensor:
+  - platform: aht10
+    id: aht20
+    temperature:
+      id: aht20_temperature
+      on_value:
+        then:
+          - globals.set:
+              id: some_global
+              value: "1"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe("aht20_temperature");
+    expect(items[0].key).toBe("automation:component_on:aht20_temperature:on_value");
+  });
+
   it("leaves a deeper non-sub-entity on_* unscoped", () => {
     // An on_* nested inside an action body (not an ided sub-block) must not
     // be mis-scoped to a sub-entity.
