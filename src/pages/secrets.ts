@@ -8,20 +8,25 @@ import {
   mdiViewSplitHorizontal,
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { withBase } from "../util/base-path.js";
+import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { UnsavedGuard } from "../util/unsaved-guard.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/secrets/secrets-structured-editor.js";
+import "../components/unsaved-changes-dialog.js";
 import "../components/yaml-editor.js";
 
 registerMdiIcons({
@@ -80,6 +85,15 @@ export class ESPHomePageSecrets extends LitElement {
 
   private _narrowMq: MediaQueryList | null = null;
 
+  @query("esphome-unsaved-changes-dialog")
+  private _unsavedDialog?: ESPHomeUnsavedChangesDialog;
+
+  private _unsavedGuard = new UnsavedGuard();
+
+  // Set true once the leave guard has cleared a navigation, so the
+  // synthetic popstate it triggers isn't re-intercepted.
+  private _allowingLeave = false;
+
   async connectedCallback() {
     super.connectedCallback();
     this._layout = this._readStoredLayout();
@@ -88,6 +102,9 @@ export class ESPHomePageSecrets extends LitElement {
       this._narrow = this._narrowMq.matches;
       this._narrowMq.addEventListener("change", this._onNarrowChange);
     }
+    setLeaveGuard(this._confirmLeave);
+    window.addEventListener("beforeunload", this._onBeforeUnload);
+    window.addEventListener("popstate", this._onPopState, { capture: true });
     window.addEventListener(
       "secrets-saved",
       this._onExternalSecretsSaved as EventListener
@@ -117,12 +134,68 @@ export class ESPHomePageSecrets extends LitElement {
 
   disconnectedCallback() {
     this._narrowMq?.removeEventListener("change", this._onNarrowChange);
+    setLeaveGuard(null);
+    window.removeEventListener("beforeunload", this._onBeforeUnload);
+    window.removeEventListener("popstate", this._onPopState, { capture: true });
+    this._unsavedGuard.cancelPending();
     window.removeEventListener(
       "secrets-saved",
       this._onExternalSecretsSaved as EventListener
     );
     super.disconnectedCallback();
   }
+
+  private get _isDirty(): boolean {
+    return this._yaml !== this._savedYaml;
+  }
+
+  // In-app navigation (nav links, header back arrow, command palette) runs
+  // this through ``runLeaveGuard``; prompt to save / discard when dirty.
+  private _confirmLeave = async (): Promise<boolean> => {
+    const ok = await this._unsavedGuard.run({
+      dirty: this._isDirty,
+      open: () => this._unsavedDialog?.open(),
+      save: async () => {
+        const saved = await this._save();
+        if (saved) this._allowingLeave = true;
+        return saved;
+      },
+    });
+    if (ok) this._allowingLeave = true;
+    return ok;
+  };
+
+  // Native tab / window close: a dirty buffer triggers the browser's own
+  // "leave site?" prompt (custom dialogs can't run here).
+  private _onBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (this._isDirty) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  };
+
+  // The browser back/forward buttons fire popstate straight at the router,
+  // bypassing ``navigate``; re-assert our URL and run the guard, then replay
+  // the back once the user has decided.
+  private _onPopState = (e: PopStateEvent) => {
+    if (this._allowingLeave) {
+      this._allowingLeave = false;
+      return;
+    }
+    if (!this._isDirty) return;
+    e.stopImmediatePropagation();
+    window.history.pushState({}, "", withBase("/secrets"));
+    void this._confirmLeave().then((canLeave) => {
+      if (canLeave) {
+        this._allowingLeave = true;
+        window.history.back();
+      }
+    });
+  };
+
+  private _onUnsavedDiscard = () => this._unsavedGuard.onDiscard();
+  private _onUnsavedSave = () => this._unsavedGuard.onSave();
+  private _onUnsavedCancel = () => this._unsavedGuard.onCancel();
 
   /** Pull `secrets.yaml` from the server and reset both buffers.
    *  On read error (file missing) seeds the editor with the
@@ -476,6 +549,13 @@ export class ESPHomePageSecrets extends LitElement {
             : html`<div class="loading"><wa-spinner></wa-spinner></div>`}
         </div>
       </div>
+      <esphome-unsaved-changes-dialog
+        heading=${this._localize("secrets.unsaved_title")}
+        message=${this._localize("secrets.unsaved_message")}
+        @discard=${this._onUnsavedDiscard}
+        @save=${this._onUnsavedSave}
+        @cancel=${this._onUnsavedCancel}
+      ></esphome-unsaved-changes-dialog>
     `;
   }
 
@@ -489,7 +569,9 @@ export class ESPHomePageSecrets extends LitElement {
     this._yaml = e.detail.value;
   };
 
-  private async _save() {
+  // Returns whether the save succeeded (timeout counts as success), so the
+  // leave guard can decide whether navigation may proceed.
+  private async _save(): Promise<boolean> {
     // Optimistic update: dirty-state UI flips back to "saved"
     // immediately so the Save button disables. Snapshot the
     // previous saved buffer first so a real (non-timeout)
@@ -538,12 +620,13 @@ export class ESPHomePageSecrets extends LitElement {
     }
     if (saved) {
       toast.success(this._localize("secrets.saved"), { richColors: true });
-      return;
+      return true;
     }
     const base = this._localize("secrets.save_error");
     toast.error(errorDetail ? `${base}: ${errorDetail}` : base, {
       richColors: true,
     });
+    return false;
   }
 }
 

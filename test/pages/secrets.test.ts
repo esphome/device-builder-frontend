@@ -33,7 +33,11 @@ interface PageView {
   _readStoredLayout(): "form" | "split" | "yaml";
   _setLayout(layout: "form" | "split" | "yaml"): void;
   _onYamlChange(e: CustomEvent<{ value: string }>): void;
-  _save(): Promise<void>;
+  _confirmLeave(): Promise<boolean>;
+  _onUnsavedSave(): void;
+  _onUnsavedDiscard(): void;
+  _onUnsavedCancel(): void;
+  _save(): Promise<boolean>;
   render(): unknown;
 }
 
@@ -347,5 +351,60 @@ describe("esphome-page-secrets layout persistence", () => {
       new CustomEvent("yaml-change", { detail: { value: "wifi_ssid: office\n" } })
     );
     expect(page._yaml).toBe("wifi_ssid: office\n");
+  });
+});
+
+describe("esphome-page-secrets unsaved-changes leave guard", () => {
+  function dirtyPage(): PageView {
+    return makePage({
+      _loaded: true,
+      _yaml: "wifi_ssid: new\n",
+      _savedYaml: "wifi_ssid: old\n",
+    });
+  }
+
+  test("a clean buffer leaves immediately without prompting", async () => {
+    const page = makePage({ _loaded: true, _yaml: "a: 1\n", _savedYaml: "a: 1\n" });
+    expect(await page._confirmLeave()).toBe(true);
+  });
+
+  test("Discard leaves without saving", async () => {
+    const page = dirtyPage();
+    page._api = { updateConfig: vi.fn() } as unknown as ESPHomeAPI;
+    const leaving = page._confirmLeave();
+    page._onUnsavedDiscard();
+    expect(await leaving).toBe(true);
+    expect(page._api.updateConfig).not.toHaveBeenCalled();
+  });
+
+  test("Cancel blocks navigation", async () => {
+    const page = dirtyPage();
+    const leaving = page._confirmLeave();
+    page._onUnsavedCancel();
+    expect(await leaving).toBe(false);
+  });
+
+  test("Save persists and then leaves", async () => {
+    const page = dirtyPage();
+    page._api = {
+      updateConfig: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ESPHomeAPI;
+    const leaving = page._confirmLeave();
+    page._onUnsavedSave();
+    expect(await leaving).toBe(true);
+    expect(page._api.updateConfig).toHaveBeenCalledWith(
+      "secrets.yaml",
+      "wifi_ssid: new\n"
+    );
+  });
+
+  test("a failed Save keeps the user on the page", async () => {
+    const page = dirtyPage();
+    page._api = {
+      updateConfig: vi.fn().mockRejectedValue(new Error("invalid secrets")),
+    } as unknown as ESPHomeAPI;
+    const leaving = page._confirmLeave();
+    page._onUnsavedSave();
+    expect(await leaving).toBe(false);
   });
 });
