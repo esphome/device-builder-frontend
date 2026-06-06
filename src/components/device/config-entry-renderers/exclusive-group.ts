@@ -58,11 +58,14 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
       isEntryVisible(m, rootValues, ctx.presentComponents, targetPlatform)
   );
 
-  // Scaffold {} only for an absent choice, so resolving a conflict (picking
-  // the member to keep) doesn't overwrite its existing values.
+  // Clear only the members actually present (avoids ~N redundant events and
+  // stray key: undefined state); scaffold {} only for an absent choice, so
+  // resolving a conflict doesn't overwrite the kept member's values.
   const onChange = (newKey: string) => {
     for (const m of members) {
-      if (m.key !== newKey) ctx.emitChange([m.key], undefined);
+      if (m.key !== newKey && ctx.getAt([m.key]) !== undefined) {
+        ctx.emitChange([m.key], undefined);
+      }
     }
     if (newKey && ctx.getAt([newKey]) === undefined) ctx.emitChange([newKey], {});
   };

@@ -61,6 +61,26 @@ describe("renderExclusiveGroupField", () => {
     expect(emitChange).toHaveBeenCalledWith(["nec"], {});
   });
 
+  it("clears only members that are present", () => {
+    // Switching must not emit undefined for absent members (avoids ~N
+    // redundant events and stray key: undefined state).
+    const emitChange = vi.fn();
+    const ms = [
+      ...members(),
+      makeEntry(ConfigEntryType.NESTED, { key: "jvc", exclusive_group: "g" }),
+    ];
+    const ctx = makeRenderCtx({ raw: { code: "x" } }, { overrides: { emitChange } });
+    const onChange = findElementBindings(
+      renderExclusiveGroupField(ms, ctx),
+      "wa-select"
+    )[0]["@change"] as (e: Event) => void;
+    onChange({ target: { value: "jvc" } } as never);
+
+    expect(emitChange).toHaveBeenCalledWith(["raw"], undefined); // present → cleared
+    expect(emitChange).not.toHaveBeenCalledWith(["nec"], undefined); // absent → untouched
+    expect(emitChange).toHaveBeenCalledWith(["jvc"], {}); // chosen → scaffolded
+  });
+
   it("preserves an existing member's values when switching to it", () => {
     // Conflict case (both set): picking the one to keep must clear only the
     // others, never overwrite the chosen member's config with {}.
