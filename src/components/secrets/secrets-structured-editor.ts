@@ -8,10 +8,13 @@ import { mdiAlertCircleOutline, mdiClose, mdiPlus } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { live } from "lit/directives/live.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { devicesContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
+import { modalDialogStyles } from "../../styles/modal-dialog.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { navigate } from "../../util/navigation.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   addSecret,
@@ -28,6 +31,7 @@ import type { PasswordInputValueChange } from "../device/password-input-event.js
 import { secretsStructuredEditorStyles } from "./secrets-structured-editor.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../base-dialog.js";
 import "../device/password-input.js";
 
 registerMdiIcons({
@@ -42,6 +46,10 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  private _devices: ConfiguredDevice[] = [];
+
   /** The secrets.yaml text — the single source of truth. */
   @property()
   value = "";
@@ -54,10 +62,28 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
   @state()
   private _keyError: { line: number; message: string } | null = null;
 
-  /** Set after Add so ``updated`` can focus the freshly-minted key input. */
-  private _focusKeyLine: number | null = null;
+  /** Add-secret dialog fields. ``target`` is "" for shared or a device name. */
+  @state()
+  private _addOpen = false;
 
-  static styles = [espHomeStyles, inputStyles, secretsStructuredEditorStyles];
+  @state()
+  private _addTarget = "";
+
+  @state()
+  private _addName = "";
+
+  @state()
+  private _addValue = "";
+
+  @state()
+  private _addError: string | null = null;
+
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    modalDialogStyles,
+    secretsStructuredEditorStyles,
+  ];
 
   protected render() {
     const entries = parseSecretsEntries(this.value);
@@ -76,22 +102,116 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
               ${entries.map((entry) => this._renderRow(entry, entries))}
             </div>`}
       <div class="add-row">
-        <button type="button" class="add-btn" @click=${() => this._add(entries)}>
+        <button type="button" class="add-btn" @click=${this._openAdd}>
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("secrets.add_secret")}
         </button>
       </div>
+      ${this._renderAddDialog()}
     `;
   }
 
   private _renderGroup(group: SecretGroup, entries: SecretEntry[]) {
-    const heading = group.device ?? this._localize("secrets.group_shared");
     return html`<div class="group">
-      <h2 class="group-header">${heading}</h2>
+      ${this._renderGroupHeader(group.device)}
       <div class="rows">
         ${group.entries.map((entry) => this._renderRow(entry, entries))}
       </div>
     </div>`;
+  }
+
+  private _renderGroupHeader(device: string | null) {
+    if (device === null) {
+      return html`<h2 class="group-header">
+        ${this._localize("secrets.group_shared")}
+      </h2>`;
+    }
+    const match = this._devices.find((d) => d.name === device);
+    if (!match) {
+      return html`<h2 class="group-header">${device}</h2>`;
+    }
+    // Resolve the device's editor route; intercept plain clicks so the SPA
+    // router handles it, leaving modifier-clicks for new tabs.
+    const href = `/device/${encodeURIComponent(match.configuration)}`;
+    return html`<h2 class="group-header">
+      <a
+        href=${href}
+        class="group-link"
+        title=${this._localize("secrets.open_device")}
+        @click=${(e: MouseEvent) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          void navigate(href);
+        }}
+        >${device}</a
+      >
+    </h2>`;
+  }
+
+  private _renderAddDialog() {
+    return html`<esphome-base-dialog
+      ?open=${this._addOpen}
+      .label=${this._localize("secrets.add_dialog_title")}
+      @request-close=${this._closeAdd}
+      @after-hide=${this._closeAdd}
+    >
+      <div class="body add-body">
+        <label class="add-field">
+          <span class="add-field-label"
+            >${this._localize("secrets.add_dialog_target")}</span
+          >
+          <select
+            class="add-select"
+            .value=${live(this._addTarget)}
+            @change=${(e: Event) =>
+              (this._addTarget = (e.target as HTMLSelectElement).value)}
+          >
+            <option value="">${this._localize("secrets.group_shared")}</option>
+            ${this._devices.map(
+              (d) => html`<option value=${d.name}>${d.friendly_name || d.name}</option>`
+            )}
+          </select>
+        </label>
+        <label class="add-field">
+          <span class="add-field-label"
+            >${this._localize("secrets.key_placeholder")}</span
+          >
+          <input
+            class="add-name ${this._addError ? "invalid" : ""}"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            .value=${live(this._addName)}
+            aria-invalid=${this._addError ? "true" : "false"}
+            @input=${(e: Event) => {
+              this._addName = (e.target as HTMLInputElement).value;
+              this._addError = null;
+            }}
+          />
+        </label>
+        <label class="add-field">
+          <span class="add-field-label"
+            >${this._localize("secrets.value_placeholder")}</span
+          >
+          <esphome-password-input
+            .value=${this._addValue}
+            @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) =>
+              (this._addValue = e.detail.value)}
+          ></esphome-password-input>
+        </label>
+        ${this._addError
+          ? html`<div class="key-error" role="alert">${this._addError}</div>`
+          : nothing}
+      </div>
+      <div class="actions">
+        <button class="btn btn--cancel" @click=${this._closeAdd}>
+          ${this._localize("layout.cancel")}
+        </button>
+        <button class="btn btn--add" @click=${this._confirmAdd}>
+          ${this._localize("secrets.add_secret")}
+        </button>
+      </div>
+    </esphome-base-dialog>`;
   }
 
   private _renderRow(entry: SecretEntry, entries: SecretEntry[]) {
@@ -114,8 +234,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     return html`<div class="row">
         <input
           type="text"
-          class="key-input ${keyInvalid ? "invalid" : ""}"
-          data-line=${entry.line}
+          class=${keyInvalid ? "invalid" : ""}
           .value=${live(entry.key)}
           autocomplete="off"
           spellcheck="false"
@@ -179,29 +298,34 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     this._emit(renameSecretKey(this.value, entry.line, newKey));
   }
 
-  private _add(entries: SecretEntry[]) {
-    const taken = new Set(entries.map((e) => e.key));
-    let key = "new_secret";
-    for (let n = 2; taken.has(key); n++) key = `new_secret_${n}`;
-    const next = addSecret(this.value, key, "");
-    // The appended entry is the last top-level key line; focus it so the
-    // user can rename the placeholder immediately.
-    const added = parseSecretsEntries(next);
-    this._focusKeyLine = added.length > 0 ? added[added.length - 1].line : null;
-    this._keyError = null;
-    this._emit(next);
-  }
+  private _openAdd = () => {
+    this._addTarget = "";
+    this._addName = "";
+    this._addValue = "";
+    this._addError = null;
+    this._addOpen = true;
+  };
 
-  protected updated() {
-    if (this._focusKeyLine === null) return;
-    const line = this._focusKeyLine;
-    this._focusKeyLine = null;
-    const input = this.renderRoot.querySelector<HTMLInputElement>(
-      `input.key-input[data-line="${line}"]`
-    );
-    input?.focus();
-    input?.select();
-  }
+  private _closeAdd = () => {
+    this._addOpen = false;
+  };
+
+  // Create the secret in one shot from the dialog fields, prefixing the key
+  // with ``<device>__`` when a device was chosen so it lands in that group.
+  private _confirmAdd = () => {
+    const name = this._addName.trim();
+    const key = (this._addTarget ? `${this._addTarget}__` : "") + name;
+    if (!isValidSecretKey(name)) {
+      this._addError = this._localize("secrets.invalid_key");
+      return;
+    }
+    if (parseSecretsEntries(this.value).some((entry) => entry.key === key)) {
+      this._addError = this._localize("secrets.duplicate_key");
+      return;
+    }
+    this._addOpen = false;
+    this._emit(addSecret(this.value, key, this._addValue));
+  };
 
   // A splice helper returns null when its target line no longer matches
   // (a stale index from a concurrent edit); skip rather than echo the

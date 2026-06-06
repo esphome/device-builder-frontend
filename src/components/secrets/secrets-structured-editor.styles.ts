@@ -29,6 +29,68 @@ export const secretsStructuredEditorStyles = css`
     padding-bottom: 4px;
   }
 
+  .group-link {
+    color: var(--esphome-primary);
+    text-decoration: none;
+  }
+
+  .group-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Keep the dialog tidy and let every field span its full width — the
+     base-dialog body is a row layout meant for icon + text, so the add
+     form overrides it to a stretched column. */
+  esphome-base-dialog {
+    --width: 480px;
+  }
+
+  .add-body {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--wa-space-m);
+  }
+
+  .add-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .add-field-label {
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-normal);
+  }
+
+  .add-field input,
+  .add-field esphome-password-input,
+  .add-select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .add-select {
+    min-height: var(--wa-form-control-height);
+    padding: 0 12px;
+    font-family: inherit;
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-normal);
+    background: var(--wa-color-surface-raised);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+  }
+
+  .btn--add {
+    background: var(--esphome-primary);
+    color: var(--esphome-on-primary);
+  }
+
+  .btn--add:hover {
+    background: var(--esphome-primary-hover);
+  }
+
   /* The password input is a block custom element; stretch it into the
      value column so it lines up with the key input and remove button. */
   .value-input {
