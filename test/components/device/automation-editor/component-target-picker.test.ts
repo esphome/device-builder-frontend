@@ -135,6 +135,37 @@ describe("component-target-picker", () => {
     expect(pressOn(el, "hub_temp", "ArrowDown")).toBe("relay");
   });
 
+  it("keeps a following plain row outside the group wrapper", async () => {
+    const el = await mount([
+      { id: "api", name: "api", component_id: "api" },
+      {
+        id: "aht20",
+        name: "AHT20",
+        component_id: "sensor.aht10",
+        is_entity_container: true,
+      },
+      {
+        id: "aht20_temperature",
+        name: "Kit Temperature",
+        component_id: "sensor",
+        parent_id: "aht20",
+      },
+      { id: "wifi", name: "wifi", component_id: "wifi" },
+    ]);
+    const sr = el.shadowRoot!;
+    const group = sr.querySelector(".component-group-wrap")!;
+    // the sub-sensor is inside the group...
+    expect(
+      group.querySelector('.component-choice[data-id="aht20_temperature"]')
+    ).not.toBeNull();
+    // ...but the plain wifi row is not (it only looked grouped without the indent).
+    expect(
+      sr
+        .querySelector('.component-choice[data-id="wifi"]')!
+        .closest(".component-group-wrap")
+    ).toBeNull();
+  });
+
   it("renders an orphan sub-entity whose container is absent", async () => {
     const el = await mount([
       { id: "orphan_t", name: "Orphan Temp", component_id: "sensor", parent_id: "ghost" },

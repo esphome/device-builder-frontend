@@ -324,6 +324,40 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((dialog as any)._componentId).toBe("aht20_humidity");
   });
+
+  it("a container-section prefill opens the scoped sub-entity picker", async () => {
+    // The per-section "+ Add automation" on a multi-entity component prefills
+    // the container id (which has no triggers); the dialog must let the user
+    // pick a sub-entity instead of dead-ending on an empty trigger list.
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(ahtAvailable())),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    dialog.open({ kind: "component_on", componentId: "aht20" });
+    await dialog.updateComplete;
+    await flushPending();
+    await dialog.updateComplete;
+
+    // Landed on the first sub-entity, not the container.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._componentId).toBe("aht20_temperature");
+    const picker = dialog.shadowRoot!.querySelector(
+      "esphome-component-target-picker"
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ) as any;
+    expect(picker).not.toBeNull();
+    // Scoped to that container's instances only.
+    expect(picker.devices.map((d: { id: string }) => d.id).sort()).toEqual([
+      "aht20",
+      "aht20_humidity",
+      "aht20_temperature",
+    ]);
+    // Entity triggers are now offered.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(
+      (dialog as any)._filteredTriggers().map((t: { id: string }) => t.id)
+    ).toContain("sensor.on_value_range");
+  });
 });
 
 // The migration onto esphome-base-dialog swapped the imperative

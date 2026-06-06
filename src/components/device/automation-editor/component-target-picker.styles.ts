@@ -33,12 +33,19 @@ export const componentTargetPickerStyles = css`
     border-radius: var(--wa-border-radius-m);
     padding: var(--wa-space-2xs);
   }
-  /* The role=group wrapper carries the same column gap as the list so a
-     grouped block lays out identically to loose rows. */
+  /* The role=group wrapper carries the same column gap as the list, with a
+     left rule + indented rows so a group's members read as nested under its
+     header and a following loose row (e.g. wifi) is clearly outside it. */
   .component-group-wrap {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    border-left: 2px solid var(--wa-color-surface-border);
+    margin-left: var(--wa-space-2xs);
+    padding-left: var(--wa-space-2xs);
+  }
+  .component-group-wrap .component-choice {
+    padding-left: var(--wa-space-m);
   }
   .component-group {
     font-size: var(--wa-font-size-2xs);
