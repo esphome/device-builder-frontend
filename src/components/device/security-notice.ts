@@ -82,7 +82,7 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
     ],
   },
   "ota.esphome": {
-    secretSection: "ota",
+    secretSection: "ota.esphome",
     marker: "password",
     copyPrefix: "ota_password",
     fields: [{ path: ["password"], generate: passphrase, secretField: "password" }],

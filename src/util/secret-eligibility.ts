@@ -21,7 +21,9 @@ const FIELD_BOUND_SHARED = new Set(
 /** Per-device base names for the well-known credential fields, joined to the
  *  hostname as ``<hostname>__<base>``. Keyed by ``sectionKey`` then key. */
 const DEVICE_BASE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  ota: { password: "ota_password" },
+  // Keyed by the editor sectionKey (the OTA esphome platform is `ota.esphome`),
+  // so the field picker and the security notice agree on the secret name.
+  "ota.esphome": { password: "ota_password" },
   api: { key: "encryption_key" },
   web_server: { password: "web_password" },
 };
