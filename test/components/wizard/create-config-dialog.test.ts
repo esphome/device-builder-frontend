@@ -12,6 +12,7 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-board.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-empty-config.js", () => ({}));
+vi.mock("../../../src/components/wizard/wizard-step-import-partial.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-method.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-overwrite-device.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-resolve-conflicts.js", () => ({}));
@@ -350,11 +351,13 @@ describe("create-config-dialog bundle import", () => {
     await el.updateComplete;
 
     expect(step(el)).toBe("import-partial");
-    const kept = [...el.shadowRoot!.querySelectorAll(".import-partial ul.kept li")].map(
-      (li) => li.textContent
-    );
-    expect(kept).toEqual(["device.yaml", "common/wifi.yaml"]);
-    expect(el.shadowRoot!.querySelector(".btn-open")).not.toBeNull();
+    // The kept list lives on the import controller, rendered by the
+    // (mocked here) wizard-step-import-partial component.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._import.partial).toEqual({
+      configuration: "device.yaml",
+      kept: ["device.yaml", "common/wifi.yaml"],
+    });
   });
 });
 

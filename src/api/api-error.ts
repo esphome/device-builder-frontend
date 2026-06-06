@@ -19,3 +19,10 @@ export class APIError extends Error {
     this.details = details ?? "";
   }
 }
+
+/** The user-facing detail carried by a thrown APIError, or "" if none.
+ *  Reads the structured 'details' field directly so callers don't parse
+ *  the formatted '<code>: <details>' message string back apart. */
+export function apiErrorDetails(err: unknown): string {
+  return err instanceof APIError && err.details.trim() ? err.details.trim() : "";
+}
