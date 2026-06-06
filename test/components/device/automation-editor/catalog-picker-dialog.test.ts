@@ -72,7 +72,7 @@ describe("catalog-picker-dialog filtering contract", () => {
     // switch.template + switch.gpio land under the same "switch"
     // header.
     expect(body).toMatch(/domain === "core"/);
-    expect(body).toMatch(/domain\.split\("\."\)\[0\]/);
+    expect(body).toMatch(/componentDomain\(item\.domain\)/);
   });
 
   it("By-target pre-fills the action's id-shaped param with the picked device's id", async () => {

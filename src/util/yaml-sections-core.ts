@@ -16,7 +16,7 @@ import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import { endsBlockAtIndent } from "./yaml-section-lexer.js";
 
 /** A YAML list-item line: leading indent, a dash, then a space or EOL. */
-const RE_LIST_ITEM = /^\s*-(\s|$)/;
+export const RE_LIST_ITEM = /^\s*-(\s|$)/;
 /** A field-path segment that addresses a list index (``["areas","0",…]``). */
 const RE_PATH_INDEX = /^\d+$/;
 

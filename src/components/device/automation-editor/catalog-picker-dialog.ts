@@ -451,7 +451,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       if (item.domain === "core") continue;
       // Normalise to bare ``<domain>``: an item with
       // ``switch.template`` lives under the "switch" group.
-      const bare = item.domain.split(".")[0];
+      const bare = componentDomain(item.domain);
       const list = byDomain.get(bare) ?? [];
       list.push(item);
       byDomain.set(bare, list);

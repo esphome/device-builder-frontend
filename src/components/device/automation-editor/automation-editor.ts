@@ -63,6 +63,7 @@ import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
+import { componentDomain, instanceName } from "./component-targets.js";
 import { loadAndHydrateAvailable } from "./hydrate-available-bodies.js";
 import { ParseErrorController } from "./parse-error-controller.js";
 import {
@@ -797,8 +798,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       case "component_action": {
         const device = this._available?.devices.find((d) => d.id === loc.component_id);
         if (!device) return loc.component_id;
-        const label = device.name ?? device.id;
-        return `${label} (${device.component_id})`;
+        return `${instanceName(device)} (${device.component_id})`;
       }
       case "interval":
         return this._localize("device.automation_target_interval_n", {
@@ -1003,7 +1003,7 @@ export class ESPHomeAutomationEditor extends LitElement {
   private _catalogIdFor(loc: AutomationLocation): string | null {
     if (loc.kind !== "component_on" || !loc.trigger) return null;
     const device = this._available?.devices.find((d) => d.id === loc.component_id);
-    const domain = device?.component_id.split(".")[0] ?? null;
+    const domain = device ? componentDomain(device.component_id) : null;
     return domain ? `${domain}.${loc.trigger}` : loc.trigger;
   }
 

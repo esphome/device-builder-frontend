@@ -11,6 +11,7 @@ import {
   lineIndent,
   listItemChildIndent,
   parseYamlTopLevelSections,
+  RE_LIST_ITEM,
   readInstanceScalar,
   smallestContainingSection,
   type YamlSection,
@@ -24,6 +25,10 @@ import {
  * would surface a spurious row here until backend parse corrects it.
  */
 const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
+/** An inline ``on_*:`` trigger handler: group 1 the indent, group 2 the key. */
+const _ON_HANDLER_RE = /^(\s+)(on_[a-zA-Z_]+):/;
+/** A bare mapping-key line (``temperature:``) — key, no value, optional comment. */
+const _BARE_MAPPING_KEY_RE = /^ *[A-Za-z_][\w.]*:\s*(#.*)?$/;
 
 /**
  * Synchronous fallback parser for automation sections. The navigator
@@ -59,7 +64,7 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
   const automations: YamlSection[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^(\s+)(on_[a-zA-Z_]+):/);
+    const match = lines[i].match(_ON_HANDLER_RE);
     if (!match) continue;
 
     const indent = match[1].length;
@@ -279,7 +284,7 @@ function _subEntity(
     if (ind < childIndent) return null; // left the instance's children
     if (ind === childIndent) {
       // Must be a bare mapping key (``temperature:``), not a sibling scalar.
-      if (!/^ *[A-Za-z_][\w.]*:\s*(#.*)?$/.test(lines[j])) return null;
+      if (!_BARE_MAPPING_KEY_RE.test(lines[j])) return null;
       headerIdx = j;
       break;
     }
@@ -296,7 +301,7 @@ function _subEntity(
     // Only the block's direct mapping fields are its id/name. Deeper lines are
     // the handler body, and a dash line at the field indent is a zero-depth
     // list (``filters:\n- ...``) — neither is the sub-entity's own id.
-    if (ind !== subChildIndent || /^\s*-/.test(lines[k])) continue;
+    if (ind !== subChildIndent || RE_LIST_ITEM.test(lines[k])) continue;
     id = readInstanceScalar(lines[k], "id") ?? id;
     name = readInstanceScalar(lines[k], "name") ?? name;
   }

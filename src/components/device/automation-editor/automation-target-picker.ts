@@ -271,7 +271,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
           ${lights.map(
             (d) =>
               html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
-                >${d.name ?? d.id}</wa-option
+                >${instanceName(d)}</wa-option
               >`
           )}
         </wa-select>
