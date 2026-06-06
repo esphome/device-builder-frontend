@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import toast from "sonner-js";
 
@@ -27,7 +27,17 @@ interface PageView {
   _savedYaml: string;
   _saving: boolean;
   _api: ESPHomeAPI;
-  _save(): Promise<void>;
+  _layout: "form" | "split" | "yaml";
+  _narrow: boolean;
+  readonly _effectiveLayout: "form" | "split" | "yaml";
+  _readStoredLayout(): "form" | "split" | "yaml";
+  _setLayout(layout: "form" | "split" | "yaml"): void;
+  _onYamlChange(e: CustomEvent<{ value: string }>): void;
+  _confirmLeave(): Promise<boolean>;
+  _onUnsavedSave(): void;
+  _onUnsavedDiscard(): void;
+  _onUnsavedCancel(): void;
+  _save(): Promise<boolean>;
   render(): unknown;
 }
 
@@ -283,5 +293,118 @@ describe("esphome-page-secrets save toast ordering", () => {
     window.removeEventListener("secrets-saved", onSaved);
 
     expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe("esphome-page-secrets layout persistence", () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  test("defaults to the structured form when nothing is stored", () => {
+    expect(makePage()._readStoredLayout()).toBe("form");
+  });
+
+  test("falls back to form for an unrecognized stored value", () => {
+    localStorage.setItem("esphome-secrets-layout", "bogus");
+    expect(makePage()._readStoredLayout()).toBe("form");
+  });
+
+  test("reads a stored valid layout", () => {
+    localStorage.setItem("esphome-secrets-layout", "split");
+    expect(makePage()._readStoredLayout()).toBe("split");
+  });
+
+  test("_setLayout updates state and persists the choice", () => {
+    const page = makePage();
+    page._setLayout("yaml");
+    expect(page._layout).toBe("yaml");
+    expect(localStorage.getItem("esphome-secrets-layout")).toBe("yaml");
+  });
+
+  test("a persisted split layout presents as the form below the breakpoint", () => {
+    const page = makePage({ _layout: "split", _narrow: true });
+    expect(page._effectiveLayout).toBe("form");
+  });
+
+  test("split stays split above the breakpoint", () => {
+    const page = makePage({ _layout: "split", _narrow: false });
+    expect(page._effectiveLayout).toBe("split");
+  });
+
+  test("both panes bind the same buffer and either change advances it", () => {
+    const page = makePage({
+      _loaded: true,
+      _layout: "split",
+      _yaml: "wifi_ssid: home\n",
+    });
+    const editors = findTemplatesByAnchor(
+      page.render(),
+      "<esphome-secrets-structured-editor"
+    );
+    const yaml = findTemplatesByAnchor(page.render(), "<esphome-yaml-editor");
+    expect(editors).toHaveLength(1);
+    expect(yaml).toHaveLength(1);
+    expect(extractAttributeBindings(editors[0])[".value"]).toBe("wifi_ssid: home\n");
+    expect(extractAttributeBindings(yaml[0])[".value"]).toBe("wifi_ssid: home\n");
+
+    page._onYamlChange(
+      new CustomEvent("yaml-change", { detail: { value: "wifi_ssid: office\n" } })
+    );
+    expect(page._yaml).toBe("wifi_ssid: office\n");
+  });
+});
+
+describe("esphome-page-secrets unsaved-changes leave guard", () => {
+  function dirtyPage(): PageView {
+    return makePage({
+      _loaded: true,
+      _yaml: "wifi_ssid: new\n",
+      _savedYaml: "wifi_ssid: old\n",
+    });
+  }
+
+  test("a clean buffer leaves immediately without prompting", async () => {
+    const page = makePage({ _loaded: true, _yaml: "a: 1\n", _savedYaml: "a: 1\n" });
+    expect(await page._confirmLeave()).toBe(true);
+  });
+
+  test("Discard leaves without saving", async () => {
+    const page = dirtyPage();
+    page._api = { updateConfig: vi.fn() } as unknown as ESPHomeAPI;
+    const leaving = page._confirmLeave();
+    page._onUnsavedDiscard();
+    expect(await leaving).toBe(true);
+    expect(page._api.updateConfig).not.toHaveBeenCalled();
+  });
+
+  test("Cancel blocks navigation", async () => {
+    const page = dirtyPage();
+    const leaving = page._confirmLeave();
+    page._onUnsavedCancel();
+    expect(await leaving).toBe(false);
+  });
+
+  test("Save persists and then leaves", async () => {
+    const page = dirtyPage();
+    page._api = {
+      updateConfig: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ESPHomeAPI;
+    const leaving = page._confirmLeave();
+    page._onUnsavedSave();
+    expect(await leaving).toBe(true);
+    expect(page._api.updateConfig).toHaveBeenCalledWith(
+      "secrets.yaml",
+      "wifi_ssid: new\n"
+    );
+  });
+
+  test("a failed Save keeps the user on the page", async () => {
+    const page = dirtyPage();
+    page._api = {
+      updateConfig: vi.fn().mockRejectedValue(new Error("invalid secrets")),
+    } as unknown as ESPHomeAPI;
+    const leaving = page._confirmLeave();
+    page._onUnsavedSave();
+    expect(await leaving).toBe(false);
   });
 });

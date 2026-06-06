@@ -85,6 +85,12 @@ export class ESPHomePasswordInput extends LitElement {
   @property()
   describedby = "";
 
+  /** Force the value visible from the parent (e.g. a "reveal all" toggle).
+   *  ORs with the per-field eye, so the field shows when either is on.
+   *  Default false so existing call sites keep their hidden-by-default eye. */
+  @property({ type: Boolean })
+  revealed = false;
+
   @state()
   private _revealed = false;
 
@@ -145,13 +151,14 @@ export class ESPHomePasswordInput extends LitElement {
   ];
 
   protected render() {
+    const revealed = this.revealed || this._revealed;
     const label = this._localize(
-      this._revealed ? "device.password_hide" : "device.password_reveal"
+      revealed ? "device.password_hide" : "device.password_reveal"
     );
     return html`
       <div class="wrap">
         <input
-          type=${this._revealed ? "text" : "password"}
+          type=${revealed ? "text" : "password"}
           class=${this.invalid ? "invalid" : ""}
           .value=${this.value}
           ?disabled=${this.disabled}
@@ -163,17 +170,21 @@ export class ESPHomePasswordInput extends LitElement {
           aria-describedby=${this.describedby || nothing}
           @input=${this._onInput}
         />
-        <button
-          type="button"
-          class="toggle"
-          ?disabled=${this.disabled}
-          aria-label=${label}
-          title=${label}
-          aria-pressed=${this._revealed}
-          @click=${this._onToggle}
-        >
-          <wa-icon library="mdi" name=${this._revealed ? "eye-off" : "eye"}></wa-icon>
-        </button>
+        ${this.revealed
+          ? // A parent-forced reveal wins, so the per-field eye would be a
+            // dead toggle — hide it rather than show a no-op control.
+            nothing
+          : html`<button
+              type="button"
+              class="toggle"
+              ?disabled=${this.disabled}
+              aria-label=${label}
+              title=${label}
+              aria-pressed=${revealed}
+              @click=${this._onToggle}
+            >
+              <wa-icon library="mdi" name=${revealed ? "eye-off" : "eye"}></wa-icon>
+            </button>`}
       </div>
     `;
   }
