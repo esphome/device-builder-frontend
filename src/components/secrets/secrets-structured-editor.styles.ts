@@ -4,7 +4,12 @@ export const secretsStructuredEditorStyles = css`
   :host {
     display: block;
     height: 100%;
+    box-sizing: border-box;
     overflow-y: auto;
+    /* This element is the single scroll container for the form pane, so
+       the clearance for the floating Save button has to live here — the
+       wrapping pane never scrolls. */
+    padding-bottom: calc(var(--wa-space-m) * 2 + 2.25rem);
   }
 
   .rows {

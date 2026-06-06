@@ -102,6 +102,10 @@ describe("splice operations preserve the rest of the document", () => {
     expect(out).toBe("ap_ssid: home # AP\n");
   });
 
+  test("renameSecretKey leaves a bare key bare (no trailing space)", () => {
+    expect(renameSecretKey("wifi_password:\n", 0, "ap_pw")).toBe("ap_pw:\n");
+  });
+
   test("addSecret appends a new line", () => {
     expect(addSecret("wifi_ssid: home\n", "api_key", "abc")).toBe(
       "wifi_ssid: home\napi_key: abc\n"

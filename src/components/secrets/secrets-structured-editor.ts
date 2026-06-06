@@ -328,10 +328,16 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
   };
 
   // A splice helper returns null when its target line no longer matches
-  // (a stale index from a concurrent edit); skip rather than echo the
-  // unchanged buffer as a successful change.
+  // (a stale index from a concurrent edit). Re-render so the optimistic
+  // input snaps back to the unchanged buffer rather than diverging from it.
   private _emit(value: string | null) {
-    if (value === null) return;
+    if (value === null) {
+      this.requestUpdate();
+      return;
+    }
+    // A structural edit shifts line indices, so a stale rename error would
+    // misattribute to whatever row now sits at that line; clear it.
+    this._keyError = null;
     this.value = value;
     this.dispatchEvent(
       new CustomEvent("yaml-change", { detail: { value }, bubbles: true, composed: true })

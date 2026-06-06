@@ -410,12 +410,10 @@ export class ESPHomePageSecrets extends LitElement {
         min-height: 0;
       }
 
-      /* Reserve room below the form so its last row clears the floating
-         Save button overlaying the card's bottom-right. */
+      /* The structured editor is its own scroll container (and owns the
+         Save-button clearance padding), so the pane just frames it. */
       .editor-pane--form {
-        overflow-y: auto;
         padding: var(--wa-space-m);
-        padding-bottom: calc(var(--wa-space-m) * 2 + 2.25rem);
       }
 
       .editor-layout--yaml .editor-pane--form,

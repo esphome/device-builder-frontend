@@ -193,6 +193,20 @@ describe("esphome-secrets-structured-editor", () => {
     expect(captured.value).toBe("ap_ssid: home\n");
   });
 
+  test("a structural edit clears a stale key error so it can't misattribute", async () => {
+    const el = await mount("wifi_ssid: home\napi_key: abc\n");
+    // Reject a rename on the second row, surfacing the error banner.
+    const keyInput = rowInputs(rows(el)[1])[0];
+    keyInput.value = "wifi_ssid";
+    keyInput.dispatchEvent(new Event("change"));
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".key-error")).not.toBeNull();
+    // Removing a row shifts indices; the stale error must clear.
+    rows(el)[0].querySelector<HTMLButtonElement>(".icon-btn")!.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".key-error")).toBeNull();
+  });
+
   test("device-prefixed keys render under group headers", async () => {
     const el = await mount("wifi_ssid: home\nbw15__api: a\nbw15__ota: b\n");
     const headers = Array.from(

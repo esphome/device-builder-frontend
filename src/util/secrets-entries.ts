@@ -106,7 +106,11 @@ export function renameSecretKey(
   newKey: string
 ): string | null {
   return rewriteLine(yaml, line, (_key, value, comment) => {
-    return `${newKey}: ${value}${comment}`;
+    // A bare ``key:`` has no value or comment; keep it bare so the rename
+    // doesn't leave a trailing space.
+    return value === "" && comment === ""
+      ? `${newKey}:`
+      : `${newKey}: ${value}${comment}`;
   });
 }
 
