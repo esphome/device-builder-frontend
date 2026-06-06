@@ -62,6 +62,16 @@ describe("parseSecretsEntries", () => {
     ]);
   });
 
+  test("a comment-only value above an indented block is advanced", () => {
+    const entries = parseSecretsEntries("group: # a note\n  inner: 1\n");
+    expect(entries).toEqual([{ key: "group", value: "", line: 0, editable: false }]);
+  });
+
+  test("a comment-only value with no block is an editable empty scalar", () => {
+    const entries = parseSecretsEntries("wifi_ssid: # set me\n");
+    expect(entries).toEqual([{ key: "wifi_ssid", value: "", line: 0, editable: true }]);
+  });
+
   test("comments and blank lines are skipped, not parsed as entries", () => {
     const entries = parseSecretsEntries("# header\n\nwifi_ssid: home\n");
     expect(entries).toEqual([
@@ -117,6 +127,18 @@ describe("splice operations preserve the rest of the document", () => {
     expect(setSecretValue(yaml, 1, "new")).toBe(
       "ssid: !secret real\nwifi_password: new\n"
     );
+  });
+
+  test("setSecretValue returns null when the line no longer holds a key", () => {
+    expect(setSecretValue("# just a comment\n", 0, "x")).toBeNull();
+  });
+
+  test("renameSecretKey returns null when the line no longer holds a key", () => {
+    expect(renameSecretKey("# just a comment\n", 0, "x")).toBeNull();
+  });
+
+  test("removeSecret returns null for an out-of-range index", () => {
+    expect(removeSecret("wifi_ssid: home\n", 9)).toBeNull();
   });
 });
 

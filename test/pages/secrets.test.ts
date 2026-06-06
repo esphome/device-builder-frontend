@@ -28,6 +28,8 @@ interface PageView {
   _saving: boolean;
   _api: ESPHomeAPI;
   _layout: "form" | "split" | "yaml";
+  _narrow: boolean;
+  readonly _effectiveLayout: "form" | "split" | "yaml";
   _readStoredLayout(): "form" | "split" | "yaml";
   _setLayout(layout: "form" | "split" | "yaml"): void;
   _onYamlChange(e: CustomEvent<{ value: string }>): void;
@@ -313,6 +315,16 @@ describe("esphome-page-secrets layout persistence", () => {
     page._setLayout("yaml");
     expect(page._layout).toBe("yaml");
     expect(localStorage.getItem("esphome-secrets-layout")).toBe("yaml");
+  });
+
+  test("a persisted split layout presents as the form below the breakpoint", () => {
+    const page = makePage({ _layout: "split", _narrow: true });
+    expect(page._effectiveLayout).toBe("form");
+  });
+
+  test("split stays split above the breakpoint", () => {
+    const page = makePage({ _layout: "split", _narrow: false });
+    expect(page._effectiveLayout).toBe("split");
   });
 
   test("both panes bind the same buffer and either change advances it", () => {

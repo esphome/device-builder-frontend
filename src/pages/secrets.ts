@@ -72,9 +72,22 @@ export class ESPHomePageSecrets extends LitElement {
   @state()
   private _layout: SecretsLayout = "form";
 
+  // True below the 900px breakpoint where the split pane collapses to a
+  // single column; drives the effective layout so the toggle's pressed
+  // state matches what's shown when the split button is hidden.
+  @state()
+  private _narrow = false;
+
+  private _narrowMq: MediaQueryList | null = null;
+
   async connectedCallback() {
     super.connectedCallback();
     this._layout = this._readStoredLayout();
+    if (typeof window.matchMedia === "function") {
+      this._narrowMq = window.matchMedia("(max-width: 900px)");
+      this._narrow = this._narrowMq.matches;
+      this._narrowMq.addEventListener("change", this._onNarrowChange);
+    }
     window.addEventListener(
       "secrets-saved",
       this._onExternalSecretsSaved as EventListener
@@ -92,7 +105,18 @@ export class ESPHomePageSecrets extends LitElement {
     localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
   }
 
+  private _onNarrowChange = (e: MediaQueryListEvent) => {
+    this._narrow = e.matches;
+  };
+
+  // Below the breakpoint the split pane collapses to the form, so the
+  // hidden split choice presents as the form for both layout and ARIA.
+  private get _effectiveLayout(): SecretsLayout {
+    return this._narrow && this._layout === "split" ? "form" : this._layout;
+  }
+
   disconnectedCallback() {
+    this._narrowMq?.removeEventListener("change", this._onNarrowChange);
     window.removeEventListener(
       "secrets-saved",
       this._onExternalSecretsSaved as EventListener
@@ -332,19 +356,12 @@ export class ESPHomePageSecrets extends LitElement {
         align-self: stretch;
       }
 
+      /* Below the breakpoint the split button is hidden; the collapse of
+         the split layout itself is driven by the effective-layout getter
+         in JS (matching the device editor), so no layout rules are
+         duplicated here. */
       @media (max-width: 900px) {
         .layout-toggle .split-btn {
-          display: none;
-        }
-
-        /* No room for two panes — collapse split to the friendlier
-           structured form and hide the YAML pane. */
-        .editor-layout--split {
-          grid-template-columns: 1fr;
-        }
-
-        .editor-layout--split .editor-pane--yaml,
-        .editor-layout--split .pane-divider {
           display: none;
         }
       }
@@ -378,7 +395,8 @@ export class ESPHomePageSecrets extends LitElement {
           >
             <button
               type="button"
-              aria-pressed=${this._layout === "form"}
+              aria-pressed=${this._effectiveLayout === "form"}
+              aria-label=${this._localize("secrets.layout_form")}
               title=${this._localize("secrets.layout_form")}
               @click=${() => this._setLayout("form")}
             >
@@ -387,7 +405,8 @@ export class ESPHomePageSecrets extends LitElement {
             <button
               type="button"
               class="split-btn"
-              aria-pressed=${this._layout === "split"}
+              aria-pressed=${this._effectiveLayout === "split"}
+              aria-label=${this._localize("secrets.layout_split")}
               title=${this._localize("secrets.layout_split")}
               @click=${() => this._setLayout("split")}
             >
@@ -395,7 +414,8 @@ export class ESPHomePageSecrets extends LitElement {
             </button>
             <button
               type="button"
-              aria-pressed=${this._layout === "yaml"}
+              aria-pressed=${this._effectiveLayout === "yaml"}
+              aria-label=${this._localize("secrets.layout_yaml")}
               title=${this._localize("secrets.layout_yaml")}
               @click=${() => this._setLayout("yaml")}
             >
@@ -432,7 +452,7 @@ export class ESPHomePageSecrets extends LitElement {
                     ? this._localize("secrets.saving")
                     : this._localize("secrets.save")}
                 </button>
-                <div class=${`editor-layout editor-layout--${this._layout}`}>
+                <div class=${`editor-layout editor-layout--${this._effectiveLayout}`}>
                   <div class="editor-pane editor-pane--form">
                     <esphome-secrets-structured-editor
                       .value=${this._yaml}
@@ -440,7 +460,7 @@ export class ESPHomePageSecrets extends LitElement {
                       @yaml-change=${this._onYamlChange}
                     ></esphome-secrets-structured-editor>
                   </div>
-                  ${this._layout === "split"
+                  ${this._effectiveLayout === "split"
                     ? html`<div class="pane-divider"></div>`
                     : nothing}
                   <div class="editor-pane editor-pane--yaml">

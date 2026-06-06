@@ -51,15 +51,19 @@ export function parseSecretsEntries(yaml: string): SecretEntry[] {
   return entries;
 }
 
-/** Replace the value of the entry at *line*, preserving key and comment. */
-export function setSecretValue(yaml: string, line: number, value: string): string {
+/** Replace the value of the entry at *line*, or null when it no longer matches. */
+export function setSecretValue(yaml: string, line: number, value: string): string | null {
   return rewriteLine(yaml, line, (key, _value, comment) => {
     return `${key}: ${formatYamlScalar(value)}${comment}`;
   });
 }
 
-/** Rename the key of the entry at *line*, preserving value and comment. */
-export function renameSecretKey(yaml: string, line: number, newKey: string): string {
+/** Rename the key of the entry at *line*, or null when it no longer matches. */
+export function renameSecretKey(
+  yaml: string,
+  line: number,
+  newKey: string
+): string | null {
   return rewriteLine(yaml, line, (_key, value, comment) => {
     return `${newKey}: ${value}${comment}`;
   });
@@ -73,10 +77,10 @@ export function addSecret(yaml: string, key: string, value: string): string {
   return `${yaml}${sep}${entry}\n`;
 }
 
-/** Drop the entry's line from *yaml*. */
-export function removeSecret(yaml: string, line: number): string {
+/** Drop the entry's line from *yaml*, or null when the index is out of range. */
+export function removeSecret(yaml: string, line: number): string | null {
   const lines = yaml.split("\n");
-  if (line < 0 || line >= lines.length) return yaml;
+  if (line < 0 || line >= lines.length) return null;
   lines.splice(line, 1);
   return lines.join("\n");
 }
@@ -86,13 +90,14 @@ function readValue(
   lines: string[],
   index: number
 ): { value: string; editable: boolean } {
-  if (rest === undefined || rest.trim() === "") {
-    // Bare ``key:`` — a nested block below makes it advanced, otherwise
-    // it's an editable empty value.
+  const { value } = splitInlineComment(rest ?? "");
+  const trimmed = value.trim();
+  // A bare ``key:`` or a comment-only value (``key: # note``) is an editable
+  // empty scalar unless an indented block sits below it, which makes it
+  // advanced — editing it inline would orphan the nested children.
+  if (trimmed === "" || trimmed.startsWith("#")) {
     return { value: "", editable: !hasIndentedChild(lines, index) };
   }
-  const { value } = splitInlineComment(rest);
-  const trimmed = value.trim();
   if (ADVANCED_VALUE_START.test(trimmed)) return { value: "", editable: false };
   return { value: stripQuotes(trimmed), editable: true };
 }
@@ -110,10 +115,10 @@ function rewriteLine(
   yaml: string,
   line: number,
   build: (key: string, value: string, comment: string) => string
-): string {
+): string | null {
   const lines = yaml.split("\n");
   const match = lines[line]?.match(TOP_LEVEL_KEY);
-  if (!match) return yaml;
+  if (!match) return null;
   const [, key, rest] = match;
   const { value, comment } = splitInlineComment(rest ?? "");
   lines[line] = build(key, value, comment);

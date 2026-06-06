@@ -59,7 +59,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     const entries = parseSecretsEntries(this.value);
     return html`
       ${entries.length === 0
-        ? html`<div class="empty">${this._localize("secrets.empty")}</div>`
+        ? html`<div class="empty" role="status">${this._localize("secrets.empty")}</div>`
         : html`<div class="rows">
             ${entries.map((entry) => this._renderRow(entry, entries))}
           </div>`}
@@ -99,6 +99,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           spellcheck="false"
           placeholder=${this._localize("secrets.key_placeholder")}
           aria-label=${this._localize("secrets.key_placeholder")}
+          aria-invalid=${keyInvalid ? "true" : "false"}
           @change=${(e: Event) =>
             this._onKeyChange(entry, entries, e.currentTarget as HTMLInputElement)}
         />
@@ -187,9 +188,15 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     input?.select();
   }
 
-  private _emit(value: string) {
+  // A splice helper returns null when its target line no longer matches
+  // (a stale index from a concurrent edit); skip rather than echo the
+  // unchanged buffer as a successful change.
+  private _emit(value: string | null) {
+    if (value === null) return;
     this.value = value;
-    this.dispatchEvent(new CustomEvent("yaml-change", { detail: { value } }));
+    this.dispatchEvent(
+      new CustomEvent("yaml-change", { detail: { value }, bubbles: true, composed: true })
+    );
   }
 }
 
