@@ -144,6 +144,42 @@ describe("esphome-secrets-structured-editor", () => {
     expect(captured.value).toBe("wifi_ssid: home\napi_key: abc\n");
   });
 
+  test("Enter in the add dialog confirms (issue #1269)", async () => {
+    const el = await mount("wifi_ssid: home\n");
+    const captured = onChange(el);
+    const view = el as unknown as AddView;
+    view._openAdd();
+    await el.updateComplete;
+    // The wrapper toggles its EnterController in willUpdate once it sees open.
+    const dialog = el.shadowRoot!.querySelector("esphome-base-dialog")!;
+    await (dialog as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    view._addName = "api_key";
+    view._addValue = "abc";
+    // A plain Enter from a neutral element bubbles to the window listener.
+    document.body.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true })
+    );
+    expect(captured.value).toBe("wifi_ssid: home\napi_key: abc\n");
+    expect(view._addOpen).toBe(false);
+  });
+
+  test("Enter with a duplicate name shows the error and adds nothing", async () => {
+    const el = await mount("wifi_ssid: home\n");
+    const captured = onChange(el);
+    const view = el as unknown as AddView;
+    view._openAdd();
+    await el.updateComplete;
+    const dialog = el.shadowRoot!.querySelector("esphome-base-dialog")!;
+    await (dialog as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    view._addName = "wifi_ssid";
+    document.body.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true })
+    );
+    expect(captured.value).toBeNull();
+    expect(view._addOpen).toBe(true);
+    expect(view._addError).not.toBeNull();
+  });
+
   test("a device target prefixes the new secret with <device>__", async () => {
     const el = await mount("wifi_ssid: home\n", false, [
       { name: "bw15", configuration: "bw15.yaml", friendly_name: "BW15" },

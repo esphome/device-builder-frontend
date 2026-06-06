@@ -162,6 +162,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     return html`<esphome-base-dialog
       ?open=${this._addOpen}
       .label=${this._localize("secrets.add_dialog_title")}
+      .confirmOnEnter=${this._confirmAdd}
       @request-close=${this._closeAdd}
       @after-hide=${this._closeAdd}
     >

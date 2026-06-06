@@ -1,10 +1,12 @@
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
+import type { PropertyValues } from "lit";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { centeredMobileDialog } from "../styles/dialog-mobile.js";
+import { EnterController } from "../util/enter-controller.js";
 
 /**
  * Thin shared wrapper around ``<wa-dialog>``.
@@ -132,9 +134,24 @@ export class ESPHomeBaseDialog extends LitElement {
    *  close button. */
   @property({ type: Boolean, reflect: true }) busy = false;
 
+  /** Opt-in Enter-to-confirm. When set, a plain Enter while the dialog is
+   *  open invokes this callback — so a form dialog gets the keyboard submit
+   *  for free instead of re-wiring an :class:`EnterController` itself (the
+   *  boilerplate the add-secret dialog originally forgot, issue #1269).
+   *  :class:`EnterController` already skips Enter on
+   *  buttons/links/textareas/selects and mid-IME composition. The callback
+   *  must self-guard against repeat/invalid — a held Enter can re-fire until
+   *  ``open`` flips false. */
+  @property({ attribute: false }) confirmOnEnter?: () => void;
+
   /** Whether a consumer has slotted footer content. Gates the
    *  forwarding ``<slot name="footer">`` — see ``willUpdate``. */
   @state() private _hasFooter = false;
+
+  // Reads the live ``confirmOnEnter`` at fire time, so a fresh arrow each
+  // render is fine; toggled from ``willUpdate`` and torn down by the
+  // controller's ``hostDisconnected``.
+  private _enter = new EnterController(this, () => this.confirmOnEnter?.());
 
   // wa-dialog turns its footer chrome (border-top + padding) on by
   // testing for a direct ``[slot="footer"]`` child element, not for
@@ -142,8 +159,14 @@ export class ESPHomeBaseDialog extends LitElement {
   // such a child, so it would draw an empty footer bar on every
   // footer-less consumer. Mirror that same presence test against our
   // own light DOM and only forward when a consumer fills the footer.
-  protected willUpdate(): void {
+  protected willUpdate(changed: PropertyValues): void {
     this._hasFooter = this.querySelector(':scope > [slot="footer"]') !== null;
+    // Listen only while open and a callback is set. Detaching the instant
+    // ``open`` flips false (not at after-hide) means a held-Enter's next
+    // keydown can't re-fire during the hide animation.
+    if (changed.has("open") || changed.has("confirmOnEnter")) {
+      this._enter.set(this.open && this.confirmOnEnter !== undefined);
+    }
   }
 
   private _onWaHide = (e: Event): void => {

@@ -174,6 +174,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
       ?open=${this._open}
       ?busy=${this._saving}
       .label=${title}
+      .confirmOnEnter=${this._onContinue}
       @request-close=${this._onRequestClose}
     >
       <p class="intro">
