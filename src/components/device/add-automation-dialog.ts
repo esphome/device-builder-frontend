@@ -242,9 +242,15 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         ${this._localize("device.automation_target_no_components")}
       </p>`;
     }
+    // Render order = the selectable rows top-to-bottom; drives roving
+    // tabindex and arrow-key navigation across the radiogroup.
+    const order = selectable.map((d) => d.id);
+    const containerIds = new Set(
+      devices.filter((d) => d.is_entity_container).map((d) => d.id)
+    );
     const subsByParent = new Map<string, AvailableComponentInstance[]>();
     for (const d of devices) {
-      if (!d.parent_id) continue;
+      if (!d.parent_id || !containerIds.has(d.parent_id)) continue;
       const list = subsByParent.get(d.parent_id) ?? [];
       list.push(d);
       subsByParent.set(d.parent_id, list);
@@ -253,45 +259,93 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       <label class="field-label" id="component-label">
         ${this._localize("device.automation_wizard_pick_component")}
       </label>
-      <div class="component-list" role="listbox" aria-labelledby="component-label">
+      <div
+        class="component-list"
+        role="radiogroup"
+        aria-labelledby="component-label"
+        @keydown=${(e: KeyboardEvent) => this._onComponentListKeydown(e, order)}
+      >
         ${devices.map((d) => {
           if (d.is_entity_container) {
             const subs = subsByParent.get(d.id) ?? [];
             if (subs.length === 0) return nothing;
-            return html`
-              <p class="component-group">
+            const headerId = `component-group-${d.id}`;
+            return html`<div
+              class="component-group-wrap"
+              role="group"
+              aria-labelledby=${headerId}
+            >
+              <p class="component-group" id=${headerId}>
                 ${d.name ?? d.id}
                 <span class="component-group-id">(${d.component_id})</span>
               </p>
-              ${subs.map((s) => this._renderComponentChoice(s))}
-            `;
+              ${subs.map((s) => this._renderComponentChoice(s, order))}
+            </div>`;
           }
-          // Sub-entities render under their container header above.
-          if (d.parent_id) return nothing;
-          return this._renderComponentChoice(d);
+          // A sub-entity whose container is present renders under it (above);
+          // an orphan (parent not in the list) falls through to a plain row.
+          if (d.parent_id && containerIds.has(d.parent_id)) return nothing;
+          return this._renderComponentChoice(d, order);
         })}
       </div>
     </div>`;
   }
 
-  private _renderComponentChoice(d: AvailableComponentInstance) {
+  private _renderComponentChoice(d: AvailableComponentInstance, order: string[]) {
     const selected = d.id === this._componentId;
+    // Roving tabindex: the checked row is the single tab stop; before any
+    // pick, the first selectable row holds it.
+    const tabbable =
+      selected || (!order.includes(this._componentId) && order[0] === d.id);
     return html`<div
       class="component-choice ${selected ? "component-choice--selected" : ""}"
-      role="option"
-      aria-selected=${selected}
-      tabindex="0"
+      role="radio"
+      aria-checked=${selected ? "true" : "false"}
+      aria-disabled=${this._saving ? "true" : "false"}
+      data-id=${d.id}
+      tabindex=${tabbable ? "0" : "-1"}
       @click=${() => !this._saving && this._onComponentChange(d.id)}
-      @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          if (!this._saving) this._onComponentChange(d.id);
-        }
-      }}
     >
       <span class="component-choice-name">${d.name ?? d.id}</span>
       <span class="component-domain">${d.component_id}</span>
     </div>`;
+  }
+
+  /**
+   * Radiogroup keyboard model: arrows move + select across the flat row
+   * order (wrapping), Enter / Space selects the focused row. Focus follows
+   * the new selection so the roving tab stop stays on the checked row.
+   */
+  private _onComponentListKeydown(e: KeyboardEvent, order: string[]) {
+    if (this._saving || order.length === 0) return;
+    const focused = (e.target as HTMLElement | null)?.closest(
+      ".component-choice"
+    ) as HTMLElement | null;
+    const currentId = focused?.dataset.id ?? null;
+    if (e.key === "Enter" || e.key === " ") {
+      if (currentId) {
+        e.preventDefault();
+        this._onComponentChange(currentId);
+      }
+      return;
+    }
+    const delta =
+      e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? 1
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+          ? -1
+          : 0;
+    if (delta === 0) return;
+    e.preventDefault();
+    const base = currentId ? order.indexOf(currentId) : -1;
+    const nextId = order[(base + delta + order.length) % order.length];
+    this._onComponentChange(nextId);
+    void this.updateComplete.then(() => {
+      const el = this.shadowRoot?.querySelector(
+        `.component-choice[data-id="${nextId}"]`
+      ) as HTMLElement | null;
+      el?.focus();
+    });
   }
 
   /**

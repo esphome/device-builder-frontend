@@ -125,6 +125,13 @@ export const addAutomationDialogStyles = css`
     border-radius: var(--wa-border-radius-m);
     padding: var(--wa-space-2xs);
   }
+  /* The role=group wrapper carries the same column gap as the list so a
+     grouped block lays out identically to loose rows. */
+  .component-group-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
   .component-group {
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-semibold);
@@ -162,6 +169,11 @@ export const addAutomationDialogStyles = css`
       var(--esphome-primary) 14%,
       var(--wa-color-surface-default)
     );
+  }
+  .component-choice[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: default;
+    pointer-events: none;
   }
   .component-choice-name {
     font-size: var(--wa-font-size-s);

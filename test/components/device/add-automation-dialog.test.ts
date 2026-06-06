@@ -340,6 +340,78 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
     await dialog.updateComplete;
     expect(choiceNames(dialog)).toEqual(["Relay"]);
   });
+
+  it("exposes a radiogroup with grouped sub-entity rows", async () => {
+    const dialog = await mountForComponentStep();
+    const root = dialog.shadowRoot!;
+    expect(root.querySelector('[role="radiogroup"]')).not.toBeNull();
+    // The container's readings sit inside a labelled group.
+    const group = root.querySelector('[role="group"]');
+    expect(group).not.toBeNull();
+    const headerId = group!.getAttribute("aria-labelledby");
+    expect(root.querySelector(`#${headerId}`)!.textContent).toContain("AHT20");
+    // Each choice is a radio.
+    expect(
+      [...root.querySelectorAll('[role="radio"]')].map((r) => r.getAttribute("data-id"))
+    ).toEqual(["aht20_temperature", "aht20_humidity", "relay"]);
+  });
+
+  it("keeps a single roving tab stop", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "aht20_humidity";
+    await dialog.updateComplete;
+    const tabbable = [...dialog.shadowRoot!.querySelectorAll(".component-choice")].filter(
+      (r) => r.getAttribute("tabindex") === "0"
+    );
+    expect(tabbable.map((r) => r.getAttribute("data-id"))).toEqual(["aht20_humidity"]);
+  });
+
+  it("arrow-down selects the next row and wraps", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "aht20_temperature";
+    await dialog.updateComplete;
+    const rowOf = (id: string) =>
+      dialog.shadowRoot!.querySelector(`.component-choice[data-id="${id}"]`)!;
+    rowOf("aht20_temperature").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
+    );
+    await dialog.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._componentId).toBe("aht20_humidity");
+    // Wrap past the end back to the first row.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "relay";
+    await dialog.updateComplete;
+    rowOf("relay").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
+    );
+    await dialog.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._componentId).toBe("aht20_temperature");
+  });
+
+  it("renders an orphan sub-entity whose container is absent", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._available = {
+      triggers: [],
+      actions: [],
+      conditions: [],
+      scripts: [],
+      devices: [
+        {
+          id: "orphan_t",
+          name: "Orphan Temp",
+          component_id: "sensor",
+          parent_id: "ghost",
+        },
+      ],
+    };
+    await dialog.updateComplete;
+    expect(choiceNames(dialog)).toEqual(["Orphan Temp"]);
+  });
 });
 
 // The migration onto esphome-base-dialog swapped the imperative
