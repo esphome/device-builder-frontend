@@ -77,6 +77,20 @@ describe("renderExclusiveGroupField", () => {
     expect(emitChange).not.toHaveBeenCalledWith(["raw"], {});
   });
 
+  it("sets the wrapper data-field-key to the selected member", () => {
+    // Focus/scroll sync needs the group's wrapper to carry the chosen
+    // protocol's path, not always the first member's.
+    const ctx = makeRenderCtx({ nec: {} });
+    const div = findElementBindings(renderExclusiveGroupField(members(), ctx), "div")[0];
+    expect(div["data-field-key"]).toBe(JSON.stringify(["nec"]));
+  });
+
+  it("uses an empty data-field-key when nothing is selected", () => {
+    const ctx = makeRenderCtx({});
+    const div = findElementBindings(renderExclusiveGroupField(members(), ctx), "div")[0];
+    expect(div["data-field-key"]).toBe(JSON.stringify([]));
+  });
+
   it("treats an explicit null member as present", () => {
     // A hand-written ``raw:`` parses to null; the key exists, so the
     // protocol is selected (only undefined means cleared/absent).
