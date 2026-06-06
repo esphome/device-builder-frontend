@@ -135,6 +135,13 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @property()
   configuration = "";
 
+  /** Backend-resolved node name (esphome.name with substitutions
+   *  expanded). Preferred over the raw YAML scalar for the esphome
+   *  core section's subtitle so a `name: $devicename` doesn't leak
+   *  the unexpanded `$devicename` into the navigator. */
+  @property()
+  deviceName = "";
+
   /** Device's target platform — forwarded to add-component / add-config
    * dialogs so the backend can resolve per-platform default values. */
   @property()
@@ -508,7 +515,14 @@ export class ESPHomeDeviceNavigator extends LitElement {
     const cached = getCachedComponent(raw, this.platform || undefined);
     if (cached?.name) primary = cached.name;
 
-    const named = item.name || item.id;
+    // Prefer the backend-resolved node name for the esphome core
+    // section so a `name: $devicename` substitution shows the
+    // expanded hostname, not the raw scalar. Falls back to the raw
+    // YAML value for a new/unsaved device not yet in the devices list.
+    const named =
+      category === "core" && item.key === "esphome" && this.deviceName
+        ? this.deviceName
+        : item.name || item.id;
     const secondary = named && named !== primary ? named : undefined;
 
     return { primary, secondary };

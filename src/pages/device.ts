@@ -1091,6 +1091,7 @@ export class ESPHomePageDevice extends LitElement {
       .board=${this._board}
       .boardName=${this._board?.name ?? ""}
       .configuration=${this.id}
+      .deviceName=${this._device?.name ?? ""}
       .platform=${this._board?.esphome.platform ?? ""}
       .platformReady=${this._platformReady}
       .selectedKey=${this._selectedSection}
