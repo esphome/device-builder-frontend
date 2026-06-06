@@ -161,8 +161,9 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     if (field.startsWith("on_")) continue;
     const fromLine = i + 1;
     const host = smallestContainingSection(sections, fromLine);
-    if (!host || indent !== listItemChildIndent(lines[host.fromLine - 1] ?? "")) continue;
-    const componentId = instanceComponentId(sections, host);
+    const scope = host && _resolveHandlerScope(lines, sections, host, i, indent, false);
+    if (!host || !scope) continue;
+    const componentId = scope.componentId;
     if (!componentId) continue;
     const labelHead = host.name || componentId;
     automations.push({
@@ -251,15 +252,17 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
   return automations;
 }
 
-/** Resolve a ``component_on`` handler to its target: the host instance for a
- *  direct child, or the host's ided sub-entity for a deeper handler. ``null``
- *  when no addressable target. */
+/** Resolve a handler at ``indent`` to its target instance: the host for a
+ *  direct child, or (when ``allowSubEntity``) the host's ided sub-entity for a
+ *  deeper handler. ``null`` when no addressable target. The ``*_action`` field
+ *  pass passes ``false`` — those fields are direct-child-only. */
 function _resolveHandlerScope(
   lines: string[],
   sections: YamlSection[],
   host: YamlSection,
   handlerIdx: number,
-  indent: number
+  indent: number,
+  allowSubEntity = true
 ): { componentId: string; displayName?: string; parentComponentId?: string } | null {
   const childIndent = listItemChildIndent(lines[host.fromLine - 1] ?? "");
   if (indent === childIndent) {
@@ -268,7 +271,7 @@ function _resolveHandlerScope(
       displayName: host.name ?? undefined,
     };
   }
-  if (indent > childIndent) {
+  if (allowSubEntity && indent > childIndent) {
     const sub = _subEntity(lines, handlerIdx, childIndent);
     if (sub) {
       return {
