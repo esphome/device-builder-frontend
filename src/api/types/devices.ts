@@ -236,6 +236,20 @@ export interface WizardResponse {
   configuration: string;
 }
 
+/** Response from devices/import_bundle.
+ *
+ * 'conflicts' means nothing was written: `conflicts` lists the bundle
+ * files that already exist on disk, so the user picks which to overwrite
+ * and re-submits the same bytes with those paths in `overwrite`.
+ * 'imported' means the tree landed; secrets.yaml is always merged. */
+export interface ImportBundleResponse {
+  status: "imported" | "conflicts";
+  configuration: string;
+  conflicts: string[];
+  has_secrets: boolean;
+  esphome_version: string;
+}
+
 /** Response from devices/update. */
 export interface UpdateDeviceResponse {
   name: string;

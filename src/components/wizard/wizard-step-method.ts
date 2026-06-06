@@ -183,7 +183,7 @@ export class ESPHomeWizardStepMethod extends LitElement {
       <input
         id="file-input"
         type="file"
-        accept=".yml,.yaml"
+        accept=".yml,.yaml,.tar.gz,.esphomebundle"
         hidden
         @change=${this._onFileSelected}
       />

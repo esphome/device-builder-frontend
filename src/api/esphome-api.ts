@@ -33,6 +33,7 @@ import type {
   AddComponentResponse,
   ConfiguredDevice,
   DevicesResponse,
+  ImportBundleResponse,
   Label,
   UpdateDeviceResponse,
   WizardResponse,
@@ -759,6 +760,19 @@ export class ESPHomeAPI {
     file_content?: string;
   }): Promise<WizardResponse> {
     return this.sendCommand<WizardResponse>("devices/create", args);
+  }
+
+  /** Import an `esphome bundle` archive as a device.
+   *
+   * `file_content_b64` is the base64 of the raw `.tar.gz`. Omit
+   * `overwrite` on the first call; if the response is 'conflicts', let
+   * the user pick which paths to replace and re-call with those paths in
+   * `overwrite` (paths left out keep the on-disk file). */
+  async importBundle(args: {
+    file_content_b64: string;
+    overwrite?: string[];
+  }): Promise<ImportBundleResponse> {
+    return this.sendCommand<ImportBundleResponse>("devices/import_bundle", args, 60000);
   }
 
   /** Update device metadata. Keyed by `configuration` (the YAML filename),

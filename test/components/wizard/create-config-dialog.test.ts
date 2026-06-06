@@ -13,6 +13,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-board.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-empty-config.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-method.js", () => ({}));
+vi.mock("../../../src/components/wizard/wizard-step-resolve-conflicts.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-setup.js", () => ({}));
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
@@ -61,6 +62,33 @@ function emitFinish(el: ESPHomeCreateConfigDialog, name: string): void {
       bubbles: true,
       composed: true,
     })
+  );
+}
+
+// The method step dispatches import-file with the picked File.
+function emitImport(el: ESPHomeCreateConfigDialog, file: File): void {
+  const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
+  wd.dispatchEvent(
+    new CustomEvent("import-file", { detail: { file }, bubbles: true, composed: true })
+  );
+}
+
+// The resolve-conflicts step dispatches the user's overwrite choices.
+function emitResolve(el: ESPHomeCreateConfigDialog, overwrite: string[]): void {
+  const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
+  wd.dispatchEvent(
+    new CustomEvent("resolve-conflicts", {
+      detail: { overwrite },
+      bubbles: true,
+      composed: true,
+    })
+  );
+}
+
+function bundleFile(): File {
+  return new File(
+    [new Uint8Array([0x1f, 0x8b, 0x08, 0x00])],
+    "device.esphomebundle.tar.gz"
   );
 }
 
@@ -169,5 +197,74 @@ describe("create-config-dialog open/close contract", () => {
     const el = await mount({});
     el.close();
     expect(isOpen(el)).toBe(false);
+  });
+});
+
+// A .tar.gz is binary, so the wizard routes it to importBundle (base64)
+// instead of reading it as text and shoving garbage into createDevice.
+describe("create-config-dialog bundle import", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const step = (el: ESPHomeCreateConfigDialog): string =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._step;
+
+  it("imports a bundle as base64 and never calls createDevice", async () => {
+    const createDevice = vi.fn();
+    const importBundle = vi.fn().mockResolvedValue({
+      status: "imported",
+      configuration: "device.yaml",
+      conflicts: [],
+      has_secrets: false,
+      esphome_version: "2026.6.0",
+    });
+    const el = await mount({ createDevice, importBundle });
+
+    emitImport(el, bundleFile());
+    await flush();
+
+    expect(createDevice).not.toHaveBeenCalled();
+    expect(importBundle).toHaveBeenCalledTimes(1);
+    const arg = importBundle.mock.calls[0][0];
+    expect(arg.file_content_b64).toBeTruthy();
+    expect(arg.overwrite).toBeUndefined();
+  });
+
+  it("routes a conflicts response to the resolve step, then re-submits the same bytes with overwrite", async () => {
+    const importBundle = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: "conflicts",
+        configuration: "device.yaml",
+        conflicts: ["device.yaml", "common/wifi.yaml"],
+        has_secrets: true,
+        esphome_version: "2026.6.0",
+      })
+      .mockResolvedValueOnce({
+        status: "imported",
+        configuration: "device.yaml",
+        conflicts: [],
+        has_secrets: true,
+        esphome_version: "2026.6.0",
+      });
+    const el = await mount({ importBundle });
+
+    emitImport(el, bundleFile());
+    await flush();
+    await el.updateComplete;
+
+    expect(step(el)).toBe("resolve-conflicts");
+    const firstB64 = importBundle.mock.calls[0][0].file_content_b64;
+
+    emitResolve(el, ["device.yaml"]);
+    await flush();
+
+    expect(importBundle).toHaveBeenCalledTimes(2);
+    const secondArg = importBundle.mock.calls[1][0];
+    expect(secondArg.overwrite).toEqual(["device.yaml"]);
+    // Same cached bytes re-sent; the file isn't re-read.
+    expect(secondArg.file_content_b64).toBe(firstB64);
   });
 });

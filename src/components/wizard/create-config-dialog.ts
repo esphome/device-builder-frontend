@@ -11,6 +11,7 @@ import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
+import { arrayBufferToBase64 } from "../../util/base64.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -21,11 +22,12 @@ import "../base-dialog.js";
 import "./wizard-step-board.js";
 import "./wizard-step-empty-config.js";
 import "./wizard-step-method.js";
+import "./wizard-step-resolve-conflicts.js";
 import "./wizard-step-setup.js";
 
 registerMdiIcons({ close: mdiClose, "arrow-left": mdiArrowLeft });
 
-type WizardStep = "method" | "board" | "setup" | "empty-config";
+type WizardStep = "method" | "board" | "setup" | "empty-config" | "resolve-conflicts";
 type CreationMethod = "basic" | "empty" | "import";
 type WizardStepDetail =
   | WizardStep
@@ -70,6 +72,16 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   /** Stored file for import flow (selected before board step). */
   private _importFile: File | null = null;
+
+  /** Base64 of the picked bundle, held across the conflict-resolution
+   *  round-trip so the user's overwrite choices re-submit the same bytes. */
+  private _bundleB64: string | null = null;
+
+  @state()
+  private _bundleConflicts: string[] = [];
+
+  @state()
+  private _bundleHasSecrets = false;
 
   @state()
   private _submitting = false;
@@ -155,6 +167,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   private _resetTransientState(): void {
     this._creationMethod = "basic";
     this._importFile = null;
+    this._bundleB64 = null;
+    this._bundleConflicts = [];
+    this._bundleHasSecrets = false;
     this._submitting = false;
     this._resetCreateErrors();
     this._open = true;
@@ -198,6 +213,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         return this._localize("wizard.title_setup");
       case "empty-config":
         return this._localize("wizard.title_empty_config");
+      case "resolve-conflicts":
+        return this._localize("wizard.import_bundle_conflicts_title");
     }
   }
 
@@ -214,6 +231,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         @finish-setup=${this._onFinishSetup}
         @create-empty-config=${this._onCreateEmptyConfig}
         @import-file=${this._onImportFile}
+        @resolve-conflicts=${this._onResolveConflicts}
       >
         ${this._step !== "method"
           ? html`<button
@@ -259,6 +277,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         return html`<esphome-wizard-step-empty-config
           ?active=${this._open}
         ></esphome-wizard-step-empty-config>`;
+      case "resolve-conflicts":
+        return html`<esphome-wizard-step-resolve-conflicts
+          .conflicts=${this._bundleConflicts}
+          .hasSecrets=${this._bundleHasSecrets}
+        ></esphome-wizard-step-resolve-conflicts>`;
     }
   }
 
@@ -284,7 +307,21 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   private _onImportFile(e: CustomEvent<{ file: File }>) {
     this._creationMethod = "import";
     this._importFile = e.detail.file;
+    // Drop any cached bytes/conflicts from a prior pick so a re-selection
+    // can't re-submit the previous file or its stale conflict list.
+    this._bundleB64 = null;
+    this._bundleConflicts = [];
+    this._bundleHasSecrets = false;
     this._createImportedDevice();
+  }
+
+  private _onResolveConflicts(e: CustomEvent<{ overwrite: string[] }>) {
+    this._importBundleFlow(e.detail.overwrite);
+  }
+
+  /** A bundle is a gzipped tarball, not text; route it to import_bundle. */
+  private _isBundleFile(file: File): boolean {
+    return /\.(tar\.gz|tgz|esphomebundle)$/i.test(file.name);
   }
 
   private _onBack() {
@@ -296,6 +333,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         this._step = "board";
         break;
       case "empty-config":
+        this._step = "method";
+        break;
+      case "resolve-conflicts":
         this._step = "method";
         break;
     }
@@ -350,6 +390,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     if (this._submitting) return;
     if (!this._importFile) return;
 
+    if (this._isBundleFile(this._importFile)) {
+      await this._importBundleFlow();
+      return;
+    }
+
     this._resetCreateErrors();
 
     let fileContent: string;
@@ -395,6 +440,45 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       this._importError = msg.includes("409")
         ? this._localize("wizard.import_duplicate_error", { name: slug })
         : this._localize("wizard.import_general_error");
+    } finally {
+      this._submitting = false;
+    }
+  }
+
+  /** Import an `esphome bundle`. The first call sends the bytes; a
+   *  'conflicts' response routes to the resolve-conflicts step, whose
+   *  confirm re-enters here with the chosen `overwrite` paths (the cached
+   *  base64 is reused so the file isn't re-read). */
+  private async _importBundleFlow(overwrite?: string[]): Promise<void> {
+    if (!this._importFile) return;
+    this._resetCreateErrors();
+
+    if (this._bundleB64 === null) {
+      try {
+        const buffer = await this._importFile.arrayBuffer();
+        this._bundleB64 = arrayBufferToBase64(buffer);
+      } catch {
+        this._importError = this._localize("wizard.import_read_error");
+        return;
+      }
+    }
+
+    this._submitting = true;
+    try {
+      const res = await this._api.importBundle({
+        file_content_b64: this._bundleB64,
+        ...(overwrite !== undefined ? { overwrite } : {}),
+      });
+      if (res.status === "conflicts") {
+        this._bundleConflicts = res.conflicts;
+        this._bundleHasSecrets = res.has_secrets;
+        this._step = "resolve-conflicts";
+        return;
+      }
+      this._navigateToCreated(res.configuration);
+    } catch (err) {
+      const msg = err instanceof APIError && err.details.trim() ? err.details.trim() : "";
+      this._importError = msg || this._localize("wizard.import_general_error");
     } finally {
       this._submitting = false;
     }
