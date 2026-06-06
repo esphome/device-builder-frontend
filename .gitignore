@@ -27,3 +27,10 @@ build/
 !/README.md
 !/CLAUDE.md
 /*.png
+
+# Stray top-level YAML must never be committed: a misplaced device config
+# could leak secrets. Only the tooling config below is tracked; nested
+# YAML is unaffected.
+/*.yaml
+/*.yml
+!/.pre-commit-config.yaml
