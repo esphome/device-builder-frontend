@@ -506,6 +506,28 @@ describe("parseYamlAutomations", () => {
     expect(items[0].key).toBe("automation:component_on:aht20_temperature:on_value");
   });
 
+  it("ignores zero-depth list fields when scoping a sub-entity", () => {
+    // A zero-depth ``filters:`` list (``filters:\n- ...``, dashes at the field
+    // indent) and a zero-depth ``then:`` must not be read as the id/name.
+    const yaml = `sensor:
+  - platform: aht10
+    id: aht20
+    temperature:
+      id: aht20_temperature
+      filters:
+      - offset: 1.0
+      on_value:
+        then:
+        - globals.set:
+            id: some_global
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe("aht20_temperature");
+  });
+
   it("leaves a deeper non-sub-entity on_* unscoped", () => {
     // An on_* nested inside an action body (not an ided sub-block) must not
     // be mis-scoped to a sub-entity.

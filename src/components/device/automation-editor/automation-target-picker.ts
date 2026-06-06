@@ -179,13 +179,20 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
           @change=${(e: Event) =>
             this._onComponentChange((e.target as HTMLSelectElement).value)}
         >
-          ${targets.map(
-            (d) =>
-              html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
-                >${d.name ?? d.id}
-                <span class="ae-muted">(${d.component_id})</span></wa-option
-              >`
-          )}
+          ${targets.map((d) => {
+            // Sub-entities carry the bare sub-domain as component_id, so two
+            // readings named alike read identically; append the parent for
+            // parity with the grouped add picker.
+            const parent = d.parent_id
+              ? this.devices.find((p) => p.id === d.parent_id)
+              : undefined;
+            const context = parent
+              ? `${d.component_id} · ${parent.name ?? parent.id}`
+              : d.component_id;
+            return html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
+              >${d.name ?? d.id} <span class="ae-muted">(${context})</span></wa-option
+            >`;
+          })}
         </wa-select>
       `;
     }

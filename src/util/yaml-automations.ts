@@ -293,9 +293,10 @@ function _subEntity(
     const ind = lineIndent(lines[k]);
     if (ind <= childIndent) break; // end of the sub-block
     if (subChildIndent === -1) subChildIndent = ind; // the block's own field level
-    // Only the block's direct fields are its id/name; deeper lines are the
-    // handler body (a nested ``id:`` there must not retarget the automation).
-    if (ind !== subChildIndent) continue;
+    // Only the block's direct mapping fields are its id/name. Deeper lines are
+    // the handler body, and a dash line at the field indent is a zero-depth
+    // list (``filters:\n- ...``) — neither is the sub-entity's own id.
+    if (ind !== subChildIndent || /^\s*-/.test(lines[k])) continue;
     id = readInstanceScalar(lines[k], "id") ?? id;
     name = readInstanceScalar(lines[k], "name") ?? name;
   }
