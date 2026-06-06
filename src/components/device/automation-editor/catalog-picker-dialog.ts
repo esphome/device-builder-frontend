@@ -49,7 +49,7 @@ import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { selectableTargets } from "./component-targets.js";
+import { componentDomain, instanceName, selectableTargets } from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../../base-dialog.js";
@@ -413,7 +413,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     // A multi-entity container isn't itself a referenceable entity — its
     // sub-entities are surfaced as their own instances.
     const sections = selectableTargets(this.devices).map((device) => {
-      const [domain] = device.component_id.split(".");
+      const domain = componentDomain(device.component_id);
       const matching = items.filter((i) => {
         if (!("domain" in i)) return false;
         return i.domain === domain || i.domain === device.component_id;
@@ -429,7 +429,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     return html`${nonEmpty.map(
       ({ device, matching }) => html`
         <p class="picker-group-label">
-          ${device.name ?? device.id}
+          ${instanceName(device)}
           <span class="ae-muted">(${device.component_id})</span>
         </p>
         ${matching.map((item) =>
@@ -526,7 +526,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     item: CatalogItem,
     device: AvailableComponentInstance
   ): Record<string, unknown> | undefined {
-    const [domain] = device.component_id.split(".");
+    const domain = componentDomain(device.component_id);
     const idEntry = item.config_entries.find((e) => e.references_component === domain);
     if (!idEntry) return undefined;
     return { [idEntry.key]: device.id };

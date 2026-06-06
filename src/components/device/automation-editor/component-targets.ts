@@ -7,6 +7,16 @@ import type {
   AvailableComponentInstance,
 } from "../../../api/types/automations.js";
 
+/** The instance's display label: its ``name:`` when set, else its id. */
+export function instanceName(device: AvailableComponentInstance): string {
+  return device.name ?? device.id;
+}
+
+/** Bare domain of a ``component_id`` (``sensor.aht10`` → ``sensor``). */
+export function componentDomain(componentId: string): string {
+  return componentId.split(".")[0];
+}
+
 /** A multi-entity platform container holds no triggers of its own (its
  *  sub-entities do), so it isn't directly selectable as a target. */
 export function isSelectableTarget(device: AvailableComponentInstance): boolean {
@@ -44,7 +54,7 @@ export function triggersForComponent(
   device: AvailableComponentInstance | undefined
 ): AutomationTrigger[] {
   if (!device || !isSelectableTarget(device)) return [];
-  const [domain] = device.component_id.split(".");
+  const domain = componentDomain(device.component_id);
   return triggers.filter(
     (t) =>
       !t.is_device_level &&

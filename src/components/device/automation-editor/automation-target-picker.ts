@@ -39,7 +39,11 @@ import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
-import { firstSelectableTarget, selectableTargets } from "./component-targets.js";
+import {
+  firstSelectableTarget,
+  instanceName,
+  selectableTargets,
+} from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
@@ -187,10 +191,10 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
               ? this.devices.find((p) => p.id === d.parent_id)
               : undefined;
             const context = parent
-              ? `${d.component_id} · ${parent.name ?? parent.id}`
+              ? `${d.component_id} · ${instanceName(parent)}`
               : d.component_id;
             return html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
-              >${d.name ?? d.id} <span class="ae-muted">(${context})</span></wa-option
+              >${instanceName(d)} <span class="ae-muted">(${context})</span></wa-option
             >`;
           })}
         </wa-select>

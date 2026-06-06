@@ -34,7 +34,7 @@ import { renderMarkdown } from "../../../util/markdown.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
-import { triggersForComponent } from "./component-targets.js";
+import { instanceName, triggersForComponent } from "./component-targets.js";
 import { applyParamChange } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -102,7 +102,7 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
         ${boundDevice
           ? html`<p class="ae-section-desc">
               ${this._localize("device.automation_trigger_on_component", {
-                component: boundDevice.name ?? boundDevice.id,
+                component: instanceName(boundDevice),
                 domain: boundDevice.component_id,
               })}
             </p>`

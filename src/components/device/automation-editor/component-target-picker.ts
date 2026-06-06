@@ -12,6 +12,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { componentTargetPickerStyles } from "./component-target-picker.styles.js";
+import { instanceName } from "./component-targets.js";
 
 type Group = { header: AvailableComponentInstance; subs: AvailableComponentInstance[] };
 
@@ -38,7 +39,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
   protected render() {
     const { plan, order } = this._plan();
     if (order.length === 0) {
-      return html`<p class="error">
+      return html`<p class="error" role="status">
         ${this._localize("device.automation_target_no_components")}
       </p>`;
     }
@@ -61,7 +62,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
             aria-labelledby=${headerId}
           >
             <p class="component-group" id=${headerId}>
-              ${item.header.name ?? item.header.id}
+              ${instanceName(item.header)}
               <span class="component-group-id">(${item.header.component_id})</span>
             </p>
             ${item.subs.map((s) => this._renderChoice(s, order))}
@@ -115,7 +116,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
       tabindex=${tabbable ? "0" : "-1"}
       @click=${() => this._select(d.id)}
     >
-      <span class="component-choice-name">${d.name ?? d.id}</span>
+      <span class="component-choice-name">${instanceName(d)}</span>
       <span class="component-domain">${d.component_id}</span>
     </div>`;
   }
