@@ -9,6 +9,7 @@ import {
   labelFor,
   renderFieldError,
   renderLabel,
+  renderYamlOnlyField,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
@@ -83,6 +84,14 @@ export function renderMultiValueField(
   path: string[],
   ctx: RenderCtx
 ) {
+  const raw = readArrayAt(ctx, path);
+  // A list whose items are mappings (a backend list-of-dicts the schema
+  // bundle couldn't type as nested, e.g. a light's ``segments``) can't be
+  // driven by scalar rows — ``String({…})`` would render "[object Object]"
+  // and a save would clobber the data. Edit those in the YAML pane.
+  if (raw.some((v) => !isPrimitiveOrNullish(v))) {
+    return renderYamlOnlyField(entry, path, ctx);
+  }
   // Show escape-worthy code points (control / Private-Use, e.g. MDI font
   // glyphs) as ``\U…`` so an otherwise-invisible value is editable, and
   // decode on input (device-builder#1232). Escaping is unconditional so
@@ -91,7 +100,7 @@ export function renderMultiValueField(
   // back unchanged, rather than being rewritten on a no-op edit. Decoding
   // must stay unconditional too — a freshly added row is empty, so a typed
   // ``\U…`` has to decode without a prior escape-worthy value to gate on.
-  const items: string[] = readArrayAt(ctx, path).map((v) => escapeForInput(String(v)));
+  const items: string[] = raw.map((v) => escapeForInput(String(v)));
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => "");

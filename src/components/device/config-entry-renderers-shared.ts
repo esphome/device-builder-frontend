@@ -274,6 +274,13 @@ export function renderYamlOnlyFallbackIfNonPrimitive(
   raw: unknown
 ) {
   if (isPrimitiveOrNullish(raw)) return null;
+  return renderYamlOnlyField(entry, path, ctx);
+}
+
+/** The "this value can only be edited in YAML" field shell — shown when a
+ *  value's shape (a mapping, or a list whose items are mappings) can't be
+ *  driven by the scalar/multi-value inputs. */
+export function renderYamlOnlyField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
