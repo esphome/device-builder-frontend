@@ -236,4 +236,13 @@ describe("esphome-secrets-structured-editor", () => {
     expect(el.shadowRoot!.querySelector(".group-link")).toBeNull();
     expect(el.shadowRoot!.querySelector(".group-header")!.textContent).toContain("bw15");
   });
+
+  test("links a hyphenated device whose secret prefix uses underscores", async () => {
+    const el = await mount("apollo_r_pro__key: a\n", false, [
+      { name: "apollo-r-pro", configuration: "apollo.yaml", friendly_name: "Apollo" },
+    ]);
+    const link = el.shadowRoot!.querySelector<HTMLAnchorElement>(".group-link");
+    expect(link).not.toBeNull();
+    expect(link!.getAttribute("href")).toBe("/device/apollo.yaml");
+  });
 });

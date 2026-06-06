@@ -31,8 +31,9 @@ export interface SecretGroup {
 // by end-of-line or whitespace (``key:value`` with no space is a plain
 // scalar in YAML, not a mapping). No leading indent — nested children
 // are indented and never match, so a parent with a block value is left
-// to the advanced (read-only) path.
-const TOP_LEVEL_KEY = /^([A-Za-z_][A-Za-z0-9_.\-]*):(?:[ \t]+([^\n]*))?$/;
+// to the advanced (read-only) path. ``<<`` matches so an HA-style merge
+// key surfaces as an advanced row rather than vanishing.
+const TOP_LEVEL_KEY = /^(<<|[A-Za-z_][A-Za-z0-9_.\-]*):(?:[ \t]+([^\n]*))?$/;
 
 const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 

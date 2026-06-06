@@ -83,6 +83,12 @@ describe("parseSecretsEntries", () => {
   test("key:value with no space after the colon is not an entry", () => {
     expect(parseSecretsEntries("notakey:value\n")).toEqual([]);
   });
+
+  test("a top-level merge key surfaces as an advanced entry", () => {
+    const entries = parseSecretsEntries("<<: *base\nwifi_ssid: home\n");
+    expect(entries[0]).toMatchObject({ key: "<<", editable: false });
+    expect(entries[1]).toMatchObject({ key: "wifi_ssid", editable: true });
+  });
 });
 
 describe("splice operations preserve the rest of the document", () => {

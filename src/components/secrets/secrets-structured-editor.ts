@@ -126,7 +126,10 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
         ${this._localize("secrets.group_shared")}
       </h2>`;
     }
-    const match = this._devices.find((d) => d.name === device);
+    // Per-device secret prefixes are valid identifiers, so a device named
+    // with hyphens (``apollo-r-pro``) yields an underscore prefix
+    // (``apollo_r_pro``); normalize both before matching.
+    const match = this._devices.find((d) => d.name.replace(/-/g, "_") === device);
     if (!match) {
       return html`<h2 class="group-header">${device}</h2>`;
     }
