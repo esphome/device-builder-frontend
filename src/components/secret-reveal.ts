@@ -50,11 +50,15 @@ export class ESPHomeSecretReveal extends LitElement {
   @state() private _revealed = false;
   @state() private _resolved?: string;
   @state() private _busy = false;
+  /** Bumped whenever the target changes, to discard a stale in-flight resolve. */
+  private _token = 0;
 
   protected willUpdate(changed: PropertyValues): void {
     if (changed.has("value") || changed.has("resolve") || changed.has("resetKey")) {
       this._revealed = false;
       this._resolved = undefined;
+      this._busy = false;
+      this._token++; // invalidate any resolve in flight for the previous target
     }
   }
 
@@ -115,17 +119,24 @@ export class ESPHomeSecretReveal extends LitElement {
     return this.value ?? this._resolved;
   }
 
-  /** Resolve the value if needed; returns it (or "" on a failed/empty resolve). */
-  private async _ensureValue(): Promise<string> {
+  /** Resolve the value if needed. Returns the value (possibly `""`) when it's
+   *  current, or `null` to ignore — the resolver rejected (it surfaces its own
+   *  error) or the target changed while the resolve was in flight. */
+  private async _ensureValue(): Promise<string | null> {
     if (this._value !== undefined) return this._value;
     if (!this.resolve) return "";
+    const token = this._token;
     this._busy = true;
     try {
-      this._resolved = (await this.resolve()) ?? "";
+      const value = (await this.resolve()) ?? "";
+      if (token !== this._token) return null; // target changed mid-flight — drop it
+      this._resolved = value;
+      return value;
+    } catch {
+      return null; // resolver failed; it surfaces its own error
     } finally {
-      this._busy = false;
+      if (token === this._token) this._busy = false;
     }
-    return this._resolved ?? "";
   }
 
   private _onToggle = (): void => {
@@ -137,8 +148,9 @@ export class ESPHomeSecretReveal extends LitElement {
       this._revealed = true; // known value — reveal immediately
       return;
     }
-    void this._ensureValue().then(() => {
-      this._revealed = true; // lazy fetch resolved
+    void this._ensureValue().then((value) => {
+      // null = failed or stale (target changed) — leave it masked.
+      if (value !== null) this._revealed = true;
     });
   };
 

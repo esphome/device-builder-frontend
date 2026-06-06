@@ -76,6 +76,29 @@ describe("esphome-secret-reveal", () => {
     expect(resolve).toHaveBeenCalledTimes(1);
   });
 
+  it("swallows a rejecting resolver and stays masked (no unhandled rejection)", async () => {
+    const resolve = vi.fn().mockRejectedValue(new Error("ws blip"));
+    const el = await mount({ resolve });
+    buttons(el)[0].click();
+    await tick();
+    await el.updateComplete;
+    expect(valueText(el)).toBe(MASK);
+  });
+
+  it("ignores a stale in-flight resolve when the target changes", async () => {
+    let release!: (v: string) => void;
+    const resolve = vi.fn(() => new Promise<string>((r) => (release = r)));
+    const el = await mount({ resolve });
+    buttons(el)[0].click(); // starts the resolve (in flight)
+    (el as any).resetKey = "switched"; // target changes before it resolves
+    await el.updateComplete;
+    release("leaked-value"); // late result for the old target
+    await tick();
+    await el.updateComplete;
+    expect(valueText(el)).toBe(MASK); // not revealed
+    expect((el as any)._resolved).toBeUndefined(); // stale value dropped
+  });
+
   it("copies the value via the clipboard helper", async () => {
     const el = await mount({ value: "abc123" });
     buttons(el)[1].click();
