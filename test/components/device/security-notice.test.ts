@@ -212,22 +212,19 @@ describe("security-notice — generate", () => {
     });
   });
 
-  it("reveals the generated credentials (actual stored value) after generating", async () => {
-    const { inner } = setup(
+  it("reuses an existing secret (no overwrite) and still references it", async () => {
+    const { inner, updateConfig, applied } = setup(
       "ota.esphome",
       "ota:\n  - platform: esphome\n",
       2,
       async () => "kitchen__ota_password: existing\n" // key already present → reused
     );
     await inner._onGenerate();
-    // Reuses the existing secret (no write) and reveals its actual value.
-    expect(inner._revealRows).toEqual([
-      {
-        labelKey: "security_field_password",
-        value: "existing",
-        key: "kitchen__ota_password",
-      },
+    expect(updateConfig).not.toHaveBeenCalled();
+    expect(applied[0]).toEqual([
+      { path: ["password"], value: "!secret kitchen__ota_password" },
     ]);
+    expect(toast.success).toHaveBeenCalled();
   });
 
   it("does nothing when the device name can't resolve", async () => {

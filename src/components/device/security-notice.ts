@@ -9,11 +9,10 @@
  * - `web_server` — missing `auth:` → generate an inline username + a password.
  *
  * On confirm it stores each generated secret in secrets.yaml (via
- * `ensureSecretInYaml`), emits `apply-security-secrets` so the host points the
- * config field(s) at them (a `!secret` ref for secret fields, the literal value
- * for inline fields), then reveals the generated values so the user can copy
- * them. Adding a setting is a single registry entry + its copy — no per-setting
- * code.
+ * `ensureSecretInYaml`) and emits `apply-security-secrets` so the host points
+ * the config field(s) at them (a `!secret` ref for secret fields, the literal
+ * value for inline fields). The user can reveal the stored value inline from the
+ * field's secret picker. Adding a setting is a single registry entry + its copy.
  */
 import { consume } from "@lit/context";
 import { mdiLockAlert } from "@mdi/js";
@@ -37,7 +36,6 @@ import { findSectionStart } from "../../util/yaml-section-reader.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
-import "../secret-reveal.js";
 
 registerMdiIcons({ "lock-alert": mdiLockAlert });
 
@@ -51,8 +49,6 @@ interface GeneratedField {
    *  this `recommendedSecretKeys` field and referenced via `!secret`. When
    *  absent, the generated value is written inline (e.g. the web username). */
   secretField?: string;
-  /** `device.<labelKey>` label for the reveal row. */
-  labelKey: string;
 }
 
 /** A recommended security setting and how to satisfy it. */
@@ -82,7 +78,6 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
         path: ["encryption", "key"],
         generate: generateApiEncryptionKey,
         secretField: "key",
-        labelKey: "security_field_encryption_key",
       },
     ],
   },
@@ -90,14 +85,7 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
     secretSection: "ota",
     marker: "password",
     copyPrefix: "ota_password",
-    fields: [
-      {
-        path: ["password"],
-        generate: passphrase,
-        secretField: "password",
-        labelKey: "security_field_password",
-      },
-    ],
+    fields: [{ path: ["password"], generate: passphrase, secretField: "password" }],
   },
   web_server: {
     secretSection: "web_server",
@@ -105,13 +93,8 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
     copyPrefix: "web_auth",
     fields: [
       // Username isn't sensitive and its field isn't a secret field — inline it.
-      { path: ["auth", "username"], generate: word, labelKey: "security_field_username" },
-      {
-        path: ["auth", "password"],
-        generate: passphrase,
-        secretField: "password",
-        labelKey: "security_field_password",
-      },
+      { path: ["auth", "username"], generate: word },
+      { path: ["auth", "password"], generate: passphrase, secretField: "password" },
     ],
   },
 };
@@ -126,14 +109,6 @@ export interface ApplySecuritySecretsDetail {
   /** Each generated field's draft path and the value to write there (a
    *  `!secret <key>` reference for secret fields, the literal for inline ones). */
   secrets: { path: string[]; value: string }[];
-}
-
-/** A revealed credential row in the post-generate dialog. */
-interface RevealRow {
-  labelKey: string;
-  value: string;
-  /** secrets.yaml key it's stored under, or `""` for an inline value. */
-  key: string;
 }
 
 @customElement("esphome-security-notice")
@@ -168,11 +143,7 @@ export class ESPHomeSecurityNotice extends LitElement {
 
   @state() private _generating = false;
 
-  /** The generated credentials shown in the reveal dialog after a generate. */
-  @state() private _revealRows: RevealRow[] = [];
-
-  @query("esphome-confirm-dialog.confirm") private _confirmDialog?: ESPHomeConfirmDialog;
-  @query("esphome-confirm-dialog.reveal") private _revealDialog?: ESPHomeConfirmDialog;
+  @query("esphome-confirm-dialog") private _dialog?: ESPHomeConfirmDialog;
 
   private get _setting(): SecuritySetting | undefined {
     return isSecuritySection(this.sectionKey)
@@ -241,7 +212,7 @@ export class ESPHomeSecurityNotice extends LitElement {
 
   private _onCta = (): void => {
     // Guard the open so a missing device name can't route into a failure path.
-    if (this._ready) this._confirmDialog?.open();
+    if (this._ready) this._dialog?.open();
   };
 
   private _onGenerate = async (): Promise<void> => {
@@ -251,18 +222,13 @@ export class ESPHomeSecurityNotice extends LitElement {
     this._generating = true;
     try {
       const applied: { path: string[]; value: string }[] = [];
-      const rows: RevealRow[] = [];
       for (const { field, key } of fields) {
         const generated = await field.generate();
         if (field.secretField) {
-          // `value` is what's actually stored (the existing one if the key was
-          // already present), so the reveal shows the truth.
-          const { value } = await ensureSecretInYaml(this._api, key, generated);
+          await ensureSecretInYaml(this._api, key, generated);
           applied.push({ path: field.path, value: `!secret ${key}` });
-          rows.push({ labelKey: field.labelKey, value, key });
         } else {
           applied.push({ path: field.path, value: generated });
-          rows.push({ labelKey: field.labelKey, value: generated, key: "" });
         }
       }
       this.dispatchEvent(
@@ -272,11 +238,9 @@ export class ESPHomeSecurityNotice extends LitElement {
           composed: true,
         })
       );
-      // Applying the secrets makes the marker present, which hides the notice +
-      // confirm dialog — so reveal via the reveal dialog, which renders
-      // independently of `_markerAbsent` and is already in the DOM.
-      this._revealRows = rows;
-      this._revealDialog?.open?.();
+      // The values are now in secrets.yaml + the draft; the user can reveal them
+      // inline from the field's secret picker.
+      toast.success(this._localize("device.security_applied"), { richColors: true });
     } catch (err) {
       // ensureSecretInYaml aborts (throws) on a read failure rather than
       // clobbering secrets.yaml; log the cause and leave the config untouched.
@@ -349,8 +313,7 @@ export class ESPHomeSecurityNotice extends LitElement {
         cursor: not-allowed;
       }
 
-      .dialog-body code,
-      .cred-stored code {
+      .dialog-body code {
         font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
         font-size: var(--wa-font-size-s);
         padding: 1px 5px;
@@ -358,50 +321,12 @@ export class ESPHomeSecurityNotice extends LitElement {
         background: var(--wa-color-surface-lowered);
         word-break: break-all;
       }
-
-      /* Wider so long secret keys / passphrases wrap less. */
-      esphome-confirm-dialog.reveal {
-        --esphome-confirm-dialog-width: 560px;
-      }
-
-      .reveal-body {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-m);
-      }
-
-      .reveal-body p {
-        margin: 0;
-      }
-
-      .cred {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-      }
-
-      .cred-label {
-        font-weight: var(--wa-font-weight-bold);
-        font-size: var(--wa-font-size-s);
-      }
-
-      .cred-stored {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-      }
     `,
   ];
 
   protected render() {
     const setting = this._setting;
-    if (!setting) return nothing;
-    return html`
-      ${this._markerAbsent ? this._renderNotice(setting) : nothing}
-      ${this._renderRevealDialog()}
-    `;
-  }
-
-  private _renderNotice(setting: SecuritySetting) {
+    if (!setting || !this._markerAbsent) return nothing;
     return html`
       <div class="notice" role="note">
         <wa-icon library="mdi" name="lock-alert"></wa-icon>
@@ -418,7 +343,6 @@ export class ESPHomeSecurityNotice extends LitElement {
         </div>
       </div>
       <esphome-confirm-dialog
-        class="confirm"
         heading=${this._localize(`device.${setting.copyPrefix}_dialog_title`)}
         confirm-label=${this._localize("device.security_generate")}
         @confirm=${this._onGenerate}
@@ -439,36 +363,6 @@ export class ESPHomeSecurityNotice extends LitElement {
       .filter((f) => f.field.secretField)
       .map((f, i) => html`${i > 0 ? ", " : ""}<code>${f.key}</code>`);
     return html`${before}${codes}${after}`;
-  }
-
-  private _renderRevealDialog() {
-    return html`
-      <esphome-confirm-dialog
-        class="reveal"
-        heading=${this._localize("device.security_reveal_title")}
-        confirm-label=${this._localize("device.security_done")}
-      >
-        <div slot="body" class="reveal-body">
-          <p>${this._localize("device.security_reveal_intro")}</p>
-          ${this._revealRows.map(
-            (row) => html`
-              <div class="cred">
-                <span class="cred-label"
-                  >${this._localize(`device.${row.labelKey}`)}</span
-                >
-                <esphome-secret-reveal .value=${row.value}></esphome-secret-reveal>
-                ${row.key
-                  ? html`<span class="cred-stored"
-                      >${this._localize("device.security_stored_as")}
-                      <code>${row.key}</code></span
-                    >`
-                  : nothing}
-              </div>
-            `
-          )}
-        </div>
-      </esphome-confirm-dialog>
-    `;
   }
 }
 
