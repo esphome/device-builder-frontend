@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { mdiAlertOutline, mdiContentSave } from "@mdi/js";
 import { LitElement, css, html } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -21,6 +21,13 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  /** Override the default device-editor wording (e.g. for the secrets page). */
+  @property()
+  heading = "";
+
+  @property()
+  message = "";
 
   @state() private _open = false;
 
@@ -177,8 +184,12 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
             <wa-icon library="mdi" name="alert-outline"></wa-icon>
           </div>
           <div class="text">
-            <h2 class="heading">${this._localize("device.unsaved_title")}</h2>
-            <p class="message">${this._localize("device.unsaved_message")}</p>
+            <h2 class="heading">
+              ${this.heading || this._localize("device.unsaved_title")}
+            </h2>
+            <p class="message">
+              ${this.message || this._localize("device.unsaved_message")}
+            </p>
           </div>
         </div>
         <div class="actions">
