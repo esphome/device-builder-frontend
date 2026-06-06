@@ -239,6 +239,8 @@ describe("create-config-dialog bundle import", () => {
       status: "imported",
       configuration: "device.yaml",
       conflicts: [],
+      written: ["device.yaml"],
+      kept: [],
       has_secrets: false,
       esphome_version: "2026.6.0",
     });
@@ -268,6 +270,8 @@ describe("create-config-dialog bundle import", () => {
         status: "imported",
         configuration: "device.yaml",
         conflicts: [],
+        written: ["device.yaml"],
+        kept: [],
         has_secrets: true,
         esphome_version: "2026.6.0",
       });
@@ -327,6 +331,30 @@ describe("create-config-dialog bundle import", () => {
     await flush();
 
     expect(importBundle).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a distinct partial-import result when the backend keeps files", async () => {
+    const importBundle = vi.fn().mockResolvedValue({
+      status: "imported",
+      configuration: "device.yaml",
+      conflicts: [],
+      written: ["common/new.yaml"],
+      kept: ["device.yaml", "common/wifi.yaml"],
+      has_secrets: false,
+      esphome_version: "2026.6.0",
+    });
+    const el = await mount({ importBundle });
+
+    emitImport(el, bundleFile());
+    await flush();
+    await el.updateComplete;
+
+    expect(step(el)).toBe("import-partial");
+    const kept = [...el.shadowRoot!.querySelectorAll(".import-partial ul.kept li")].map(
+      (li) => li.textContent
+    );
+    expect(kept).toEqual(["device.yaml", "common/wifi.yaml"]);
+    expect(el.shadowRoot!.querySelector(".btn-open")).not.toBeNull();
   });
 });
 

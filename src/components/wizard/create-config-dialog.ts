@@ -35,7 +35,8 @@ type WizardStep =
   | "setup"
   | "empty-config"
   | "resolve-conflicts"
-  | "confirm-overwrite";
+  | "confirm-overwrite"
+  | "import-partial";
 type CreationMethod = "basic" | "empty" | "import";
 type WizardStepDetail =
   | WizardStep
@@ -100,6 +101,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
    *  existing device. */
   private _pendingUpload: { slug: string; fileContent: string } | null = null;
 
+  /** Set after a bundle import that left some existing files in place, so
+   *  the result is shown as a partial import rather than a silent success. */
+  @state()
+  private _partialImport: { configuration: string; kept: string[] } | null = null;
+
   @state()
   private _submitting = false;
 
@@ -145,6 +151,40 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         font-size: var(--wa-font-size-s);
         margin-top: var(--wa-space-s);
       }
+
+      .import-partial p {
+        margin: 0 0 var(--wa-space-m);
+        color: var(--wa-color-text-normal);
+        font-size: var(--wa-font-size-s);
+      }
+
+      .import-partial ul.kept {
+        margin: 0 0 var(--wa-space-l);
+        padding-left: var(--wa-space-l);
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: var(--wa-font-family-code, monospace);
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-quiet);
+        word-break: break-all;
+      }
+
+      .partial-actions {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .btn-open {
+        padding: 8px 18px;
+        border-radius: var(--wa-border-radius-m);
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-bold);
+        font-family: inherit;
+        cursor: pointer;
+        border: none;
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+      }
     `,
   ];
 
@@ -189,6 +229,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._bundleHasSecrets = false;
     this._bundleMainConfig = "";
     this._pendingUpload = null;
+    this._partialImport = null;
     this._submitting = false;
     this._resetCreateErrors();
     this._open = true;
@@ -236,6 +277,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         return this._localize("wizard.import_bundle_conflicts_title");
       case "confirm-overwrite":
         return this._localize("wizard.overwrite_device_title");
+      case "import-partial":
+        return this._localize("wizard.import_partial_title");
     }
   }
 
@@ -255,7 +298,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         @resolve-conflicts=${this._onResolveConflicts}
         @overwrite-device=${this._onConfirmOverwrite}
       >
-        ${this._step !== "method"
+        ${this._step !== "method" && this._step !== "import-partial"
           ? html`<button
               slot="header-prefix"
               class="back-button"
@@ -309,7 +352,27 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         return html`<esphome-wizard-step-overwrite-device
           .deviceName=${this._pendingUpload?.slug ?? ""}
         ></esphome-wizard-step-overwrite-device>`;
+      case "import-partial":
+        return this._renderPartialImport();
     }
+  }
+
+  private _renderPartialImport() {
+    const kept = this._partialImport?.kept ?? [];
+    const configuration = this._partialImport?.configuration ?? "";
+    return html`
+      <div class="import-partial">
+        <p>${this._localize("wizard.import_partial_desc", { count: kept.length })}</p>
+        <ul class="kept">
+          ${kept.map((p) => html`<li>${p}</li>`)}
+        </ul>
+        <div class="partial-actions">
+          <button class="btn-open" @click=${() => this._navigateToCreated(configuration)}>
+            ${this._localize("wizard.import_partial_open")}
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   private _onNextStep(e: CustomEvent<WizardStepDetail>) {
@@ -530,6 +593,14 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         this._bundleHasSecrets = res.has_secrets;
         this._bundleMainConfig = res.configuration;
         this._step = "resolve-conflicts";
+        return;
+      }
+      // A partial import (some conflicts kept) is shown explicitly so the
+      // user knows the device may still run its old config, rather than a
+      // silent jump to the editor.
+      if (res.kept.length) {
+        this._partialImport = { configuration: res.configuration, kept: res.kept };
+        this._step = "import-partial";
         return;
       }
       this._navigateToCreated(res.configuration);

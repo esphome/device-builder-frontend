@@ -547,6 +547,9 @@
     "overwrite_device_title": "Device already exists",
     "overwrite_device_message": "A device named \"{name}\" already exists. Overwriting replaces its configuration but keeps your labels, comment, and board.",
     "overwrite_device_button": "Overwrite",
+    "import_partial_title": "Imported, some files kept",
+    "import_partial_desc": "The bundle was imported, but {count} existing file(s) you chose to keep were not replaced. The device may still use its previous configuration for those.",
+    "import_partial_open": "Open device",
     "tag": {
       "esp32": "ESP32",
       "esp32s2": "ESP32-S2",
