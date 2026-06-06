@@ -46,14 +46,12 @@ import "./add-api-action-dialog.js";
 import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
 import "./add-automation-dialog.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
-import "./api-encryption-notice.js";
-import type { ApplyEncryptionKeyDetail } from "./api-encryption-notice.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import "./device-section-automation-list.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import {
-  applyEncryptionKey,
+  applySecuritySecrets,
   flushDraft,
   onDeleteConfirmed,
   onValueChange,
@@ -62,6 +60,8 @@ import {
   loadConfig,
   type SectionConfigResponse,
 } from "./device-section-config/loading.js";
+import "./security-notice.js";
+import { isSecuritySection, type ApplySecuritySecretsDetail } from "./security-notice.js";
 
 registerMdiIcons({
   delete: mdiDelete,
@@ -281,8 +281,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private _onDeleteConfirmed = () => onDeleteConfirmed(this);
 
-  private _onApplyEncryptionKey = (e: CustomEvent<ApplyEncryptionKeyDetail>) =>
-    applyEncryptionKey(this, e.detail.secretKey);
+  private _onApplySecuritySecrets = (e: CustomEvent<ApplySecuritySecretsDetail>) =>
+    applySecuritySecrets(this, e.detail.secrets);
 
   protected render() {
     if (this._loading) {
@@ -368,13 +368,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
             ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
         : html`
-            ${this.sectionKey === "api"
-              ? html`<esphome-api-encryption-notice
+            ${isSecuritySection(this.sectionKey)
+              ? html`<esphome-security-notice
+                  .sectionKey=${this.sectionKey}
                   .yaml=${this.yaml}
                   .configuration=${this.configuration}
                   .fromLine=${this._resolvedFromLine}
-                  @apply-encryption-key=${this._onApplyEncryptionKey}
-                ></esphome-api-encryption-notice>`
+                  @apply-security-secrets=${this._onApplySecuritySecrets}
+                ></esphome-security-notice>`
               : nothing}
             <esphome-config-entry-form
               .entries=${renderEntries}

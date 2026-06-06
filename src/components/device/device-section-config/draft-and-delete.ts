@@ -80,13 +80,17 @@ export function onValueChange(
   host._scheduleDraftFlush();
 }
 
-/** Point `api.encryption.key` at a generated secret (from the api-encryption
- *  notice) in the unsaved draft and flush it into the YAML buffer. */
-export function applyEncryptionKey(
+/** Point the section's field(s) at generated secrets (from the security notice)
+ *  in the unsaved draft and flush the result into the YAML buffer. Each entry is
+ *  a `setIn` path and a `!secret <key>` reference (one for api/ota, two for
+ *  web_server auth). */
+export function applySecuritySecrets(
   host: ESPHomeDeviceSectionConfig,
-  secretKey: string
+  secrets: { path: string[]; ref: string }[]
 ): void {
-  host._values = setIn(host._values, ["encryption", "key"], `!secret ${secretKey}`);
+  for (const { path, ref } of secrets) {
+    host._values = setIn(host._values, path, ref);
+  }
   host._setDirty(true);
   if (host._draftTimer) {
     clearTimeout(host._draftTimer);
