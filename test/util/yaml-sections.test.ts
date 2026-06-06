@@ -484,6 +484,37 @@ describe("parseYamlAutomations", () => {
     expect(items[0].parentKey).toBe("sensor");
   });
 
+  it("scopes a handler on each of two sibling sub-entities to its own block", () => {
+    // The real AHT20 case: each reading carries its own handler; each must
+    // resolve to its own sub-block (not the first one), and the id-only
+    // humidity leaves name undefined.
+    const yaml = `sensor:
+  - platform: aht10
+    id: aht20
+    temperature:
+      name: "Kit Temperature"
+      id: aht20_temperature
+      on_value:
+        - logger.log: t
+    humidity:
+      id: aht20_humidity
+      on_value_range:
+        - logger.log: h
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:aht20_temperature:on_value",
+      "automation:component_on:aht20_humidity:on_value_range",
+    ]);
+    expect(
+      items.every((s) => s.parentComponentId === "aht20" && s.parentKey === "sensor")
+    ).toBe(true);
+    expect(items[0].name).toBe("Kit Temperature");
+    expect(items[1].name).toBeUndefined();
+  });
+
   it("ignores a nested id: in the handler body when scoping a sub-entity", () => {
     // A globals.set action inside the handler carries its own id: at a deeper
     // indent; it must not retarget the automation away from the sub-sensor.
