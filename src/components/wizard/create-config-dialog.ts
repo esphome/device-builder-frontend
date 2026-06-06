@@ -604,29 +604,17 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     }
   }
 
-  /** Pull the user-facing message out of an APIError-shaped failure.
-   *
-   * Reads the structured ``details`` field directly when the WS
-   * client throws an :class:`APIError`, so we don't have to parse
-   * the formatted ``"<code>: <details>"`` message string back
-   * apart. Falls back to a localised generic for any non-APIError
-   * shape (transport failures, unexpected non-Error throws) and
-   * for the case where ``details`` is empty (e.g. ``invalid_args:``
-   * with no body — empty after trimming would otherwise render as
-   * a blank red bar on the dialog, which is worse than a generic
-   * "create failed").
-   *
-   * When ``board`` is provided, the result is wrapped with
-   * ``wizard.create_with_board_error`` so the displayed message
-   * names the board the wizard was trying to use. The basic-setup
-   * flow always passes a board; the empty-config flow only does
-   * when the user picked one (it's optional there).
-   */
-  /** The user-facing detail carried by a thrown APIError, or "" if none. */
+  /** The user-facing detail carried by a thrown APIError, or "" if none.
+   *  Reads the structured 'details' field directly so callers don't parse
+   *  the formatted '<code>: <details>' message string back apart. */
   private _apiErrorDetails(err: unknown): string {
     return err instanceof APIError && err.details.trim() ? err.details.trim() : "";
   }
 
+  /** Build a create-flow error message. Falls back to a localised generic
+   *  when the error carries no actionable detail (a blank red bar is worse
+   *  than 'create failed'). When 'board' is set, the message names the
+   *  board the wizard tried to use so a template failure is attributable. */
   private _extractCreateErrorMessage(
     err: unknown,
     board: BoardCatalogEntry | null
