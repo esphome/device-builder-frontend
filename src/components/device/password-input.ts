@@ -176,10 +176,10 @@ export class ESPHomePasswordInput extends LitElement {
           ?disabled=${this.disabled}
           aria-label=${label}
           title=${label}
-          aria-pressed=${this._revealed}
+          aria-pressed=${revealed}
           @click=${this._onToggle}
         >
-          <wa-icon library="mdi" name=${this._revealed ? "eye-off" : "eye"}></wa-icon>
+          <wa-icon library="mdi" name=${revealed ? "eye-off" : "eye"}></wa-icon>
         </button>
       </div>
     `;
