@@ -24,10 +24,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { navigate } from "../../util/navigation.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import {
-  secretValueFromYaml,
-  withoutForeignDeviceSecrets,
-} from "../../util/secret-eligibility.js";
+import { secretValueFromYaml, visibleSecretKeys } from "../../util/secret-eligibility.js";
 import {
   fetchSecretKeys,
   getCachedSecretKeys,
@@ -283,10 +280,12 @@ export class ESPHomeSecretPicker extends LitElement {
 
   protected render() {
     const selected = this.selectedKey !== "";
-    // Hide per-device secrets that belong to other devices (migrate/_keys
-    // membership still use the full unfiltered list).
-    const keys = withoutForeignDeviceSecrets(
+    // Hide other devices' per-device secrets and field-bound shared secrets
+    // (wifi_*) not meant for this field. Migrate / _keys membership still use
+    // the full unfiltered list.
+    const keys = visibleSecretKeys(
       this._keys,
+      [...this.recommendedKeys, this.selectedKey],
       this.deviceName,
       this._devices.map((d) => d.name)
     );
@@ -325,7 +324,7 @@ export class ESPHomeSecretPicker extends LitElement {
           : nothing}
         ${recommended.length
           ? html`<small class="group-label" aria-hidden="true"
-                >${this._localize("device.secret_picker_recommended")}</small
+                >${this._localize("device.secret_picker_related")}</small
               >
               ${recommended.map((k) => this._renderKeyItem(k))}
               ${others.length

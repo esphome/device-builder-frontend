@@ -211,6 +211,8 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           <esphome-password-input
             .value=${this._addValue}
             .revealed=${this.revealSensitive}
+            label=${this._localize("secrets.value_placeholder")}
+            placeholder=${this._localize("secrets.value_placeholder")}
             @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) =>
               (this._addValue = e.detail.value)}
           ></esphome-password-input>

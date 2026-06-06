@@ -188,6 +188,19 @@ describe("esphome-secrets-structured-editor", () => {
     expect((pw as unknown as { revealed: boolean }).revealed).toBe(true);
   });
 
+  test("the add dialog's value field carries an accessible name", async () => {
+    // esphome-password-input isn't a labelable control, so the visible
+    // caption can't bind to its inner input; the label prop forwards to the
+    // inner input as aria-label. Assert that end state, not the host attr.
+    const el = await mount("wifi_ssid: home\n", false);
+    const pw = el.shadowRoot!.querySelector<HTMLElement>(
+      ".add-body esphome-password-input"
+    )!;
+    await (pw as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    const input = pw.shadowRoot!.querySelector("input")!;
+    expect(input.getAttribute("aria-label")).toBeTruthy();
+  });
+
   async function changeTarget(el: ESPHomeSecretsStructuredEditor, value: string) {
     await el.updateComplete;
     const select = el.shadowRoot!.querySelector<HTMLSelectElement>(".add-select")!;
