@@ -248,8 +248,8 @@ export interface ImportBundleResponse {
   status: "imported" | "conflicts";
   configuration: string;
   conflicts: string[];
-  written?: string[];
-  kept?: string[];
+  written: string[];
+  kept: string[];
   has_secrets: boolean;
   esphome_version: string;
 }
