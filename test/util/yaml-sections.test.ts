@@ -611,6 +611,63 @@ describe("parseYamlAutomations", () => {
     ]);
   });
 
+  it("splits an on_multi_click whose entries sit at the key indent with comments", () => {
+    // The ``- timing:`` items align with ``on_multi_click:`` (a valid
+    // block-sequence value at the key's own indent) and ``# S`` / ``# L``
+    // comments sit between them; the block scan must look past both or the
+    // list collapses to one un-indexed row that never matches the backend.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    id: button_main
+    on_multi_click:
+    # S
+    - timing:
+        - ON for 50ms to 500ms
+        - OFF for at least 500ms
+      then:
+        - switch.toggle: usb
+    # L
+    - timing:
+        - ON for 1s to 3s
+        - OFF for at least 500ms
+      then:
+        - switch.turn_on: socket_1
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:button_main:on_multi_click")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:button_main:on_multi_click:0",
+      "automation:component_on:button_main:on_multi_click:1",
+    ]);
+    expect(items[0].displayLabel).toBe("button_main → on_multi_click #1");
+    expect(items[0].fromLine).toBe(6); // first ``- timing:``
+    expect(items[1].fromLine).toBe(12); // second ``- timing:``
+  });
+
+  it("keeps splitting when a bare-dash placeholder row sits among the entries", () => {
+    // A bare ``-`` (no value yet, mid-edit) at the key indent must not
+    // close the block — otherwise the real entry after it collapses to one
+    // un-indexed row. The dash test matches end-of-line, like the lexer's
+    // ``LIST_ITEM_START_RE``.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    id: button_main
+    on_multi_click:
+    -
+    - timing:
+        - ON for 1s to 3s
+      then:
+        - switch.toggle: usb
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:button_main:on_multi_click")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:button_main:on_multi_click:0",
+    ]);
+  });
+
   it("does not split a bare action list into per-action rows", () => {
     const yaml = `binary_sensor:
   - platform: gpio

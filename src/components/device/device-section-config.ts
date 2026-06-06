@@ -370,6 +370,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .yaml=${this.yaml}
               .fromLine=${this._resolvedFromLine}
               .sectionKey=${this.sectionKey}
+              .configuration=${this.configuration}
               .focusFieldPath=${this.focusFieldPath}
               .presentComponents=${this._presentComponents}
               ?show-advanced=${showAdvanced}

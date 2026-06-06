@@ -14,6 +14,7 @@ import {
 } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { renderMultiValueField } from "../../../src/components/device/config-entry-renderers/lists.js";
 import {
   renderBooleanField,
   renderFloatWithUnitField,
@@ -208,6 +209,36 @@ describe("renderTimePeriodField / renderFloatWithUnitField — bail on non-primi
     const tpl = renderFloatWithUnitField(entry, ["frequency"], ctx);
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
     expect(rendersBailBranch(json)).toBe(false);
+  });
+});
+
+// A backend list-of-dicts the schema bundle couldn't type as nested can
+// arrive as multi_value=true with scalar type (a light's ``segments``).
+// The scalar-row editor would render "[object Object]" per item and a
+// save would clobber the dicts, so it bails to the YAML-only notice.
+describe("renderMultiValueField — bail when items are mappings", () => {
+  const entry = (): ConfigEntry =>
+    makeConfigEntry({
+      key: "segments",
+      type: ConfigEntryType.STRING,
+      label: "Segments",
+      multi_value: true,
+    });
+
+  it("renders editable rows for a list of scalars", () => {
+    const { ctx } = makeCtx({ segments: ["ON for 1s", "OFF for 500ms"] });
+    const tpl = renderMultiValueField(entry(), ["segments"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(json).toContain("multi-input");
+  });
+
+  it("bails when an item is a mapping", () => {
+    const { ctx } = makeCtx({ segments: [{ id: "a", from: 0, to: 10 }] });
+    const tpl = renderMultiValueField(entry(), ["segments"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+    expect(json).not.toContain("multi-input");
   });
 });
 

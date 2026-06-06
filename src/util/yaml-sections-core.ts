@@ -13,6 +13,7 @@
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
+import { endsBlockAtIndent } from "./yaml-section-lexer.js";
 
 /** A YAML list-item line: leading indent, a dash, then a space or EOL. */
 const RE_LIST_ITEM = /^\s*-(\s|$)/;
@@ -401,8 +402,9 @@ export function findFieldLine(
       if (rest.length === 0) return i + 1;
       let blockHi = hi;
       for (let j = i + 1; j <= hi; j++) {
-        const cs = stripComment(lines[j]);
-        if (cs.trim() && indentOf(cs) <= baseIndent) {
+        // Shared block-end rule: a same-indent compact block-sequence
+        // value (``key:\n- a\n- b``) stays in the block; comments don't end it.
+        if (endsBlockAtIndent(lines[j], baseIndent)) {
           blockHi = j - 1;
           break;
         }

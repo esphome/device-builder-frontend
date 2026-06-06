@@ -5,6 +5,7 @@
  * unaffected; import from there or from here directly.
  */
 
+import { endsBlockAtIndent } from "./yaml-section-lexer.js";
 import {
   instanceComponentId,
   listItemChildIndent,
@@ -246,13 +247,14 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
   return automations;
 }
 
-/** First non-empty line at indent ≤ ``indent`` after ``startIdx``,
- *  or end-of-file. */
+/** Index of the first line past the block opened at ``startIdx`` (its key
+ *  at ``indent`` columns), or ``lines.length`` at EOF. Read as a 1-indexed
+ *  line number this is the block's last content line, so callers use it
+ *  directly as a section's ``toLine``. The same-indent-sequence and comment
+ *  rules live in ``endsBlockAtIndent``. */
 function _findBlockEnd(lines: string[], startIdx: number, indent: number): number {
   for (let j = startIdx + 1; j < lines.length; j++) {
-    if (lines[j].trim() === "") continue;
-    const lineIndent = (lines[j].match(/^(\s*)/) ?? ["", ""])[1].length;
-    if (lineIndent <= indent) return j;
+    if (endsBlockAtIndent(lines[j], indent)) return j;
   }
   return lines.length;
 }
