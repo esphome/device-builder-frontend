@@ -3,6 +3,7 @@ import { mdiContentSave, mdiEye, mdiEyeOff } from "@mdi/js";
 import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
+import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
@@ -306,6 +307,11 @@ export class ESPHomePageSecrets extends LitElement {
     // save secrets" on a real backend rejection — the misleading
     // sequence the device editor fixed under issue #436.
     let saved = true;
+    // Backend rejection detail (e.g. the secrets.yaml parse error with
+    // line/column) so the failure toast can name what's wrong. Read the
+    // structured APIError.details, not Error.message, which is prefixed
+    // with the internal error_code.
+    let errorDetail = "";
     try {
       await this._api.updateConfig(SECRETS_FILE, this._yaml);
     } catch (e) {
@@ -317,6 +323,7 @@ export class ESPHomePageSecrets extends LitElement {
       if (!msg.includes("timed out")) {
         saved = false;
         this._savedYaml = previousSaved;
+        errorDetail = apiErrorDetails(e);
       }
     } finally {
       this._saving = false;
@@ -331,9 +338,14 @@ export class ESPHomePageSecrets extends LitElement {
         new CustomEvent("secrets-saved", { detail: { source: this } })
       );
     }
-    const message = saved ? "secrets.saved" : "secrets.save_error";
-    const variant = saved ? toast.success : toast.error;
-    variant(this._localize(message), { richColors: true });
+    if (saved) {
+      toast.success(this._localize("secrets.saved"), { richColors: true });
+      return;
+    }
+    const base = this._localize("secrets.save_error");
+    toast.error(errorDetail ? `${base}: ${errorDetail}` : base, {
+      richColors: true,
+    });
   }
 }
 
