@@ -409,14 +409,18 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         ${this._localize("device.automation_pick_no_targets")}
       </p>`;
     }
-    const sections = this.devices.map((device) => {
-      const [domain] = device.component_id.split(".");
-      const matching = items.filter((i) => {
-        if (!("domain" in i)) return false;
-        return i.domain === domain || i.domain === device.component_id;
+    const sections = this.devices
+      // A multi-entity container isn't itself a referenceable entity — its
+      // sub-entities are surfaced as their own instances.
+      .filter((device) => !device.is_entity_container)
+      .map((device) => {
+        const [domain] = device.component_id.split(".");
+        const matching = items.filter((i) => {
+          if (!("domain" in i)) return false;
+          return i.domain === domain || i.domain === device.component_id;
+        });
+        return { device, matching };
       });
-      return { device, matching };
-    });
     const nonEmpty = sections.filter((s) => s.matching.length > 0);
     if (nonEmpty.length === 0) {
       return html`<p class="picker-empty">

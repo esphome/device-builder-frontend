@@ -148,7 +148,9 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
     if (this.target.kind === "component_on") {
       const componentId = this.target.component_id;
       const device = this.devices.find((d) => d.id === componentId);
-      if (!device) return [];
+      // A multi-entity container holds no entity triggers of its own —
+      // those belong on its sub-entities.
+      if (!device || device.is_entity_container) return [];
       // Match either the bare domain (``binary_sensor``) or the
       // domain.platform tuple (``binary_sensor.gpio``); the backend
       // emits triggers under both shapes and the catalog dictates

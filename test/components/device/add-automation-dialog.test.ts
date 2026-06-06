@@ -211,6 +211,137 @@ describe("add-automation-dialog list-shaped triggers (#1080)", () => {
   });
 });
 
+const ahtAvailable = (): AvailableAutomations =>
+  ({
+    triggers: [
+      {
+        id: "sensor.on_value_range",
+        name: "On Value Range",
+        applies_to: ["sensor"],
+        is_device_level: false,
+        repeatable: false,
+        config_entries: [],
+      },
+    ],
+    actions: [],
+    conditions: [],
+    scripts: [],
+    devices: [
+      {
+        id: "aht20",
+        name: "AHT20",
+        component_id: "sensor.aht10",
+        is_entity_container: true,
+      },
+      {
+        id: "aht20_temperature",
+        name: "Temperature",
+        component_id: "sensor",
+        parent_id: "aht20",
+      },
+      {
+        id: "aht20_humidity",
+        name: "Humidity",
+        component_id: "sensor",
+        parent_id: "aht20",
+      },
+      { id: "relay", name: "Relay", component_id: "switch.gpio" },
+    ],
+  }) as unknown as AvailableAutomations;
+
+describe("add-automation-dialog sub-entity targets (#1263)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  async function mountForComponentStep(): Promise<ESPHomeAddAutomationDialog> {
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(ahtAvailable())),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    dialog.open();
+    await dialog.updateComplete;
+    await flushPending();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._kind = "component_on";
+    await dialog.updateComplete;
+    return dialog;
+  }
+
+  const choiceNames = (d: ESPHomeAddAutomationDialog): string[] =>
+    [...d.shadowRoot!.querySelectorAll(".component-choice")].map((c) =>
+      c.querySelector(".component-choice-name")!.textContent!.trim()
+    );
+
+  it("lists sub-entities as choices and the container only as a header", async () => {
+    const dialog = await mountForComponentStep();
+    const names = choiceNames(dialog);
+    expect(names).toEqual(expect.arrayContaining(["Temperature", "Humidity", "Relay"]));
+    // The container is not a selectable choice...
+    expect(names).not.toContain("AHT20");
+    // ...it appears as a group header instead.
+    const groups = [...dialog.shadowRoot!.querySelectorAll(".component-group")].map((g) =>
+      g.textContent!.trim()
+    );
+    expect(groups.join(" ")).toContain("AHT20");
+  });
+
+  it("offers no entity triggers when the container is somehow selected", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "aht20";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._filteredTriggers()).toEqual([]);
+  });
+
+  it("offers the entity trigger on a sub-sensor", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "aht20_temperature";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const offered = (dialog as any)._filteredTriggers() as Array<{ id: string }>;
+    expect(offered.map((t) => t.id)).toContain("sensor.on_value_range");
+  });
+
+  it("builds a component_on location keyed on the sub-sensor id", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "aht20_temperature";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._triggerId = "sensor.on_value_range";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._buildLocation()).toEqual({
+      kind: "component_on",
+      component_id: "aht20_temperature",
+      trigger: "on_value_range",
+    });
+  });
+
+  it("defaults the component to the first non-container instance", async () => {
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._onKindChange("component_on");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._componentId).toBe("aht20_temperature");
+  });
+
+  it("degrades to a flat list when the backend omits the new fields", async () => {
+    // Legacy backend: no is_entity_container / parent_id. Every instance is
+    // a plain selectable row and nothing throws.
+    const dialog = await mountForComponentStep();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._available = {
+      triggers: [],
+      actions: [],
+      conditions: [],
+      scripts: [],
+      devices: [{ id: "relay", name: "Relay", component_id: "switch.gpio" }],
+    };
+    await dialog.updateComplete;
+    expect(choiceNames(dialog)).toEqual(["Relay"]);
+  });
+});
+
 // The migration onto esphome-base-dialog swapped the imperative
 // @query _dialog.open for a reactive _open flag. Pin the open / request-close
 // contract — request-close flipping _open is what makes a user-driven close

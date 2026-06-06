@@ -28,6 +28,7 @@ import type {
   AutomationTree,
   AutomationTrigger,
   AvailableAutomations,
+  AvailableComponentInstance,
   YamlDiff,
 } from "../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
@@ -170,7 +171,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
 
   private _renderForm() {
     const filteredTriggers = this._filteredTriggers();
-    const componentLocked = this._kind !== "component_on";
     const triggerLocked = this._kind === "interval";
     // When prefilled, the shortcut already chose the kind (and, for
     // component_on, the component instance) — hide those rows so the
@@ -206,7 +206,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
             </wa-select>
           </div>`
         : nothing}
-      ${showComponentRow ? this._renderComponentRow(componentLocked) : nothing}
+      ${showComponentRow ? this._renderComponentRow() : nothing}
       ${this._kind === "interval" ? this._renderIntervalRow() : nothing}
       ${!triggerLocked ? this._renderTriggerRow(filteredTriggers) : nothing}
       ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
@@ -225,31 +225,67 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     `;
   }
 
-  private _renderComponentRow(locked: boolean) {
+  private _renderComponentRow() {
     const devices = this._available?.devices ?? [];
-    if (devices.length === 0) {
+    // A multi-entity platform (``sensor: - platform: aht10``) is a
+    // non-selectable group header; its sub-entities (and plain instances)
+    // are the selectable rows. Picking the container would write entity
+    // triggers under the platform item, which is invalid.
+    const selectable = devices.filter((d) => !d.is_entity_container);
+    if (selectable.length === 0) {
       return html`<p class="error">
         ${this._localize("device.automation_target_no_components")}
       </p>`;
+    }
+    const subsByParent = new Map<string, AvailableComponentInstance[]>();
+    for (const d of devices) {
+      if (!d.parent_id) continue;
+      const list = subsByParent.get(d.parent_id) ?? [];
+      list.push(d);
+      subsByParent.set(d.parent_id, list);
     }
     return html`<div class="field">
       <label class="field-label" id="component-label">
         ${this._localize("device.automation_wizard_pick_component")}
       </label>
-      <wa-select
-        aria-labelledby="component-label"
-        value=${this._componentId}
-        ?disabled=${this._saving || locked}
-        @change=${(e: Event) =>
-          this._onComponentChange((e.target as HTMLSelectElement).value)}
-      >
-        ${devices.map(
-          (d) =>
-            html`<wa-option value=${d.id} ?selected=${d.id === this._componentId}>
-              ${d.name ?? d.id} (${d.component_id})
-            </wa-option>`
-        )}
-      </wa-select>
+      <div class="component-list" role="listbox" aria-labelledby="component-label">
+        ${devices.map((d) => {
+          if (d.is_entity_container) {
+            const subs = subsByParent.get(d.id) ?? [];
+            if (subs.length === 0) return nothing;
+            return html`
+              <p class="component-group">
+                ${d.name ?? d.id}
+                <span class="component-group-id">(${d.component_id})</span>
+              </p>
+              ${subs.map((s) => this._renderComponentChoice(s))}
+            `;
+          }
+          // Sub-entities render under their container header above.
+          if (d.parent_id) return nothing;
+          return this._renderComponentChoice(d);
+        })}
+      </div>
+    </div>`;
+  }
+
+  private _renderComponentChoice(d: AvailableComponentInstance) {
+    const selected = d.id === this._componentId;
+    return html`<div
+      class="component-choice ${selected ? "component-choice--selected" : ""}"
+      role="option"
+      aria-selected=${selected}
+      tabindex="0"
+      @click=${() => !this._saving && this._onComponentChange(d.id)}
+      @keydown=${(e: KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (!this._saving) this._onComponentChange(d.id);
+        }
+      }}
+    >
+      <span class="component-choice-name">${d.name ?? d.id}</span>
+      <span class="component-domain">${d.component_id}</span>
     </div>`;
   }
 
@@ -337,7 +373,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     if (this._kind === "component_on") {
       if (!this._componentId) return [];
       const device = this._available?.devices.find((d) => d.id === this._componentId);
-      if (!device) return [];
+      if (!device || device.is_entity_container) return [];
       const [domain] = device.component_id.split(".");
       // A component's inline ``on_*:`` fires once, so hide triggers that
       // already have a handler here; repeatable ones stay offerable.
@@ -393,7 +429,9 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     this._triggerId = null;
     if (k === "component_on") {
       const devices = this._available?.devices ?? [];
-      this._componentId = devices[0]?.id ?? "";
+      // A container isn't selectable (entity triggers go on its
+      // sub-entities); default to the first real target.
+      this._componentId = devices.find((d) => !d.is_entity_container)?.id ?? "";
     } else {
       this._componentId = "";
     }
