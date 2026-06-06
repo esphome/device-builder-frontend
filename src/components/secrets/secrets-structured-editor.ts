@@ -1,12 +1,7 @@
 /**
- * Structured (form) side of the split secrets editor.
- *
- * The YAML string passed as ``value`` is the source of truth; every
- * mutation splices one line through ``util/secrets-entries`` and emits a
- * ``yaml-change`` event carrying the new text, exactly like
- * ``<esphome-yaml-editor>`` — so the page treats both panes the same.
- * Simple ``name: value`` scalars are editable rows; tagged / block /
- * nested values render read-only with an "advanced" badge.
+ * Structured (form) side of the split secrets editor. The ``value`` YAML
+ * is the source of truth; each edit splices one line via
+ * ``util/secrets-entries`` and emits ``yaml-change`` like the YAML editor.
  */
 import { consume } from "@lit/context";
 import { mdiAlertCircleOutline, mdiClose, mdiPlus } from "@mdi/js";

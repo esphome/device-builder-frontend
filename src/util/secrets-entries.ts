@@ -1,12 +1,9 @@
 /**
- * Line-based parse / splice for the structured secrets editor.
- *
- * The YAML text is the source of truth: every mutation rewrites only the
- * one affected line so comments, blank lines, and tagged / block values
- * round-trip byte-stable. Only simple top-level ``name: value`` scalars
- * are marked editable; anything else (a ``!secret`` / ``!include`` tag,
- * an anchor / alias / merge key, a block or flow collection, a nested
- * mapping) is surfaced read-only so the form can never clobber it.
+ * Line-based parse / splice for the structured secrets editor. The YAML
+ * text is the source of truth, so each mutation rewrites only its one
+ * line and comments / tags / blanks round-trip untouched. Only simple
+ * top-level ``name: value`` scalars are editable; tags, anchors, merge
+ * keys, block / flow collections and nested mappings are read-only.
  */
 
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
