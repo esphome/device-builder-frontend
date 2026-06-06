@@ -293,4 +293,17 @@ describe("create-config-dialog bundle import", () => {
     // Initial conflicts call + one resolve call; the double-click is dropped.
     expect(importBundle).toHaveBeenCalledTimes(2);
   });
+
+  it("guards a double-click on the first import (across the file-read window)", async () => {
+    const inflight = deferred<{ status: string }>();
+    const importBundle = vi.fn().mockReturnValueOnce(inflight.promise);
+    const el = await mount({ importBundle });
+
+    // Two synchronous picks before the awaited arrayBuffer() resolves.
+    emitImport(el, bundleFile());
+    emitImport(el, bundleFile());
+    await flush();
+
+    expect(importBundle).toHaveBeenCalledTimes(1);
+  });
 });

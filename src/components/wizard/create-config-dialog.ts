@@ -446,25 +446,27 @@ export class ESPHomeCreateConfigDialog extends LitElement {
    *  confirm re-enters here with the chosen `overwrite` paths (the cached
    *  base64 is reused so the file isn't re-read). */
   private async _importBundleFlow(overwrite?: string[]): Promise<void> {
-    // The resolve-conflicts step re-enters here directly, bypassing
-    // _createImportedDevice's guard, so a double-click on Import would
-    // otherwise fire two parallel import_bundle commands.
+    // Flip _submitting synchronously, before the first await (the file
+    // read), so a fast double-click can't slip two parallel
+    // import_bundle commands through the guard. Both the resolve-step
+    // re-entry (which bypasses _createImportedDevice's guard) and the
+    // initial import are covered.
     if (this._submitting) return;
     if (!this._importFile) return;
     this._resetCreateErrors();
-
-    if (this._bundleB64 === null) {
-      try {
-        const buffer = await this._importFile.arrayBuffer();
-        this._bundleB64 = arrayBufferToBase64(buffer);
-      } catch {
-        this._importError = this._localize("wizard.import_read_error");
-        return;
-      }
-    }
-
     this._submitting = true;
+
     try {
+      if (this._bundleB64 === null) {
+        try {
+          const buffer = await this._importFile.arrayBuffer();
+          this._bundleB64 = arrayBufferToBase64(buffer);
+        } catch {
+          this._importError = this._localize("wizard.import_read_error");
+          return;
+        }
+      }
+
       const res = await this._api.importBundle({
         file_content_b64: this._bundleB64,
         ...(overwrite !== undefined ? { overwrite } : {}),
