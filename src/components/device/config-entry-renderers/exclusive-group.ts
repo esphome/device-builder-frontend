@@ -7,36 +7,55 @@ import {
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
+// Partition a flat entry list into the mutually-exclusive groups
+// (keyed by exclusive_group) and the remaining entries, preserving order.
+// Lives here so the form's render() stays small.
+export function partitionExclusiveGroups(entries: ConfigEntry[]): {
+  rest: ConfigEntry[];
+  groups: ConfigEntry[][];
+} {
+  const groups = new Map<string, ConfigEntry[]>();
+  const rest: ConfigEntry[] = [];
+  for (const entry of entries) {
+    if (entry.exclusive_group) {
+      const group = groups.get(entry.exclusive_group) ?? [];
+      group.push(entry);
+      groups.set(entry.exclusive_group, group);
+    } else {
+      rest.push(entry);
+    }
+  }
+  return { rest, groups: [...groups.values()] };
+}
+
 // Renders entries sharing a backend exclusive_group (a remote_receiver
 // binary_sensor's protocols) as one pick-one dropdown plus the chosen
 // member's fields. ESPHome accepts exactly one, so only the selected
 // member's key stays in the values dict.
 export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx) {
-  // Membership is value presence, not serializable content: the freshly
-  // picked member is scaffolded with {} (which hasSerializableValue would
-  // reject), while a cleared member is left as undefined by emitChange.
-  const present = members.filter((m) => {
-    const value = ctx.getAt([m.key]);
-    return value !== undefined && value !== null;
-  });
+  // Membership is "key present in values": emitChange clears a member by
+  // writing undefined, so only undefined means absent — a scaffolded {} or
+  // an explicit null (hand-written raw:) both count as the chosen member.
+  const present = members.filter((m) => ctx.getAt([m.key]) !== undefined);
   const selectedKey = present[0]?.key ?? "";
   const selected = members.find((m) => m.key === selectedKey);
   const disabled = ctx.disabled;
 
   // Clear every other member so the YAML keeps a single key; scaffold the
-  // chosen one with {} so its fields render.
+  // chosen one with {} only when it's absent, so switching to a member that
+  // already has config (conflict resolution) keeps its values.
   const onChange = (newKey: string) => {
     for (const m of members) {
       if (m.key !== newKey) ctx.emitChange([m.key], undefined);
     }
-    if (newKey) ctx.emitChange([newKey], {});
+    if (newKey && ctx.getAt([newKey]) === undefined) ctx.emitChange([newKey], {});
   };
 
   // data-no-value-sync: the select's value is derived (which member is
   // present), not a YAML path, so the form syncs it via the selected
   // option rather than a path lookup.
   return html`
-    <div class="field" data-field-key=${fieldKeyAttr([members[0].key])}>
+    <div class="field" data-field-key=${fieldKeyAttr(selected ? [selected.key] : [])}>
       <label class="field-label">
         ${ctx.localize("device.exclusive_group_label")}
         <span class="required">*</span>

@@ -58,6 +58,32 @@ describe("renderExclusiveGroupField", () => {
     expect(emitChange).toHaveBeenCalledWith(["nec"], {});
   });
 
+  it("preserves an existing member's values when switching to it", () => {
+    // Conflict case (both set): picking the one to keep must clear only the
+    // others, never overwrite the chosen member's config with {}.
+    const emitChange = vi.fn();
+    const ctx = makeRenderCtx(
+      { raw: { code: "x" }, nec: { address: 1 } },
+      { overrides: { emitChange } }
+    );
+    const tpl = renderExclusiveGroupField(members(), ctx);
+
+    const onChange = findElementBindings(tpl, "wa-select")[0]["@change"] as (
+      e: Event
+    ) => void;
+    onChange({ target: { value: "raw" } } as never);
+
+    expect(emitChange).toHaveBeenCalledWith(["nec"], undefined);
+    expect(emitChange).not.toHaveBeenCalledWith(["raw"], {});
+  });
+
+  it("treats an explicit null member as present", () => {
+    // A hand-written ``raw:`` parses to null; the key exists, so the
+    // protocol is selected (only undefined means cleared/absent).
+    const ctx = makeRenderCtx({ raw: null });
+    expect(selectedValues(renderExclusiveGroupField(members(), ctx))).toEqual(["raw"]);
+  });
+
   it("keeps a freshly-scaffolded member selected", () => {
     // onChange writes {} for the picked member; it must stay selected even
     // though it has no serializable content yet (else the dropdown snaps
