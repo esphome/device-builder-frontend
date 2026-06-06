@@ -22,7 +22,7 @@ describe("ensureSecretInYaml", () => {
 
     const result = await ensureSecretInYaml(api, "kitchen__encryption_key", "oQ3==");
 
-    expect(result).toEqual({ created: true });
+    expect(result).toEqual({ created: true, value: "oQ3==" });
     const [file, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(file).toBe("secrets.yaml");
     expect(content).toContain("wifi_ssid: x");
@@ -40,7 +40,7 @@ describe("ensureSecretInYaml", () => {
 
     const result = await ensureSecretInYaml(api, "kitchen__encryption_key", "new");
 
-    expect(result).toEqual({ created: false });
+    expect(result).toEqual({ created: false, value: "existing" });
     expect(api.updateConfig).not.toHaveBeenCalled();
   });
 

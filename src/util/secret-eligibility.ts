@@ -23,7 +23,7 @@ const FIELD_BOUND_SHARED = new Set(
 const DEVICE_BASE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   ota: { password: "ota_password" },
   api: { key: "encryption_key" },
-  web_server: { username: "web_username", password: "web_password" },
+  web_server: { password: "web_password" },
 };
 
 /** True when a non-concealed *key* under *sectionKey* still wants the picker. */

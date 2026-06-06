@@ -37,7 +37,7 @@ describe("applySecuritySecrets", () => {
       id: "api_server",
     });
     applySecuritySecrets(c, [
-      { path: ["encryption", "key"], ref: "!secret kitchen__encryption_key" },
+      { path: ["encryption", "key"], value: "!secret kitchen__encryption_key" },
     ]);
     expect(inner._values.encryption.key).toBe("!secret kitchen__encryption_key");
     expect(drafts).toHaveLength(1);
@@ -49,26 +49,26 @@ describe("applySecuritySecrets", () => {
       platform: "esphome",
     });
     applySecuritySecrets(c, [
-      { path: ["password"], ref: "!secret kitchen__ota_password" },
+      { path: ["password"], value: "!secret kitchen__ota_password" },
     ]);
     expect(inner._values.password).toBe("!secret kitchen__ota_password");
     expect(drafts[0]).toContain("password: !secret kitchen__ota_password");
   });
 
-  it("web_server: sets both auth.username and auth.password in one flush", () => {
+  it("web_server: sets inline username + secret password in one flush", () => {
     const { c, inner, drafts } = host("web_server", "web_server:\n  port: 80\n", 1, {
       port: 80,
     });
     applySecuritySecrets(c, [
-      { path: ["auth", "username"], ref: "!secret kitchen__web_username" },
-      { path: ["auth", "password"], ref: "!secret kitchen__web_password" },
+      { path: ["auth", "username"], value: "falcon" },
+      { path: ["auth", "password"], value: "!secret kitchen__web_password" },
     ]);
     expect(inner._values.auth).toEqual({
-      username: "!secret kitchen__web_username",
+      username: "falcon",
       password: "!secret kitchen__web_password",
     });
     expect(drafts).toHaveLength(1);
-    expect(drafts[0]).toContain("!secret kitchen__web_username");
+    expect(drafts[0]).toContain("username: falcon");
     expect(drafts[0]).toContain("!secret kitchen__web_password");
   });
 });

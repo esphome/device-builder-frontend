@@ -62,7 +62,9 @@ export class ESPHomeConfirmDialog extends LitElement {
     modalDialogStyles,
     css`
       esphome-base-dialog {
-        --width: 420px;
+        /* Hosts can widen a specific dialog (e.g. one showing long secret
+           keys) by setting --esphome-confirm-dialog-width on the element. */
+        --width: var(--esphome-confirm-dialog-width, 420px);
       }
 
       .icon-wrap.destructive {

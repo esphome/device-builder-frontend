@@ -80,16 +80,16 @@ export function onValueChange(
   host._scheduleDraftFlush();
 }
 
-/** Point the section's field(s) at generated secrets (from the security notice)
+/** Point the section's field(s) at generated values (from the security notice)
  *  in the unsaved draft and flush the result into the YAML buffer. Each entry is
- *  a `setIn` path and a `!secret <key>` reference (one for api/ota, two for
- *  web_server auth). */
+ *  a `setIn` path and the value to write there — a `!secret <key>` reference for
+ *  secret fields, or the literal value for inline ones (e.g. the web username). */
 export function applySecuritySecrets(
   host: ESPHomeDeviceSectionConfig,
-  secrets: { path: string[]; ref: string }[]
+  secrets: { path: string[]; value: string }[]
 ): void {
-  for (const { path, ref } of secrets) {
-    host._values = setIn(host._values, path, ref);
+  for (const { path, value } of secrets) {
+    host._values = setIn(host._values, path, value);
   }
   host._setDirty(true);
   if (host._draftTimer) {

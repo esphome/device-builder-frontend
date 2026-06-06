@@ -41,10 +41,6 @@ describe("recommendedSecretKeys", () => {
       "kitchen__encryption_key",
       "kitchen_encryption_key",
     ]);
-    expect(recommendedSecretKeys("web_server", "username", "kitchen", true)).toEqual([
-      "kitchen__web_username",
-      "kitchen_web_username",
-    ]);
     expect(recommendedSecretKeys("web_server", "password", "kitchen", true)).toEqual([
       "kitchen__web_password",
       "kitchen_web_password",

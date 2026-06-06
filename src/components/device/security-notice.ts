@@ -6,12 +6,14 @@
  *
  * - `api` — missing `encryption:` → generate a Noise key.
  * - `ota.esphome` — missing `password:` → generate a passphrase.
- * - `web_server` — missing `auth:` → generate a username + password.
+ * - `web_server` — missing `auth:` → generate an inline username + a password.
  *
- * On confirm it stores each generated value in secrets.yaml (via
- * `ensureSecretInYaml`) and emits `apply-security-secrets` so the host points
- * the config field(s) at them with `!secret` in the unsaved draft. Adding a
- * setting is a single registry entry + its copy — no per-setting code.
+ * On confirm it stores each generated secret in secrets.yaml (via
+ * `ensureSecretInYaml`), emits `apply-security-secrets` so the host points the
+ * config field(s) at them (a `!secret` ref for secret fields, the literal value
+ * for inline fields), then reveals the generated values so the user can copy
+ * them. Adding a setting is a single registry entry + its copy — no per-setting
+ * code.
  */
 import { consume } from "@lit/context";
 import { mdiLockAlert } from "@mdi/js";
@@ -35,18 +37,22 @@ import { findSectionStart } from "../../util/yaml-section-reader.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
+import "../secret-reveal.js";
 
 registerMdiIcons({ "lock-alert": mdiLockAlert });
 
-/** One secret a setting generates: where it's referenced and how it's made. */
-interface SecretSpec {
-  /** `recommendedSecretKeys` leaf, e.g. `key` / `password` / `username`. */
-  field: string;
+/** A value the setting generates: where it goes and how it's made. */
+interface GeneratedField {
   /** `setIn` path into the section's draft values. */
   path: string[];
-  /** Produces the secret's value (the passphrase generator is async — it
-   *  lazy-loads its wordlist). */
+  /** Produces the value (the passphrase generator is async — lazy wordlist). */
   generate: () => string | Promise<string>;
+  /** When set, the value is stored in secrets.yaml under the per-device key for
+   *  this `recommendedSecretKeys` field and referenced via `!secret`. When
+   *  absent, the generated value is written inline (e.g. the web username). */
+  secretField?: string;
+  /** `device.<labelKey>` label for the reveal row. */
+  labelKey: string;
 }
 
 /** A recommended security setting and how to satisfy it. */
@@ -57,11 +63,13 @@ interface SecuritySetting {
   marker: string;
   /** `device.<copyPrefix>_*` localization keys for this setting's copy. */
   copyPrefix: string;
-  /** The secret(s) to generate, store, and reference. */
-  secrets: SecretSpec[];
+  /** The value(s) to generate, store/inline, and reference. */
+  fields: GeneratedField[];
 }
 
+/** A 4-word passphrase (strong); a single random word (memorable, non-secret). */
 const passphrase = () => generatePassphrase();
+const word = () => generatePassphrase(1);
 
 /** Registry keyed by the editor `sectionKey`. */
 export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
@@ -69,23 +77,41 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
     secretSection: "api",
     marker: "encryption",
     copyPrefix: "api_encryption",
-    secrets: [
-      { field: "key", path: ["encryption", "key"], generate: generateApiEncryptionKey },
+    fields: [
+      {
+        path: ["encryption", "key"],
+        generate: generateApiEncryptionKey,
+        secretField: "key",
+        labelKey: "security_field_encryption_key",
+      },
     ],
   },
   "ota.esphome": {
     secretSection: "ota",
     marker: "password",
     copyPrefix: "ota_password",
-    secrets: [{ field: "password", path: ["password"], generate: passphrase }],
+    fields: [
+      {
+        path: ["password"],
+        generate: passphrase,
+        secretField: "password",
+        labelKey: "security_field_password",
+      },
+    ],
   },
   web_server: {
     secretSection: "web_server",
     marker: "auth",
     copyPrefix: "web_auth",
-    secrets: [
-      { field: "username", path: ["auth", "username"], generate: passphrase },
-      { field: "password", path: ["auth", "password"], generate: passphrase },
+    fields: [
+      // Username isn't sensitive and its field isn't a secret field — inline it.
+      { path: ["auth", "username"], generate: word, labelKey: "security_field_username" },
+      {
+        path: ["auth", "password"],
+        generate: passphrase,
+        secretField: "password",
+        labelKey: "security_field_password",
+      },
     ],
   },
 };
@@ -97,8 +123,17 @@ export const isSecuritySection = (sectionKey: string): boolean =>
 
 /** Detail for the `apply-security-secrets` event. */
 export interface ApplySecuritySecretsDetail {
-  /** Each generated secret's draft path and the `!secret <key>` reference. */
-  secrets: { path: string[]; ref: string }[];
+  /** Each generated field's draft path and the value to write there (a
+   *  `!secret <key>` reference for secret fields, the literal for inline ones). */
+  secrets: { path: string[]; value: string }[];
+}
+
+/** A revealed credential row in the post-generate dialog. */
+interface RevealRow {
+  labelKey: string;
+  value: string;
+  /** secrets.yaml key it's stored under, or `""` for an inline value. */
+  key: string;
 }
 
 @customElement("esphome-security-notice")
@@ -133,7 +168,11 @@ export class ESPHomeSecurityNotice extends LitElement {
 
   @state() private _generating = false;
 
-  @query("esphome-confirm-dialog") private _dialog?: ESPHomeConfirmDialog;
+  /** The generated credentials shown in the reveal dialog after a generate. */
+  @state() private _revealRows: RevealRow[] = [];
+
+  @query("esphome-confirm-dialog.confirm") private _confirmDialog?: ESPHomeConfirmDialog;
+  @query("esphome-confirm-dialog.reveal") private _revealDialog?: ESPHomeConfirmDialog;
 
   private get _setting(): SecuritySetting | undefined {
     return isSecuritySection(this.sectionKey)
@@ -147,24 +186,29 @@ export class ESPHomeSecurityNotice extends LitElement {
     }
   }
 
-  /** The recommended secret key for each of the setting's secrets, in order.
-   *  An entry is `""` until the device name resolves. */
-  private _secretKeys(): { spec: SecretSpec; key: string }[] {
+  /** Each field with its resolved secrets.yaml key (`""` for inline fields, or
+   *  until the device name resolves for secret fields). */
+  private _resolvedFields(): { field: GeneratedField; key: string }[] {
     const setting = this._setting;
     if (!setting) return [];
     const deviceName = resolveDeviceName(this._devices, this.configuration);
-    return setting.secrets.map((spec) => ({
-      spec,
-      key:
-        recommendedSecretKeys(setting.secretSection, spec.field, deviceName, true)[0] ??
-        "",
+    return setting.fields.map((field) => ({
+      field,
+      key: field.secretField
+        ? (recommendedSecretKeys(
+            setting.secretSection,
+            field.secretField,
+            deviceName,
+            true
+          )[0] ?? "")
+        : "",
     }));
   }
 
-  /** All secret keys resolved (device known) — gates the generate flow. */
+  /** Every secret field's key resolved (device known) — gates the generate flow. */
   private get _ready(): boolean {
-    const keys = this._secretKeys();
-    return keys.length > 0 && keys.every((k) => k.key !== "");
+    const fields = this._resolvedFields();
+    return fields.length > 0 && fields.every((f) => !f.field.secretField || f.key !== "");
   }
 
   /** Whether the section body has the setting's marker as a *direct child*. A
@@ -197,27 +241,29 @@ export class ESPHomeSecurityNotice extends LitElement {
 
   private _onCta = (): void => {
     // Guard the open so a missing device name can't route into a failure path.
-    if (this._ready) this._dialog?.open();
+    if (this._ready) this._confirmDialog?.open();
   };
 
   private _onGenerate = async (): Promise<void> => {
     const setting = this._setting;
-    const entries = this._secretKeys();
+    const fields = this._resolvedFields();
     if (this._generating || !this._api || !setting || !this._ready) return;
     this._generating = true;
     try {
-      const applied: { path: string[]; ref: string }[] = [];
-      // `created` false = a secret already existed (rare); reuse it rather than
-      // overwrite, and say "linked" instead of "added".
-      let allCreated = true;
-      for (const { spec, key } of entries) {
-        const { created } = await ensureSecretInYaml(
-          this._api,
-          key,
-          await spec.generate()
-        );
-        if (!created) allCreated = false;
-        applied.push({ path: spec.path, ref: `!secret ${key}` });
+      const applied: { path: string[]; value: string }[] = [];
+      const rows: RevealRow[] = [];
+      for (const { field, key } of fields) {
+        const generated = await field.generate();
+        if (field.secretField) {
+          // `value` is what's actually stored (the existing one if the key was
+          // already present), so the reveal shows the truth.
+          const { value } = await ensureSecretInYaml(this._api, key, generated);
+          applied.push({ path: field.path, value: `!secret ${key}` });
+          rows.push({ labelKey: field.labelKey, value, key });
+        } else {
+          applied.push({ path: field.path, value: generated });
+          rows.push({ labelKey: field.labelKey, value: generated, key: "" });
+        }
       }
       this.dispatchEvent(
         new CustomEvent<ApplySecuritySecretsDetail>("apply-security-secrets", {
@@ -226,15 +272,11 @@ export class ESPHomeSecurityNotice extends LitElement {
           composed: true,
         })
       );
-      toast.success(
-        this._localize(
-          `device.${setting.copyPrefix}_${allCreated ? "success" : "linked"}`,
-          {
-            key: entries.map((e) => e.key).join(", "),
-          }
-        ),
-        { richColors: true }
-      );
+      // Applying the secrets makes the marker present, which hides the notice +
+      // confirm dialog — so reveal via the reveal dialog, which renders
+      // independently of `_markerAbsent` and is already in the DOM.
+      this._revealRows = rows;
+      this._revealDialog?.open?.();
     } catch (err) {
       // ensureSecretInYaml aborts (throws) on a read failure rather than
       // clobbering secrets.yaml; log the cause and leave the config untouched.
@@ -307,7 +349,8 @@ export class ESPHomeSecurityNotice extends LitElement {
         cursor: not-allowed;
       }
 
-      .dialog-body code {
+      .dialog-body code,
+      .cred-stored code {
         font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
         font-size: var(--wa-font-size-s);
         padding: 1px 5px;
@@ -315,12 +358,50 @@ export class ESPHomeSecurityNotice extends LitElement {
         background: var(--wa-color-surface-lowered);
         word-break: break-all;
       }
+
+      /* Wider so long secret keys / passphrases wrap less. */
+      esphome-confirm-dialog.reveal {
+        --esphome-confirm-dialog-width: 560px;
+      }
+
+      .reveal-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-m);
+      }
+
+      .reveal-body p {
+        margin: 0;
+      }
+
+      .cred {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-2xs);
+      }
+
+      .cred-label {
+        font-weight: var(--wa-font-weight-bold);
+        font-size: var(--wa-font-size-s);
+      }
+
+      .cred-stored {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+      }
     `,
   ];
 
   protected render() {
     const setting = this._setting;
-    if (!setting || !this._markerAbsent) return nothing;
+    if (!setting) return nothing;
+    return html`
+      ${this._markerAbsent ? this._renderNotice(setting) : nothing}
+      ${this._renderRevealDialog()}
+    `;
+  }
+
+  private _renderNotice(setting: SecuritySetting) {
     return html`
       <div class="notice" role="note">
         <wa-icon library="mdi" name="lock-alert"></wa-icon>
@@ -337,6 +418,7 @@ export class ESPHomeSecurityNotice extends LitElement {
         </div>
       </div>
       <esphome-confirm-dialog
+        class="confirm"
         heading=${this._localize(`device.${setting.copyPrefix}_dialog_title`)}
         confirm-label=${this._localize("device.security_generate")}
         @confirm=${this._onGenerate}
@@ -349,14 +431,44 @@ export class ESPHomeSecurityNotice extends LitElement {
   private _renderDialogBody(setting: SecuritySetting) {
     // Called without params, `_localize` leaves the `{key}` placeholder intact,
     // so we split on it and render each secret key as a real `<code>` element
-    // wherever the locale positions it.
+    // wherever the locale positions it. Inline fields have no key to show.
     const [before, after = ""] = this._localize(
       `device.${setting.copyPrefix}_dialog_body`
     ).split("{key}");
-    const codes = this._secretKeys().map(
-      (k, i) => html`${i > 0 ? ", " : ""}<code>${k.key}</code>`
-    );
+    const codes = this._resolvedFields()
+      .filter((f) => f.field.secretField)
+      .map((f, i) => html`${i > 0 ? ", " : ""}<code>${f.key}</code>`);
     return html`${before}${codes}${after}`;
+  }
+
+  private _renderRevealDialog() {
+    return html`
+      <esphome-confirm-dialog
+        class="reveal"
+        heading=${this._localize("device.security_reveal_title")}
+        confirm-label=${this._localize("device.security_done")}
+      >
+        <div slot="body" class="reveal-body">
+          <p>${this._localize("device.security_reveal_intro")}</p>
+          ${this._revealRows.map(
+            (row) => html`
+              <div class="cred">
+                <span class="cred-label"
+                  >${this._localize(`device.${row.labelKey}`)}</span
+                >
+                <esphome-secret-reveal .value=${row.value}></esphome-secret-reveal>
+                ${row.key
+                  ? html`<span class="cred-stored"
+                      >${this._localize("device.security_stored_as")}
+                      <code>${row.key}</code></span
+                    >`
+                  : nothing}
+              </div>
+            `
+          )}
+        </div>
+      </esphome-confirm-dialog>
+    `;
   }
 }
 

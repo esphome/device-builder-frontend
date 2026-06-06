@@ -127,14 +127,14 @@ describe("security-notice — render", () => {
     expect(el.shadowRoot!.querySelector<HTMLButtonElement>(".cta")!.disabled).toBe(false);
   });
 
-  it("renders both web_server secret keys as <code> in the dialog body", async () => {
+  it("shows only secret-field keys as <code> in the dialog body (web password, not the inline username)", async () => {
     const { el } = await mount("web_server", "web_server:\n  port: 80\n", 1, [
       { name: "kitchen" },
     ]);
     const codes = Array.from(el.shadowRoot!.querySelectorAll(".dialog-body code")).map(
       (c) => c.textContent
     );
-    expect(codes).toEqual(["kitchen__web_username", "kitchen__web_password"]);
+    expect(codes).toEqual(["kitchen__web_password"]);
   });
 });
 
@@ -150,7 +150,7 @@ describe("security-notice — generate", () => {
     const { el, inner } = make(sectionKey, yaml, fromLine);
     inner._api = { getConfig: vi.fn(getConfig), updateConfig } as Partial<ESPHomeAPI>;
     inner._devices = devices.map((d) => ({ ...d, configuration: "device.yaml" }));
-    const applied: { path: string[]; ref: string }[][] = [];
+    const applied: { path: string[]; value: string }[][] = [];
     el.addEventListener("apply-security-secrets", (e) =>
       applied.push((e as CustomEvent).detail.secrets)
     );
@@ -169,9 +169,8 @@ describe("security-notice — generate", () => {
     expect(file).toBe("secrets.yaml");
     expect(content).toMatch(/kitchen__encryption_key: [A-Za-z0-9+/]{43}=/);
     expect(applied[0]).toEqual([
-      { path: ["encryption", "key"], ref: "!secret kitchen__encryption_key" },
+      { path: ["encryption", "key"], value: "!secret kitchen__encryption_key" },
     ]);
-    expect(toast.success).toHaveBeenCalled();
   });
 
   it("ota: writes a passphrase and references password", async () => {
@@ -185,11 +184,11 @@ describe("security-notice — generate", () => {
     const [, content] = updateConfig.mock.calls[0];
     expect(content).toMatch(/kitchen__ota_password: [a-z]+(-[a-z]+){3}\n/);
     expect(applied[0]).toEqual([
-      { path: ["password"], ref: "!secret kitchen__ota_password" },
+      { path: ["password"], value: "!secret kitchen__ota_password" },
     ]);
   });
 
-  it("web_server: writes username + password and references both", async () => {
+  it("web_server: inlines a single-word username, stores only the password", async () => {
     const { inner, updateConfig, applied } = setup(
       "web_server",
       "web_server:\n  port: 80\n",
@@ -197,29 +196,38 @@ describe("security-notice — generate", () => {
       async () => ""
     );
     await inner._onGenerate();
-    const written = updateConfig.mock.calls.map((c) => c[1]).join("");
-    expect(written).toMatch(/kitchen__web_username: [a-z]+(-[a-z]+){3}/);
-    expect(written).toMatch(/kitchen__web_password: [a-z]+(-[a-z]+){3}/);
-    expect(applied[0]).toEqual([
-      { path: ["auth", "username"], ref: "!secret kitchen__web_username" },
-      { path: ["auth", "password"], ref: "!secret kitchen__web_password" },
-    ]);
-    expect(toast.success).toHaveBeenCalled();
+    // Only the password is written to secrets.yaml (username is inline).
+    expect(updateConfig).toHaveBeenCalledTimes(1);
+    expect(updateConfig.mock.calls[0][1]).toMatch(
+      /kitchen__web_password: [a-z]+(-[a-z]+){3}\n/
+    );
+    expect(updateConfig.mock.calls[0][1]).not.toContain("web_username");
+
+    const [user, pass] = applied[0];
+    expect(user.path).toEqual(["auth", "username"]);
+    expect(user.value).toMatch(/^[a-z]+$/); // single inline word, not a !secret ref
+    expect(pass).toEqual({
+      path: ["auth", "password"],
+      value: "!secret kitchen__web_password",
+    });
   });
 
-  it("links to an existing secret (no overwrite) and toasts linked", async () => {
-    const { inner, updateConfig, applied } = setup(
+  it("reveals the generated credentials (actual stored value) after generating", async () => {
+    const { inner } = setup(
       "ota.esphome",
       "ota:\n  - platform: esphome\n",
       2,
-      async () => "kitchen__ota_password: existing\n"
+      async () => "kitchen__ota_password: existing\n" // key already present → reused
     );
     await inner._onGenerate();
-    expect(updateConfig).not.toHaveBeenCalled();
-    expect(applied[0]).toEqual([
-      { path: ["password"], ref: "!secret kitchen__ota_password" },
+    // Reuses the existing secret (no write) and reveals its actual value.
+    expect(inner._revealRows).toEqual([
+      {
+        labelKey: "security_field_password",
+        value: "existing",
+        key: "kitchen__ota_password",
+      },
     ]);
-    expect(toast.success).toHaveBeenCalled(); // the "linked" copy
   });
 
   it("does nothing when the device name can't resolve", async () => {

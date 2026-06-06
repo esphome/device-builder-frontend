@@ -112,6 +112,18 @@ describe("esphome-secret-picker", () => {
     expect(active?.getAttribute("value")).toBe("wifi_ssid");
   });
 
+  it("renders an inline reveal for the selected secret's value", async () => {
+    const el = await mount(["wifi_ssid"]);
+    expect(el.shadowRoot!.querySelector(".selected-reveal")).toBeNull(); // none until selected
+    el.selectedKey = "wifi_ssid";
+    await el.updateComplete;
+    const reveal = el.shadowRoot!.querySelector(".selected-reveal esphome-secret-reveal");
+    expect(reveal).not.toBeNull();
+    // The reveal is wired to lazily fetch the selected key's value.
+    expect((reveal as unknown as { resolve?: unknown }).resolve).toBeTypeOf("function");
+    expect(reveal!.getAttribute("resetkey")).toBe("wifi_ssid");
+  });
+
   it("shows the placeholder label when no secret is selected", async () => {
     const el = await mount(["wifi_ssid"]);
     expect(el.shadowRoot!.querySelector(".trigger")!.classList.contains("selected")).toBe(
