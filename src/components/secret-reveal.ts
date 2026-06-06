@@ -160,6 +160,9 @@ export class ESPHomeSecretReveal extends LitElement {
           title=${this._localize(
             this._revealed ? "device.secret_reveal_hide" : "device.secret_reveal_show"
           )}
+          aria-label=${this._localize(
+            this._revealed ? "device.secret_reveal_hide" : "device.secret_reveal_show"
+          )}
           @click=${this._onToggle}
         >
           <wa-icon library="mdi" name=${this._revealed ? "eye-off" : "eye"}></wa-icon>
@@ -169,6 +172,7 @@ export class ESPHomeSecretReveal extends LitElement {
           type="button"
           ?disabled=${this._busy}
           title=${this._localize("device.secret_reveal_copy")}
+          aria-label=${this._localize("device.secret_reveal_copy")}
           @click=${this._onCopy}
         >
           <wa-icon library="mdi" name="content-copy"></wa-icon>

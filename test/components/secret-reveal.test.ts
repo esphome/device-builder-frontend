@@ -37,6 +37,13 @@ afterEach(() => {
 });
 
 describe("esphome-secret-reveal", () => {
+  it("gives the icon-only buttons accessible names (aria-label)", async () => {
+    const el = await mount({ value: "x" });
+    expect(
+      buttons(el).every((b) => (b.getAttribute("aria-label") || "").length > 0)
+    ).toBe(true);
+  });
+
   it("masks by default and reveals/hides on the eye toggle", async () => {
     const el = await mount({ value: "swordfish" });
     expect(valueText(el)).toBe(MASK);
