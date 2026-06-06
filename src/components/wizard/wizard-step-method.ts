@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { ACCEPTED_UPLOAD_EXTENSIONS } from "../../util/upload-file-types.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -183,7 +184,7 @@ export class ESPHomeWizardStepMethod extends LitElement {
       <input
         id="file-input"
         type="file"
-        accept=".yml,.yaml,.tar.gz,.esphomebundle"
+        accept=${ACCEPTED_UPLOAD_EXTENSIONS.join(",")}
         hidden
         @change=${this._onFileSelected}
       />

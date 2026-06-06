@@ -16,6 +16,7 @@ import { markJustCreated } from "../../util/just-created.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { safeUploadFilename } from "../../util/safe-upload-filename.js";
+import { isBundleFilename } from "../../util/upload-file-types.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
@@ -319,11 +320,6 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._importBundleFlow(e.detail.overwrite);
   }
 
-  /** A bundle is a gzipped tarball, not text; route it to import_bundle. */
-  private _isBundleFile(file: File): boolean {
-    return /\.(tar\.gz|tgz|esphomebundle)$/i.test(file.name);
-  }
-
   private _onBack() {
     switch (this._step) {
       case "board":
@@ -390,7 +386,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     if (this._submitting) return;
     if (!this._importFile) return;
 
-    if (this._isBundleFile(this._importFile)) {
+    if (isBundleFilename(this._importFile.name)) {
       await this._importBundleFlow();
       return;
     }
@@ -481,8 +477,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       }
       this._navigateToCreated(res.configuration);
     } catch (err) {
-      const msg = err instanceof APIError && err.details.trim() ? err.details.trim() : "";
-      this._importError = msg || this._localize("wizard.import_general_error");
+      this._importError =
+        this._apiErrorDetails(err) || this._localize("wizard.import_general_error");
     } finally {
       this._submitting = false;
     }
@@ -569,16 +565,17 @@ export class ESPHomeCreateConfigDialog extends LitElement {
    * flow always passes a board; the empty-config flow only does
    * when the user picked one (it's optional there).
    */
+  /** The user-facing detail carried by a thrown APIError, or "" if none. */
+  private _apiErrorDetails(err: unknown): string {
+    return err instanceof APIError && err.details.trim() ? err.details.trim() : "";
+  }
+
   private _extractCreateErrorMessage(
     err: unknown,
     board: BoardCatalogEntry | null
   ): string {
-    let message: string;
-    if (err instanceof APIError && err.details.trim()) {
-      message = err.details.trim();
-    } else {
-      message = this._localize("wizard.create_general_error");
-    }
+    const message =
+      this._apiErrorDetails(err) || this._localize("wizard.create_general_error");
     if (board) {
       return this._localize("wizard.create_with_board_error", {
         board: board.name,
