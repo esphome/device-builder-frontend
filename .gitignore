@@ -40,4 +40,3 @@ build/
 /*.yaml
 /*.yml
 !/.pre-commit-config.yaml
-
