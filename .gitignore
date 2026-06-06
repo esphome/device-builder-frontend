@@ -19,6 +19,11 @@ build/
 # from src/translations/*.json by build-scripts/gen-language-manifest.cjs.
 /src/generated/
 .DS_Store
+# Editor swap & backup files. Vim rotates .swp/.swo/.swn/.swm/... and a
+# swap such as .secrets.yaml.swp can hold unsaved buffer contents,
+# including secrets, so the whole range must be ignored.
+*.sw[a-p]
+*~
 .claude/*
 !.claude/skills/
 # Stray notes / screenshots dropped at the repo root during development.
