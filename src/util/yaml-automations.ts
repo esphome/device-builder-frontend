@@ -246,13 +246,18 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
   return automations;
 }
 
-/** First non-empty line at indent ≤ ``indent`` after ``startIdx``,
- *  or end-of-file. */
+/** First line that closes the block opened at ``startIdx``, or
+ *  end-of-file. Blank and comment lines never close a block. A
+ *  block-sequence value may sit at its key's own indent (``on_*:``
+ *  with the ``- `` items un-indented), so a same-indent list dash
+ *  continues the block; only a same-indent non-dash line closes it. */
 function _findBlockEnd(lines: string[], startIdx: number, indent: number): number {
   for (let j = startIdx + 1; j < lines.length; j++) {
-    if (lines[j].trim() === "") continue;
+    const trimmed = lines[j].trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
     const lineIndent = (lines[j].match(/^(\s*)/) ?? ["", ""])[1].length;
-    if (lineIndent <= indent) return j;
+    if (lineIndent < indent) return j;
+    if (lineIndent === indent && !/^\s*-\s/.test(lines[j])) return j;
   }
   return lines.length;
 }
