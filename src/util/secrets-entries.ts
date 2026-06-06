@@ -66,11 +66,10 @@ export function groupSecretsByDevice(entries: SecretEntry[]): SecretGroup[] {
     }
     byDevice.get(device)!.push(entry);
   }
-  const groups = order.map((device) => ({ device, entries: byDevice.get(device)! }));
-  // Shared (no prefix) first; device runs keep first-appearance order.
-  return groups.sort((a, b) =>
-    a.device === b.device ? 0 : a.device === null ? -1 : b.device === null ? 1 : 0
-  );
+  // Shared (no prefix) first, then device runs in first-appearance order.
+  // Built explicitly rather than via a partial-order sort comparator.
+  const ordered = byDevice.has(null) ? [null, ...order.filter((d) => d !== null)] : order;
+  return ordered.map((device) => ({ device, entries: byDevice.get(device)! }));
 }
 
 function formatSecretValue(value: string): string {
@@ -123,10 +122,12 @@ export function addSecret(yaml: string, key: string, value: string): string {
   return `${yaml}${sep}${entry}\n`;
 }
 
-/** Drop the entry's line from *yaml*, or null when the index is out of range. */
+/** Drop the entry's line from *yaml*, or null when it no longer holds a key. */
 export function removeSecret(yaml: string, line: number): string | null {
   const lines = yaml.split("\n");
-  if (line < 0 || line >= lines.length) return null;
+  // Validate the target still holds a key so a stale index can't delete an
+  // unrelated comment / blank / other line.
+  if (line < 0 || line >= lines.length || !TOP_LEVEL_KEY.test(lines[line])) return null;
   lines.splice(line, 1);
   return lines.join("\n");
 }

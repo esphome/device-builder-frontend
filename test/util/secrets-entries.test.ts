@@ -152,6 +152,11 @@ describe("splice operations preserve the rest of the document", () => {
     expect(removeSecret("wifi_ssid: home\n", 9)).toBeNull();
   });
 
+  test("removeSecret returns null when the line isn't a top-level key", () => {
+    // A stale index landing on a comment must not delete an unrelated line.
+    expect(removeSecret("# header\nwifi_ssid: home\n", 0)).toBeNull();
+  });
+
   test.each([
     "!tag",
     "&anchor",
