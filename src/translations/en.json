@@ -1241,6 +1241,7 @@
     "key_placeholder": "Name",
     "value_placeholder": "Value",
     "remove_secret": "Remove secret",
+    "group_shared": "Shared",
     "advanced_badge": "Advanced — edit in YAML",
     "empty": "No secrets yet. Add one below or switch to YAML.",
     "invalid_key": "Names may use letters, numbers, dots, dashes and underscores, and can't start with a number.",

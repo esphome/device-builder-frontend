@@ -6,6 +6,7 @@
  * keys, block / flow collections and nested mappings are read-only.
  */
 
+import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
 
@@ -18,6 +19,12 @@ export interface SecretEntry {
   line: number;
   /** True when the value is a single-line inline scalar safe to edit in the form. */
   editable: boolean;
+}
+
+/** A run of secrets sharing a ``<device>__`` prefix; ``device`` is null for the shared run. */
+export interface SecretGroup {
+  device: string | null;
+  entries: SecretEntry[];
 }
 
 // Top-level ``key:`` or ``key: value`` line. The colon must be followed
@@ -34,8 +41,42 @@ const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 // collection ([ ] / { }).
 const ADVANCED_VALUE_START = /^[!&*|>[{]/;
 
+// ``formatYamlScalar`` quotes most unsafe scalars (``:`` ``#`` leading
+// ``-`` / space / quote, booleans, numbers …) but not a value that
+// *starts* with a YAML indicator (``! & * | > [ ] { } @ \` %``). Written
+// bare, such a value reparses as a tag / anchor / block marker and
+// vanishes from the form, so force-quote it.
+const LEADING_INDICATOR = /^[!&*|>[\]{}@`%]/;
+
 export function isValidSecretKey(key: string): boolean {
   return VALID_KEY.test(key);
+}
+
+/** Group entries into shared-then-per-device runs by the ``<device>__`` key prefix. */
+export function groupSecretsByDevice(entries: SecretEntry[]): SecretGroup[] {
+  const order: (string | null)[] = [];
+  const byDevice = new Map<string | null, SecretEntry[]>();
+  for (const entry of entries) {
+    const sep = entry.key.indexOf("__");
+    const device = sep > 0 ? entry.key.slice(0, sep) : null;
+    if (!byDevice.has(device)) {
+      byDevice.set(device, []);
+      order.push(device);
+    }
+    byDevice.get(device)!.push(entry);
+  }
+  const groups = order.map((device) => ({ device, entries: byDevice.get(device)! }));
+  // Shared (no prefix) first; device runs keep first-appearance order.
+  return groups.sort((a, b) =>
+    a.device === b.device ? 0 : a.device === null ? -1 : b.device === null ? 1 : 0
+  );
+}
+
+function formatSecretValue(value: string): string {
+  if (value !== "" && LEADING_INDICATOR.test(value)) {
+    return `"${escapeYamlDoubleQuoted(value)}"`;
+  }
+  return formatYamlScalar(value);
 }
 
 /** Parse *yaml* into one entry per top-level key line. */
@@ -54,7 +95,7 @@ export function parseSecretsEntries(yaml: string): SecretEntry[] {
 /** Replace the value of the entry at *line*, or null when it no longer matches. */
 export function setSecretValue(yaml: string, line: number, value: string): string | null {
   return rewriteLine(yaml, line, (key, _value, comment) => {
-    return `${key}: ${formatYamlScalar(value)}${comment}`;
+    return `${key}: ${formatSecretValue(value)}${comment}`;
   });
 }
 
@@ -71,7 +112,7 @@ export function renameSecretKey(
 
 /** Append a new ``key: value`` line to *yaml*. */
 export function addSecret(yaml: string, key: string, value: string): string {
-  const entry = `${key}: ${formatYamlScalar(value)}`;
+  const entry = `${key}: ${formatSecretValue(value)}`;
   if (yaml === "") return `${entry}\n`;
   const sep = yaml.endsWith("\n") ? "" : "\n";
   return `${yaml}${sep}${entry}\n`;

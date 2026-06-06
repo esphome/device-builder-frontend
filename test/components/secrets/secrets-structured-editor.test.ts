@@ -49,20 +49,23 @@ describe("esphome-secrets-structured-editor", () => {
     expect(el.shadowRoot!.querySelector(".add-btn")).not.toBeNull();
   });
 
-  test("value inputs mask by default and reveal honours the prop", async () => {
+  test("the value field is a password input whose reveal follows the prop", async () => {
     const masked = await mount("wifi_ssid: home\n");
-    expect(rowInputs(rows(masked)[0])[1].type).toBe("password");
+    const maskedPw = rows(masked)[0].querySelector("esphome-password-input");
+    expect((maskedPw as unknown as { revealed: boolean }).revealed).toBe(false);
 
     const revealed = await mount("wifi_ssid: home\n", true);
-    expect(rowInputs(rows(revealed)[0])[1].type).toBe("text");
+    const revealedPw = rows(revealed)[0].querySelector("esphome-password-input");
+    expect((revealedPw as unknown as { revealed: boolean }).revealed).toBe(true);
   });
 
   test("editing a value emits yaml-change with the spliced buffer", async () => {
     const el = await mount("wifi_ssid: home\n");
     const captured = onChange(el);
-    const valueInput = rowInputs(rows(el)[0])[1];
-    valueInput.value = "office";
-    valueInput.dispatchEvent(new Event("input"));
+    const pw = rows(el)[0].querySelector("esphome-password-input")!;
+    pw.dispatchEvent(
+      new CustomEvent("password-input-change", { detail: { value: "office" } })
+    );
     expect(captured.value).toBe("wifi_ssid: office\n");
   });
 
@@ -120,5 +123,20 @@ describe("esphome-secrets-structured-editor", () => {
     keyInput.value = "ap_ssid";
     keyInput.dispatchEvent(new Event("change"));
     expect(captured.value).toBe("ap_ssid: home\n");
+  });
+
+  test("device-prefixed keys render under group headers", async () => {
+    const el = await mount("wifi_ssid: home\nbw15__api: a\nbw15__ota: b\n");
+    const headers = Array.from(
+      el.shadowRoot!.querySelectorAll(".group-header"),
+      (h) => h.textContent
+    );
+    expect(headers).toContain("bw15");
+    expect(rows(el)).toHaveLength(3);
+  });
+
+  test("a flat shared file shows no group headers", async () => {
+    const el = await mount("wifi_ssid: home\nwifi_password: x\n");
+    expect(el.shadowRoot!.querySelectorAll(".group-header")).toHaveLength(0);
   });
 });

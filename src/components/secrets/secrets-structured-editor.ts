@@ -15,16 +15,20 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   addSecret,
+  groupSecretsByDevice,
   isValidSecretKey,
   parseSecretsEntries,
   removeSecret,
   renameSecretKey,
   setSecretValue,
   type SecretEntry,
+  type SecretGroup,
 } from "../../util/secrets-entries.js";
+import type { PasswordInputValueChange } from "../device/password-input-event.js";
 import { secretsStructuredEditorStyles } from "./secrets-structured-editor.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../device/password-input.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
@@ -57,12 +61,20 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
 
   protected render() {
     const entries = parseSecretsEntries(this.value);
+    const groups = groupSecretsByDevice(entries);
+    // Headers only earn their keep once a ``<device>__`` prefix appears;
+    // a flat shared file stays a plain list.
+    const grouped = groups.some((group) => group.device !== null);
     return html`
       ${entries.length === 0
         ? html`<div class="empty" role="status">${this._localize("secrets.empty")}</div>`
-        : html`<div class="rows">
-            ${entries.map((entry) => this._renderRow(entry, entries))}
-          </div>`}
+        : grouped
+          ? html`<div class="groups">
+              ${groups.map((group) => this._renderGroup(group, entries))}
+            </div>`
+          : html`<div class="rows">
+              ${entries.map((entry) => this._renderRow(entry, entries))}
+            </div>`}
       <div class="add-row">
         <button type="button" class="add-btn" @click=${() => this._add(entries)}>
           <wa-icon library="mdi" name="plus"></wa-icon>
@@ -70,6 +82,16 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
         </button>
       </div>
     `;
+  }
+
+  private _renderGroup(group: SecretGroup, entries: SecretEntry[]) {
+    const heading = group.device ?? this._localize("secrets.group_shared");
+    return html`<div class="group">
+      <h2 class="group-header">${heading}</h2>
+      <div class="rows">
+        ${group.entries.map((entry) => this._renderRow(entry, entries))}
+      </div>
+    </div>`;
   }
 
   private _renderRow(entry: SecretEntry, entries: SecretEntry[]) {
@@ -103,22 +125,15 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           @change=${(e: Event) =>
             this._onKeyChange(entry, entries, e.currentTarget as HTMLInputElement)}
         />
-        <input
-          type=${this.revealSensitive ? "text" : "password"}
-          .value=${live(entry.value)}
-          autocomplete="off"
-          spellcheck="false"
+        <esphome-password-input
+          class="value-input"
+          .value=${entry.value}
+          .revealed=${this.revealSensitive}
+          label=${this._localize("secrets.value_placeholder")}
           placeholder=${this._localize("secrets.value_placeholder")}
-          aria-label=${this._localize("secrets.value_placeholder")}
-          @input=${(e: Event) =>
-            this._emit(
-              setSecretValue(
-                this.value,
-                entry.line,
-                (e.currentTarget as HTMLInputElement).value
-              )
-            )}
-        />
+          @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) =>
+            this._emit(setSecretValue(this.value, entry.line, e.detail.value))}
+        ></esphome-password-input>
         <button
           type="button"
           class="icon-btn"

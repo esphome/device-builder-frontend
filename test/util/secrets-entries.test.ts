@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   addSecret,
+  groupSecretsByDevice,
   isValidSecretKey,
   parseSecretsEntries,
   removeSecret,
@@ -139,6 +140,50 @@ describe("splice operations preserve the rest of the document", () => {
 
   test("removeSecret returns null for an out-of-range index", () => {
     expect(removeSecret("wifi_ssid: home\n", 9)).toBeNull();
+  });
+
+  test.each([
+    "!tag",
+    "&anchor",
+    "*alias",
+    "|block",
+    ">fold",
+    "[flow",
+    "{flow",
+    "@home",
+    "%pct",
+  ])(
+    "a value starting with the YAML indicator %s is quoted and round-trips editable",
+    (value) => {
+      const out = setSecretValue("pw: x\n", 0, value)!;
+      const [entry] = parseSecretsEntries(out);
+      expect(entry.editable).toBe(true);
+      expect(entry.value).toBe(value);
+    }
+  );
+});
+
+describe("groupSecretsByDevice", () => {
+  test("splits shared and per-device runs by the __ prefix", () => {
+    const entries = parseSecretsEntries(
+      "wifi_ssid: home\nbw15__api: a\nbw15__ota: b\nfan__key: c\n"
+    );
+    const groups = groupSecretsByDevice(entries);
+    expect(groups.map((g) => g.device)).toEqual([null, "bw15", "fan"]);
+    expect(groups[1].entries.map((e) => e.key)).toEqual(["bw15__api", "bw15__ota"]);
+  });
+
+  test("a leading __ has no device prefix and stays shared", () => {
+    const groups = groupSecretsByDevice(parseSecretsEntries("__weird: 1\n"));
+    expect(groups).toHaveLength(1);
+    expect(groups[0].device).toBeNull();
+  });
+
+  test("the shared run sorts ahead of device runs even when it appears later", () => {
+    const groups = groupSecretsByDevice(
+      parseSecretsEntries("bw15__api: a\nwifi_ssid: home\n")
+    );
+    expect(groups.map((g) => g.device)).toEqual([null, "bw15"]);
   });
 });
 

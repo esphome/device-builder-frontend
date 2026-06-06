@@ -13,6 +13,28 @@ export const secretsStructuredEditorStyles = css`
     gap: var(--wa-space-s);
   }
 
+  .groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-l);
+  }
+
+  .group-header {
+    margin: 0 0 var(--wa-space-s);
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-quiet);
+    text-transform: none;
+    border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    padding-bottom: 4px;
+  }
+
+  /* The password input is a block custom element; stretch it into the
+     value column so it lines up with the key input and remove button. */
+  .value-input {
+    min-width: 0;
+  }
+
   .row {
     display: grid;
     grid-template-columns: minmax(8rem, 1fr) minmax(8rem, 2fr) auto;
