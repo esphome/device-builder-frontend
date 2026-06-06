@@ -17,6 +17,21 @@ export function componentDomain(componentId: string): string {
   return componentId.split(".")[0];
 }
 
+/** The parenthetical context shown beside an instance's label: its domain,
+ *  plus the owning container's name when it's a sub-entity, so two readings
+ *  named alike (``Temperature``) read distinctly across the picker surfaces. */
+export function instanceContext(
+  device: AvailableComponentInstance,
+  devices: AvailableComponentInstance[]
+): string {
+  const parent = device.parent_id
+    ? devices.find((p) => p.id === device.parent_id)
+    : undefined;
+  return parent
+    ? `${device.component_id} · ${instanceName(parent)}`
+    : device.component_id;
+}
+
 /** A multi-entity platform container holds no triggers of its own (its
  *  sub-entities do), so it isn't directly selectable as a target. */
 export function isSelectableTarget(device: AvailableComponentInstance): boolean {

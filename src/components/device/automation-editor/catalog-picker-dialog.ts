@@ -49,7 +49,12 @@ import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { componentDomain, instanceName, selectableTargets } from "./component-targets.js";
+import {
+  componentDomain,
+  instanceContext,
+  instanceName,
+  selectableTargets,
+} from "./component-targets.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../../base-dialog.js";
@@ -430,7 +435,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       ({ device, matching }) => html`
         <p class="picker-group-label">
           ${instanceName(device)}
-          <span class="ae-muted">(${device.component_id})</span>
+          <span class="ae-muted">(${instanceContext(device, this.devices)})</span>
         </p>
         ${matching.map((item) =>
           this._renderRow(item, () => this._pick(item.id, this._preFillFor(item, device)))

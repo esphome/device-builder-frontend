@@ -41,6 +41,7 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   firstSelectableTarget,
+  instanceContext,
   instanceName,
   selectableTargets,
 } from "./component-targets.js";
@@ -183,20 +184,15 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
           @change=${(e: Event) =>
             this._onComponentChange((e.target as HTMLSelectElement).value)}
         >
-          ${targets.map((d) => {
-            // Sub-entities carry the bare sub-domain as component_id, so two
-            // readings named alike read identically; append the parent for
-            // parity with the grouped add picker.
-            const parent = d.parent_id
-              ? this.devices.find((p) => p.id === d.parent_id)
-              : undefined;
-            const context = parent
-              ? `${d.component_id} · ${instanceName(parent)}`
-              : d.component_id;
-            return html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
-              >${instanceName(d)} <span class="ae-muted">(${context})</span></wa-option
-            >`;
-          })}
+          ${targets.map(
+            (d) =>
+              html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
+                >${instanceName(d)}
+                <span class="ae-muted"
+                  >(${instanceContext(d, this.devices)})</span
+                ></wa-option
+              >`
+          )}
         </wa-select>
       `;
     }

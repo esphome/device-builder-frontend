@@ -5,7 +5,10 @@ import type {
   AvailableComponentInstance,
 } from "../../../../src/api/types/automations.js";
 import {
+  componentDomain,
   firstSelectableTarget,
+  instanceContext,
+  instanceName,
   isSelectableTarget,
   selectableTargets,
   triggersForComponent,
@@ -66,5 +69,34 @@ describe("component-targets", () => {
   it("offers nothing for a container or a missing device", () => {
     expect(triggersForComponent([onValueRange], container)).toEqual([]);
     expect(triggersForComponent([onValueRange], undefined)).toEqual([]);
+  });
+});
+
+describe("instance label helpers", () => {
+  it("instanceName falls back from name to id", () => {
+    expect(instanceName(inst({ id: "x", component_id: "sensor", name: "Kit" }))).toBe(
+      "Kit"
+    );
+    expect(instanceName(inst({ id: "x", component_id: "sensor" }))).toBe("x");
+  });
+
+  it("componentDomain takes the bare domain", () => {
+    expect(componentDomain("sensor.aht10")).toBe("sensor");
+    expect(componentDomain("sensor")).toBe("sensor");
+  });
+
+  it("instanceContext appends the owning container for a sub-entity", () => {
+    const named = inst({ id: "aht20", component_id: "sensor.aht10", name: "AHT20" });
+    const devices = [named, temp];
+    // Sub-entity → domain · parent label; plain instance → bare domain only.
+    expect(instanceContext(temp, devices)).toBe("sensor · AHT20");
+    expect(instanceContext(relay, devices)).toBe("switch.gpio");
+    // A dangling parent_id (parent absent) degrades to the bare domain.
+    expect(
+      instanceContext(
+        inst({ id: "o", component_id: "sensor", parent_id: "gone" }),
+        devices
+      )
+    ).toBe("sensor");
   });
 });
