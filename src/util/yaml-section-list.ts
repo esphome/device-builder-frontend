@@ -14,6 +14,7 @@ import {
 import {
   BLOCK_SCALAR_INLINE_RE,
   BLOCK_SCALAR_RE,
+  endsBlockAtIndent,
   isBlankOrCommentLine,
   LIST_ITEM_BARE_DASH_RE,
   LIST_ITEM_DICT_KEY_RE,
@@ -160,16 +161,9 @@ export const _scanValueBlock = (
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
     if (isBlankOrCommentLine(line)) continue;
-    const lead = line.match(/^ */)![0];
-    if (lead.length < keyIndent.length) return { endIdx: i, isComplex };
-    if (lead.length === keyIndent.length) {
-      // YAML's compact block-sequence form allows a child list to
-      // share the parent key's indent (``calibration:\n- a\n- b``).
-      // Same-indent dash lines stay in the block; any other shape
-      // at this indent terminates as before.
-      const tail = line.slice(lead.length);
-      if (tail !== "-" && !tail.startsWith("- ")) return { endIdx: i, isComplex };
-    }
+    // Same-indent compact block-sequence + comment rules live in
+    // ``endsBlockAtIndent`` (see the lexer).
+    if (endsBlockAtIndent(line, keyIndent.length)) return { endIdx: i, isComplex };
     if (!isComplex) {
       if (
         BLOCK_SCALAR_RE.test(line) ||

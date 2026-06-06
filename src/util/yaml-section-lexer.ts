@@ -277,3 +277,23 @@ export const isChildListItemLine = (line: string, parentIndent: string): boolean
   const tail = line.slice(lead.length);
   return tail === "-" || tail.startsWith("- ");
 };
+
+/**
+ * The one rule for "where does a block end". True when *line* terminates a
+ * block whose opener key sits at *openerIndent* columns. Blank and
+ * comment-only lines never terminate (they belong to the block); a line
+ * indented deeper is the block's body; a *same-indent* compact
+ * block-sequence dash (``calibration:\n- a\n- b``, bare ``-`` or ``- x``)
+ * continues the block; any other same-indent or shallower line ends it.
+ *
+ * Every block-boundary scan funnels through here so the same-indent-
+ * sequence and comment cases are handled in one place instead of being
+ * relearned (and mis-learned) per call site.
+ */
+export const endsBlockAtIndent = (line: string, openerIndent: number): boolean => {
+  if (isBlankOrCommentLine(line)) return false;
+  const lineIndent = _leadingIndent(line).length;
+  if (lineIndent < openerIndent) return true;
+  if (lineIndent > openerIndent) return false;
+  return !isChildListItemLine(line, line.slice(0, lineIndent));
+};

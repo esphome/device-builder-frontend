@@ -84,6 +84,23 @@ describe("findFieldLine", () => {
     expect(findFieldLine(yaml, section, ["areas", "0", "name_add_mac"])).toBeNull();
   });
 
+  it("descends a same-indent compact block-sequence value", () => {
+    // ``items:`` carries its list at the key's own indent (YAML's compact
+    // block-sequence form). The block-end scan must keep those dashes in
+    // the block or descending into ``items.0`` fails and returns null.
+    const yaml = [
+      "wifi:",
+      "  group:",
+      "    items:",
+      "    - ssid: a",
+      "    - ssid: b",
+      "",
+    ].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(findFieldLine(yaml, section, ["group", "items", "0", "ssid"])).toBe(4);
+    expect(findFieldLine(yaml, section, ["group", "items", "1", "ssid"])).toBe(5);
+  });
+
   it("resolves a numeric mapping key instead of reading it as a list index", () => {
     const yaml = ["substitutions:", "  0: zero", "  name: x", ""].join("\n");
     const section = sectionAt(yaml, 1);

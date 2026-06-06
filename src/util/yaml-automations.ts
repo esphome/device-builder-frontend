@@ -5,6 +5,7 @@
  * unaffected; import from there or from here directly.
  */
 
+import { endsBlockAtIndent } from "./yaml-section-lexer.js";
 import {
   instanceComponentId,
   listItemChildIndent,
@@ -246,20 +247,14 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
   return automations;
 }
 
-/** First line that closes the block opened at ``startIdx``, or
- *  end-of-file. Blank and comment lines never close a block. A
- *  block-sequence value may sit at its key's own indent (``on_*:``
- *  with the ``- `` items un-indented), so a same-indent list dash
- *  continues the block; only a same-indent non-dash line closes it. */
+/** Index of the first line past the block opened at ``startIdx`` (its key
+ *  at ``indent`` columns), or ``lines.length`` at EOF. Read as a 1-indexed
+ *  line number this is the block's last content line, so callers use it
+ *  directly as a section's ``toLine``. The same-indent-sequence and comment
+ *  rules live in ``endsBlockAtIndent``. */
 function _findBlockEnd(lines: string[], startIdx: number, indent: number): number {
   for (let j = startIdx + 1; j < lines.length; j++) {
-    const trimmed = lines[j].trim();
-    if (trimmed === "" || trimmed.startsWith("#")) continue;
-    const lineIndent = (lines[j].match(/^(\s*)/) ?? ["", ""])[1].length;
-    if (lineIndent < indent) return j;
-    // A bare ``-`` (value on the next line) is still a list item, so
-    // match end-of-line too — mirrors ``LIST_ITEM_START_RE``.
-    if (lineIndent === indent && !/^\s*-(\s|$)/.test(lines[j])) return j;
+    if (endsBlockAtIndent(lines[j], indent)) return j;
   }
   return lines.length;
 }
