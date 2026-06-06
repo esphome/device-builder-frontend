@@ -21,6 +21,10 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
   /** Whether the bundle ships secrets (merged, not overwritten). */
   @property({ type: Boolean }) hasSecrets = false;
 
+  /** The device's own config file; overwriting it keeps the device's
+   *  labels / comment / board, so its row is flagged distinctly. */
+  @property({ type: String }) mainConfig = "";
+
   /** Paths the user has marked for overwrite. */
   @state()
   private _overwrite = new Set<string>();
@@ -66,6 +70,14 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
         cursor: pointer;
       }
 
+      .badge {
+        margin-left: var(--wa-space-xs);
+        font-family: var(--wa-font-family-body, sans-serif);
+        font-size: var(--wa-font-size-2xs, 0.7rem);
+        color: var(--wa-color-text-quiet);
+        white-space: nowrap;
+      }
+
       .state {
         font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
@@ -96,6 +108,7 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
           // break the label-to-input association.
           const id = `cf-${i}`;
           const overwrite = this._overwrite.has(path);
+          const isMain = path === this.mainConfig;
           return html`
             <div class="file-row">
               <input
@@ -104,7 +117,14 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
                 .checked=${overwrite}
                 @change=${() => this._toggle(path)}
               />
-              <label for=${id}>${path}</label>
+              <label for=${id}>
+                ${path}
+                ${isMain
+                  ? html`<span class="badge"
+                      >${this._localize("wizard.import_bundle_main_config")}</span
+                    >`
+                  : nothing}
+              </label>
               <span class="state">
                 ${overwrite
                   ? this._localize("wizard.import_bundle_overwrite")

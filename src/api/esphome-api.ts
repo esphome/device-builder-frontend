@@ -750,7 +750,11 @@ export class ESPHomeAPI {
     return this.sendCommand<YamlSearchHit[]>("yaml/search", args);
   }
 
-  /** Create a new device configuration. */
+  /** Create a new device configuration.
+   *
+   * A filename collision rejects with `already_exists`; pass
+   * `overwrite: true` to replace the config in place, keeping the
+   * existing device's labels / comment / board. */
   async createDevice(args: {
     name: string;
     board_id?: string;
@@ -758,6 +762,7 @@ export class ESPHomeAPI {
     ssid?: string;
     psk?: string;
     file_content?: string;
+    overwrite?: boolean;
   }): Promise<WizardResponse> {
     return this.sendCommand<WizardResponse>("devices/create", args);
   }

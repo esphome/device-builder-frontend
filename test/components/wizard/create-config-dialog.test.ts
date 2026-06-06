@@ -13,9 +13,11 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-board.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-empty-config.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-method.js", () => ({}));
+vi.mock("../../../src/components/wizard/wizard-step-overwrite-device.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-resolve-conflicts.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-setup.js", () => ({}));
 
+import { APIError } from "../../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeCreateConfigDialog } from "../../../src/components/wizard/create-config-dialog.js";
 
@@ -89,6 +91,26 @@ function bundleFile(): File {
   return new File(
     [new Uint8Array([0x1f, 0x8b, 0x08, 0x00])],
     "device.esphomebundle.tar.gz"
+  );
+}
+
+function yamlFile(): File {
+  return new File(["esphome:\n  name: device\n"], "device.yaml");
+}
+
+// The overwrite-confirm step dispatches this when the user confirms.
+function emitOverwriteDevice(el: ESPHomeCreateConfigDialog): void {
+  const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
+  wd.dispatchEvent(
+    new CustomEvent("overwrite-device", { bubbles: true, composed: true })
+  );
+}
+
+// The overwrite-confirm step's Cancel routes back via next-step.
+function emitNextStep(el: ESPHomeCreateConfigDialog, step: string): void {
+  const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
+  wd.dispatchEvent(
+    new CustomEvent("next-step", { detail: step, bubbles: true, composed: true })
   );
 }
 
@@ -305,5 +327,83 @@ describe("create-config-dialog bundle import", () => {
     await flush();
 
     expect(importBundle).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A YAML upload that collides routes to a confirm step; confirming
+// re-sends with overwrite:true (the backend keeps the device's labels).
+describe("create-config-dialog upload overwrite", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const step = (el: ESPHomeCreateConfigDialog): string =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._step;
+
+  it("routes an already_exists collision to the confirm-overwrite step", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new APIError("already_exists", "Configuration device.yaml already exists")
+      );
+    const el = await mount({ createDevice });
+
+    emitImport(el, yamlFile());
+    await flush();
+    await el.updateComplete;
+
+    expect(step(el)).toBe("confirm-overwrite");
+    expect(createDevice).toHaveBeenCalledTimes(1);
+    expect(createDevice.mock.calls[0][0].overwrite).toBeUndefined();
+  });
+
+  it("re-sends with overwrite:true when the user confirms", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(new APIError("already_exists", "exists"))
+      .mockResolvedValueOnce({ configuration: "device.yaml" });
+    const el = await mount({ createDevice });
+
+    emitImport(el, yamlFile());
+    await flush();
+    await el.updateComplete;
+
+    emitOverwriteDevice(el);
+    await flush();
+
+    expect(createDevice).toHaveBeenCalledTimes(2);
+    expect(createDevice.mock.calls[1][0].overwrite).toBe(true);
+  });
+
+  it("cancelling the confirm step does not re-call createDevice", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(new APIError("already_exists", "exists"));
+    const el = await mount({ createDevice });
+
+    emitImport(el, yamlFile());
+    await flush();
+    await el.updateComplete;
+
+    emitNextStep(el, "method"); // Cancel
+    await flush();
+
+    expect(step(el)).toBe("method");
+    expect(createDevice).toHaveBeenCalledTimes(1);
+  });
+
+  it("a non-collision upload error stays on the method step", async () => {
+    const createDevice = vi
+      .fn()
+      .mockRejectedValueOnce(new APIError("invalid_args", "bad yaml"));
+    const el = await mount({ createDevice });
+
+    emitImport(el, yamlFile());
+    await flush();
+    await el.updateComplete;
+
+    expect(step(el)).toBe("method");
+    expect(createDevice).toHaveBeenCalledTimes(1);
   });
 });

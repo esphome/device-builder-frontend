@@ -23,12 +23,19 @@ import "../base-dialog.js";
 import "./wizard-step-board.js";
 import "./wizard-step-empty-config.js";
 import "./wizard-step-method.js";
+import "./wizard-step-overwrite-device.js";
 import "./wizard-step-resolve-conflicts.js";
 import "./wizard-step-setup.js";
 
 registerMdiIcons({ close: mdiClose, "arrow-left": mdiArrowLeft });
 
-type WizardStep = "method" | "board" | "setup" | "empty-config" | "resolve-conflicts";
+type WizardStep =
+  | "method"
+  | "board"
+  | "setup"
+  | "empty-config"
+  | "resolve-conflicts"
+  | "confirm-overwrite";
 type CreationMethod = "basic" | "empty" | "import";
 type WizardStepDetail =
   | WizardStep
@@ -83,6 +90,15 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   @state()
   private _bundleHasSecrets = false;
+
+  /** Main config filename of the bundle, so the resolve step can flag
+   *  the row whose overwrite replaces the device (keeping its labels). */
+  @state()
+  private _bundleMainConfig = "";
+
+  /** Pending YAML upload held while the user confirms overwriting an
+   *  existing device. */
+  private _pendingUpload: { slug: string; fileContent: string } | null = null;
 
   @state()
   private _submitting = false;
@@ -171,6 +187,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._bundleB64 = null;
     this._bundleConflicts = [];
     this._bundleHasSecrets = false;
+    this._bundleMainConfig = "";
+    this._pendingUpload = null;
     this._submitting = false;
     this._resetCreateErrors();
     this._open = true;
@@ -216,6 +234,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         return this._localize("wizard.title_empty_config");
       case "resolve-conflicts":
         return this._localize("wizard.import_bundle_conflicts_title");
+      case "confirm-overwrite":
+        return this._localize("wizard.overwrite_device_title");
     }
   }
 
@@ -233,6 +253,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         @create-empty-config=${this._onCreateEmptyConfig}
         @import-file=${this._onImportFile}
         @resolve-conflicts=${this._onResolveConflicts}
+        @overwrite-device=${this._onConfirmOverwrite}
       >
         ${this._step !== "method"
           ? html`<button
@@ -282,7 +303,12 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         return html`<esphome-wizard-step-resolve-conflicts
           .conflicts=${this._bundleConflicts}
           .hasSecrets=${this._bundleHasSecrets}
+          .mainConfig=${this._bundleMainConfig}
         ></esphome-wizard-step-resolve-conflicts>`;
+      case "confirm-overwrite":
+        return html`<esphome-wizard-step-overwrite-device
+          .deviceName=${this._pendingUpload?.slug ?? ""}
+        ></esphome-wizard-step-overwrite-device>`;
     }
   }
 
@@ -313,7 +339,15 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._bundleB64 = null;
     this._bundleConflicts = [];
     this._bundleHasSecrets = false;
+    this._bundleMainConfig = "";
+    this._pendingUpload = null;
     this._createImportedDevice();
+  }
+
+  private _onConfirmOverwrite() {
+    if (!this._pendingUpload) return;
+    const { slug, fileContent } = this._pendingUpload;
+    this._runUpload(slug, fileContent, true);
   }
 
   private _onResolveConflicts(e: CustomEvent<{ overwrite: string[] }>) {
@@ -332,6 +366,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         this._step = "method";
         break;
       case "resolve-conflicts":
+        this._step = "method";
+        break;
+      case "confirm-overwrite":
         this._step = "method";
         break;
     }
@@ -423,19 +460,36 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       return;
     }
 
+    await this._runUpload(slug, fileContent);
+  }
+
+  /** Send a YAML upload. A first-time collision (`already_exists`) routes
+   *  to the confirm-overwrite step; the user's confirm re-enters here with
+   *  `overwrite=true`, which replaces the config and keeps its labels. */
+  private async _runUpload(
+    slug: string,
+    fileContent: string,
+    overwrite = false
+  ): Promise<void> {
+    if (this._submitting) return;
+    this._resetCreateErrors();
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
         name: slug,
         config_type: "upload",
         file_content: fileContent,
+        ...(overwrite ? { overwrite: true } : {}),
       });
       this._navigateToCreated(configuration);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this._importError = msg.includes("409")
-        ? this._localize("wizard.import_duplicate_error", { name: slug })
-        : this._localize("wizard.import_general_error");
+      if (!overwrite && err instanceof APIError && err.errorCode === "already_exists") {
+        this._pendingUpload = { slug, fileContent };
+        this._step = "confirm-overwrite";
+        return;
+      }
+      this._importError =
+        this._apiErrorDetails(err) || this._localize("wizard.import_general_error");
     } finally {
       this._submitting = false;
     }
@@ -474,6 +528,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       if (res.status === "conflicts") {
         this._bundleConflicts = res.conflicts;
         this._bundleHasSecrets = res.has_secrets;
+        this._bundleMainConfig = res.configuration;
         this._step = "resolve-conflicts";
         return;
       }
