@@ -15,7 +15,8 @@ export class ESPHomeWizardStepOverwriteDevice extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  /** Filename of the device that already exists. */
+  /** Name of the existing device (its hostname slug, as shown on the
+   *  device card), not the YAML filename. */
   @property({ type: String }) deviceName = "";
 
   static styles = [
