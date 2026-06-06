@@ -101,12 +101,17 @@ export function renderMultiValueField(
   // back unchanged, rather than being rewritten on a no-op edit. Decoding
   // must stay unconditional too — a freshly added row is empty, so a typed
   // ``\U…`` has to decode without a prior escape-worthy value to gate on.
-  // INTEGER / FLOAT lists (modbus custom_command, sync_value, lcd user
-  // characters data, ...) get number inputs and coerce each item back to a
-  // number on edit, so the YAML serializer emits them unquoted; numeric
-  // items are plain stringified numbers and skip the glyph escaping above.
+  // INTEGER / FLOAT lists (lcd user-characters data, microphone channels,
+  // ...) get number inputs and coerce each item back to a number on edit, so
+  // the YAML serializer emits them unquoted; numeric items are plain
+  // stringified numbers and skip the glyph escaping above. Hex-display
+  // integers (modbus custom_command, sync_value) stay text: <input
+  // type="number"> rejects 0x.. literals and Number("0x76") would both lose
+  // the canonical hex form and overflow 64-bit values, same reason the
+  // single-value number renderer hands hex off to its own text parser.
   const numeric =
-    entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT;
+    (entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT) &&
+    entry.display_format !== "hex";
   const items: string[] = numeric
     ? raw.map((v) => String(v ?? ""))
     : raw.map((v) => escapeForInput(String(v)));

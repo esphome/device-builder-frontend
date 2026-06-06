@@ -56,4 +56,16 @@ describe("renderMultiValueField numeric coercion", () => {
     fireInput(inputs[0], "b");
     expect(ctx.emitChange).toHaveBeenCalledWith(["field"], ["b"]);
   });
+
+  it("keeps text inputs for a hex-display INTEGER list (modbus custom_command)", () => {
+    const ctx = makeRenderCtx({ field: [0x76] });
+    const entry = makeEntry(ConfigEntryType.INTEGER, { display_format: "hex" });
+    const inputs = findElementBindings(
+      renderMultiValueField(entry, ["field"], ctx),
+      "input"
+    );
+
+    // A number input would reject 0x.. and Number("0x76") would corrupt it.
+    expect(inputs[0].type).toBe("text");
+  });
 });
