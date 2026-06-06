@@ -645,6 +645,29 @@ describe("parseYamlAutomations", () => {
     expect(items[1].fromLine).toBe(12); // second ``- timing:``
   });
 
+  it("keeps splitting when a bare-dash placeholder row sits among the entries", () => {
+    // A bare ``-`` (no value yet, mid-edit) at the key indent must not
+    // close the block — otherwise the real entry after it collapses to one
+    // un-indexed row. The dash test matches end-of-line, like the lexer's
+    // ``LIST_ITEM_START_RE``.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    id: button_main
+    on_multi_click:
+    -
+    - timing:
+        - ON for 1s to 3s
+      then:
+        - switch.toggle: usb
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:button_main:on_multi_click")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:button_main:on_multi_click:0",
+    ]);
+  });
+
   it("does not split a bare action list into per-action rows", () => {
     const yaml = `binary_sensor:
   - platform: gpio
