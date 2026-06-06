@@ -175,9 +175,10 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
             .value=${live(this._addTarget)}
             @change=${(e: Event) => {
               this._addTarget = (e.target as HTMLSelectElement).value;
-              // The full key includes the ``<device>__`` prefix, so a new
-              // target can resolve a duplicate-key error — clear it.
-              this._addError = null;
+              // A new target can resolve (or re-introduce) a duplicate via the
+              // ``<device>__`` prefix, but can't fix an invalid name; recompute
+              // only when an error is already shown so it isn't blanket-cleared.
+              if (this._addError) this._addError = this._addKeyError();
             }}
           >
             <option value="">${this._localize("secrets.group_shared")}</option>
@@ -325,21 +326,33 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     this._addOpen = false;
   };
 
+  private _addKey(): string {
+    return (this._addTarget ? `${this._addTarget}__` : "") + this._addName.trim();
+  }
+
+  // Validate the dialog's name against the chosen target; null when valid.
+  // The duplicate check depends on the ``<device>__`` prefix, so it can flip
+  // when the target changes — an invalid identifier never can.
+  private _addKeyError(): string | null {
+    if (!isValidSecretKey(this._addName.trim())) {
+      return this._localize("secrets.invalid_key");
+    }
+    if (parseSecretsEntries(this.value).some((entry) => entry.key === this._addKey())) {
+      return this._localize("secrets.duplicate_key");
+    }
+    return null;
+  }
+
   // Create the secret in one shot from the dialog fields, prefixing the key
   // with ``<device>__`` when a device was chosen so it lands in that group.
   private _confirmAdd = () => {
-    const name = this._addName.trim();
-    const key = (this._addTarget ? `${this._addTarget}__` : "") + name;
-    if (!isValidSecretKey(name)) {
-      this._addError = this._localize("secrets.invalid_key");
-      return;
-    }
-    if (parseSecretsEntries(this.value).some((entry) => entry.key === key)) {
-      this._addError = this._localize("secrets.duplicate_key");
+    const error = this._addKeyError();
+    if (error) {
+      this._addError = error;
       return;
     }
     this._addOpen = false;
-    this._emit(addSecret(this.value, key, this._addValue));
+    this._emit(addSecret(this.value, this._addKey(), this._addValue));
   };
 
   // A splice helper returns null when its target line no longer matches

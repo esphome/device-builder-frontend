@@ -188,18 +188,37 @@ describe("esphome-secrets-structured-editor", () => {
     expect((pw as unknown as { revealed: boolean }).revealed).toBe(true);
   });
 
-  test("changing the add target clears a stale key error", async () => {
-    const el = await mount("bw15__api: a\n", false, [
-      { name: "bw15", configuration: "bw15.yaml", friendly_name: "BW15" },
-    ]);
-    const view = el as unknown as AddView & { _addError: string | null };
-    view._openAdd();
-    view._addError = "stale";
+  async function changeTarget(el: ESPHomeSecretsStructuredEditor, value: string) {
     await el.updateComplete;
     const select = el.shadowRoot!.querySelector<HTMLSelectElement>(".add-select")!;
-    select.value = "bw15";
+    select.value = value;
     select.dispatchEvent(new Event("change"));
+  }
+
+  test("switching target clears a duplicate error it resolves", async () => {
+    const el = await mount("api: x\n", false, [
+      { name: "bw15", configuration: "bw15.yaml", friendly_name: "BW15" },
+    ]);
+    const view = el as unknown as AddView;
+    view._openAdd();
+    view._addName = "api";
+    view._confirmAdd(); // shared "api" duplicates the existing key
+    expect(view._addError).not.toBeNull();
+    await changeTarget(el, "bw15"); // bw15__api is unique
     expect(view._addError).toBeNull();
+  });
+
+  test("switching target keeps an invalid-name error it can't fix", async () => {
+    const el = await mount("wifi_ssid: home\n", false, [
+      { name: "bw15", configuration: "bw15.yaml", friendly_name: "BW15" },
+    ]);
+    const view = el as unknown as AddView;
+    view._openAdd();
+    view._addName = "1bad";
+    view._confirmAdd();
+    expect(view._addError).not.toBeNull();
+    await changeTarget(el, "bw15");
+    expect(view._addError).not.toBeNull();
   });
 
   test("a tagged value renders read-only with no value input", async () => {
