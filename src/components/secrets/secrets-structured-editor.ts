@@ -135,9 +135,11 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     if (!match) {
       return html`<h2 class="group-header">${device}</h2>`;
     }
-    // Resolve the device's editor route; intercept plain clicks so the SPA
-    // router handles it, leaving modifier-clicks for new tabs.
-    const href = `/device/${encodeURIComponent(match.configuration)}`;
+    // The anchor href carries the deployment base path (HA ingress / reverse
+    // proxy) so modifier-click / copy-link resolve correctly; ``navigate``
+    // gets the un-based path and applies the base itself.
+    const path = `/device/${encodeURIComponent(match.configuration)}`;
+    const href = withBase(path);
     return html`<h2 class="group-header">
       <a
         href=${href}
@@ -148,7 +150,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           e.preventDefault();
           // Fall back to a full navigation if the SPA router rejects, so the
           // click is never a silent no-op.
-          navigate(href).catch(() => window.location.assign(withBase(href)));
+          navigate(path).catch(() => window.location.assign(href));
         }}
         >${device}</a
       >
