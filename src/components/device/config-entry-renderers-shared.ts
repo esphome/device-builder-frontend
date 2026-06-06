@@ -466,11 +466,9 @@ function renderSuggestionSelect(
   `;
 }
 
-// Filter a nested entry's children and render each at its scoped path.
-// Shared by the collapsible nested renderer and the exclusive-group
-// dropdown so both scope and recurse the same way. ``includeAdvanced``
-// forces advanced children visible — an exclusive-group member's fields
-// must all show once it's picked, since there's no per-member toggle.
+// Shared child rendering for the nested renderer and the exclusive-group
+// dropdown. ``includeAdvanced`` forces advanced children visible — a picked
+// exclusive member's fields must all show, as it has no per-member toggle.
 export function renderChildEntries(
   entry: ConfigEntry,
   path: string[],

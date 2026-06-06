@@ -8,15 +8,12 @@ import {
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
-// Placeholder option value. A non-empty sentinel (not "") so the form's
-// _syncSelectedAttr — which no-ops on an empty value — still drives the
-// select to the placeholder on first paint; mapped back to "" in onChange.
+// Non-empty sentinel so _syncSelectedAttr (which no-ops on "") still
+// selects the placeholder on first paint; mapped back to "" in onChange.
 const NO_SELECTION = "__none__";
 
-// The form's entries in schema order, with each exclusive_group collapsed
-// to its member array at the position of its first member; non-exclusive
-// entries pass through for the caller to filter and render. Lives here so
-// the form's render() stays small.
+// Fold each exclusive_group to its member array at its first member's slot;
+// other entries pass through. Keeps the form's render() small.
 export function orderExclusiveGroups(
   entries: ConfigEntry[]
 ): (ConfigEntry | ConfigEntry[])[] {
@@ -41,24 +38,18 @@ export function orderExclusiveGroups(
   return out;
 }
 
-// Renders entries sharing a backend exclusive_group (a remote_receiver
-// binary_sensor's protocols) as one pick-one dropdown plus the chosen
-// member's fields. ESPHome accepts exactly one, so only the selected
-// member's key stays in the values dict.
+// One exclusive_group as a pick-one dropdown plus the chosen member's
+// fields; ESPHome accepts exactly one, so only that key stays in values.
 export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx) {
-  // Membership is "key present in values": emitChange clears a member by
-  // writing undefined, so only undefined means absent — a scaffolded {} or
-  // an explicit null (hand-written raw:) both count as the chosen member.
+  // emitChange clears with undefined, so only undefined is absent — a
+  // scaffolded {} or an explicit null both count as the chosen member.
   const present = members.filter((m) => ctx.getAt([m.key]) !== undefined);
   const selectedKey = present[0]?.key ?? "";
   const selected = members.find((m) => m.key === selectedKey);
   const disabled = ctx.disabled;
 
-  // Only offer members the platform/visibility gate allows, so a protocol
-  // invalid for this board (supported_platforms), hidden, or depends_on-gated
-  // can't be picked — matching what validateEntries treats as visible. A
-  // member already set in the YAML stays selectable so existing configs
-  // aren't silently hidden.
+  // Gate options through isEntryVisible so a board-incompatible / hidden /
+  // depends_on member can't be picked; keep an already-set one selectable.
   const rootValues = ctx.scopeValues([]);
   const targetPlatform = ctx.board?.esphome.platform ?? null;
   const options = members.filter(
@@ -67,9 +58,8 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
       isEntryVisible(m, rootValues, ctx.presentComponents, targetPlatform)
   );
 
-  // Clear every other member so the YAML keeps a single key; scaffold the
-  // chosen one with {} only when it's absent, so switching to a member that
-  // already has config (conflict resolution) keeps its values.
+  // Scaffold {} only for an absent choice, so resolving a conflict (picking
+  // the member to keep) doesn't overwrite its existing values.
   const onChange = (newKey: string) => {
     for (const m of members) {
       if (m.key !== newKey) ctx.emitChange([m.key], undefined);
@@ -77,12 +67,9 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
     if (newKey && ctx.getAt([newKey]) === undefined) ctx.emitChange([newKey], {});
   };
 
-  // data-no-value-sync: the select's value is derived (which member is
-  // present), not a YAML path, so the form syncs it via the selected
-  // option rather than a path lookup.
-  // Give the select an accessible name: associate the visible label via
-  // aria-labelledby (string-attribute form) so screen readers announce
-  // "Type" with the combobox.
+  // data-no-value-sync: value is derived (which member is present), not a
+  // YAML path, so the form sets it from the selected option; aria-labelledby
+  // gives the select its name.
   const labelId = `exclusive-group-${members[0].key}`;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(selected ? [selected.key] : [])}>

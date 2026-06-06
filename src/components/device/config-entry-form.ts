@@ -246,11 +246,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   protected render() {
     const ctx = this._buildCtx();
-    // Walk entries in schema order; each exclusive_group (e.g.
-    // remote_receiver protocols) collapses to one always-shown pick-one
-    // dropdown at its first member's position. Non-exclusive entries keep
-    // the advanced/visibility filter; a Set lets us preserve order while
-    // skipping filtered-out ones.
+    // Each exclusive_group renders as one always-shown dropdown at its
+    // first member's slot; other entries keep the advanced/visibility
+    // filter (the Set preserves order while dropping filtered-out ones).
     const ordered = orderExclusiveGroups(this.entries);
     const nonExclusive = this.entries.filter((entry) => !entry.exclusive_group);
     const visible = new Set(this._filterRenderable(nonExclusive, this.values));
