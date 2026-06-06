@@ -71,13 +71,10 @@ export class ImportFlowController implements ReactiveController {
 
   /** Begin importing the picked file (YAML upload or bundle). */
   start(file: File): void {
+    // Clear any prior pick's cached bytes / conflicts so a re-selection
+    // can't re-submit the previous file or its stale state.
+    this.reset();
     this._file = file;
-    this._bundleB64 = null;
-    this.conflicts = [];
-    this.hasSecrets = false;
-    this.mainConfig = "";
-    this.partial = null;
-    this._pendingUpload = null;
     void this._createImportedDevice();
   }
 

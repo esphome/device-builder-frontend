@@ -351,13 +351,14 @@ describe("create-config-dialog bundle import", () => {
     await el.updateComplete;
 
     expect(step(el)).toBe("import-partial");
-    // The kept list lives on the import controller, rendered by the
-    // (mocked here) wizard-step-import-partial component.
+    // Assert the observable output: the kept list the dialog hands to the
+    // rendered partial-import step, not the controller's private field.
+    const partialStep = el.shadowRoot!.querySelector(
+      "esphome-wizard-step-import-partial"
+    );
+    expect(partialStep).not.toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._import.partial).toEqual({
-      configuration: "device.yaml",
-      kept: ["device.yaml", "common/wifi.yaml"],
-    });
+    expect((partialStep as any).kept).toEqual(["device.yaml", "common/wifi.yaml"]);
   });
 });
 
