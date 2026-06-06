@@ -167,6 +167,26 @@ describe("esphome-secrets-structured-editor", () => {
     expect(view._addOpen).toBe(true);
   });
 
+  test("the add dialog's value field honors the page-level reveal", async () => {
+    const el = await mount("wifi_ssid: home\n", true);
+    const pw = el.shadowRoot!.querySelector(".add-body esphome-password-input");
+    expect((pw as unknown as { revealed: boolean }).revealed).toBe(true);
+  });
+
+  test("changing the add target clears a stale key error", async () => {
+    const el = await mount("bw15__api: a\n", false, [
+      { name: "bw15", configuration: "bw15.yaml", friendly_name: "BW15" },
+    ]);
+    const view = el as unknown as AddView & { _addError: string | null };
+    view._openAdd();
+    view._addError = "stale";
+    await el.updateComplete;
+    const select = el.shadowRoot!.querySelector<HTMLSelectElement>(".add-select")!;
+    select.value = "bw15";
+    select.dispatchEvent(new Event("change"));
+    expect(view._addError).toBeNull();
+  });
+
   test("a tagged value renders read-only with no value input", async () => {
     const el = await mount("ssid: !secret real_ssid\n");
     const row = rows(el)[0];

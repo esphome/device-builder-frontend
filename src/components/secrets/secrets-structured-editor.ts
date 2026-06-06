@@ -172,8 +172,12 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           <select
             class="add-select"
             .value=${live(this._addTarget)}
-            @change=${(e: Event) =>
-              (this._addTarget = (e.target as HTMLSelectElement).value)}
+            @change=${(e: Event) => {
+              this._addTarget = (e.target as HTMLSelectElement).value;
+              // The full key includes the ``<device>__`` prefix, so a new
+              // target can resolve a duplicate-key error — clear it.
+              this._addError = null;
+            }}
           >
             <option value="">${this._localize("secrets.group_shared")}</option>
             ${this._devices.map(
@@ -204,6 +208,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           >
           <esphome-password-input
             .value=${this._addValue}
+            .revealed=${this.revealSensitive}
             @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) =>
               (this._addValue = e.detail.value)}
           ></esphome-password-input>
