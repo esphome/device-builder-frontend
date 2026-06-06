@@ -268,23 +268,9 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
     return dialog;
   }
 
-  const choiceNames = (d: ESPHomeAddAutomationDialog): string[] =>
-    [...d.shadowRoot!.querySelectorAll(".component-choice")].map((c) =>
-      c.querySelector(".component-choice-name")!.textContent!.trim()
-    );
-
-  it("lists sub-entities as choices and the container only as a header", async () => {
-    const dialog = await mountForComponentStep();
-    const names = choiceNames(dialog);
-    expect(names).toEqual(expect.arrayContaining(["Temperature", "Humidity", "Relay"]));
-    // The container is not a selectable choice...
-    expect(names).not.toContain("AHT20");
-    // ...it appears as a group header instead.
-    const groups = [...dialog.shadowRoot!.querySelectorAll(".component-group")].map((g) =>
-      g.textContent!.trim()
-    );
-    expect(groups.join(" ")).toContain("AHT20");
-  });
+  // The grouped picker UI (rows / headers / roving tabindex / arrow nav)
+  // lives in <esphome-component-target-picker>; pinned in its own test. Here
+  // we cover the dialog's own logic that keys off the picked component id.
 
   it("offers no entity triggers when the container is somehow selected", async () => {
     const dialog = await mountForComponentStep();
@@ -325,135 +311,18 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
     expect((dialog as any)._componentId).toBe("aht20_temperature");
   });
 
-  it("degrades to a flat list when the backend omits the new fields", async () => {
-    // Legacy backend: no is_entity_container / parent_id. Every instance is
-    // a plain selectable row and nothing throws.
+  it("forwards the picker's component-change to its selection", async () => {
     const dialog = await mountForComponentStep();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._available = {
-      triggers: [],
-      actions: [],
-      conditions: [],
-      scripts: [],
-      devices: [{ id: "relay", name: "Relay", component_id: "switch.gpio" }],
-    };
-    await dialog.updateComplete;
-    expect(choiceNames(dialog)).toEqual(["Relay"]);
-  });
-
-  it("exposes a radiogroup with grouped sub-entity rows", async () => {
-    const dialog = await mountForComponentStep();
-    const root = dialog.shadowRoot!;
-    expect(root.querySelector('[role="radiogroup"]')).not.toBeNull();
-    // The container's readings sit inside a labelled group.
-    const group = root.querySelector('[role="group"]');
-    expect(group).not.toBeNull();
-    const headerId = group!.getAttribute("aria-labelledby");
-    expect(root.querySelector(`#${headerId}`)!.textContent).toContain("AHT20");
-    // Each choice is a radio.
-    expect(
-      [...root.querySelectorAll('[role="radio"]')].map((r) => r.getAttribute("data-id"))
-    ).toEqual(["aht20_temperature", "aht20_humidity", "relay"]);
-  });
-
-  it("keeps a single roving tab stop", async () => {
-    const dialog = await mountForComponentStep();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._componentId = "aht20_humidity";
-    await dialog.updateComplete;
-    const tabbable = [...dialog.shadowRoot!.querySelectorAll(".component-choice")].filter(
-      (r) => r.getAttribute("tabindex") === "0"
+    const picker = dialog.shadowRoot!.querySelector("esphome-component-target-picker")!;
+    picker.dispatchEvent(
+      new CustomEvent("component-change", {
+        detail: { componentId: "aht20_humidity" },
+        bubbles: true,
+        composed: true,
+      })
     );
-    expect(tabbable.map((r) => r.getAttribute("data-id"))).toEqual(["aht20_humidity"]);
-  });
-
-  it("arrow-down selects the next row and wraps", async () => {
-    const dialog = await mountForComponentStep();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._componentId = "aht20_temperature";
-    await dialog.updateComplete;
-    const rowOf = (id: string) =>
-      dialog.shadowRoot!.querySelector(`.component-choice[data-id="${id}"]`)!;
-    rowOf("aht20_temperature").dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
-    );
-    await dialog.updateComplete;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((dialog as any)._componentId).toBe("aht20_humidity");
-    // Wrap past the end back to the first row.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._componentId = "relay";
-    await dialog.updateComplete;
-    rowOf("relay").dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
-    );
-    await dialog.updateComplete;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((dialog as any)._componentId).toBe("aht20_temperature");
-  });
-
-  it("tracks keyboard order to the rendered order for interleaved devices", async () => {
-    // Backend lists a container before a plain instance, but the container's
-    // sub renders first (under its header) — so render order is [sub, plain].
-    // Keyboard order must follow the DOM, not the raw devices array.
-    const dialog = await mountForComponentStep();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._available = {
-      triggers: [],
-      actions: [],
-      conditions: [],
-      scripts: [],
-      devices: [
-        {
-          id: "hub",
-          name: "Hub",
-          component_id: "sensor.aht10",
-          is_entity_container: true,
-        },
-        { id: "relay", name: "Relay", component_id: "switch.gpio" },
-        { id: "hub_temp", name: "Temp", component_id: "sensor", parent_id: "hub" },
-      ],
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._componentId = "";
-    await dialog.updateComplete;
-    const ids = [...dialog.shadowRoot!.querySelectorAll(".component-choice")].map((r) =>
-      r.getAttribute("data-id")
-    );
-    expect(ids).toEqual(["hub_temp", "relay"]);
-    // Initial roving tab stop is the first rendered row, not devices[1].
-    const tabbable = [...dialog.shadowRoot!.querySelectorAll(".component-choice")].filter(
-      (r) => r.getAttribute("tabindex") === "0"
-    );
-    expect(tabbable.map((r) => r.getAttribute("data-id"))).toEqual(["hub_temp"]);
-    // Arrow-down from the first rendered row lands on the next rendered row.
-    dialog
-      .shadowRoot!.querySelector('.component-choice[data-id="hub_temp"]')!
-      .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-    await dialog.updateComplete;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((dialog as any)._componentId).toBe("relay");
-  });
-
-  it("renders an orphan sub-entity whose container is absent", async () => {
-    const dialog = await mountForComponentStep();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (dialog as any)._available = {
-      triggers: [],
-      actions: [],
-      conditions: [],
-      scripts: [],
-      devices: [
-        {
-          id: "orphan_t",
-          name: "Orphan Temp",
-          component_id: "sensor",
-          parent_id: "ghost",
-        },
-      ],
-    };
-    await dialog.updateComplete;
-    expect(choiceNames(dialog)).toEqual(["Orphan Temp"]);
   });
 });
 
