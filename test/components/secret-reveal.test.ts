@@ -99,6 +99,21 @@ describe("esphome-secret-reveal", () => {
     expect((el as any)._resolved).toBeUndefined(); // stale value dropped
   });
 
+  it("retries after a failed (null) resolve instead of caching empty", async () => {
+    const resolve = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce("later");
+    const el = await mount({ resolve });
+    buttons(el)[0].click();
+    await tick();
+    await el.updateComplete;
+    expect(valueText(el)).toBe(MASK); // first resolve failed → still masked
+
+    buttons(el)[0].click();
+    await tick();
+    await el.updateComplete;
+    expect(resolve).toHaveBeenCalledTimes(2); // re-fetched, not cached empty
+    expect(valueText(el)).toBe("later");
+  });
+
   it("copies the value via the clipboard helper", async () => {
     const el = await mount({ value: "abc123" });
     buttons(el)[1].click();

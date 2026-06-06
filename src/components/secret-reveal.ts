@@ -128,12 +128,16 @@ export class ESPHomeSecretReveal extends LitElement {
     const token = this._token;
     this._busy = true;
     try {
-      const value = (await this.resolve()) ?? "";
+      const value = await this.resolve();
       if (token !== this._token) return null; // target changed mid-flight — drop it
+      // `null` = absent or a swallowed failure — don't cache, so the next click
+      // can re-fetch (the resolver surfaces its own error toast). Only cache a
+      // genuine value (an empty string is a legitimate value to cache).
+      if (value === null) return null;
       this._resolved = value;
       return value;
     } catch {
-      return null; // resolver failed; it surfaces its own error
+      return null; // resolver threw; leave uncached so a retry can re-fetch
     } finally {
       if (token === this._token) this._busy = false;
     }

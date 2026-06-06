@@ -1,19 +1,9 @@
 /**
- * Word list for generated passphrases (OTA / web_server credentials).
- *
- * A repo-owned, curated list of 2038 common, unambiguous English words (lowercase
- * a–z, 3–8 letters) across everyday categories — animals, plants, food, nature,
- * materials, household, and the like. Authored for this project and shipped
- * under the repository's own license, so it carries no third-party attribution
- * obligation (unlike the CC-BY EFF / CC-BY-SA Orchard Street lists). Words are
- * facts and a functional list of common words is not an original creative
- * compilation.
- *
- * Each word adds ~11.0 bits, so the default 4-word passphrase carries
- * ~44 bits of entropy, drawn without modulo bias by the CSPRNG in
- * `passphrase.ts`. The list is dynamically imported so it stays out of the entry
- * bundle. Stored as one whitespace-separated string (split at load); order is
- * irrelevant, do not rely on indices. A generated data file.
+ * Generated, repo-owned word list for passphrases (~2k common, unambiguous
+ * lowercase words; ~11 bits each → ~44 bits for the default 4-word phrase).
+ * Dynamically imported by `passphrase.ts` so it stays out of the entry bundle.
+ * Stored as one whitespace-separated string (split at load); order is
+ * irrelevant, do not rely on indices.
  */
 const RAW = `
 abacus acorn acrobat actor adder agate agile alarm album alder alight alley alloy allspice almanac almond alpaca aluminum amber amble amethyst amulet anaconda anchor anchovy anemone angelica angler aniseed ankle anklet ant antelope anthem anvil aphid apple apricot apron aqueduct arbor arch archer arm artist ash ashen aspen aster atoll atom atrium attic author autumn avenue avocet awl awning axe axle axolotl azure babble baboon backpack badger bagel bagpipe baker balcony ballad ballast balloon
