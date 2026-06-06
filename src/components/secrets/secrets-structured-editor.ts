@@ -14,6 +14,7 @@ import { devicesContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { modalDialogStyles } from "../../styles/modal-dialog.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { withBase } from "../../util/base-path.js";
 import { navigate } from "../../util/navigation.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -126,10 +127,11 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
         ${this._localize("secrets.group_shared")}
       </h2>`;
     }
-    // Per-device secret prefixes are valid identifiers, so a device named
-    // with hyphens (``apollo-r-pro``) yields an underscore prefix
-    // (``apollo_r_pro``); normalize both before matching.
-    const match = this._devices.find((d) => d.name.replace(/-/g, "_") === device);
+    // A device's secret prefix may keep its name verbatim (``pintest-direction``)
+    // or swap hyphens for underscores (``apollo_r_pro``); normalize both sides
+    // before matching so either spelling links.
+    const norm = (s: string) => s.replace(/-/g, "_");
+    const match = this._devices.find((d) => norm(d.name) === norm(device));
     if (!match) {
       return html`<h2 class="group-header">${device}</h2>`;
     }
@@ -144,7 +146,9 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
         @click=${(e: MouseEvent) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
           e.preventDefault();
-          void navigate(href);
+          // Fall back to a full navigation if the SPA router rejects, so the
+          // click is never a silent no-op.
+          navigate(href).catch(() => window.location.assign(withBase(href)));
         }}
         >${device}</a
       >

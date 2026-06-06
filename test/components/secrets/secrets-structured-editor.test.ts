@@ -72,6 +72,22 @@ describe("esphome-secrets-structured-editor", () => {
     expect((revealedPw as unknown as { revealed: boolean }).revealed).toBe(true);
   });
 
+  test("the value field's per-row eye hides while the page reveals all", async () => {
+    const masked = await mount("wifi_ssid: home\n");
+    expect(
+      rows(masked)[0]
+        .querySelector("esphome-password-input")!
+        .shadowRoot!.querySelector(".toggle")
+    ).not.toBeNull();
+
+    const revealed = await mount("wifi_ssid: home\n", true);
+    expect(
+      rows(revealed)[0]
+        .querySelector("esphome-password-input")!
+        .shadowRoot!.querySelector(".toggle")
+    ).toBeNull();
+  });
+
   test("editing a value emits yaml-change with the spliced buffer", async () => {
     const el = await mount("wifi_ssid: home\n");
     const captured = onChange(el);
@@ -244,5 +260,14 @@ describe("esphome-secrets-structured-editor", () => {
     const link = el.shadowRoot!.querySelector<HTMLAnchorElement>(".group-link");
     expect(link).not.toBeNull();
     expect(link!.getAttribute("href")).toBe("/device/apollo.yaml");
+  });
+
+  test("links a device whose secret prefix keeps the hyphens verbatim", async () => {
+    const el = await mount("pintest-direction__zipzip: a\n", false, [
+      { name: "pintest-direction", configuration: "pintest.yaml", friendly_name: "Pin" },
+    ]);
+    const link = el.shadowRoot!.querySelector<HTMLAnchorElement>(".group-link");
+    expect(link).not.toBeNull();
+    expect(link!.getAttribute("href")).toBe("/device/pintest.yaml");
   });
 });
