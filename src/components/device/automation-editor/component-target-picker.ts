@@ -15,6 +15,14 @@ import { componentTargetPickerStyles } from "./component-target-picker.styles.js
 
 type Group = { header: AvailableComponentInstance; subs: AvailableComponentInstance[] };
 
+/** Arrow key → step through the flat row order (Left/Up back, Right/Down on). */
+const ARROW_DELTA: Record<string, number> = {
+  ArrowDown: 1,
+  ArrowRight: 1,
+  ArrowUp: -1,
+  ArrowLeft: -1,
+};
+
 @customElement("esphome-component-target-picker")
 export class ESPHomeComponentTargetPicker extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -127,12 +135,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
       }
       return;
     }
-    const delta =
-      e.key === "ArrowDown" || e.key === "ArrowRight"
-        ? 1
-        : e.key === "ArrowUp" || e.key === "ArrowLeft"
-          ? -1
-          : 0;
+    const delta = ARROW_DELTA[e.key] ?? 0;
     if (delta === 0) return;
     e.preventDefault();
     const base = currentId ? order.indexOf(currentId) : -1;

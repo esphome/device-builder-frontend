@@ -11,6 +11,7 @@ import {
   lineIndent,
   listItemChildIndent,
   parseYamlTopLevelSections,
+  readInstanceScalar,
   smallestContainingSection,
   type YamlSection,
 } from "./yaml-sections-core.js";
@@ -289,10 +290,8 @@ function _subEntity(
   for (let k = headerIdx + 1; k < lines.length; k++) {
     if (skip(lines[k])) continue;
     if (lineIndent(lines[k]) <= childIndent) break; // end of the sub-block
-    const im = lines[k].match(/^ *id:\s*["']?(\S+?)["']?\s*$/);
-    if (im) id = im[1];
-    const nm = lines[k].match(/^ *name:\s*["']?(.+?)["']?\s*$/);
-    if (nm) name = nm[1];
+    id = readInstanceScalar(lines[k], "id") ?? id;
+    name = readInstanceScalar(lines[k], "name") ?? name;
   }
   return id ? { id, name } : null;
 }

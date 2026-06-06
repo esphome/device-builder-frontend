@@ -226,10 +226,11 @@ function _expandListItems(
     let name = "";
     let id = "";
     for (let i = keyIdx + 1; i <= endIdx; i++) {
-      const nameMatch = lines[i].match(/^\s{2}name:\s*["']?(.+?)["']?\s*$/);
-      if (nameMatch) name = nameMatch[1];
-      const idMatch = lines[i].match(/^\s{2}id:\s*["']?(\S+?)["']?\s*$/);
-      if (idMatch) id = idMatch[1];
+      // Only the block's own direct keys; deeper nested keys aren't the
+      // singleton's id/name.
+      if (lineIndent(lines[i]) !== ESPHOME_YAML_INDENT.length) continue;
+      name = readInstanceScalar(lines[i], "name") ?? name;
+      id = readInstanceScalar(lines[i], "id") ?? id;
     }
     return [
       {
@@ -259,12 +260,9 @@ function _expandListItems(
     for (let j = itemStart; j <= itemEnd; j++) {
       const line = lines[j];
       if (j !== itemStart && lineIndent(line) !== childIndent) continue;
-      const nameMatch = line.match(/^\s+(?:-\s+)?name:\s*["']?(.+?)["']?\s*$/);
-      if (nameMatch) name = nameMatch[1];
-      const idMatch = line.match(/^\s+(?:-\s+)?id:\s*["']?(\S+?)["']?\s*$/);
-      if (idMatch) id = idMatch[1];
-      const platformMatch = line.match(/^\s+(?:-\s+)?platform:\s*["']?(\S+?)["']?\s*$/);
-      if (platformMatch) platform = platformMatch[1];
+      name = readInstanceScalar(line, "name") ?? name;
+      id = readInstanceScalar(line, "id") ?? id;
+      platform = readInstanceScalar(line, "platform") ?? platform;
     }
 
     items.push({
@@ -337,6 +335,25 @@ export function listItemChildIndent(dashLine: string): number {
 /** Leading-space count of *line* (its indentation column). */
 export function lineIndent(line: string): number {
   return line.match(/^ */)?.[0].length ?? 0;
+}
+
+const _INSTANCE_SCALAR_RE = new Map<string, RegExp>();
+
+/**
+ * Value of a ``<key>: value`` line (surrounding quotes peeled), or ``null``.
+ *
+ * Allows an optional leading ``- `` list dash; ``id`` / ``platform`` take a
+ * bare token, other keys (``name``) the rest of the line. Callers gate the
+ * line's indent — this only peels the key + value.
+ */
+export function readInstanceScalar(line: string, key: string): string | null {
+  let re = _INSTANCE_SCALAR_RE.get(key);
+  if (re === undefined) {
+    const value = key === "id" || key === "platform" ? "(\\S+?)" : "(.+?)";
+    re = new RegExp(`^\\s*(?:-\\s+)?${key}:\\s*["']?${value}["']?\\s*$`);
+    _INSTANCE_SCALAR_RE.set(key, re);
+  }
+  return line.match(re)?.[1] ?? null;
 }
 
 /**
