@@ -34,3 +34,9 @@ build/
 /*.yaml
 /*.yml
 !/.pre-commit-config.yaml
+
+# Editor swap/backup files — a vim swap of a secrets file would leak
+# credentials, and `.swp` slips past the `*.yaml` rule above.
+*.swp
+*.swo
+*~
