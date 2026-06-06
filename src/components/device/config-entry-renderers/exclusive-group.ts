@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { isEntryVisible } from "../../../util/config-validation.js";
 import {
   fieldKeyAttr,
   labelFor,
@@ -53,6 +54,19 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
   const selected = members.find((m) => m.key === selectedKey);
   const disabled = ctx.disabled;
 
+  // Only offer members the platform/visibility gate allows, so a protocol
+  // invalid for this board (supported_platforms), hidden, or depends_on-gated
+  // can't be picked — matching what validateEntries treats as visible. A
+  // member already set in the YAML stays selectable so existing configs
+  // aren't silently hidden.
+  const rootValues = ctx.scopeValues([]);
+  const targetPlatform = ctx.board?.esphome.platform ?? null;
+  const options = members.filter(
+    (m) =>
+      ctx.getAt([m.key]) !== undefined ||
+      isEntryVisible(m, rootValues, ctx.presentComponents, targetPlatform)
+  );
+
   // Clear every other member so the YAML keeps a single key; scaffold the
   // chosen one with {} only when it's absent, so switching to a member that
   // already has config (conflict resolution) keeps its values.
@@ -83,7 +97,7 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
         <wa-option value=${NO_SELECTION} ?selected=${selectedKey === ""}>
           ${ctx.localize("device.exclusive_group_placeholder")}
         </wa-option>
-        ${members.map(
+        ${options.map(
           (m) =>
             html`<wa-option value=${m.key} ?selected=${m.key === selectedKey}
               >${labelFor(m, ctx)}</wa-option

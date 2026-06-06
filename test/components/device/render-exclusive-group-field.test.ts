@@ -94,6 +94,40 @@ describe("renderExclusiveGroupField", () => {
     expect(div["data-field-key"]).toBe(JSON.stringify([]));
   });
 
+  it("hides a platform-incompatible member from the options", () => {
+    // Board defaults to esp32; an esp8266-only protocol must not be offered.
+    const ms = [
+      ...members(),
+      makeEntry(ConfigEntryType.NESTED, {
+        key: "esp8266only",
+        exclusive_group: "g",
+        supported_platforms: ["esp8266"],
+      }),
+    ];
+    const opts = findElementBindings(
+      renderExclusiveGroupField(ms, makeRenderCtx({})),
+      "wa-option"
+    ).map((o) => o.value);
+    expect(opts).toContain("raw");
+    expect(opts).not.toContain("esp8266only");
+  });
+
+  it("keeps an incompatible member selectable when it's already set", () => {
+    const ms = [
+      ...members(),
+      makeEntry(ConfigEntryType.NESTED, {
+        key: "esp8266only",
+        exclusive_group: "g",
+        supported_platforms: ["esp8266"],
+      }),
+    ];
+    const opts = findElementBindings(
+      renderExclusiveGroupField(ms, makeRenderCtx({ esp8266only: {} })),
+      "wa-option"
+    ).map((o) => o.value);
+    expect(opts).toContain("esp8266only");
+  });
+
   it("treats an explicit null member as present", () => {
     // A hand-written ``raw:`` parses to null; the key exists, so the
     // protocol is selected (only undefined means cleared/absent).
