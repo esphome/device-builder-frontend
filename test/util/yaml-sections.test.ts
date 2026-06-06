@@ -460,6 +460,51 @@ describe("parseYamlAutomations", () => {
     expect(result[1].displayLabel).toBe("Light → on_turn_off");
   });
 
+  it("scopes a sub-entity handler to the sub-entity id with its parent", () => {
+    const yaml = `sensor:
+  - platform: aht10
+    id: aht20
+    temperature:
+      name: "Kit Temperature"
+      id: aht20_temperature
+      on_value:
+        then:
+          - light.toggle: led
+    humidity:
+      id: aht20_humidity
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].key).toBe("automation:component_on:aht20_temperature:on_value");
+    expect(items[0].id).toBe("aht20_temperature");
+    expect(items[0].name).toBe("Kit Temperature");
+    expect(items[0].parentComponentId).toBe("aht20");
+    expect(items[0].parentKey).toBe("sensor");
+  });
+
+  it("leaves a deeper non-sub-entity on_* unscoped", () => {
+    // An on_* nested inside an action body (not an ided sub-block) must not
+    // be mis-scoped to a sub-entity.
+    const yaml = `sensor:
+  - platform: adc
+    id: a
+    pin: GPIO1
+    on_value:
+      then:
+        - if:
+            then:
+              - logger.log: x
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    // Only the direct on_value scopes to the adc instance; no spurious extra.
+    expect(items.map((s) => s.key)).toEqual(["automation:component_on:a:on_value"]);
+    expect(items[0].parentComponentId).toBeUndefined();
+  });
+
   it("recognises device-level on_* handlers under esphome:", () => {
     const yaml = `esphome:
   on_boot:

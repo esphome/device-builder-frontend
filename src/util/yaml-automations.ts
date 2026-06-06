@@ -8,6 +8,7 @@
 import { endsBlockAtIndent } from "./yaml-section-lexer.js";
 import {
   instanceComponentId,
+  lineIndent,
   listItemChildIndent,
   parseYamlTopLevelSections,
   smallestContainingSection,
@@ -85,21 +86,36 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
       continue;
     }
 
-    // Only a direct ``on_*`` child scopes to the host; a deeper handler
-    // (``sensor[i].temperature.on_value``) isn't addressable → ``unscoped``.
+    // A direct ``on_*`` child scopes to the host; a deeper handler scopes to
+    // a nested sub-entity block (``sensor[i].temperature.on_value``) when that
+    // block carries its own id, else it's ``unscoped``.
     let componentId: string | null = null;
-    if (host && indent === listItemChildIndent(lines[host.fromLine - 1] ?? "")) {
-      componentId = instanceComponentId(sections, host);
+    let parentComponentId: string | undefined;
+    let displayName: string | undefined;
+    if (host) {
+      const childIndent = listItemChildIndent(lines[host.fromLine - 1] ?? "");
+      if (indent === childIndent) {
+        componentId = instanceComponentId(sections, host);
+        displayName = host.name ?? undefined;
+      } else if (indent > childIndent) {
+        const sub = _subEntity(lines, i, childIndent);
+        if (sub) {
+          componentId = sub.id;
+          displayName = sub.name;
+          parentComponentId = instanceComponentId(sections, host);
+        }
+      }
     }
     if (host && componentId) {
-      const labelHead = host.name || componentId;
+      const labelHead = displayName || componentId;
       const base = {
         id: componentId,
-        name: host.name ?? undefined,
+        name: displayName,
         // Domain (``key`` for a flat singleton) — the catalog is keyed
         // ``<domain>.<event>``, so this resolves the trigger name.
         parentKey: host.parentKey ?? host.key,
         eventKey: eventName,
+        ...(parentComponentId !== undefined ? { parentComponentId } : {}),
       };
       // List-shaped trigger (``time.on_time``): one row per cron entry,
       // keyed with its index so each matches the backend's per-entry
@@ -245,6 +261,42 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
   }
 
   return automations;
+}
+
+/** The ided sub-entity block enclosing the handler at ``handlerIdx``: walk
+ *  up to the nearest mapping-key line at ``childIndent`` (the ``temperature:``
+ *  header), then read that block's ``id`` / ``name``. ``null`` when the
+ *  handler isn't inside an ided sub-block (so it stays unscoped). */
+function _subEntity(
+  lines: string[],
+  handlerIdx: number,
+  childIndent: number
+): { id: string; name?: string } | null {
+  const skip = (l: string): boolean => l.trim() === "" || l.trim().startsWith("#");
+  let headerIdx = -1;
+  for (let j = handlerIdx - 1; j >= 0; j--) {
+    if (skip(lines[j])) continue;
+    const ind = lineIndent(lines[j]);
+    if (ind < childIndent) return null; // left the instance's children
+    if (ind === childIndent) {
+      // Must be a bare mapping key (``temperature:``), not a sibling scalar.
+      if (!/^ *[A-Za-z_][\w.]*:\s*(#.*)?$/.test(lines[j])) return null;
+      headerIdx = j;
+      break;
+    }
+  }
+  if (headerIdx === -1) return null;
+  let id: string | null = null;
+  let name: string | undefined;
+  for (let k = headerIdx + 1; k < lines.length; k++) {
+    if (skip(lines[k])) continue;
+    if (lineIndent(lines[k]) <= childIndent) break; // end of the sub-block
+    const im = lines[k].match(/^ *id:\s*["']?(\S+?)["']?\s*$/);
+    if (im) id = im[1];
+    const nm = lines[k].match(/^ *name:\s*["']?(.+?)["']?\s*$/);
+    if (nm) name = nm[1];
+  }
+  return id ? { id, name } : null;
 }
 
 /** Index of the first line past the block opened at ``startIdx`` (its key

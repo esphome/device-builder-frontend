@@ -611,9 +611,19 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       .filter((s) => {
         if (!s.eventKey) return false;
         if (target.kind === "device_on") return s.parentKey === "esphome";
-        return s.id === target.componentId;
+        // Include the component's own triggers and those on its sub-entities.
+        return s.id === target.componentId || s.parentComponentId === target.componentId;
       })
-      .map((s) => ({ key: s.key, label: this._triggerLabel(s) }));
+      .map((s) => ({
+        key: s.key,
+        // A sub-entity row is prefixed with its name so two readings'
+        // identically-named triggers (Temperature/Humidity → On Value) read
+        // distinctly within the parent component's section.
+        label:
+          s.parentComponentId !== undefined
+            ? `${s.name ?? s.id} → ${this._triggerLabel(s)}`
+            : this._triggerLabel(s),
+      }));
     const heading =
       target.kind === "device_on"
         ? this._localize("device.automations_list_title_device")
