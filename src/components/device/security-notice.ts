@@ -53,7 +53,8 @@ interface GeneratedField {
 
 /** A recommended security setting and how to satisfy it. */
 interface SecuritySetting {
-  /** Section name passed to `recommendedSecretKeys` (e.g. `ota` for `ota.esphome`). */
+  /** Section name passed to `recommendedSecretKeys`; matches the field picker's
+   *  `sectionKey` so both derive the same secret name (e.g. `ota.esphome`). */
   secretSection: string;
   /** Direct-child key whose presence means the setting is already configured. */
   marker: string;
