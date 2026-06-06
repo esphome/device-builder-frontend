@@ -1,10 +1,15 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import toast from "sonner-js";
+
 // wa-dialog / wa-button run form-validation lifecycle hooks happy-dom doesn't
 // implement; stub them so the add-secret dialog can render in the test.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
 
 import { ESPHomeSecretsStructuredEditor } from "../../../src/components/secrets/secrets-structured-editor.js";
 
@@ -103,6 +108,16 @@ describe("esphome-secrets-structured-editor", () => {
     const captured = onChange(el);
     rows(el)[0].querySelector<HTMLButtonElement>(".icon-btn")!.click();
     expect(captured.value).toBe("api_key: abc\n");
+  });
+
+  test("a null splice (stale index) toasts and emits nothing", async () => {
+    vi.mocked(toast.error).mockClear();
+    const el = await mount("wifi_ssid: home\n");
+    const captured = onChange(el);
+    // Removing an out-of-range line returns null from the splice helper.
+    (el as unknown as { _emit(v: string | null): void })._emit(null);
+    expect(captured.value).toBeNull();
+    expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
   interface AddView {

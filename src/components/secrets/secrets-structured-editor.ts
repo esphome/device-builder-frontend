@@ -8,6 +8,7 @@ import { mdiAlertCircleOutline, mdiClose, mdiPlus } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { live } from "lit/directives/live.js";
+import toast from "sonner-js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { devicesContext, localizeContext } from "../../context/index.js";
@@ -343,9 +344,11 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
 
   // A splice helper returns null when its target line no longer matches
   // (a stale index from a concurrent edit). Re-render so the optimistic
-  // input snaps back to the unchanged buffer rather than diverging from it.
+  // input snaps back to the unchanged buffer, and toast so the dropped
+  // edit is visible rather than a silent no-op.
   private _emit(value: string | null) {
     if (value === null) {
+      toast.error(this._localize("secrets.edit_out_of_sync"), { richColors: true });
       this.requestUpdate();
       return;
     }

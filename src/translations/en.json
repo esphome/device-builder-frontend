@@ -1243,6 +1243,7 @@
     "remove_secret": "Remove secret",
     "group_shared": "Shared",
     "open_device": "Open this device",
+    "edit_out_of_sync": "That change couldn't be applied; the editor was out of sync and has been refreshed.",
     "unsaved_title": "Unsaved secrets",
     "unsaved_message": "You have unsaved changes to your secrets. If you leave without saving, they will be lost.",
     "add_dialog_title": "Add a secret",
