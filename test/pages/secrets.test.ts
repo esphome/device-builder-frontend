@@ -164,6 +164,27 @@ describe("esphome-page-secrets save toast ordering", () => {
     expect(page._savedYaml).toBe("wifi_password: old\n");
   });
 
+  test("_save() surfaces the backend rejection message in the error toast", async () => {
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
+    const page = makePage({
+      _loaded: true,
+      _yaml: "wifi_ssid: home\nxx:xxx\n",
+      _savedYaml: "wifi_ssid: old\n",
+    });
+    const detail =
+      "refusing to save invalid secrets.yaml: could not find expected ':' at line 2, column 1";
+    page._api = {
+      updateConfig: vi.fn().mockRejectedValue(new Error(detail)),
+    } as unknown as ESPHomeAPI;
+
+    await page._save();
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    const [message] = vi.mocked(toast.error).mock.calls[0];
+    expect(message).toContain(detail);
+  });
+
   test("_save() toasts success and fires secrets-saved only after the write resolves", async () => {
     vi.mocked(toast.success).mockClear();
     vi.mocked(toast.error).mockClear();
