@@ -1,10 +1,10 @@
 /**
- * A memorable, unpredictable passphrase: `words` random words from the EFF long
+ * A memorable, unpredictable passphrase: `words` random words from a curated
  * wordlist joined with `-` (e.g. `jumping-brown-fox-under`). Used for generated
- * OTA / web_server credentials — strong (~13 bits/word) but readable if the user
+ * OTA / web_server credentials — strong (~11 bits/word) but readable if the user
  * ever needs to type it.
  *
- * The ~7.8k-word list is **dynamically imported** so it lands in its own async
+ * The ~2k-word list is **dynamically imported** so it lands in its own async
  * chunk instead of the entry bundle — it's only fetched the first time a
  * passphrase is generated (behind the security-notice confirm dialog), then
  * cached by the module loader. Words are drawn with `crypto.getRandomValues`

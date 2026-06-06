@@ -39,9 +39,9 @@ describe("generatePassphrase", () => {
     expect(await generatePassphrase(-3)).toMatch(/^[a-z]+$/);
   });
 
-  it("uses the EFF long wordlist (7772 unambiguous words)", () => {
-    expect(PASSPHRASE_WORDS).toHaveLength(7772);
+  it("is a large, de-duplicated list of short lowercase words", () => {
+    expect(PASSPHRASE_WORDS.length).toBeGreaterThanOrEqual(2000); // ~44 bits at 4 words
     expect(new Set(PASSPHRASE_WORDS).size).toBe(PASSPHRASE_WORDS.length);
-    expect(PASSPHRASE_WORDS.every((w) => /^[a-z]+$/.test(w))).toBe(true);
+    expect(PASSPHRASE_WORDS.every((w) => /^[a-z]{3,8}$/.test(w))).toBe(true);
   });
 });
