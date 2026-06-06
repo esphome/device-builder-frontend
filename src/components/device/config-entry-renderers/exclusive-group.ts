@@ -7,25 +7,37 @@ import {
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
-// Partition a flat entry list into the mutually-exclusive groups
-// (keyed by exclusive_group) and the remaining entries, preserving order.
-// Lives here so the form's render() stays small.
-export function partitionExclusiveGroups(entries: ConfigEntry[]): {
-  rest: ConfigEntry[];
-  groups: ConfigEntry[][];
-} {
-  const groups = new Map<string, ConfigEntry[]>();
-  const rest: ConfigEntry[] = [];
+// Placeholder option value. A non-empty sentinel (not "") so the form's
+// _syncSelectedAttr — which no-ops on an empty value — still drives the
+// select to the placeholder on first paint; mapped back to "" in onChange.
+const NO_SELECTION = "__none__";
+
+// The form's entries in schema order, with each exclusive_group collapsed
+// to its member array at the position of its first member; non-exclusive
+// entries pass through for the caller to filter and render. Lives here so
+// the form's render() stays small.
+export function orderExclusiveGroups(
+  entries: ConfigEntry[]
+): (ConfigEntry | ConfigEntry[])[] {
+  const byId = new Map<string, ConfigEntry[]>();
   for (const entry of entries) {
     if (entry.exclusive_group) {
-      const group = groups.get(entry.exclusive_group) ?? [];
+      const group = byId.get(entry.exclusive_group) ?? [];
       group.push(entry);
-      groups.set(entry.exclusive_group, group);
-    } else {
-      rest.push(entry);
+      byId.set(entry.exclusive_group, group);
     }
   }
-  return { rest, groups: [...groups.values()] };
+  const seen = new Set<string>();
+  const out: (ConfigEntry | ConfigEntry[])[] = [];
+  for (const entry of entries) {
+    if (!entry.exclusive_group) {
+      out.push(entry);
+    } else if (!seen.has(entry.exclusive_group)) {
+      seen.add(entry.exclusive_group);
+      out.push(byId.get(entry.exclusive_group)!);
+    }
+  }
+  return out;
 }
 
 // Renders entries sharing a backend exclusive_group (a remote_receiver
@@ -63,10 +75,12 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
       <wa-select
         data-no-value-sync
         ?disabled=${disabled}
-        @change=${(e: Event) =>
-          onChange((e.target as unknown as { value: string }).value)}
+        @change=${(e: Event) => {
+          const value = (e.target as unknown as { value: string }).value;
+          onChange(value === NO_SELECTION ? "" : value);
+        }}
       >
-        <wa-option value=${""} ?selected=${selectedKey === ""}>
+        <wa-option value=${NO_SELECTION} ?selected=${selectedKey === ""}>
           ${ctx.localize("device.exclusive_group_placeholder")}
         </wa-option>
         ${members.map(
@@ -82,7 +96,11 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
           </p>`
         : nothing}
       ${selected
-        ? renderChildEntries(selected, [selected.key], ctx, { includeAdvanced: true })
+        ? html`<div class="nested-fields">
+            ${renderChildEntries(selected, [selected.key], ctx, {
+              includeAdvanced: true,
+            })}
+          </div>`
         : nothing}
     </div>
   `;

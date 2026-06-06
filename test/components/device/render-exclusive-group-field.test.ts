@@ -7,7 +7,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
-import { renderExclusiveGroupField } from "../../../src/components/device/config-entry-renderers.js";
+import {
+  orderExclusiveGroups,
+  renderExclusiveGroupField,
+} from "../../../src/components/device/config-entry-renderers.js";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
@@ -118,10 +121,30 @@ describe("renderExclusiveGroupField", () => {
     expect(note.length).toBe(1);
   });
 
-  it("defaults to the placeholder when nothing is set", () => {
+  it("defaults to the placeholder (non-empty sentinel) when nothing is set", () => {
+    // The placeholder uses a sentinel value, not "", so the form's
+    // _syncSelectedAttr (which no-ops on empty) still drives the select to it.
     const ctx = makeRenderCtx({});
     const tpl = renderExclusiveGroupField(members(), ctx);
 
-    expect(selectedValues(tpl)).toEqual([""]);
+    expect(selectedValues(tpl)).toEqual(["__none__"]);
+  });
+});
+
+describe("orderExclusiveGroups", () => {
+  it("collapses a group to its first member's position", () => {
+    const entries = [
+      makeEntry(ConfigEntryType.STRING, { key: "name" }),
+      makeEntry(ConfigEntryType.NESTED, { key: "raw", exclusive_group: "g" }),
+      makeEntry(ConfigEntryType.STRING, { key: "id" }),
+      makeEntry(ConfigEntryType.NESTED, { key: "nec", exclusive_group: "g" }),
+    ];
+    const ordered = orderExclusiveGroups(entries);
+    // name, [raw, nec] (at raw's slot), id — the second member is folded in.
+    expect(ordered.map((i) => (Array.isArray(i) ? i.map((m) => m.key) : i.key))).toEqual([
+      "name",
+      ["raw", "nec"],
+      "id",
+    ]);
   });
 });

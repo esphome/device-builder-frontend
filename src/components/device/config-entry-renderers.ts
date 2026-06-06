@@ -39,6 +39,6 @@ export { renderNestedField } from "./config-entry-renderers/nested.js";
 export { renderRegistryListField } from "./config-entry-renderers/registry-list.js";
 
 export {
-  partitionExclusiveGroups,
+  orderExclusiveGroups,
   renderExclusiveGroupField,
 } from "./config-entry-renderers/exclusive-group.js";

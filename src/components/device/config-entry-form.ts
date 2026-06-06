@@ -58,7 +58,7 @@ import "../mdi-icon-picker.js";
 import {
   fieldRendererStyles,
   labelFor,
-  partitionExclusiveGroups,
+  orderExclusiveGroups,
   renderBooleanField,
   renderExclusiveGroupField,
   renderFloatWithUnitField,
@@ -246,18 +246,25 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   protected render() {
     const ctx = this._buildCtx();
-    // Mutually-exclusive entries (backend exclusive_group, e.g.
-    // remote_receiver protocols) render as one always-shown pick-one
-    // dropdown, separate from the advanced-filtered rest.
-    const { rest, groups } = partitionExclusiveGroups(this.entries);
-    const visible = this._filterRenderable(rest, this.values);
+    // Walk entries in schema order; each exclusive_group (e.g.
+    // remote_receiver protocols) collapses to one always-shown pick-one
+    // dropdown at its first member's position. Non-exclusive entries keep
+    // the advanced/visibility filter; a Set lets us preserve order while
+    // skipping filtered-out ones.
+    const ordered = orderExclusiveGroups(this.entries);
+    const nonExclusive = this.entries.filter((entry) => !entry.exclusive_group);
+    const visible = new Set(this._filterRenderable(nonExclusive, this.values));
     // An empty key means "this entry IS the whole values dict" —
     // used by top-level user-keyed sections (substitutions:) where
     // the component itself is the map. Pass ``[]`` so the entry's
     // renderer sees the values dict directly via ``ctx.getAt([])``.
-    return html`${visible.map((entry) =>
-      this._renderEntry(entry, entry.key ? [entry.key] : [], ctx)
-    )}${groups.map((members) => renderExclusiveGroupField(members, ctx))}`;
+    return html`${ordered.map((item) =>
+      Array.isArray(item)
+        ? renderExclusiveGroupField(item, ctx)
+        : visible.has(item)
+          ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
+          : nothing
+    )}`;
   }
 
   /** Subscribe to the shared pin-registry-modes cache so the form repaints
