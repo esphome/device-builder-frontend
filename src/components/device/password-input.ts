@@ -85,6 +85,12 @@ export class ESPHomePasswordInput extends LitElement {
   @property()
   describedby = "";
 
+  /** Force the value visible from the parent (e.g. a "reveal all" toggle).
+   *  ORs with the per-field eye, so the field shows when either is on.
+   *  Default false so existing call sites keep their hidden-by-default eye. */
+  @property({ type: Boolean })
+  revealed = false;
+
   @state()
   private _revealed = false;
 
@@ -145,13 +151,14 @@ export class ESPHomePasswordInput extends LitElement {
   ];
 
   protected render() {
+    const revealed = this.revealed || this._revealed;
     const label = this._localize(
-      this._revealed ? "device.password_hide" : "device.password_reveal"
+      revealed ? "device.password_hide" : "device.password_reveal"
     );
     return html`
       <div class="wrap">
         <input
-          type=${this._revealed ? "text" : "password"}
+          type=${revealed ? "text" : "password"}
           class=${this.invalid ? "invalid" : ""}
           .value=${this.value}
           ?disabled=${this.disabled}
