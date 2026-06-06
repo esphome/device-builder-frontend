@@ -83,7 +83,7 @@ export function makeRenderCtx(
     yaml: "",
     fromLine: 0,
     sectionKey: "",
-    board: options.board ?? makeTestBoard(),
+    board: "board" in options ? (options.board ?? null) : makeTestBoard(),
     requiredOnly: false,
     showAdvanced: false,
     presentComponents: new Set<string>(),
