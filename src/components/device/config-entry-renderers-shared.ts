@@ -23,6 +23,7 @@ import {
   isSecretEligible,
   recommendedSecretKeys,
 } from "../../util/secret-eligibility.js";
+import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
@@ -41,6 +42,7 @@ export const fieldRendererStyles = [
   espHomeStyles,
   inputStyles,
   configEntryFormStyles,
+  configEntryFormExtraStyles,
   fieldHighlightStyles,
 ];
 
