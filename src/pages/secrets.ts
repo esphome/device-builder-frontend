@@ -432,6 +432,12 @@ export class ESPHomePageSecrets extends LitElement {
          in JS (matching the device editor), so no layout rules are
          duplicated here. */
       @media (max-width: 900px) {
+        .page-header {
+          flex-wrap: wrap;
+        }
+        .page-title {
+          flex-basis: 100%;
+        }
         .layout-toggle .split-btn {
           display: none;
         }
