@@ -76,6 +76,9 @@ export class ESPHomeComponentCatalog extends LitElement {
   @state() _initialLoad = true;
   @state() _search = "";
   @state() _category = "all";
+  // Interface to probe via the ``provides`` filter (set by ``filterByDomain``
+  // for a non-category reference domain); cleared on user-driven browsing.
+  @state() _provides = "";
   @state() _expandedId: string | null = null;
 
   // Per-id tracking — a single broken image_url shouldn't pull every other
@@ -90,6 +93,7 @@ export class ESPHomeComponentCatalog extends LitElement {
   // open, and (b) race the device-page's async board load — the first
   // request would go out with empty platform / board_id.
   public load() {
+    this._provides = "";
     // Auto-select "Featured" when the board has any recommendations; reset
     // away from it when reopening against a board without any.
     const featuredCount =
@@ -105,18 +109,21 @@ export class ESPHomeComponentCatalog extends LitElement {
     this._fetchComponents();
   }
 
-  // Filter to a specific component domain. If the domain matches a known
-  // ComponentCategory we use the category filter (exact match against
-  // output.gpio, output.ledc, …); otherwise fall back to the search query.
+  // Filter to a specific component domain. A known ComponentCategory uses the
+  // category filter (output.gpio, output.ledc, …); anything else may be a
+  // component id/stem OR a homeless interface (voltage_sampler), so we probe
+  // ``provides`` and fall back to a search when it yields nothing.
   public filterByDomain(domain: string) {
     const isCategory = Object.values(ComponentCategory).includes(
       domain as ComponentCategory
     );
     if (isCategory) {
       this._search = "";
+      this._provides = "";
       this._category = domain;
     } else {
       this._search = domain;
+      this._provides = domain;
       this._category = "all";
     }
     this._fetchComponents();
@@ -136,14 +143,25 @@ export class ESPHomeComponentCatalog extends LitElement {
           : undefined;
       const exclude_category: string[] | undefined =
         !locked && this.excludeCategories.length > 0 ? this.excludeCategories : undefined;
-      const response = await this._api.getComponents({
-        query,
+      const base = {
         category,
         exclude_category,
         platform: this.platform || undefined,
         board_id: this.boardId || undefined,
         limit: 50,
-      });
+      };
+      // Interface probe first; a homeless interface (voltage_sampler) has no
+      // matching id/name, so an empty result means it was a plain domain and
+      // we retry as a search (an i2c dependency still resolves). Clear
+      // ``_provides`` on that empty branch so a later fetch (board/platform
+      // prop change) goes straight to search instead of re-probing.
+      let response = this._provides
+        ? await this._api.getComponents({ ...base, provides: this._provides })
+        : await this._api.getComponents({ ...base, query });
+      if (this._provides && response.components.length === 0) {
+        this._provides = "";
+        response = await this._api.getComponents({ ...base, query });
+      }
       this._components = response.components;
       this._categories = response.categories;
       this._total = response.total;
@@ -187,6 +205,7 @@ export class ESPHomeComponentCatalog extends LitElement {
                   type="button"
                   @click=${() => {
                     this._category = id;
+                    this._provides = "";
                     this._fetchComponents();
                   }}
                 >
@@ -254,6 +273,7 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   private _onSearchInput = (ev: Event) => {
     this._search = (ev.target as HTMLInputElement).value;
+    this._provides = "";
     this._debouncedSearch();
   };
 

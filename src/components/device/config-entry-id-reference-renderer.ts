@@ -7,7 +7,7 @@
 
 import { html } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { findReferencedComponents } from "../../util/config-entry-yaml-scan.js";
+import { findReferenceCandidates } from "../../util/config-entry-yaml-scan.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -25,7 +25,11 @@ export function renderIdReferenceField(
   ctx: RenderCtx
 ) {
   const domain = entry.references_component || "";
-  const candidates = findReferencedComponents(ctx.yaml, domain);
+  const candidates = findReferenceCandidates(
+    ctx.yaml,
+    domain,
+    ctx.resolveInterfaceProviders(domain)
+  );
   const raw = ctx.getAt(path);
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;

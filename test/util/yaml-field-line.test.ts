@@ -3,8 +3,36 @@ import {
   _clearYamlSectionsMemo,
   findFieldLine,
   parseYamlTopLevelSections,
+  readInstanceScalar,
   type YamlSection,
 } from "../../src/util/yaml-sections-core.js";
+
+describe("readInstanceScalar", () => {
+  it("peels a bare token and surrounding quotes", () => {
+    expect(readInstanceScalar("  - platform: adc", "platform")).toBe("adc");
+    expect(readInstanceScalar('    id: "bus_a"', "id")).toBe("bus_a");
+    expect(readInstanceScalar("    name: My Sensor", "name")).toBe("My Sensor");
+  });
+
+  it("strips a whitespace-preceded inline comment from a bare token", () => {
+    expect(readInstanceScalar("  - platform: adc  # current clamp", "platform")).toBe(
+      "adc"
+    );
+    expect(readInstanceScalar("    id: adc_a # note", "id")).toBe("adc_a");
+  });
+
+  it("keeps a `#` that is not preceded by whitespace (not a YAML comment)", () => {
+    expect(readInstanceScalar("    id: foo#bar", "id")).toBe("foo#bar");
+  });
+
+  it("keeps `#` literal in a free-text name value", () => {
+    expect(readInstanceScalar("    name: Sensor #3", "name")).toBe("Sensor #3");
+  });
+
+  it("returns null when the key doesn't match", () => {
+    expect(readInstanceScalar("    id: adc_a", "name")).toBeNull();
+  });
+});
 
 function sectionAt(yaml: string, fromLine: number): YamlSection {
   _clearYamlSectionsMemo();

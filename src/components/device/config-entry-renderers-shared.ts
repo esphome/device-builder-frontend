@@ -13,6 +13,7 @@ import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -136,6 +137,12 @@ export interface RenderCtx {
    *  values), without overriding a later explicit user collapse. */
   seedNestedOpen: (key: string) => void;
   requestAddComponent: (domain: string) => void;
+  /**
+   * Providers of a cross-domain interface reference. Returns synchronously
+   * from a per-form cache; a miss kicks an async catalog fetch and
+   * re-renders. Empty until loaded, and ``[]`` for a same-domain reference.
+   */
+  resolveInterfaceProviders: (interfaceName: string) => ReadonlyArray<ComponentProvider>;
   scopeValues: (path: string[]) => Record<string, unknown>;
   filterRenderable: (
     entries: ConfigEntry[],

@@ -105,6 +105,9 @@ export interface ComponentCatalogEntry {
   multi_conf: boolean;
   /** Empty list = works on every target platform. Non-empty = restricted to those. */
   supported_platforms: string[];
+  /** Interfaces this component can be referenced *as* beyond its own domain
+   *  (an `adc` sensor provides `voltage_sampler`). */
+  provides?: string[];
   /** The component's configuration schema. May contain `nested` entries
    *  (`type === "nested"`) whose `config_entries` recurse. */
   config_entries: ConfigEntry[];

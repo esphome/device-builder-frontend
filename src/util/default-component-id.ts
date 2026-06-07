@@ -1,3 +1,5 @@
+import { readInstanceScalar } from "./yaml-sections-core.js";
+
 /**
  * Auto-generate a default `id:` value for a component being added
  * via the catalog. Used by `esphome-add-component-form` to seed the
@@ -42,16 +44,18 @@ export function generateDefaultComponentId(
 
 /**
  * Scan the YAML for every `id:` line and return the set of values.
- * Best-effort regex match — same approach the ID-reference picker
- * uses, deliberately simple (we only need a uniqueness check, not
- * a full parse).
+ * Best-effort line scan via the shared `readInstanceScalar`, deliberately
+ * simple (we only need a uniqueness check, not a full parse).
  */
 export function collectExistingIds(yaml: string): Set<string> {
   const ids = new Set<string>();
   if (!yaml) return ids;
   for (const line of yaml.split("\n")) {
-    const m = line.match(/^\s+(?:-\s+)?id:\s*["']?(\S+?)["']?\s*$/);
-    if (m) ids.add(m[1]);
+    // A real component id is always indented under a block; `readInstanceScalar`
+    // leaves indent-gating to callers, so skip a column-0 `id:`.
+    if (!/^\s/.test(line)) continue;
+    const id = readInstanceScalar(line, "id");
+    if (id !== null) ids.add(id);
   }
   return ids;
 }

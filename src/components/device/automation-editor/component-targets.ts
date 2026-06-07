@@ -6,6 +6,7 @@ import type {
   AutomationTrigger,
   AvailableComponentInstance,
 } from "../../../api/types/automations.js";
+import { parseCatalogId } from "../../../util/config-entry-yaml-scan.js";
 
 /** The instance's display label: its ``name:`` when set, else its id. */
 export function instanceName(device: AvailableComponentInstance): string {
@@ -14,7 +15,7 @@ export function instanceName(device: AvailableComponentInstance): string {
 
 /** Bare domain of a ``component_id`` (``sensor.aht10`` → ``sensor``). */
 export function componentDomain(componentId: string): string {
-  return componentId.split(".")[0];
+  return parseCatalogId(componentId).domain;
 }
 
 /** The parenthetical context shown beside an instance's label: its domain,

@@ -343,14 +343,18 @@ const _INSTANCE_SCALAR_RE = new Map<string, RegExp>();
  * Value of a ``<key>: value`` line (surrounding quotes peeled), or ``null``.
  *
  * Allows an optional leading ``- `` list dash; ``id`` / ``platform`` take a
- * bare token, other keys (``name``) the rest of the line. Callers gate the
- * line's indent — this only peels the key + value.
+ * bare token, other keys (``name``) the rest of the line. For bare tokens a
+ * trailing inline comment is tolerated, but only when ``#`` is whitespace-
+ * preceded (YAML's rule) — ``id: a#b`` keeps ``a#b``, ``id: a  # b`` keeps
+ * ``a``. Callers gate the line's indent — this only peels the key + value.
  */
 export function readInstanceScalar(line: string, key: string): string | null {
   let re = _INSTANCE_SCALAR_RE.get(key);
   if (re === undefined) {
-    const value = key === "id" || key === "platform" ? "(\\S+?)" : "(.+?)";
-    re = new RegExp(`^\\s*(?:-\\s+)?${key}:\\s*["']?${value}["']?\\s*$`);
+    const bareToken = key === "id" || key === "platform";
+    const value = bareToken ? "(\\S+?)" : "(.+?)";
+    const tail = bareToken ? "(?:\\s+#.*)?\\s*" : "\\s*";
+    re = new RegExp(`^\\s*(?:-\\s+)?${key}:\\s*["']?${value}["']?${tail}$`);
     _INSTANCE_SCALAR_RE.set(key, re);
   }
   return line.match(re)?.[1] ?? null;

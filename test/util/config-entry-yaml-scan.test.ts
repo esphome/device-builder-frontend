@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   _clearScanMemos,
-  findReferencedComponents,
+  findComponentsByProviders,
+  findReferenceCandidates,
   findUsedPins,
 } from "../../src/util/config-entry-yaml-scan.js";
 
@@ -198,7 +199,7 @@ describe("findUsedPins", () => {
   });
 });
 
-describe("findReferencedComponents", () => {
+describe("findReferenceCandidates (same-domain base case)", () => {
   const yaml = [
     "i2c:",
     "  - id: bus_a",
@@ -208,41 +209,115 @@ describe("findReferencedComponents", () => {
     "",
   ].join("\n");
 
-  it("returns id/name pairs for the given domain", () => {
-    expect(findReferencedComponents(yaml, "i2c")).toEqual([
+  it("returns id/name pairs for the reference's own domain", () => {
+    expect(findReferenceCandidates(yaml, "i2c", [])).toEqual([
       { id: "bus_a", name: "" },
       { id: "bus_b", name: "" },
     ]);
   });
 
   it("returns an empty array for an unknown domain", () => {
-    expect(findReferencedComponents(yaml, "uart")).toEqual([]);
+    expect(findReferenceCandidates(yaml, "uart", [])).toEqual([]);
   });
 
   it("returns an empty array for an empty domain string", () => {
-    expect(findReferencedComponents(yaml, "")).toEqual([]);
+    expect(findReferenceCandidates(yaml, "", [])).toEqual([]);
   });
 
-  it("returns the same array reference on repeated calls (memoised)", () => {
-    const a = findReferencedComponents(yaml, "i2c");
-    const b = findReferencedComponents(yaml, "i2c");
-    expect(a).toBe(b);
+  it("unions the own-domain ids with cross-domain providers", () => {
+    const config = [yaml, "sensor:", "  - platform: adc", "    id: adc_a", ""].join("\n");
+    expect(
+      findReferenceCandidates(config, "i2c", [{ domain: "sensor", stem: "adc" }])
+    ).toEqual([
+      { id: "bus_a", name: "" },
+      { id: "bus_b", name: "" },
+      { id: "adc_a", name: "" },
+    ]);
+  });
+});
+
+describe("findComponentsByProviders", () => {
+  const yaml = [
+    "sensor:",
+    "  - platform: adc",
+    "    id: adc_a",
+    "    pin: GPIO34",
+    "  - platform: dht",
+    "    id: temp_a",
+    "  - platform: ads1115",
+    "    id: adc_b",
+    "ble_nus:",
+    "  id: nus_link",
+    "",
+  ].join("\n");
+
+  it("matches list items by provider platform", () => {
+    const providers = [
+      { domain: "sensor", stem: "adc" },
+      { domain: "sensor", stem: "ads1115" },
+    ];
+    expect(findComponentsByProviders(yaml, providers)).toEqual([
+      { id: "adc_a", name: "" },
+      { id: "adc_b", name: "" },
+    ]);
   });
 
-  it("invalidates the memo when yaml changes", () => {
-    // Single-entry semantics: round-trip back to the original
-    // yaml re-scans, not returns the original array. Pinning
-    // for the same reason as the pin memo's equivalent test.
-    const a = findReferencedComponents(yaml, "i2c");
-    const otherYaml = "i2c:\n  - id: bus_z\n";
-    const b = findReferencedComponents(otherYaml, "i2c");
-    expect(a).not.toBe(b);
-    expect(b).toEqual([{ id: "bus_z", name: "" }]);
+  it("matches a platform value carrying a trailing inline comment", () => {
+    const commented = [
+      "sensor:",
+      "  - platform: adc  # current clamp",
+      "    id: adc_c",
+      "",
+    ].join("\n");
+    expect(
+      findComponentsByProviders(commented, [{ domain: "sensor", stem: "adc" }])
+    ).toEqual([{ id: "adc_c", name: "" }]);
   });
 
-  it("invalidates the memo when domain changes", () => {
-    const a = findReferencedComponents(yaml, "i2c");
-    const b = findReferencedComponents(yaml, "uart");
-    expect(a).not.toBe(b);
+  it("keeps the item across a nested list (filters) before its id/name", () => {
+    // A nested `filters:` list must not end the component scan — the
+    // platform/id/name still belong to the outer sensor item.
+    const nested = [
+      "sensor:",
+      "  - platform: adc",
+      "    filters:",
+      "      - offset: 0.1",
+      "      - multiply: 2.0",
+      "    id: adc_nested",
+      '    name: "Nested ADC"',
+      "",
+    ].join("\n");
+    expect(
+      findComponentsByProviders(nested, [{ domain: "sensor", stem: "adc" }])
+    ).toEqual([{ id: "adc_nested", name: "Nested ADC" }]);
+  });
+
+  it("excludes platforms that do not provide the interface", () => {
+    const ids = findComponentsByProviders(yaml, [{ domain: "sensor", stem: "adc" }]).map(
+      (c) => c.id
+    );
+    expect(ids).toEqual(["adc_a"]);
+    expect(ids).not.toContain("temp_a");
+  });
+
+  it("an empty stem matches every id in the block (top-level provider)", () => {
+    expect(findComponentsByProviders(yaml, [{ domain: "ble_nus", stem: "" }])).toEqual([
+      { id: "nus_link", name: "" },
+    ]);
+  });
+
+  it("returns an empty array when no providers are given", () => {
+    expect(findComponentsByProviders(yaml, [])).toEqual([]);
+  });
+
+  it("memoises on (yaml, providers) and invalidates on change", () => {
+    const providers = [{ domain: "sensor", stem: "adc" }];
+    expect(findComponentsByProviders(yaml, providers)).toBe(
+      findComponentsByProviders(yaml, providers)
+    );
+    const other = findComponentsByProviders(yaml, [
+      { domain: "sensor", stem: "ads1115" },
+    ]);
+    expect(other).toEqual([{ id: "adc_b", name: "" }]);
   });
 });

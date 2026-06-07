@@ -1374,6 +1374,10 @@ export class ESPHomeAPI {
     exclude_category?: string | string[];
     platform?: string;
     board_id?: string;
+    /** Filter to components that can be referenced *as* this interface
+     *  (e.g. ``voltage_sampler`` returns the ADC-family sensors), matching
+     *  ``ComponentCatalogEntry.provides``. */
+    provides?: string;
     offset?: number;
     limit?: number;
   }): Promise<PagedComponentsResponse> {

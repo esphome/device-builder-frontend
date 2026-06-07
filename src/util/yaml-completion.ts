@@ -29,7 +29,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
-import { findReferencedComponents } from "./config-entry-yaml-scan.js";
+import { findReferenceCandidates, parseCatalogId } from "./config-entry-yaml-scan.js";
 import {
   getActions,
   getConfigVarKeys,
@@ -458,17 +458,22 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       const entry = entries.find((e) => e.key === key);
 
       // ID-reference field (``i2c_id:``, ``output:``, …) → suggest the
-      // IDs declared in the referenced domain. Mirrors the visual
-      // form's ``renderIdReferenceField`` so both editors offer the
-      // same candidate set. Declaring ``id:`` fields carry a null
-      // ``references_component`` and fall through untouched.
+      // IDs declared in the referenced domain plus any cross-domain
+      // providers (``voltage_sampler`` → ADC sensors under ``sensor:``).
+      // Mirrors the visual form's ``renderIdReferenceField`` so both
+      // editors offer the same candidate set. Declaring ``id:`` fields
+      // carry a null ``references_component`` and fall through untouched.
       if (entry?.type === ConfigEntryType.ID && entry.references_component) {
-        const candidates = findReferencedComponents(
+        const domain = entry.references_component;
+        const providers = catalog.components
+          .filter((c) => c.provides?.includes(domain))
+          .map((c) => parseCatalogId(c.id));
+        const candidates = findReferenceCandidates(
           state.doc.toString(),
-          entry.references_component
+          domain,
+          providers
         );
         if (candidates.length > 0) {
-          const domain = entry.references_component;
           return {
             from: valueFrom,
             options: candidates.map((c) => ({

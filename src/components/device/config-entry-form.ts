@@ -31,6 +31,10 @@ import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
+import {
+  parseCatalogId,
+  type ComponentProvider,
+} from "../../util/config-entry-yaml-scan.js";
 import { type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -194,6 +198,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /** Keys already default-opened by ``_seedNestedOpen`` so the seed fires
    *  once and a later user collapse isn't re-overridden. */
   private _seededNestedOpen: Set<string> = new Set();
+
+  /** Resolved providers per interface name, and the in-flight set, for the
+   *  id-reference dropdown's cross-domain lookup. */
+  private _interfaceProviders: Map<string, ComponentProvider[]> = new Map();
+  private _interfaceProvidersPending: Set<string> = new Set();
 
   /** Scrolls the YAML-cursor-selected field into view (the structured side
    *  of the field sync); driven from ``updated``. */
@@ -614,6 +623,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       toggleNested: (key) => this._toggleNested(key),
       seedNestedOpen: (key) => this._seedNestedOpen(key),
       requestAddComponent: (domain) => this._requestAddComponent(domain),
+      resolveInterfaceProviders: (interfaceName) =>
+        this._resolveInterfaceProviders(interfaceName),
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
       getPendingUnit: (path) => this._pendingUnits.get(path.join(".")),
@@ -732,6 +743,49 @@ export class ESPHomeConfigEntryForm extends LitElement {
         composed: true,
       })
     );
+  }
+
+  /**
+   * Providers of an interface reference, from a per-form cache.
+   *
+   * A miss fetches the catalog by ``provides`` once and re-renders on
+   * resolve; an empty *success* caches ``[]`` (a same-domain reference has
+   * no extra providers). A *failure* is logged and left uncached so a later
+   * render retries rather than permanently dropping candidates.
+   */
+  private _resolveInterfaceProviders(
+    interfaceName: string
+  ): readonly ComponentProvider[] {
+    if (!interfaceName) return [];
+    const cached = this._interfaceProviders.get(interfaceName);
+    if (cached) return cached;
+    if (this._api && !this._interfaceProvidersPending.has(interfaceName)) {
+      this._interfaceProvidersPending.add(interfaceName);
+      // ``limit: 200`` captures every provider of the interface in one shot
+      // (interfaces have at most a couple dozen); this is the full dropdown
+      // candidate set, distinct from the Add-component picker's paginated grid.
+      this._api
+        .getComponents({ provides: interfaceName, limit: 200 })
+        .then((resp) => {
+          this._interfaceProviders.set(
+            interfaceName,
+            resp.components.map((c) => parseCatalogId(c.id))
+          );
+          this.requestUpdate();
+        })
+        .catch((err) =>
+          // Warn (not debug) so the dropped-candidate path is observable, and
+          // don't cache [] — that's indistinguishable from "no providers" and
+          // would silently omit candidates for the form's lifetime.
+          console.warn(
+            "[config-entry-form] provider fetch failed for",
+            interfaceName,
+            err
+          )
+        )
+        .finally(() => this._interfaceProvidersPending.delete(interfaceName));
+    }
+    return [];
   }
 }
 

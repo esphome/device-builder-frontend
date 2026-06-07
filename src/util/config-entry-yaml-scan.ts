@@ -17,6 +17,7 @@
  * type into a field) from O(N) per keystroke to O(1).
  */
 import { scanPinGpios } from "./pin-gpio.js";
+import { parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
 /**
  * Single-entry memo for the YAML scans. The hot path is the
@@ -233,60 +234,97 @@ export function sectionEndLine(yaml: string, fromLine?: number): number | undefi
   return lines.length;
 }
 
-/**
- * Walk the YAML and return every `id:` (with its sibling `name:`) found
- * inside the given top-level domain. Block-list items reset the cursor
- * so each list element produces its own `{ id, name }` record.
- */
-interface RefKey {
-  yaml: string;
+/** One provider of an interface: a catalog domain and optional platform
+ *  stem. ``{sensor, adc}`` matches a ``sensor:`` item with ``platform: adc``;
+ *  an empty stem matches every id in the ``domain:`` block. */
+export interface ComponentProvider {
   domain: string;
+  stem: string;
 }
-const refKeyEquals = (a: RefKey, b: RefKey) => a.yaml === b.yaml && a.domain === b.domain;
-const refMemo = createScanMemo<RefKey, Array<{ id: string; name: string }>>(refKeyEquals);
 
-export function findReferencedComponents(
+/** Split a catalog id into a provider: ``"sensor.adc"`` → ``{sensor, adc}``;
+ *  a bare ``"ble_nus"`` → ``{ble_nus, ""}`` (a top-level component). */
+export function parseCatalogId(id: string): ComponentProvider {
+  const dot = id.indexOf(".");
+  return dot === -1
+    ? { domain: id, stem: "" }
+    : { domain: id.slice(0, dot), stem: id.slice(dot + 1) };
+}
+
+interface ProviderKey {
+  yaml: string;
+  signature: string;
+}
+const providerKeyEquals = (a: ProviderKey, b: ProviderKey) =>
+  a.yaml === b.yaml && a.signature === b.signature;
+const providerMemo = createScanMemo<ProviderKey, Array<{ id: string; name: string }>>(
+  providerKeyEquals
+);
+
+/**
+ * Configured components matching a set of providers.
+ *
+ * For each provider, keeps a configured instance under its ``domain:`` block
+ * whose ``platform`` matches the provider stem (or every id when the stem is
+ * empty, e.g. a top-level component like a ``uart``-providing ``ble_nus:``).
+ * Delegates the YAML structure to {@link parseYamlTopLevelSections} so nested
+ * lists (``filters:``) and sub-mappings don't break item boundaries. The
+ * building block under {@link findReferenceCandidates}.
+ */
+export function findComponentsByProviders(
   yaml: string,
-  domain: string
+  providers: ReadonlyArray<ComponentProvider>
 ): Array<{ id: string; name: string }> {
-  if (!domain) return [];
-  const probe: RefKey = { yaml, domain };
-  const cached = refMemo.get(probe);
+  if (!providers.length) return [];
+  const signature = providers
+    .map((p) => `${p.domain}.${p.stem}`)
+    .sort()
+    .join(",");
+  const probe: ProviderKey = { yaml, signature };
+  const cached = providerMemo.get(probe);
   if (cached) return cached;
-  const lines = yaml.split("\n");
+
+  // ``stem === ""`` for any provider in a domain means "match every id".
+  const stemsByDomain = new Map<string, Set<string>>();
+  for (const p of providers) {
+    const stems = stemsByDomain.get(p.domain) ?? new Set<string>();
+    stems.add(p.stem);
+    stemsByDomain.set(p.domain, stems);
+  }
+
   const result: Array<{ id: string; name: string }> = [];
-  let inSection = false;
-  let currentId = "";
-  let currentName = "";
-
-  const flush = () => {
-    if (currentId) result.push({ id: currentId, name: currentName });
-    currentId = "";
-    currentName = "";
-  };
-
-  for (const line of lines) {
-    const topMatch = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*):/);
-    if (topMatch) {
-      flush();
-      inSection = topMatch[1] === domain;
-      continue;
-    }
-    if (!inSection) continue;
-    if (/^\s*-\s/.test(line)) flush();
-    const idMatch = line.match(/^\s+(?:-\s+)?id:\s*["']?(\S+?)["']?\s*$/);
-    if (idMatch) {
-      currentId = idMatch[1];
-      continue;
-    }
-    const nameMatch = line.match(/^\s+(?:-\s+)?name:\s*["']?(.+?)["']?\s*$/);
-    if (nameMatch) {
-      currentName = nameMatch[1];
+  const seen = new Set<string>();
+  for (const section of parseYamlTopLevelSections(yaml)) {
+    if (!section.id || seen.has(section.id)) continue;
+    const stems = stemsByDomain.get(section.parentKey ?? section.key);
+    if (!stems) continue;
+    if (
+      stems.has("") ||
+      (section.platform !== undefined && stems.has(section.platform))
+    ) {
+      seen.add(section.id);
+      result.push({ id: section.id, name: section.name ?? "" });
     }
   }
-  flush();
-  refMemo.set(probe, result);
+  providerMemo.set(probe, result);
   return result;
+}
+
+/**
+ * Configured components that satisfy a reference, via its providers.
+ *
+ * The reference's own domain is an implicit provider (empty stem ⇒ every id
+ * in that ``<domain>:`` block), so same-domain (``i2c``) and cross-domain
+ * (``voltage_sampler`` → ADC sensors under ``sensor:``) references resolve
+ * through one scan. Shared by the visual editor and the YAML autocomplete.
+ */
+export function findReferenceCandidates(
+  yaml: string,
+  domain: string,
+  providers: ReadonlyArray<ComponentProvider>
+): Array<{ id: string; name: string }> {
+  if (!domain) return [];
+  return findComponentsByProviders(yaml, [{ domain, stem: "" }, ...providers]);
 }
 
 /**
@@ -298,5 +336,5 @@ export function findReferencedComponents(
  */
 export function _clearScanMemos(): void {
   pinMemo.clear();
-  refMemo.clear();
+  providerMemo.clear();
 }
