@@ -34,8 +34,8 @@ export function itemId(item: Record<string, unknown>): string {
 /** True when *item* looks like a registry-list item the renderer can
  *  edit: a plain object with zero or one key. Multi-key items or
  *  non-object entries are preserved verbatim through edits via
- *  ``preserveForeignEntries`` so a click in the visual editor never
- *  drops data the form doesn't understand. */
+ *  ``editableEntries`` / ``spliceEditable`` so a click in the visual
+ *  editor never drops data the form doesn't understand. */
 export function isEditableItem(raw: unknown): raw is Record<string, unknown> {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return false;
   return Object.keys(raw as Record<string, unknown>).length <= 1;
