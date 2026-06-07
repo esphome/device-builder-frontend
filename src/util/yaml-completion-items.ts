@@ -22,7 +22,7 @@ import type {
   SchemaRegistryEntry,
 } from "./esphome-schema.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
-import type { CatalogIndex } from "./yaml-completion.js";
+import type { CatalogIndex } from "./yaml-completion-catalog.js";
 
 // Leading-whitespace counter — used when computing indents and
 // list-item lead text for the trigger / action apply snippets.
