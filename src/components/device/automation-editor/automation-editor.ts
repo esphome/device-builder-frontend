@@ -396,17 +396,13 @@ export class ESPHomeAutomationEditor extends LitElement {
       this.configuration,
       this._localize,
       {
-        // Hydrate all three lists — the editor renders the trigger
-        // picker, unlike the trigger-less editors (actions +
-        // conditions only).
+        // All three lists: this editor renders the trigger picker.
         lists: ["triggers", "actions", "conditions"],
-        // Paint the picker with the slim list AND drop the loading
-        // spinner so the dropdowns mount while hydration runs in the
-        // background; the controller guards this against a superseded
-        // load. The post-hydration ``available`` below carries fresh
-        // array refs so identity-based ``hasChanged`` consumers
-        // (trigger picker, condition tree, action node) re-render with
-        // the hydrated ``config_entries``.
+        // Paint the slim list and drop the spinner so the dropdowns
+        // mount while hydration runs; the controller guards this
+        // against a superseded load. The post-hydration ``available``
+        // below carries fresh array refs so identity-based
+        // ``hasChanged`` consumers re-render with the hydrated bodies.
         onPaint: (painted) => {
           this._available = painted;
           this._loading = false;
@@ -415,8 +411,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     );
     // A stale/no-op load returns neither field — leave ``_loading`` to
     // the newer load that superseded this one (the old finally-seq
-    // guard). The partial-hydration toast now fires inside the
-    // controller's ``resolveLoadedAvailable``.
+    // guard). The partial-hydration toast fires inside the controller.
     if (error !== undefined) {
       this._error = error;
       this._loading = false;
