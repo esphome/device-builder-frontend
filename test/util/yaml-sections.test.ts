@@ -590,6 +590,29 @@ describe("parseYamlAutomations", () => {
     expect(entry.displayLabel).toBe("esphome → on_boot");
   });
 
+  it("splits a list-form on_boot into indexed device_on rows", () => {
+    const yaml = `esphome:
+  on_boot:
+    - priority: -300
+      then:
+        - logger.log: "late"
+    - priority: 200
+      then:
+        - logger.log: "early"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:device_on:")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:device_on:on_boot:0",
+      "automation:device_on:on_boot:1",
+    ]);
+    expect(items.map((s) => s.displayLabel)).toEqual([
+      "esphome → on_boot #1",
+      "esphome → on_boot #2",
+    ]);
+  });
+
   it("enumerates top-level script: list items by their id", () => {
     const yaml = `script:
   - id: my_alarm

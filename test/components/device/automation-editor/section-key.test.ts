@@ -17,6 +17,12 @@ describe("sectionKeyFromLocation", () => {
       "automation:device_on:on_boot"
     );
     expect(
+      sectionKeyFromLocation({ kind: "device_on", trigger: "on_boot", index: 0 })
+    ).toBe("automation:device_on:on_boot:0");
+    expect(
+      sectionKeyFromLocation({ kind: "device_on", trigger: "on_boot", index: 1 })
+    ).toBe("automation:device_on:on_boot:1");
+    expect(
       sectionKeyFromLocation({
         kind: "component_on",
         component_id: "my_button",
@@ -102,10 +108,32 @@ describe("locationFromSectionKey", () => {
     expect(
       locationFromSectionKey("automation:component_on:my_time:on_time:x")
     ).toBeNull();
+    // Empty index (Number("") is 0 in JS) and extra trailing segments.
+    expect(locationFromSectionKey("automation:component_on:my_time:on_time:")).toBeNull();
+    expect(
+      locationFromSectionKey("automation:component_on:my_time:on_time:0:extra")
+    ).toBeNull();
+  });
+
+  it("rejects a device_on index that is not a non-negative integer", () => {
+    expect(locationFromSectionKey("automation:device_on:on_boot:-1")).toBeNull();
+    expect(locationFromSectionKey("automation:device_on:on_boot:1.5")).toBeNull();
+    expect(locationFromSectionKey("automation:device_on:on_boot:x")).toBeNull();
+    // Empty index (Number("") is 0 in JS) and extra trailing segments.
+    expect(locationFromSectionKey("automation:device_on:on_boot:")).toBeNull();
+    expect(locationFromSectionKey("automation:device_on:on_boot:0:extra")).toBeNull();
   });
 
   const cases: [string, AutomationLocation][] = [
     ["automation:device_on:on_boot", { kind: "device_on", trigger: "on_boot" }],
+    [
+      "automation:device_on:on_boot:0",
+      { kind: "device_on", trigger: "on_boot", index: 0 },
+    ],
+    [
+      "automation:device_on:on_boot:1",
+      { kind: "device_on", trigger: "on_boot", index: 1 },
+    ],
     [
       "automation:component_on:my_button:on_press",
       { kind: "component_on", component_id: "my_button", trigger: "on_press" },

@@ -137,14 +137,14 @@ const timeAvailable = (): AvailableAutomations =>
         id: "time.on_time",
         name: "On time",
         applies_to: ["time"],
-        repeatable: true,
+        supports_list: true,
         config_entries: [],
       },
       {
         id: "time.on_time_sync",
         name: "On time sync",
         applies_to: ["time"],
-        repeatable: false,
+        supports_list: false,
         config_entries: [],
       },
     ],
@@ -211,6 +211,77 @@ describe("add-automation-dialog list-shaped triggers (#1080)", () => {
   });
 });
 
+const ON_BOOT_LIST_YAML = `esphome:
+  name: x
+  on_boot:
+    - priority: -300
+      then:
+        - logger.log: late
+`;
+
+const deviceAvailable = (): AvailableAutomations =>
+  ({
+    triggers: [
+      {
+        id: "on_boot",
+        name: "On Boot",
+        applies_to: [],
+        is_device_level: true,
+        supports_list: true,
+        config_entries: [],
+      },
+      {
+        id: "on_shutdown",
+        name: "On Shutdown",
+        applies_to: [],
+        is_device_level: true,
+        supports_list: false,
+        config_entries: [],
+      },
+    ],
+    actions: [],
+    conditions: [],
+    scripts: [],
+    devices: [],
+  }) as unknown as AvailableAutomations;
+
+describe("add-automation-dialog device-level list triggers (#1283)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  async function mountForDevice(): Promise<ESPHomeAddAutomationDialog> {
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(deviceAvailable())),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    dialog.open();
+    await dialog.updateComplete;
+    await flushPending();
+    dialog.yaml = ON_BOOT_LIST_YAML;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._kind = "device_on";
+    await dialog.updateComplete;
+    return dialog;
+  }
+
+  it("still offers on_boot when one already exists (supports_list)", async () => {
+    const dialog = await mountForDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const offered = (dialog as any)._filteredTriggers() as Array<{ id: string }>;
+    expect(offered.map((t) => t.id)).toContain("on_boot");
+  });
+
+  it("appends a second on_boot as an indexed device_on entry", async () => {
+    const dialog = await mountForDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._triggerId = "on_boot";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const loc = (dialog as any)._buildLocation();
+    expect(loc).toEqual({ kind: "device_on", trigger: "on_boot", index: 1 });
+  });
+});
+
 const ahtAvailable = (): AvailableAutomations =>
   ({
     triggers: [
@@ -219,7 +290,7 @@ const ahtAvailable = (): AvailableAutomations =>
         name: "On Value Range",
         applies_to: ["sensor"],
         is_device_level: false,
-        repeatable: false,
+        supports_list: false,
         config_entries: [],
       },
     ],

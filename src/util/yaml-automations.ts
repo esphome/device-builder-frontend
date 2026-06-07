@@ -77,18 +77,31 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     const host = smallestContainingSection(sections, fromLine);
 
     if (host && host.parentKey === undefined && host.key === "esphome") {
-      automations.push({
-        key: `automation:device_on:${eventName}`,
-        // ``displayLabel`` is the legacy "Esphome → on_boot" label;
-        // the navigator now prefers catalog-resolved labels but
-        // keeps ``displayLabel`` as a graceful fallback for
-        // pre-catalog renders.
-        displayLabel: `esphome → ${eventName}`,
-        fromLine,
-        toLine,
-        parentKey: "esphome",
-        eventKey: eventName,
-      });
+      // ``displayLabel`` is the legacy "esphome → on_boot" fallback; the
+      // navigator prefers catalog-resolved labels.
+      const deviceBase = { parentKey: "esphome", eventKey: eventName };
+      // List-form device handler (multiple on_boot priorities): one row per
+      // entry, keyed with its index to match the backend's per-entry location.
+      const entries = _listTriggerEntries(lines, fromLine, toLine);
+      if (entries) {
+        entries.forEach((entry, idx) => {
+          automations.push({
+            ...deviceBase,
+            key: `automation:device_on:${eventName}:${idx}`,
+            displayLabel: `esphome → ${eventName} #${idx + 1}`,
+            fromLine: entry.fromLine,
+            toLine: entry.toLine,
+          });
+        });
+      } else {
+        automations.push({
+          ...deviceBase,
+          key: `automation:device_on:${eventName}`,
+          displayLabel: `esphome → ${eventName}`,
+          fromLine,
+          toLine,
+        });
+      }
       continue;
     }
 

@@ -35,7 +35,7 @@ const trigger = (over: Partial<AutomationTrigger> & { id: string }): AutomationT
     name: over.id,
     applies_to: [],
     is_device_level: false,
-    repeatable: false,
+    supports_list: false,
     config_entries: [],
     ...over,
   }) as AutomationTrigger;

@@ -346,19 +346,21 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   private _filteredTriggers(): AutomationTrigger[] {
     const all = this._available?.triggers ?? [];
     if (this._kind === "device_on") {
-      // Device-level handlers are offered once; the catalog never marks
-      // them repeatable (only component triggers stack by index), so a
-      // second is grown inline rather than added as another block.
+      // Device-level handlers fire once unless ESPHome accepts a list
+      // (supports_list, e.g. multiple on_boot priorities); list-capable ones
+      // stay offerable past the first and append an indexed entry.
       const takenDeviceTriggers = this._existingDeviceTriggers();
-      return all.filter((t) => t.is_device_level && !takenDeviceTriggers.has(t.id));
+      return all.filter(
+        (t) => t.is_device_level && (!takenDeviceTriggers.has(t.id) || t.supports_list)
+      );
     }
     if (this._kind === "component_on") {
       const device = this._available?.devices.find((d) => d.id === this._componentId);
       // A component's inline ``on_*:`` fires once, so hide triggers that
-      // already have a handler here; repeatable ones stay offerable.
+      // already have a handler here; list-capable ones stay offerable.
       const takenComponentTriggers = this._existingComponentTriggers(this._componentId);
       return triggersForComponent(all, device).filter(
-        (t) => !takenComponentTriggers.has(this._bareTrigger(t.id)) || t.repeatable
+        (t) => !takenComponentTriggers.has(this._bareTrigger(t.id)) || t.supports_list
       );
     }
     return [];
@@ -471,6 +473,16 @@ export class ESPHomeAddAutomationDialog extends LitElement {
 
   private _buildLocation(): AutomationLocation {
     if (this._kind === "device_on") {
+      // List-capable device triggers (supports_list, e.g. on_boot) append a
+      // new indexed entry; the index is the existing handler count, so the
+      // first lands at 0 (a one-item list) and later ones append.
+      const trigger = this._available?.triggers.find((t) => t.id === this._triggerId);
+      if (trigger?.supports_list) {
+        const index = parseYamlAutomations(this.yaml).filter(
+          (s) => s.parentKey === "esphome" && s.eventKey === this._triggerId
+        ).length;
+        return { kind: "device_on", trigger: this._triggerId!, index };
+      }
       return { kind: "device_on", trigger: this._triggerId! };
     }
     if (this._kind === "component_on") {
@@ -480,11 +492,11 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       // triggers.
       const dotIdx = this._triggerId!.indexOf(".");
       const bare = dotIdx >= 0 ? this._triggerId!.slice(dotIdx + 1) : this._triggerId!;
-      // Repeatable triggers append a new indexed entry; an un-indexed
+      // List-capable triggers append a new indexed entry; an un-indexed
       // location would overwrite the block. Index = existing entry
       // count on this instance (mirrors the interval path).
       const trigger = this._available?.triggers.find((t) => t.id === this._triggerId);
-      if (trigger?.repeatable) {
+      if (trigger?.supports_list) {
         const index = parseYamlAutomations(this.yaml).filter(
           (s) => s.id === this._componentId && s.eventKey === bare
         ).length;

@@ -101,6 +101,16 @@ export function swap<T>(arr: T[], i: number, j: number): T[] {
 }
 
 /**
+ * Parse a section-key segment as a list index: a non-negative integer only.
+ * Returns null for empty (Number('') is 0 in JS), signed, fractional, or
+ * non-numeric segments so a malformed key is rejected rather than routed to
+ * the wrong entry.
+ */
+function parseListIndex(part: string): number | null {
+  return /^\d+$/.test(part) ? Number(part) : null;
+}
+
+/**
  * Convert an ``AutomationLocation`` into the stable section key the
  * navigator emits (and the page consumes to route a click into the
  * automation editor). Mirrors the construction in
@@ -109,7 +119,9 @@ export function swap<T>(arr: T[], i: number, j: number): T[] {
 export function sectionKeyFromLocation(loc: AutomationLocation): string {
   switch (loc.kind) {
     case "device_on":
-      return `automation:device_on:${loc.trigger}`;
+      return loc.index === undefined
+        ? `automation:device_on:${loc.trigger}`
+        : `automation:device_on:${loc.trigger}:${loc.index}`;
     case "component_on":
       return loc.index === undefined
         ? `automation:component_on:${loc.component_id}:${loc.trigger}`
@@ -178,24 +190,32 @@ export function locationFromSectionKey(key: string): AutomationLocation | null {
   const parts = key.split(":");
   // parts[0] = "automation"
   switch (parts[1]) {
-    case "device_on":
-      return parts[2] ? { kind: "device_on", trigger: parts[2] } : null;
-    case "component_on": {
-      if (parts.length < 4) return null;
-      // A 5th part marks one entry of a list-shaped trigger (time.on_time).
-      // The index is a list position, so only a non-negative integer is valid.
-      if (parts.length >= 5) {
-        const idx = Number(parts[4]);
-        return Number.isInteger(idx) && idx >= 0
-          ? {
-              kind: "component_on",
-              component_id: parts[2],
-              trigger: parts[3],
-              index: idx,
-            }
-          : null;
+    case "device_on": {
+      if (!parts[2]) return null;
+      // A 4th part marks one entry of a list-form device handler (multiple
+      // on_boot priorities); exactly 4 parts, index a non-negative integer.
+      // Extra trailing parts or a non-index 4th part are rejected.
+      if (parts.length === 3) return { kind: "device_on", trigger: parts[2] };
+      if (parts.length === 4) {
+        const index = parseListIndex(parts[3]);
+        return index === null ? null : { kind: "device_on", trigger: parts[2], index };
       }
-      return { kind: "component_on", component_id: parts[2], trigger: parts[3] };
+      return null;
+    }
+    case "component_on": {
+      if (!parts[2] || !parts[3]) return null;
+      // A 5th part marks one entry of a list-shaped trigger (time.on_time);
+      // exactly 5 parts, index a non-negative integer.
+      if (parts.length === 4) {
+        return { kind: "component_on", component_id: parts[2], trigger: parts[3] };
+      }
+      if (parts.length === 5) {
+        const index = parseListIndex(parts[4]);
+        return index === null
+          ? null
+          : { kind: "component_on", component_id: parts[2], trigger: parts[3], index };
+      }
+      return null;
     }
     case "component_action":
       // `automation:component_action:<component_id>:<field>` — exactly 4

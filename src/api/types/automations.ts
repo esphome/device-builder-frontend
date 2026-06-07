@@ -31,9 +31,10 @@ export interface AutomationTrigger {
    *  components are configured. */
   applies_to: string[];
   is_device_level: boolean;
-  /** True for a component trigger the wizard can stack: it stays
-   *  offerable past the first handler and appends an indexed entry. */
-  repeatable: boolean;
+  /** True when ESPHome accepts a list of handlers (single=False): the
+   *  trigger stays offerable past the first handler and appends an indexed
+   *  entry. Deterministic replacement for the old 'repeatable' heuristic. */
+  supports_list: boolean;
   /** Parameter schema (e.g. ``on_click`` has ``min_length`` /
    *  ``max_length`` time-period fields). */
   config_entries: ConfigEntry[];
@@ -143,7 +144,7 @@ export type AutomationLocation =
   | { kind: "interval"; index: number }
   | { kind: "component_on"; component_id: string; trigger: string; index?: number }
   | { kind: "component_action"; component_id: string; field: string }
-  | { kind: "device_on"; trigger: string }
+  | { kind: "device_on"; trigger: string; index?: number }
   | { kind: "light_effect"; component_id: string; index: number }
   | { kind: "api_action"; action_name: string };
 
