@@ -63,8 +63,8 @@ import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
+import { CatalogLoadController } from "./catalog-load-controller.js";
 import { componentDomain, instanceName } from "./component-targets.js";
-import { loadAndHydrateAvailable } from "./hydrate-available-bodies.js";
 import { ParseErrorController } from "./parse-error-controller.js";
 import {
   applyYamlDiff,
@@ -130,13 +130,6 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  device's YAML) so the dropdowns only show what's usable. */
   @state() private _available: AvailableAutomations | null = null;
 
-  /** Monotonic generation token for ``_loadAvailable``. Two
-   *  overlapping reconnect-driven loads can otherwise have the
-   *  earlier one's stale assignment land after the later one's
-   *  fresh assignment; this lets each invocation drop its results
-   *  if the seq has moved on while it awaited. */
-  private _loadAvailableSeq = 0;
-
   /** Component catalog entry for the ``interval`` component, lazily
    *  fetched the first time we render an interval automation. Drives
    *  the header (name / description / docs / image) and the inline
@@ -150,6 +143,13 @@ export class ESPHomeAutomationEditor extends LitElement {
   /** Renders read-only + blocks auto-apply for a parse-errored
    *  automation so its empty tree can't overwrite the real YAML. */
   private readonly _parseError = new ParseErrorController(this);
+
+  /** Owns the catalog-load concurrency guard (sequence token +
+   *  host-disconnect invalidation) so an overlapping load can't
+   *  clobber ``_available``, paint a stale slim catalog, or
+   *  double-fire the partial-hydration toast. Shared with the
+   *  trigger-less editors (script, api-action). */
+  private readonly _catalogLoad = new CatalogLoadController(this);
 
   /** "Show advanced settings" toggle state for the params form.
    *  Mirrors ``device-section-config``'s same-named state but
@@ -389,49 +389,41 @@ export class ESPHomeAutomationEditor extends LitElement {
 
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
-    const seq = ++this._loadAvailableSeq;
     this._loading = true;
     this._error = "";
-    try {
-      const outcome = await loadAndHydrateAvailable(this._api, this.configuration, {
+    const { available, error } = await this._catalogLoad.load(
+      this._api,
+      this.configuration,
+      this._localize,
+      {
+        // Hydrate all three lists — the editor renders the trigger
+        // picker, unlike the trigger-less editors (actions +
+        // conditions only).
+        lists: ["triggers", "actions", "conditions"],
         // Paint the picker with the slim list AND drop the loading
-        // spinner so the dropdowns mount while hydration runs in
-        // the background. The post-hydration ``_available``
-        // reassignment below carries fresh array refs to force a
-        // re-render with the hydrated ``config_entries``.
+        // spinner so the dropdowns mount while hydration runs in the
+        // background; the controller guards this against a superseded
+        // load. The post-hydration ``available`` below carries fresh
+        // array refs so identity-based ``hasChanged`` consumers
+        // (trigger picker, condition tree, action node) re-render with
+        // the hydrated ``config_entries``.
         onPaint: (painted) => {
-          if (seq !== this._loadAvailableSeq) return;
           this._available = painted;
           this._loading = false;
         },
-        isStale: () => seq !== this._loadAvailableSeq,
-      });
-      if (outcome.status === "stale") return;
-      if (outcome.status === "error") {
-        this._error =
-          outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
-        return;
       }
-      // Fresh array refs so identity-based ``hasChanged`` consumers
-      // (trigger picker, condition tree, action node) re-render
-      // with the hydrated entries.
-      this._available = outcome.available;
-      const { missingBody, missingField, rejected } = outcome.hydration;
-      const failures = missingBody + missingField + rejected;
-      if (failures > 0) {
-        // Soft surface: non-blocking toast. Don't set ``_error``
-        // since the picker is still usable for the entries that
-        // hydrated; ``cacheMisses: false`` lets a re-mount retry
-        // the missing ones.
-        toast.error(
-          this._localize("device.automation_partial_hydration", {
-            count: String(failures),
-          }),
-          { richColors: true }
-        );
-      }
-    } finally {
-      if (seq === this._loadAvailableSeq) this._loading = false;
+    );
+    // A stale/no-op load returns neither field — leave ``_loading`` to
+    // the newer load that superseded this one (the old finally-seq
+    // guard). The partial-hydration toast now fires inside the
+    // controller's ``resolveLoadedAvailable``.
+    if (error !== undefined) {
+      this._error = error;
+      this._loading = false;
+    }
+    if (available) {
+      this._available = available;
+      this._loading = false;
     }
   }
 

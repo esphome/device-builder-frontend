@@ -30,6 +30,15 @@ const slimWithAction = (): AvailableAutomations =>
     devices: [],
   }) as unknown as AvailableAutomations;
 
+const slimWithTrigger = (): AvailableAutomations =>
+  ({
+    triggers: [{ id: "on_boot", config_entries: [] }],
+    actions: [],
+    conditions: [],
+    scripts: [],
+    devices: [],
+  }) as unknown as AvailableAutomations;
+
 describe("CatalogLoadController", () => {
   beforeEach(() => {
     _clearAutomationBodyCache();
@@ -101,5 +110,72 @@ describe("CatalogLoadController", () => {
     ctrl.hostDisconnected();
 
     expect(await p).toEqual({});
+  });
+
+  it("does not invoke a superseded load's onPaint (staleness wrap)", async () => {
+    const ctrl = new CatalogLoadController(stubHost());
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(emptySlim()),
+      getAutomationBodies: vi.fn().mockResolvedValue({}),
+    } as unknown as ESPHomeAPI;
+
+    const firstPaint = vi.fn();
+    const secondPaint = vi.fn();
+    // Second call bumps the token before the first awaits resolve, so
+    // the first's early paint must never land.
+    const first = ctrl.load(api, "a.yaml", localize, { onPaint: firstPaint });
+    const second = ctrl.load(api, "b.yaml", localize, { onPaint: secondPaint });
+    await Promise.all([first, second]);
+
+    expect(firstPaint).not.toHaveBeenCalled();
+    expect(secondPaint).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not invoke onPaint after the host disconnects", async () => {
+    const ctrl = new CatalogLoadController(stubHost());
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(emptySlim()),
+      getAutomationBodies: vi.fn().mockResolvedValue({}),
+    } as unknown as ESPHomeAPI;
+
+    const onPaint = vi.fn();
+    const p = ctrl.load(api, "a.yaml", localize, { onPaint });
+    ctrl.hostDisconnected();
+    await p;
+
+    expect(onPaint).not.toHaveBeenCalled();
+  });
+
+  it("forwards an explicit lists selector so triggers hydrate too", async () => {
+    const ctrl = new CatalogLoadController(stubHost());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slimWithTrigger()),
+      getAutomationBodies,
+    } as unknown as ESPHomeAPI;
+
+    await ctrl.load(api, "a.yaml", localize, {
+      lists: ["triggers", "actions", "conditions"],
+    });
+
+    expect(getAutomationBodies).toHaveBeenCalledTimes(1);
+    expect(getAutomationBodies).toHaveBeenCalledWith([
+      { type: "triggers", id: "on_boot" },
+    ]);
+  });
+
+  it("defaults to actions + conditions, skipping trigger hydration", async () => {
+    const ctrl = new CatalogLoadController(stubHost());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slimWithTrigger()),
+      getAutomationBodies,
+    } as unknown as ESPHomeAPI;
+
+    // No options: the trigger-less default scopes hydration to actions
+    // + conditions, so a trigger-only slim fetches no bodies.
+    await ctrl.load(api, "a.yaml", localize);
+
+    expect(getAutomationBodies).not.toHaveBeenCalled();
   });
 });
