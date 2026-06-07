@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 
 // Capture the resolver handed to webawesome's icon-library registry so we
 // can drive it directly — registering the resolver is the only observable
@@ -62,19 +62,22 @@ describe("registerMdiIcons", () => {
     resolver = (call![1] as { resolver: Resolver }).resolver;
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   test("resolves a registered icon name to its data URI", () => {
     expect(resolver("home")).toBe(mdiIconSrc(HOME));
   });
 
   test("returns an empty string and warns for an unknown name", () => {
+    // Restore the spy locally rather than in an ``afterEach`` so the
+    // once-guard assertion below stays decoupled from how vitest treats the
+    // hoisted ``registerIconLibrary`` mock's call history.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(resolver("does-not-exist")).toBe("");
-    expect(warn).toHaveBeenCalledOnce();
-    expect(warn.mock.calls[0]!.join(" ")).toContain("does-not-exist");
+    try {
+      expect(resolver("does-not-exist")).toBe("");
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]!.join(" ")).toContain("does-not-exist");
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   test("registers the library exactly once across repeated calls", () => {
