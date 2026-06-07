@@ -22,7 +22,6 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
-import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/secrets/secrets-structured-editor.js";
@@ -515,7 +514,6 @@ export class ESPHomePageSecrets extends LitElement {
             ${revealLabel}
           </button>
         </div>
-        <wa-divider></wa-divider>
         <div class="editor-card">
           ${this._loaded
             ? html`
