@@ -240,7 +240,7 @@ export class ESPHomePageSecrets extends LitElement {
         flex: 1;
         display: flex;
         flex-direction: column;
-        padding: var(--wa-space-l);
+        padding: var(--wa-space-l) var(--content-gutter);
         gap: var(--wa-space-m);
         overflow: hidden;
       }
@@ -432,6 +432,9 @@ export class ESPHomePageSecrets extends LitElement {
          in JS (matching the device editor), so no layout rules are
          duplicated here. */
       @media (max-width: 900px) {
+        .page {
+          padding-block: var(--wa-space-s);
+        }
         .page-header {
           flex-wrap: wrap;
         }
