@@ -17,7 +17,7 @@ vi.mock("../../../src/components/device/device-navigator-search.js", () => ({}))
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
-import { navItemMatches } from "../../../src/components/device/navigator-search.js";
+import { navItemMatches } from "../../../src/components/device/navigator-search-match.js";
 
 const YAML = [
   "esphome:",

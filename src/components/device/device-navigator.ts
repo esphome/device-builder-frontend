@@ -32,7 +32,7 @@ import {
 } from "../../util/yaml-sections.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
-import { navItemMatches } from "./navigator-search.js";
+import { navItemMatches } from "./navigator-search-match.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./add-automation-dialog.js";
@@ -346,12 +346,14 @@ export class ESPHomeDeviceNavigator extends LitElement {
       : null;
     const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
     const matchCount = matches ? matches.reduce((n, m) => n + m.length, 0) : 0;
-    const resultLabel = filtering
-      ? this._localize("device.navigator_search_count", {
-          count: matchCount,
-          total: totalItems,
-        })
-      : "";
+    // Stay silent on zero matches; the "No matches" empty state speaks.
+    const resultLabel =
+      filtering && matchCount > 0
+        ? this._localize("device.navigator_search_count", {
+            count: matchCount,
+            total: totalItems,
+          })
+        : "";
 
     return html`
       <section class="card">
