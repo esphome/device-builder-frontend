@@ -2146,4 +2146,22 @@ describe("ESPHomeAPI — console-debug redaction", () => {
     expect(text).toContain("bar");
     expect(text).not.toContain("<redacted>");
   });
+
+  it("redacts the value of a config/set_secret frame (but sends it on the wire)", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.setSecret("api_key", "topsecretvalue", false);
+    const sent = ws.sentAs<{ args: { value: string }; message_id: string }>(0);
+    ws.receive({ message_id: sent.message_id, result: { created: true } });
+    await pending;
+
+    // The real value must reach the backend on the wire...
+    expect(sent.args.value).toBe("topsecretvalue");
+    // ...but never appear in the debug log.
+    const text = debugText(debugSpy);
+    expect(text).not.toContain("topsecretvalue");
+    expect(text).toContain("<redacted>");
+  });
 });
