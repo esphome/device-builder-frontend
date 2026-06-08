@@ -344,9 +344,10 @@ export class ESPHomeSecretPicker extends LitElement {
           class=${missing ? "trigger missing" : selected ? "trigger selected" : "trigger"}
           type="button"
           ?disabled=${this.disabled}
-          aria-label=${this._localize("device.secret_picker_aria", {
-            field: this.fieldLabel,
-          })}
+          aria-label=${this._localize(
+            missing ? "device.secret_picker_aria_missing" : "device.secret_picker_aria",
+            { field: this.fieldLabel }
+          )}
         >
           <wa-icon
             class="key"
