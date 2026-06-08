@@ -144,6 +144,28 @@ describe("manual firmware-binary download flow", () => {
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 
+  it("web flasher with no flashable binary points at the web-flasher limits", async () => {
+    const { host, api } = makeHost("web-download", []);
+    await run(host);
+    expect(host._fail).toHaveBeenCalledWith("firmware.no_flashable_binary");
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("names the build server when a remote compile yields no flashable binary", async () => {
+    const { host, api } = makeHost("web-download", []);
+    api.firmwareCompile.mockResolvedValueOnce({
+      job_id: "j1",
+      source: JobSource.REMOTE,
+      source_label: "build-server-1",
+    });
+    await run(host);
+    expect(host._fail).toHaveBeenCalledWith(
+      "firmware.no_binaries_remote",
+      "firmware.no_binaries_remote_detail"
+    );
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+
   it("re-picking after a download grabs the other format and keeps the list", async () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     await run(host); // lands on choose-binary

@@ -139,6 +139,20 @@ describe("download flow (startArtifactDownload)", () => {
     await run(host);
     expect(api.firmwareCompile).toHaveBeenCalledTimes(1);
     expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.no_binaries");
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("names the build server when a remote compile returns no artefacts", async () => {
+    const { host, api } = makeHost([[], []]);
+    api.firmwareCompile.mockResolvedValueOnce({
+      job_id: "j1",
+      source: JobSource.REMOTE,
+      source_label: "build-server-1",
+    });
+    await run(host);
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.no_binaries_remote");
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 });

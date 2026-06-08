@@ -1,4 +1,8 @@
-import { JobStatus, type FirmwareBinary } from "../../api/types/firmware-jobs.js";
+import {
+  JobSource,
+  JobStatus,
+  type FirmwareBinary,
+} from "../../api/types/firmware-jobs.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
@@ -237,6 +241,28 @@ function showBinaryPicker(
   host._step = "choose-binary";
 }
 
+// Reached only after a *successful* compile produced nothing to download. A
+// remote build that succeeded but returned no artifacts is a packaging /
+// transfer problem on the build server, not a failed build, so name the
+// server instead of telling the user to check that the build completed.
+function failNoBinaries(
+  host: ESPHomeFirmwareInstallDialog,
+  { isWebFlasher }: { isWebFlasher: boolean }
+): void {
+  if (host._jobSource === JobSource.REMOTE) {
+    const receiver =
+      host._jobSourceLabel || host._localize("firmware.no_binaries_remote_server");
+    host._fail(
+      host._localize("firmware.no_binaries_remote", { receiver }),
+      host._localize("firmware.no_binaries_remote_detail")
+    );
+    return;
+  }
+  host._fail(
+    host._localize(isWebFlasher ? "firmware.no_flashable_binary" : "firmware.no_binaries")
+  );
+}
+
 // web.esphome.io needs a self-contained image (factory.bin / firmware.bin);
 // manual download takes whatever the build produced (incl. .uf2).
 export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise<void> {
@@ -258,11 +284,7 @@ export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise
     binaries.find((b) => b.file === "firmware.bin") ??
     (isWebFlasher ? undefined : binaries[0]);
   if (!flashable) {
-    host._fail(
-      host._localize(
-        isWebFlasher ? "firmware.no_flashable_binary" : "firmware.no_binaries"
-      )
-    );
+    failNoBinaries(host, { isWebFlasher });
     return;
   }
   await downloadSelectedBinary(host, flashable.file);
@@ -286,7 +308,7 @@ export async function startArtifactDownload(
   }
 
   if (binaries.length === 0) {
-    host._fail(host._localize("firmware.no_binaries"));
+    failNoBinaries(host, { isWebFlasher: false });
     return;
   }
   if (binaries.length === 1) {
