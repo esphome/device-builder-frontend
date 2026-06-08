@@ -40,6 +40,7 @@ import {
   fetchApiKey,
   unarchiveDevice,
 } from "../components/dashboard/actions.js";
+import { deviceGridStyles } from "../components/dashboard/device-grid-styles.js";
 import {
   onInstallMethodSelect,
   openCommand,
@@ -73,11 +74,13 @@ import {
   setSearchMode,
   syncYamlSearch,
 } from "../components/dashboard/search.js";
+import { skeletonStyles } from "../components/dashboard/skeleton-styles.js";
 import {
   cardSkeletonTemplate,
   tableSkeletonTemplate,
 } from "../components/dashboard/skeletons.js";
 import { dashboardStyles } from "../components/dashboard/styles.js";
+import { yamlModeStyles } from "../components/dashboard/yaml-mode-styles.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import {
   activeJobsContext,
@@ -269,7 +272,14 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-logs-dialog") _logsDialog!: ESPHomeLogsDialog;
   @query(".search-input") _searchInputEl?: HTMLElement & { focus: () => void };
 
-  static styles = [espHomeStyles, inputStyles, dashboardStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    dashboardStyles,
+    deviceGridStyles,
+    yamlModeStyles,
+    skeletonStyles,
+  ];
 
   private _onSerialSetup = (event: Event) => {
     const port = (event as CustomEvent<{ port: SerialPort | null }>).detail?.port ?? null;
