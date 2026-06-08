@@ -123,6 +123,7 @@ export const deviceNavigatorStyles = css`
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: var(--wa-space-2xs);
     cursor: pointer;
     user-select: none;
     transition:
@@ -152,6 +153,9 @@ export const deviceNavigatorStyles = css`
     margin: 0;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .nav-item-subtitle {
@@ -160,11 +164,15 @@ export const deviceNavigatorStyles = css`
     font-weight: normal;
     margin: 0;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .nav-item wa-icon {
     font-size: var(--wa-font-size-xl);
     color: var(--esphome-primary);
+    flex-shrink: 0;
   }
 
   .action-item {
