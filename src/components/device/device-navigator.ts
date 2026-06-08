@@ -146,7 +146,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
         components: YamlSection[];
         automations: YamlSection[];
       },
-      _cacheTick: number,
+      _tick: number,
       _platform: string,
       _deviceName: string,
       _localize: LocalizeFunc
