@@ -146,9 +146,14 @@ export class ESPHomeSecretValue extends LitElement {
         color 0.12s;
     }
 
-    .copy:hover {
+    .copy:hover:not(:disabled) {
       background: var(--wa-color-surface-border);
       color: var(--wa-color-text-normal);
+    }
+
+    .copy:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .copy wa-icon {
@@ -209,6 +214,7 @@ export class ESPHomeSecretValue extends LitElement {
         <button
           class="copy"
           type="button"
+          ?disabled=${this._busy || this._loadingStored}
           title=${this._localize("device.secret_reveal_copy")}
           aria-label=${this._localize("device.secret_reveal_copy")}
           @click=${this._copy}

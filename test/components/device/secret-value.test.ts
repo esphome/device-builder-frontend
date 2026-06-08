@@ -221,27 +221,25 @@ describe("esphome-secret-value", () => {
     document.body.appendChild(el);
     await el.updateComplete;
 
-    // Load in flight → input disabled so an async prefill can't clobber typing.
-    expect(
+    // Load in flight → input disabled so an async prefill can't clobber typing,
+    // and copy disabled so it can't copy the empty initial draft.
+    const pwDisabled = () =>
       (
         el.shadowRoot!.querySelector("esphome-password-input") as unknown as {
           disabled: boolean;
         }
-      ).disabled
-    ).toBe(true);
+      ).disabled;
+    const copyBtn = () => el.shadowRoot!.querySelector(".copy") as HTMLButtonElement;
+    expect(pwDisabled()).toBe(true);
+    expect(copyBtn().disabled).toBe(true);
 
     resolveGet("api_key: stored\n");
     await new Promise((r) => setTimeout(r, 0));
     await el.updateComplete;
 
     expect(pwInput(el).value).toBe("stored");
-    expect(
-      (
-        el.shadowRoot!.querySelector("esphome-password-input") as unknown as {
-          disabled: boolean;
-        }
-      ).disabled
-    ).toBe(false);
+    expect(pwDisabled()).toBe(false);
+    expect(copyBtn().disabled).toBe(false);
   });
 
   it("fetches the stored value once despite re-renders during the load", async () => {
