@@ -33,6 +33,10 @@ class TestCmEditor extends CodeMirrorEditorElement {
   destroyView(): void {
     this._destroyView();
   }
+
+  remount(doc: string): void {
+    this._mountView(doc, []);
+  }
 }
 
 async function mount(): Promise<TestCmEditor> {
@@ -59,6 +63,16 @@ describe("CodeMirrorEditorElement", () => {
     el.destroyView();
     expect(el.view).toBeNull();
     expect(el.container.querySelector(".cm-editor")).toBeNull();
+  });
+
+  it("tears down the prior view when mounted again", async () => {
+    const el = await mount();
+    const first = el.view!;
+    el.remount("again");
+    expect(el.view).not.toBe(first);
+    expect(el.view!.state.doc.toString()).toBe("again");
+    // Old view torn down — only the new editor remains in the host.
+    expect(el.container.querySelectorAll(".cm-editor").length).toBe(1);
   });
 
   it("tears the view down when disconnected", async () => {

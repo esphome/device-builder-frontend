@@ -16,8 +16,11 @@ export abstract class CodeMirrorEditorElement extends LitElement {
 
   protected _view: EditorView | null = null;
 
-  /** Build the view into ``.cm-wrap`` with the subclass's extensions. */
-  protected _mountView(doc: string, extensions: Extension[]): void {
+  /** Build the view into ``.cm-wrap`` with the subclass's extensions;
+   *  tears down any existing view first so the single-handle contract
+   *  holds even if a subclass mounts twice. */
+  protected _mountView(doc: string, extensions: Extension): void {
+    this._destroyView();
     this._view = new EditorView({
       state: EditorState.create({ doc, extensions }),
       parent: this._container,
