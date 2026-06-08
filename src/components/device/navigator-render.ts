@@ -3,6 +3,7 @@ import { ifDefined } from "lit/directives/if-defined.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
 import type { NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
+import { iconForDomain } from "./navigator-row-icons.js";
 
 /** A "+ Add X" affordance at the foot of a section. */
 export interface NavAction {
@@ -80,6 +81,11 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
         }
       }}
     >
+      <wa-icon
+        class="nav-subgroup-icon"
+        library="mdi"
+        name=${iconForDomain(group.key)}
+      ></wa-icon>
       <span class="nav-subgroup-title">${prettyDomain(group.key)}</span>
       <span class="nav-subgroup-count">${group.rows.length}</span>
       ${interactive

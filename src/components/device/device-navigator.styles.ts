@@ -184,6 +184,12 @@ export const deviceNavigatorStyles = css`
     cursor: default;
   }
 
+  .nav-subgroup-icon {
+    font-size: var(--wa-font-size-m);
+    color: var(--wa-color-text-quiet);
+    flex-shrink: 0;
+  }
+
   .nav-subgroup-title {
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-semibold);
