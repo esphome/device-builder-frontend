@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { YamlSection } from "../../util/yaml-sections.js";
-import type { NavRow } from "./navigator-labels.js";
+import type { NavGroup } from "./navigator-groups.js";
+import { type NavRow, prettyDomain } from "./navigator-labels.js";
 
 /** A "+ Add X" affordance at the foot of a section. */
 export interface NavAction {
@@ -24,6 +25,11 @@ export interface NavSectionView {
   onItemEnter: (item: YamlSection) => void;
   onItemLeave: () => void;
   onItemClick: (item: YamlSection) => void;
+  /** When set, ``rows`` are rendered under collapsible domain subgroups
+   *  instead of as a flat list. */
+  groups?: NavGroup[];
+  collapsedGroups?: Set<string>;
+  onToggleGroup?: (key: string) => void;
 }
 
 /** One navigator row; shared by the filtered and unfiltered paths. */
@@ -45,6 +51,30 @@ function renderNavRow(row: NavRow, v: NavSectionView): TemplateResult {
       </div>
       <wa-icon library="mdi" name="chevron-right"></wa-icon>
     </div>
+  `;
+}
+
+/** One collapsible domain subgroup: header (name + count) then its rows. */
+function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
+  // Force open while filtering — you can't collapse a search result.
+  const open = v.filtering || !v.collapsedGroups?.has(group.key);
+  return html`
+    <div class="nav-subgroup-header" @click=${() => v.onToggleGroup?.(group.key)}>
+      <span class="nav-subgroup-title">${prettyDomain(group.key)}</span>
+      <span class="nav-subgroup-count">${group.rows.length}</span>
+      ${v.filtering
+        ? nothing
+        : html`<wa-icon
+            class="nav-subgroup-chevron"
+            library="mdi"
+            name=${open ? "chevron-up" : "chevron-down"}
+          ></wa-icon>`}
+    </div>
+    ${open
+      ? html`<div class="nav-items nav-items--grouped">
+          ${group.rows.map((row) => renderNavRow(row, v))}
+        </div>`
+      : nothing}
   `;
 }
 
@@ -83,11 +113,13 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
       ? html`
           <div class="separator"></div>
           ${v.filtering ? nothing : html`<p class="italic">${v.desc}</p>`}
-          ${v.rows.length > 0
-            ? html`<div class="nav-items">
-                ${v.rows.map((row) => renderNavRow(row, v))}
-              </div>`
-            : nothing}
+          ${v.groups
+            ? v.groups.map((group) => renderNavGroup(group, v))
+            : v.rows.length > 0
+              ? html`<div class="nav-items">
+                  ${v.rows.map((row) => renderNavRow(row, v))}
+                </div>`
+              : nothing}
           ${v.filtering
             ? nothing
             : html`<div class="nav-items">

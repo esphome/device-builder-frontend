@@ -1,6 +1,7 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getCachedComponent } from "../../util/component-name-cache.js";
 import { type YamlSection, sectionKeyOf } from "../../util/yaml-sections.js";
+import type { NavigatorBuckets } from "./navigator-buckets.js";
 import type { TriggerCatalogController } from "./trigger-catalog-controller.js";
 
 export type NavCategory = "core" | "component" | "automation";
@@ -62,6 +63,27 @@ export function resolveNavItemLabels(
   const secondary = named && named !== primary ? named : undefined;
 
   return { primary, secondary };
+}
+
+/** Resolve labels for every bucket, indexed [core, components, automations]. */
+export function resolveBucketLabels(
+  buckets: NavigatorBuckets,
+  ctx: LabelContext
+): NavRow[][] {
+  return [
+    buckets.core.map((item) => ({
+      item,
+      labels: resolveNavItemLabels(item, "core", ctx),
+    })),
+    buckets.components.map((item) => ({
+      item,
+      labels: resolveNavItemLabels(item, "component", ctx),
+    })),
+    buckets.automations.map((item) => ({
+      item,
+      labels: resolveNavItemLabels(item, "automation", ctx),
+    })),
+  ];
 }
 
 /**
@@ -128,10 +150,9 @@ function automationLabels(
 }
 
 /** Capitalize a YAML domain key for display (``binary_sensor`` →
- *  ``Binary sensor``). Used only for the pre-catalog fallback label so
- *  the navigator never shows a raw lowercase domain while the trigger
- *  fetch is still in flight. */
-function prettyDomain(domain: string): string {
+ *  ``Binary sensor``). Used for the pre-catalog fallback label and the
+ *  domain subgroup headers. */
+export function prettyDomain(domain: string): string {
   const spaced = domain.replace(/_/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
