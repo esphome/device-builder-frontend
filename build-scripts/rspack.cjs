@@ -187,30 +187,33 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
       },
     },
     historyApiFallback: { disableDotRule: true },
+    // Honor BACKEND_PORT so a dev server can point at a backend on a
+    // non-default port; lets two backends run side by side (testing
+    // multiple checkouts) without editing this file. Defaults to 6052.
     proxy: [
       {
         // All communication goes through the single /ws WebSocket endpoint
         context: ["/ws"],
-        target: "ws://localhost:6052",
+        target: `ws://localhost:${process.env.BACKEND_PORT || 6052}`,
         ws: true,
       },
       {
         // Backend-served static files (board images, etc.)
         context: ["/boards"],
-        target: "http://localhost:6052",
+        target: `http://localhost:${process.env.BACKEND_PORT || 6052}`,
         changeOrigin: true,
       },
       {
         // REST endpoints, incl. the firmware artifact download
         // (GET /api/firmware/download — too large for the WS).
         context: ["/api"],
-        target: "http://localhost:6052",
+        target: `http://localhost:${process.env.BACKEND_PORT || 6052}`,
         changeOrigin: true,
       },
       {
         // Legacy REST endpoints (for backward compat if needed)
         context: ["/devices", "/json-config", "/compile", "/upload"],
-        target: "http://localhost:6052",
+        target: `http://localhost:${process.env.BACKEND_PORT || 6052}`,
         changeOrigin: true,
       },
     ],
