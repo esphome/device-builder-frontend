@@ -13,6 +13,16 @@ const SRC_DIR = path.resolve(ROOT_DIR, "src");
 const OUTPUT_DIR = path.resolve(ROOT_DIR, "esphome_device_builder_frontend");
 const PUBLIC_DIR = path.resolve(ROOT_DIR, "public");
 
+// Backend port the dev proxy targets. Honors BACKEND_PORT so two
+// checkouts can run side by side without editing this file; validated
+// like PORT in dev-server.cjs so a typo (BACKEND_PORT=abc) can't
+// produce an invalid proxy URL. Falls back to 6052.
+const parsedBackendPort = parseInt(process.env.BACKEND_PORT, 10);
+const BACKEND_PORT =
+  Number.isFinite(parsedBackendPort) && parsedBackendPort > 0
+    ? parsedBackendPort
+    : 6052;
+
 /**
  * Create the rspack configuration for the ESPHome frontend.
  */
@@ -187,37 +197,34 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
       },
     },
     historyApiFallback: { disableDotRule: true },
-    // Honor BACKEND_PORT so a dev server can point at a backend on a
-    // non-default port; lets two backends run side by side (testing
-    // multiple checkouts) without editing this file. Defaults to 6052.
     proxy: [
       {
         // All communication goes through the single /ws WebSocket endpoint
         context: ["/ws"],
-        target: `ws://localhost:${process.env.BACKEND_PORT || 6052}`,
+        target: `ws://localhost:${BACKEND_PORT}`,
         ws: true,
       },
       {
         // Backend-served static files (board images, etc.)
         context: ["/boards"],
-        target: `http://localhost:${process.env.BACKEND_PORT || 6052}`,
+        target: `http://localhost:${BACKEND_PORT}`,
         changeOrigin: true,
       },
       {
         // REST endpoints, incl. the firmware artifact download
         // (GET /api/firmware/download — too large for the WS).
         context: ["/api"],
-        target: `http://localhost:${process.env.BACKEND_PORT || 6052}`,
+        target: `http://localhost:${BACKEND_PORT}`,
         changeOrigin: true,
       },
       {
         // Legacy REST endpoints (for backward compat if needed)
         context: ["/devices", "/json-config", "/compile", "/upload"],
-        target: `http://localhost:${process.env.BACKEND_PORT || 6052}`,
+        target: `http://localhost:${BACKEND_PORT}`,
         changeOrigin: true,
       },
     ],
   },
 });
 
-module.exports = { createRspackConfig };
+module.exports = { createRspackConfig, BACKEND_PORT };

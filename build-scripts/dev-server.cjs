@@ -1,4 +1,4 @@
-const { createRspackConfig } = require("./rspack.cjs");
+const { createRspackConfig, BACKEND_PORT } = require("./rspack.cjs");
 const { RspackDevServer } = require("@rspack/dev-server");
 const rspack = require("@rspack/core");
 
@@ -20,10 +20,8 @@ if (Number.isFinite(envPort) && envPort > 0) {
 const compiler = rspack.rspack(config);
 const server = new RspackDevServer(config.devServer, compiler);
 
-const backendPort = process.env.BACKEND_PORT || 6052;
-
 server.start().then(() => {
   console.log(`\n  ESPHome Frontend dev server running at:\n`);
   console.log(`  > Local:   http://localhost:${config.devServer.port}/\n`);
-  console.log(`  API proxy target: http://localhost:${backendPort}\n`);
+  console.log(`  API proxy target: http://localhost:${BACKEND_PORT}\n`);
 });
