@@ -9,6 +9,7 @@
  */
 import { consume } from "@lit/context";
 import {
+  mdiAlert,
   mdiCheck,
   mdiChevronDown,
   mdiKeyVariant,
@@ -22,6 +23,7 @@ import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
+import { ensureSecretWithToast } from "../../util/ensure-secret-with-toast.js";
 import { navigate } from "../../util/navigation.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { secretValueFromYaml, visibleSecretKeys } from "../../util/secret-eligibility.js";
@@ -30,16 +32,16 @@ import {
   getCachedSecretKeys,
   subscribeSecretKeys,
 } from "../../util/secrets-cache.js";
-import { ensureSecretInYaml } from "../../util/secrets-write.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import "@home-assistant/webawesome/dist/components/dropdown/dropdown.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "../secret-reveal.js";
+import "./secret-value.js";
 
 registerMdiIcons({
+  alert: mdiAlert,
   check: mdiCheck,
   "chevron-down": mdiChevronDown,
   "key-variant": mdiKeyVariant,
@@ -124,9 +126,11 @@ export class ESPHomeSecretPicker extends LitElement {
     () => this._api
   );
 
-  /** Cached secret keys, ``[]`` until the first fetch resolves. */
-  private get _keys(): string[] {
-    return this._secretKeys.value ?? [];
+  /** Loaded secret keys, or ``undefined`` until the shared cache first
+   *  resolves — kept distinct from ``[]`` so the absence of a referenced key
+   *  isn't mistaken for "missing" before the list has arrived. */
+  private get _keys(): string[] | undefined {
+    return this._secretKeys.value;
   }
 
   /** The key a migrate would create: always the preferred (first) form, never
@@ -144,7 +148,18 @@ export class ESPHomeSecretPicker extends LitElement {
       this.selectedKey === "" &&
       this.value !== "" &&
       this._migrateTarget !== "" &&
+      this._keys !== undefined &&
       !this._keys.includes(this._migrateTarget)
+    );
+  }
+
+  /** The referenced key isn't in secrets.yaml. Only meaningful once the key
+   *  list has loaded, so a referenced field isn't flagged on first paint. */
+  private get _missing(): boolean {
+    return (
+      this.selectedKey !== "" &&
+      this._keys !== undefined &&
+      !this._keys.includes(this.selectedKey)
     );
   }
 
@@ -168,16 +183,6 @@ export class ESPHomeSecretPicker extends LitElement {
 
     :host([full]) .chevron {
       margin-left: auto;
-    }
-
-    /* Inline reveal of the selected secret's value (eye + copy). */
-    .selected-reveal {
-      display: flex;
-      align-items: center;
-      gap: var(--wa-space-xs);
-      padding-left: var(--wa-space-2xs);
-      font-size: var(--wa-font-size-xs);
-      color: var(--wa-color-text-quiet);
     }
 
     .trigger {
@@ -211,6 +216,16 @@ export class ESPHomeSecretPicker extends LitElement {
     .trigger.selected {
       color: var(--wa-color-text-normal);
       border-color: var(--esphome-primary);
+    }
+
+    /* Referenced secret is absent from secrets.yaml — flag it. */
+    .trigger.missing {
+      color: var(--wa-color-text-normal);
+      border-color: var(--wa-color-danger-border, var(--wa-color-danger-60));
+    }
+
+    .trigger.missing .key {
+      color: var(--wa-color-danger-border, var(--wa-color-danger-60));
     }
 
     .trigger:disabled {
@@ -284,11 +299,12 @@ export class ESPHomeSecretPicker extends LitElement {
 
   protected render() {
     const selected = this.selectedKey !== "";
+    const missing = this._missing;
     // Hide other devices' per-device secrets and field-bound shared secrets
     // (wifi_*) not meant for this field. Migrate / _keys membership still use
     // the full unfiltered list.
     const keys = visibleSecretKeys(
-      this._keys,
+      this._keys ?? [],
       [...this.recommendedKeys, this.selectedKey],
       this.deviceName,
       this._devices.map((d) => d.name)
@@ -302,14 +318,19 @@ export class ESPHomeSecretPicker extends LitElement {
       <wa-dropdown @wa-select=${this._onSelect}>
         <button
           slot="trigger"
-          class=${selected ? "trigger selected" : "trigger"}
+          class=${missing ? "trigger missing" : selected ? "trigger selected" : "trigger"}
           type="button"
           ?disabled=${this.disabled}
-          aria-label=${this._localize("device.secret_picker_aria", {
-            field: this.fieldLabel,
-          })}
+          aria-label=${this._localize(
+            missing ? "device.secret_picker_aria_missing" : "device.secret_picker_aria",
+            { field: this.fieldLabel }
+          )}
         >
-          <wa-icon class="key" library="mdi" name="key-variant"></wa-icon>
+          <wa-icon
+            class="key"
+            library="mdi"
+            name=${missing ? "alert" : "key-variant"}
+          ></wa-icon>
           ${selected
             ? html`<span class="label">${this.selectedKey}</span>`
             : html`<span class="placeholder"
@@ -354,35 +375,15 @@ export class ESPHomeSecretPicker extends LitElement {
             </wa-dropdown-item>`
           : nothing}
       </wa-dropdown>
-      ${selected ? this._renderSelectedReveal() : nothing}
+      ${selected
+        ? html`<esphome-secret-value
+            secret-key=${this.selectedKey}
+            ?present=${!missing}
+            device-name=${this.deviceName}
+          ></esphome-secret-value>`
+        : nothing}
     `;
   }
-
-  /** Reveal the selected secret's value inline, so the user can see it without
-   *  switching to the secrets editor. The value is fetched lazily on first
-   *  reveal (mirrors the `_manual` revert path's read). */
-  private _renderSelectedReveal() {
-    return html`<div class="selected-reveal">
-      <span>${this._localize("device.secret_picker_value")}</span>
-      <esphome-secret-reveal
-        .resolve=${this._revealSecretValue}
-        resetKey=${this.selectedKey}
-      ></esphome-secret-reveal>
-    </div>`;
-  }
-
-  private _revealSecretValue = async (): Promise<string | null> => {
-    if (!this._api || !this.selectedKey) return null;
-    try {
-      const yaml = await this._api.getConfig(SECRETS_FILE);
-      return secretValueFromYaml(yaml, this.selectedKey);
-    } catch {
-      toast.error(this._localize("device.secret_picker_reveal_error"), {
-        richColors: true,
-      });
-      return null;
-    }
-  };
 
   private _renderKeyItem(key: string) {
     return html`<wa-dropdown-item
@@ -456,24 +457,14 @@ export class ESPHomeSecretPicker extends LitElement {
   private async _migrate(): Promise<void> {
     const key = this._migrateTarget;
     if (!this._api || !key || !this.value) return;
-    try {
-      const { created } = await ensureSecretInYaml(this._api, key, this.value);
-      // `created` false = the key already existed (cache was stale / created in
-      // another tab); its value may differ from what the user typed, so say
-      // "linked" rather than "saved".
-      toast[created ? "success" : "info"](
-        this._localize(
-          created ? "device.secret_picker_migrated" : "device.secret_picker_linked",
-          { key }
-        ),
-        { richColors: true }
-      );
+    if (
+      await ensureSecretWithToast(this._api, key, this.value, this._localize, {
+        createdKey: "device.secret_picker_migrated",
+        errorKey: "device.secret_picker_migrate_error",
+        logLabel: "Secret migration failed",
+      })
+    ) {
       this._emit(`!secret ${key}`);
-    } catch (err) {
-      console.error("Secret migration failed", err);
-      toast.error(this._localize("device.secret_picker_migrate_error"), {
-        richColors: true,
-      });
     }
   }
 }
