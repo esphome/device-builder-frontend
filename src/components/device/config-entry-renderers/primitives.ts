@@ -4,9 +4,11 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import {
   chooseDisplayUnit,
+  defaultUnitForFloatWithUnit,
   parseFloatWithUnit,
   placeholderForFloatWithUnit,
   serializeFloatWithUnit,
+  visibleUnitOptions,
 } from "../../../util/float-with-unit.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
@@ -297,6 +299,13 @@ export function renderFloatWithUnitField(
     ctx.getPendingUnit(path),
     unitOptions
   );
+  // Narrow the picker to the field's scale; keep canonical/default/in-use so a
+  // trimmed unit a value uses is never hidden (parsing uses the full list).
+  const pickerUnitOptions = visibleUnitOptions(unitOptions, entry.range, [
+    canonicalUnit,
+    defaultUnitForFloatWithUnit(entry.default_value, unitOptions),
+    unit,
+  ]);
   const placeholder = placeholderForFloatWithUnit(entry.default_value, unitOptions);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
@@ -329,7 +338,7 @@ export function renderFloatWithUnitField(
           }}
           @blur=${() => ctx.clearEditingMagnitude(path)}
         />
-        ${unitOptions.length > 1
+        ${pickerUnitOptions.length > 1
           ? html`
               <wa-select
                 data-no-value-sync
@@ -345,7 +354,7 @@ export function renderFloatWithUnitField(
                   }
                 }}
               >
-                ${unitOptions.map(
+                ${pickerUnitOptions.map(
                   (option) =>
                     html`<wa-option value=${option} ?selected=${option === unit}
                       >${option}</wa-option

@@ -5,6 +5,7 @@ import {
   parseFloatWithUnit,
   placeholderForFloatWithUnit,
   serializeFloatWithUnit,
+  visibleUnitOptions,
 } from "../../src/util/float-with-unit.js";
 
 const FREQUENCY_UNITS = ["Hz", "mHz", "kHz", "MHz", "GHz"] as const;
@@ -334,5 +335,49 @@ describe("serializeFloatWithUnit", () => {
   it("round-trips through parse", () => {
     const parsed = parseFloatWithUnit("3.3V", ["V", "mV", "kV"]);
     expect(serializeFloatWithUnit(parsed)).toBe("3.3V");
+  });
+});
+
+describe("visibleUnitOptions", () => {
+  const VOLTS = ["V", "nV", "µV", "mV", "kV", "MV", "GV"];
+
+  it("keeps the full list when there is no range", () => {
+    expect(visibleUnitOptions(VOLTS, null, ["V"])).toEqual(VOLTS);
+  });
+
+  it("drops prefixes above a small max", () => {
+    // 0-32 V field: kV/MV/GV are out of scale, sub-volt prefixes stay.
+    expect(visibleUnitOptions(VOLTS, [0, 32], ["V"])).toEqual(["V", "nV", "µV", "mV"]);
+  });
+
+  it("keeps high prefixes when the max needs them", () => {
+    // 0-65535 m: km is in scale, Mm/Gm are not.
+    const metres = ["m", "nm", "µm", "mm", "km", "Mm", "Gm"];
+    expect(visibleUnitOptions(metres, [0, 65535], ["m"])).toEqual([
+      "m",
+      "nm",
+      "µm",
+      "mm",
+      "km",
+    ]);
+  });
+
+  it("never drops a mustKeep unit even if out of range", () => {
+    // The value already uses kV; trimming must not strand it.
+    expect(visibleUnitOptions(VOLTS, [0, 32], ["V", "kV"])).toContain("kV");
+  });
+
+  it("leaves fixed-unit lists untouched", () => {
+    const fixed = ["FPS", "Hz"];
+    expect(visibleUnitOptions(fixed, [0, 1], ["FPS"])).toEqual(fixed);
+    const db = ["dB", "dBm"];
+    expect(visibleUnitOptions(db, [0, 1], ["dB"])).toEqual(db);
+  });
+
+  it("does not treat inherited Object keys as metric prefixes", () => {
+    // A unit whose 'prefix' is an inherited key (constructor/toString) must
+    // be read as non-metric and left untouched, not coerced and mis-trimmed.
+    const tricky = ["X", "constructorX", "toStringX"];
+    expect(visibleUnitOptions(tricky, [0, 1], ["X"])).toEqual(tricky);
   });
 });
