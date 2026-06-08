@@ -176,9 +176,18 @@ export class ESPHomeSecretValue extends LitElement {
     return this.present ? this._renderEdit() : this._renderCreate();
   }
 
+  /** The draft diverges from the stored value (present mode). */
+  private get _dirty(): boolean {
+    return this._stored !== null && this._draftValue !== this._stored;
+  }
+
+  /** A create draft with actual content (not blank/whitespace). */
+  private get _hasDraft(): boolean {
+    return this._draftValue.trim() !== "";
+  }
+
   /** Existing secret: the value is directly editable; Save when it changes. */
   private _renderEdit() {
-    const dirty = this._stored !== null && this._draftValue !== this._stored;
     return html`<div class="row">
         ${this._renderInput()}
         <button
@@ -193,7 +202,7 @@ export class ESPHomeSecretValue extends LitElement {
         <button
           class="save"
           type="button"
-          ?disabled=${this._busy || !dirty}
+          ?disabled=${this._busy || !this._dirty}
           @click=${this._save}
         >
           ${this._localize("device.secret_picker_save")}
@@ -218,7 +227,12 @@ export class ESPHomeSecretValue extends LitElement {
       </span>
       <div class="row">
         ${this._renderInput()}
-        <button class="save" type="button" ?disabled=${this._busy} @click=${this._create}>
+        <button
+          class="save"
+          type="button"
+          ?disabled=${this._busy || !this._hasDraft}
+          @click=${this._create}
+        >
           ${this._localize("device.secret_picker_missing_create")}
         </button>
       </div>
@@ -230,7 +244,11 @@ export class ESPHomeSecretValue extends LitElement {
       class="value"
       .value=${this._draftValue}
       .disabled=${this._busy}
-      .placeholder=${this._localize("device.secret_picker_missing_placeholder")}
+      .placeholder=${this._localize(
+        this.present
+          ? "device.secret_picker_value"
+          : "device.secret_picker_missing_placeholder"
+      )}
       .label=${this._localize("device.secret_picker_value_label", {
         key: this.secretKey,
       })}
@@ -270,6 +288,7 @@ export class ESPHomeSecretValue extends LitElement {
   };
 
   private _create = (): void => {
+    if (!this._hasDraft) return; // never create an empty/whitespace credential
     void this._run(
       (api) =>
         ensureSecretWithToast(api, this.secretKey, this._draftValue, this._localize, {
@@ -284,6 +303,7 @@ export class ESPHomeSecretValue extends LitElement {
   };
 
   private _save = (): void => {
+    if (!this._dirty) return; // Enter shouldn't write an unchanged value
     // A shared secret (wifi_*, plain, or another device's) is referenced by
     // other devices, so overwriting it changes the value everywhere — confirm
     // first. This device's own `<host>__…` secret writes straight through.

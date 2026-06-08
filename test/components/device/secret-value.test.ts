@@ -94,6 +94,29 @@ describe("esphome-secret-value", () => {
     expect(api.getSecretKeys).toHaveBeenCalled(); // cache refreshed
   });
 
+  it("won't create an empty/whitespace secret", async () => {
+    const api = {
+      getConfig: vi.fn(async () => ""),
+      updateConfig: vi.fn(async () => {}),
+      getSecretKeys: vi.fn(async () => []),
+    } as unknown as ESPHomeAPI;
+    const el = await mount(api, "api_key", false);
+    const saveBtn = () => el.shadowRoot!.querySelector(".save") as HTMLButtonElement;
+
+    expect(saveBtn().disabled).toBe(true); // blank
+    await typeValue(el, "   "); // whitespace only
+    expect(saveBtn().disabled).toBe(true);
+    // Enter is guarded too.
+    el.shadowRoot!.querySelector("esphome-password-input")!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true })
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(api.updateConfig).not.toHaveBeenCalled();
+
+    await typeValue(el, "real");
+    expect(saveBtn().disabled).toBe(false);
+  });
+
   it("prefills the value directly (no pencil) and disables Save until changed", async () => {
     const api = {
       getConfig: vi.fn(async () => "api_key: stored\n"),
@@ -104,6 +127,14 @@ describe("esphome-secret-value", () => {
     expect(el.shadowRoot!.querySelector(".edit")).toBeNull();
     expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).toBeNull();
     expect(pwInput(el).value).toBe("stored");
+    // Present mode uses the generic "Value" placeholder, not the create copy.
+    expect(
+      (
+        el.shadowRoot!.querySelector("esphome-password-input") as unknown as {
+          placeholder: string;
+        }
+      ).placeholder
+    ).toBe("device.secret_picker_value");
     // Unchanged → Save disabled.
     expect((el.shadowRoot!.querySelector(".save") as HTMLButtonElement).disabled).toBe(
       true
