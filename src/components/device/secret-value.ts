@@ -66,6 +66,9 @@ export class ESPHomeSecretValue extends LitElement {
   @state() private _busy = false;
   /** Cancels a stale load when the target changes mid-fetch. */
   private _loadToken = 0;
+  /** A `_loadStored()` fetch is in flight — dedupes the `updated()` kick so a
+   *  re-render during the round-trip doesn't fire a second `getConfig`. */
+  private _loading = false;
 
   protected willUpdate(changed: PropertyValues): void {
     // Reset on a new target OR a present flip: a stale draft mustn't leak across
@@ -75,13 +78,20 @@ export class ESPHomeSecretValue extends LitElement {
       this._draftValue = "";
       this._stored = null;
       this._busy = false;
+      this._loading = false;
       this._loadToken++;
     }
   }
 
   protected updated(): void {
     // Prefill the editable field with the stored value once present + ready.
-    if (this.present && this.secretKey && this._api && this._stored === null) {
+    if (
+      this.present &&
+      this.secretKey &&
+      this._api &&
+      this._stored === null &&
+      !this._loading
+    ) {
       void this._loadStored();
     }
   }
@@ -273,6 +283,7 @@ export class ESPHomeSecretValue extends LitElement {
   /** Load the stored value into the editable field (cancellable). */
   private async _loadStored(): Promise<void> {
     const token = ++this._loadToken;
+    this._loading = true;
     let value: string | null = null;
     try {
       const yaml = await this._api!.getConfig(SECRETS_FILE);
@@ -282,7 +293,10 @@ export class ESPHomeSecretValue extends LitElement {
         richColors: true,
       });
     }
-    if (token !== this._loadToken) return; // target changed mid-flight
+    // A newer load (or target change) superseded this one — it now owns
+    // `_loading`, so don't clear it or apply this stale value.
+    if (token !== this._loadToken) return;
+    this._loading = false;
     this._stored = value ?? "";
     this._draftValue = this._stored;
   }

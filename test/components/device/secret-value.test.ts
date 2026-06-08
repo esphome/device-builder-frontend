@@ -244,6 +244,33 @@ describe("esphome-secret-value", () => {
     ).toBe(false);
   });
 
+  it("fetches the stored value once despite re-renders during the load", async () => {
+    let resolveGet!: (yaml: string) => void;
+    const api = {
+      getConfig: vi.fn(() => new Promise<string>((r) => (resolveGet = r))),
+    } as unknown as ESPHomeAPI;
+    const el = new ESPHomeSecretValue();
+    el.secretKey = "api_key";
+    el.present = true;
+    (el as unknown as { _api: ESPHomeAPI })._api = api;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // Re-render repeatedly while the load is still in flight (e.g. contexts settling).
+    el.requestUpdate();
+    await el.updateComplete;
+    el.requestUpdate();
+    await el.updateComplete;
+
+    // Still a single read — the in-flight guard dedupes the updated() kicks.
+    expect((api.getConfig as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+
+    resolveGet("api_key: stored\n");
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    expect(pwInput(el).value).toBe("stored");
+  });
+
   it("reloads the value and resets the draft when present flips", async () => {
     // Draft from the pre-keys-load window must not survive a missing→present flip.
     const api = {
