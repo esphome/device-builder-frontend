@@ -224,10 +224,13 @@ export interface YamlDiff {
  *  ``!lambda |- ...`` block from a literal string. Used wherever a
  *  ``ConfigEntry`` has ``templatable: true`` and the user picked the
  *  lambda branch of the literal/lambda toggle. The backend writer
- *  emits this as a ruamel ``LiteralScalarString`` with ``|-`` style;
- *  the parser inverts. */
+ *  emits an untagged ``_lambda`` as a bare ``|-`` block; ``_tag:
+ *  "!lambda"`` re-emits the explicit tag, which a templatable value
+ *  field (``uart.write:``, ``delay:``) needs to compile as a lambda
+ *  rather than a string literal. Echo it back unchanged on save. */
 export interface LambdaValue {
   _lambda: string;
+  _tag?: "!lambda";
 }
 
 /** Type guard for ``LambdaValue``. */

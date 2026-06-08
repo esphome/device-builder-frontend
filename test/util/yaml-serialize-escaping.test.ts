@@ -130,3 +130,31 @@ describe("serializeYamlValues — array nested in a list item", () => {
     );
   });
 });
+
+describe("serializeYamlValues — lambda tag", () => {
+  it("emits a tagged lambda as !lambda |- so it compiles as a lambda", () => {
+    // Dropping the tag on a templatable value field (uart.write:)
+    // would compile the body as a string literal, not a lambda.
+    const out = serializeYamlValues(
+      {
+        set_action: [
+          { "uart.write": { _lambda: "uint8_t a = 1;\nreturn {a};", _tag: "!lambda" } },
+        ],
+      },
+      ""
+    ).join("\n");
+    expect(out).toBe(
+      [
+        "set_action:",
+        "  - uart.write: !lambda |-",
+        "      uint8_t a = 1;",
+        "      return {a};",
+      ].join("\n")
+    );
+  });
+
+  it("emits an untagged lambda as a bare |- block (no !lambda injected)", () => {
+    const out = serializeYamlValues({ lambda: { _lambda: "return x;" } }, "").join("\n");
+    expect(out).toBe(["lambda: |-", "  return x;"].join("\n"));
+  });
+});

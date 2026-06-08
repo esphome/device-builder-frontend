@@ -13,7 +13,7 @@
  * dependency checks against the user's current configuration.
  */
 
-import { isLambdaValue } from "../api/types/automations.js";
+import { isLambdaValue, type LambdaValue } from "../api/types/automations.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject } from "./nested-values.js";
 import { escapeYamlDoubleQuoted, hasEscapeWorthyChar } from "./yaml-escape.js";
@@ -21,9 +21,11 @@ import { escapeYamlDoubleQuoted, hasEscapeWorthyChar } from "./yaml-escape.js";
 /**
  * Wrap a ``LambdaValue`` sentinel (``{_lambda: "<body>"}``) as a
  * ``YamlRawValue`` so the serializer's existing block-scalar path
- * handles the emission. Bare ``|-`` (no ``!lambda`` tag) mirrors
- * the backend's ``controllers/automations/emitter.encode_value``
- * convention; the ESPHome parser accepts both forms.
+ * handles the emission. ``_tag: "!lambda"`` emits ``!lambda |-`` so a
+ * templatable value field (``uart.write:``) compiles as a lambda;
+ * untagged stays a bare ``|-`` block, the shape ESPHome auto-detects
+ * on ``lambda:``-keyed fields. Both mirror the backend's
+ * ``controllers/automations/emitter.encode_value`` convention.
  *
  * Without this conversion the form serializer falls through the
  * generic ``typeof val === "object"`` recursion and emits the
@@ -33,11 +35,12 @@ import { escapeYamlDoubleQuoted, hasEscapeWorthyChar } from "./yaml-escape.js";
  * save; each keystroke then appends a fresh copy alongside the
  * malformed one. #940.
  */
-function lambdaToRawValue(body: string, bodyIndent: string): YamlRawValue {
-  const lines = body
+function lambdaToRawValue(value: LambdaValue, bodyIndent: string): YamlRawValue {
+  const lines = value._lambda
     .split("\n")
     .map((line) => (line === "" ? "" : `${bodyIndent}${line}`));
-  return new YamlRawValue(lines, "|-");
+  const header = value._tag === "!lambda" ? "!lambda |-" : "|-";
+  return new YamlRawValue(lines, header);
 }
 
 /**
@@ -254,7 +257,7 @@ function serializeListItem(
         return;
       }
       if (isLambdaValue(v)) {
-        const raw = lambdaToRawValue(v._lambda, `${childIndent}${ESPHOME_YAML_INDENT}`);
+        const raw = lambdaToRawValue(v, `${childIndent}${ESPHOME_YAML_INDENT}`);
         lines.push(...emitYamlRawValueLines(k, prefix, raw));
         return;
       }
@@ -363,7 +366,7 @@ export function serializeYamlValues(
       continue;
     }
     if (isLambdaValue(val)) {
-      const raw = lambdaToRawValue(val._lambda, `${indent}${step}`);
+      const raw = lambdaToRawValue(val, `${indent}${step}`);
       lines.push(...emitYamlRawValueLines(key, indent, raw));
       continue;
     }
