@@ -393,7 +393,13 @@ export class ESPHomeRegistryList extends LitElement {
           </wa-select>
           ${renderListRemoveButton(this.ctx, disabled, () => this._removeAt(index))}
         </div>
-        ${this._renderSubForm(index, currentId, scalarConfigType, childEntries)}
+        ${this._renderSubForm(
+          index,
+          currentId,
+          scalarConfigType,
+          childEntries,
+          catalogEntry?.templatable ?? false
+        )}
       </div>
     `;
   }
@@ -445,11 +451,13 @@ export class ESPHomeRegistryList extends LitElement {
     index: number,
     currentId: string,
     scalarConfigType: ConfigEntryType | null,
-    childEntries: ConfigEntry[]
+    childEntries: ConfigEntry[],
+    templatable: boolean
   ) {
     if (scalarConfigType !== null) {
+      // templatable adds the literal/lambda toggle on the value (multiply: !lambda).
       return html`<div class="registry-list-sub-form">
-        ${this.ctx.renderEntry(makeConfigEntry({ type: scalarConfigType }), [
+        ${this.ctx.renderEntry(makeConfigEntry({ type: scalarConfigType, templatable }), [
           ...this.path,
           String(index),
           currentId,

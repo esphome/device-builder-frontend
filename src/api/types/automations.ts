@@ -100,6 +100,9 @@ export interface RegistryCatalogEntry {
    *  inline input at the polymorphic value position instead of an
    *  empty sub-form. */
   value_type?: RegistryValueType | null;
+  /** The scalar value accepts a lambda (``multiply: !lambda``); the
+   *  renderer offers a literal/lambda toggle on the inline input. */
+  templatable?: boolean;
 }
 
 /** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).

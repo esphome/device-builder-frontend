@@ -602,6 +602,43 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     });
   });
 
+  it("marks a templatable scalar filter so the row gets a lambda toggle", async () => {
+    // multiply takes a float OR a lambda; the synthetic scalar entry must carry
+    // templatable so renderEntry wraps it with the literal/lambda toggle.
+    const renderEntry = vi.fn();
+    const catalog = [
+      {
+        id: "multiply",
+        name: "Multiply",
+        config_entries: [],
+        applies_to: [],
+        value_type: "float",
+        templatable: true,
+      },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ multiply: 0.01 }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    const synthetic = renderEntry.mock.calls.map(
+      (c) => c[0] as { type: string; templatable?: boolean }
+    );
+    expect(synthetic).toContainEqual(
+      expect.objectContaining({ type: ConfigEntryType.FLOAT, templatable: true })
+    );
+  });
+
   it("renders no sub-form on an empty / unselected row", async () => {
     const renderEntry = vi.fn();
     const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
