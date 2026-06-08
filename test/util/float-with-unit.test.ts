@@ -10,6 +10,7 @@ import {
 
 const FREQUENCY_UNITS = ["Hz", "mHz", "kHz", "MHz", "GHz"] as const;
 const TEMPERATURE_UNITS = ["°C", "°F", "K"] as const;
+const RESISTANCE_UNITS = ["Ω", "nΩ", "µΩ", "mΩ", "kΩ", "MΩ", "GΩ"] as const;
 
 describe("parseFloatWithUnit", () => {
   it("splits the canonical case", () => {
@@ -203,30 +204,31 @@ describe("parseFloatWithUnit", () => {
       });
     });
 
-    it("handles case-variant resistance suffixes", () => {
-      // Scope check: the bug is in ``cv.float_with_unit`` itself,
-      // not specific to ``cv.frequency``. Pin that resistance
-      // (which takes ``Ω|ohm|Ohm|OHM`` and various SI prefixes in
-      // its ESPHome regex) gets the same case-insensitive
-      // treatment for the BASE unit. The user can type the base
-      // in any case (``ohm``, ``Ohm``, ``OHM``) and the parser
-      // picks the right SI-prefixed option, normalising to the
-      // canonical-cased option on round-trip.
-      const resistanceUnits = ["Ohm", "kOhm", "MOhm"] as const;
-      // All-lowercase: ``k`` matches case (score 1) > ``Ohm``'s
-      // ``o`` ≠ ``O`` (score 0). Length tie-break would also pick
-      // ``kOhm`` over the bare ``Ohm`` if scores tied.
-      expect(parseFloatWithUnit("4.7kohm", resistanceUnits)).toEqual({
+    it("folds ESPHome's textual Ohm spelling onto the Ω options", () => {
+      // The catalog emits the Ω symbol, but ESPHome accepts and the
+      // docs use the textual 'Ohm' / 'OHM' spelling (e.g. '4.7kOhm').
+      // Fold the spelling so the prefixed value lands on the matching
+      // symbol option; an already-symbol value is unaffected. Issue #1299.
+      expect(parseFloatWithUnit("4.7kohm", RESISTANCE_UNITS)).toEqual({
         value: 4.7,
-        unit: "kOhm",
+        unit: "kΩ",
       });
-      // Lowercase prefix + uppercase base: ``kOhm`` scores 2
-      // (k=k, O=O) vs ``Ohm``'s 1 (O=O, h≠H), so the SI prefix
-      // is preserved correctly even though the user uppercased
-      // the base.
-      expect(parseFloatWithUnit("4.7kOHM", resistanceUnits)).toEqual({
+      expect(parseFloatWithUnit("4.7kOHM", RESISTANCE_UNITS)).toEqual({
         value: 4.7,
-        unit: "kOhm",
+        unit: "kΩ",
+      });
+      expect(parseFloatWithUnit("10Ohm", RESISTANCE_UNITS)).toEqual({
+        value: 10,
+        unit: "Ω",
+      });
+      expect(parseFloatWithUnit("4.7kΩ", RESISTANCE_UNITS)).toEqual({
+        value: 4.7,
+        unit: "kΩ",
+      });
+      // ESPHome rejects the plural 'Ohms', so it is not folded.
+      expect(parseFloatWithUnit("4.7kOhms", RESISTANCE_UNITS)).toEqual({
+        value: null,
+        unit: "Ω",
       });
     });
 

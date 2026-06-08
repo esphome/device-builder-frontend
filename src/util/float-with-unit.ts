@@ -16,6 +16,16 @@ export interface FloatWithUnit {
   unit: string;
 }
 
+// ESPHome accepts a textual spelling for some units whose unit_options carry a
+// non-ASCII symbol (resistance: 'Ohm' / 'OHM' for Ω). Keyed by the canonical
+// base symbol (unit_options[0]); the matched spelling is folded onto that
+// symbol before matching, so '5.6kOhm' lands on the kΩ option. Only the symbol
+// units a user cannot easily type need an entry. ESPHome rejects plural forms
+// ('Ohms'), so the patterns are anchored to the singular.
+const UNIT_SPELLING_ALIASES: Record<string, RegExp> = {
+  Ω: /ohm$/i,
+};
+
 /**
  * Parse a raw value into number + unit.
  *
@@ -51,9 +61,13 @@ export function parseFloatWithUnit(
   // function only deals with strings. NaN/Infinity numbers stringify
   // to "NaN"/"Infinity" which `Number()` round-trips back to non-finite
   // — caught by the final `Number.isFinite` guard.
-  const text = raw === null || raw === undefined ? "" : String(raw).trim();
-  if (text === "") return { value: null, unit: fallbackUnit };
+  const trimmed = raw === null || raw === undefined ? "" : String(raw).trim();
+  if (trimmed === "") return { value: null, unit: fallbackUnit };
 
+  // Fold a textual unit spelling onto its symbol when this picker uses one,
+  // so '5.6kOhm' matches the kΩ option (see UNIT_SPELLING_ALIASES).
+  const aliasPattern = UNIT_SPELLING_ALIASES[fallbackUnit];
+  const text = aliasPattern ? trimmed.replace(aliasPattern, fallbackUnit) : trimmed;
   const lowerText = text.toLowerCase();
   let match: string | undefined;
   let bestScore = -1;
