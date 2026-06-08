@@ -1,6 +1,4 @@
 /**
- * @vitest-environment happy-dom
- *
  * Pins the core-row " Component" suffix trim in resolveNavItemLabels.
  */
 import { describe, expect, it, vi } from "vitest";
