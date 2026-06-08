@@ -13,7 +13,6 @@ vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-component-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-config-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-script-dialog.js", () => ({}));
-vi.mock("../../../src/components/device/device-navigator-search.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
@@ -42,8 +41,16 @@ async function mountNavigator(query = ""): Promise<ESPHomeDeviceNavigator> {
   document.body.appendChild(nav);
   await nav.updateComplete;
   if (query) {
-    (nav as unknown as { _query: string })._query = query;
-    nav.requestUpdate();
+    // Drive filtering through the public ``navigator-search`` contract
+    // rather than the private query state.
+    const search = nav.shadowRoot!.querySelector("esphome-navigator-search")!;
+    search.dispatchEvent(
+      new CustomEvent("navigator-search", {
+        detail: { value: query },
+        bubbles: true,
+        composed: true,
+      })
+    );
     await nav.updateComplete;
   }
   return nav;
