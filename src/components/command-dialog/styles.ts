@@ -27,7 +27,6 @@ export const commandDialogStyles = css`
     color: var(--esphome-on-primary);
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
-    font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
   }
   esphome-base-dialog::part(body) {
     padding: 0;
@@ -49,7 +48,7 @@ export const commandDialogStyles = css`
     gap: 16px;
     padding: 24px;
     text-align: center;
-    font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
+    font-family: var(--term-mono-font);
     color: var(--term-fg);
     z-index: 1;
   }
@@ -91,7 +90,7 @@ export const commandDialogStyles = css`
     gap: 8px;
     padding: 8px 20px;
     border-bottom: 1px solid var(--term-border);
-    font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
+    font-family: var(--term-mono-font);
     font-size: 12px;
     color: var(--wa-color-text-quiet, #888);
   }
@@ -133,7 +132,7 @@ export const commandDialogStyles = css`
     padding: 10px 20px;
     border-top: 1px solid var(--term-border);
     background: var(--term-bg-alt);
-    font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
+    font-family: var(--term-mono-font);
     font-size: 12px;
     line-height: 1.5;
     color: var(--term-fg-muted);

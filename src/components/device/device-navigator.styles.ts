@@ -112,6 +112,14 @@ export const deviceNavigatorStyles = css`
     flex-shrink: 0;
   }
 
+  .nav-empty {
+    padding: var(--wa-space-l) var(--wa-space-m);
+    margin: 0;
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-quiet);
+    text-align: center;
+  }
+
   .nav-content {
     display: flex;
     align-items: center;

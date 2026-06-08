@@ -45,6 +45,7 @@ import {
   subscribePinRegistryModes,
 } from "../../util/pin-registry-modes-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 import {
   _isStructuralType,
   filterRenderable,
@@ -120,8 +121,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @state()
   private _devices: ConfiguredDevice[] = [];
 
-  private _unsubPinRegistryModes?: () => void;
-  private _pinRegistryModesKicked = false;
+  // Repaints the form (scoping the pin Mode checkboxes) once the shared
+  // pin-registry-modes map arrives, and kicks the fetch when the api lands.
+  private _pinRegistryModes = new SessionBlobCacheController<Record<string, string[]>>(
+    this,
+    {
+      getCached: getCachedPinRegistryModes,
+      subscribe: subscribePinRegistryModes,
+      fetch: fetchPinRegistryModes,
+    },
+    () => this._api
+  );
 
   /** Schema entries to render (recursive — NESTED entries contain
    *  their own `config_entries`). */
@@ -275,21 +285,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
     )}`;
   }
 
-  /** Subscribe to the shared pin-registry-modes cache so the form repaints
-   *  (scoping the pin Mode checkboxes) once the map arrives. */
-  connectedCallback(): void {
-    super.connectedCallback();
-    // Re-render when the shared pin-registry-modes map populates so the pin
-    // Mode checkboxes scope once it arrives.
-    this._unsubPinRegistryModes = subscribePinRegistryModes(() => this.requestUpdate());
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._unsubPinRegistryModes?.();
-    this._unsubPinRegistryModes = undefined;
-  }
-
   protected willUpdate(changed: PropertyValues) {
     // A different entry list means the form was re-targeted to a
     // different component (e.g. the dep-flow detour swapping
@@ -313,12 +308,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
     super.updated(changed);
     void this._syncSelectValues();
     this._fieldScroll.maybeScroll(changed);
-    // Kick the shared fetch once, when the api context first lands — not on
-    // every render. The cache + subscribe handle dedupe and the repaint.
-    if (this._api && !this._pinRegistryModesKicked) {
-      this._pinRegistryModesKicked = true;
-      void fetchPinRegistryModes(this._api);
-    }
   }
 
   /**
@@ -613,7 +602,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       sectionKey: this.sectionKey,
       deviceName: resolveDeviceName(this._devices, this.configuration),
       board: this.board,
-      pinRegistryModes: getCachedPinRegistryModes(),
+      pinRegistryModes: this._pinRegistryModes.value,
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
