@@ -5,6 +5,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { ESPHomeLogParser } from "../../util/esphome-log-parser.js";
 import {
   connectToPort,
@@ -37,7 +38,7 @@ export async function archiveDevice(
   try {
     await api.archiveDevice(device.configuration);
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
+    const error = getErrorMessage(err);
     toast.error(localize("dashboard.action_archive_failed", { name, error }), {
       richColors: true,
     });
@@ -79,7 +80,7 @@ export async function unarchiveDevice(
   try {
     await api.unarchiveDevice(device.configuration);
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
+    const error = getErrorMessage(err);
     toast.error(localize("dashboard.action_unarchive_failed", { name, error }), {
       richColors: true,
     });
@@ -106,7 +107,7 @@ export async function deleteArchivedDevice(
   try {
     await api.deleteArchivedDevice(device.configuration);
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
+    const error = getErrorMessage(err);
     toast.error(localize("dashboard.action_delete_archived_failed", { name, error }), {
       richColors: true,
     });

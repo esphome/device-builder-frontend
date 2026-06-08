@@ -39,6 +39,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
@@ -322,7 +323,7 @@ export class ESPHomeApiActionEditor extends LitElement {
     try {
       if (this.configuration) await this._loadAvailable();
     } catch (err) {
-      this._error = err instanceof Error ? err.message : String(err);
+      this._error = getErrorMessage(err);
     } finally {
       this._loading = false;
     }

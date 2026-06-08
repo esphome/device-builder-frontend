@@ -37,6 +37,7 @@ import {
 } from "../../util/config-entry-yaml-scan.js";
 import { type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   fetchPinRegistryModes,
@@ -477,7 +478,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         { key: entry.key, type: entry.type, path },
         err
       );
-      const message = err instanceof Error ? err.message : String(err);
+      const message = getErrorMessage(err);
       return html`<div class="render-error" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div>

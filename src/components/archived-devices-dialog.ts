@@ -7,6 +7,7 @@ import type { ArchivedDevice } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { getErrorMessage } from "../util/error-message.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -262,7 +263,7 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
     try {
       this._devices = await this._api.listArchivedDevices();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = getErrorMessage(err);
       this._error = msg;
       this._devices = [];
     } finally {

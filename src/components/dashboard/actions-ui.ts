@@ -6,6 +6,7 @@ import type {
   Label,
 } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
 import { attachSerialLogStream } from "../../util/post-install-logs.js";
@@ -21,7 +22,7 @@ export async function executeFriendlyName(
   try {
     result = await host._api.editFriendlyName(device.configuration, newFriendlyName);
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+    const reason = getErrorMessage(err);
     toast.error(
       host._localize("dashboard.action_friendly_name_failed", {
         name: device.name,
@@ -66,7 +67,7 @@ export async function executeClone(
     const friendly = newFriendlyName.length > 0 ? newFriendlyName : undefined;
     await host._api.cloneDevice(device.configuration, newName, friendly);
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+    const reason = getErrorMessage(err);
     toast.error(
       host._localize("dashboard.action_clone_failed", {
         name: device.name,
