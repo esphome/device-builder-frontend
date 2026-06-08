@@ -34,6 +34,13 @@ import {
 import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
+import { type NavigatorBuckets, deriveNavigatorBuckets } from "./navigator-buckets.js";
+import {
+  type LabelContext,
+  type NavRow,
+  resolveNavItemLabels,
+} from "./navigator-labels.js";
+import { type NavAction, renderNavSection } from "./navigator-render.js";
 import { navItemMatches } from "./navigator-search-match.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -59,12 +66,6 @@ registerMdiIcons({
   "plus-circle-outline": mdiPlusCircleOutline,
   "script-text-outline": mdiScriptTextOutline,
 });
-
-/** A nav row paired with its resolved display labels. */
-interface NavRow {
-  item: YamlSection;
-  labels: { primary: string; secondary?: string };
-}
 
 @customElement("esphome-device-navigator")
 export class ESPHomeDeviceNavigator extends LitElement {
@@ -99,39 +100,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @property({ attribute: false })
   yaml = "";
 
-  /** Derive the three navigator buckets (core, components,
-   *  automations) from the YAML string. Memoised on the YAML
-   *  source so the parse + categorize + filter + sort pipeline
-   *  runs once per YAML edit, not per render. Two parser passes
-   *  and three list traversals collapse into a single cached
-   *  result. The render path destructures from this object. */
-  private _deriveBuckets = memoizeOne((yaml: string) => {
-    const {
-      core,
-      components,
-      automations: topLevelAutomations,
-    } = categorizeSections(parseYamlTopLevelSections(yaml));
-    // ``parseYamlAutomations`` enumerates individual ``script:`` /
-    // ``interval:`` list items as stable-keyed entries; drop the
-    // bare top-level blocks so each automation shows up exactly
-    // once.
-    const detailed = parseYamlAutomations(yaml);
-    const filteredTopLevel = topLevelAutomations.filter(
-      (s) => s.key !== "script" && s.key !== "interval"
-    );
-    // Drop ``light_effect`` (managed via the parent light's section
-    // editor) and ``unscoped`` entries (inline ``on_*:`` handlers
-    // on id-less components that the structured editor can't
-    // address).
-    const automations = [...filteredTopLevel, ...detailed]
-      .filter(
-        (s) =>
-          !s.key.startsWith("automation:light_effect:") &&
-          !s.key.startsWith("automation:unscoped:")
-      )
-      .sort((a, b) => a.fromLine - b.fromLine);
-    return { core, components, automations };
-  });
+  /** Memoised on the YAML source so the parse pipeline runs once per
+   *  edit, not per render. See {@link deriveNavigatorBuckets}. */
+  private _deriveBuckets = memoizeOne(deriveNavigatorBuckets);
 
   /** Resolve every row's labels, indexed [core, components, automations]
    *  to match the section order. Memoised on the parsed buckets plus the
@@ -141,26 +112,33 @@ export class ESPHomeDeviceNavigator extends LitElement {
    *  args exist solely to invalidate the memo. */
   private _resolveLabels = memoizeOne(
     (
-      buckets: {
-        core: YamlSection[];
-        components: YamlSection[];
-        automations: YamlSection[];
-      },
+      buckets: NavigatorBuckets,
       _tick: number,
-      _platform: string,
-      _deviceName: string,
-      _localize: LocalizeFunc
-    ): NavRow[][] => [
-      buckets.core.map((item) => ({ item, labels: this._navItemLabels(item, "core") })),
-      buckets.components.map((item) => ({
-        item,
-        labels: this._navItemLabels(item, "component"),
-      })),
-      buckets.automations.map((item) => ({
-        item,
-        labels: this._navItemLabels(item, "automation"),
-      })),
-    ]
+      platform: string,
+      deviceName: string,
+      localize: LocalizeFunc
+    ): NavRow[][] => {
+      const ctx: LabelContext = {
+        triggerCatalog: this._triggerCatalog,
+        platform,
+        deviceName,
+        localize,
+      };
+      return [
+        buckets.core.map((item) => ({
+          item,
+          labels: resolveNavItemLabels(item, "core", ctx),
+        })),
+        buckets.components.map((item) => ({
+          item,
+          labels: resolveNavItemLabels(item, "component", ctx),
+        })),
+        buckets.automations.map((item) => ({
+          item,
+          labels: resolveNavItemLabels(item, "automation", ctx),
+        })),
+      ];
+    }
   );
 
   /** Optional board metadata; forwarded to the add-component dialog so
@@ -285,11 +263,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
     const buckets = this._deriveBuckets(this.yaml);
     const { core, components, automations } = buckets;
 
-    interface NavAction {
-      label: string;
-      icon: string;
-      onClick: () => void;
-    }
     interface NavSection {
       label: string;
       desc: string;
@@ -448,97 +421,30 @@ export class ESPHomeDeviceNavigator extends LitElement {
             ? html`<p class="nav-empty" role="status">
                 ${this._localize("device.navigator_search_none")}
               </p>`
-            : sections.map(({ label, desc, icon, actions }, i) => {
-                const open = filtering ? true : this.openSections.has(i);
-                // Filtered rows come from the pre-pass; otherwise the
-                // section's full (memoised) row set.
-                const rows = matches?.[i] ?? resolved[i];
-                // While filtering, drop sections with no matches entirely.
-                if (filtering && rows.length === 0) return nothing;
-                return html`
-                  <div
-                    class="nav-content"
-                    @click=${() => {
-                      if (!filtering) this._toggleSection(i);
-                    }}
-                  >
-                    <div class="nav-content-label">
-                      <wa-icon library="mdi" name=${icon}></wa-icon>
-                      <p>${label}</p>
-                    </div>
-                    ${filtering
-                      ? nothing
-                      : html`<wa-icon
-                          class="nav-content-chevron"
-                          library="mdi"
-                          name=${open ? "chevron-up" : "chevron-down"}
-                        ></wa-icon>`}
-                  </div>
-                  ${open
-                    ? html`
-                        <div class="separator"></div>
-                        ${filtering ? nothing : html`<p class="italic">${desc}</p>`}
-                        ${rows.length > 0
-                          ? html`<div class="nav-items">
-                              ${rows.map(({ item, labels }) =>
-                                this._renderNavItem(item, labels)
-                              )}
-                            </div>`
-                          : nothing}
-                        ${filtering
-                          ? nothing
-                          : html`<div class="nav-items">
-                              ${actions.map((action) => this._renderActionItem(action))}
-                            </div>`}
-                      `
-                    : nothing}
-                  <div class="separator"></div>
-                `;
-              })}
+            : sections.map(({ label, desc, icon, actions }, i) =>
+                renderNavSection({
+                  label,
+                  desc,
+                  icon,
+                  actions,
+                  // Filtered rows from the pre-pass; else the full set.
+                  rows: matches?.[i] ?? resolved[i],
+                  open: filtering ? true : this.openSections.has(i),
+                  filtering,
+                  selectedLine: this._selectedLine,
+                  hoveredLine: this._hoveredLine,
+                  onToggle: () => {
+                    if (!filtering) this._toggleSection(i);
+                  },
+                  onItemEnter: (item) =>
+                    this._onItemHover(item.fromLine, item.fromLine, item.toLine),
+                  onItemLeave: () => this._onItemLeave(),
+                  onItemClick: (item) => this._onItemClick(item),
+                })
+              )}
         </div>
       </section>
     `;
-  }
-
-  /** One navigator row; shared by the filtered and unfiltered paths. */
-  private _renderNavItem(
-    item: YamlSection,
-    labels: { primary: string; secondary?: string }
-  ) {
-    const { primary, secondary } = labels;
-    return html`
-      <div
-        class="nav-item ${this._selectedLine === item.fromLine
-          ? "nav-item--selected"
-          : ""} ${this._hoveredLine === item.fromLine ? "nav-item--hovered" : ""}"
-        @mouseenter=${() => this._onItemHover(item.fromLine, item.fromLine, item.toLine)}
-        @mouseleave=${() => this._onItemLeave()}
-        @click=${() => this._onItemClick(item)}
-      >
-        <div class="nav-item-content">
-          <p>${primary}</p>
-          ${secondary
-            ? html`<span class="nav-item-subtitle">${secondary}</span>`
-            : nothing}
-        </div>
-        <wa-icon library="mdi" name="chevron-right"></wa-icon>
-      </div>
-    `;
-  }
-
-  /** One "+ Add X" affordance at the foot of a section. */
-  private _renderActionItem(action: {
-    label: string;
-    icon: string;
-    onClick: () => void;
-  }) {
-    return html`<div class="action-item" @click=${() => action.onClick()}>
-      <div>
-        <wa-icon library="mdi" name=${action.icon}></wa-icon>
-        <p>${action.label}</p>
-      </div>
-      <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
-    </div>`;
   }
 
   private _onSearchChange = (e: CustomEvent<{ value: string }>) => {
@@ -604,119 +510,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // "Switch → On Turn On" instead of the raw YAML key. The
     // controller re-renders the host when the fetch lands.
     this._triggerCatalog.ensure();
-  }
-
-  /**
-   * Decide what to show on the two lines of a nav item.
-   *
-   *   line 1 (primary)   the catalog's friendly name (e.g.
-   *                      "GPIO Binary Sensor") once resolved.
-   *                      Falls back to <domain>.<platform> (or just
-   *                      the domain for core keys like `wifi`) until
-   *                      the cache is populated, or when no catalog
-   *                      entry exists (typically: automations).
-   *   line 2 (secondary) the user-supplied `name:` if present, else
-   *                      the `id:`. Hidden when neither is set or
-   *                      when it's identical to the primary.
-   */
-  private _navItemLabels(
-    item: YamlSection,
-    category: "core" | "component" | "automation"
-  ): { primary: string; secondary?: string } {
-    const raw = sectionKeyOf(item);
-
-    if (category === "automation") {
-      return this._automationLabels(item, raw);
-    }
-
-    let primary = raw;
-    const cached = getCachedComponent(raw, this.platform || undefined);
-    if (cached?.name) primary = cached.name;
-
-    // Prefer the backend-resolved node name for the esphome core
-    // section so a `name: $devicename` substitution shows the
-    // expanded hostname, not the raw scalar. Falls back to the raw
-    // YAML value for a new/unsaved device not yet in the devices list.
-    const named =
-      category === "core" && item.key === "esphome" && this.deviceName
-        ? this.deviceName
-        : item.name || item.id;
-    const secondary = named && named !== primary ? named : undefined;
-
-    return { primary, secondary };
-  }
-
-  /**
-   * Two-line layout for automation entries — keeps the navigator
-   * consistent with how components render (catalog name on top,
-   * instance name/id below):
-   *
-   *   on_*: under a component  →  "Switch → Turn on" / instance name+id
-   *   script entry             →  "Script"           / id
-   *   interval entry           →  "Interval"         / "Every 60s"
-   *
-   * The catalog-derived "Switch" / "Turn on" pair comes from the
-   * automation triggers catalog. While the catalog is still loading
-   * we render a graceful fallback ("Switch → on_turn_on") so the
-   * navigator never blanks out on first paint.
-   */
-  private _automationLabels(
-    item: YamlSection,
-    raw: string
-  ): { primary: string; secondary?: string } {
-    // Script: line 1 = "Script", line 2 = id.
-    if (item.parentKey === "script") {
-      const primary = this._localize("device.script_header_title_static");
-      const secondary = item.id ?? raw;
-      return { primary, secondary: secondary !== primary ? secondary : undefined };
-    }
-    // Interval: line 1 = "Interval", line 2 = the time if known.
-    // Uses the bare "automation_interval_label" key (not the
-    // longer-form "On an interval" used by the kind picker) so the
-    // nav row stays scannable.
-    if (item.parentKey === "interval") {
-      const primary = this._localize("device.automation_interval_label");
-      const every = item.meta?.every;
-      const secondary = every
-        ? this._localize("device.automation_interval_every_n", { time: every })
-        : undefined;
-      return { primary, secondary };
-    }
-    // Device-level (``esphome → on_boot``) — no instance to show on
-    // line 2; keep line 2 empty since the trigger name already
-    // identifies the automation uniquely.
-    if (item.parentKey === "esphome" && item.eventKey) {
-      const primary = this._triggerCatalog.resolveName(
-        "esphome",
-        item.eventKey,
-        `${this._prettyDomain("esphome")} → ${item.eventKey}`
-      );
-      return { primary };
-    }
-    // Component-bound (``Switch → On Turn On`` resolved from the
-    // catalog; "Warmtepomp" on line 2).
-    if (item.parentKey && item.eventKey) {
-      const fallback = `${this._prettyDomain(item.parentKey)} → ${item.eventKey}`;
-      const primary = this._triggerCatalog.resolveName(
-        item.parentKey,
-        item.eventKey,
-        fallback
-      );
-      const named = item.name || item.id;
-      const secondary = named && named !== primary ? named : undefined;
-      return { primary, secondary };
-    }
-    // Unscoped / unrecognised — fall back to displayLabel.
-    return { primary: item.displayLabel || raw };
-  }
-
-  /** Capitalize a YAML domain key for display (``binary_sensor`` →
-   *  ``Binary sensor``). Used only for the pre-catalog fallback
-   *  label so the navigator never shows a raw lowercase domain
-   *  while the trigger fetch is still in flight. */
-  private _prettyDomain(domain: string): string {
-    const spaced = domain.replace(/_/g, " ");
-    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
   }
 
   private _onItemHover(line: number, fromLine: number, toLine: number) {
