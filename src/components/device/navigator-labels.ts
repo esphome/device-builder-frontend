@@ -50,6 +50,11 @@ export function resolveNavItemLabels(
   let primary = raw;
   const cached = getCachedComponent(raw, ctx.platform || undefined);
   if (cached?.name) primary = cached.name;
+  if (category === "core") {
+    // Core infrastructure names carry a redundant " Component" suffix
+    // ("Native API Component", "Logger Component"); trim it for the nav.
+    primary = primary.replace(/ Component$/, "") || primary;
+  }
 
   // Prefer the backend-resolved node name for the esphome core section
   // so a `name: $devicename` substitution shows the expanded hostname,
