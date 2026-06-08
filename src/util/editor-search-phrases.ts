@@ -5,9 +5,8 @@ import type { LocalizeFunc } from "../common/localize.js";
 /**
  * Localize CodeMirror's search / goto-line panel via the `phrases` facet.
  *
- * Keys MUST be the verbatim English source strings `@codemirror/search`
- * passes to `state.phrase(...)`. `$` is CodeMirror's positional arg slot,
- * substituted after lookup, so it stays in the value untouched.
+ * Keys are the verbatim source strings `@codemirror/search` looks up; keep
+ * the `$` positional slot, which CodeMirror substitutes after lookup.
  */
 export function editorSearchPhrases(localize: LocalizeFunc): Extension {
   return EditorState.phrases.of({

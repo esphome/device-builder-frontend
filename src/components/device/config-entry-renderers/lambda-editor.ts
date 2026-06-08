@@ -41,7 +41,8 @@ export class ESPHomeLambdaEditor extends LitElement {
   @state()
   private _darkMode = false;
 
-  @consume({ context: localizeContext, subscribe: true })
+  // Not subscribed: phrases are captured at mount, so the panel localizes at mount only.
+  @consume({ context: localizeContext })
   @state()
   private _localize: LocalizeFunc = (key) => key;
 

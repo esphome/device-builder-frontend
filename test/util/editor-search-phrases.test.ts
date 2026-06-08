@@ -32,9 +32,7 @@ describe("editorSearchPhrases", () => {
   });
 
   it("keeps CodeMirror's $ positional slot so announcements interpolate", () => {
-    // CodeMirror substitutes $ with the passed argument after lookup, so the
-    // translated value must still contain $. A localize that returns the
-    // English source proves the slot survives our facet.
+    // CM substitutes $ after lookup, so the value must keep its $.
     const state = phraseState((key) =>
       key === "editor_search.replaced_matches" ? "replaced $ matches" : key
     );
