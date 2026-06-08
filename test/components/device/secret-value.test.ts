@@ -242,6 +242,29 @@ describe("esphome-secret-value", () => {
     expect(copyBtn().disabled).toBe(false);
   });
 
+  it("shows an error with retry (not an empty editable field) when the load fails", async () => {
+    let calls = 0;
+    const api = {
+      getConfig: vi.fn(async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("ws blip");
+        return "api_key: real\n";
+      }),
+    } as unknown as ESPHomeAPI;
+    const el = await mount(api, "api_key", true);
+
+    // Failed read → error state, no editable field to overwrite the real value.
+    expect(el.shadowRoot!.querySelector(".msg")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector("esphome-password-input")).toBeNull();
+    expect(toast.error).toHaveBeenCalled();
+
+    // Retry re-fetches and recovers.
+    await click(el, ".retry");
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    expect(pwInput(el).value).toBe("real");
+  });
+
   it("fetches the stored value once despite re-renders during the load", async () => {
     let resolveGet!: (yaml: string) => void;
     const api = {

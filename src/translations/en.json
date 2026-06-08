@@ -717,6 +717,7 @@
     "secret_picker_missing_error": "Couldn't create the secret",
     "secret_picker_save": "Save",
     "secret_picker_saved": "Updated {key} in secrets.yaml",
+    "secret_picker_retry": "Retry",
     "secret_picker_shared_confirm_title": "Change shared secret?",
     "secret_picker_shared_confirm_message": "\"{key}\" is shared; other devices that use it will get the new value too.",
     "secret_picker_save_error": "Couldn't save the secret",

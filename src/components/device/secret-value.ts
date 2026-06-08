@@ -64,6 +64,9 @@ export class ESPHomeSecretValue extends LitElement {
    *  while missing). Save is enabled only when the draft diverges from it. */
   @state() private _stored: string | null = null;
   @state() private _busy = false;
+  /** The stored-value read failed — show an error instead of an empty editable
+   *  field, so a transient failure can't be saved over the real secret. */
+  @state() private _loadError = false;
   /** Cancels a stale load when the target changes mid-fetch. */
   private _loadToken = 0;
   /** A `_loadStored()` fetch is in flight — dedupes the `updated()` kick so a
@@ -79,6 +82,7 @@ export class ESPHomeSecretValue extends LitElement {
       this._stored = null;
       this._busy = false;
       this._loading = false;
+      this._loadError = false;
       this._loadToken++;
     }
   }
@@ -90,7 +94,8 @@ export class ESPHomeSecretValue extends LitElement {
       this.secretKey &&
       this._api &&
       this._stored === null &&
-      !this._loading
+      !this._loading &&
+      !this._loadError
     ) {
       void this._loadStored();
     }
@@ -160,6 +165,16 @@ export class ESPHomeSecretValue extends LitElement {
       font-size: 15px;
     }
 
+    .retry {
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: var(--esphome-primary);
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
     .save {
       padding: 0 14px;
       min-height: var(--wa-form-control-height);
@@ -209,6 +224,7 @@ export class ESPHomeSecretValue extends LitElement {
 
   /** Existing secret: the value is directly editable; Save when it changes. */
   private _renderEdit() {
+    if (this._loadError) return this._renderLoadError();
     return html`<div class="row">
         ${this._renderInput()}
         <button
@@ -238,6 +254,20 @@ export class ESPHomeSecretValue extends LitElement {
         })}
         @confirm=${this._persist}
       ></esphome-confirm-dialog>`;
+  }
+
+  /** The stored value couldn't be read — surface it with a retry rather than an
+   *  empty editable field that could be saved over the real secret. */
+  private _renderLoadError() {
+    return html`<div class="fix">
+      <span class="msg" role="alert">
+        <wa-icon library="mdi" name="alert"></wa-icon>
+        ${this._localize("device.secret_picker_reveal_error")}
+        <button class="retry" type="button" @click=${this._retry}>
+          ${this._localize("device.secret_picker_retry")}
+        </button>
+      </span>
+    </div>`;
   }
 
   /** Missing secret: warn and offer to create it inline. */
@@ -291,21 +321,35 @@ export class ESPHomeSecretValue extends LitElement {
     const token = ++this._loadToken;
     this._loading = true;
     let value: string | null = null;
+    let failed = false;
     try {
       const yaml = await this._api!.getConfig(SECRETS_FILE);
       value = secretValueFromYaml(yaml, this.secretKey);
     } catch {
+      failed = true;
       toast.error(this._localize("device.secret_picker_reveal_error"), {
         richColors: true,
       });
     }
     // A newer load (or target change) superseded this one — it now owns
-    // `_loading`, so don't clear it or apply this stale value.
+    // `_loading`, so don't clear it or apply this stale result.
     if (token !== this._loadToken) return;
     this._loading = false;
+    // On failure show the error state rather than `""` — an empty editable
+    // field reads as "this secret is empty" and could be saved over the real
+    // value. `_stored` stays null so the field never enables.
+    if (failed) {
+      this._loadError = true;
+      return;
+    }
     this._stored = value ?? "";
     this._draftValue = this._stored;
   }
+
+  /** Clear the error so `updated()` re-kicks the stored-value fetch. */
+  private _retry = (): void => {
+    this._loadError = false;
+  };
 
   private _copy = async (): Promise<void> => {
     if (await copyToClipboard(this._draftValue)) {
