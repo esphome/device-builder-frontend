@@ -5,7 +5,7 @@
  * literal sentinel as a config value.
  */
 
-import { html } from "lit";
+import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { findReferenceCandidates } from "../../util/config-entry-yaml-scan.js";
 import {
@@ -35,7 +35,31 @@ export function renderIdReferenceField(
   if (bail) return bail;
   const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
-  const empty = candidates.length === 0;
+
+  const idOption = (optValue: string, primary: string, secondary: string) => html`
+    <wa-option
+      class="id-option"
+      value=${optValue}
+      .label=${primary}
+      ?selected=${optValue === value}
+    >
+      <span class="id-option-stack">
+        <span class="id-option-primary">${primary}</span>
+        <span class="id-option-secondary">${secondary}</span>
+      </span>
+    </wa-option>
+  `;
+
+  // The current id may not be a local candidate: defined in a `packages:`
+  // include / another file the scan can't see, or a dangling reference (typo,
+  // deleted id). We can't tell which, so surface it as a selected option with
+  // provenance-neutral copy rather than dropping it on save.
+  const hasOrphanValue = value !== "" && !candidates.some((c) => c.id === value);
+  const orphanOption = hasOrphanValue
+    ? idOption(value, value, ctx.localize("device.id_reference_unresolved", { domain }))
+    : nothing;
+  // Solo "Add new" CTA only when there's genuinely nothing to show.
+  const empty = candidates.length === 0 && !hasOrphanValue;
 
   const onChange = (e: Event) => {
     const select = e.target as HTMLSelectElement;
@@ -93,21 +117,9 @@ export function renderIdReferenceField(
         ?disabled=${effectiveDisabled(entry, ctx)}
         @change=${onChange}
       >
-        ${candidates.map(
-          (c) =>
-            html`<wa-option
-              class="id-option"
-              value=${c.id}
-              .label=${c.name || c.id}
-              ?selected=${c.id === value}
-            >
-              <span class="id-option-stack">
-                <span class="id-option-primary">${c.name || c.id}</span>
-                <span class="id-option-secondary"
-                  >${c.name ? `${c.id} · ${domain}` : domain}</span
-                >
-              </span>
-            </wa-option>`
+        ${orphanOption}
+        ${candidates.map((c) =>
+          idOption(c.id, c.name || c.id, c.name ? `${c.id} · ${domain}` : domain)
         )}
         ${addOption}
       </wa-select>

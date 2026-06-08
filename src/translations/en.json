@@ -870,6 +870,7 @@
     "missing_dependencies_add": "Add {domain}",
     "id_reference_empty": "No {domain} configured yet",
     "id_reference_add": "Add {domain}",
+    "id_reference_unresolved": "{domain} not defined in this file",
     "return_to_after_dep_prefix": "Adding a dependency. We'll bring you back to",
     "return_to_after_dep_suffix": "after.",
     "add_automation_error": "Failed to add automation",
