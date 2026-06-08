@@ -301,8 +301,7 @@ describe("esphome-secret-picker", () => {
   it("migrates an inline value into the preferred (double-underscore) secret", async () => {
     const el = await mount([]); // neither recommended form on disk yet
     const api = {
-      getConfig: vi.fn(async () => "wifi_ssid: x\n"),
-      updateConfig: vi.fn(async () => {}),
+      setSecret: vi.fn(async () => ({ created: true })),
       getSecretKeys: vi.fn(async () => []),
     } as unknown as ESPHomeAPI;
     (el as unknown as { _api: ESPHomeAPI })._api = api;
@@ -319,13 +318,12 @@ describe("esphome-secret-picker", () => {
     fireSelectItem(el, ".migrate");
     await new Promise((r) => setTimeout(r, 0)); // let the async write settle
 
-    expect(api.updateConfig).toHaveBeenCalledTimes(1);
-    const [file, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(file).toBe("secrets.yaml");
-    // The double-underscore form is created, never the back-compat alias.
-    expect(content).toContain("kitchen__ota_password: plaintextpw");
-    expect(content).not.toContain("kitchen_ota_password: plaintextpw");
-    expect(content).toContain("wifi_ssid: x");
+    // The double-underscore form is created (create-if-absent), never the alias.
+    expect(api.setSecret).toHaveBeenCalledWith(
+      "kitchen__ota_password",
+      "plaintextpw",
+      false
+    );
     expect(saved).toHaveBeenCalled();
     expect((onSelected.mock.calls[0][0] as CustomEvent).detail.value).toBe(
       "!secret kitchen__ota_password"
@@ -333,13 +331,12 @@ describe("esphome-secret-picker", () => {
     window.removeEventListener("secrets-saved", saved as EventListener);
   });
 
-  it("aborts the migration (no write, no field change) when the read fails", async () => {
+  it("aborts the migration (no field change) when the write fails", async () => {
     const el = await mount([]);
     const api = {
-      getConfig: vi.fn(async () => {
+      setSecret: vi.fn(async () => {
         throw new Error("ws blip");
       }),
-      updateConfig: vi.fn(async () => {}),
       getSecretKeys: vi.fn(async () => []),
     } as unknown as ESPHomeAPI;
     (el as unknown as { _api: ESPHomeAPI })._api = api;
@@ -353,17 +350,15 @@ describe("esphome-secret-picker", () => {
     fireSelectItem(el, ".migrate");
     await new Promise((r) => setTimeout(r, 0));
 
-    // A read failure must never lead to a write that could clobber secrets.yaml.
-    expect(api.updateConfig).not.toHaveBeenCalled();
+    // A failed write must never change the field to a !secret ref.
     expect(onSelected).not.toHaveBeenCalled();
   });
 
-  it("points at the existing key instead of appending a duplicate (stale cache)", async () => {
-    // Cache says empty, but the freshly-read file already defines the key.
+  it("points at the existing key instead of appending a duplicate", async () => {
+    // The backend reports the key already existed (create-if-absent left it).
     const el = await mount([]);
     const api = {
-      getConfig: vi.fn(async () => "kitchen__ota_password: alreadythere\n"),
-      updateConfig: vi.fn(async () => {}),
+      setSecret: vi.fn(async () => ({ created: false })),
       getSecretKeys: vi.fn(async () => []),
     } as unknown as ESPHomeAPI;
     (el as unknown as { _api: ESPHomeAPI })._api = api;
@@ -377,9 +372,13 @@ describe("esphome-secret-picker", () => {
     fireSelectItem(el, ".migrate");
     await new Promise((r) => setTimeout(r, 0));
 
-    // No duplicate write; just reference the existing key, with a distinct
+    // create-if-absent left the existing value; reference the key with a distinct
     // "linked" toast (its value may differ from what the user typed).
-    expect(api.updateConfig).not.toHaveBeenCalled();
+    expect(api.setSecret).toHaveBeenCalledWith(
+      "kitchen__ota_password",
+      "plaintextpw",
+      false
+    );
     expect(toast.info).toHaveBeenCalled();
     expect((onSelected.mock.calls[0][0] as CustomEvent).detail.value).toBe(
       "!secret kitchen__ota_password"

@@ -3,6 +3,7 @@
  *
  * Pins ensureSecretWithToast: created → success toast + createdKey, existing →
  * info toast + the shared "linked" key, failure → error toast + false return.
+ * The write goes through the atomic ``config/set_secret`` command (issue #1334).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -26,6 +27,14 @@ const messages = {
 };
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
+/** Stub API whose ``setSecret`` reports the given create/overwrite outcome. */
+function apiWith(created: boolean, keys: string[]) {
+  return {
+    setSecret: vi.fn(async () => ({ created })),
+    getSecretKeys: vi.fn(async () => keys),
+  } as unknown as ESPHomeAPI;
+}
+
 afterEach(() => {
   document.body.innerHTML = "";
   _resetSecretKeysCache();
@@ -35,48 +44,36 @@ afterEach(() => {
 });
 
 describe("ensureSecretWithToast", () => {
-  it("appends a new key, toasts success, refreshes the cache, and returns true", async () => {
-    const api = {
-      getConfig: vi.fn(async () => "other: x\n"),
-      updateConfig: vi.fn(async () => {}),
-      getSecretKeys: vi.fn(async () => ["other", "k"]),
-    } as unknown as ESPHomeAPI;
+  it("creates a new key, toasts success, refreshes the cache, and returns true", async () => {
+    const api = apiWith(true, ["other", "k"]);
 
     const ok = await ensureSecretWithToast(api, "k", "v", localize, messages);
     await flush();
 
     expect(ok).toBe(true);
-    const [, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(content).toContain("k: v");
+    expect(api.setSecret).toHaveBeenCalledWith("k", "v", false);
     expect(toast.success).toHaveBeenCalledWith("device.created", { richColors: true });
     expect(api.getSecretKeys).toHaveBeenCalled();
   });
 
-  it("links to an existing key (no write), toasts info, and still refreshes the cache", async () => {
-    const api = {
-      getConfig: vi.fn(async () => "k: existing\n"),
-      updateConfig: vi.fn(async () => {}),
-      getSecretKeys: vi.fn(async () => ["k"]),
-    } as unknown as ESPHomeAPI;
+  it("links to an existing key, toasts info, and still refreshes the cache", async () => {
+    const api = apiWith(false, ["k"]);
 
     const ok = await ensureSecretWithToast(api, "k", "v", localize, messages);
     await flush();
 
     expect(ok).toBe(true);
-    expect(api.updateConfig).not.toHaveBeenCalled();
     expect(toast.info).toHaveBeenCalledWith("device.secret_picker_linked", {
       richColors: true,
     });
-    // The linked path doesn't fire secrets-saved, so the cache is refreshed here.
     expect(api.getSecretKeys).toHaveBeenCalled();
   });
 
-  it("toasts an error, returns false, and skips the refresh when the read fails", async () => {
+  it("toasts an error, returns false, and skips the refresh when the write fails", async () => {
     const api = {
-      getConfig: vi.fn(async () => {
+      setSecret: vi.fn(async () => {
         throw new Error("ws blip");
       }),
-      updateConfig: vi.fn(async () => {}),
       getSecretKeys: vi.fn(async () => []),
     } as unknown as ESPHomeAPI;
 
@@ -84,7 +81,6 @@ describe("ensureSecretWithToast", () => {
     await flush();
 
     expect(ok).toBe(false);
-    expect(api.updateConfig).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith("device.error", { richColors: true });
     expect(api.getSecretKeys).not.toHaveBeenCalled();
   });
@@ -98,28 +94,22 @@ describe("setSecretWithToast", () => {
   };
 
   it("overwrites the value, toasts success, and refreshes the cache", async () => {
-    const api = {
-      getConfig: vi.fn(async () => "k: old\n"),
-      updateConfig: vi.fn(async () => {}),
-      getSecretKeys: vi.fn(async () => ["k"]),
-    } as unknown as ESPHomeAPI;
+    const api = apiWith(false, ["k"]);
 
     const ok = await setSecretWithToast(api, "k", "new", localize, setMessages);
     await flush();
 
     expect(ok).toBe(true);
-    const [, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(content).toContain("k: new");
+    expect(api.setSecret).toHaveBeenCalledWith("k", "new", true);
     expect(toast.success).toHaveBeenCalledWith("device.saved", { richColors: true });
     expect(api.getSecretKeys).toHaveBeenCalled();
   });
 
   it("toasts an error, returns false, and skips the refresh on failure", async () => {
     const api = {
-      getConfig: vi.fn(async () => {
+      setSecret: vi.fn(async () => {
         throw new Error("ws blip");
       }),
-      updateConfig: vi.fn(async () => {}),
       getSecretKeys: vi.fn(async () => []),
     } as unknown as ESPHomeAPI;
 
@@ -127,7 +117,6 @@ describe("setSecretWithToast", () => {
     await flush();
 
     expect(ok).toBe(false);
-    expect(api.updateConfig).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith("device.error", { richColors: true });
     expect(api.getSecretKeys).not.toHaveBeenCalled();
   });

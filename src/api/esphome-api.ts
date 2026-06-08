@@ -100,6 +100,7 @@ function redactForLog(payload: unknown): unknown {
   // all of them should have their secrets redacted before logging.
   const containsSecret =
     (command !== null && command.startsWith("auth")) ||
+    command === "config/set_secret" ||
     "token" in obj ||
     "password" in obj ||
     (result !== null && ("token" in result || "password" in result));
@@ -112,6 +113,10 @@ function redactForLog(payload: unknown): unknown {
     const safeArgs: Record<string, unknown> = { ...args };
     if ("token" in safeArgs) safeArgs.token = "<redacted>";
     if ("password" in safeArgs) safeArgs.password = "<redacted>";
+    // config/set_secret carries the secret in ``value``.
+    if (command === "config/set_secret" && "value" in safeArgs) {
+      safeArgs.value = "<redacted>";
+    }
     clone.args = safeArgs;
   }
   if (result !== null) {
@@ -1683,6 +1688,24 @@ export class ESPHomeAPI {
   /** Get secret key names. */
   async getSecretKeys(): Promise<string[]> {
     return this.sendCommand<string[]>("config/get_secrets");
+  }
+
+  /**
+   * Atomically set one secret in secrets.yaml; returns whether it was newly
+   * created. The backend serialises the read-modify-write under a lock so
+   * concurrent per-key writes don't lose each other (issue #1334).
+   * ``overwrite=false`` leaves an existing key untouched (create-if-absent).
+   */
+  async setSecret(
+    key: string,
+    value: string,
+    overwrite = true
+  ): Promise<{ created: boolean }> {
+    return this.sendCommand<{ created: boolean }>("config/set_secret", {
+      key,
+      value,
+      overwrite,
+    });
   }
 
   /**

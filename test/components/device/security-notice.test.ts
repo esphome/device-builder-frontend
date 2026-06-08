@@ -143,65 +143,63 @@ describe("security-notice — generate", () => {
     sectionKey: string,
     yaml: string,
     fromLine: number,
-    getConfig: () => Promise<string>,
+    setSecretImpl: (
+      key: string,
+      value: string,
+      overwrite: boolean
+    ) => Promise<{ created: boolean }> = async () => ({ created: true }),
     devices = [{ name: "kitchen" }]
   ) {
-    const updateConfig = vi.fn().mockResolvedValue(undefined);
+    const setSecret = vi.fn(setSecretImpl);
     const { el, inner } = make(sectionKey, yaml, fromLine);
-    inner._api = { getConfig: vi.fn(getConfig), updateConfig } as Partial<ESPHomeAPI>;
+    inner._api = { setSecret } as Partial<ESPHomeAPI>;
     inner._devices = devices.map((d) => ({ ...d, configuration: "device.yaml" }));
     const applied: { path: string[]; value: string }[][] = [];
     el.addEventListener("apply-security-secrets", (e) =>
       applied.push((e as CustomEvent).detail.secrets)
     );
-    return { el, inner, updateConfig, applied };
+    return { el, inner, setSecret, applied };
   }
 
   it("api: writes the encryption key and references encryption.key", async () => {
-    const { inner, updateConfig, applied } = setup(
-      "api",
-      "api:\n  id: api_server\n",
-      1,
-      async () => "wifi_ssid: x\n"
-    );
+    const { inner, setSecret, applied } = setup("api", "api:\n  id: api_server\n", 1);
     await inner._onGenerate();
-    const [file, content] = updateConfig.mock.calls[0];
-    expect(file).toBe("secrets.yaml");
-    expect(content).toMatch(/kitchen__encryption_key: [A-Za-z0-9+/]{43}=/);
+    const [key, value, overwrite] = setSecret.mock.calls[0];
+    expect(key).toBe("kitchen__encryption_key");
+    expect(value).toMatch(/^[A-Za-z0-9+/]{43}=$/);
+    expect(overwrite).toBe(false); // create-if-absent
     expect(applied[0]).toEqual([
       { path: ["encryption", "key"], value: "!secret kitchen__encryption_key" },
     ]);
   });
 
   it("ota: writes a passphrase and references password", async () => {
-    const { inner, updateConfig, applied } = setup(
+    const { inner, setSecret, applied } = setup(
       "ota.esphome",
       "ota:\n  - platform: esphome\n",
-      2,
-      async () => ""
+      2
     );
     await inner._onGenerate();
-    const [, content] = updateConfig.mock.calls[0];
-    expect(content).toMatch(/kitchen__ota_password: [a-z]+(-[a-z]+){3}\n/);
+    const [key, value] = setSecret.mock.calls[0];
+    expect(key).toBe("kitchen__ota_password");
+    expect(value).toMatch(/^[a-z]+(-[a-z]+){3}$/);
     expect(applied[0]).toEqual([
       { path: ["password"], value: "!secret kitchen__ota_password" },
     ]);
   });
 
   it("web_server: inlines a single-word username, stores only the password", async () => {
-    const { inner, updateConfig, applied } = setup(
+    const { inner, setSecret, applied } = setup(
       "web_server",
       "web_server:\n  port: 80\n",
-      1,
-      async () => ""
+      1
     );
     await inner._onGenerate();
     // Only the password is written to secrets.yaml (username is inline).
-    expect(updateConfig).toHaveBeenCalledTimes(1);
-    expect(updateConfig.mock.calls[0][1]).toMatch(
-      /kitchen__web_password: [a-z]+(-[a-z]+){3}\n/
-    );
-    expect(updateConfig.mock.calls[0][1]).not.toContain("web_username");
+    expect(setSecret).toHaveBeenCalledTimes(1);
+    const [key, value] = setSecret.mock.calls[0];
+    expect(key).toBe("kitchen__web_password");
+    expect(value).toMatch(/^[a-z]+(-[a-z]+){3}$/);
 
     const [user, pass] = applied[0];
     expect(user.path).toEqual(["auth", "username"]);
@@ -213,14 +211,19 @@ describe("security-notice — generate", () => {
   });
 
   it("reuses an existing secret (no overwrite) and still references it", async () => {
-    const { inner, updateConfig, applied } = setup(
+    const { inner, setSecret, applied } = setup(
       "ota.esphome",
       "ota:\n  - platform: esphome\n",
       2,
-      async () => "kitchen__ota_password: existing\n" // key already present → reused
+      async () => ({ created: false }) // key already present → reused, not overwritten
     );
     await inner._onGenerate();
-    expect(updateConfig).not.toHaveBeenCalled();
+    // The write is create-if-absent, so the existing value is left intact server-side.
+    expect(setSecret).toHaveBeenCalledWith(
+      "kitchen__ota_password",
+      expect.any(String),
+      false
+    );
     expect(applied[0]).toEqual([
       { path: ["password"], value: "!secret kitchen__ota_password" },
     ]);
@@ -228,28 +231,22 @@ describe("security-notice — generate", () => {
   });
 
   it("does nothing when the device name can't resolve", async () => {
-    const { inner, updateConfig } = setup(
+    const { inner, setSecret } = setup(
       "api",
       "api:\n  id: api_server\n",
       1,
-      async () => "",
+      async () => ({ created: true }),
       []
     );
     await inner._onGenerate();
-    expect(updateConfig).not.toHaveBeenCalled();
+    expect(setSecret).not.toHaveBeenCalled();
   });
 
-  it("aborts on a secrets read failure without emitting", async () => {
-    const { inner, updateConfig, applied } = setup(
-      "api",
-      "api:\n  id: api_server\n",
-      1,
-      async () => {
-        throw new Error("ws blip");
-      }
-    );
+  it("aborts on a secrets write failure without emitting", async () => {
+    const { inner, applied } = setup("api", "api:\n  id: api_server\n", 1, async () => {
+      throw new Error("ws blip");
+    });
     await inner._onGenerate();
-    expect(updateConfig).not.toHaveBeenCalled();
     expect(applied).toHaveLength(0);
     expect(toast.error).toHaveBeenCalled();
   });
