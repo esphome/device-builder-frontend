@@ -169,8 +169,19 @@ export const deviceNavigatorStyles = css`
     flex-shrink: 0;
   }
 
-  .nav-subgroup-header:hover .nav-subgroup-title {
+  .nav-subgroup-header:not(.nav-subgroup-header--static):hover .nav-subgroup-title {
     color: var(--esphome-primary);
+  }
+
+  .nav-subgroup-header:focus-visible {
+    outline: none;
+    box-shadow: var(--esphome-focus-ring-tight);
+    border-radius: var(--wa-border-radius-s);
+  }
+
+  /* While filtering the subgroup can't collapse, so it isn't interactive. */
+  .nav-subgroup-header--static {
+    cursor: default;
   }
 
   .nav-subgroup-title {

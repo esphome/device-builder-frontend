@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
+import { ifDefined } from "lit/directives/if-defined.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
 import type { NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
@@ -56,19 +57,36 @@ function renderNavRow(row: NavRow, v: NavSectionView): TemplateResult {
 
 /** One collapsible domain subgroup: header (name + count) then its rows. */
 function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
-  // Force open while filtering — you can't collapse a search result.
+  // Force open while filtering — you can't collapse a search result, so
+  // the header is a static label there (no toggle, no focus, no chevron).
   const open = v.filtering || !v.collapsedGroups?.has(group.key);
+  const interactive = !v.filtering;
+  const toggle = () => {
+    if (interactive) v.onToggleGroup?.(group.key);
+  };
   return html`
-    <div class="nav-subgroup-header" @click=${() => v.onToggleGroup?.(group.key)}>
+    <div
+      class="nav-subgroup-header ${interactive ? "" : "nav-subgroup-header--static"}"
+      role=${ifDefined(interactive ? "button" : undefined)}
+      tabindex=${ifDefined(interactive ? "0" : undefined)}
+      aria-expanded=${ifDefined(interactive ? String(open) : undefined)}
+      @click=${toggle}
+      @keydown=${(e: KeyboardEvent) => {
+        if (interactive && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          toggle();
+        }
+      }}
+    >
       <span class="nav-subgroup-title">${prettyDomain(group.key)}</span>
       <span class="nav-subgroup-count">${group.rows.length}</span>
-      ${v.filtering
-        ? nothing
-        : html`<wa-icon
+      ${interactive
+        ? html`<wa-icon
             class="nav-subgroup-chevron"
             library="mdi"
             name=${open ? "chevron-up" : "chevron-down"}
-          ></wa-icon>`}
+          ></wa-icon>`
+        : nothing}
     </div>
     ${open
       ? html`<div class="nav-items nav-items--grouped">
