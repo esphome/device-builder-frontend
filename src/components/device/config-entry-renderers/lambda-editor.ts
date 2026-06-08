@@ -25,7 +25,9 @@ import { basicSetup, EditorView } from "codemirror";
 import { css, html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 
-import { darkModeContext } from "../../../context/index.js";
+import type { LocalizeFunc } from "../../../common/localize.js";
+import { darkModeContext, localizeContext } from "../../../context/index.js";
+import { editorSearchPhrases } from "../../../util/editor-search-phrases.js";
 import { vscodeDark, vscodeLight } from "../../../util/yaml-editor-theme.js";
 
 /** Marks the doc change that syncs the external ``value`` prop into the
@@ -38,6 +40,11 @@ export class ESPHomeLambdaEditor extends LitElement {
   @consume({ context: darkModeContext, subscribe: true })
   @state()
   private _darkMode = false;
+
+  // Not subscribed: phrases are captured at mount, so the panel localizes at mount only.
+  @consume({ context: localizeContext })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
 
   @property() value = "";
 
@@ -135,6 +142,7 @@ export class ESPHomeLambdaEditor extends LitElement {
         doc: this.value,
         extensions: [
           basicSetup,
+          editorSearchPhrases(this._localize),
           cpp(),
           indentUnit.of("  "),
           keymap.of([indentWithTab]),

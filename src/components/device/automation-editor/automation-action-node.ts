@@ -31,7 +31,9 @@ import type {
   AvailableComponentInstance,
   AvailableScript,
   ConditionNode,
+  LambdaValue,
 } from "../../../api/types/automations.js";
+import { isLambdaValue } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
@@ -43,6 +45,12 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
+import "../config-entry-renderers/lambda-editor.js";
+import { lambdaBodyOf } from "../config-entry-renderers/lambda.js";
+import {
+  literalLambdaToggleStyles,
+  renderLiteralLambdaToggle,
+} from "../config-entry-renderers/literal-lambda-toggle.js";
 import "./automation-condition-tree.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./catalog-picker-dialog.js";
@@ -143,7 +151,19 @@ export class ESPHomeAutomationActionNode extends LitElement {
   /** "Show advanced settings" gate for the action params form. */
   @state() private _showAdvanced = false;
 
-  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+  /** Stashed other-side values for the Delay literal/lambda toggle, so
+   *  flipping back and forth doesn't discard the user's work before they
+   *  return to it: the C++ body for the lambda side, the value + unit for
+   *  the literal side. Both reset when the action kind changes. */
+  @state() private _delayLambdaStash = "";
+  @state() private _delayLiteralStash: { value: string; unit: DelayUnit } | null = null;
+
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    automationEditorStyles,
+    literalLambdaToggleStyles,
+  ];
 
   /**
    * The list reuses nodes by DOM position (plain actions.map, no keyed
@@ -159,6 +179,8 @@ export class ESPHomeAutomationActionNode extends LitElement {
     if (previous && previous.action_id !== this.value.action_id) {
       this._collapsed = false;
       this._showAdvanced = false;
+      this._delayLambdaStash = "";
+      this._delayLiteralStash = null;
     }
   }
 
@@ -411,8 +433,26 @@ export class ESPHomeAutomationActionNode extends LitElement {
    * backend's shortcut writer lands as ``params.id = "2s"`` —
    * fall back to that key as a last resort so we don't lose
    * historic shortcut values when the user opens the editor.
+   *
+   * Delay is also templatable: ``delay: !lambda "..."`` lands as a
+   * lambda sentinel under ``params.id``. A literal/lambda toggle
+   * (matching the templatable field UX) swaps the number + unit pair
+   * for the C++ editor so the lambda is visible and round-trips.
    */
   private _renderDelayParams() {
+    const lambda = this._delayLambda();
+    return html`<div class="ae-delay">
+      ${renderLiteralLambdaToggle({
+        isLambda: lambda !== null,
+        disabled: this.disabled,
+        localize: this._localize,
+        onSwitch: (toLambda) => this._toggleDelayLambda(toLambda),
+      })}
+      ${lambda ? this._renderDelayLambda(lambda) : this._renderDelayLiteral()}
+    </div>`;
+  }
+
+  private _renderDelayLiteral() {
     const { value: numericValue, unit } = this._readDelay();
     return html`<div class="ae-delay-row">
       <div class="ae-delay-value">
@@ -454,6 +494,38 @@ export class ESPHomeAutomationActionNode extends LitElement {
     </div>`;
   }
 
+  private _renderDelayLambda(lambda: LambdaValue) {
+    return html`<esphome-lambda-editor
+      .value=${lambdaBodyOf(lambda)}
+      ?disabled=${this.disabled}
+      @lambda-change=${(e: CustomEvent<{ value: string }>) =>
+        this._writeDelayLambda(e.detail.value)}
+    ></esphome-lambda-editor>`;
+  }
+
+  /** The Delay value when it is a ``!lambda`` (the templatable form),
+   *  else null. The backend lands a scalar delay under ``params.id``. */
+  private _delayLambda(): LambdaValue | null {
+    const id = (this.value.params ?? {}).id;
+    return isLambdaValue(id) ? id : null;
+  }
+
+  /** Flip the Delay action between its literal (value + unit) and
+   *  ``!lambda`` forms, stashing the side being left so an accidental
+   *  toggle doesn't discard the user's work before they flip back. */
+  private _toggleDelayLambda(toLambda: boolean) {
+    const isLambda = this._delayLambda() !== null;
+    if (toLambda === isLambda) return;
+    if (toLambda) {
+      this._delayLiteralStash = this._readDelay();
+      this._writeDelayLambda(this._delayLambdaStash);
+    } else {
+      this._delayLambdaStash = lambdaBodyOf(this._delayLambda());
+      const { value, unit } = this._delayLiteralStash ?? { value: "", unit: "s" };
+      this._writeDelay(value, unit);
+    }
+  }
+
   /** Pick a (numeric value, unit) pair out of the delay action's
    *  params dict. Falls back to seconds when no field is set. */
   private _readDelay(): { value: string; unit: DelayUnit } {
@@ -479,18 +551,33 @@ export class ESPHomeAutomationActionNode extends LitElement {
     return { value: "", unit: "s" };
   }
 
-  /** Write a (numeric value, unit) pair into the delay action's
-   *  params dict. Clears every other delay field so we never end
-   *  up with two competing values; also drops the legacy ``id``
-   *  shortcut slot so the next round-trip uses the canonical
-   *  ``<unit>: <value>`` form. */
-  private _writeDelay(value: string, unit: DelayUnit) {
-    const trimmed = value.trim();
+  /** A copy of the params with every delay slot removed — the six unit
+   *  fields and the ``id`` scalar shorthand — so a writer can set
+   *  exactly one form (value + unit, or lambda) without the others
+   *  lingering as a competing value. */
+  private _clearedDelayParams(): Record<string, unknown> {
     const next: Record<string, unknown> = { ...(this.value.params ?? {}) };
-    // Clear all six fields + the shortcut slot before re-setting.
     for (const u of DELAY_UNITS) delete next[DELAY_UNIT_TO_KEY[u]];
     delete next.id;
+    return next;
+  }
+
+  /** Write a (numeric value, unit) pair into the delay action's params,
+   *  using the canonical ``<unit>: <value>`` form. */
+  private _writeDelay(value: string, unit: DelayUnit) {
+    const trimmed = value.trim();
+    const next = this._clearedDelayParams();
     if (trimmed) next[DELAY_UNIT_TO_KEY[unit]] = trimmed;
+    this._emit({ ...this.value, params: next });
+  }
+
+  /** Write a ``!lambda`` body into the delay action's scalar ``id``
+   *  slot. The explicit ``!lambda`` tag is what makes the backend
+   *  re-emit a lambda rather than a string literal. */
+  private _writeDelayLambda(body: string) {
+    this._delayLambdaStash = body;
+    const next = this._clearedDelayParams();
+    next.id = { _lambda: body, _tag: "!lambda" };
     this._emit({ ...this.value, params: next });
   }
 

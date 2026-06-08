@@ -51,7 +51,11 @@ import {
   filterRenderable,
   renderFilterOptions,
 } from "./config-entry-render-filter.js";
-import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
+import {
+  fieldKeyAttr,
+  parseFieldKey,
+  renderYamlOnlyField,
+} from "./config-entry-renderers-shared.js";
 import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";
 
@@ -582,6 +586,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
             ${ctx.localize("device.automation_action_field_edit")}
           </button>
         </div>`;
+      case ConfigEntryType.UNKNOWN:
+        // A mapping-or-list union the backend can't model; the YAML pane
+        // holds it where a single input can't.
+        return renderYamlOnlyField(entry, path, ctx);
       default:
         return renderStringField(entry, "text", path, ctx);
     }

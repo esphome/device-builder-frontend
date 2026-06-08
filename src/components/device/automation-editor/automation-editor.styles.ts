@@ -477,6 +477,11 @@ export const automationEditorStyles = css`
      its six separate time-component string inputs. Keeps the user
      in the same "one knob" mental model as the interval form
      (which is a single time_period string). */
+  .ae-delay {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
   .ae-delay-row {
     display: grid;
     grid-template-columns: 1fr 1fr;

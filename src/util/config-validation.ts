@@ -116,7 +116,10 @@ export function getDeviceNameWarning(name: string): ValidationError | null {
 }
 
 export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError | null {
-  if (entry.hidden) return null;
+  // UNKNOWN renders as the YAML-only notice (a mapping-or-list union the
+  // form can't edit), so there is nothing to validate; a required one must
+  // not block the wizard with an error the user can't clear in the form.
+  if (entry.hidden || entry.type === ConfigEntryType.UNKNOWN) return null;
 
   const isEmpty =
     raw === undefined ||
