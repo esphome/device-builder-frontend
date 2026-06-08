@@ -595,6 +595,10 @@
   "device": {
     "navigator_title": "Device navigator",
     "navigator_home": "Back to device overview",
+    "navigator_search_placeholder": "Filter by name or ID…",
+    "navigator_search_clear": "Clear filter",
+    "navigator_search_count": "{count} of {total}",
+    "navigator_search_none": "No matches",
     "navigator_desc": "Navigate, add and remove options to define your ESP device and its functionality.",
     "section_core": "Core configuration",
     "section_components": "Components",

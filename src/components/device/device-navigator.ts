@@ -32,6 +32,7 @@ import {
 } from "../../util/yaml-sections.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
+import { navItemMatches } from "./navigator-search.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./add-automation-dialog.js";
@@ -42,6 +43,7 @@ import "./add-config-dialog.js";
 import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
 import "./add-script-dialog.js";
 import type { ESPHomeAddScriptDialog } from "./add-script-dialog.js";
+import "./device-navigator-search.js";
 import { SECTION_ICON } from "./section-icons.js";
 import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 
@@ -180,6 +182,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   @state()
   private _hoveredLine: number | null = null;
+
+  /** Active navigator search query; empty string means "not filtering". */
+  @state()
+  private _query = "";
 
   static styles = [espHomeStyles, deviceNavigatorStyles];
 
@@ -324,6 +330,27 @@ export class ESPHomeDeviceNavigator extends LitElement {
       },
     ];
 
+    // Resolve labels once; reused for the count and the rows below.
+    const q = this._query.trim();
+    const filtering = q.length > 0;
+    const resolved = sections.map(({ items, category }) =>
+      items
+        .map((item) => ({ item, labels: this._navItemLabels(item, category) }))
+        .filter(({ item, labels }) =>
+          filtering
+            ? navItemMatches(q, labels.primary, labels.secondary, item.id, item.name)
+            : true
+        )
+    );
+    const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
+    const matchCount = resolved.reduce((n, m) => n + m.length, 0);
+    const resultLabel = filtering
+      ? this._localize("device.navigator_search_count", {
+          count: matchCount,
+          total: totalItems,
+        })
+      : "";
+
     return html`
       <section class="card">
         <esphome-add-config-dialog
@@ -377,86 +404,113 @@ export class ESPHomeDeviceNavigator extends LitElement {
           </button>
         </header>
         <div class="card-body">
-          <p class="italic">${this._localize("device.navigator_desc")}</p>
+          <esphome-navigator-search
+            .value=${this._query}
+            .resultLabel=${resultLabel}
+            @navigator-search=${this._onSearchChange}
+          ></esphome-navigator-search>
+          ${filtering
+            ? nothing
+            : html`<p class="italic">${this._localize("device.navigator_desc")}</p>`}
           <div class="separator"></div>
-          ${sections.map(({ label, desc, icon, items, category, actions }, i) => {
-            const open = this.openSections.has(i);
-            return html`
-              <div class="nav-content" @click=${() => this._toggleSection(i)}>
-                <div class="nav-content-label">
-                  <wa-icon library="mdi" name=${icon}></wa-icon>
-                  <p>${label}</p>
-                </div>
-                <wa-icon
-                  class="nav-content-chevron"
-                  library="mdi"
-                  name=${open ? "chevron-up" : "chevron-down"}
-                ></wa-icon>
-              </div>
-              ${open
-                ? html`
-                    <div class="separator"></div>
-                    <p class="italic">${desc}</p>
-                    ${items.length > 0
-                      ? html`
-                          <div class="nav-items">
-                            ${items.map((item) => {
-                              const { primary, secondary } = this._navItemLabels(
-                                item,
-                                category
-                              );
-                              return html`
-                                <div
-                                  class="nav-item ${this._selectedLine === item.fromLine
-                                    ? "nav-item--selected"
-                                    : ""} ${this._hoveredLine === item.fromLine
-                                    ? "nav-item--hovered"
-                                    : ""}"
-                                  @mouseenter=${() =>
-                                    this._onItemHover(
-                                      item.fromLine,
-                                      item.fromLine,
-                                      item.toLine
-                                    )}
-                                  @mouseleave=${() => this._onItemLeave()}
-                                  @click=${() => this._onItemClick(item)}
-                                >
-                                  <div class="nav-item-content">
-                                    <p>${primary}</p>
-                                    ${secondary
-                                      ? html`<span class="nav-item-subtitle"
-                                          >${secondary}</span
-                                        >`
-                                      : nothing}
-                                  </div>
-                                  <wa-icon library="mdi" name="chevron-right"></wa-icon>
-                                </div>
-                              `;
-                            })}
-                          </div>
-                        `
-                      : nothing}
-                    <div class="nav-items">
-                      ${actions.map(
-                        (action) =>
-                          html`<div class="action-item" @click=${() => action.onClick()}>
-                            <div>
-                              <wa-icon library="mdi" name=${action.icon}></wa-icon>
-                              <p>${action.label}</p>
-                            </div>
-                            <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
-                          </div>`
-                      )}
+          ${filtering && matchCount === 0
+            ? html`<p class="nav-empty" role="status">
+                ${this._localize("device.navigator_search_none")}
+              </p>`
+            : sections.map(({ label, desc, icon, actions }, i) => {
+                const matched = resolved[i];
+                // While filtering, drop sections with no matches entirely.
+                if (filtering && matched.length === 0) return nothing;
+                const open = filtering ? true : this.openSections.has(i);
+                return html`
+                  <div
+                    class="nav-content"
+                    @click=${() => {
+                      if (!filtering) this._toggleSection(i);
+                    }}
+                  >
+                    <div class="nav-content-label">
+                      <wa-icon library="mdi" name=${icon}></wa-icon>
+                      <p>${label}</p>
                     </div>
-                  `
-                : nothing}
-              <div class="separator"></div>
-            `;
-          })}
+                    ${filtering
+                      ? nothing
+                      : html`<wa-icon
+                          class="nav-content-chevron"
+                          library="mdi"
+                          name=${open ? "chevron-up" : "chevron-down"}
+                        ></wa-icon>`}
+                  </div>
+                  ${open
+                    ? html`
+                        <div class="separator"></div>
+                        ${filtering ? nothing : html`<p class="italic">${desc}</p>`}
+                        ${matched.length > 0
+                          ? html`<div class="nav-items">
+                              ${matched.map(({ item, labels }) =>
+                                this._renderNavItem(item, labels)
+                              )}
+                            </div>`
+                          : nothing}
+                        ${filtering
+                          ? nothing
+                          : html`<div class="nav-items">
+                              ${actions.map((action) => this._renderActionItem(action))}
+                            </div>`}
+                      `
+                    : nothing}
+                  <div class="separator"></div>
+                `;
+              })}
         </div>
       </section>
     `;
   }
+
+  /** One navigator row; shared by the filtered and unfiltered paths. */
+  private _renderNavItem(
+    item: YamlSection,
+    labels: { primary: string; secondary?: string }
+  ) {
+    const { primary, secondary } = labels;
+    return html`
+      <div
+        class="nav-item ${this._selectedLine === item.fromLine
+          ? "nav-item--selected"
+          : ""} ${this._hoveredLine === item.fromLine ? "nav-item--hovered" : ""}"
+        @mouseenter=${() => this._onItemHover(item.fromLine, item.fromLine, item.toLine)}
+        @mouseleave=${() => this._onItemLeave()}
+        @click=${() => this._onItemClick(item)}
+      >
+        <div class="nav-item-content">
+          <p>${primary}</p>
+          ${secondary
+            ? html`<span class="nav-item-subtitle">${secondary}</span>`
+            : nothing}
+        </div>
+        <wa-icon library="mdi" name="chevron-right"></wa-icon>
+      </div>
+    `;
+  }
+
+  /** One "+ Add X" affordance at the foot of a section. */
+  private _renderActionItem(action: {
+    label: string;
+    icon: string;
+    onClick: () => void;
+  }) {
+    return html`<div class="action-item" @click=${() => action.onClick()}>
+      <div>
+        <wa-icon library="mdi" name=${action.icon}></wa-icon>
+        <p>${action.label}</p>
+      </div>
+      <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
+    </div>`;
+  }
+
+  private _onSearchChange = (e: CustomEvent<{ value: string }>) => {
+    this._query = e.detail.value;
+  };
 
   private _toggleSection(index: number) {
     this.dispatchEvent(
