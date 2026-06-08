@@ -214,14 +214,21 @@ export const deviceNavigatorStyles = css`
     font-size: var(--wa-font-size-l);
     color: var(--esphome-primary);
     flex-shrink: 0;
-    opacity: 0;
-    transition: opacity 0.1s;
   }
 
-  .nav-item:hover wa-icon,
-  .nav-item--hovered wa-icon,
-  .nav-item--selected wa-icon {
-    opacity: 1;
+  /* Declutter the chevron only where hover exists; on touch (no hover)
+     it stays visible so the "this row navigates" cue isn't lost. */
+  @media (hover: hover) {
+    .nav-item wa-icon {
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    .nav-item:hover wa-icon,
+    .nav-item--hovered wa-icon,
+    .nav-item--selected wa-icon {
+      opacity: 1;
+    }
   }
 
   .action-item {
