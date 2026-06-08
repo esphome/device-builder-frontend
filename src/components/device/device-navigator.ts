@@ -330,20 +330,22 @@ export class ESPHomeDeviceNavigator extends LitElement {
       },
     ];
 
-    // Resolve labels once; reused for the count and the rows below.
+    // Resolve+filter every row only while searching; when idle, labels
+    // are resolved per open section in the loop below so collapsed
+    // sections cost nothing on big configs (catalog + trigger lookups).
     const q = this._query.trim();
     const filtering = q.length > 0;
-    const resolved = sections.map(({ items, category }) =>
-      items
-        .map((item) => ({ item, labels: this._navItemLabels(item, category) }))
-        .filter(({ item, labels }) =>
-          filtering
-            ? navItemMatches(q, labels.primary, labels.secondary, item.id, item.name)
-            : true
+    const matches = filtering
+      ? sections.map(({ items, category }) =>
+          items
+            .map((item) => ({ item, labels: this._navItemLabels(item, category) }))
+            .filter(({ item, labels }) =>
+              navItemMatches(q, labels.primary, labels.secondary, item.id, item.name)
+            )
         )
-    );
+      : null;
     const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
-    const matchCount = resolved.reduce((n, m) => n + m.length, 0);
+    const matchCount = matches ? matches.reduce((n, m) => n + m.length, 0) : 0;
     const resultLabel = filtering
       ? this._localize("device.navigator_search_count", {
           count: matchCount,
@@ -417,11 +419,20 @@ export class ESPHomeDeviceNavigator extends LitElement {
             ? html`<p class="nav-empty" role="status">
                 ${this._localize("device.navigator_search_none")}
               </p>`
-            : sections.map(({ label, desc, icon, actions }, i) => {
-                const matched = resolved[i];
-                // While filtering, drop sections with no matches entirely.
-                if (filtering && matched.length === 0) return nothing;
+            : sections.map(({ label, desc, icon, items, category, actions }, i) => {
                 const open = filtering ? true : this.openSections.has(i);
+                // Filtered rows come from the pre-pass; otherwise resolve
+                // only the open section's labels (collapsed costs nothing).
+                const rows =
+                  matches?.[i] ??
+                  (open
+                    ? items.map((item) => ({
+                        item,
+                        labels: this._navItemLabels(item, category),
+                      }))
+                    : []);
+                // While filtering, drop sections with no matches entirely.
+                if (filtering && rows.length === 0) return nothing;
                 return html`
                   <div
                     class="nav-content"
@@ -445,9 +456,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
                     ? html`
                         <div class="separator"></div>
                         ${filtering ? nothing : html`<p class="italic">${desc}</p>`}
-                        ${matched.length > 0
+                        ${rows.length > 0
                           ? html`<div class="nav-items">
-                              ${matched.map(({ item, labels }) =>
+                              ${rows.map(({ item, labels }) =>
                                 this._renderNavItem(item, labels)
                               )}
                             </div>`

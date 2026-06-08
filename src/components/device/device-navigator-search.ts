@@ -83,6 +83,8 @@ export class ESPHomeNavigatorSearch extends LitElement {
   };
 
   private _clear = () => {
+    // Reflect the cleared state immediately, before the parent echoes it.
+    this.value = "";
     this._emit("");
     this._input?.focus();
   };
