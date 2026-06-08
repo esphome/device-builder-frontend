@@ -210,7 +210,12 @@ export class ESPHomeDeviceEditor extends LitElement {
         <header class="card-header ${compactHeader ? "card-header--compact" : ""}">
           <slot name="header-start"></slot>
           <div class="editor-header-main">
-            <h2 class="editor-header-title">${title}</h2>
+            <div class="editor-header-titlerow">
+              <h2 class="editor-header-title">${title}</h2>
+              ${this.configuration && !compactHeader
+                ? html`<span class="editor-header-file">${this.configuration}</span>`
+                : nothing}
+            </div>
           </div>
           <div class="header-actions">
             ${effectiveLayout !== "left"

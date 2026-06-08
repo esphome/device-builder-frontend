@@ -53,6 +53,13 @@ export const deviceEditorStyles = css`
     flex: 1;
   }
 
+  .editor-header-titlerow {
+    display: flex;
+    align-items: baseline;
+    gap: var(--wa-space-xs);
+    min-width: 0;
+  }
+
   .editor-header-title {
     margin: 0;
     font-size: var(--wa-font-size-s);
@@ -60,6 +67,17 @@ export const deviceEditorStyles = css`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex-shrink: 0;
+  }
+
+  .editor-header-file {
+    font-size: var(--wa-font-size-2xs);
+    font-weight: var(--wa-font-weight-normal);
+    color: color-mix(in srgb, var(--esphome-on-primary), transparent 25%);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .editor-floating-actions {

@@ -594,6 +594,7 @@
   },
   "device": {
     "navigator_title": "Device navigator",
+    "navigator_home": "Back to device overview",
     "navigator_desc": "Navigate, add and remove options to define your ESP device and its functionality.",
     "section_core": "Core configuration",
     "section_components": "Components",

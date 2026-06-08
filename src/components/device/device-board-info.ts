@@ -1,10 +1,7 @@
 import { consume } from "@lit/context";
 import {
-  mdiArrowDecisionOutline,
   mdiArrowLeft,
   mdiClose,
-  mdiCogOutline,
-  mdiMemory,
   mdiOpenInNew,
   mdiPartyPopper,
   mdiPlusCircleOutline,
@@ -29,6 +26,7 @@ import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
 import { deviceBoardInfoStyles } from "./device-board-info.styles.js";
 import type { ESPHomeDeviceSectionConfig } from "./device-section-config.js";
+import { SECTION_ICON } from "./section-icons.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/callout/callout.js";
@@ -45,10 +43,7 @@ import "./device-section-config.js";
 
 registerMdiIcons({
   "open-in-new": mdiOpenInNew,
-  memory: mdiMemory,
-  "arrow-decision-outline": mdiArrowDecisionOutline,
   "arrow-left": mdiArrowLeft,
-  "cog-outline": mdiCogOutline,
   close: mdiClose,
   "party-popper": mdiPartyPopper,
   "plus-circle-outline": mdiPlusCircleOutline,
@@ -303,21 +298,21 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
             ${this._renderStepSection({
               title: this._localize("device.step_core"),
               desc: this._localize("device.step_core_desc"),
-              icon: "cog-outline",
+              icon: SECTION_ICON.core,
               action: this._localize("device.show_core_configuration"),
               section: "core",
             })}
             ${this._renderStepSection({
               title: this._localize("device.step_components"),
               desc: this._localize("device.step_components_desc"),
-              icon: "memory",
+              icon: SECTION_ICON.components,
               action: this._localize("device.show_components"),
               section: "components",
             })}
             ${this._renderStepSection({
               title: this._localize("device.step_automations"),
               desc: this._localize("device.step_automations_desc"),
-              icon: "arrow-decision-outline",
+              icon: SECTION_ICON.automations,
               action: this._localize("device.show_automations"),
               section: "automations",
             })}
