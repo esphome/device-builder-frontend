@@ -17,6 +17,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { subscribeAutomationCatalogCache } from "../../util/automation-catalog-cache.js";
 import {
   fetchComponent,
   getCachedComponent,
@@ -31,6 +32,7 @@ import {
   sectionKeyOf,
 } from "../../util/yaml-sections.js";
 import type { HighlightRange } from "../yaml-editor.js";
+import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
 import { navItemMatches } from "./navigator-search-match.js";
 
@@ -58,6 +60,12 @@ registerMdiIcons({
   "script-text-outline": mdiScriptTextOutline,
 });
 
+/** A nav row paired with its resolved display labels. */
+interface NavRow {
+  item: YamlSection;
+  labels: { primary: string; secondary?: string };
+}
+
 @customElement("esphome-device-navigator")
 export class ESPHomeDeviceNavigator extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -68,14 +76,14 @@ export class ESPHomeDeviceNavigator extends LitElement {
   private _api?: ESPHomeAPI;
 
   /**
-   * Bumped whenever a fresh entry lands in the component-name cache,
-   * which forces a re-render so resolved labels appear without
-   * needing the user to interact with the navigator.
+   * Re-renders when the component-name or automation-trigger cache fills
+   * in (so resolved labels appear); ``tick`` is the invalidation key for
+   * ``_resolveLabels``.
    */
-  @state()
-  private _cacheTick = 0;
-
-  private _unsubscribeCache?: () => void;
+  private readonly _caches = new CacheTickController(this, [
+    subscribeComponentCache,
+    subscribeAutomationCatalogCache,
+  ]);
 
   // Resolves automation rows' pretty trigger names; shared with the
   // component automations list in device-section-config.
@@ -124,6 +132,36 @@ export class ESPHomeDeviceNavigator extends LitElement {
       .sort((a, b) => a.fromLine - b.fromLine);
     return { core, components, automations };
   });
+
+  /** Resolve every row's labels, indexed [core, components, automations]
+   *  to match the section order. Memoised on the parsed buckets plus the
+   *  inputs labels depend on (catalog ticks, platform, device name,
+   *  locale), so typing a query reuses the cached labels and only the
+   *  cheap ``navItemMatches`` predicate runs per keystroke. The trailing
+   *  args exist solely to invalidate the memo. */
+  private _resolveLabels = memoizeOne(
+    (
+      buckets: {
+        core: YamlSection[];
+        components: YamlSection[];
+        automations: YamlSection[];
+      },
+      _cacheTick: number,
+      _platform: string,
+      _deviceName: string,
+      _localize: LocalizeFunc
+    ): NavRow[][] => [
+      buckets.core.map((item) => ({ item, labels: this._navItemLabels(item, "core") })),
+      buckets.components.map((item) => ({
+        item,
+        labels: this._navItemLabels(item, "component"),
+      })),
+      buckets.automations.map((item) => ({
+        item,
+        labels: this._navItemLabels(item, "automation"),
+      })),
+    ]
+  );
 
   /** Optional board metadata; forwarded to the add-component dialog so
    * the embedded form can render GPIO pin selectors. */
@@ -189,22 +227,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   static styles = [espHomeStyles, deviceNavigatorStyles];
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    // Re-render when any other navigator (or this one on a previous
-    // mount) fills in a catalog entry we're showing — keeps labels
-    // live across device switches without a manual refresh.
-    this._unsubscribeCache = subscribeComponentCache(() => {
-      this._cacheTick++;
-    });
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._unsubscribeCache?.();
-    this._unsubscribeCache = undefined;
-  }
-
   protected willUpdate(changedProperties: Map<string, unknown>) {
     // Fire on the edge that satisfies the gate — typically just
     // the last of (yaml, platformReady) to land. A subsequent
@@ -260,7 +282,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   protected render() {
-    const { core, components, automations } = this._deriveBuckets(this.yaml);
+    const buckets = this._deriveBuckets(this.yaml);
+    const { core, components, automations } = buckets;
 
     interface NavAction {
       label: string;
@@ -330,18 +353,22 @@ export class ESPHomeDeviceNavigator extends LitElement {
       },
     ];
 
-    // Resolve+filter every row only while searching; when idle, labels
-    // are resolved per open section in the loop below so collapsed
-    // sections cost nothing on big configs (catalog + trigger lookups).
+    // Labels resolve once per (yaml, catalog tick, platform, name, locale)
+    // via the memo, so typing only re-runs the cheap match predicate.
+    const resolved = this._resolveLabels(
+      buckets,
+      this._caches.tick,
+      this.platform,
+      this.deviceName,
+      this._localize
+    );
     const q = this._query.trim();
     const filtering = q.length > 0;
     const matches = filtering
-      ? sections.map(({ items, category }) =>
-          items
-            .map((item) => ({ item, labels: this._navItemLabels(item, category) }))
-            .filter(({ item, labels }) =>
-              navItemMatches(q, labels.primary, labels.secondary, item.id, item.name)
-            )
+      ? resolved.map((rows) =>
+          rows.filter(({ item, labels }) =>
+            navItemMatches(q, labels.primary, labels.secondary, item.id, item.name)
+          )
         )
       : null;
     const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
@@ -421,18 +448,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
             ? html`<p class="nav-empty" role="status">
                 ${this._localize("device.navigator_search_none")}
               </p>`
-            : sections.map(({ label, desc, icon, items, category, actions }, i) => {
+            : sections.map(({ label, desc, icon, actions }, i) => {
                 const open = filtering ? true : this.openSections.has(i);
-                // Filtered rows come from the pre-pass; otherwise resolve
-                // only the open section's labels (collapsed costs nothing).
-                const rows =
-                  matches?.[i] ??
-                  (open
-                    ? items.map((item) => ({
-                        item,
-                        labels: this._navItemLabels(item, category),
-                      }))
-                    : []);
+                // Filtered rows come from the pre-pass; otherwise the
+                // section's full (memoised) row set.
+                const rows = matches?.[i] ?? resolved[i];
                 // While filtering, drop sections with no matches entirely.
                 if (filtering && rows.length === 0) return nothing;
                 return html`
@@ -562,9 +582,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   /**
    * Fire-and-forget catalog lookups for any sections whose name we
    * haven't cached yet. Resolved entries land in the shared cache;
-   * the subscription bumps `_cacheTick` to trigger a re-render.
-   * Automations are skipped — their keys are free-form strings
-   * (`<component> → on_press`), not catalog ids.
+   * `_caches` re-renders the host when a fetch lands. Automations are
+   * skipped — their keys are free-form strings (`<component> →
+   * on_press`), not catalog ids.
    */
   private _kickoffNameResolves(): void {
     if (!this._api) return;
