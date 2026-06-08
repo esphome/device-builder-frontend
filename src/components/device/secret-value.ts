@@ -186,6 +186,12 @@ export class ESPHomeSecretValue extends LitElement {
     return this._draftValue.trim() !== "";
   }
 
+  /** Present mode is still fetching the stored value — block edits so the async
+   *  prefill can't clobber what the user typed. */
+  private get _loadingStored(): boolean {
+    return this.present && this._stored === null;
+  }
+
   /** Existing secret: the value is directly editable; Save when it changes. */
   private _renderEdit() {
     return html`<div class="row">
@@ -243,7 +249,7 @@ export class ESPHomeSecretValue extends LitElement {
     return html`<esphome-password-input
       class="value"
       .value=${this._draftValue}
-      .disabled=${this._busy}
+      .disabled=${this._busy || this._loadingStored}
       .placeholder=${this._localize(
         this.present
           ? "device.secret_picker_value"

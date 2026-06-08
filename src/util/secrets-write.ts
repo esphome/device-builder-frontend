@@ -58,8 +58,8 @@ export async function ensureSecretInYaml(
 /**
  * Overwrite ``key``'s value in secrets.yaml (or append it when absent),
  * preserving every other secret and any inline comment on the line. Unlike
- * :func:`ensureSecretInYaml` this always writes — it backs the inline "edit
- * this secret" path. Dispatches ``secrets-saved`` so pickers refresh.
+ * `ensureSecretInYaml` this always writes — it backs the inline "edit this
+ * secret" path. Dispatches ``secrets-saved`` so pickers refresh.
  */
 export async function setSecretInYaml(
   api: ESPHomeAPI,

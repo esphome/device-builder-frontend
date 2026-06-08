@@ -209,6 +209,41 @@ describe("esphome-secret-value", () => {
     expect(content).toContain("kitchen__encryption_key: newkey");
   });
 
+  it("disables the field while the stored value is loading", async () => {
+    let resolveGet!: (yaml: string) => void;
+    const api = {
+      getConfig: vi.fn(() => new Promise<string>((r) => (resolveGet = r))),
+    } as unknown as ESPHomeAPI;
+    const el = new ESPHomeSecretValue();
+    el.secretKey = "api_key";
+    el.present = true;
+    (el as unknown as { _api: ESPHomeAPI })._api = api;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // Load in flight → input disabled so an async prefill can't clobber typing.
+    expect(
+      (
+        el.shadowRoot!.querySelector("esphome-password-input") as unknown as {
+          disabled: boolean;
+        }
+      ).disabled
+    ).toBe(true);
+
+    resolveGet("api_key: stored\n");
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+
+    expect(pwInput(el).value).toBe("stored");
+    expect(
+      (
+        el.shadowRoot!.querySelector("esphome-password-input") as unknown as {
+          disabled: boolean;
+        }
+      ).disabled
+    ).toBe(false);
+  });
+
   it("reloads the value and resets the draft when present flips", async () => {
     // Draft from the pre-keys-load window must not survive a missing→present flip.
     const api = {
