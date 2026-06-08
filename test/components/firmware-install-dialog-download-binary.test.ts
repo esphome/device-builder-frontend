@@ -151,7 +151,7 @@ describe("manual firmware-binary download flow", () => {
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 
-  it("names the build server when a remote compile yields no flashable binary", async () => {
+  it("names the build server when a remote compile returns no binaries", async () => {
     const { host, api } = makeHost("web-download", []);
     api.firmwareCompile.mockResolvedValueOnce({
       job_id: "j1",
@@ -163,6 +163,20 @@ describe("manual firmware-binary download flow", () => {
       "firmware.no_binaries_remote",
       "firmware.no_binaries_remote_detail"
     );
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("keeps the web-flasher message when a remote build returns only non-flashable formats", async () => {
+    // Binaries DID come back (OTA), so the build transferred fine — the web
+    // flasher just can't use them. Not a remote-transfer failure.
+    const { host, api } = makeHost("web-download", [OTA]);
+    api.firmwareCompile.mockResolvedValueOnce({
+      job_id: "j1",
+      source: JobSource.REMOTE,
+      source_label: "build-server-1",
+    });
+    await run(host);
+    expect(host._fail).toHaveBeenCalledWith("firmware.no_flashable_binary");
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 

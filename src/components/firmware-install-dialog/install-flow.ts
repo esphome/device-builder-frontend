@@ -241,15 +241,16 @@ function showBinaryPicker(
   host._step = "choose-binary";
 }
 
-// Reached only after a *successful* compile produced nothing to download. A
-// remote build that succeeded but returned no artifacts is a packaging /
-// transfer problem on the build server, not a failed build, so name the
-// server instead of telling the user to check that the build completed.
+// Reached after a *successful* compile when there's nothing to flash. A remote
+// build that returned an EMPTY list is a packaging / transfer problem on the
+// build server, so name it. Binaries that came back but aren't web-flashable
+// (e.g. only OTA / uf2) transferred fine — that's a web.esphome.io format
+// limit, so they keep the flashable-binary message regardless of build origin.
 function failNoBinaries(
   host: ESPHomeFirmwareInstallDialog,
-  { isWebFlasher }: { isWebFlasher: boolean }
+  { isWebFlasher, isEmpty }: { isWebFlasher: boolean; isEmpty: boolean }
 ): void {
-  if (host._jobSource === JobSource.REMOTE) {
+  if (isEmpty && host._jobSource === JobSource.REMOTE) {
     const receiver =
       host._jobSourceLabel || host._localize("firmware.no_binaries_remote_server");
     host._fail(
@@ -284,7 +285,7 @@ export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise
     binaries.find((b) => b.file === "firmware.bin") ??
     (isWebFlasher ? undefined : binaries[0]);
   if (!flashable) {
-    failNoBinaries(host, { isWebFlasher });
+    failNoBinaries(host, { isWebFlasher, isEmpty: binaries.length === 0 });
     return;
   }
   await downloadSelectedBinary(host, flashable.file);
@@ -308,7 +309,7 @@ export async function startArtifactDownload(
   }
 
   if (binaries.length === 0) {
-    failNoBinaries(host, { isWebFlasher: false });
+    failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
     return;
   }
   if (binaries.length === 1) {
