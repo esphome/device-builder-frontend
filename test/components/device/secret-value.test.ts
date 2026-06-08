@@ -1,8 +1,9 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the inline secret-value affordance: create-when-missing, reveal +
- * inline edit when present, and that every write refreshes the key cache.
+ * Pins the inline secret-value affordance: create-when-missing, and a directly
+ * editable value when present (Save only when changed). Every write refreshes
+ * the key cache.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -27,6 +28,9 @@ async function mount(
   (el as unknown as { _api: ESPHomeAPI })._api = api as ESPHomeAPI;
   document.body.appendChild(el);
   await el.updateComplete;
+  // Present mode prefills the field from secrets.yaml via an async load.
+  await new Promise((r) => setTimeout(r, 0));
+  await el.updateComplete;
   return el;
 }
 
@@ -35,6 +39,9 @@ const click = async (el: ESPHomeSecretValue, selector: string): Promise<void> =>
   await new Promise((r) => setTimeout(r, 0));
   await el.updateComplete;
 };
+
+const pwInput = (el: ESPHomeSecretValue) =>
+  el.shadowRoot!.querySelector("esphome-password-input") as unknown as { value: string };
 
 const typeValue = async (el: ESPHomeSecretValue, value: string): Promise<void> => {
   el.shadowRoot!.querySelector("esphome-password-input")!.dispatchEvent(
@@ -62,7 +69,6 @@ describe("esphome-secret-value", () => {
 
     const msg = el.shadowRoot!.querySelector(".msg")!;
     expect(msg.getAttribute("role")).toBe("alert");
-    expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).toBeNull();
 
     await typeValue(el, "base64key==");
     await click(el, ".save");
@@ -74,39 +80,36 @@ describe("esphome-secret-value", () => {
     expect(api.getSecretKeys).toHaveBeenCalled(); // cache refreshed
   });
 
-  it("reveals the value with an edit affordance when present", async () => {
+  it("prefills the value directly (no pencil) and disables Save until changed", async () => {
     const api = {
       getConfig: vi.fn(async () => "api_key: stored\n"),
     } as unknown as ESPHomeAPI;
     const el = await mount(api, "api_key", true);
 
-    const reveal = el.shadowRoot!.querySelector("esphome-secret-reveal")!;
-    expect(reveal).not.toBeNull();
-    expect(reveal.getAttribute("resetkey")).toBe("api_key");
-    expect(el.shadowRoot!.querySelector(".edit")).not.toBeNull();
-    // No editor until the pencil is clicked.
-    expect(el.shadowRoot!.querySelector("esphome-password-input")).toBeNull();
+    // No view/edit toggle — the value is editable straight away.
+    expect(el.shadowRoot!.querySelector(".edit")).toBeNull();
+    expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).toBeNull();
+    expect(pwInput(el).value).toBe("stored");
+    // Unchanged → Save disabled.
+    expect((el.shadowRoot!.querySelector(".save") as HTMLButtonElement).disabled).toBe(
+      true
+    );
   });
 
-  it("prefills the current value when editing, then overwrites it on save", async () => {
+  it("enables Save once the value changes and overwrites on save", async () => {
     const api = {
       getConfig: vi.fn(async () => "api_key: oldvalue\nother: y\n"),
       updateConfig: vi.fn(async () => {}),
       getSecretKeys: vi.fn(async () => ["api_key", "other"]),
     } as unknown as ESPHomeAPI;
     const el = await mount(api, "api_key", true);
-
-    await click(el, ".edit");
-    // The editor is prefilled with the resolved current value.
-    expect(
-      (
-        el.shadowRoot!.querySelector("esphome-password-input") as unknown as {
-          value: string;
-        }
-      ).value
-    ).toBe("oldvalue");
+    expect(pwInput(el).value).toBe("oldvalue");
 
     await typeValue(el, "newvalue");
+    expect((el.shadowRoot!.querySelector(".save") as HTMLButtonElement).disabled).toBe(
+      false
+    );
+
     await click(el, ".save");
 
     const [, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
@@ -114,58 +117,28 @@ describe("esphome-secret-value", () => {
     expect(content).toContain("other: y"); // other secrets preserved
     expect(content).not.toContain("oldvalue");
     expect(toast.success).toHaveBeenCalled();
-    // Back to the reveal once saved.
-    expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).not.toBeNull();
+    // Saved value is now the baseline → Save disabled again.
+    expect((el.shadowRoot!.querySelector(".save") as HTMLButtonElement).disabled).toBe(
+      true
+    );
   });
 
-  it("cancels an edit without writing", async () => {
-    const api = {
-      getConfig: vi.fn(async () => "api_key: stored\n"),
-      updateConfig: vi.fn(async () => {}),
-    } as unknown as ESPHomeAPI;
-    const el = await mount(api, "api_key", true);
-
-    await click(el, ".edit");
-    await typeValue(el, "discarded");
-    await click(el, ".cancel");
-
-    expect(api.updateConfig).not.toHaveBeenCalled();
-    expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).not.toBeNull();
-  });
-
-  it("drops edit state when present flips (no stale editor after create)", async () => {
-    // Edit begun while optimistically present (pre-keys-load) must not resurface
-    // as an empty editor once the key resolves missing then created → present.
+  it("reloads the value and resets the draft when present flips", async () => {
+    // Draft from the pre-keys-load window must not survive a missing→present flip.
     const api = {
       getConfig: vi.fn(async () => "api_key: stored\n"),
     } as unknown as ESPHomeAPI;
     const el = await mount(api, "api_key", true);
 
-    await click(el, ".edit");
-    expect(el.shadowRoot!.querySelector("esphome-password-input")).not.toBeNull();
-
-    el.present = false; // keys loaded → key absent
+    await typeValue(el, "halftyped");
+    el.present = false;
     await el.updateComplete;
-    el.present = true; // user created it → present again
+    el.present = true;
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
     await el.updateComplete;
 
-    expect(el.shadowRoot!.querySelector("esphome-password-input")).toBeNull();
-    expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).not.toBeNull();
-  });
-
-  it("drops edit state when the target key changes", async () => {
-    const api = {
-      getConfig: vi.fn(async () => "api_key: stored\n"),
-    } as unknown as ESPHomeAPI;
-    const el = await mount(api, "api_key", true);
-
-    await click(el, ".edit");
-    expect(el.shadowRoot!.querySelector("esphome-password-input")).not.toBeNull();
-
-    el.secretKey = "other_key";
-    await el.updateComplete;
-    // New target → back to the reveal, no stale editor/draft.
-    expect(el.shadowRoot!.querySelector("esphome-password-input")).toBeNull();
-    expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).not.toBeNull();
+    // Back to the freshly-loaded stored value, not the abandoned draft.
+    expect(pwInput(el).value).toBe("stored");
   });
 });

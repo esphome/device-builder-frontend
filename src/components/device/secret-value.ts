@@ -1,18 +1,20 @@
 /**
  * The selected secret's value affordance, shown beneath the picker trigger.
  * When the key isn't in ``secrets.yaml`` (``present`` false) it warns and offers
- * inline creation; when it exists it reveals the value (eye/copy) with an inline
- * edit. Any write refreshes the shared key cache so the picker re-evaluates —
- * the field already references ``!secret <secretKey>``, so nothing is re-emitted.
+ * inline creation; when it exists the value is directly editable (masked, with a
+ * reveal toggle) and Save persists a change. Any write refreshes the shared key
+ * cache so the picker re-evaluates — the field already references
+ * ``!secret <secretKey>``, so nothing is re-emitted.
  */
 import { consume } from "@lit/context";
-import { mdiAlert, mdiPencil } from "@mdi/js";
-import { css, html, LitElement, nothing, type PropertyValues } from "lit";
+import { mdiAlert, mdiContentCopy } from "@mdi/js";
+import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { copyToClipboard } from "../../util/copy-to-clipboard.js";
 import {
   ensureSecretWithToast,
   setSecretWithToast,
@@ -22,10 +24,9 @@ import { secretValueFromYaml } from "../../util/secret-eligibility.js";
 import type { PasswordInputValueChange } from "./password-input-event.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "../secret-reveal.js";
 import "./password-input.js";
 
-registerMdiIcons({ alert: mdiAlert, pencil: mdiPencil });
+registerMdiIcons({ alert: mdiAlert, "content-copy": mdiContentCopy });
 
 const SECRETS_FILE = "secrets.yaml";
 
@@ -47,19 +48,31 @@ export class ESPHomeSecretValue extends LitElement {
   @property({ type: Boolean })
   present = false;
 
-  @state() private _editing = false;
+  /** The value being edited. */
   @state() private _draftValue = "";
+  /** The stored value last read for *present*; ``null`` until loaded (or N/A
+   *  while missing). Save is enabled only when the draft diverges from it. */
+  @state() private _stored: string | null = null;
   @state() private _busy = false;
+  /** Cancels a stale load when the target changes mid-fetch. */
+  private _loadToken = 0;
 
   protected willUpdate(changed: PropertyValues): void {
-    // Drop edit state on a new target OR a present flip: a stale draft mustn't
-    // leak across keys, and an edit begun in the brief pre-keys-load window
-    // (optimistically present) must not resurface as an empty editor once the
-    // key resolves missing → created → present again.
+    // Reset on a new target OR a present flip: a stale draft mustn't leak across
+    // keys, and the loaded value must be refetched (e.g. after an inline create
+    // flips present false → true).
     if (changed.has("secretKey") || changed.has("present")) {
-      this._editing = false;
       this._draftValue = "";
+      this._stored = null;
       this._busy = false;
+      this._loadToken++;
+    }
+  }
+
+  protected updated(): void {
+    // Prefill the editable field with the stored value once present + ready.
+    if (this.present && this.secretKey && this._api && this._stored === null) {
+      void this._loadStored();
     }
   }
 
@@ -73,12 +86,6 @@ export class ESPHomeSecretValue extends LitElement {
       flex-direction: column;
       gap: var(--wa-space-2xs);
       padding-left: var(--wa-space-2xs);
-    }
-
-    .view {
-      padding-left: var(--wa-space-2xs);
-      font-size: var(--wa-font-size-xs);
-      color: var(--wa-color-text-quiet);
     }
 
     .msg {
@@ -101,12 +108,13 @@ export class ESPHomeSecretValue extends LitElement {
       min-width: 0;
     }
 
-    .edit {
+    .copy {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       width: 28px;
       height: 28px;
+      flex-shrink: 0;
       padding: 0;
       border: none;
       border-radius: var(--wa-border-radius-m);
@@ -118,12 +126,12 @@ export class ESPHomeSecretValue extends LitElement {
         color 0.12s;
     }
 
-    .edit:hover {
+    .copy:hover {
       background: var(--wa-color-surface-border);
       color: var(--wa-color-text-normal);
     }
 
-    .edit wa-icon {
+    .copy wa-icon {
       font-size: 15px;
     }
 
@@ -131,6 +139,7 @@ export class ESPHomeSecretValue extends LitElement {
       padding: 0 14px;
       min-height: var(--wa-form-control-height);
       box-sizing: border-box;
+      flex-shrink: 0;
       border: var(--wa-border-width-s) solid var(--esphome-primary);
       border-radius: var(--wa-border-radius-m);
       background: var(--esphome-primary);
@@ -147,47 +156,37 @@ export class ESPHomeSecretValue extends LitElement {
       opacity: 0.9;
     }
 
-    .cancel {
-      padding: 0 14px;
-      min-height: var(--wa-form-control-height);
-      box-sizing: border-box;
-      border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      border-radius: var(--wa-border-radius-m);
-      background: transparent;
-      color: var(--wa-color-text-normal);
-      font-family: inherit;
-      font-size: var(--wa-font-size-s);
-      cursor: pointer;
-    }
-
-    .save:disabled,
-    .cancel:disabled {
+    .save:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
   `;
 
   protected render() {
-    if (!this.present) return this._renderCreate();
-    return this._editing ? this._renderEdit() : this._renderView();
+    return this.present ? this._renderEdit() : this._renderCreate();
   }
 
-  /** Existing secret: reveal the value (eye/copy) with an inline edit. */
-  private _renderView() {
-    return html`<div class="row view">
-      <span>${this._localize("device.secret_picker_value")}</span>
-      <esphome-secret-reveal
-        .resolve=${this._resolve}
-        resetKey=${this.secretKey}
-      ></esphome-secret-reveal>
+  /** Existing secret: the value is directly editable; Save when it changes. */
+  private _renderEdit() {
+    const dirty = this._stored !== null && this._draftValue !== this._stored;
+    return html`<div class="row">
+      ${this._renderInput()}
       <button
-        class="edit"
+        class="copy"
         type="button"
-        title=${this._localize("device.secret_picker_edit")}
-        aria-label=${this._localize("device.secret_picker_edit")}
-        @click=${this._startEdit}
+        title=${this._localize("device.secret_reveal_copy")}
+        aria-label=${this._localize("device.secret_reveal_copy")}
+        @click=${this._copy}
       >
-        <wa-icon library="mdi" name="pencil"></wa-icon>
+        <wa-icon library="mdi" name="content-copy"></wa-icon>
+      </button>
+      <button
+        class="save"
+        type="button"
+        ?disabled=${this._busy || !dirty}
+        @click=${this._save}
+      >
+        ${this._localize("device.secret_picker_save")}
       </button>
     </div>`;
   }
@@ -199,76 +198,57 @@ export class ESPHomeSecretValue extends LitElement {
         <wa-icon library="mdi" name="alert"></wa-icon>
         ${this._localize("device.secret_picker_missing", { key: this.secretKey })}
       </span>
-      ${this._renderField(this._create, "device.secret_picker_missing_create", false)}
+      <div class="row">
+        ${this._renderInput()}
+        <button class="save" type="button" ?disabled=${this._busy} @click=${this._create}>
+          ${this._localize("device.secret_picker_missing_create")}
+        </button>
+      </div>
     </div>`;
   }
 
-  /** Existing secret being edited: prefilled field with save / cancel. */
-  private _renderEdit() {
-    return html`<div class="fix">
-      ${this._renderField(this._save, "device.secret_picker_save", true)}
-    </div>`;
+  private _renderInput() {
+    return html`<esphome-password-input
+      class="value"
+      .value=${this._draftValue}
+      .disabled=${this._busy}
+      .placeholder=${this._localize("device.secret_picker_missing_placeholder")}
+      .label=${this._localize("device.secret_picker_value_label", {
+        key: this.secretKey,
+      })}
+      @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) => {
+        this._draftValue = e.detail.value;
+      }}
+      @keydown=${(e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this.present ? this._save() : this._create();
+        }
+      }}
+    ></esphome-password-input>`;
   }
 
-  private _renderField(submit: () => void, submitKey: string, cancelable: boolean) {
-    return html`<div class="row">
-      <esphome-password-input
-        class="value"
-        .value=${this._draftValue}
-        .disabled=${this._busy}
-        .placeholder=${this._localize("device.secret_picker_missing_placeholder")}
-        .label=${this._localize("device.secret_picker_value_label", {
-          key: this.secretKey,
-        })}
-        @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) => {
-          this._draftValue = e.detail.value;
-        }}
-        @keydown=${(e: KeyboardEvent) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            submit();
-          }
-        }}
-      ></esphome-password-input>
-      <button class="save" type="button" ?disabled=${this._busy} @click=${submit}>
-        ${this._localize(submitKey)}
-      </button>
-      ${cancelable
-        ? html`<button
-            class="cancel"
-            type="button"
-            ?disabled=${this._busy}
-            @click=${this._cancelEdit}
-          >
-            ${this._localize("device.secret_picker_cancel")}
-          </button>`
-        : nothing}
-    </div>`;
-  }
-
-  /** Read the selected secret's current value from secrets.yaml. */
-  private _resolve = async (): Promise<string | null> => {
-    if (!this._api || !this.secretKey) return null;
+  /** Load the stored value into the editable field (cancellable). */
+  private async _loadStored(): Promise<void> {
+    const token = ++this._loadToken;
+    let value: string | null = null;
     try {
-      const yaml = await this._api.getConfig(SECRETS_FILE);
-      return secretValueFromYaml(yaml, this.secretKey);
+      const yaml = await this._api!.getConfig(SECRETS_FILE);
+      value = secretValueFromYaml(yaml, this.secretKey);
     } catch {
       toast.error(this._localize("device.secret_picker_reveal_error"), {
         richColors: true,
       });
-      return null;
     }
-  };
+    if (token !== this._loadToken) return; // target changed mid-flight
+    this._stored = value ?? "";
+    this._draftValue = this._stored;
+  }
 
-  /** Prefill the editor with the current value so the user edits, not retypes. */
-  private _startEdit = async (): Promise<void> => {
-    this._draftValue = (await this._resolve()) ?? "";
-    this._editing = true;
-  };
-
-  private _cancelEdit = (): void => {
-    this._editing = false;
-    this._draftValue = "";
+  private _copy = async (): Promise<void> => {
+    if (await copyToClipboard(this._draftValue)) {
+      toast.success(this._localize("device.secret_reveal_copied"), { richColors: true });
+    }
   };
 
   private _create = (): void => {
@@ -294,8 +274,7 @@ export class ESPHomeSecretValue extends LitElement {
           logLabel: "Secret save failed",
         }),
       () => {
-        this._editing = false;
-        this._draftValue = "";
+        this._stored = this._draftValue; // clears the dirty state
       }
     );
   };
