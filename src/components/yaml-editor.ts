@@ -1,13 +1,13 @@
 import { autocompletion } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
-import { EditorState, StateEffect, StateField } from "@codemirror/state";
+import { StateEffect, StateField } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
 import { consume } from "@lit/context";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { basicSetup, EditorView } from "codemirror";
-import { css, html, LitElement } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { css, html } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
@@ -21,10 +21,10 @@ import {
   EDITOR_BG_LIGHT,
   EDITOR_FONT_FAMILY,
   EDITOR_FONT_SIZE,
+  editorHeightTheme,
   INDENT_GUIDE_COLORS,
   lightHighlight,
-  vscodeDark,
-  vscodeLight,
+  selectEditorTheme,
 } from "../util/yaml-editor-theme.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
@@ -37,6 +37,7 @@ import {
   setRevealSensitiveEffect,
 } from "../util/yaml-sensitive-mask.js";
 import { yamlStickyScroll } from "../util/yaml-sticky-scroll.js";
+import { CodeMirrorEditorElement } from "./codemirror-editor-element.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 
@@ -84,7 +85,7 @@ const highlightField = StateField.define<DecorationSet>({
 });
 
 @customElement("esphome-yaml-editor")
-export class ESPHomeYamlEditor extends LitElement {
+export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   @consume({ context: darkModeContext, subscribe: true })
   @state()
   private _darkMode = false;
@@ -124,10 +125,6 @@ export class ESPHomeYamlEditor extends LitElement {
    *  extension-construction time; runtime changes trigger an
    *  editor remount via `updated()` (same path dark-mode uses). */
   @property({ type: Boolean }) maskAllValues = false;
-
-  @query(".cm-wrap") private _container!: HTMLDivElement;
-
-  private _view: EditorView | null = null;
 
   /** Last 1-indexed cursor line we emitted as `yaml-cursor-line`.
    *  We only emit on line transitions so a horizontal mouse / arrow
@@ -181,8 +178,8 @@ export class ESPHomeYamlEditor extends LitElement {
         jumpToLineLabel: (line) =>
           this._localize("yaml_editor.sticky_jump_to_line", { line: String(line) }),
       }),
+      editorHeightTheme,
       EditorView.theme({
-        "&": { height: "100%" },
         ".cm-scroller": {
           overflow: "auto",
           fontFamily: EDITOR_FONT_FAMILY,
@@ -421,7 +418,7 @@ export class ESPHomeYamlEditor extends LitElement {
           }
         }
       }),
-      this._darkMode ? vscodeDark : vscodeLight,
+      selectEditorTheme(this._darkMode),
     ];
 
     if (this._api && this.configuration) {
@@ -462,13 +459,7 @@ export class ESPHomeYamlEditor extends LitElement {
   }
 
   private _mountEditor() {
-    this._view = new EditorView({
-      state: EditorState.create({
-        doc: this.value,
-        extensions: this._buildExtensions(),
-      }),
-      parent: this._container,
-    });
+    this._mountView(this.value, this._buildExtensions());
 
     // Remount paths in updated() return before the highlightRange
     // branch, so re-apply a pending highlight (+ scroll) here.
@@ -504,7 +495,7 @@ export class ESPHomeYamlEditor extends LitElement {
    * field outliving the destroyed view).
    */
   private _remountEditor() {
-    this._view!.destroy();
+    this._destroyView();
     this._container.innerHTML = "";
     this._lastReportedCursorLine = 0;
     this._mountEditor();
@@ -640,12 +631,6 @@ export class ESPHomeYamlEditor extends LitElement {
         effects: setRevealSensitiveEffect.of(this.revealSensitive),
       });
     }
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this._view?.destroy();
-    this._view = null;
   }
 }
 

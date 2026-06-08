@@ -18,17 +18,18 @@
 import { indentWithTab } from "@codemirror/commands";
 import { cpp } from "@codemirror/lang-cpp";
 import { indentUnit } from "@codemirror/language";
-import { Annotation, Compartment, EditorState } from "@codemirror/state";
+import { Annotation, Compartment } from "@codemirror/state";
 import { keymap } from "@codemirror/view";
 import { consume } from "@lit/context";
 import { basicSetup, EditorView } from "codemirror";
-import { css, html, LitElement } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { css, html } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { darkModeContext, localizeContext } from "../../../context/index.js";
 import { editorSearchPhrases } from "../../../util/editor-search-phrases.js";
-import { vscodeDark, vscodeLight } from "../../../util/yaml-editor-theme.js";
+import { editorHeightTheme, selectEditorTheme } from "../../../util/yaml-editor-theme.js";
+import { CodeMirrorEditorElement } from "../../codemirror-editor-element.js";
 
 /** Marks the doc change that syncs the external ``value`` prop into the
  *  view, so the update listener can tell it apart from a user edit and
@@ -36,7 +37,7 @@ import { vscodeDark, vscodeLight } from "../../../util/yaml-editor-theme.js";
 const externalSync = Annotation.define<boolean>();
 
 @customElement("esphome-lambda-editor")
-export class ESPHomeLambdaEditor extends LitElement {
+export class ESPHomeLambdaEditor extends CodeMirrorEditorElement {
   @consume({ context: darkModeContext, subscribe: true })
   @state()
   private _darkMode = false;
@@ -58,9 +59,6 @@ export class ESPHomeLambdaEditor extends LitElement {
 
   @property() placeholder = "";
 
-  @query(".cm-wrap") private _container!: HTMLDivElement;
-
-  private _view: EditorView | null = null;
   private _themeCompartment = new Compartment();
   private _editableCompartment = new Compartment();
 
@@ -107,9 +105,7 @@ export class ESPHomeLambdaEditor extends LitElement {
     if (!this._view) return;
     if (changed.has("_darkMode")) {
       this._view.dispatch({
-        effects: this._themeCompartment.reconfigure(
-          this._darkMode ? vscodeDark : vscodeLight
-        ),
+        effects: this._themeCompartment.reconfigure(selectEditorTheme(this._darkMode)),
       });
     }
     if (changed.has("disabled")) {
@@ -130,50 +126,36 @@ export class ESPHomeLambdaEditor extends LitElement {
     }
   }
 
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this._view?.destroy();
-    this._view = null;
-  }
-
   private _mountEditor() {
-    this._view = new EditorView({
-      state: EditorState.create({
-        doc: this.value,
-        extensions: [
-          basicSetup,
-          editorSearchPhrases(this._localize),
-          cpp(),
-          indentUnit.of("  "),
-          keymap.of([indentWithTab]),
-          this._editableCompartment.of(EditorView.editable.of(!this.disabled)),
-          this._themeCompartment.of(this._darkMode ? vscodeDark : vscodeLight),
-          EditorView.theme({
-            "&": { height: "100%" },
-          }),
-          EditorView.updateListener.of((update) => {
-            // Skip programmatic ``value``-prop syncs (tagged ``externalSync``);
-            // only a real user edit should emit ``lambda-change`` (#1223).
-            // Presence check, not truthiness, so the marker reads as "this is
-            // a sync" regardless of the annotation's payload.
-            if (
-              update.docChanged &&
-              !update.transactions.some((tr) => tr.annotation(externalSync) !== undefined)
-            ) {
-              const value = update.state.doc.toString();
-              this.dispatchEvent(
-                new CustomEvent("lambda-change", {
-                  detail: { value },
-                  bubbles: true,
-                  composed: true,
-                })
-              );
-            }
-          }),
-        ],
+    this._mountView(this.value, [
+      basicSetup,
+      editorSearchPhrases(this._localize),
+      cpp(),
+      indentUnit.of("  "),
+      keymap.of([indentWithTab]),
+      this._editableCompartment.of(EditorView.editable.of(!this.disabled)),
+      this._themeCompartment.of(selectEditorTheme(this._darkMode)),
+      editorHeightTheme,
+      EditorView.updateListener.of((update) => {
+        // Skip programmatic ``value``-prop syncs (tagged ``externalSync``);
+        // only a real user edit should emit ``lambda-change`` (#1223).
+        // Presence check, not truthiness, so the marker reads as "this is
+        // a sync" regardless of the annotation's payload.
+        if (
+          update.docChanged &&
+          !update.transactions.some((tr) => tr.annotation(externalSync) !== undefined)
+        ) {
+          const value = update.state.doc.toString();
+          this.dispatchEvent(
+            new CustomEvent("lambda-change", {
+              detail: { value },
+              bubbles: true,
+              composed: true,
+            })
+          );
+        }
       }),
-      parent: this._container,
-    });
+    ]);
   }
 }
 
