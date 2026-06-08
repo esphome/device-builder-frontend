@@ -32,10 +32,11 @@ afterEach(() => {
 describe("esphome-navigator-search", () => {
   beforeEach(() => mount());
 
-  it("emits navigator-search { value } on input", async () => {
+  it("emits navigator-search { value } and self-syncs value on input", async () => {
     input().value = "clamp";
     input().dispatchEvent(new Event("input", { bubbles: true, composed: true }));
     expect(events).toEqual([{ value: "clamp" }]);
+    expect(el.value).toBe("clamp");
   });
 
   it("clears in place on Escape and zeroes value first", async () => {

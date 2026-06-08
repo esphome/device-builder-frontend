@@ -71,12 +71,15 @@ export class ESPHomeNavigatorSearch extends LitElement {
   }
 
   private _onInput = (e: Event) => {
-    this._emit((e.target as HTMLInputElement).value);
+    // Track our own value so it never lags the parent's echo.
+    this.value = (e.target as HTMLInputElement).value;
+    this._emit(this.value);
   };
 
   private _onKeydown = (e: KeyboardEvent) => {
-    // Escape clears in-place; stop it from bubbling to a parent dialog/drawer.
-    if (e.key === "Escape" && this.value) {
+    // Escape clears in-place; gate on the live input value (it can lead
+    // ``value`` by a keystroke) and stop it bubbling to a parent drawer.
+    if (e.key === "Escape" && this._input?.value) {
       e.stopPropagation();
       this._clear();
     }
