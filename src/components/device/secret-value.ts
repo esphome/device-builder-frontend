@@ -69,6 +69,10 @@ export class ESPHomeSecretValue extends LitElement {
   @state() private _loadError = false;
   /** Cancels a stale load when the target changes mid-fetch. */
   private _loadToken = 0;
+  /** Bumped on every target change so a write (`_run`) that resolves after the
+   *  user switched keys/present doesn't apply its result or clear a newer
+   *  operation's busy state. */
+  private _opToken = 0;
   /** A `_loadStored()` fetch is in flight — dedupes the `updated()` kick so a
    *  re-render during the round-trip doesn't fire a second `getConfig`. */
   private _loading = false;
@@ -84,6 +88,7 @@ export class ESPHomeSecretValue extends LitElement {
       this._loading = false;
       this._loadError = false;
       this._loadToken++;
+      this._opToken++;
     }
   }
 
@@ -405,11 +410,16 @@ export class ESPHomeSecretValue extends LitElement {
   ): Promise<void> {
     const api = this._api;
     if (!api || !this.secretKey || this._busy) return;
+    const token = this._opToken;
     this._busy = true;
     try {
-      if (await write(api)) onOk();
+      const ok = await write(api);
+      // The target changed mid-write — a newer operation now owns the state,
+      // so don't apply this result or touch its busy flag.
+      if (token !== this._opToken) return;
+      if (ok) onOk();
     } finally {
-      this._busy = false;
+      if (token === this._opToken) this._busy = false;
     }
   }
 }

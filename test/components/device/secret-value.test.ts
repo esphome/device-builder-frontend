@@ -292,6 +292,49 @@ describe("esphome-secret-value", () => {
     expect(pwInput(el).value).toBe("stored");
   });
 
+  it("a stale write completion doesn't clear a newer operation's busy state", async () => {
+    let resolveA!: () => void;
+    let resolveB!: () => void;
+    let n = 0;
+    const api = {
+      getConfig: vi.fn(async () => ""), // both keys absent → create path
+      updateConfig: vi.fn(
+        () =>
+          new Promise<void>((r) => {
+            n += 1;
+            if (n === 1) resolveA = r;
+            else resolveB = r;
+          })
+      ),
+      getSecretKeys: vi.fn(async () => []),
+    } as unknown as ESPHomeAPI;
+    const saveBtn = () => el.shadowRoot!.querySelector(".save") as HTMLButtonElement;
+
+    const el = await mount(api, "kitchen__a", false, "kitchen");
+    await typeValue(el, "aval");
+    await click(el, ".save"); // write A in flight (updateConfig#1 pending)
+
+    // Switch target, then start write B.
+    el.secretKey = "kitchen__b";
+    await el.updateComplete;
+    await typeValue(el, "bval");
+    await click(el, ".save"); // write B in flight; busy=true for B
+    expect(saveBtn().disabled).toBe(true);
+
+    // The stale write A resolves — must NOT clear B's busy (else B's button
+    // re-enables mid-write). Without the op-token guard this would be enabled.
+    resolveA();
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    expect(saveBtn().disabled).toBe(true);
+
+    // B completes normally (both writes were issued).
+    resolveB();
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    expect((api.updateConfig as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2);
+  });
+
   it("reloads the value and resets the draft when present flips", async () => {
     // Draft from the pre-keys-load window must not survive a missing→present flip.
     const api = {
