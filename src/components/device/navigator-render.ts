@@ -71,7 +71,7 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
       role=${ifDefined(interactive ? "button" : undefined)}
       tabindex=${ifDefined(interactive ? "0" : undefined)}
       aria-expanded=${ifDefined(interactive ? String(open) : undefined)}
-      aria-controls=${ifDefined(interactive && open ? rowsId : undefined)}
+      aria-controls=${ifDefined(interactive ? rowsId : undefined)}
       @click=${toggle}
       @keydown=${(e: KeyboardEvent) => {
         if (interactive && (e.key === "Enter" || e.key === " ")) {
