@@ -11,6 +11,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { editorSearchPhrases } from "../util/editor-search-phrases.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { getKeyPath } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
@@ -158,6 +159,7 @@ export class ESPHomeYamlEditor extends LitElement {
   private _buildExtensions() {
     const extensions = [
       basicSetup,
+      editorSearchPhrases(this._localize),
       esphomeYaml(),
       indentUnit.of(ESPHOME_YAML_INDENT),
       keymap.of([indentWithTab]),
@@ -518,17 +520,21 @@ export class ESPHomeYamlEditor extends LitElement {
     // would dispatch a stale-cursor preservation against the
     // freshly-mounted view.
 
-    // Theme / API / maskAllValues changes require a full editor
-    // rebuild — CodeMirror extensions are static once the state is
-    // built, and the mask-all flag is captured at extension
-    // construction time. The user may have unsaved edits in the
+    // Theme / API / maskAllValues / locale changes require a full
+    // editor rebuild — CodeMirror extensions are static once the state
+    // is built, so the mask-all flag and the search-panel phrases facet
+    // are captured at extension construction time. The user may have
+    // unsaved edits in the
     // view that the parent's `value` prop doesn't yet reflect (the
     // parent only learns about edits via `yaml-change`, which it
     // loops back as `value`), so preserve the current view content
     // across the rebuild by writing it back into `this.value`
     // before remounting.
     if (
-      (changed.has("_darkMode") || changed.has("_api") || changed.has("maskAllValues")) &&
+      (changed.has("_darkMode") ||
+        changed.has("_api") ||
+        changed.has("maskAllValues") ||
+        changed.has("_localize")) &&
       this._view
     ) {
       this.value = this._view.state.doc.toString();

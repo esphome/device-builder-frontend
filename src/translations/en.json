@@ -1009,6 +1009,25 @@
   "yaml_editor": {
     "sticky_jump_to_line": "Jump to line {line}"
   },
+  "editor_search": {
+    "find": "Find",
+    "replace_placeholder": "Replace",
+    "next": "next",
+    "previous": "previous",
+    "all": "all",
+    "match_case": "match case",
+    "by_word": "by word",
+    "regexp": "regexp",
+    "replace": "replace",
+    "replace_all": "replace all",
+    "close": "close",
+    "go_to_line": "Go to line",
+    "go": "go",
+    "current_match": "current match",
+    "on_line": "on line",
+    "replaced_matches": "replaced $ matches",
+    "replaced_match_on_line": "replaced match on line $"
+  },
   "settings": {
     "title": "Settings",
     "appearance": "Appearance",
