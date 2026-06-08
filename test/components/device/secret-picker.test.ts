@@ -15,6 +15,9 @@ vi.mock(
   () => ({})
 );
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+// secret-value (rendered for a selected key) pulls in confirm-dialog → wa-button,
+// which trips happy-dom's form-associated path; stub it (mirrors security-notice).
+vi.mock("../../../src/components/confirm-dialog.js", () => ({}));
 
 const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
 vi.mock("../../../src/util/navigation.js", () => ({ navigate }));

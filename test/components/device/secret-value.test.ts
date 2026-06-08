@@ -11,6 +11,18 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
+// Stub the confirm dialog (avoids pulling base-dialog / webawesome) while still
+// registering a working <esphome-confirm-dialog> with an open() the gate calls.
+vi.mock("../../../src/components/confirm-dialog.js", () => {
+  class Stub extends HTMLElement {
+    open(): void {}
+    close(): void {}
+  }
+  if (!customElements.get("esphome-confirm-dialog")) {
+    customElements.define("esphome-confirm-dialog", Stub);
+  }
+  return {};
+});
 
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../src/api/esphome-api.js";
@@ -20,11 +32,13 @@ import { _resetSecretKeysCache } from "../../../src/util/secrets-cache.js";
 async function mount(
   api: Partial<ESPHomeAPI>,
   key: string,
-  present: boolean
+  present: boolean,
+  deviceName = ""
 ): Promise<ESPHomeSecretValue> {
   const el = new ESPHomeSecretValue();
   el.secretKey = key;
   el.present = present;
+  el.deviceName = deviceName;
   (el as unknown as { _api: ESPHomeAPI })._api = api as ESPHomeAPI;
   document.body.appendChild(el);
   await el.updateComplete;
@@ -97,12 +111,13 @@ describe("esphome-secret-value", () => {
   });
 
   it("enables Save once the value changes and overwrites on save", async () => {
+    // Device-specific key so the save isn't gated by the shared-secret confirm.
     const api = {
-      getConfig: vi.fn(async () => "api_key: oldvalue\nother: y\n"),
+      getConfig: vi.fn(async () => "kitchen__api_key: oldvalue\nother: y\n"),
       updateConfig: vi.fn(async () => {}),
-      getSecretKeys: vi.fn(async () => ["api_key", "other"]),
+      getSecretKeys: vi.fn(async () => ["kitchen__api_key", "other"]),
     } as unknown as ESPHomeAPI;
-    const el = await mount(api, "api_key", true);
+    const el = await mount(api, "kitchen__api_key", true, "kitchen");
     expect(pwInput(el).value).toBe("oldvalue");
 
     await typeValue(el, "newvalue");
@@ -113,7 +128,7 @@ describe("esphome-secret-value", () => {
     await click(el, ".save");
 
     const [, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(content).toContain("api_key: newvalue");
+    expect(content).toContain("kitchen__api_key: newvalue");
     expect(content).toContain("other: y"); // other secrets preserved
     expect(content).not.toContain("oldvalue");
     expect(toast.success).toHaveBeenCalled();
@@ -121,6 +136,46 @@ describe("esphome-secret-value", () => {
     expect((el.shadowRoot!.querySelector(".save") as HTMLButtonElement).disabled).toBe(
       true
     );
+  });
+
+  it("confirms before overwriting a shared secret, then writes on confirm", async () => {
+    const api = {
+      getConfig: vi.fn(async () => "wifi_password: old\n"),
+      updateConfig: vi.fn(async () => {}),
+      getSecretKeys: vi.fn(async () => ["wifi_password"]),
+    } as unknown as ESPHomeAPI;
+    // wifi_password is shared (not this device's `<host>__` namespace).
+    const el = await mount(api, "wifi_password", true, "kitchen");
+
+    await typeValue(el, "newpass");
+    await click(el, ".save");
+    // Write is deferred until the user confirms.
+    expect(api.updateConfig).not.toHaveBeenCalled();
+
+    el.shadowRoot!.querySelector("esphome-confirm-dialog")!.dispatchEvent(
+      new CustomEvent("confirm")
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+
+    const [, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(content).toContain("wifi_password: newpass");
+  });
+
+  it("saves a device-specific secret without confirmation", async () => {
+    const api = {
+      getConfig: vi.fn(async () => "kitchen__encryption_key: old\n"),
+      updateConfig: vi.fn(async () => {}),
+      getSecretKeys: vi.fn(async () => ["kitchen__encryption_key"]),
+    } as unknown as ESPHomeAPI;
+    const el = await mount(api, "kitchen__encryption_key", true, "kitchen");
+
+    await typeValue(el, "newkey");
+    await click(el, ".save");
+
+    // This device's own secret → no prompt, write goes straight through.
+    const [, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(content).toContain("kitchen__encryption_key: newkey");
   });
 
   it("reloads the value and resets the draft when present flips", async () => {

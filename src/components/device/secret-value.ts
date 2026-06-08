@@ -9,7 +9,7 @@
 import { consume } from "@lit/context";
 import { mdiAlert, mdiContentCopy } from "@mdi/js";
 import { css, html, LitElement, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -20,10 +20,12 @@ import {
   setSecretWithToast,
 } from "../../util/ensure-secret-with-toast.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { secretValueFromYaml } from "../../util/secret-eligibility.js";
+import { isSharedSecret, secretValueFromYaml } from "../../util/secret-eligibility.js";
+import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { PasswordInputValueChange } from "./password-input-event.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../confirm-dialog.js";
 import "./password-input.js";
 
 registerMdiIcons({ alert: mdiAlert, "content-copy": mdiContentCopy });
@@ -47,6 +49,14 @@ export class ESPHomeSecretValue extends LitElement {
   /** Whether the key exists in secrets.yaml. False → offer to create it. */
   @property({ type: Boolean })
   present = false;
+
+  /** This device's resolved node name — distinguishes a shared secret (warn on
+   *  overwrite) from this device's own ``<host>__…`` secret. */
+  @property({ attribute: "device-name" })
+  deviceName = "";
+
+  @query("esphome-confirm-dialog")
+  private _confirmDialog?: ESPHomeConfirmDialog;
 
   /** The value being edited. */
   @state() private _draftValue = "";
@@ -170,25 +180,33 @@ export class ESPHomeSecretValue extends LitElement {
   private _renderEdit() {
     const dirty = this._stored !== null && this._draftValue !== this._stored;
     return html`<div class="row">
-      ${this._renderInput()}
-      <button
-        class="copy"
-        type="button"
-        title=${this._localize("device.secret_reveal_copy")}
-        aria-label=${this._localize("device.secret_reveal_copy")}
-        @click=${this._copy}
-      >
-        <wa-icon library="mdi" name="content-copy"></wa-icon>
-      </button>
-      <button
-        class="save"
-        type="button"
-        ?disabled=${this._busy || !dirty}
-        @click=${this._save}
-      >
-        ${this._localize("device.secret_picker_save")}
-      </button>
-    </div>`;
+        ${this._renderInput()}
+        <button
+          class="copy"
+          type="button"
+          title=${this._localize("device.secret_reveal_copy")}
+          aria-label=${this._localize("device.secret_reveal_copy")}
+          @click=${this._copy}
+        >
+          <wa-icon library="mdi" name="content-copy"></wa-icon>
+        </button>
+        <button
+          class="save"
+          type="button"
+          ?disabled=${this._busy || !dirty}
+          @click=${this._save}
+        >
+          ${this._localize("device.secret_picker_save")}
+        </button>
+      </div>
+      <esphome-confirm-dialog
+        heading=${this._localize("device.secret_picker_shared_confirm_title")}
+        confirm-label=${this._localize("device.secret_picker_save")}
+        message=${this._localize("device.secret_picker_shared_confirm_message", {
+          key: this.secretKey,
+        })}
+        @confirm=${this._persist}
+      ></esphome-confirm-dialog>`;
   }
 
   /** Missing secret: warn and offer to create it inline. */
@@ -266,6 +284,17 @@ export class ESPHomeSecretValue extends LitElement {
   };
 
   private _save = (): void => {
+    // A shared secret (wifi_*, plain, or another device's) is referenced by
+    // other devices, so overwriting it changes the value everywhere — confirm
+    // first. This device's own `<host>__…` secret writes straight through.
+    if (isSharedSecret(this.secretKey, this.deviceName)) {
+      this._confirmDialog?.open();
+      return;
+    }
+    this._persist();
+  };
+
+  private _persist = (): void => {
     void this._run(
       (api) =>
         setSecretWithToast(api, this.secretKey, this._draftValue, this._localize, {

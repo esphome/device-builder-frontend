@@ -33,6 +33,18 @@ export function isSecretEligible(sectionKey: string, key: string): boolean {
   return SHARED[sectionKey]?.[key] !== undefined;
 }
 
+/**
+ * Whether *key* is shared across devices rather than scoped to *hostname*.
+ * Only this device's ``<host>__…`` namespace counts as device-specific;
+ * everything else (``wifi_*``, plain names, another device's key, or an
+ * ambiguous single-underscore form) is treated as shared, so overwriting its
+ * value warns. An unknown hostname can't prove scoping → shared.
+ */
+export function isSharedSecret(key: string, hostname: string): boolean {
+  const host = slug(hostname);
+  return !host || !key.startsWith(`${host}__`);
+}
+
 /** Lowercase + collapse anything outside ``[a-z0-9_]`` so a hostname or
  *  field name is safe to embed in a secret key. */
 function slug(s: string): string {

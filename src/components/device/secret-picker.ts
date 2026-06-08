@@ -391,6 +391,7 @@ export class ESPHomeSecretPicker extends LitElement {
         ? html`<esphome-secret-value
             secret-key=${this.selectedKey}
             ?present=${!missing}
+            device-name=${this.deviceName}
           ></esphome-secret-value>`
         : nothing}
     `;
