@@ -211,6 +211,11 @@ export interface ParsedAutomation {
    *  action / condition id). Siblings still parse; the editor renders
    *  it read-only so its empty tree can't overwrite the real YAML. */
   error?: string | null;
+  /** True when ``error`` is a *known* action with no structured form
+   *  (an oversized LVGL ``*.update``) rather than a genuine parse
+   *  failure. The editor shows the neutral "edit in YAML" hint instead
+   *  of an error alert; it stays read-only either way. */
+  unsupported?: boolean;
 }
 
 /** Splice instruction returned by ``automations/upsert`` and
