@@ -21,6 +21,9 @@ export const termTokens = css`
     --term-accent: #4ec9b0;
     --term-error: #f44747;
     --term-success: #6a9955;
+    /* One monospace stack for every terminal-body element (status banner,
+       queued overlay, transport chip, sub-lines) across the driver dialogs. */
+    --term-mono-font: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
   }
 
   :host([light]) {
@@ -54,7 +57,6 @@ export const termButtonStyles = css`
     border-radius: 4px;
     font-size: 12px;
     font-weight: 600;
-    font-family: "SF Mono", "Fira Code", monospace;
     cursor: pointer;
     border: 1px solid var(--term-border);
     transition:
@@ -170,7 +172,7 @@ export const processTerminalStyles = css`
     gap: 12px;
     padding: 14px 20px;
     border-top: 1px solid var(--term-border);
-    font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
+    font-family: var(--term-mono-font);
     font-size: 14px;
     font-weight: 600;
   }

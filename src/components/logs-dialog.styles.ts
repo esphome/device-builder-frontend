@@ -13,11 +13,6 @@ import { fillTerminal } from "./process-terminal/process-terminal.styles.js";
  * from the shared termTokens / termButtonStyles in the component's styles.
  */
 export const logsDialogStyles = css`
-  :host {
-    /* Shared by the title part and the chip so the two can't drift. */
-    --logs-mono-font: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
-  }
-
   esphome-base-dialog {
     /* Width history: 900 wrapped, 1100 still ~100px short, 1200 still wrapped
        on retina / HiDPI screens where ESPHome's ANSI-coloured output reads at
@@ -30,12 +25,10 @@ export const logsDialogStyles = css`
   }
 
   /* The primary header bar + title colour/size come from the shared
-     primaryDialogHeaderStyles; the log title is the only monospace one.
-     The title ellipsis + close-button-clearance now live in base-dialog,
-     so a long /dev/cu… path can't overflow the header here either. */
-  esphome-base-dialog::part(title) {
-    font-family: var(--logs-mono-font);
-  }
+     primaryDialogHeaderStyles; the title uses the normal UI font (the
+     monospace transport chip carries the technical detail). The title
+     ellipsis + close-button-clearance live in base-dialog, so a long
+     /dev/cu… path can't overflow the header here either. */
   esphome-base-dialog::part(body) {
     padding: 0;
     background: var(--term-bg);
@@ -55,7 +48,7 @@ export const logsDialogStyles = css`
     text-overflow: ellipsis;
     padding: 1px 8px;
     border-radius: 999px;
-    font-family: var(--logs-mono-font);
+    font-family: var(--term-mono-font);
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-normal);
     color: var(--esphome-on-primary);
