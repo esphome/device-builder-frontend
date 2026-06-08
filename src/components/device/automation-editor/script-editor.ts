@@ -45,6 +45,7 @@ import {
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
+import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
@@ -234,7 +235,7 @@ export class ESPHomeScriptEditor extends LitElement {
       if (this.configuration) await this._loadAvailable();
       void this._loadScriptComponent();
     } catch (err) {
-      this._error = err instanceof Error ? err.message : String(err);
+      this._error = getErrorMessage(err);
     } finally {
       this._loading = false;
     }

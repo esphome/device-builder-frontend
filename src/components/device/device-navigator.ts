@@ -1,12 +1,11 @@
 import { consume } from "@lit/context";
 import {
-  mdiArrowDecisionOutline,
   mdiChevronDown,
   mdiChevronLeft,
   mdiChevronRight,
   mdiChevronUp,
   mdiCog,
-  mdiMemory,
+  mdiHomeOutline,
   mdiPlusCircleOutline,
   mdiScriptTextOutline,
 } from "@mdi/js";
@@ -43,6 +42,7 @@ import "./add-config-dialog.js";
 import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
 import "./add-script-dialog.js";
 import type { ESPHomeAddScriptDialog } from "./add-script-dialog.js";
+import { SECTION_ICON } from "./section-icons.js";
 import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 
 registerMdiIcons({
@@ -51,8 +51,7 @@ registerMdiIcons({
   "chevron-up": mdiChevronUp,
   "chevron-right": mdiChevronRight,
   cog: mdiCog,
-  "arrow-decision-outline": mdiArrowDecisionOutline,
-  memory: mdiMemory,
+  "home-outline": mdiHomeOutline,
   "plus-circle-outline": mdiPlusCircleOutline,
   "script-text-outline": mdiScriptTextOutline,
 });
@@ -265,6 +264,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
     interface NavSection {
       label: string;
       desc: string;
+      /** Leading section icon — mirrors the overview pane's step
+       *  buttons (cog / chip / automation) so the two surfaces agree. */
+      icon: string;
       items: YamlSection[];
       category: "core" | "component" | "automation";
       /** A section can carry multiple "+ Add X" affordances —
@@ -276,6 +278,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
       {
         label: this._localize("device.section_core"),
         desc: this._localize("device.section_core_desc"),
+        icon: SECTION_ICON.core,
         items: core,
         category: "core",
         actions: [
@@ -289,12 +292,13 @@ export class ESPHomeDeviceNavigator extends LitElement {
       {
         label: this._localize("device.section_components"),
         desc: this._localize("device.section_components_desc"),
+        icon: SECTION_ICON.components,
         items: components,
         category: "component",
         actions: [
           {
             label: this._localize("device.add_component"),
-            icon: "memory",
+            icon: SECTION_ICON.components,
             onClick: () => this._addComponentDialog.open(),
           },
         ],
@@ -302,12 +306,13 @@ export class ESPHomeDeviceNavigator extends LitElement {
       {
         label: this._localize("device.section_automations"),
         desc: this._localize("device.section_automations_desc"),
+        icon: SECTION_ICON.automations,
         items: automations,
         category: "automation",
         actions: [
           {
             label: this._localize("device.add_automation"),
-            icon: "arrow-decision-outline",
+            icon: SECTION_ICON.automations,
             onClick: () => this._addAutomationDialog.open(),
           },
           {
@@ -350,7 +355,17 @@ export class ESPHomeDeviceNavigator extends LitElement {
           @automation-added=${this._onAutomationAdded}
         ></esphome-add-script-dialog>
         <header class="card-header">
-          <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
+          <h2 class="card-title">
+            <button
+              type="button"
+              class="card-title-btn"
+              @click=${this._goToOverview}
+              title=${this._localize("device.navigator_home")}
+            >
+              <wa-icon library="mdi" name="home-outline"></wa-icon>
+              <span>${this._localize("device.navigator_title")}</span>
+            </button>
+          </h2>
           <button
             type="button"
             class="collapse-btn"
@@ -364,12 +379,16 @@ export class ESPHomeDeviceNavigator extends LitElement {
         <div class="card-body">
           <p class="italic">${this._localize("device.navigator_desc")}</p>
           <div class="separator"></div>
-          ${sections.map(({ label, desc, items, category, actions }, i) => {
+          ${sections.map(({ label, desc, icon, items, category, actions }, i) => {
             const open = this.openSections.has(i);
             return html`
               <div class="nav-content" @click=${() => this._toggleSection(i)}>
-                <p>${label}</p>
+                <div class="nav-content-label">
+                  <wa-icon library="mdi" name=${icon}></wa-icon>
+                  <p>${label}</p>
+                </div>
                 <wa-icon
+                  class="nav-content-chevron"
                   library="mdi"
                   name=${open ? "chevron-up" : "chevron-down"}
                 ></wa-icon>
@@ -448,6 +467,18 @@ export class ESPHomeDeviceNavigator extends LitElement {
       })
     );
   }
+
+  /** Clear the current section selection so the editor pane returns to
+   *  the device overview (board image + "Change board"). Mirrors the
+   *  deselect branch of ``_onItemClick`` without a row to toggle. */
+  private _goToOverview = () => {
+    this.selectedKey = null;
+    this._selectedLine = null;
+    this._selectedRange = null;
+    this._hoveredLine = null;
+    this._emitHighlight(null, false);
+    this._emitSectionSelect(null, undefined);
+  };
 
   /** Ask the page to hide the navigator. The page decides between
    *  desktop (set ``_navCollapsed`` + persist) and mobile (close the

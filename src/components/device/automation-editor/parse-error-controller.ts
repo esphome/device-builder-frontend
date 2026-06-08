@@ -27,6 +27,7 @@ import { sectionKeyFromLocation } from "./serialise.js";
 export class ParseErrorController implements ReactiveController {
   private _active = false;
   private _message = "";
+  private _unsupported = false;
 
   constructor(private readonly _host: ReactiveControllerHost) {
     _host.addController(this);
@@ -60,7 +61,7 @@ export class ParseErrorController implements ReactiveController {
       this._set(null);
       return null;
     }
-    this._set(match.error ?? null);
+    this._set(match.error ?? null, match.unsupported ?? false);
     if (match.error != null) return null;
     // The section key encodes every location field, so a match shares
     // the caller's location kind; ``as L`` re-narrows for the writer.
@@ -69,17 +70,30 @@ export class ParseErrorController implements ReactiveController {
 
   /** The read-only panel rendered in place of the editable form. */
   renderPanel(localize: LocalizeFunc) {
+    // A known action with no structured form is not an error — show the
+    // neutral "edit in YAML" hint, no alert styling.
+    if (this._unsupported) {
+      return html`<div class="ae-empty-block" role="note">
+        <p>${localize("device.yaml_only_section")}</p>
+      </div>`;
+    }
     return html`<div class="ae-empty-block" role="alert">
       <p class="ae-error">${localize("device.automation_parse_error")}</p>
       ${this._message ? html`<p>${this._message}</p>` : nothing}
     </div>`;
   }
 
-  private _set(message: string | null): void {
+  private _set(message: string | null, unsupported = false): void {
     const active = message != null;
-    if (this._active === active && this._message === (message ?? "")) return;
+    if (
+      this._active === active &&
+      this._message === (message ?? "") &&
+      this._unsupported === unsupported
+    )
+      return;
     this._active = active;
     this._message = message ?? "";
+    this._unsupported = unsupported;
     this._host.requestUpdate();
   }
 }

@@ -97,4 +97,53 @@ describe("ParseErrorController.resolve", () => {
     c.resolve([], SCRIPT, "script");
     expect(c.active).toBe(false);
   });
+
+  it("renders the neutral yaml-only hint for a known-but-unsupported action", () => {
+    const c = new ParseErrorController(fakeHost());
+    expect(
+      c.resolve(
+        [
+          parsed({
+            error: "No structured editor for action 'lvgl.label.update'",
+            unsupported: true,
+          }),
+        ],
+        SCRIPT,
+        "script"
+      )
+    ).toBeNull();
+    expect(c.active).toBe(true);
+    const localize = vi.fn((k: string) => k);
+    c.renderPanel(localize as never);
+    expect(localize).toHaveBeenCalledWith("device.yaml_only_section");
+    expect(localize).not.toHaveBeenCalledWith("device.automation_parse_error");
+  });
+
+  it("renders the error alert for a genuine parse error", () => {
+    const c = new ParseErrorController(fakeHost());
+    c.resolve([parsed({ error: "Unknown action id: 'x'" })], SCRIPT, "script");
+    const localize = vi.fn((k: string) => k);
+    c.renderPanel(localize as never);
+    expect(localize).toHaveBeenCalledWith("device.automation_parse_error");
+    expect(localize).not.toHaveBeenCalledWith("device.yaml_only_section");
+  });
+
+  it("clears the unsupported hint when a later resolve matches cleanly", () => {
+    const c = new ParseErrorController(fakeHost());
+    c.resolve([parsed({ error: "boom", unsupported: true })], SCRIPT, "script");
+    expect(c.active).toBe(true);
+    c.resolve([parsed({})], SCRIPT, "script");
+    expect(c.active).toBe(false);
+  });
+
+  it("swaps the unsupported hint for the error alert when a later resolve is a plain error", () => {
+    const c = new ParseErrorController(fakeHost());
+    c.resolve([parsed({ error: "boom", unsupported: true })], SCRIPT, "script");
+    c.resolve([parsed({ error: "Unknown action id: 'x'" })], SCRIPT, "script");
+    expect(c.active).toBe(true);
+    const localize = vi.fn((k: string) => k);
+    c.renderPanel(localize as never);
+    expect(localize).toHaveBeenCalledWith("device.automation_parse_error");
+    expect(localize).not.toHaveBeenCalledWith("device.yaml_only_section");
+  });
 });

@@ -100,6 +100,9 @@ export interface RegistryCatalogEntry {
    *  inline input at the polymorphic value position instead of an
    *  empty sub-form. */
   value_type?: RegistryValueType | null;
+  /** The scalar value accepts a lambda (``multiply: !lambda``); the
+   *  renderer offers a literal/lambda toggle on the inline input. */
+  templatable?: boolean;
 }
 
 /** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).
@@ -208,6 +211,11 @@ export interface ParsedAutomation {
    *  action / condition id). Siblings still parse; the editor renders
    *  it read-only so its empty tree can't overwrite the real YAML. */
   error?: string | null;
+  /** True when ``error`` is a *known* action with no structured form
+   *  (an oversized LVGL ``*.update``) rather than a genuine parse
+   *  failure. The editor shows the neutral "edit in YAML" hint instead
+   *  of an error alert; it stays read-only either way. */
+  unsupported?: boolean;
 }
 
 /** Splice instruction returned by ``automations/upsert`` and
@@ -224,10 +232,13 @@ export interface YamlDiff {
  *  ``!lambda |- ...`` block from a literal string. Used wherever a
  *  ``ConfigEntry`` has ``templatable: true`` and the user picked the
  *  lambda branch of the literal/lambda toggle. The backend writer
- *  emits this as a ruamel ``LiteralScalarString`` with ``|-`` style;
- *  the parser inverts. */
+ *  emits an untagged ``_lambda`` as a bare ``|-`` block; ``_tag:
+ *  "!lambda"`` re-emits the explicit tag, which a templatable value
+ *  field (``uart.write:``, ``delay:``) needs to compile as a lambda
+ *  rather than a string literal. Echo it back unchanged on save. */
 export interface LambdaValue {
   _lambda: string;
+  _tag?: "!lambda";
 }
 
 /** Type guard for ``LambdaValue``. */

@@ -47,6 +47,10 @@ export function renderLambdaField(entry: ConfigEntry, path: string[], ctx: Rende
   const value = lambdaBodyOf(raw);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
+  // Carry an existing ``!lambda`` tag forward across body edits so a
+  // tagged value (set by the templatable toggle, or parsed from a
+  // ``!lambda``-tagged field) doesn't decay to a bare ``|-`` block.
+  const tag = isLambdaValue(raw) ? raw._tag : undefined;
   return renderFieldShell(
     entry,
     path,
@@ -57,7 +61,10 @@ export function renderLambdaField(entry: ConfigEntry, path: string[], ctx: Rende
       ?disabled=${disabled}
       placeholder=${String(entry.default_value ?? "")}
       @lambda-change=${(e: CustomEvent<{ value: string }>) =>
-        ctx.emitChange(path, { _lambda: e.detail.value })}
+        ctx.emitChange(
+          path,
+          tag ? { _lambda: e.detail.value, _tag: tag } : { _lambda: e.detail.value }
+        )}
     ></esphome-lambda-editor>`
   );
 }

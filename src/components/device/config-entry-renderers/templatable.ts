@@ -86,8 +86,11 @@ export function renderTemplatableField(
       ctx.emitChange(path, stash.literal ?? "");
     } else {
       // Currently literal → going to lambda. Capture literal, restore lambda body.
+      // A templatable field also accepts a literal of the same type, so the
+      // lambda form needs the explicit ``!lambda`` tag — a bare ``|-`` block
+      // would parse as that literal, not a lambda.
       stash.literal = raw;
-      ctx.emitChange(path, { _lambda: stash.lambda ?? "" });
+      ctx.emitChange(path, { _lambda: stash.lambda ?? "", _tag: "!lambda" });
     }
   };
 

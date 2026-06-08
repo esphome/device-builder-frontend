@@ -37,8 +37,36 @@ export const deviceNavigatorStyles = css`
 
   .card-title {
     margin: 0;
+    line-height: 1;
+    min-width: 0;
+  }
+
+  .card-title-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    padding: var(--wa-space-2xs) var(--wa-space-xs);
+    margin-left: calc(-1 * var(--wa-space-xs));
+    border-radius: var(--wa-border-radius-s);
+    min-width: 0;
+    line-height: 1;
+    font-family: inherit;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
+  }
+
+  .card-title-btn:hover {
+    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+  }
+
+  .card-title-btn wa-icon {
+    display: block;
+    font-size: 18px;
+    flex-shrink: 0;
   }
 
   .collapse-btn {
@@ -94,6 +122,13 @@ export const deviceNavigatorStyles = css`
     flex-shrink: 0;
   }
 
+  .nav-content-label {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-xs);
+    min-width: 0;
+  }
+
   .nav-content:hover p {
     color: var(--esphome-primary);
   }
@@ -104,25 +139,33 @@ export const deviceNavigatorStyles = css`
     font-weight: var(--wa-font-weight-bold);
   }
 
-  .nav-content wa-icon {
+  .nav-content-label wa-icon {
+    font-size: var(--wa-font-size-l);
+    color: var(--esphome-primary);
+    flex-shrink: 0;
+  }
+
+  .nav-content-chevron {
     font-size: var(--wa-font-size-xl);
     color: var(--esphome-primary);
+    flex-shrink: 0;
   }
 
   .nav-items {
     display: flex;
     flex-direction: column;
-    gap: var(--wa-space-2xs);
-    padding: var(--wa-space-xs) var(--wa-space-m);
+    gap: 1px;
+    padding: var(--wa-space-2xs) var(--wa-space-s);
   }
 
   .nav-item {
-    padding: 0 var(--wa-space-2xs);
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    padding: 0 var(--wa-space-xs);
     border-radius: var(--wa-border-radius-m);
+    border-left: 3px solid transparent;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: var(--wa-space-2xs);
     cursor: pointer;
     user-select: none;
     transition:
@@ -133,25 +176,27 @@ export const deviceNavigatorStyles = css`
   .nav-item:hover,
   .nav-item--hovered {
     background: var(--esphome-tint);
-    border-color: var(--esphome-primary);
   }
 
   .nav-item--selected {
     background: var(--esphome-tint);
-    border-color: var(--esphome-primary);
+    border-left-color: var(--esphome-primary);
   }
 
   .nav-item-content {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: var(--wa-space-xs) 0;
+    padding: var(--wa-space-2xs) 0;
   }
 
   .nav-item-content p {
     margin: 0;
     font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
+    font-weight: var(--wa-font-weight-semibold);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .nav-item-subtitle {
@@ -160,11 +205,30 @@ export const deviceNavigatorStyles = css`
     font-weight: normal;
     margin: 0;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .nav-item wa-icon {
-    font-size: var(--wa-font-size-xl);
+    font-size: var(--wa-font-size-l);
     color: var(--esphome-primary);
+    flex-shrink: 0;
+  }
+
+  /* Declutter the chevron only where hover exists; on touch (no hover)
+     it stays visible so the "this row navigates" cue isn't lost. */
+  @media (hover: hover) {
+    .nav-item wa-icon {
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    .nav-item:hover wa-icon,
+    .nav-item--hovered wa-icon,
+    .nav-item--selected wa-icon {
+      opacity: 1;
+    }
   }
 
   .action-item {

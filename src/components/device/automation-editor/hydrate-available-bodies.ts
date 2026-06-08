@@ -15,6 +15,7 @@ import {
   type AutomationBodyFetcher,
   type HydrationResult,
 } from "../../../util/automation-body-hydration.js";
+import { getErrorMessage } from "../../../util/error-message.js";
 
 /** Which catalog lists to hydrate bodies for. A consumer that renders
  *  only some of them (the trigger-less editors never show triggers)
@@ -143,8 +144,7 @@ export function resolveLoadedAvailable(
   if (outcome.status === "stale") return {};
   if (outcome.status === "error") {
     return {
-      error:
-        outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
+      error: getErrorMessage(outcome.error),
     };
   }
   const { missingBody, missingField, rejected } = outcome.hydration;

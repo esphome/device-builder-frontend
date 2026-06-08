@@ -91,4 +91,19 @@ describe("renderLambdaField change handler", () => {
     expect(path).toEqual(["field"]);
     expect(value).toEqual({ _lambda: "return 7;" });
   });
+
+  it("carries an existing !lambda tag forward across a body edit", () => {
+    const emit = vi.fn();
+    const ctx = makeRenderCtx(
+      { field: { _lambda: "return 1;", _tag: "!lambda" } },
+      { overrides: { emitChange: emit } }
+    );
+    const entry = makeEntry(ConfigEntryType.LAMBDA, { key: "field" });
+    const template = renderLambdaField(entry, ["field"], ctx);
+    const b = getEditorBindings(template);
+    (b["@lambda-change"] as (e: CustomEvent<{ value: string }>) => void)(
+      new CustomEvent("lambda-change", { detail: { value: "return 7;" } })
+    );
+    expect(emit.mock.calls[0][1]).toEqual({ _lambda: "return 7;", _tag: "!lambda" });
+  });
 });

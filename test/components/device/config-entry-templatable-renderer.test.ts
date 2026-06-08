@@ -72,7 +72,7 @@ describe("renderTemplatableField", () => {
     expect(innerRender).not.toHaveBeenCalled();
   });
 
-  it("toggling literal → lambda emits a LambdaValue sentinel", () => {
+  it("toggling literal → lambda emits a tagged LambdaValue sentinel", () => {
     const emit = vi.fn();
     const ctx = makeRenderCtx({ field: "hello" }, { overrides: { emitChange: emit } });
     const entry = makeEntry(ConfigEntryType.STRING, {
@@ -84,7 +84,9 @@ describe("renderTemplatableField", () => {
     expect(emit).toHaveBeenCalledTimes(1);
     const [path, value] = emit.mock.calls[0];
     expect(path).toEqual(["field"]);
-    expect(value).toEqual({ _lambda: "" } satisfies LambdaValue);
+    // Templatable fields accept a literal too, so the lambda form needs
+    // the explicit ``!lambda`` tag to compile as a lambda.
+    expect(value).toEqual({ _lambda: "", _tag: "!lambda" } satisfies LambdaValue);
   });
 
   it("toggling lambda → literal emits a non-lambda primitive", () => {

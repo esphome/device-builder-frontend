@@ -174,3 +174,51 @@ export function chooseDisplayUnit(
   }
   return pendingUnit ?? defaultUnitForFloatWithUnit(defaultValue, unitOptions);
 }
+
+// SI prefixes the metric pickers use, with multipliers, for judging which
+// prefixed options sit at a field's scale. 'µ' is the canonical micro form.
+const METRIC_PREFIX_MULTIPLIERS: Record<string, number> = {
+  "": 1,
+  n: 1e-9,
+  µ: 1e-6,
+  m: 1e-3,
+  k: 1e3,
+  M: 1e6,
+  G: 1e9,
+};
+
+/**
+ * Narrow `unitOptions` to prefixes at the field's `range` scale, always keeping
+ * `mustKeep` units. Only metric-prefixed lists are trimmed; fixed lists and
+ * rangeless fields pass through. Display-only: callers parse against the full
+ * list, so a trimmed unit a value already uses is never stranded.
+ */
+export function visibleUnitOptions(
+  unitOptions: readonly string[],
+  range: readonly [number, number] | null,
+  mustKeep: readonly string[]
+): string[] {
+  const all = [...unitOptions];
+  if (!range || all.length <= 1) return all;
+  const base = all[0];
+  const prefixOf = (option: string): string | null => {
+    if (option === base) return "";
+    if (!option.endsWith(base)) return null;
+    const prefix = option.slice(0, option.length - base.length);
+    // own-key check, not `in`, so inherited keys (toString/constructor) can't
+    // masquerade as a known prefix and mis-trim a non-metric unit.
+    return Object.prototype.hasOwnProperty.call(METRIC_PREFIX_MULTIPLIERS, prefix)
+      ? prefix
+      : null;
+  };
+  // Only trim genuinely metric-prefixed lists.
+  if (!all.every((option) => prefixOf(option) !== null)) return all;
+  const [min, max] = range;
+  const keep = new Set(mustKeep);
+  const result = all.filter((option) => {
+    if (keep.has(option)) return true;
+    const mult = METRIC_PREFIX_MULTIPLIERS[prefixOf(option) as string];
+    return 0.1 * mult <= max && 1000 * mult >= min;
+  });
+  return result.length ? result : all;
+}
