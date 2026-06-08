@@ -13,6 +13,7 @@
 import { forEachDiagnostic, linter, type Diagnostic } from "@codemirror/lint";
 import {
   RangeSetBuilder,
+  StateEffect,
   StateField,
   type EditorState,
   type Extension,
@@ -304,9 +305,19 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
       // Don't auto-open the panel — we only want the inline wavy underlines
       // and hover tooltip.
       autoPanel: false,
+      // Re-run for unchanged content when a relintEffect is dispatched. A
+      // secrets.yaml write doesn't touch the editor doc, so without this the
+      // lint plugin has nothing scheduled and forceLinting() is a no-op.
+      needsRefresh: (update) =>
+        update.transactions.some((tr) => tr.effects.some((e) => e.is(relintEffect))),
     }
   );
 }
+
+// Dispatch on the editor view to make the backend linter re-validate the
+// current (unchanged) content, e.g. after a secrets.yaml write the doc can't
+// see. Pair with forceLinting(view) to run it immediately.
+export const relintEffect = StateEffect.define<null>();
 
 /** Tags a line so its line-number gutter cell renders the error icon. */
 const errorLineMarker = new (class extends GutterMarker {

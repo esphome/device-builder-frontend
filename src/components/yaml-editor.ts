@@ -1,6 +1,7 @@
 import { autocompletion } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
+import { forceLinting } from "@codemirror/lint";
 import { EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
 import { consume } from "@lit/context";
@@ -30,6 +31,7 @@ import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
+  relintEffect,
 } from "../util/yaml-lint-backend.js";
 import type { YamlSection } from "../util/yaml-sections.js";
 import {
@@ -642,11 +644,28 @@ export class ESPHomeYamlEditor extends LitElement {
     }
   }
 
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener("secrets-saved", this._onSecretsSaved);
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
+    window.removeEventListener("secrets-saved", this._onSecretsSaved);
     this._view?.destroy();
     this._view = null;
   }
+
+  // A secrets.yaml write doesn't change the editor doc, so the backend lint
+  // result for the open device is stale (its squiggle outlives the now-defined
+  // !secret). Force a re-validate; the relintEffect schedules the lint so
+  // forceLinting can run it immediately on unchanged content.
+  private _onSecretsSaved = () => {
+    const view = this._view;
+    if (!view) return;
+    view.dispatch({ effects: relintEffect.of(null) });
+    forceLinting(view);
+  };
 }
 
 declare global {
