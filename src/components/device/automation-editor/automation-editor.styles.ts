@@ -482,35 +482,6 @@ export const automationEditorStyles = css`
     flex-direction: column;
     gap: var(--wa-space-s);
   }
-  /* Literal/lambda toggle, matching the templatable-field toggle the
-     catalog-driven forms render (config-entry-form-extra.styles). */
-  .ae-delay .templatable-toggle {
-    display: inline-flex;
-    align-self: flex-start;
-    border-radius: var(--wa-border-radius-s);
-    background: var(--wa-color-surface-lowered);
-    padding: 2px;
-  }
-  .ae-delay .templatable-toggle button {
-    appearance: none;
-    border: none;
-    background: transparent;
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-2xs);
-    font-weight: var(--wa-font-weight-semibold);
-    padding: 4px 10px;
-    border-radius: var(--wa-border-radius-s);
-    cursor: pointer;
-  }
-  .ae-delay .templatable-toggle button.active {
-    background: var(--wa-color-surface-default);
-    color: var(--wa-color-text-normal);
-    box-shadow: var(--wa-shadow-xs);
-  }
-  .ae-delay .templatable-toggle button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
   .ae-delay-row {
     display: grid;
     grid-template-columns: 1fr 1fr;

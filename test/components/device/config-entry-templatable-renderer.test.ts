@@ -14,27 +14,28 @@ import { describe, expect, it, vi } from "vitest";
 import type { LambdaValue } from "../../../src/api/types/automations.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderTemplatableField } from "../../../src/components/device/config-entry-renderers/templatable.js";
-import { isTemplateResult } from "../../_lit-template-walker.js";
+import { isTemplateResult, visitTemplates } from "../../_lit-template-walker.js";
 import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 /**
- * Extract every ``@click`` handler from a template in declaration
- * order. The wrapper emits two buttons in literal-then-lambda order
- * inside a single template, so the two click handlers in ``values``
- * line up with that order too.
+ * Extract every ``@click`` handler from a template tree in document
+ * order. The two buttons live in the nested literal/lambda toggle
+ * template, so recurse through ``visitTemplates``; the literal button
+ * precedes the lambda one, so the handlers come out in that order.
  */
 function clickHandlers(template: unknown): Array<(e: Event) => void> {
   if (!isTemplateResult(template)) {
     throw new Error("Expected a Lit TemplateResult");
   }
-  const t = template as TemplateResult;
   const out: Array<(e: Event) => void> = [];
-  for (let i = 0; i < t.values.length; i++) {
-    const prefix = t.strings[i];
-    if (/@click\s*=\s*"?\s*$/.test(prefix) && typeof t.values[i] === "function") {
-      out.push(t.values[i] as (e: Event) => void);
+  visitTemplates(template, (t: TemplateResult) => {
+    for (let i = 0; i < t.values.length; i++) {
+      const prefix = t.strings[i];
+      if (/@click\s*=\s*"?\s*$/.test(prefix) && typeof t.values[i] === "function") {
+        out.push(t.values[i] as (e: Event) => void);
+      }
     }
-  }
+  });
   return out;
 }
 

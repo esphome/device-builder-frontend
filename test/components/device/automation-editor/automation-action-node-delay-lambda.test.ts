@@ -152,6 +152,20 @@ describe("automation-action-node delay lambda", () => {
     expect((lambdaEditor(el) as unknown as { value: string }).value).toBe("return 7;");
   });
 
+  it("keeps the value + unit when toggling to lambda and back", async () => {
+    const { el } = await mountDelay({ seconds: "5" });
+    const [literalBtn, lambdaBtn] = toggleButtons(el);
+
+    lambdaBtn.click();
+    await el.updateComplete;
+    expect(lambdaEditor(el)).not.toBeNull();
+
+    literalBtn.click();
+    await el.updateComplete;
+    expect(valueInput(el)!.value).toBe("5");
+    expect(selectedUnit(el)).toBe("s");
+  });
+
   it("still renders a plain string shorthand as value + unit", async () => {
     const { el } = await mountDelay({ id: "2s" });
     expect(lambdaEditor(el)).toBeNull();

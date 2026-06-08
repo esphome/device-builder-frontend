@@ -24,6 +24,7 @@ import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { fieldKeyAttr, type RenderCtx } from "../config-entry-renderers-shared.js";
 import { renderLambdaField } from "./lambda.js";
+import { renderLiteralLambdaToggle } from "./literal-lambda-toggle.js";
 
 interface StashEntry {
   /** Last literal value the user typed before flipping to lambda. */
@@ -96,32 +97,12 @@ export function renderTemplatableField(
 
   return html`
     <div class="templatable-field" data-field-key=${fieldKey}>
-      <div
-        class="templatable-toggle"
-        role="tablist"
-        aria-label=${ctx.localize("device.automation_literal")}
-      >
-        <button
-          type="button"
-          role="tab"
-          class=${!isLambda ? "active" : ""}
-          aria-selected=${!isLambda}
-          ?disabled=${ctx.disabled}
-          @click=${() => switchTo(false)}
-        >
-          ${ctx.localize("device.automation_literal")}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class=${isLambda ? "active" : ""}
-          aria-selected=${isLambda}
-          ?disabled=${ctx.disabled}
-          @click=${() => switchTo(true)}
-        >
-          ${ctx.localize("device.automation_lambda")}
-        </button>
-      </div>
+      ${renderLiteralLambdaToggle({
+        isLambda,
+        disabled: ctx.disabled,
+        localize: ctx.localize,
+        onSwitch: switchTo,
+      })}
       ${isLambda ? renderLambdaField(entry, path, ctx) : innerRender()}
     </div>
   `;

@@ -26,6 +26,7 @@ import {
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
+import { literalLambdaToggleStyles } from "./config-entry-renderers/literal-lambda-toggle.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
 import type { PasswordInputValueChange } from "./password-input.js";
 // Type-only — the `<esphome-secret-picker>` element is registered by the
@@ -43,6 +44,7 @@ export const fieldRendererStyles = [
   inputStyles,
   configEntryFormStyles,
   configEntryFormExtraStyles,
+  literalLambdaToggleStyles,
   fieldHighlightStyles,
 ];
 

@@ -293,45 +293,13 @@ export const configEntryFormExtraStyles = css`
     font-size: var(--wa-font-size-s);
   }
 
-  /* Templatable field wrapper — small literal/lambda tab strip
-     above the active body. The toggle is a pair of buttons rather
-     than a wa-tab-group to keep the markup leaf-cheap and the
-     keyboard story explicit. */
+  /* Templatable field wrapper — column holding the literal/lambda tab
+     strip (styled by literalLambdaToggleStyles) above the active
+     body. */
   .templatable-field {
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-2xs);
-  }
-
-  .templatable-toggle {
-    display: inline-flex;
-    align-self: flex-start;
-    border-radius: var(--wa-border-radius-s);
-    background: var(--wa-color-surface-lowered);
-    padding: 2px;
-  }
-
-  .templatable-toggle button {
-    appearance: none;
-    border: none;
-    background: transparent;
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-2xs);
-    font-weight: var(--wa-font-weight-semibold);
-    padding: 4px 10px;
-    border-radius: var(--wa-border-radius-s);
-    cursor: pointer;
-  }
-
-  .templatable-toggle button.active {
-    background: var(--wa-color-surface-default);
-    color: var(--wa-color-text-normal);
-    box-shadow: var(--wa-shadow-xs);
-  }
-
-  .templatable-toggle button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
   }
 
   /* TRIGGER (action-list) field — a button that opens the automation
