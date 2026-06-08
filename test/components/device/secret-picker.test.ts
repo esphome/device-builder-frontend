@@ -112,19 +112,18 @@ describe("esphome-secret-picker", () => {
     expect(active?.getAttribute("value")).toBe("wifi_ssid");
   });
 
-  it("renders an inline reveal for the selected secret's value", async () => {
+  it("renders the value affordance (present) for a selected existing key", async () => {
     const el = await mount(["wifi_ssid"]);
-    expect(el.shadowRoot!.querySelector(".selected-reveal")).toBeNull(); // none until selected
+    expect(el.shadowRoot!.querySelector("esphome-secret-value")).toBeNull(); // none until selected
     el.selectedKey = "wifi_ssid";
     await el.updateComplete;
-    const reveal = el.shadowRoot!.querySelector(".selected-reveal esphome-secret-reveal");
-    expect(reveal).not.toBeNull();
-    // The reveal is wired to lazily fetch the selected key's value.
-    expect((reveal as unknown as { resolve?: unknown }).resolve).toBeTypeOf("function");
-    expect(reveal!.getAttribute("resetkey")).toBe("wifi_ssid");
+    const val = el.shadowRoot!.querySelector("esphome-secret-value")!;
+    expect(val.getAttribute("secret-key")).toBe("wifi_ssid");
+    // Key is in the loaded list → present (reveal + edit), not the create flow.
+    expect((val as unknown as { present: boolean }).present).toBe(true);
   });
 
-  it("flags a referenced secret absent from the loaded list and offers the fix", async () => {
+  it("flags a referenced secret absent from the loaded list", async () => {
     const el = await mount(["wifi_ssid"]);
     el.selectedKey = "this_secret_is_missing";
     await el.updateComplete;
@@ -132,12 +131,10 @@ describe("esphome-secret-picker", () => {
     const trigger = el.shadowRoot!.querySelector(".trigger")!;
     expect(trigger.classList.contains("missing")).toBe(true);
     expect(trigger.querySelector(".key")!.getAttribute("name")).toBe("alert");
-    // The inline fix replaces the (misleading) masked reveal.
-    expect(el.shadowRoot!.querySelector("esphome-secret-missing")).not.toBeNull();
-    expect(el.shadowRoot!.querySelector(".selected-reveal")).toBeNull();
-    expect(
-      el.shadowRoot!.querySelector("esphome-secret-missing")!.getAttribute("secret-key")
-    ).toBe("this_secret_is_missing");
+    const val = el.shadowRoot!.querySelector("esphome-secret-value")!;
+    expect(val.getAttribute("secret-key")).toBe("this_secret_is_missing");
+    // Not present → the value affordance shows the inline create flow.
+    expect((val as unknown as { present: boolean }).present).toBe(false);
   });
 
   it("does not flag a referenced secret before the key list has loaded", async () => {
@@ -150,7 +147,9 @@ describe("esphome-secret-picker", () => {
     expect(el.shadowRoot!.querySelector(".trigger")!.classList.contains("missing")).toBe(
       false
     );
-    expect(el.shadowRoot!.querySelector("esphome-secret-missing")).toBeNull();
+    // Rendered, but treated as present (reveal) until the list confirms absence.
+    const val = el.shadowRoot!.querySelector("esphome-secret-value")!;
+    expect((val as unknown as { present: boolean }).present).toBe(true);
   });
 
   it("shows the placeholder label when no secret is selected", async () => {

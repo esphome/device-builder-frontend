@@ -37,8 +37,7 @@ import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import "@home-assistant/webawesome/dist/components/dropdown/dropdown.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "../secret-reveal.js";
-import "./secret-missing.js";
+import "./secret-value.js";
 
 registerMdiIcons({
   alert: mdiAlert,
@@ -196,16 +195,6 @@ export class ESPHomeSecretPicker extends LitElement {
 
     :host([full]) .chevron {
       margin-left: auto;
-    }
-
-    /* Inline reveal of the selected secret's value (eye + copy). */
-    .selected-reveal {
-      display: flex;
-      align-items: center;
-      gap: var(--wa-space-xs);
-      padding-left: var(--wa-space-2xs);
-      font-size: var(--wa-font-size-xs);
-      color: var(--wa-color-text-quiet);
     }
 
     .trigger {
@@ -399,40 +388,13 @@ export class ESPHomeSecretPicker extends LitElement {
           : nothing}
       </wa-dropdown>
       ${selected
-        ? missing
-          ? html`<esphome-secret-missing
-              secret-key=${this.selectedKey}
-            ></esphome-secret-missing>`
-          : this._renderSelectedReveal()
+        ? html`<esphome-secret-value
+            secret-key=${this.selectedKey}
+            ?present=${!missing}
+          ></esphome-secret-value>`
         : nothing}
     `;
   }
-
-  /** Reveal the selected secret's value inline, so the user can see it without
-   *  switching to the secrets editor. The value is fetched lazily on first
-   *  reveal (mirrors the `_manual` revert path's read). */
-  private _renderSelectedReveal() {
-    return html`<div class="selected-reveal">
-      <span>${this._localize("device.secret_picker_value")}</span>
-      <esphome-secret-reveal
-        .resolve=${this._revealSecretValue}
-        resetKey=${this.selectedKey}
-      ></esphome-secret-reveal>
-    </div>`;
-  }
-
-  private _revealSecretValue = async (): Promise<string | null> => {
-    if (!this._api || !this.selectedKey) return null;
-    try {
-      const yaml = await this._api.getConfig(SECRETS_FILE);
-      return secretValueFromYaml(yaml, this.selectedKey);
-    } catch {
-      toast.error(this._localize("device.secret_picker_reveal_error"), {
-        richColors: true,
-      });
-      return null;
-    }
-  };
 
   private _renderKeyItem(key: string) {
     return html`<wa-dropdown-item

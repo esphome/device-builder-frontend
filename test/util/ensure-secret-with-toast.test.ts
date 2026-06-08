@@ -12,7 +12,10 @@ vi.mock("sonner-js", () => ({
 
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
-import { ensureSecretWithToast } from "../../src/util/ensure-secret-with-toast.js";
+import {
+  ensureSecretWithToast,
+  setSecretWithToast,
+} from "../../src/util/ensure-secret-with-toast.js";
 import { _resetSecretKeysCache } from "../../src/util/secrets-cache.js";
 
 const localize = ((key: string) => key) as (key: string, args?: unknown) => string;
@@ -78,6 +81,49 @@ describe("ensureSecretWithToast", () => {
     } as unknown as ESPHomeAPI;
 
     const ok = await ensureSecretWithToast(api, "k", "v", localize, messages);
+    await flush();
+
+    expect(ok).toBe(false);
+    expect(api.updateConfig).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("device.error", { richColors: true });
+    expect(api.getSecretKeys).not.toHaveBeenCalled();
+  });
+});
+
+describe("setSecretWithToast", () => {
+  const setMessages = {
+    savedKey: "device.saved",
+    errorKey: "device.error",
+    logLabel: "save failed",
+  };
+
+  it("overwrites the value, toasts success, and refreshes the cache", async () => {
+    const api = {
+      getConfig: vi.fn(async () => "k: old\n"),
+      updateConfig: vi.fn(async () => {}),
+      getSecretKeys: vi.fn(async () => ["k"]),
+    } as unknown as ESPHomeAPI;
+
+    const ok = await setSecretWithToast(api, "k", "new", localize, setMessages);
+    await flush();
+
+    expect(ok).toBe(true);
+    const [, content] = (api.updateConfig as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(content).toContain("k: new");
+    expect(toast.success).toHaveBeenCalledWith("device.saved", { richColors: true });
+    expect(api.getSecretKeys).toHaveBeenCalled();
+  });
+
+  it("toasts an error, returns false, and skips the refresh on failure", async () => {
+    const api = {
+      getConfig: vi.fn(async () => {
+        throw new Error("ws blip");
+      }),
+      updateConfig: vi.fn(async () => {}),
+      getSecretKeys: vi.fn(async () => []),
+    } as unknown as ESPHomeAPI;
+
+    const ok = await setSecretWithToast(api, "k", "new", localize, setMessages);
     await flush();
 
     expect(ok).toBe(false);
