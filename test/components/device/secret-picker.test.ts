@@ -124,6 +124,35 @@ describe("esphome-secret-picker", () => {
     expect(reveal!.getAttribute("resetkey")).toBe("wifi_ssid");
   });
 
+  it("flags a referenced secret absent from the loaded list and offers the fix", async () => {
+    const el = await mount(["wifi_ssid"]);
+    el.selectedKey = "this_secret_is_missing";
+    await el.updateComplete;
+
+    const trigger = el.shadowRoot!.querySelector(".trigger")!;
+    expect(trigger.classList.contains("missing")).toBe(true);
+    expect(trigger.querySelector(".key")!.getAttribute("name")).toBe("alert");
+    // The inline fix replaces the (misleading) masked reveal.
+    expect(el.shadowRoot!.querySelector("esphome-secret-missing")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector(".selected-reveal")).toBeNull();
+    expect(
+      el.shadowRoot!.querySelector("esphome-secret-missing")!.getAttribute("secret-key")
+    ).toBe("this_secret_is_missing");
+  });
+
+  it("does not flag a referenced secret before the key list has loaded", async () => {
+    // No fetch primes the cache, so `getCachedSecretKeys()` is undefined.
+    const el = new ESPHomeSecretPicker();
+    el.selectedKey = "this_secret_is_missing";
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    expect(el.shadowRoot!.querySelector(".trigger")!.classList.contains("missing")).toBe(
+      false
+    );
+    expect(el.shadowRoot!.querySelector("esphome-secret-missing")).toBeNull();
+  });
+
   it("shows the placeholder label when no secret is selected", async () => {
     const el = await mount(["wifi_ssid"]);
     expect(el.shadowRoot!.querySelector(".trigger")!.classList.contains("selected")).toBe(
