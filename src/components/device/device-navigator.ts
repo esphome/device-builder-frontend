@@ -101,6 +101,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
    *  edit, not per render. See {@link deriveNavigatorBuckets}. */
   private _deriveBuckets = memoizeOne(deriveNavigatorBuckets);
 
+  /** Memoised on the rows identity so the Components regroup is stable
+   *  across idle re-renders (selection/hover); collapse is render-time. */
+  private _groupComponents = memoizeOne(groupRowsByDomain);
+
   /** Resolve every row's labels, indexed [core, components, automations]
    *  to match the section order. Memoised on the parsed buckets plus the
    *  inputs labels depend on (catalog ticks, platform, device name,
@@ -416,7 +420,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
                   actions,
                   rows,
                   // Components group by domain; other sections stay flat.
-                  groups: category === "component" ? groupRowsByDomain(rows) : undefined,
+                  groups:
+                    category === "component" ? this._groupComponents(rows) : undefined,
                   collapsedGroups: this._collapsedGroups,
                   onToggleGroup: (key) => this._toggleGroup(key),
                   open: filtering ? true : this.openSections.has(i),

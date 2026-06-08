@@ -64,12 +64,14 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
   const toggle = () => {
     if (interactive) v.onToggleGroup?.(group.key);
   };
+  const rowsId = `navgroup-${group.key}`;
   return html`
     <div
       class="nav-subgroup-header ${interactive ? "" : "nav-subgroup-header--static"}"
       role=${ifDefined(interactive ? "button" : undefined)}
       tabindex=${ifDefined(interactive ? "0" : undefined)}
       aria-expanded=${ifDefined(interactive ? String(open) : undefined)}
+      aria-controls=${ifDefined(interactive ? rowsId : undefined)}
       @click=${toggle}
       @keydown=${(e: KeyboardEvent) => {
         if (interactive && (e.key === "Enter" || e.key === " ")) {
@@ -89,7 +91,7 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
         : nothing}
     </div>
     ${open
-      ? html`<div class="nav-items nav-items--grouped">
+      ? html`<div id=${rowsId} class="nav-items nav-items--grouped">
           ${group.rows.map((row) => renderNavRow(row, v))}
         </div>`
       : nothing}
