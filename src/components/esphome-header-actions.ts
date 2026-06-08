@@ -13,7 +13,7 @@ import {
   mdiWifiCog,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { JobStatus } from "../api/types/firmware-jobs.js";
@@ -68,6 +68,12 @@ export class ESPHomeHeaderActions extends LitElement {
 
   @state()
   private _open = false;
+
+  /** True on the dashboard route. Dashboard-only menu entries
+   *  (Archived Devices) hide elsewhere; their dialog is hosted on the
+   *  dashboard page, so the entry would no-op anywhere else. */
+  @property({ type: Boolean, attribute: "dashboard-route" })
+  dashboardRoute = false;
 
   /** True when onboarding still has work to do (currently:
    *  Wi-Fi step pending — data-derived from ``secrets.yaml``).
@@ -336,16 +342,18 @@ export class ESPHomeHeaderActions extends LitElement {
                     : this._localize("onboarding.menu_item_change_wifi")}</span
                 >
               </div>
-              <div
-                class="menu-item"
-                role="menuitem"
-                tabindex="0"
-                @click=${this._openArchivedDevices}
-                @keydown=${this._onMenuItemKeydown}
-              >
-                <wa-icon library="mdi" name="archive-outline"></wa-icon>
-                ${this._localize("layout.archived_devices")}
-              </div>
+              ${this.dashboardRoute
+                ? html`<div
+                    class="menu-item"
+                    role="menuitem"
+                    tabindex="0"
+                    @click=${this._openArchivedDevices}
+                    @keydown=${this._onMenuItemKeydown}
+                  >
+                    <wa-icon library="mdi" name="archive-outline"></wa-icon>
+                    ${this._localize("layout.archived_devices")}
+                  </div>`
+                : nothing}
               ${ignoredCount > 0
                 ? html`<div
                     class="menu-item"

@@ -7,6 +7,7 @@ import { setLeaveGuard } from "../../src/util/navigation.js";
 interface LayoutPrivateView {
   _path: string;
   readonly _showBack: boolean;
+  readonly _isDashboard: boolean;
   _goHome: () => Promise<void>;
 }
 
@@ -25,6 +26,15 @@ describe("esphome-layout header back button visibility", () => {
   test("shown inside a device editor and other non-root routes", () => {
     expect(makeLayout("/device/living-room")._showBack).toBe(true);
     expect(makeLayout("/secrets")._showBack).toBe(true);
+  });
+});
+
+describe("esphome-layout dashboard-route detection", () => {
+  test("true on the device-list root, false elsewhere", () => {
+    expect(makeLayout("/")._isDashboard).toBe(true);
+    expect(makeLayout("")._isDashboard).toBe(true);
+    expect(makeLayout("/device/living-room")._isDashboard).toBe(false);
+    expect(makeLayout("/secrets")._isDashboard).toBe(false);
   });
 });
 

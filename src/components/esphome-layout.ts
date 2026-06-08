@@ -58,8 +58,12 @@ export class ESPHomeLayout extends LitElement {
     window.removeEventListener("popstate", this._onPopState);
   }
 
+  private get _isDashboard(): boolean {
+    return this._path === "/" || this._path === "";
+  }
+
   private get _showBack(): boolean {
-    return this._path !== "/" && this._path !== "";
+    return !this._isDashboard;
   }
 
   protected updated() {
@@ -337,7 +341,9 @@ export class ESPHomeLayout extends LitElement {
           <p>${this._localize("dashboard.subtitle")}</p>
         </div>
         <div class="header-spacer"></div>
-        <esphome-header-actions></esphome-header-actions>
+        <esphome-header-actions
+          ?dashboard-route=${this._isDashboard}
+        ></esphome-header-actions>
       </div>
       <slot></slot>
       <div class="app-footer">
