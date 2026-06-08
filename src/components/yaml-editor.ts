@@ -11,10 +11,6 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
-import { editorSearchPhrases } from "../util/editor-search-phrases.js";
-import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
-import { getKeyPath } from "../util/yaml-ast.js";
-import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import {
   darkHighlight,
   EDITOR_BG_DARK,
@@ -25,7 +21,11 @@ import {
   INDENT_GUIDE_COLORS,
   lightHighlight,
   selectEditorTheme,
-} from "../util/yaml-editor-theme.js";
+} from "../util/codemirror-theme.js";
+import { editorSearchPhrases } from "../util/editor-search-phrases.js";
+import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { getKeyPath } from "../util/yaml-ast.js";
+import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   createBackendYamlLinter,

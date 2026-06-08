@@ -4,7 +4,7 @@ import { EditorView } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 
 /**
- * VSCode-flavored CodeMirror themes for the YAML editor.
+ * VSCode-flavored CodeMirror themes, shared by the YAML and lambda editors.
  *
  * Dark mode mirrors VSCode "Dark+":
  *   keys light-blue, strings peach, comments green italic,

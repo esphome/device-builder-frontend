@@ -27,8 +27,8 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { darkModeContext, localizeContext } from "../../../context/index.js";
+import { editorHeightTheme, selectEditorTheme } from "../../../util/codemirror-theme.js";
 import { editorSearchPhrases } from "../../../util/editor-search-phrases.js";
-import { editorHeightTheme, selectEditorTheme } from "../../../util/yaml-editor-theme.js";
 import { CodeMirrorEditorElement } from "../../codemirror-editor-element.js";
 
 /** Marks the doc change that syncs the external ``value`` prop into the

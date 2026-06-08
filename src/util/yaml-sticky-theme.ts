@@ -1,6 +1,6 @@
 import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { EDITOR_FONT_FAMILY, EDITOR_FONT_SIZE } from "./yaml-editor-theme.js";
+import { EDITOR_FONT_FAMILY, EDITOR_FONT_SIZE } from "./codemirror-theme.js";
 
 export function buildStickyTheme(background: string): Extension {
   return EditorView.theme({
