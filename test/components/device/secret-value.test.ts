@@ -133,6 +133,26 @@ describe("esphome-secret-value", () => {
     expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).not.toBeNull();
   });
 
+  it("drops edit state when present flips (no stale editor after create)", async () => {
+    // Edit begun while optimistically present (pre-keys-load) must not resurface
+    // as an empty editor once the key resolves missing then created → present.
+    const api = {
+      getConfig: vi.fn(async () => "api_key: stored\n"),
+    } as unknown as ESPHomeAPI;
+    const el = await mount(api, "api_key", true);
+
+    await click(el, ".edit");
+    expect(el.shadowRoot!.querySelector("esphome-password-input")).not.toBeNull();
+
+    el.present = false; // keys loaded → key absent
+    await el.updateComplete;
+    el.present = true; // user created it → present again
+    await el.updateComplete;
+
+    expect(el.shadowRoot!.querySelector("esphome-password-input")).toBeNull();
+    expect(el.shadowRoot!.querySelector("esphome-secret-reveal")).not.toBeNull();
+  });
+
   it("drops edit state when the target key changes", async () => {
     const api = {
       getConfig: vi.fn(async () => "api_key: stored\n"),

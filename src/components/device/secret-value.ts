@@ -52,8 +52,11 @@ export class ESPHomeSecretValue extends LitElement {
   @state() private _busy = false;
 
   protected willUpdate(changed: PropertyValues): void {
-    // A new target drops edit state so a stale draft can't leak across keys.
-    if (changed.has("secretKey")) {
+    // Drop edit state on a new target OR a present flip: a stale draft mustn't
+    // leak across keys, and an edit begun in the brief pre-keys-load window
+    // (optimistically present) must not resurface as an empty editor once the
+    // key resolves missing → created → present again.
+    if (changed.has("secretKey") || changed.has("present")) {
       this._editing = false;
       this._draftValue = "";
       this._busy = false;
