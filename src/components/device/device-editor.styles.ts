@@ -67,7 +67,7 @@ export const deviceEditorStyles = css`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-shrink: 0;
+    min-width: 0;
   }
 
   .editor-header-file {
@@ -78,6 +78,9 @@ export const deviceEditorStyles = css`
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    /* Yield before the device name when the header is tight; the
+       filename is the secondary half of the title row. */
+    flex-shrink: 2;
   }
 
   .editor-floating-actions {

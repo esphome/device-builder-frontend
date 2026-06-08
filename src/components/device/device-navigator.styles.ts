@@ -37,9 +37,8 @@ export const deviceNavigatorStyles = css`
 
   .card-title {
     margin: 0;
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
     line-height: 1;
+    min-width: 0;
   }
 
   .card-title-btn {
@@ -55,6 +54,9 @@ export const deviceNavigatorStyles = css`
     border-radius: var(--wa-border-radius-s);
     min-width: 0;
     line-height: 1;
+    font-family: inherit;
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-bold);
   }
 
   .card-title-btn:hover {

@@ -355,16 +355,18 @@ export class ESPHomeDeviceNavigator extends LitElement {
           @automation-added=${this._onAutomationAdded}
         ></esphome-add-script-dialog>
         <header class="card-header">
-          <button
-            type="button"
-            class="card-title-btn"
-            @click=${this._goToOverview}
-            title=${this._localize("device.navigator_home")}
-            aria-label=${this._localize("device.navigator_home")}
-          >
-            <wa-icon library="mdi" name="home-outline"></wa-icon>
-            <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
-          </button>
+          <h2 class="card-title">
+            <button
+              type="button"
+              class="card-title-btn"
+              @click=${this._goToOverview}
+              title=${this._localize("device.navigator_home")}
+              aria-label=${this._localize("device.navigator_home")}
+            >
+              <wa-icon library="mdi" name="home-outline"></wa-icon>
+              <span>${this._localize("device.navigator_title")}</span>
+            </button>
+          </h2>
           <button
             type="button"
             class="collapse-btn"
