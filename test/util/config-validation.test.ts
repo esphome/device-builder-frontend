@@ -73,6 +73,13 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, "")).toBeNull();
   });
 
+  it("ignores UNKNOWN (YAML-only) fields even when required", () => {
+    // A mapping-or-list union the form renders as the YAML-only notice;
+    // it must not block the wizard with an unclearable required error.
+    const entry = makeEntry({ required: true, type: ConfigEntryType.UNKNOWN });
+    expect(validateEntry(entry, "")).toBeNull();
+  });
+
   it("allows empty optional fields", () => {
     expect(validateEntry(makeEntry({ required: false }), "")).toBeNull();
   });
