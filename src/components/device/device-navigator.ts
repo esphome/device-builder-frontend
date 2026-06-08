@@ -361,7 +361,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
               class="card-title-btn"
               @click=${this._goToOverview}
               title=${this._localize("device.navigator_home")}
-              aria-label=${this._localize("device.navigator_home")}
             >
               <wa-icon library="mdi" name="home-outline"></wa-icon>
               <span>${this._localize("device.navigator_title")}</span>
