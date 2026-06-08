@@ -31,6 +31,7 @@ import {
   subscribeSecretKeys,
 } from "../../util/secrets-cache.js";
 import { ensureSecretInYaml } from "../../util/secrets-write.js";
+import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/dropdown-item/dropdown-item.js";
@@ -110,34 +111,22 @@ export class ESPHomeSecretPicker extends LitElement {
   @property({ attribute: false })
   recommendedKeys: string[] = [];
 
-  @state()
-  private _keys: string[] = getCachedSecretKeys() ?? [];
+  // The shared cache owns the `secrets-saved` refresh (deduped, once for all
+  // pickers) and the fetch-once-on-api dedupe; the controller subscribes,
+  // repaints on change, and kicks the fetch when the api lands.
+  private _secretKeys = new SessionBlobCacheController<string[]>(
+    this,
+    {
+      getCached: getCachedSecretKeys,
+      subscribe: subscribeSecretKeys,
+      fetch: fetchSecretKeys,
+    },
+    () => this._api
+  );
 
-  private _unsub?: () => void;
-  private _kicked = false;
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    // The shared cache owns the `secrets-saved` refresh (deduped, once for all
-    // pickers); we just repaint when its list changes.
-    this._unsub = subscribeSecretKeys(() => {
-      this._keys = getCachedSecretKeys() ?? [];
-    });
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._unsub?.();
-    this._unsub = undefined;
-  }
-
-  protected updated(): void {
-    // Kick the shared fetch once, when the api context first lands — the
-    // cache + subscribe handle dedupe and the repaint.
-    if (this._api && !this._kicked) {
-      this._kicked = true;
-      void fetchSecretKeys(this._api);
-    }
+  /** Cached secret keys, ``[]`` until the first fetch resolves. */
+  private get _keys(): string[] {
+    return this._secretKeys.value ?? [];
   }
 
   /** The key a migrate would create: always the preferred (first) form, never
