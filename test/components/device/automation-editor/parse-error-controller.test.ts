@@ -134,8 +134,16 @@ describe("ParseErrorController.resolve", () => {
     expect(c.active).toBe(true);
     c.resolve([parsed({})], SCRIPT, "script");
     expect(c.active).toBe(false);
+  });
+
+  it("swaps the unsupported hint for the error alert when a later resolve is a plain error", () => {
+    const c = new ParseErrorController(fakeHost());
+    c.resolve([parsed({ error: "boom", unsupported: true })], SCRIPT, "script");
+    c.resolve([parsed({ error: "Unknown action id: 'x'" })], SCRIPT, "script");
+    expect(c.active).toBe(true);
     const localize = vi.fn((k: string) => k);
     c.renderPanel(localize as never);
     expect(localize).toHaveBeenCalledWith("device.automation_parse_error");
+    expect(localize).not.toHaveBeenCalledWith("device.yaml_only_section");
   });
 });
