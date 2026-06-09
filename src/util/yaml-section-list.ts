@@ -12,12 +12,12 @@ import {
   stripQuotes,
 } from "./yaml-scalar.js";
 import {
-  BLOCK_SCALAR_INLINE_RE,
   BLOCK_SCALAR_RE,
   endsBlockAtIndent,
   isBlankOrCommentLine,
   LIST_ITEM_BARE_DASH_RE,
   LIST_ITEM_DICT_KEY_RE,
+  parseBlockScalarHeader,
 } from "./yaml-section-lexer.js";
 
 export const collectBlockListItems = (
@@ -80,10 +80,12 @@ export const parseFlatMappingField = (
   // so the surrounding parser keeps the block as YamlRawValue
   // and the serializer doesn't quote the dotted key on save.
   if (key.includes(".")) return null;
-  // Block-scalar headers (``key: |-``) stay opaque so the body
-  // round-trips through YamlRawValue; ``parseScalar("|-")`` would
-  // otherwise return the literal string ``"|-"``.
-  if (BLOCK_SCALAR_INLINE_RE.test(raw)) return null;
+  // Block-scalar headers (``key: |-``, ``key: !lambda |-``) stay
+  // opaque here so the multi-line body round-trips: the inline
+  // ``raw`` is only the header, the body sits on following lines
+  // the caller captures. ``parseScalar("|-")`` would otherwise
+  // return the literal string ``"|-"`` (or ``"!lambda |-"``).
+  if (parseBlockScalarHeader(raw)) return null;
   // ``key:`` with no value is structurally ``{key: null}`` in YAML.
   // Recognising it here is what lets list-of-single-key-mappings
   // (light ``effects:``, sensor ``filters:``, any registry-shaped

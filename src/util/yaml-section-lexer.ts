@@ -77,8 +77,13 @@ export const LIST_ITEM_START_RE = /^\s+-(\s|$)/;
  * conservative (they over-trigger raw mode, which is lossless),
  * but the anchor avoids the surprise of raw-mode kicking in on a
  * value the parser could otherwise round-trip.
+ *
+ * An optional YAML tag (`!lambda`, `!secret`) may sit between the
+ * colon and the `|`/`>` marker (`multiply: !lambda |-`); ESPHome's
+ * templatable fields emit that shape, so the tag has to count as a
+ * block-scalar header too.
  */
-export const BLOCK_SCALAR_RE = /^[^"']*:\s*[|>][-+]?\s*(?:#.*)?$/;
+export const BLOCK_SCALAR_RE = /^[^"']*:\s*(?:!\S+\s+)?[|>][-+]?\s*(?:#.*)?$/;
 
 /**
  * Match an inline block-scalar marker — the part AFTER the colon
@@ -87,6 +92,23 @@ export const BLOCK_SCALAR_RE = /^[^"']*:\s*[|>][-+]?\s*(?:#.*)?$/;
  * block scalar header rather than a list of items).
  */
 export const BLOCK_SCALAR_INLINE_RE = /^[|>][-+]?$/;
+
+/**
+ * Tag-aware form of `BLOCK_SCALAR_INLINE_RE`: the post-colon `raw`
+ * is an optional YAML tag followed by a `|`/`>` marker. Capture
+ * group 1 is the tag (or undefined), group 2 the marker. Used by
+ * the reader to recognise `!lambda |-` so a lambda block round-trips
+ * as an editable value instead of decaying to the literal string
+ * `"!lambda |-"`.
+ */
+const TAGGED_BLOCK_SCALAR_INLINE_RE = /^(?:(!\S+)\s+)?([|>][-+]?)$/;
+
+export const parseBlockScalarHeader = (
+  raw: string
+): { tag: string | undefined; marker: string } | null => {
+  const m = raw.match(TAGGED_BLOCK_SCALAR_INLINE_RE);
+  return m ? { tag: m[1], marker: m[2] } : null;
+};
 
 /**
  * Match a bare-dash list item (``    -`` followed by EOL or only

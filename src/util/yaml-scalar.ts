@@ -6,6 +6,7 @@
  * keep growing.
  */
 
+import type { LambdaValue } from "../api/types/automations.js";
 import { splitTopLevelCommas } from "./split-top-level-commas.js";
 import { unescapeYamlDoubleQuoted } from "./yaml-escape.js";
 import { parseYamlBoolean } from "./yaml-serialize.js";
@@ -57,6 +58,19 @@ export const splitInlineComment = (raw: string): { value: string; comment: strin
   return { value: raw, comment: "" };
 };
 
+// Inline lambda scalar: ``!lambda return x;`` (and the quoted
+// ``!lambda 'return x;'`` form). Recognised as a ``LambdaValue``
+// so a templatable field shows the lambda editor instead of a
+// string field holding the literal ``!lambda …`` text. The block
+// form (``!lambda |-``) is captured by the reader's block-scalar
+// branch before reaching here.
+const INLINE_LAMBDA_RE = /^!lambda\s+([\s\S]+)$/;
+
+const parseInlineLambda = (scalar: string): LambdaValue | null => {
+  const m = scalar.match(INLINE_LAMBDA_RE);
+  return m ? { _lambda: stripQuotes(m[1].trim()), _tag: "!lambda" } : null;
+};
+
 // Quoting in YAML is the explicit "treat me as a string" signal —
 // ``key: "on"`` must stay the literal ``"on"`` even though ``on`` is
 // a truthy spelling. Detect the quotes BEFORE stripping so we only
@@ -67,6 +81,8 @@ export const parseScalar = (raw: string): unknown => {
   // Strip a trailing inline comment so a boolean/number field coerces
   // and the form value isn't polluted with `# ...` text (#1235).
   const { value: scalar } = splitInlineComment(raw);
+  const lambda = parseInlineLambda(scalar);
+  if (lambda !== null) return lambda;
   const wasQuoted =
     (scalar.startsWith('"') && scalar.endsWith('"')) ||
     (scalar.startsWith("'") && scalar.endsWith("'"));

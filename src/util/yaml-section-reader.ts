@@ -6,6 +6,7 @@
  * facade in yaml-section-values.ts.
  */
 
+import type { LambdaValue } from "../api/types/automations.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { parseFlowList, parseScalar, splitInlineComment } from "./yaml-scalar.js";
@@ -14,7 +15,6 @@ import {
   _detectSectionChildIndent,
   _leadingIndent,
   _skipBlankAndCommentLines,
-  BLOCK_SCALAR_INLINE_RE,
   childRegexFor,
   isBlankOrCommentLine,
   isChildListItemLine,
@@ -25,6 +25,7 @@ import {
   LIST_ITEM_INLINE_KEY_RE,
   LIST_ITEM_START_RE,
   listItemRegexFor,
+  parseBlockScalarHeader,
   TOP_LEVEL_KEY_START_RE,
 } from "./yaml-section-lexer.js";
 import {
@@ -32,9 +33,36 @@ import {
   _matchFlatMappingField,
   _scanValueBlock,
   collectBlockListItems,
+  parseFlatMappingField,
 } from "./yaml-section-list.js";
 import { type KeySpan, type ParsedSection } from "./yaml-section-splice.js";
 import { YamlRawValue } from "./yaml-serialize.js";
+
+/**
+ * Build a ``LambdaValue`` sentinel from a captured ``!lambda`` block
+ * body. Reuses ``YamlRawValue.body`` to strip the block's common
+ * indent (so ``          return 0.01;`` becomes ``return 0.01;``);
+ * the trailing-whitespace trim mirrors the ``|-`` chomp.
+ */
+const lambdaValueFromBlock = (bodyLines: string[]): LambdaValue => ({
+  _lambda: new YamlRawValue(bodyLines).body.replace(/[ \t\r\n]+$/, ""),
+  _tag: "!lambda",
+});
+
+/**
+ * Turn a (possibly tagged) block-scalar header + its captured body
+ * lines into a form value: a ``LambdaValue`` for ``!lambda`` so the
+ * value stays editable, a ``YamlRawValue`` (carrying the verbatim
+ * header) for any other tag or a bare ``|-``/``>`` block.
+ */
+const blockScalarValue = (
+  tag: string | undefined,
+  rawHeader: string,
+  bodyLines: string[]
+): LambdaValue | YamlRawValue =>
+  tag === "!lambda"
+    ? lambdaValueFromBlock(bodyLines)
+    : new YamlRawValue(bodyLines, rawHeader);
 
 /**
  * Dispatch a YAML list block (``key:\n  - …``) into the right
@@ -197,7 +225,33 @@ const collectBlockListMappings = (
     const item: Record<string, unknown> = Object.create(null);
     let firstEmptyKey: string | null = null;
     if (!LIST_ITEM_BARE_DASH_RE.test(lines[at])) {
-      const header = _matchFlatMappingField(lines[at], headerRe);
+      const headerMatch = lines[at].match(headerRe);
+      if (!headerMatch) return null;
+      const headerKey = headerMatch[1];
+      const headerRaw = headerMatch[2].trim();
+      // ``- multiply: !lambda |-`` (#1351): the body sits on the
+      // following deeper-indented lines, so capture it here rather
+      // than letting ``parseFlatMappingField`` mis-read the lone
+      // header as a scalar and drop the body. Scoped to the ``!lambda``
+      // tag so the value comes back as an editable ``LambdaValue``;
+      // a bare ``- foo: |-`` (or ``- then:`` automation sequence)
+      // still bails to the whole-list ``YamlRawValue`` fallback. The
+      // body extent is measured against the dash's key column
+      // (``dashIndent + "- "``) — the detected ``childIndent``
+      // collapses onto the body indent when there are no flat
+      // sibling sub-keys.
+      const blockHeader = parseBlockScalarHeader(headerRaw);
+      if (blockHeader) {
+        if (blockHeader.tag !== "!lambda") return null;
+        const { endIdx } = _scanValueBlock(
+          lines,
+          at + 1,
+          `${dashIndent}${ESPHOME_YAML_INDENT}`
+        );
+        item[headerKey] = lambdaValueFromBlock(lines.slice(at + 1, endIdx));
+        return { item, endIdx };
+      }
+      const header = parseFlatMappingField(headerKey, headerRaw);
       if (!header) return null;
       item[header.key] = header.value;
       // ``- effect_id:`` with no value may be a polymorphic single-
@@ -389,16 +443,17 @@ export function parseSectionCore(
     const raw = match[2].trim();
 
     // Direct block scalar: `key: |-` (or `|`, `>`, `>-`, `|+`,
-    // `>+`). The header sits on this line; the body lines are
-    // indented underneath. Without this branch the parser would
-    // store `raw` as a literal string `"|-"` and drop the body —
-    // the serializer would then quote `|-` (it starts with `-`)
-    // and emit `key: "|-"`, corrupting any inline lambda /
-    // multi-line scalar field. Capture the body lines as raw
-    // and replay the inline header on serialize.
-    if (BLOCK_SCALAR_INLINE_RE.test(raw)) {
+    // `>+`), optionally tagged (`key: !lambda |-`). The header sits
+    // on this line; the body lines are indented underneath. Without
+    // this branch the parser would store `raw` as a literal string
+    // `"|-"` / `"!lambda |-"` and drop the body — the serializer
+    // would then quote it and corrupt the field. A `!lambda` tag
+    // becomes an editable `LambdaValue`; anything else round-trips
+    // through `YamlRawValue` (header replayed on serialize).
+    const blockHeader = parseBlockScalarHeader(raw);
+    if (blockHeader) {
       const { endIdx } = _scanValueBlock(lines, i + 1, childIndent);
-      values[key] = new YamlRawValue(lines.slice(i + 1, endIdx), raw);
+      values[key] = blockScalarValue(blockHeader.tag, raw, lines.slice(i + 1, endIdx));
       recordSpan(key, i, endIdx);
       i = endIdx - 1;
       continue;
@@ -519,12 +574,18 @@ function parseNestedBlock(
 
     // Direct block scalar at nested indent (same shape as the
     // top-level parser's branch — see comment there). A nested
-    // field written as `key: |-` followed by indented body has
-    // to round-trip via `YamlRawValue`; otherwise the body is
-    // dropped and `raw` survives as a stray `"|-"` string.
-    if (BLOCK_SCALAR_INLINE_RE.test(raw)) {
+    // field written as `key: |-` (or `key: !lambda |-`) followed by
+    // indented body round-trips via `LambdaValue` / `YamlRawValue`;
+    // otherwise the body is dropped and `raw` survives as a stray
+    // `"|-"` / `"!lambda |-"` string.
+    const nestedBlockHeader = parseBlockScalarHeader(raw);
+    if (nestedBlockHeader) {
       const { endIdx } = _scanValueBlock(lines, i + 1, indent);
-      values[key] = new YamlRawValue(lines.slice(i + 1, endIdx), raw);
+      values[key] = blockScalarValue(
+        nestedBlockHeader.tag,
+        raw,
+        lines.slice(i + 1, endIdx)
+      );
       i = endIdx;
       continue;
     }

@@ -958,6 +958,80 @@ ${lambdaBlock}
     // Old body is gone.
     expect(after).not.toContain("return original_body");
   });
+
+  it("reads a tagged-block-scalar filter lambda as an editable LambdaValue (#1351)", () => {
+    // The exact #1351 repro: a templatable filter whose value the
+    // editor wrote as ``!lambda |-``. The tag sat between the colon
+    // and the ``|-`` marker, which the tag-blind block-scalar
+    // detectors missed — the body was dropped and ``!lambda |-``
+    // survived as a literal string, so the editor could no longer
+    // parse the value. It must come back as a ``LambdaValue`` so the
+    // templatable lambda editor renders (not YAML-only).
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    id: sensor_template_1
+    filters:
+      - multiply: !lambda |-
+          return 0.01;
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    const filters = values.filters as Array<Record<string, unknown>>;
+    expect(filters).toHaveLength(1);
+    expect(filters[0].multiply).toEqual({ _lambda: "return 0.01;", _tag: "!lambda" });
+  });
+
+  it("round-trips a tagged-block-scalar filter lambda through a re-save (#1351)", () => {
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    filters:
+      - multiply: !lambda |-
+          return 0.01;
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    const after = updateSectionInYaml(yaml, "sensor.template", values, 2);
+    expect(after).toContain("- multiply: !lambda |-");
+    expect(after).toContain("          return 0.01;");
+    // No mangled literal-string / sentinel leak.
+    expect(after).not.toContain('"!lambda');
+    expect(after).not.toContain("_lambda:");
+    // Re-parsing the saved YAML yields the same LambdaValue — the
+    // editor's own output is readable on the next focus change.
+    const reparsed = parseYamlSectionValues(after, "sensor.template", 2);
+    const filters = reparsed.filters as Array<Record<string, unknown>>;
+    expect(filters[0].multiply).toEqual({ _lambda: "return 0.01;", _tag: "!lambda" });
+  });
+
+  it("reads an inline `!lambda` filter value as a LambdaValue (#1351)", () => {
+    // Second #1351 symptom: the inline form was not identified as a
+    // valid lambda. ``parseScalar`` now recognises ``!lambda <body>``.
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    filters:
+      - multiply: !lambda return 0.01;
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    const filters = values.filters as Array<Record<string, unknown>>;
+    expect(filters[0].multiply).toEqual({ _lambda: "return 0.01;", _tag: "!lambda" });
+  });
+
+  it("reads a direct `!lambda |-` field as an editable LambdaValue (#1351)", () => {
+    // A non-list templatable field (e.g. ``lambda:`` on a template
+    // sensor) written with the explicit ``!lambda`` tag.
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    lambda: !lambda |-
+      return 0.01;
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.lambda).toEqual({ _lambda: "return 0.01;", _tag: "!lambda" });
+    const after = updateSectionInYaml(yaml, "sensor.template", values, 2);
+    expect(after).toContain("lambda: !lambda |-");
+    expect(after).toContain("      return 0.01;");
+  });
 });
 
 describe("updateSectionInYaml — preserves untouched field byte layout (#1227)", () => {
