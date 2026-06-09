@@ -27,6 +27,8 @@ const YAML = [
   "switch:",
   "  - platform: template",
   "    id: sw1",
+  "  - platform: template",
+  "    id: sw2",
   "",
 ].join("\n");
 
@@ -70,8 +72,8 @@ describe("device-navigator domain grouping", () => {
   it("renders a subgroup header per domain with its count", async () => {
     const nav = await mountNavigator([1]); // Components open
     expect(subTitles(nav)).toEqual(["Sensor", "Switch"]);
-    expect(subCounts(nav)).toEqual(["2", "1"]);
-    expect(navItemCount(nav)).toBe(3);
+    expect(subCounts(nav)).toEqual(["2", "2"]);
+    expect(navItemCount(nav)).toBe(4);
   });
 
   it("collapsing a subgroup hides its rows", async () => {
@@ -80,8 +82,8 @@ describe("device-navigator domain grouping", () => {
       nav.shadowRoot?.querySelector<HTMLElement>(".nav-subgroup-header");
     sensorHeader!.click();
     await nav.updateComplete;
-    // The two Sensor rows are hidden; only the Switch row remains.
-    expect(navItemCount(nav)).toBe(1);
+    // The two Sensor rows are hidden; only the two Switch rows remain.
+    expect(navItemCount(nav)).toBe(2);
     // Headers themselves stay visible.
     expect(subTitles(nav)).toEqual(["Sensor", "Switch"]);
   });
@@ -89,6 +91,40 @@ describe("device-navigator domain grouping", () => {
   it("leaves non-component sections flat (no subgroups)", async () => {
     const nav = await mountNavigator([0]); // Core open
     expect(nav.shadowRoot?.querySelector(".nav-subgroup-header")).toBeNull();
+  });
+
+  it("collapses a single-of-a-kind domain to a flat row with its glyph", async () => {
+    const nav = new ESPHomeDeviceNavigator();
+    nav.yaml = [
+      "esphome:",
+      "  name: t",
+      "sensor:",
+      "  - platform: template",
+      "    id: s1",
+      "  - platform: template",
+      "    id: s2",
+      "light:", // a lone component
+      "  - platform: binary",
+      "    id: led",
+      "    name: Status LED",
+      "    output: o1",
+      "",
+    ].join("\n");
+    nav.openSections = new Set([1]); // Components open
+    document.body.appendChild(nav);
+    await nav.updateComplete;
+
+    // Multi-item Sensor keeps its subgroup header; lone Light does not.
+    expect(subTitles(nav)).toEqual(["Sensor"]);
+    // The Light renders as a flat single row carrying the domain glyph, with
+    // the instance name on the subtitle line (the primary is the catalog name,
+    // which falls back to the raw key with no catalog loaded in the test).
+    const single = nav.shadowRoot!.querySelector(".nav-items--single");
+    expect(single).toBeTruthy();
+    expect(single!.querySelector(".nav-item-icon")).toBeTruthy();
+    expect(single!.querySelector(".nav-item-subtitle")?.textContent?.trim()).toBe(
+      "Status LED"
+    );
   });
 
   it("force-opens a collapsed domain while filtering and drops empty ones", async () => {

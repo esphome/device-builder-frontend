@@ -25,6 +25,8 @@ const YAML = [
   "sensor:",
   "  - platform: template",
   "    id: s1",
+  "  - platform: template",
+  "    id: s2",
   "",
 ].join("\n");
 
@@ -94,6 +96,30 @@ describe("device-navigator row icons", () => {
     expect(names).toContain("script-text-outline"); // script
     expect(names).toContain("clock-outline"); // interval
     expect(names).not.toContain("shape-outline");
+  });
+
+  it("titles each row glyph with its domain for a hover tooltip", async () => {
+    const nav = new ESPHomeDeviceNavigator();
+    nav.yaml = [
+      "esphome:",
+      "  name: t",
+      "binary_sensor:",
+      "  - platform: gpio",
+      "    id: b1",
+      "    pin: 1",
+      "    on_press:",
+      "      - logger.log: pressed",
+      "",
+    ].join("\n");
+    nav.openSections = new Set([0, 1, 2]);
+    document.body.appendChild(nav);
+    await nav.updateComplete;
+
+    // The on_press automation glyph carries the targeted component's domain.
+    const titles = [...(nav.shadowRoot?.querySelectorAll(".nav-item-icon") ?? [])].map(
+      (el) => el.getAttribute("title")
+    );
+    expect(titles).toContain("Binary sensor");
   });
 
   it("leads action-field automations with the action so they stay distinct", async () => {

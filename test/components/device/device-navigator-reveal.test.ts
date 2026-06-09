@@ -36,6 +36,11 @@ const YAML = [
   "  - platform: template",
   '    name: "Living Temp"',
   "    id: living_temp",
+  // A second sensor keeps the domain a collapsible subgroup (a lone component
+  // now collapses to a flat row), which the reveal tests below rely on.
+  "  - platform: template",
+  '    name: "Bedroom Temp"',
+  "    id: bedroom_temp",
   "",
 ].join("\n");
 

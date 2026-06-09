@@ -232,10 +232,20 @@ export const deviceNavigatorStyles = css`
     padding-left: var(--wa-space-m);
   }
 
+  /* A single-of-a-kind domain collapses to one flat row in place of its
+     subgroup header; align its glyph with the other subgroup-header glyphs by
+     backing out the nav-item's own left padding and its transparent selection
+     border (the header inset is the larger wa-space-m). */
+  .nav-items--single {
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: calc(var(--wa-space-xs) - var(--wa-border-width-l));
+  }
+
   .nav-item {
     padding: 0 var(--wa-space-xs);
     border-radius: var(--wa-border-radius-m);
-    border-left: 3px solid transparent;
+    border-left: var(--wa-border-width-l) solid transparent;
     display: flex;
     align-items: center;
     gap: var(--wa-space-2xs);

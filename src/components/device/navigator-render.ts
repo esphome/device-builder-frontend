@@ -43,6 +43,10 @@ export interface NavSectionView {
 function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): TemplateResult {
   const { item, labels } = row;
   const { primary, secondary } = labels;
+  // The domain the glyph stands for (an automation row's is the component it
+  // targets); also the icon's hover tooltip, since the glyph is the only
+  // domain cue on a flat row.
+  const domain = item.parentKey ?? item.key;
   return html`
     <div
       class="nav-item ${v.selectedLine === item.fromLine
@@ -56,7 +60,8 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
         ? html`<wa-icon
             class="nav-item-icon"
             library="mdi"
-            name=${iconForDomain(item.parentKey ?? item.key)}
+            name=${iconForDomain(domain)}
+            title=${prettyDomain(domain)}
           ></wa-icon>`
         : nothing}
       <div class="nav-item-content">
@@ -116,6 +121,15 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
   `;
 }
 
+/** A single-of-a-kind domain: a collapsible header guarding one row is pure
+ *  overhead, so render the row flat with its domain glyph (like an ungrouped
+ *  Core row), in place of where the subgroup header would sit. */
+function renderNavSingleGroup(group: NavGroup, v: NavSectionView): TemplateResult {
+  return html`<div class="nav-items nav-items--single">
+    ${renderNavRow(group.rows[0], v, true)}
+  </div>`;
+}
+
 function renderNavAction(action: NavAction): TemplateResult {
   return html`<div class="action-item" @click=${() => action.onClick()}>
     <div>
@@ -152,7 +166,14 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
           <div class="separator"></div>
           ${v.filtering ? nothing : html`<p class="italic">${v.desc}</p>`}
           ${v.groups
-            ? v.groups.map((group) => renderNavGroup(group, v))
+            ? v.groups.map((group) =>
+                // Collapse a single-of-a-kind domain to a flat row only when
+                // browsing; while filtering, keep the subgroup header so a
+                // lone search match still shows its domain context.
+                !v.filtering && group.rows.length === 1
+                  ? renderNavSingleGroup(group, v)
+                  : renderNavGroup(group, v)
+              )
             : v.rows.length > 0
               ? html`<div class="nav-items">
                   ${v.rows.map((row) => renderNavRow(row, v, true))}
