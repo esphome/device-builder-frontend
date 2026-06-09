@@ -43,6 +43,9 @@ export const navigatorSearchStyles = css`
     background: transparent;
     color: var(--wa-color-text-normal);
     ${searchControlText}
+    /* 16px floor avoids iOS focus-zoom in the mobile drawer (overrides the
+       shared 14px); the wrapper holds the height, so this doesn't grow it. */
+    font-size: max(16px, var(--wa-font-size-s));
     font-family: inherit;
     padding: 0;
     outline: none;
