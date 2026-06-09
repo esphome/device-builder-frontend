@@ -1017,6 +1017,20 @@ ${lambdaBlock}
     expect(filters[0].multiply).toEqual({ _lambda: "return 0.01;", _tag: "!lambda" });
   });
 
+  it("reads a quoted inline `!lambda '<body>'` filter value as a LambdaValue (#1351)", () => {
+    // ``parseInlineLambda`` strips the surrounding quotes, so the
+    // single-quoted inline form lands the same sentinel body.
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    filters:
+      - multiply: !lambda 'return 0.01;'
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    const filters = values.filters as Array<Record<string, unknown>>;
+    expect(filters[0].multiply).toEqual({ _lambda: "return 0.01;", _tag: "!lambda" });
+  });
+
   it("reads a direct `!lambda |-` field as an editable LambdaValue (#1351)", () => {
     // A non-list templatable field (e.g. ``lambda:`` on a template
     // sensor) written with the explicit ``!lambda`` tag.
