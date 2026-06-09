@@ -8,6 +8,26 @@
  */
 import { css } from "lit";
 
+/**
+ * Compact search-field control sizing, shared so the dashboard toolbar
+ * search and the device-navigator search stay in lockstep. Inline into a
+ * selector that targets the native search ``<input>``.
+ */
+export const searchControlSizing = css`
+  min-height: var(--esphome-control-height);
+  font-size: var(--wa-font-size-s);
+  line-height: var(--wa-form-control-value-line-height);
+`;
+
+/**
+ * Focus treatment shared by native inputs and the search wrappers that
+ * carry the border themselves, so the focus ring stays in lockstep.
+ */
+export const inputFocusRing = css`
+  border-color: var(--esphome-primary);
+  box-shadow: var(--esphome-focus-ring);
+`;
+
 export const inputStyles = css`
   input[type="text"],
   input[type="number"],
@@ -42,8 +62,7 @@ export const inputStyles = css`
   }
 
   input:focus {
-    border-color: var(--esphome-primary);
-    box-shadow: var(--esphome-focus-ring);
+    ${inputFocusRing}
   }
 
   input:disabled {

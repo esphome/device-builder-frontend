@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { inputFocusRing, searchControlSizing } from "../../styles/inputs.js";
+
 /**
  * Styles for <esphome-navigator-search>. Kept in its own file to mirror
  * the navigator's split layout (see device-navigator.styles.ts).
@@ -25,7 +27,7 @@ export const navigatorSearchStyles = css`
   }
 
   .search:focus-within {
-    border-color: var(--esphome-primary);
+    ${inputFocusRing}
   }
 
   input {
@@ -34,10 +36,9 @@ export const navigatorSearchStyles = css`
     border: none;
     background: transparent;
     color: var(--wa-color-text-normal);
-    /* 16px floor avoids iOS focus-zoom in the mobile drawer. */
-    font-size: max(16px, var(--wa-font-size-s));
+    ${searchControlSizing}
     font-family: inherit;
-    padding: var(--wa-space-s) 0;
+    padding: 0;
     outline: none;
   }
 
