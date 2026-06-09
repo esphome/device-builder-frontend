@@ -19,6 +19,28 @@ describe("iconForDomain", () => {
     expect(iconForDomain("number")).toBe("numeric");
   });
 
+  it("gives the core config/data utilities meaningful glyphs, not the generic cog", () => {
+    expect(iconForDomain("substitutions")).toBe("code-braces");
+    expect(iconForDomain("packages")).toBe("package-variant-closed");
+    expect(iconForDomain("globals")).toBe("variable");
+    expect(iconForDomain("external_components")).toBe("puzzle-outline");
+    expect(iconForDomain("json")).toBe("code-json");
+    // bytebuffer is a byte array, not RAM — distinct from psram's memory glyph.
+    expect(iconForDomain("bytebuffer")).toBe("code-array");
+    expect(iconForDomain("psram")).toBe("memory");
+  });
+
+  it("marks hash/HMAC helpers with the pound-box (#) glyph, not a lock", () => {
+    expect(iconForDomain("sha256")).toBe("pound-box-outline");
+    expect(iconForDomain("hmac_md5")).toBe("pound-box-outline");
+    expect(iconForDomain("hmac_sha256")).toBe("pound-box-outline");
+  });
+
+  it("gives preferences a save-settings glyph, distinct from psram's memory", () => {
+    expect(iconForDomain("preferences")).toBe("content-save-cog-outline");
+    expect(iconForDomain("psram")).toBe("memory");
+  });
+
   it("shares one glyph across related domains", () => {
     expect(iconForDomain("i2c")).toBe(iconForDomain("spi"));
   });
@@ -37,10 +59,21 @@ describe("iconForDomain", () => {
     }
   });
 
-  it("gives board platforms the chip glyph", () => {
-    expect(iconForDomain("esp32")).toBe(iconForDomain("esphome"));
-    expect(iconForDomain("esp8266")).toBe("chip");
-    expect(iconForDomain("rp2040")).toBe("chip");
+  it("gives 32-bit MCU platforms the cpu-32-bit glyph", () => {
+    for (const d of [
+      "esp32",
+      "esp8266",
+      "rp2040",
+      "bk72xx",
+      "rtl87xx",
+      "ln882x",
+      "libretiny",
+      "nrf52",
+    ]) {
+      expect(iconForDomain(d)).toBe("cpu-32-bit");
+    }
+    // The native host platform isn't a 32-bit MCU; it keeps the generic chip.
+    expect(iconForDomain("host")).toBe("chip");
   });
 
   it("maps the newly-filled common components off the fallback", () => {
