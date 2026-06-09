@@ -99,9 +99,13 @@ export const BLOCK_SCALAR_RE = /^[^"']*:\s*(?:!\S+\s+)?[|>][-+]?\s*(?:#.*)?$/;
  */
 const BLOCK_SCALAR_INLINE_RE = /^(?:(!\S+)\s+)?([|>][-+]?)\s*(?:#.*)?$/;
 
-export const parseBlockScalarHeader = (
-  raw: string
-): { tag: string | undefined; marker: string } | null => {
+/** A parsed block-scalar header: its optional tag and its `|`/`>` marker. */
+export interface BlockScalarHeader {
+  tag: string | undefined;
+  marker: string;
+}
+
+export const parseBlockScalarHeader = (raw: string): BlockScalarHeader | null => {
   const m = raw.match(BLOCK_SCALAR_INLINE_RE);
   return m ? { tag: m[1], marker: m[2] } : null;
 };
