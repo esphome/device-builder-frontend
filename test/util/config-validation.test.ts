@@ -97,6 +97,24 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, "abc")?.code).toBe("validation.not_a_number");
   });
 
+  it("accepts decimal or hex on a plain INTEGER field, but not forms cv.int_ rejects", () => {
+    const entry = makeEntry({ type: ConfigEntryType.INTEGER });
+    expect(validateEntry(entry, "4369")).toBeNull();
+    expect(validateEntry(entry, "0x1111")).toBeNull();
+    // 1e3 is Number()-valid (1000) but cv.int_ can't parse it — must be flagged.
+    expect(validateEntry(entry, "1e3")?.code).toBe("validation.not_an_integer");
+  });
+
+  it("range-checks a plain INTEGER field with BigInt so 64-bit decimals stay precise", () => {
+    const entry = makeEntry({
+      type: ConfigEntryType.INTEGER,
+      range: [0, 18446744073709551615],
+    });
+    // A value Number() would round to the imprecise bound stays distinguishable.
+    expect(validateEntry(entry, "18446744073709551615")).toBeNull();
+    expect(validateEntry(entry, "-1")?.code).toBe("validation.min");
+  });
+
   it("validates hex-typed INTEGER fields via BigInt (#944 range honesty)", () => {
     // ``Number(String(raw))`` rounds 0xbe030c9794184728 to
     // 0xbe030c9794184800 before the comparison; a precise input would

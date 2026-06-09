@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { coerceIntFieldValue } from "../../src/util/int-input.js";
+import { coerceIntFieldValue, parseIntInput } from "../../src/util/int-input.js";
 
 describe("coerceIntFieldValue", () => {
   it("turns a bare decimal into a number", () => {
@@ -49,5 +49,29 @@ describe("coerceIntFieldValue", () => {
     expect(coerceIntFieldValue("   ")).toBe("");
     expect(coerceIntFieldValue(null)).toBe("");
     expect(coerceIntFieldValue(undefined)).toBe("");
+  });
+});
+
+describe("parseIntInput", () => {
+  it("parses bare decimal (incl. negative) to a BigInt", () => {
+    expect(parseIntInput("4369")).toBe(4369n);
+    expect(parseIntInput("-5")).toBe(-5n);
+    expect(parseIntInput(118)).toBe(118n);
+  });
+
+  it("parses 0x hex (either case) to a BigInt", () => {
+    expect(parseIntInput("0x1111")).toBe(4369n);
+    expect(parseIntInput("0X2A")).toBe(42n);
+    expect(parseIntInput("0xffffffffffffffff")).toBe(18446744073709551615n);
+  });
+
+  it("rejects forms cv.int_ does not accept", () => {
+    // cv.int_ does int(value, 10) — these all raise there, so they must
+    // not validate clean in the editor either.
+    expect(parseIntInput("1e3")).toBeNull();
+    expect(parseIntInput("1.5")).toBeNull();
+    expect(parseIntInput("zzz")).toBeNull();
+    expect(parseIntInput("-0x5")).toBeNull();
+    expect(parseIntInput("")).toBeNull();
   });
 });

@@ -1,8 +1,23 @@
-// A bare decimal integer (optionally negative). Such input is emitted as a
-// number so its YAML / WS form stays numeric (and unquoted on disk); hex
-// (0x..) or anything else stays a verbatim string — ESPHome's cv.int_ parses
-// 0x.. on its own, and the inline validator flags junk.
+// The integer literals ESPHome's cv.int_ accepts: a bare decimal (optionally
+// negative) or non-negative 0x hex. Decimal is emitted as a number so its YAML
+// / WS form stays numeric; hex / anything else stays a verbatim string.
 const DECIMAL_INT_RE = /^-?\d+$/;
+const HEX_INT_RE = /^0x[0-9a-f]+$/i;
+
+/**
+ * BigInt value of a decimal-or-hex integer literal (what `cv.int_` accepts),
+ * or null for any other form. Lets validation reject `1e3` / `1.5` and
+ * range-check 64-bit values precisely, matching `coerceIntFieldValue`.
+ */
+export function parseIntInput(raw: unknown): bigint | null {
+  const v = String(raw ?? "").trim();
+  if (!DECIMAL_INT_RE.test(v) && !HEX_INT_RE.test(v)) return null;
+  try {
+    return BigInt(v);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Normalise a decimal-or-hex integer field value: bare decimal → number,

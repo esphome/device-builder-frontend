@@ -2,6 +2,7 @@ import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
 import { parseHexInt } from "./hex-int.js";
+import { parseIntInput } from "./int-input.js";
 import { asMappingList, asRecord } from "./nested-values.js";
 import { YamlRawValue } from "./yaml-serialize.js";
 
@@ -158,16 +159,33 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
         return { key: entry.key, code: "validation.max", params: { max } };
       }
     }
-  } else if (
-    entry.type === ConfigEntryType.INTEGER ||
-    entry.type === ConfigEntryType.FLOAT
-  ) {
+  } else if (entry.type === ConfigEntryType.INTEGER) {
+    // Accept exactly what cv.int_ does — bare decimal or 0x hex — so the
+    // editor doesn't pass forms (`1e3`) the backend rejects, and range-check
+    // with BigInt so the 64-bit values the renderer keeps as strings compare
+    // precisely. ``1.5`` / ``1e3`` parse as numbers but aren't integer
+    // literals (``not_an_integer``); junk isn't numeric (``not_a_number``).
+    const n = parseIntInput(raw);
+    if (n === null) {
+      const numeric = !Number.isNaN(Number(String(raw).trim()));
+      return {
+        key: entry.key,
+        code: numeric ? "validation.not_an_integer" : "validation.not_a_number",
+      };
+    }
+    if (entry.range) {
+      const [min, max] = entry.range;
+      if (n < BigInt(Math.floor(min))) {
+        return { key: entry.key, code: "validation.min", params: { min } };
+      }
+      if (n > BigInt(Math.ceil(max))) {
+        return { key: entry.key, code: "validation.max", params: { max } };
+      }
+    }
+  } else if (entry.type === ConfigEntryType.FLOAT) {
     const num = typeof raw === "number" ? raw : Number(String(raw));
     if (Number.isNaN(num)) {
       return { key: entry.key, code: "validation.not_a_number" };
-    }
-    if (entry.type === ConfigEntryType.INTEGER && !Number.isInteger(num)) {
-      return { key: entry.key, code: "validation.not_an_integer" };
     }
     if (entry.range) {
       const [min, max] = entry.range;
