@@ -156,6 +156,39 @@ describe("device-navigator reveal-selected", () => {
     expect(scrollSpy).toHaveBeenCalledTimes(1);
   });
 
+  // Regression: a selected row whose section was revealed but never scrolled
+  // (it lives in a collapsed subgroup) must not re-fire section-reveal when the
+  // user later opens a different section, or the cursor's section is force-
+  // reopened on every render and the user can't toggle anything else.
+  it("does not re-reveal the cursor's section after the user opens another", async () => {
+    const { nav, reveals } = await mount(new Set([1]));
+    const sensorGroup = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].find((h) =>
+        h.querySelector(".nav-subgroup-title")?.textContent?.includes("Sensor")
+      ) as HTMLElement;
+
+    // Collapse the Sensor subgroup so the selected row can never scroll-latch.
+    sensorGroup().click();
+    await nav.updateComplete;
+    nav.openSections = new Set();
+    await nav.updateComplete;
+
+    // Cursor lands on the hidden sensor row: section reveal fires exactly once.
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    nav.openSections = new Set([1]);
+    await nav.updateComplete;
+    expect(reveals).toEqual([1]);
+    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeNull();
+
+    // User opens Core (accordion closes Components). The controller must not
+    // re-reveal Components — reveals stays [1], so the toggle sticks.
+    nav.openSections = new Set([0]);
+    await nav.updateComplete;
+    expect(reveals).toEqual([1]);
+  });
+
   // The page renders two navigators (drawer + desktop) sharing one
   // openSections. A toggle would race them open/closed forever and hang the
   // page; section-reveal is an idempotent set, so it converges.
