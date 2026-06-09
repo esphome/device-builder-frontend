@@ -599,6 +599,7 @@
     "navigator_title": "Device navigator",
     "navigator_home": "Back to device overview",
     "navigator_search_placeholder": "Filter by name or ID…",
+    "navigator_search_toggle": "Search",
     "navigator_search_clear": "Clear filter",
     "navigator_search_count": "{count} of {total}",
     "navigator_search_none": "No matches",

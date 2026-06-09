@@ -9,6 +9,10 @@ export const navigatorSearchStyles = css`
     display: block;
   }
 
+  :host([hidden]) {
+    display: none;
+  }
+
   .search {
     display: flex;
     align-items: center;
@@ -22,12 +26,6 @@ export const navigatorSearchStyles = css`
 
   .search:focus-within {
     border-color: var(--esphome-primary);
-  }
-
-  .search-icon {
-    font-size: var(--wa-font-size-l);
-    color: var(--wa-color-text-quiet);
-    flex-shrink: 0;
   }
 
   input {

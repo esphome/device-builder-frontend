@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiClose, mdiMagnify } from "@mdi/js";
+import { mdiClose } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -11,7 +11,6 @@ import { navigatorSearchStyles } from "./device-navigator-search.styles.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
-  magnify: mdiMagnify,
   close: mdiClose,
 });
 
@@ -34,11 +33,15 @@ export class ESPHomeNavigatorSearch extends LitElement {
 
   static styles = [espHomeStyles, navigatorSearchStyles];
 
+  /** Focus the input; called by the navigator when it expands the box. */
+  focusInput() {
+    this._input?.focus();
+  }
+
   render() {
     const placeholder = this._localize("device.navigator_search_placeholder");
     return html`
       <div class="search">
-        <wa-icon class="search-icon" library="mdi" name="magnify"></wa-icon>
         <input
           type="search"
           .value=${this.value}

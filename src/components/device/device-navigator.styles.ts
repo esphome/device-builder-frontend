@@ -28,8 +28,8 @@ export const deviceNavigatorStyles = css`
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--wa-space-s);
-    padding: var(--wa-space-s) var(--wa-space-m);
+    gap: var(--wa-space-2xs);
+    padding: var(--wa-space-s) var(--wa-space-s) var(--wa-space-s) var(--wa-space-m);
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
     flex-shrink: 0;
@@ -39,6 +39,12 @@ export const deviceNavigatorStyles = css`
     margin: 0;
     line-height: 1;
     min-width: 0;
+    /* Flex container (not the default block) so the inline-flex button gets
+       a real width to fill; otherwise its ellipsis span collapses and the
+       title truncates even with free space beside it. Grow to claim that
+       space; ellipsis only kicks in once a long locale outgrows the row. */
+    display: flex;
+    flex: 1 1 auto;
   }
 
   .card-title-btn {
@@ -53,10 +59,26 @@ export const deviceNavigatorStyles = css`
     margin-left: calc(-1 * var(--wa-space-xs));
     border-radius: var(--wa-border-radius-s);
     min-width: 0;
+    max-width: 100%;
     line-height: 1;
     font-family: inherit;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
+  }
+
+  /* Keep the title on one line; ellipsis only if the panel is too narrow.
+     The ellipsis needs overflow:hidden, which would clip descenders (the g
+     in navigator); extend the clip box down with padding and cancel the
+     added height with a negative margin so the header still lines up with
+     the editor header beside it. */
+  .card-title-btn span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1;
+    padding-bottom: 4px;
+    margin-bottom: -4px;
   }
 
   .card-title-btn:hover {
@@ -69,7 +91,14 @@ export const deviceNavigatorStyles = css`
     flex-shrink: 0;
   }
 
-  .collapse-btn {
+  .header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .collapse-btn,
+  .search-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -77,15 +106,21 @@ export const deviceNavigatorStyles = css`
     background: transparent;
     color: var(--esphome-on-primary);
     cursor: pointer;
-    padding: 2px 4px;
+    padding: 2px;
     border-radius: var(--wa-border-radius-s);
   }
 
-  .collapse-btn:hover {
+  .collapse-btn:hover,
+  .search-btn:hover {
     background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
   }
 
-  .collapse-btn wa-icon {
+  .search-btn[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--esphome-on-primary), transparent 80%);
+  }
+
+  .collapse-btn wa-icon,
+  .search-btn wa-icon {
     font-size: 18px;
   }
 

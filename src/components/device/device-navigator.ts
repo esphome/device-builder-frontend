@@ -5,7 +5,7 @@ import {
   mdiChevronRight,
   mdiChevronUp,
   mdiCog,
-  mdiHomeOutline,
+  mdiMagnify,
   mdiPlusCircleOutline,
   mdiScriptTextOutline,
 } from "@mdi/js";
@@ -60,10 +60,13 @@ registerMdiIcons({
   "chevron-up": mdiChevronUp,
   "chevron-right": mdiChevronRight,
   cog: mdiCog,
-  "home-outline": mdiHomeOutline,
+  magnify: mdiMagnify,
   "plus-circle-outline": mdiPlusCircleOutline,
   "script-text-outline": mdiScriptTextOutline,
 });
+
+/** Items across all sections at/above which the search box auto-expands. */
+const SEARCH_AUTO_SHOW_THRESHOLD = 25;
 
 @customElement("esphome-device-navigator")
 export class ESPHomeDeviceNavigator extends LitElement {
@@ -197,6 +200,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
   /** Active navigator search query; empty string means "not filtering". */
   @state()
   private _query = "";
+
+  /** Whether the user manually revealed the search box (small configs). */
+  @state()
+  private _searchOpen = false;
 
   /** Domains collapsed in the grouped Components list. */
   @state()
@@ -344,6 +351,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
         )
       : null;
     const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
+    // Long lists earn the search box's space; short ones hide it behind
+    // the header magnifier until the user (or a query) reveals it.
+    const autoShow = totalItems >= SEARCH_AUTO_SHOW_THRESHOLD;
+    const showSearch = autoShow || this._searchOpen || filtering;
     const matchCount = matches ? matches.reduce((n, m) => n + m.length, 0) : 0;
     // Stay silent on zero matches; the "No matches" empty state speaks.
     const resultLabel =
@@ -392,22 +403,36 @@ export class ESPHomeDeviceNavigator extends LitElement {
               @click=${this._goToOverview}
               title=${this._localize("device.navigator_home")}
             >
-              <wa-icon library="mdi" name="home-outline"></wa-icon>
               <span>${this._localize("device.navigator_title")}</span>
             </button>
           </h2>
-          <button
-            type="button"
-            class="collapse-btn"
-            @click=${this._onCollapseClick}
-            title=${this._localize("device.hide_navigator")}
-            aria-label=${this._localize("device.hide_navigator")}
-          >
-            <wa-icon library="mdi" name="chevron-left"></wa-icon>
-          </button>
+          <div class="header-actions">
+            ${autoShow
+              ? nothing
+              : html`<button
+                  type="button"
+                  class="search-btn"
+                  aria-pressed=${showSearch}
+                  @click=${this._toggleSearch}
+                  title=${this._localize("device.navigator_search_toggle")}
+                  aria-label=${this._localize("device.navigator_search_toggle")}
+                >
+                  <wa-icon library="mdi" name="magnify"></wa-icon>
+                </button>`}
+            <button
+              type="button"
+              class="collapse-btn"
+              @click=${this._onCollapseClick}
+              title=${this._localize("device.hide_navigator")}
+              aria-label=${this._localize("device.hide_navigator")}
+            >
+              <wa-icon library="mdi" name="chevron-left"></wa-icon>
+            </button>
+          </div>
         </header>
         <div class="card-body">
           <esphome-navigator-search
+            ?hidden=${!showSearch}
             .value=${this._query}
             .resultLabel=${resultLabel}
             @navigator-search=${this._onSearchChange}
@@ -453,6 +478,19 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   private _onSearchChange = (e: CustomEvent<{ value: string }>) => {
     this._query = e.detail.value;
+  };
+
+  /** Header magnifier: reveal + focus the search, or collapse and clear it. */
+  private _toggleSearch = () => {
+    if (this._searchOpen || this._query) {
+      this._searchOpen = false;
+      this._query = "";
+      return;
+    }
+    this._searchOpen = true;
+    void this.updateComplete.then(() => {
+      this.shadowRoot?.querySelector("esphome-navigator-search")?.focusInput();
+    });
   };
 
   private _toggleSection(index: number) {
