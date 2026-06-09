@@ -39,6 +39,12 @@ describe("readInstanceScalar", () => {
     expect(readInstanceScalar("    name: Sensor#3", "name")).toBe("Sensor#3");
   });
 
+  it("treats a value that is only a comment as empty", () => {
+    // `name: # c` is a comment in value position per YAML, so the value is empty.
+    expect(readInstanceScalar("    name: # comment", "name")).toBeNull();
+    expect(readInstanceScalar("    name:   # comment", "name")).toBeNull();
+  });
+
   it("returns null when the key doesn't match", () => {
     expect(readInstanceScalar("    id: adc_a", "name")).toBeNull();
   });

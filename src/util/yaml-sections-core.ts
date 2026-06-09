@@ -347,7 +347,8 @@ const _INSTANCE_SCALAR_RE = new Map<string, RegExp>();
  * bare token, other keys (``name``) the rest of the line. A trailing inline
  * comment is stripped quote-aware (YAML's whitespace-preceded ``#`` rule):
  * ``name: a#b`` keeps ``a#b``, ``name: "Foo # b"`` keeps ``Foo # b``,
- * ``name: Foo  # bar`` keeps ``Foo``. Callers gate the line's indent.
+ * ``name: Foo  # bar`` keeps ``Foo``, ``name: # c`` is ``null`` (comment
+ * only). Callers gate the line's indent.
  */
 export function readInstanceScalar(line: string, key: string): string | null {
   const bareToken = key === "id" || key === "platform";
@@ -362,7 +363,11 @@ export function readInstanceScalar(line: string, key: string): string | null {
   if (!m) return null;
   if (bareToken) return m[1];
   const { value } = splitInlineComment(m[1]);
-  return stripQuotes(value.trim()).trim() || null;
+  const trimmed = value.trim();
+  // Comment-only value (``name: # c``): the leading ``#`` isn't whitespace-
+  // preceded, so splitInlineComment keeps it. Quoted ``"#x"`` starts with the quote.
+  if (trimmed.startsWith("#")) return null;
+  return stripQuotes(trimmed).trim() || null;
 }
 
 /**
