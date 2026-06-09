@@ -19,9 +19,6 @@ export const addComponentDialogStyles = css`
      "add a dependency" mid-way through adding another component.
      Tells them we'll bring them back to the original after. */
   .return-banner {
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-2xs);
     margin-bottom: var(--wa-space-m);
     padding: var(--wa-space-2xs) var(--wa-space-s);
     background: var(--esphome-tint);
