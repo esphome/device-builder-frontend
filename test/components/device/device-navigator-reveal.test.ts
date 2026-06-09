@@ -17,7 +17,12 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
 import { deriveNavigatorBuckets } from "../../../src/components/device/navigator-buckets.js";
-import { sectionIndexForLine } from "../../../src/components/device/navigator-reveal-controller.js";
+import {
+  NavigatorRevealController,
+  type RevealHost,
+  type RevealState,
+  sectionIndexForLine,
+} from "../../../src/components/device/navigator-reveal-controller.js";
 import {
   parseYamlTopLevelSections,
   sectionKeyOf,
@@ -81,6 +86,49 @@ describe("sectionIndexForLine", () => {
     expect(sectionIndexForLine(buckets, buckets.core[0].fromLine)).toBe(0);
     expect(sectionIndexForLine(buckets, buckets.components[0].fromLine)).toBe(1);
     expect(sectionIndexForLine(buckets, 9999)).toBe(-1);
+  });
+});
+
+// Focused on the controller: an intervening selection that maps to no nav row
+// (index === -1, e.g. an unscoped automation) must not pin the reveal latch, so
+// returning to a still-collapsed section re-reveals it.
+describe("NavigatorRevealController one-shot latch", () => {
+  it("re-reveals after an index===-1 line breaks the selection run", () => {
+    const buckets = deriveNavigatorBuckets(YAML);
+    const sLine = sensorLine();
+    const reveals: number[] = [];
+    const host = {
+      addController() {},
+      removeController() {},
+      requestUpdate() {},
+      updateComplete: Promise.resolve(true),
+      renderRoot: { querySelector: () => null } as unknown as ParentNode,
+      dispatchEvent(e: Event) {
+        reveals.push((e as CustomEvent<{ index: number }>).detail.index);
+        return true;
+      },
+    } as unknown as RevealHost;
+    // Section stays closed and the row never scrolls (querySelector → null), so
+    // only the latch governs whether reveal fires.
+    const state: RevealState = {
+      selectedLine: null,
+      buckets,
+      openSections: new Set(),
+      filtering: false,
+    };
+    const ctrl = new NavigatorRevealController(host, () => state);
+
+    state.selectedLine = sLine; // sensor row, section closed
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([1]);
+
+    state.selectedLine = 9999; // unscoped line: index === -1
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([1]);
+
+    state.selectedLine = sLine; // back to the still-closed sensor row
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([1, 1]);
   });
 });
 
@@ -154,6 +202,99 @@ describe("device-navigator reveal-selected", () => {
     await nav.updateComplete;
     expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeTruthy();
     expect(scrollSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: a selected row whose section was revealed but never scrolled
+  // (it lives in a collapsed subgroup) must not re-fire section-reveal when the
+  // user later opens a different section, or the cursor's section is force-
+  // reopened on every render and the user can't toggle anything else.
+  it("does not re-reveal the cursor's section after the user opens another", async () => {
+    const { nav, reveals } = await mount(new Set([1]));
+    const sensorGroup = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].find((h) =>
+        h.querySelector(".nav-subgroup-title")?.textContent?.includes("Sensor")
+      ) as HTMLElement;
+
+    // Collapse the Sensor subgroup so the selected row can never scroll-latch.
+    sensorGroup().click();
+    await nav.updateComplete;
+    nav.openSections = new Set();
+    await nav.updateComplete;
+
+    // Cursor lands on the hidden sensor row: section reveal fires exactly once.
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    nav.openSections = new Set([1]);
+    await nav.updateComplete;
+    expect(reveals).toEqual([1]);
+    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeNull();
+
+    // User opens Core (accordion closes Components). The controller must not
+    // re-reveal Components — reveals stays [1], so the toggle sticks.
+    nav.openSections = new Set([0]);
+    await nav.updateComplete;
+    expect(reveals).toEqual([1]);
+  });
+
+  // Regression: a row selected while its section was already open (URL
+  // ``?section=&open=1`` restore) must mark the line handled, so closing that
+  // section (by opening another) doesn't re-fire reveal and snap it back open.
+  it("does not re-reveal a section that was already open when selected", async () => {
+    const { nav, reveals } = await mount(new Set([1]));
+    const sensorGroup = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].find((h) =>
+        h.querySelector(".nav-subgroup-title")?.textContent?.includes("Sensor")
+      ) as HTMLElement;
+
+    // Collapse the Sensor subgroup so the selected row can never scroll-latch.
+    sensorGroup().click();
+    await nav.updateComplete;
+
+    // Select the row while Components is already open: nothing to reveal.
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    expect(reveals).toEqual([]);
+
+    // User opens Core (accordion closes Components). Must not snap back.
+    nav.openSections = new Set([0]);
+    await nav.updateComplete;
+    expect(reveals).toEqual([]);
+  });
+
+  // The one-shot latch is per continuous selection, not forever: moving the
+  // cursor away and clicking back to a line whose reveal never scroll-latched
+  // (its section was left closed) must reveal it again.
+  it("re-reveals a line after the selection moves away and returns", async () => {
+    const coreLine = () => {
+      const s = parseYamlTopLevelSections(YAML).find(
+        (sec) => sectionKeyOf(sec) === "wifi"
+      );
+      if (!s) throw new Error("fixture: wifi not found");
+      return s.fromLine;
+    };
+    // Leave everything collapsed so no reveal ever scroll-latches.
+    const { nav, reveals } = await mount(new Set());
+
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    expect(reveals).toEqual([1]);
+
+    // Same-line idle re-render: one-shot, no repeat.
+    nav.requestUpdate();
+    await nav.updateComplete;
+    expect(reveals).toEqual([1]);
+
+    // Move to a core line, then back to the sensor line: each move re-reveals.
+    nav.selectedKey = "wifi";
+    nav.selectedFromLine = coreLine();
+    await nav.updateComplete;
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    expect(reveals).toEqual([1, 0, 1]);
   });
 
   // The page renders two navigators (drawer + desktop) sharing one
