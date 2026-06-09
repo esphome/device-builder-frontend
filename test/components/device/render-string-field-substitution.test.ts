@@ -59,11 +59,12 @@ describe("renderStringField — substitution preview", () => {
     expect(json).not.toContain("substitution-note");
   });
 
-  it("shows no preview for an unresolvable reference", () => {
+  it("shows the 'defined elsewhere' marker for an unresolved reference", () => {
     const json = serialize(
       renderStringField(makeEntry(), "text", ["name"], ctxFor("${unknown} Moving"))
     );
-    expect(json).not.toContain("substitution-note");
+    expect(json).toContain("substitution-note--external");
+    expect(json).toContain("device.substitution_unresolved");
   });
 
   it("never previews a concealed (password) field, to avoid leaking a secret", () => {

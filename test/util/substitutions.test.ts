@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hasSubstitutionReference,
   parseSubstitutions,
   resolveSubstitutions,
 } from "../../src/util/substitutions.js";
@@ -89,5 +90,21 @@ describe("resolveSubstitutions", () => {
     expect(resolveSubstitutions("${upper_devicename}", undefined)).toBe(
       "${upper_devicename}"
     );
+  });
+
+  it("does not treat a literal like $5.00 as a reference", () => {
+    expect(resolveSubstitutions("costs $5.00", subs)).toBe("costs $5.00");
+  });
+});
+
+describe("hasSubstitutionReference", () => {
+  it("detects ${var} and bare $var references", () => {
+    expect(hasSubstitutionReference("${upper_devicename} Moving")).toBe(true);
+    expect(hasSubstitutionReference("$id_prefix")).toBe(true);
+  });
+
+  it("is false for plain text and dollar amounts", () => {
+    expect(hasSubstitutionReference("Front Door")).toBe(false);
+    expect(hasSubstitutionReference("costs $5.00")).toBe(false);
   });
 });

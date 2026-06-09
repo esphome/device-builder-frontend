@@ -42,7 +42,15 @@ export function parseSubstitutions(yaml: string): Map<string, string> {
   return subs;
 }
 
-const SUBSTITUTION_RE = /\$\{(\w+)\}|\$(\w+)/g;
+// Bare ``$name`` must start with a letter/underscore so a literal like
+// ``$5.00`` isn't mistaken for a reference; braces make ``${...}`` explicit.
+const SUBSTITUTION_RE = /\$\{(\w+)\}|\$([a-zA-Z_]\w*)/g;
+const SUBSTITUTION_REF_RE = /\$\{\w+\}|\$[a-zA-Z_]\w*/;
+
+/** True when *text* contains a ``${var}`` / ``$var`` reference. */
+export function hasSubstitutionReference(text: string): boolean {
+  return SUBSTITUTION_REF_RE.test(text);
+}
 
 /** Expand ``${name}`` / ``$name`` in *text* against *subs*, leaving
  *  unknown refs literal. Iterates (capped) so chained substitutions

@@ -92,6 +92,12 @@ export const configEntryFormStyles = css`
     color: var(--esphome-primary);
   }
 
+  /* The "defined elsewhere" marker is a quiet heads-up, not a positive
+     resolve, so its icon stays muted. */
+  .substitution-note--external wa-icon {
+    color: var(--wa-color-text-quiet);
+  }
+
   .secret-note code,
   .substitution-note code {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;

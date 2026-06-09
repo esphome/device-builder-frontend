@@ -5,7 +5,12 @@
  * barrel.
  */
 
-import { mdiCodeBraces, mdiKeyVariant, mdiLockOutline } from "@mdi/js";
+import {
+  mdiCodeBraces,
+  mdiInformationOutline,
+  mdiKeyVariant,
+  mdiLockOutline,
+} from "@mdi/js";
 import { html, nothing } from "lit";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
@@ -23,7 +28,11 @@ import {
   isSecretEligible,
   recommendedSecretKeys,
 } from "../../util/secret-eligibility.js";
-import { parseSubstitutions, resolveSubstitutions } from "../../util/substitutions.js";
+import {
+  hasSubstitutionReference,
+  parseSubstitutions,
+  resolveSubstitutions,
+} from "../../util/substitutions.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
@@ -51,6 +60,7 @@ export const fieldRendererStyles = [
 
 registerMdiIcons({
   "code-braces": mdiCodeBraces,
+  "information-outline": mdiInformationOutline,
   "key-variant": mdiKeyVariant,
   "lock-outline": mdiLockOutline,
 });
@@ -106,13 +116,29 @@ export function renderSecretHint(value: string, ctx: RenderCtx) {
   </span>`;
 }
 
-/** Render a braces icon + resolved value when the field references a
- *  ``${var}`` defined in the file's own ``substitutions:``. Returns
- *  ``nothing`` when nothing resolves (no ref, or an unknown one). The
- *  icon carries the only label so the hint stays compact. */
+/**
+ * Hint beneath a string field that references a ``${var}``. When the
+ * reference resolves against this file's ``substitutions:`` it previews
+ * the value; when it's still unresolved (defined in a package / include /
+ * command line) it shows an info marker whose tooltip explains that those
+ * are resolved at build time, not previewed here — so an unexpanded value
+ * doesn't read as a bug. ``nothing`` when the value has no reference.
+ */
 export function renderSubstitutionHint(value: string, ctx: RenderCtx) {
+  if (!hasSubstitutionReference(value)) return nothing;
   const resolved = resolveSubstitutions(value, parseSubstitutions(ctx.yaml));
-  if (resolved === value) return nothing;
+  if (hasSubstitutionReference(resolved)) {
+    const hint = ctx.localize("device.substitution_unresolved_hint");
+    return html`<span
+      class="substitution-note substitution-note--external"
+      role="note"
+      aria-label=${hint}
+      title=${hint}
+    >
+      <wa-icon library="mdi" name="information-outline"></wa-icon>
+      <span>${ctx.localize("device.substitution_unresolved")}</span>
+    </span>`;
+  }
   const label = ctx.localize("device.substitution_resolves_to");
   return html`<span
     class="substitution-note"
