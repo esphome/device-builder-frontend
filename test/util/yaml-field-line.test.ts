@@ -25,8 +25,18 @@ describe("readInstanceScalar", () => {
     expect(readInstanceScalar("    id: foo#bar", "id")).toBe("foo#bar");
   });
 
-  it("keeps `#` literal in a free-text name value", () => {
-    expect(readInstanceScalar("    name: Sensor #3", "name")).toBe("Sensor #3");
+  it("strips a whitespace-preceded inline comment from a free-text name", () => {
+    // `name: Sensor #3` is "Sensor" + a comment per YAML; the device uses
+    // "Sensor", so the navigator should too.
+    expect(readInstanceScalar("    name: Detection Delay   # range 0-100", "name")).toBe(
+      "Detection Delay"
+    );
+    expect(readInstanceScalar("    name: Sensor #3", "name")).toBe("Sensor");
+  });
+
+  it("keeps `#` in a name when it's quoted or not whitespace-preceded", () => {
+    expect(readInstanceScalar('    name: "Sensor #3"', "name")).toBe("Sensor #3");
+    expect(readInstanceScalar("    name: Sensor#3", "name")).toBe("Sensor#3");
   });
 
   it("returns null when the key doesn't match", () => {

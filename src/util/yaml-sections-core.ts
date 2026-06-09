@@ -13,6 +13,7 @@
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
+import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
 import { endsBlockAtIndent } from "./yaml-section-lexer.js";
 
 /** A YAML list-item line: leading indent, a dash, then a space or EOL. */
@@ -343,21 +344,25 @@ const _INSTANCE_SCALAR_RE = new Map<string, RegExp>();
  * Value of a ``<key>: value`` line (surrounding quotes peeled), or ``null``.
  *
  * Allows an optional leading ``- `` list dash; ``id`` / ``platform`` take a
- * bare token, other keys (``name``) the rest of the line. For bare tokens a
- * trailing inline comment is tolerated, but only when ``#`` is whitespace-
- * preceded (YAML's rule) — ``id: a#b`` keeps ``a#b``, ``id: a  # b`` keeps
- * ``a``. Callers gate the line's indent — this only peels the key + value.
+ * bare token, other keys (``name``) the rest of the line. A trailing inline
+ * comment is stripped quote-aware (YAML's whitespace-preceded ``#`` rule):
+ * ``name: a#b`` keeps ``a#b``, ``name: "Foo # b"`` keeps ``Foo # b``,
+ * ``name: Foo  # bar`` keeps ``Foo``. Callers gate the line's indent.
  */
 export function readInstanceScalar(line: string, key: string): string | null {
+  const bareToken = key === "id" || key === "platform";
   let re = _INSTANCE_SCALAR_RE.get(key);
   if (re === undefined) {
-    const bareToken = key === "id" || key === "platform";
-    const value = bareToken ? "(\\S+?)" : "(.+?)";
-    const tail = bareToken ? "(?:\\s+#.*)?\\s*" : "\\s*";
-    re = new RegExp(`^\\s*(?:-\\s+)?${key}:\\s*["']?${value}["']?${tail}$`);
+    re = bareToken
+      ? new RegExp(`^\\s*(?:-\\s+)?${key}:\\s*["']?(\\S+?)["']?(?:\\s+#.*)?\\s*$`)
+      : new RegExp(`^\\s*(?:-\\s+)?${key}:\\s*(.*)$`);
     _INSTANCE_SCALAR_RE.set(key, re);
   }
-  return line.match(re)?.[1] ?? null;
+  const m = line.match(re);
+  if (!m) return null;
+  if (bareToken) return m[1];
+  const { value } = splitInlineComment(m[1]);
+  return stripQuotes(value.trim()).trim() || null;
 }
 
 /**
