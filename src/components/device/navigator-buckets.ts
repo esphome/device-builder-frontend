@@ -1,3 +1,4 @@
+import { parseSubstitutions } from "../../util/substitutions.js";
 import {
   type YamlSection,
   categorizeSections,
@@ -9,6 +10,8 @@ export interface NavigatorBuckets {
   core: YamlSection[];
   components: YamlSection[];
   automations: YamlSection[];
+  /** The file's own top-level ``substitutions:``, for label resolution. */
+  substitutions: Map<string, string>;
 }
 
 /**
@@ -39,5 +42,5 @@ export function deriveNavigatorBuckets(yaml: string): NavigatorBuckets {
         !s.key.startsWith("automation:unscoped:")
     )
     .sort((a, b) => a.fromLine - b.fromLine);
-  return { core, components, automations };
+  return { core, components, automations, substitutions: parseSubstitutions(yaml) };
 }

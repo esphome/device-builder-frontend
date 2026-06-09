@@ -5,7 +5,12 @@
  * barrel.
  */
 
-import { mdiKeyVariant, mdiLockOutline } from "@mdi/js";
+import {
+  mdiAlertCircleOutline,
+  mdiCodeBraces,
+  mdiKeyVariant,
+  mdiLockOutline,
+} from "@mdi/js";
 import { html, nothing } from "lit";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
@@ -23,6 +28,10 @@ import {
   isSecretEligible,
   recommendedSecretKeys,
 } from "../../util/secret-eligibility.js";
+import {
+  hasSubstitutionReference,
+  resolveSubstitutions,
+} from "../../util/substitutions.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
@@ -49,6 +58,8 @@ export const fieldRendererStyles = [
 ];
 
 registerMdiIcons({
+  "alert-circle-outline": mdiAlertCircleOutline,
+  "code-braces": mdiCodeBraces,
   "key-variant": mdiKeyVariant,
   "lock-outline": mdiLockOutline,
 });
@@ -104,10 +115,51 @@ export function renderSecretHint(value: string, ctx: RenderCtx) {
   </span>`;
 }
 
+/**
+ * Hint beneath a string field referencing a ``${var}``: previews the
+ * value when it resolves against this file's ``substitutions:``, else a
+ * marker whose tooltip notes the reference is resolved at build time
+ * (from a package/include), not previewed here. ``nothing`` with no ref.
+ */
+export function renderSubstitutionHint(value: string, ctx: RenderCtx) {
+  if (!hasSubstitutionReference(value)) return nothing;
+  const resolved = resolveSubstitutions(value, ctx.substitutions);
+  if (hasSubstitutionReference(resolved)) {
+    const hint = ctx.localize("device.substitution_unresolved_hint");
+    return html`<span
+      class="substitution-note substitution-note--external"
+      role="note"
+      aria-label=${hint}
+      title=${hint}
+    >
+      <wa-icon library="mdi" name="code-braces"></wa-icon>
+      <wa-icon
+        class="substitution-warn"
+        library="mdi"
+        name="alert-circle-outline"
+      ></wa-icon>
+      <span>${ctx.localize("device.substitution_unresolved")}</span>
+    </span>`;
+  }
+  const label = ctx.localize("device.substitution_resolves_to");
+  return html`<span
+    class="substitution-note"
+    role="note"
+    aria-label=${`${label}: ${resolved}`}
+    title=${label}
+  >
+    <wa-icon library="mdi" name="code-braces"></wa-icon>
+    <code>${resolved}</code>
+  </span>`;
+}
+
 export interface RenderCtx {
   localize: LocalizeFunc;
   disabled: boolean;
   yaml: string;
+  /** Parsed ``substitutions:`` for ``yaml``; built once per render so
+   *  referencing fields share one parse. */
+  substitutions: Map<string, string>;
   fromLine?: number;
   /** Section being edited (``light.esp32_rmt_led_strip``,
    *  ``sensor.template``, …). Empty when the form runs outside a
@@ -384,6 +436,9 @@ export function renderStringField(
         : html`<div class="field-input-row">${input}${secretPicker}</div>`;
   // Picker doubles as the secret indicator; only the no-picker path hints.
   const secretHint = secretPicker === nothing ? renderSecretHint(value, ctx) : nothing;
+  // Never preview the resolved value for concealed fields — a secret kept
+  // in `substitutions:` (e.g. a WiFi/API password) must not leak in plaintext.
+  const subHint = inputType === "password" ? nothing : renderSubstitutionHint(value, ctx);
   // When the entry carries a closed list of `suggestions`, render a
   // strict <wa-select> regardless of the underlying inputType — used
   // by featured components to pin the field to one of a few values
@@ -420,7 +475,7 @@ export function renderStringField(
   />`;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx)} ${withPicker(textInput)} ${secretHint}
+      ${renderLabel(entry, ctx)} ${withPicker(textInput)} ${secretHint} ${subHint}
       ${renderFieldError(path, ctx)}
     </div>
   `;

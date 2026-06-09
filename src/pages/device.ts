@@ -869,6 +869,7 @@ export class ESPHomePageDevice extends LitElement {
       <div
         class="drawer ${this._drawerOpen ? "drawer--open" : ""}"
         @section-toggle=${this._onSectionToggle}
+        @section-reveal=${this._onSectionReveal}
         @section-select=${this._onSectionSelect}
         @yaml-highlight=${this._onYamlHighlight}
         @yaml-updated=${this._onYamlUpdated}
@@ -882,6 +883,7 @@ export class ESPHomePageDevice extends LitElement {
         <div
           class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""}"
           @section-toggle=${this._onSectionToggle}
+          @section-reveal=${this._onSectionReveal}
           @layout-change=${this._onLayoutChange}
           @yaml-change=${this._onYamlChange}
           @yaml-cursor-line=${this._onYamlCursorLine}
@@ -1044,6 +1046,16 @@ export class ESPHomePageDevice extends LitElement {
       next.add(index);
     }
     this._openSections = next;
+    this._updateUrl();
+  }
+
+  /** Idempotently open the section holding an externally-selected row.
+   *  A set, not a toggle: two navigators fire this and a toggle would
+   *  race them into oscillating the section open/closed. */
+  private _onSectionReveal(e: CustomEvent<{ index: number }>) {
+    const { index } = e.detail;
+    if (this._openSections.has(index)) return;
+    this._openSections = new Set([index]);
     this._updateUrl();
   }
 

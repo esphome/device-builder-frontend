@@ -24,6 +24,7 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
@@ -46,6 +47,7 @@ import {
 } from "../../util/pin-registry-modes-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
+import { parseSubstitutions } from "../../util/substitutions.js";
 import {
   _isStructuralType,
   filterRenderable,
@@ -601,11 +603,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * `renderEntry` is wired back through `ctx` so nested renderers can
    * recurse without re-entering the dispatch via the host element.
    */
+  /** Memoised on the YAML so the substitution parse runs once per edit,
+   *  not once per render or per referencing field. */
+  private _parseSubstitutions = memoizeOne(parseSubstitutions);
+
   private _buildCtx(): RenderCtx {
     const ctx: RenderCtx = {
       localize: this._localize,
       disabled: this.disabled,
       yaml: this.yaml,
+      substitutions: this._parseSubstitutions(this.yaml),
       fromLine: this.fromLine,
       sectionKey: this.sectionKey,
       deviceName: resolveDeviceName(this._devices, this.configuration),
