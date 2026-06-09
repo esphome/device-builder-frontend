@@ -54,7 +54,13 @@ export class NavigatorRevealController implements ReactiveController {
     }
     if (selectedLine === this._scrolledLine) return;
     const index = sectionIndexForLine(buckets, selectedLine);
-    if (index !== -1 && !filtering && !openSections.has(index)) {
+    if (index === -1) {
+      // No navigator row for this line (e.g. an unscoped automation); latch so
+      // we don't re-scan the buckets on every later update.
+      this._scrolledLine = selectedLine;
+      return;
+    }
+    if (!filtering && !openSections.has(index)) {
       // Ask the page to open it and bail; the re-render re-enters with the row.
       this._host.dispatchEvent(
         new CustomEvent("section-reveal", {
