@@ -38,6 +38,7 @@ import { type NavigatorBuckets, deriveNavigatorBuckets } from "./navigator-bucke
 import { groupRowsByDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
 import { type NavAction, renderNavSection } from "./navigator-render.js";
+import { NavigatorRevealController } from "./navigator-reveal-controller.js";
 import { navItemMatches } from "./navigator-search-match.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -89,6 +90,13 @@ export class ESPHomeDeviceNavigator extends LitElement {
     api: this._api,
     platform: this.platform || undefined,
     boardId: this.board?.id,
+  }));
+
+  private readonly _reveal = new NavigatorRevealController(this, () => ({
+    selectedLine: this._selectedLine,
+    buckets: this._deriveBuckets(this.yaml),
+    openSections: this.openSections,
+    filtering: this._query.trim().length > 0,
   }));
 
   @property({ attribute: false })
