@@ -17,7 +17,12 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
 import { deriveNavigatorBuckets } from "../../../src/components/device/navigator-buckets.js";
-import { sectionIndexForLine } from "../../../src/components/device/navigator-reveal-controller.js";
+import {
+  NavigatorRevealController,
+  type RevealHost,
+  type RevealState,
+  sectionIndexForLine,
+} from "../../../src/components/device/navigator-reveal-controller.js";
 import {
   parseYamlTopLevelSections,
   sectionKeyOf,
@@ -81,6 +86,49 @@ describe("sectionIndexForLine", () => {
     expect(sectionIndexForLine(buckets, buckets.core[0].fromLine)).toBe(0);
     expect(sectionIndexForLine(buckets, buckets.components[0].fromLine)).toBe(1);
     expect(sectionIndexForLine(buckets, 9999)).toBe(-1);
+  });
+});
+
+// Focused on the controller: an intervening selection that maps to no nav row
+// (index === -1, e.g. an unscoped automation) must not pin the reveal latch, so
+// returning to a still-collapsed section re-reveals it.
+describe("NavigatorRevealController one-shot latch", () => {
+  it("re-reveals after an index===-1 line breaks the selection run", () => {
+    const buckets = deriveNavigatorBuckets(YAML);
+    const sLine = sensorLine();
+    const reveals: number[] = [];
+    const host = {
+      addController() {},
+      removeController() {},
+      requestUpdate() {},
+      updateComplete: Promise.resolve(true),
+      renderRoot: { querySelector: () => null } as unknown as ParentNode,
+      dispatchEvent(e: Event) {
+        reveals.push((e as CustomEvent<{ index: number }>).detail.index);
+        return true;
+      },
+    } as unknown as RevealHost;
+    // Section stays closed and the row never scrolls (querySelector → null), so
+    // only the latch governs whether reveal fires.
+    const state: RevealState = {
+      selectedLine: null,
+      buckets,
+      openSections: new Set(),
+      filtering: false,
+    };
+    const ctrl = new NavigatorRevealController(host, () => state);
+
+    state.selectedLine = sLine; // sensor row, section closed
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([1]);
+
+    state.selectedLine = 9999; // unscoped line: index === -1
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([1]);
+
+    state.selectedLine = sLine; // back to the still-closed sensor row
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([1, 1]);
   });
 });
 
