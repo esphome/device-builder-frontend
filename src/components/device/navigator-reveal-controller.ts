@@ -65,13 +65,20 @@ export class NavigatorRevealController implements ReactiveController {
       );
       return;
     }
-    // Latch only on a confirmed scroll: a row inside a collapsed Components
-    // subgroup isn't rendered yet, so leave the line unlatched to retry once
-    // it mounts.
+    // Latch only on a confirmed scroll, so the reveal retries when the row
+    // becomes scrollable. querySelector finds a row that isn't yet rendered
+    // (collapsed Components subgroup) or whose nav is display:none (collapsed
+    // desktop nav), and scrolling either is a silent no-op; checkVisibility
+    // screens both out (and is absent in older engines, so we fall through).
     const row = this._host.renderRoot.querySelector(".nav-item--selected");
-    if (row) {
+    if (row && isVisible(row)) {
       row.scrollIntoView({ block: "nearest" });
       this._scrolledLine = selectedLine;
     }
   }
+}
+
+function isVisible(el: Element): boolean {
+  const check = (el as { checkVisibility?: () => boolean }).checkVisibility;
+  return check ? check.call(el) : true;
 }
