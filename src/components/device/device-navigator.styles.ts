@@ -184,7 +184,10 @@ export const deviceNavigatorStyles = css`
     cursor: default;
   }
 
-  .nav-subgroup-icon {
+  /* Muted leading domain glyph — on a domain subgroup header and on an
+     ungrouped row (Core / Automations). Always visible. */
+  .nav-subgroup-icon,
+  .nav-item-icon {
     font-size: var(--wa-font-size-m);
     color: var(--wa-color-text-quiet);
     flex-shrink: 0;
@@ -277,14 +280,6 @@ export const deviceNavigatorStyles = css`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  /* Leading domain glyph on ungrouped rows (Core / Automations). Muted
-     and always visible, mirroring the subgroup header glyph. */
-  .nav-item-icon {
-    font-size: var(--wa-font-size-m);
-    color: var(--wa-color-text-quiet);
-    flex-shrink: 0;
   }
 
   .nav-item-chevron {
