@@ -66,8 +66,8 @@ registerMdiIcons({
   "script-text-outline": mdiScriptTextOutline,
 });
 
-/** Items across all sections at/above which the search box auto-expands. */
-const SEARCH_AUTO_SHOW_THRESHOLD = 25;
+/** Items across all sections above which the search toggle is offered. */
+const SEARCH_TOGGLE_THRESHOLD = 10;
 
 @customElement("esphome-device-navigator")
 export class ESPHomeDeviceNavigator extends LitElement {
@@ -357,8 +357,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
     const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
     // Long lists earn the search box's space; short ones hide it behind
     // the header magnifier until the user (or a query) reveals it.
-    const autoShow = totalItems >= SEARCH_AUTO_SHOW_THRESHOLD;
-    const showSearch = autoShow || this._searchOpen || filtering;
+    // Offer the toggle only once the list is long enough to be worth
+    // filtering; keep it while open so an expanded box can still be closed.
+    const showSearchToggle = totalItems > SEARCH_TOGGLE_THRESHOLD || this._searchOpen;
+    const showSearch = this._searchOpen || filtering;
     const matchCount = matches ? matches.reduce((n, m) => n + m.length, 0) : 0;
     // Stay silent on zero matches; the "No matches" empty state speaks.
     const resultLabel =
@@ -411,9 +413,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
             </button>
           </h2>
           <div class="header-actions">
-            ${autoShow
-              ? nothing
-              : html`<button
+            ${showSearchToggle
+              ? html`<button
                   type="button"
                   class="search-btn"
                   aria-pressed=${showSearch}
@@ -422,7 +423,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
                   aria-label=${this._localize("device.navigator_search_toggle")}
                 >
                   <wa-icon library="mdi" name="magnify"></wa-icon>
-                </button>`}
+                </button>`
+              : nothing}
             <button
               type="button"
               class="collapse-btn"
