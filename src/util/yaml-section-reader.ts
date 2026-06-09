@@ -224,6 +224,17 @@ const collectBlockListMappings = (
           at + 1,
           `${dashIndent}${ESPHOME_YAML_INDENT}`
         );
+        // A sibling sub-key after the lambda body would be lost by the
+        // early return; bail to the whole-list YamlRawValue fallback
+        // instead (this helper's conservative contract). Unreachable
+        // with valid ESPHome YAML: filter/effect items are single-key.
+        const peek = _skipBlankAndCommentLines(lines, endIdx);
+        if (
+          peek < lines.length &&
+          _leadingIndent(lines[peek]).length > dashIndent.length
+        ) {
+          return null;
+        }
         item[headerKey] = lambdaValueFromBlock(lines.slice(at + 1, endIdx));
         return { item, endIdx };
       }

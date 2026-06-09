@@ -981,6 +981,26 @@ ${lambdaBlock}
     expect(filters[0].multiply).toEqual({ _lambda: "return 0.01;", _tag: "!lambda" });
   });
 
+  it("bails to YamlRawValue when a sibling sub-key follows the lambda body", () => {
+    // The lambda-capture branch must not silently drop a sub-key that
+    // trails the block body within the same list item; it falls back
+    // to the whole-list raw path so the sibling round-trips verbatim.
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    filters:
+      - multiply: !lambda |-
+          return x;
+        unit: y
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.filters).toBeInstanceOf(YamlRawValue);
+    const after = updateSectionInYaml(yaml, "sensor.template", values, 2);
+    expect(after).toContain("- multiply: !lambda |-");
+    expect(after).toContain("          return x;");
+    expect(after).toContain("        unit: y");
+  });
+
   it("round-trips a tagged-block-scalar filter lambda through a re-save (#1351)", () => {
     const yaml = `sensor:
   - platform: template
