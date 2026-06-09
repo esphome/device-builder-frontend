@@ -164,33 +164,43 @@ describe("device-navigator reveal-selected", () => {
     let reveals = 0;
     const navs: ESPHomeDeviceNavigator[] = [];
     // Mimic the page handler: idempotent open, applied to both navigators.
-    document.addEventListener("section-reveal", (e) => {
-      reveals++;
-      if (reveals > 30) return; // safety net: a regression would loop here
-      const idx = (e as CustomEvent<{ index: number }>).detail.index;
-      if (shared.has(idx)) return;
-      shared = new Set([idx]);
-      for (const n of navs) n.openSections = shared;
-    });
+    // Scoped to an AbortController so the document listener doesn't leak.
+    const controller = new AbortController();
+    document.addEventListener(
+      "section-reveal",
+      (e) => {
+        reveals++;
+        if (reveals > 30) return; // safety net: a regression would loop here
+        const idx = (e as CustomEvent<{ index: number }>).detail.index;
+        if (shared.has(idx)) return;
+        shared = new Set([idx]);
+        for (const n of navs) n.openSections = shared;
+      },
+      { signal: controller.signal }
+    );
 
-    for (let i = 0; i < 2; i++) {
-      const n = new ESPHomeDeviceNavigator();
-      n.yaml = YAML;
-      n.openSections = shared;
-      document.body.appendChild(n);
-      navs.push(n);
+    try {
+      for (let i = 0; i < 2; i++) {
+        const n = new ESPHomeDeviceNavigator();
+        n.yaml = YAML;
+        n.openSections = shared;
+        document.body.appendChild(n);
+        navs.push(n);
+      }
+      await Promise.all(navs.map((n) => n.updateComplete));
+
+      for (const n of navs) {
+        n.selectedKey = "sensor.template";
+        n.selectedFromLine = sensorLine();
+      }
+      // Let the open → re-render → scroll settle across both instances.
+      for (let i = 0; i < 5; i++) await Promise.all(navs.map((n) => n.updateComplete));
+
+      expect(reveals).toBeLessThan(10); // converged, nowhere near the safety net
+      expect(shared.has(1)).toBe(true); // Components ended open
+      expect(scrollSpy).toHaveBeenCalled();
+    } finally {
+      controller.abort();
     }
-    await Promise.all(navs.map((n) => n.updateComplete));
-
-    for (const n of navs) {
-      n.selectedKey = "sensor.template";
-      n.selectedFromLine = sensorLine();
-    }
-    // Let the open → re-render → scroll settle across both instances.
-    for (let i = 0; i < 5; i++) await Promise.all(navs.map((n) => n.updateComplete));
-
-    expect(reveals).toBeLessThan(10); // converged, nowhere near the safety net
-    expect(shared.has(1)).toBe(true); // Components ended open
-    expect(scrollSpy).toHaveBeenCalled();
   });
 });
