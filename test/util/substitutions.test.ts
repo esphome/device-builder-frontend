@@ -23,9 +23,30 @@ describe("parseSubstitutions", () => {
     expect(parseSubstitutions("esphome:\n  name: x\n").size).toBe(0);
   });
 
-  it("coerces a numeric-looking scalar to a string", () => {
-    const subs = parseSubstitutions("substitutions:\n  count: 5\n");
+  it("keeps scalars as their raw string, not YAML-coerced", () => {
+    const subs = parseSubstitutions(
+      "substitutions:\n  count: 5\n  enabled: yes\n  flag: false\n"
+    );
     expect(subs.get("count")).toBe("5");
+    // ESPHome treats these as raw strings, not booleans.
+    expect(subs.get("enabled")).toBe("yes");
+    expect(subs.get("flag")).toBe("false");
+  });
+
+  it("strips surrounding quotes and inline comments", () => {
+    const subs = parseSubstitutions(
+      'substitutions:\n  a: "Driveway Gate"  # the name\n  b: plain  # note\n'
+    );
+    expect(subs.get("a")).toBe("Driveway Gate");
+    expect(subs.get("b")).toBe("plain");
+  });
+
+  it("ends the block at the next top-level key", () => {
+    const subs = parseSubstitutions(
+      "substitutions:\n  a: one\nesphome:\n  name: not_a_sub\n"
+    );
+    expect(subs.get("a")).toBe("one");
+    expect(subs.has("name")).toBe(false);
   });
 });
 

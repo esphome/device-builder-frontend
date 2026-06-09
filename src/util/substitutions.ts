@@ -1,7 +1,3 @@
-import memoizeOne from "memoize-one";
-
-import { parseYamlSectionValues } from "./yaml-section-reader.js";
-
 /**
  * Expand ESPHome ``${var}`` / ``$var`` references against the open
  * file's own top-level ``substitutions:`` block, for display only.
@@ -12,19 +8,39 @@ import { parseYamlSectionValues } from "./yaml-section-reader.js";
  * reach those sources without a backend round-trip.
  */
 
-/** Parse the file's top-level ``substitutions:`` into a name→value map;
- *  empty when absent. Memoised so callers don't re-parse. */
-export const parseSubstitutions = memoizeOne((yaml: string): Map<string, string> => {
+/** Strip surrounding quotes / an inline ``# comment`` from a raw scalar. */
+function rawScalar(raw: string): string {
+  const v = raw.trim();
+  if (v[0] === '"' || v[0] === "'") {
+    const end = v.indexOf(v[0], 1);
+    if (end > 0) return v.slice(1, end);
+  }
+  const comment = v.search(/\s#/);
+  return (comment >= 0 ? v.slice(0, comment) : v).trim();
+}
+
+/**
+ * Parse the file's top-level ``substitutions:`` into a name→value map;
+ * empty when absent. Values are kept as their raw scalar text — ESPHome
+ * treats substitutions as strings, so ``enabled: yes`` stays ``yes``
+ * rather than coercing to ``true``.
+ */
+export function parseSubstitutions(yaml: string): Map<string, string> {
   const subs = new Map<string, string>();
   if (!yaml.includes("substitutions:")) return subs;
-  for (const [key, value] of Object.entries(
-    parseYamlSectionValues(yaml, "substitutions")
-  )) {
-    // Skip nested mappings — substitution values are scalars.
-    if (value != null && typeof value !== "object") subs.set(key, String(value));
+  let inBlock = false;
+  for (const line of yaml.split("\n")) {
+    if (!inBlock) {
+      if (/^substitutions:\s*(#.*)?$/.test(line)) inBlock = true;
+      continue;
+    }
+    if (/^\s*(#.*)?$/.test(line)) continue; // blank / comment-only
+    if (!/^\s/.test(line)) break; // dedent to a new top-level key
+    const m = line.match(/^\s+(\w+):\s*(.*)$/);
+    if (m) subs.set(m[1], rawScalar(m[2]));
   }
   return subs;
-});
+}
 
 const SUBSTITUTION_RE = /\$\{(\w+)\}|\$(\w+)/g;
 
