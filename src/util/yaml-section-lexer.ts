@@ -86,30 +86,23 @@ export const LIST_ITEM_START_RE = /^\s+-(\s|$)/;
 export const BLOCK_SCALAR_RE = /^[^"']*:\s*(?:!\S+\s+)?[|>][-+]?\s*(?:#.*)?$/;
 
 /**
- * Match an inline block-scalar marker — the part AFTER the colon
- * on a `key: |-` line, captured by the parser as `raw`. Used to
- * detect the direct-block-scalar shape (a key whose value is a
- * block scalar header rather than a list of items).
+ * Match the part AFTER the colon on a `key: |-` line (the `raw` value
+ * the parser captures) as a block-scalar header: an optional YAML tag,
+ * the `|`/`>` marker, and an optional trailing comment. Capture group 1
+ * is the tag (or undefined), group 2 the marker.
+ *
+ * The trailing `\s*(?:#.*)?` mirrors `BLOCK_SCALAR_RE` so a header
+ * comment (`!lambda |- # note`) still reads as a block scalar rather
+ * than falling through to inline-scalar parsing. An undefined tag is
+ * the plain `|-`/`>` case; a `!lambda` tag is what the reader turns
+ * into an editable lambda instead of the literal string `"!lambda |-"`.
  */
-export const BLOCK_SCALAR_INLINE_RE = /^[|>][-+]?$/;
-
-/**
- * Tag-aware form of `BLOCK_SCALAR_INLINE_RE`: the post-colon `raw`
- * is an optional YAML tag followed by a `|`/`>` marker and an
- * optional trailing comment. Capture group 1 is the tag (or
- * undefined), group 2 the marker. Used by the reader to recognise
- * `!lambda |-` so a lambda block round-trips as an editable value
- * instead of decaying to the literal string `"!lambda |-"`. The
- * trailing `\s*(?:#.*)?` mirrors `BLOCK_SCALAR_RE` so a header
- * comment (`!lambda |- # note`) still reads as a block scalar
- * rather than falling through to inline-scalar parsing.
- */
-const TAGGED_BLOCK_SCALAR_INLINE_RE = /^(?:(!\S+)\s+)?([|>][-+]?)\s*(?:#.*)?$/;
+const BLOCK_SCALAR_INLINE_RE = /^(?:(!\S+)\s+)?([|>][-+]?)\s*(?:#.*)?$/;
 
 export const parseBlockScalarHeader = (
   raw: string
 ): { tag: string | undefined; marker: string } | null => {
-  const m = raw.match(TAGGED_BLOCK_SCALAR_INLINE_RE);
+  const m = raw.match(BLOCK_SCALAR_INLINE_RE);
   return m ? { tag: m[1], marker: m[2] } : null;
 };
 
