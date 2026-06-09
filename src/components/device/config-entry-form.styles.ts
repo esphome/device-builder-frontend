@@ -93,9 +93,18 @@ export const configEntryFormStyles = css`
   }
 
   /* The "defined elsewhere" marker is a quiet heads-up, not a positive
-     resolve, so its icon stays muted. */
+     resolve, so its braces icon and text stay muted. */
+  .substitution-note--external {
+    color: var(--wa-color-text-quiet);
+  }
+
   .substitution-note--external wa-icon {
     color: var(--wa-color-text-quiet);
+  }
+
+  /* …except the warning glyph, which signals the unresolved reference. */
+  .substitution-note--external wa-icon.substitution-warn {
+    color: var(--wa-color-warning-fill-loud, #b8860b);
   }
 
   .secret-note code,

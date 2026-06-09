@@ -6,8 +6,8 @@
  */
 
 import {
+  mdiAlertCircleOutline,
   mdiCodeBraces,
-  mdiInformationOutline,
   mdiKeyVariant,
   mdiLockOutline,
 } from "@mdi/js";
@@ -32,6 +32,7 @@ import {
   hasSubstitutionReference,
   parseSubstitutions,
   resolveSubstitutions,
+  substitutionReferences,
 } from "../../util/substitutions.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
@@ -59,8 +60,8 @@ export const fieldRendererStyles = [
 ];
 
 registerMdiIcons({
+  "alert-circle-outline": mdiAlertCircleOutline,
   "code-braces": mdiCodeBraces,
-  "information-outline": mdiInformationOutline,
   "key-variant": mdiKeyVariant,
   "lock-outline": mdiLockOutline,
 });
@@ -128,14 +129,21 @@ export function renderSubstitutionHint(value: string, ctx: RenderCtx) {
   if (!hasSubstitutionReference(value)) return nothing;
   const resolved = resolveSubstitutions(value, parseSubstitutions(ctx.yaml));
   if (hasSubstitutionReference(resolved)) {
+    const refs = substitutionReferences(resolved).join(", ");
     const hint = ctx.localize("device.substitution_unresolved_hint");
     return html`<span
       class="substitution-note substitution-note--external"
       role="note"
-      aria-label=${hint}
+      aria-label=${`${refs} ${ctx.localize("device.substitution_unresolved")}`}
       title=${hint}
     >
-      <wa-icon library="mdi" name="information-outline"></wa-icon>
+      <wa-icon library="mdi" name="code-braces"></wa-icon>
+      <code>${refs}</code>
+      <wa-icon
+        class="substitution-warn"
+        library="mdi"
+        name="alert-circle-outline"
+      ></wa-icon>
       <span>${ctx.localize("device.substitution_unresolved")}</span>
     </span>`;
   }

@@ -4,6 +4,7 @@ import {
   hasSubstitutionReference,
   parseSubstitutions,
   resolveSubstitutions,
+  substitutionReferences,
 } from "../../src/util/substitutions.js";
 
 describe("parseSubstitutions", () => {
@@ -106,5 +107,15 @@ describe("hasSubstitutionReference", () => {
   it("is false for plain text and dollar amounts", () => {
     expect(hasSubstitutionReference("Front Door")).toBe(false);
     expect(hasSubstitutionReference("costs $5.00")).toBe(false);
+  });
+});
+
+describe("substitutionReferences", () => {
+  it("returns the distinct reference tokens", () => {
+    expect(substitutionReferences("${a} and $b and ${a}")).toEqual(["${a}", "$b"]);
+  });
+
+  it("returns an empty list when there are none", () => {
+    expect(substitutionReferences("plain $5.00")).toEqual([]);
   });
 });
