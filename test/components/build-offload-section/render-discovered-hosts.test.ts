@@ -1,14 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins that ``_renderDiscoveredHosts`` hides dashboards that can't build
- * (``remote_build_port === 0``, i.e. no peer-link receiver bound, as an HA
- * addon advertises) and keeps real build servers.
- *
- * Uses ``happy-dom`` only so the component module imports: it pulls in
- * WebAwesome side-effect imports that touch ``CSSStyleSheet`` at load time.
- * The render call itself never mounts a DOM; the sibling helpers
- * (``_statusRow`` / ``_renderDiscoveredRow``) are stubbed to plain sentinels.
+ * Pins that ``_renderDiscoveredHosts`` hides un-buildable dashboards
+ * (``remote_build_port === 0``) and keeps real build servers. ``happy-dom`` is
+ * only for the component import (WebAwesome touches ``CSSStyleSheet`` at load);
+ * the render call uses stubbed sentinels, no DOM.
  */
 import { describe, expect, it } from "vitest";
 import type { RemoteBuildPeer } from "../../../src/api/types/remote-build.js";
