@@ -95,13 +95,16 @@ export const BLOCK_SCALAR_INLINE_RE = /^[|>][-+]?$/;
 
 /**
  * Tag-aware form of `BLOCK_SCALAR_INLINE_RE`: the post-colon `raw`
- * is an optional YAML tag followed by a `|`/`>` marker. Capture
- * group 1 is the tag (or undefined), group 2 the marker. Used by
- * the reader to recognise `!lambda |-` so a lambda block round-trips
- * as an editable value instead of decaying to the literal string
- * `"!lambda |-"`.
+ * is an optional YAML tag followed by a `|`/`>` marker and an
+ * optional trailing comment. Capture group 1 is the tag (or
+ * undefined), group 2 the marker. Used by the reader to recognise
+ * `!lambda |-` so a lambda block round-trips as an editable value
+ * instead of decaying to the literal string `"!lambda |-"`. The
+ * trailing `\s*(?:#.*)?` mirrors `BLOCK_SCALAR_RE` so a header
+ * comment (`!lambda |- # note`) still reads as a block scalar
+ * rather than falling through to inline-scalar parsing.
  */
-const TAGGED_BLOCK_SCALAR_INLINE_RE = /^(?:(!\S+)\s+)?([|>][-+]?)$/;
+const TAGGED_BLOCK_SCALAR_INLINE_RE = /^(?:(!\S+)\s+)?([|>][-+]?)\s*(?:#.*)?$/;
 
 export const parseBlockScalarHeader = (
   raw: string

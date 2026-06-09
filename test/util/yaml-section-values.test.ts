@@ -1032,6 +1032,55 @@ ${lambdaBlock}
     expect(after).toContain("lambda: !lambda |-");
     expect(after).toContain("      return 0.01;");
   });
+
+  it("recognises a tagged block-scalar header carrying a trailing comment (#1351)", () => {
+    // ``!lambda |- # note`` must still read as a block scalar; without
+    // stripping the comment the header fell through to inline parsing,
+    // which read the body as the literal ``|-`` and dropped the real
+    // lambda lines.
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    filters:
+      - multiply: !lambda |- # scale factor
+          return 0.01;
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    const filters = values.filters as Array<Record<string, unknown>>;
+    expect(filters[0].multiply).toEqual({ _lambda: "return 0.01;", _tag: "!lambda" });
+  });
+
+  it("keeps a non-strip lambda marker (`!lambda >-`) opaque so it round-trips verbatim", () => {
+    // Folded (``>``) / keep (``|+``) markers carry distinct YAML
+    // semantics; coercing them to an editable LambdaValue would
+    // normalise the style to ``!lambda |-`` and change meaning. They
+    // stay YamlRawValue and survive a save byte-for-byte.
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    lambda: !lambda >-
+      return 0.01;
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.lambda).toBeInstanceOf(YamlRawValue);
+    const after = updateSectionInYaml(yaml, "sensor.template", values, 2);
+    expect(after).toContain("lambda: !lambda >-");
+    expect(after).toContain("      return 0.01;");
+    expect(after).not.toContain("!lambda |-");
+  });
+
+  it("preserves trailing whitespace on a lambda's last line (|- strips newlines only)", () => {
+    // ``|-`` strips trailing line breaks, not trailing spaces/tabs on
+    // the final content line, so the dedented body must keep them.
+    const yaml = `sensor:
+  - platform: template
+    name: Test Sensor
+    lambda: !lambda |-
+      return 0.01;${"  "}
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.lambda).toEqual({ _lambda: "return 0.01;  ", _tag: "!lambda" });
+  });
 });
 
 describe("updateSectionInYaml — preserves untouched field byte layout (#1227)", () => {

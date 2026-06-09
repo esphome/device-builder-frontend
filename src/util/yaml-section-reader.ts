@@ -39,28 +39,42 @@ import { type KeySpan, type ParsedSection } from "./yaml-section-splice.js";
 import { YamlRawValue } from "./yaml-serialize.js";
 
 /**
- * Build a ``LambdaValue`` sentinel from a captured ``!lambda`` block
+ * True for the canonical strip-chomped literal block (``|-``) — the
+ * only marker the form's lambda editor (and the serializer) emit.
+ * Other markers (folded ``>``, keep ``|+``) carry distinct YAML
+ * semantics the editor would silently normalise to ``|-``, so they
+ * stay opaque ``YamlRawValue`` blocks instead of editable lambdas.
+ */
+const isEditableLambdaBlock = (header: {
+  tag: string | undefined;
+  marker: string;
+}): boolean => header.tag === "!lambda" && header.marker === "|-";
+
+/**
+ * Build a ``LambdaValue`` sentinel from a captured ``!lambda |-`` block
  * body. Reuses ``YamlRawValue.body`` to strip the block's common
  * indent (so ``          return 0.01;`` becomes ``return 0.01;``);
- * the trailing-whitespace trim mirrors the ``|-`` chomp.
+ * only trailing newlines are dropped (the ``|-`` strip chomp), not
+ * trailing spaces/tabs on the last line.
  */
 const lambdaValueFromBlock = (bodyLines: string[]): LambdaValue => ({
-  _lambda: new YamlRawValue(bodyLines).body.replace(/[ \t\r\n]+$/, ""),
+  _lambda: new YamlRawValue(bodyLines).body.replace(/\n+$/, ""),
   _tag: "!lambda",
 });
 
 /**
  * Turn a (possibly tagged) block-scalar header + its captured body
- * lines into a form value: a ``LambdaValue`` for ``!lambda`` so the
- * value stays editable, a ``YamlRawValue`` (carrying the verbatim
- * header) for any other tag or a bare ``|-``/``>`` block.
+ * lines into a form value: a ``LambdaValue`` for a canonical
+ * ``!lambda |-`` so the value stays editable, a ``YamlRawValue``
+ * (carrying the verbatim header) for any other tag, marker, or a
+ * bare ``|-``/``>`` block.
  */
 const blockScalarValue = (
-  tag: string | undefined,
+  header: { tag: string | undefined; marker: string },
   rawHeader: string,
   bodyLines: string[]
 ): LambdaValue | YamlRawValue =>
-  tag === "!lambda"
+  isEditableLambdaBlock(header)
     ? lambdaValueFromBlock(bodyLines)
     : new YamlRawValue(bodyLines, rawHeader);
 
@@ -242,7 +256,7 @@ const collectBlockListMappings = (
       // sibling sub-keys.
       const blockHeader = parseBlockScalarHeader(headerRaw);
       if (blockHeader) {
-        if (blockHeader.tag !== "!lambda") return null;
+        if (!isEditableLambdaBlock(blockHeader)) return null;
         const { endIdx } = _scanValueBlock(
           lines,
           at + 1,
@@ -453,7 +467,7 @@ export function parseSectionCore(
     const blockHeader = parseBlockScalarHeader(raw);
     if (blockHeader) {
       const { endIdx } = _scanValueBlock(lines, i + 1, childIndent);
-      values[key] = blockScalarValue(blockHeader.tag, raw, lines.slice(i + 1, endIdx));
+      values[key] = blockScalarValue(blockHeader, raw, lines.slice(i + 1, endIdx));
       recordSpan(key, i, endIdx);
       i = endIdx - 1;
       continue;
@@ -581,11 +595,7 @@ function parseNestedBlock(
     const nestedBlockHeader = parseBlockScalarHeader(raw);
     if (nestedBlockHeader) {
       const { endIdx } = _scanValueBlock(lines, i + 1, indent);
-      values[key] = blockScalarValue(
-        nestedBlockHeader.tag,
-        raw,
-        lines.slice(i + 1, endIdx)
-      );
+      values[key] = blockScalarValue(nestedBlockHeader, raw, lines.slice(i + 1, endIdx));
       i = endIdx;
       continue;
     }
