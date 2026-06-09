@@ -312,8 +312,11 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     if (this._discoveredHosts === null) {
       return this._statusRow("settings.remote_build_peers_loading");
     }
+    // remote_build_port === 0 means no peer-link receiver is bound, so the
+    // dashboard can't accept builds (an HA addon advertises this way). Hide it
+    // here: there's nothing to send builds to in this context.
     const peers = Array.from(this._discoveredHosts.values()).filter(
-      (peer) => !this._hasPairingFor(peer.hostname)
+      (peer) => peer.remote_build_port > 0 && !this._hasPairingFor(peer.hostname)
     );
     if (peers.length === 0) {
       return this._statusRow("settings.remote_build_peers_empty");
