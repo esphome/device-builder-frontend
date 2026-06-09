@@ -269,9 +269,9 @@ export interface RemoteBuildPeer {
   /**
    * Receiver's peer-link Noise WS port from the TXT
    * `remote_build_port` key, NOT the SRV dashboard HTTP `port` above.
-   * `0` when no peer-link listener is bound (default-off, e.g. HA addon);
-   * such hosts can't build, so Known Dashboards filters them out. Rendered
-   * rows always carry a `> 0` port, which the Pair button pre-fills.
+   * `0` when no peer-link listener is bound (default-off, e.g. HA addon),
+   * i.e. the host can't accept builds. The Send Builds → Known Dashboards
+   * list filters those out; the Pair button there pre-fills a `> 0` port.
    */
   remote_build_port: number;
 }
