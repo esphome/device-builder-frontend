@@ -30,7 +30,6 @@ import {
 } from "../../util/secret-eligibility.js";
 import {
   hasSubstitutionReference,
-  parseSubstitutions,
   resolveSubstitutions,
 } from "../../util/substitutions.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
@@ -117,16 +116,14 @@ export function renderSecretHint(value: string, ctx: RenderCtx) {
 }
 
 /**
- * Hint beneath a string field that references a ``${var}``. When the
- * reference resolves against this file's ``substitutions:`` it previews
- * the value; when it's still unresolved (defined in a package / include /
- * command line) it shows an info marker whose tooltip explains that those
- * are resolved at build time, not previewed here — so an unexpanded value
- * doesn't read as a bug. ``nothing`` when the value has no reference.
+ * Hint beneath a string field referencing a ``${var}``: previews the
+ * value when it resolves against this file's ``substitutions:``, else a
+ * marker whose tooltip notes the reference is resolved at build time
+ * (from a package/include), not previewed here. ``nothing`` with no ref.
  */
 export function renderSubstitutionHint(value: string, ctx: RenderCtx) {
   if (!hasSubstitutionReference(value)) return nothing;
-  const resolved = resolveSubstitutions(value, parseSubstitutions(ctx.yaml));
+  const resolved = resolveSubstitutions(value, ctx.substitutions);
   if (hasSubstitutionReference(resolved)) {
     const hint = ctx.localize("device.substitution_unresolved_hint");
     return html`<span
@@ -160,6 +157,9 @@ export interface RenderCtx {
   localize: LocalizeFunc;
   disabled: boolean;
   yaml: string;
+  /** Parsed ``substitutions:`` for ``yaml``; built once per render so
+   *  referencing fields share one parse. */
+  substitutions: Map<string, string>;
   fromLine?: number;
   /** Section being edited (``light.esp32_rmt_led_strip``,
    *  ``sensor.template``, …). Empty when the form runs outside a

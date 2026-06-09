@@ -19,6 +19,7 @@ import type { BoardCatalogEntry, BoardPin } from "../../../src/api/types/boards.
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { parseSubstitutions } from "../../../src/util/substitutions.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
@@ -77,10 +78,13 @@ export function makeRenderCtx(
     overrides?: Partial<RenderCtx>;
   } = {}
 ): RenderCtx {
+  const overrides = options.overrides ?? {};
+  const yaml = overrides.yaml ?? "";
   return {
     localize: (k: string) => k,
     disabled: false,
-    yaml: "",
+    yaml,
+    substitutions: parseSubstitutions(yaml),
     fromLine: 0,
     sectionKey: "",
     board: "board" in options ? (options.board ?? null) : makeTestBoard(),
@@ -119,7 +123,7 @@ export function makeRenderCtx(
     // fresh ``{}`` per ``makeRenderCtx`` invocation matches the
     // production form's "one stashOwner per host element" contract.
     stashOwner: {},
-    ...(options.overrides ?? {}),
+    ...overrides,
   };
 }
 
