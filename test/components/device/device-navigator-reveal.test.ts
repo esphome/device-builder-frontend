@@ -44,8 +44,10 @@ const sensorLine = () => {
 };
 
 let scrollSpy: ReturnType<typeof vi.fn>;
+let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
 
 beforeEach(() => {
+  originalScrollIntoView = Element.prototype.scrollIntoView;
   scrollSpy = vi.fn();
   // happy-dom doesn't implement scrollIntoView; install a spy to assert on.
   Element.prototype.scrollIntoView = scrollSpy as typeof Element.prototype.scrollIntoView;
@@ -53,7 +55,8 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.innerHTML = "";
-  vi.restoreAllMocks();
+  // Direct prototype assignment isn't a vi.spyOn, so restore it explicitly.
+  Element.prototype.scrollIntoView = originalScrollIntoView;
 });
 
 async function mount(openSections: Set<number>): Promise<{
@@ -124,6 +127,32 @@ describe("device-navigator reveal-selected", () => {
     // A re-render that doesn't change the selection (e.g. hover) must not rescroll.
     nav.requestUpdate();
     await nav.updateComplete;
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // A Components row inside a collapsed domain subgroup isn't rendered even
+  // when its section is open; the controller must not latch on that empty
+  // render, so it retries once the subgroup expands and the row mounts.
+  it("retries the scroll after a collapsed subgroup is expanded", async () => {
+    const { nav } = await mount(new Set([1]));
+    const sensorGroup = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].find((h) =>
+        h.querySelector(".nav-subgroup-title")?.textContent?.includes("Sensor")
+      ) as HTMLElement;
+
+    // Collapse the Sensor subgroup, then select the sensor row it hides.
+    sensorGroup().click();
+    await nav.updateComplete;
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeNull();
+    expect(scrollSpy).not.toHaveBeenCalled();
+
+    // Expand it: the row mounts and the deferred scroll fires.
+    sensorGroup().click();
+    await nav.updateComplete;
+    expect(nav.shadowRoot!.querySelector(".nav-item--selected")).toBeTruthy();
     expect(scrollSpy).toHaveBeenCalledTimes(1);
   });
 

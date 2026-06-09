@@ -65,9 +65,13 @@ export class NavigatorRevealController implements ReactiveController {
       );
       return;
     }
-    this._host.renderRoot
-      .querySelector(".nav-item--selected")
-      ?.scrollIntoView({ block: "nearest" });
-    this._scrolledLine = selectedLine;
+    // Latch only on a confirmed scroll: a row inside a collapsed Components
+    // subgroup isn't rendered yet, so leave the line unlatched to retry once
+    // it mounts.
+    const row = this._host.renderRoot.querySelector(".nav-item--selected");
+    if (row) {
+      row.scrollIntoView({ block: "nearest" });
+      this._scrolledLine = selectedLine;
+    }
   }
 }
