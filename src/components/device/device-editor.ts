@@ -452,10 +452,10 @@ export class ESPHomeDeviceEditor extends LitElement {
     );
   }
 
-  updated(changed: Map<string, unknown>) {
+  willUpdate(changed: Map<string, unknown>) {
     // Switching device clears the banner until the new file re-lints, so a
     // stale "invalid" never flashes over a freshly-opened valid config.
-    if (changed.has("configuration")) {
+    if (changed.has("configuration") && this._liveErrors.length) {
       this._liveErrors = [];
     }
     if (this._showDiff && changed.has("_showDiffButton") && !this._showDiffButton) {

@@ -181,7 +181,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   static styles = [espHomeStyles, inputStyles, deviceSectionConfigStyles];
 
-  updated(changedProperties: Map<string, unknown>) {
+  willUpdate(changedProperties: Map<string, unknown>) {
+    // loadConfig synchronously flips _loading/_config/_error; running it in
+    // willUpdate folds those into the in-progress render rather than
+    // scheduling a second one.
     if (
       (changedProperties.has("sectionKey") ||
         changedProperties.has("configuration") ||
@@ -191,6 +194,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     ) {
       void loadConfig(this);
     }
+  }
+
+  updated() {
     this._triggerCatalog.ensure();
   }
 

@@ -131,10 +131,16 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
 
   private _reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
-  updated(changedProperties: Map<string, unknown>) {
+  willUpdate(changedProperties: Map<string, unknown>) {
+    // _refreshAlternateBoards synchronously resets _alternateBoards before its
+    // await; doing that in willUpdate folds it into the in-progress render
+    // instead of scheduling a second one.
     if (changedProperties.has("board")) {
       this._refreshAlternateBoards();
     }
+  }
+
+  updated(changedProperties: Map<string, unknown>) {
     // Coalesce typing in the YAML editor pane to one
     // `reload()` per debounce window, but bypass the debounce
     // on the empty-to-populated transition (page-load arrival,

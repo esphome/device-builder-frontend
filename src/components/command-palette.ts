@@ -324,9 +324,6 @@ export class ESPHomeCommandPalette extends LitElement {
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);
-  }
-
-  protected updated(changed: Map<string, unknown>) {
     if (changed.has("_open") || changed.has("_query")) {
       const items = this._filtered();
       if (items.length && !items.find((i) => i.id === this._selectedId)) {
