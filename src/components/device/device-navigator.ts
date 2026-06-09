@@ -51,6 +51,7 @@ import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
 import "./add-script-dialog.js";
 import type { ESPHomeAddScriptDialog } from "./add-script-dialog.js";
 import "./device-navigator-search.js";
+import type { ESPHomeNavigatorSearch } from "./device-navigator-search.js";
 import { SECTION_ICON } from "./section-icons.js";
 import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 
@@ -181,6 +182,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   @query("esphome-add-script-dialog")
   private _addScriptDialog!: ESPHomeAddScriptDialog;
+
+  @query("esphome-navigator-search")
+  private _search!: ESPHomeNavigatorSearch;
 
   @property({ attribute: false })
   selectedKey: string | null = null;
@@ -488,9 +492,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
       return;
     }
     this._searchOpen = true;
-    void this.updateComplete.then(() => {
-      this.shadowRoot?.querySelector("esphome-navigator-search")?.focusInput();
-    });
+    void this.updateComplete.then(() => this._search?.focusInput());
   };
 
   private _toggleSection(index: number) {
