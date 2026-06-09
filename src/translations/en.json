@@ -697,6 +697,7 @@
     "password_reveal": "Show password",
     "password_hide": "Hide password",
     "value_from_secret": "Using stored secret:",
+    "substitution_resolves_to": "Resolved substitution value",
     "secret_picker_label": "Use secret",
     "secret_picker_aria": "Pick a stored secret for {field}",
     "secret_picker_create": "Create new secret…",

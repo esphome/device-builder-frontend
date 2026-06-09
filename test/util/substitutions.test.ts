@@ -1,0 +1,72 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  parseSubstitutions,
+  resolveSubstitutions,
+} from "../../src/util/substitutions.js";
+
+describe("parseSubstitutions", () => {
+  it("reads the top-level substitutions block into a map", () => {
+    const yaml = [
+      "substitutions:",
+      "  upper_devicename: Driveway Gate",
+      "  close_duration: 34.1sec",
+      "esphome:",
+      "  name: x",
+    ].join("\n");
+    const subs = parseSubstitutions(yaml);
+    expect(subs.get("upper_devicename")).toBe("Driveway Gate");
+    expect(subs.get("close_duration")).toBe("34.1sec");
+  });
+
+  it("returns an empty map when there is no block", () => {
+    expect(parseSubstitutions("esphome:\n  name: x\n").size).toBe(0);
+  });
+
+  it("coerces a numeric-looking scalar to a string", () => {
+    const subs = parseSubstitutions("substitutions:\n  count: 5\n");
+    expect(subs.get("count")).toBe("5");
+  });
+});
+
+describe("resolveSubstitutions", () => {
+  const subs = new Map([
+    ["upper_devicename", "Driveway Gate"],
+    ["id_prefix", "driveway_gate"],
+  ]);
+
+  it("expands ${var} references", () => {
+    expect(resolveSubstitutions("${upper_devicename} Moving", subs)).toBe(
+      "Driveway Gate Moving"
+    );
+  });
+
+  it("expands a bare $var reference", () => {
+    expect(resolveSubstitutions("$id_prefix", subs)).toBe("driveway_gate");
+  });
+
+  it("leaves an unknown reference literal", () => {
+    expect(resolveSubstitutions("${nope} Moving", subs)).toBe("${nope} Moving");
+  });
+
+  it("resolves a substitution whose value references another", () => {
+    const chain = new Map([
+      ["a", "${b}"],
+      ["b", "done"],
+    ]);
+    expect(resolveSubstitutions("${a}", chain)).toBe("done");
+  });
+
+  it("passes text with no references through unchanged", () => {
+    expect(resolveSubstitutions("plain text", subs)).toBe("plain text");
+  });
+
+  it("passes through when the map is empty or undefined", () => {
+    expect(resolveSubstitutions("${upper_devicename}", new Map())).toBe(
+      "${upper_devicename}"
+    );
+    expect(resolveSubstitutions("${upper_devicename}", undefined)).toBe(
+      "${upper_devicename}"
+    );
+  });
+});

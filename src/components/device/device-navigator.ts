@@ -124,6 +124,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
         platform,
         deviceName,
         localize,
+        substitutions: buckets.substitutions,
       })
   );
 

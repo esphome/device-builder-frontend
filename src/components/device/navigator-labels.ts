@@ -1,5 +1,6 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getCachedComponent } from "../../util/component-name-cache.js";
+import { resolveSubstitutions } from "../../util/substitutions.js";
 import { type YamlSection, sectionKeyOf } from "../../util/yaml-sections.js";
 import type { NavigatorBuckets } from "./navigator-buckets.js";
 import type { TriggerCatalogController } from "./trigger-catalog-controller.js";
@@ -23,6 +24,9 @@ export interface LabelContext {
   platform: string;
   deviceName: string;
   localize: LocalizeFunc;
+  /** File's top-level ``substitutions:`` for expanding ``${var}`` in
+   *  displayed names/ids. */
+  substitutions?: Map<string, string>;
 }
 
 /**
@@ -61,10 +65,12 @@ export function resolveNavItemLabels(
   // so a `name: $devicename` substitution shows the expanded hostname,
   // not the raw scalar. Falls back to the raw YAML value for a
   // new/unsaved device not yet in the devices list.
-  const named =
+  const rawNamed =
     category === "core" && item.key === "esphome" && ctx.deviceName
       ? ctx.deviceName
       : item.name || item.id;
+  // Expand `${var}`; the esphome branch is already backend-resolved.
+  const named = rawNamed ? resolveSubstitutions(rawNamed, ctx.substitutions) : rawNamed;
   const secondary = named && named !== primary ? named : undefined;
 
   return { primary, secondary };
@@ -113,7 +119,7 @@ function automationLabels(
   // Script: line 1 = "Script", line 2 = id.
   if (item.parentKey === "script") {
     const primary = ctx.localize("device.script_header_title_static");
-    const secondary = item.id ?? raw;
+    const secondary = resolveSubstitutions(item.id ?? raw, ctx.substitutions);
     return { primary, secondary: secondary !== primary ? secondary : undefined };
   }
   // Interval: line 1 = "Interval", line 2 = the time if known. Uses the
@@ -146,7 +152,8 @@ function automationLabels(
       item.eventKey,
       fallback
     );
-    const named = item.name || item.id;
+    const rawNamed = item.name || item.id;
+    const named = rawNamed ? resolveSubstitutions(rawNamed, ctx.substitutions) : rawNamed;
     const secondary = named && named !== primary ? named : undefined;
     return { primary, secondary };
   }

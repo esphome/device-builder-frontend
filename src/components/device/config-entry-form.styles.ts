@@ -76,7 +76,8 @@ export const configEntryFormStyles = css`
   /* Hint shown below a string/password input when the value is a
      !secret reference — clarifies that the field points into
      secrets.yaml instead of holding a literal value. */
-  .secret-note {
+  .secret-note,
+  .substitution-note {
     display: inline-flex;
     align-items: center;
     gap: var(--wa-space-2xs);
@@ -85,12 +86,14 @@ export const configEntryFormStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  .secret-note wa-icon {
+  .secret-note wa-icon,
+  .substitution-note wa-icon {
     font-size: 14px;
     color: var(--esphome-primary);
   }
 
-  .secret-note code {
+  .secret-note code,
+  .substitution-note code {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: var(--wa-font-size-2xs);
     padding: 1px 4px;

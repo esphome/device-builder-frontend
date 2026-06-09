@@ -47,3 +47,27 @@ describe("resolveNavItemLabels core suffix", () => {
     expect(resolveNavItemLabels(item("x"), "core", ctx).primary).toBe("Component");
   });
 });
+
+describe("resolveNavItemLabels substitution resolution", () => {
+  const subs = new Map([["upper_devicename", "Driveway Gate"]]);
+  const row = (name: string): YamlSection =>
+    ({ key: "binary_sensor", platform: "gpio", name }) as unknown as YamlSection;
+
+  it("expands ${var} in the secondary label", () => {
+    mockGetCached.mockReturnValue(undefined);
+    const labels = resolveNavItemLabels(row("${upper_devicename} Moving"), "component", {
+      ...ctx,
+      substitutions: subs,
+    });
+    expect(labels.secondary).toBe("Driveway Gate Moving");
+  });
+
+  it("leaves an unknown ${var} literal", () => {
+    mockGetCached.mockReturnValue(undefined);
+    const labels = resolveNavItemLabels(row("${nope} Moving"), "component", {
+      ...ctx,
+      substitutions: subs,
+    });
+    expect(labels.secondary).toBe("${nope} Moving");
+  });
+});
