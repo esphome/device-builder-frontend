@@ -158,15 +158,32 @@ function automationLabels(
         humanizeEvent(item.eventKey)
       )
     );
-    const rawNamed = item.name || item.id;
-    const target = rawNamed
-      ? resolveSubstitutions(rawNamed, ctx.substitutions)
-      : prettyDomain(item.parentKey);
-    const secondary = target !== primary ? target : undefined;
-    return { primary, secondary };
+    return { primary, secondary: componentTarget(item, ctx, primary) };
+  }
+  // Component action-list field (``turn_on_action`` / ``set_action``) — lead
+  // with the action so the two switch.template actions (turn on vs turn off)
+  // are distinct; entity on line 2, mirroring the trigger rows.
+  if (item.parentKey && item.actionField) {
+    const primary = humanizeEvent(item.actionField.replace(/_action$/, ""));
+    return { primary, secondary: componentTarget(item, ctx, primary) };
   }
   // Unscoped / unrecognised — fall back to displayLabel.
   return { primary: item.displayLabel || raw };
+}
+
+/** Line-2 component target for a component-bound automation: the instance
+ *  name/id (``${var}`` expanded), else the domain; hidden when it would just
+ *  repeat line 1. */
+function componentTarget(
+  item: YamlSection,
+  ctx: LabelContext,
+  primary: string
+): string | undefined {
+  const rawNamed = item.name || item.id;
+  const target = rawNamed
+    ? resolveSubstitutions(rawNamed, ctx.substitutions)
+    : prettyDomain(item.parentKey ?? "");
+  return target !== primary ? target : undefined;
 }
 
 /** Title-case a trigger event key for the pre-catalog fallback

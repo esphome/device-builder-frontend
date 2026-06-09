@@ -185,6 +185,7 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
       fromLine,
       toLine: _findBlockEnd(lines, i, indent),
       id: componentId,
+      name: host.name,
       parentKey: host.parentKey ?? host.key,
       actionField: field,
     });

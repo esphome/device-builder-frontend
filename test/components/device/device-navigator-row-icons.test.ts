@@ -95,4 +95,30 @@ describe("device-navigator row icons", () => {
     expect(names).toContain("clock-outline"); // interval
     expect(names).not.toContain("shape-outline");
   });
+
+  it("leads action-field automations with the action so they stay distinct", async () => {
+    const nav = new ESPHomeDeviceNavigator();
+    nav.yaml = [
+      "esphome:",
+      "  name: t",
+      "switch:",
+      "  - platform: template",
+      "    name: mmWave Status",
+      "    turn_on_action:",
+      "      - logger.log: on",
+      "    turn_off_action:",
+      "      - logger.log: off",
+      "",
+    ].join("\n");
+    nav.openSections = new Set([0, 1, 2]);
+    document.body.appendChild(nav);
+    await nav.updateComplete;
+
+    const primaries = [
+      ...(nav.shadowRoot?.querySelectorAll(".nav-item-content p") ?? []),
+    ].map((el) => el.textContent?.trim());
+    // The two switch.template actions lead with the action, not "mmWave Status → …".
+    expect(primaries).toContain("Turn On");
+    expect(primaries).toContain("Turn Off");
+  });
 });
