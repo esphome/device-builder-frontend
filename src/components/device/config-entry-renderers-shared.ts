@@ -113,9 +113,12 @@ export function renderSecretHint(value: string, ctx: RenderCtx) {
 export function renderSubstitutionHint(value: string, ctx: RenderCtx) {
   const resolved = resolveSubstitutions(value, parseSubstitutions(ctx.yaml));
   if (resolved === value) return nothing;
+  const label = ctx.localize("device.substitution_resolves_to");
   return html`<span
     class="substitution-note"
-    title=${ctx.localize("device.substitution_resolves_to")}
+    role="note"
+    aria-label=${`${label}: ${resolved}`}
+    title=${label}
   >
     <wa-icon library="mdi" name="code-braces"></wa-icon>
     <code>${resolved}</code>

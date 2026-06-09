@@ -70,4 +70,16 @@ describe("resolveNavItemLabels substitution resolution", () => {
     });
     expect(labels.secondary).toBe("${nope} Moving");
   });
+
+  it("does not re-resolve the backend-resolved esphome device name", () => {
+    mockGetCached.mockReturnValue(undefined);
+    // A device name that happens to contain a substitution-key-shaped
+    // substring must pass through untouched — it's already backend-expanded.
+    const labels = resolveNavItemLabels(
+      { key: "esphome" } as unknown as YamlSection,
+      "core",
+      { ...ctx, deviceName: "gate_$upper_devicename", substitutions: subs }
+    );
+    expect(labels.secondary).toBe("gate_$upper_devicename");
+  });
 });

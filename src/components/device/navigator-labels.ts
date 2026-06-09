@@ -65,12 +65,13 @@ export function resolveNavItemLabels(
   // so a `name: $devicename` substitution shows the expanded hostname,
   // not the raw scalar. Falls back to the raw YAML value for a
   // new/unsaved device not yet in the devices list.
-  const rawNamed =
-    category === "core" && item.key === "esphome" && ctx.deviceName
-      ? ctx.deviceName
-      : item.name || item.id;
-  // Expand `${var}`; the esphome branch is already backend-resolved.
-  const named = rawNamed ? resolveSubstitutions(rawNamed, ctx.substitutions) : rawNamed;
+  const useDeviceName = category === "core" && item.key === "esphome" && !!ctx.deviceName;
+  // The backend device name is already substitution-expanded; only the
+  // raw YAML scalar needs `${var}` resolved (and re-resolving the device
+  // name could rewrite a legitimate `$`-shaped substring in it).
+  const named = useDeviceName
+    ? ctx.deviceName
+    : resolveSubstitutions(item.name || item.id || "", ctx.substitutions) || undefined;
   const secondary = named && named !== primary ? named : undefined;
 
   return { primary, secondary };
