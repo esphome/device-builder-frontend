@@ -164,8 +164,17 @@ describe("loadAndHydrateAvailable", () => {
     const outcome = await loadAndHydrateAvailable(api, "device.yaml");
 
     expect(getAvailableAutomations).toHaveBeenCalledTimes(1);
-    expect(getAvailableAutomations).toHaveBeenCalledWith("device.yaml");
+    expect(getAvailableAutomations).toHaveBeenCalledWith("device.yaml", undefined);
     expect(outcome.status).toBe("ok");
+  });
+
+  it("forwards the draft yaml override to getAvailableAutomations (#1348)", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(emptySlim());
+    const api = { getAvailableAutomations } as unknown as ESPHomeAPI;
+
+    await loadAndHydrateAvailable(api, "device.yaml", { yaml: "draft: true\n" });
+
+    expect(getAvailableAutomations).toHaveBeenCalledWith("device.yaml", "draft: true\n");
   });
 
   it("returns fresh array refs in the hydrated outcome", async () => {

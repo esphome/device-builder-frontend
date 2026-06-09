@@ -398,6 +398,9 @@ export class ESPHomeAutomationEditor extends LitElement {
       {
         // All three lists: this editor renders the trigger picker.
         lists: ["triggers", "actions", "conditions"],
+        // Scope off the draft so a just-added component's triggers
+        // surface while re-editing before the global save (#1348).
+        yaml: this.yaml,
         // Paint the slim list and drop the spinner so the dropdowns
         // mount while hydration runs; the controller guards this
         // against a superseded load. The post-hydration ``available``

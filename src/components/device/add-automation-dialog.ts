@@ -152,7 +152,10 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     if (!this._api || !this.configuration) return;
     this._loading = true;
     try {
-      this._available = await this._api.getAvailableAutomations(this.configuration);
+      this._available = await this._api.getAvailableAutomations(
+        this.configuration,
+        this.yaml
+      );
       // A per-section shortcut on a multi-entity container prefills the
       // container id, which has no triggers of its own; land on its first
       // sub-entity so the user sees a real target instead of an empty list.

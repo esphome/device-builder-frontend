@@ -119,6 +119,22 @@ describe("add-automation-dialog render gate (behavioral)", () => {
     second.resolve(slimAvailable());
     await flushPending();
   });
+
+  it("scopes available automations off the unsaved draft yaml (#1348)", async () => {
+    const getAvailableAutomations = vi.fn(() => Promise.resolve(slimAvailable()));
+    const api = { getAvailableAutomations } as unknown as ESPHomeAPI;
+
+    const dialog = await mountDialog(api);
+    dialog.yaml = "esphome:\n  name: drafty\n";
+    dialog.open();
+    await dialog.updateComplete;
+    await flushPending();
+
+    expect(getAvailableAutomations).toHaveBeenCalledWith(
+      "device.yaml",
+      "esphome:\n  name: drafty\n"
+    );
+  });
 });
 
 const ON_TIME_YAML = `time:

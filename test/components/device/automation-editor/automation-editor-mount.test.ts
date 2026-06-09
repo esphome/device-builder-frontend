@@ -75,7 +75,9 @@ describe("automation-editor mount-time load (behavioral)", () => {
     await mountEditor(api, "device.yaml");
 
     expect(getAvailableAutomations).toHaveBeenCalledTimes(1);
-    expect(getAvailableAutomations).toHaveBeenCalledWith("device.yaml");
+    // Second arg is the editor's draft yaml (empty here), forwarded so a
+    // wizard-added component's triggers scope off the draft (#1348).
+    expect(getAvailableAutomations).toHaveBeenCalledWith("device.yaml", "");
   });
 
   it("editor mounted without configuration does not call getAvailableAutomations", async () => {

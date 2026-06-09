@@ -38,6 +38,7 @@ export class CatalogLoadController implements ReactiveController {
     options?: {
       lists?: readonly HydrateList[];
       onPaint?: (available: AvailableAutomations) => void;
+      yaml?: string;
     }
   ): Promise<{ available?: AvailableAutomations; error?: string }> {
     if (!api || !configuration) return {};
@@ -45,6 +46,7 @@ export class CatalogLoadController implements ReactiveController {
     const onPaint = options?.onPaint;
     const outcome = await loadAndHydrateAvailable(api, configuration, {
       isStale: () => seq !== this._seq,
+      yaml: options?.yaml,
       // Trigger-less editors (script, api-action) render actions +
       // conditions only; skipping trigger-body hydration avoids needless
       // get_bodies work on mount. automation-editor passes all three to

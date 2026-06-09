@@ -177,7 +177,10 @@ export class ESPHomeAddScriptDialog extends LitElement {
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
     try {
-      this._available = await this._api.getAvailableAutomations(this.configuration);
+      this._available = await this._api.getAvailableAutomations(
+        this.configuration,
+        this.yaml
+      );
     } catch (err) {
       this._error = getErrorMessage(err);
     }

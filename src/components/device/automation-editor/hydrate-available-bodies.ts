@@ -91,10 +91,11 @@ export async function loadAndHydrateAvailable(
     onPaint?: (available: AvailableAutomations) => void;
     isStale?: () => boolean;
     lists?: readonly HydrateList[];
+    yaml?: string;
   }
 ): Promise<LoadAndHydrateOutcome> {
   try {
-    const slim = await api.getAvailableAutomations(configuration);
+    const slim = await api.getAvailableAutomations(configuration, options?.yaml);
     if (options?.isStale?.()) return { status: "stale" };
     // Shallow-clone each entry so ``hydrateAvailableBodies``
     // mutates ``available``'s copies, not the api-client object
