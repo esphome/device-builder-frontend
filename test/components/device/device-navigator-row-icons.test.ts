@@ -62,4 +62,29 @@ describe("device-navigator row icons", () => {
     // ...and its rows don't repeat a per-row glyph.
     expect(iconNames(nav, ".nav-items--grouped .nav-item-icon")).toEqual([]);
   });
+
+  it("gives ungrouped Automation rows their per-type glyph (not the fallback shape)", async () => {
+    const nav = new ESPHomeDeviceNavigator();
+    nav.yaml = [
+      "esphome:",
+      "  name: t",
+      "script:",
+      "  - id: scr1",
+      "    then:",
+      "      - logger.log: x",
+      "interval:",
+      "  - interval: 60s",
+      "    then:",
+      "      - logger.log: tick",
+      "",
+    ].join("\n");
+    nav.openSections = new Set([0, 1, 2]);
+    document.body.appendChild(nav);
+    await nav.updateComplete;
+
+    const names = iconNames(nav, ".nav-item-icon");
+    expect(names).toContain("script-text-outline"); // script
+    expect(names).toContain("clock-outline"); // interval
+    expect(names).not.toContain("shape-outline");
+  });
 });

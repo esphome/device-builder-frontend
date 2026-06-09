@@ -1,5 +1,6 @@
 import {
   mdiApi,
+  mdiArrowDecisionOutline,
   mdiBellOutline,
   mdiBluetooth,
   mdiBug,
@@ -45,6 +46,7 @@ import {
   mdiRadioTower,
   mdiRemote,
   mdiRestartAlert,
+  mdiScriptTextOutline,
   mdiSerialPort,
   mdiShapeOutline,
   mdiShieldHomeOutline,
@@ -373,9 +375,30 @@ const DOMAIN_ICON: Record<string, readonly [string, string]> = {
 /** Neutral glyph for any domain not in {@link DOMAIN_ICON}. */
 const FALLBACK: readonly [string, string] = ["shape-outline", mdiShapeOutline];
 
-registerMdiIcons(Object.fromEntries([...Object.values(DOMAIN_ICON), FALLBACK]));
+/** Glyphs for the structured ``automation:*`` row keys (script / interval
+ *  share the time + script glyphs; triggers and actions share the section's
+ *  flow glyph). Registered alongside DOMAIN_ICON so {@link iconForRowKey}
+ *  always returns a known name. */
+const AUTOMATION_ICONS: readonly (readonly [string, string])[] = [
+  ["script-text-outline", mdiScriptTextOutline],
+  ["arrow-decision-outline", mdiArrowDecisionOutline],
+];
+
+registerMdiIcons(
+  Object.fromEntries([...Object.values(DOMAIN_ICON), ...AUTOMATION_ICONS, FALLBACK])
+);
 
 /** Registered mdi icon name for a row's domain; neutral shape if unmapped. */
 export function iconForDomain(domain: string): string {
   return (DOMAIN_ICON[domain] ?? FALLBACK)[0];
+}
+
+/** Glyph for a navigator row's key, handling the structured ``automation:*``
+ *  keys (script / interval / trigger / action) before falling back to the
+ *  plain-domain lookup. */
+export function iconForRowKey(key: string): string {
+  if (key.startsWith("automation:script:")) return "script-text-outline";
+  if (key.startsWith("automation:interval:")) return "clock-outline";
+  if (key.startsWith("automation:")) return "arrow-decision-outline";
+  return iconForDomain(key);
 }

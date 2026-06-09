@@ -3,7 +3,7 @@ import { ifDefined } from "lit/directives/if-defined.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
 import type { NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
-import { iconForDomain } from "./navigator-row-icons.js";
+import { iconForDomain, iconForRowKey } from "./navigator-row-icons.js";
 
 /** A "+ Add X" affordance at the foot of a section. */
 export interface NavAction {
@@ -54,7 +54,7 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
         ? html`<wa-icon
             class="nav-item-icon"
             library="mdi"
-            name=${iconForDomain(item.key)}
+            name=${iconForRowKey(item.key)}
           ></wa-icon>`
         : nothing}
       <div class="nav-item-content">
