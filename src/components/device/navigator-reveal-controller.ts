@@ -69,8 +69,8 @@ export class NavigatorRevealController implements ReactiveController {
     }
     if (!filtering && !openSections.has(index) && this._revealedLine !== selectedLine) {
       // Ask the page to open it once, then bail; the re-render re-enters with
-      // the row. Latching the line here (not on scroll) keeps a manual re-close
-      // of this section from re-triggering the forced open on the next render.
+      // the row. Latch *before* dispatch (below) so a manual re-close of this
+      // section can't re-trigger the forced open on a later render.
       this._revealedLine = selectedLine;
       this._host.dispatchEvent(
         new CustomEvent("section-reveal", {
@@ -81,6 +81,12 @@ export class NavigatorRevealController implements ReactiveController {
       );
       return;
     }
+    // Past the reveal gate: the section is already open (URL ``open=`` restore,
+    // accordion), we're filtering, or we already asked once. Latch the line
+    // here too — without it a section opened by URL never marks the line
+    // handled, so closing it (by opening another section) re-fires the reveal
+    // and snaps it back open.
+    this._revealedLine = selectedLine;
     // Latch only on a confirmed scroll so the reveal retries when the row
     // becomes scrollable: querySelector misses a row that isn't rendered yet
     // (collapsed Components subgroup), and getClientRects catches one that is

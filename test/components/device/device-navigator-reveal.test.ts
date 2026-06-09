@@ -189,6 +189,32 @@ describe("device-navigator reveal-selected", () => {
     expect(reveals).toEqual([1]);
   });
 
+  // Regression: a row selected while its section was already open (URL
+  // ``?section=&open=1`` restore) must mark the line handled, so closing that
+  // section (by opening another) doesn't re-fire reveal and snap it back open.
+  it("does not re-reveal a section that was already open when selected", async () => {
+    const { nav, reveals } = await mount(new Set([1]));
+    const sensorGroup = () =>
+      [...nav.shadowRoot!.querySelectorAll(".nav-subgroup-header")].find((h) =>
+        h.querySelector(".nav-subgroup-title")?.textContent?.includes("Sensor")
+      ) as HTMLElement;
+
+    // Collapse the Sensor subgroup so the selected row can never scroll-latch.
+    sensorGroup().click();
+    await nav.updateComplete;
+
+    // Select the row while Components is already open: nothing to reveal.
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    expect(reveals).toEqual([]);
+
+    // User opens Core (accordion closes Components). Must not snap back.
+    nav.openSections = new Set([0]);
+    await nav.updateComplete;
+    expect(reveals).toEqual([]);
+  });
+
   // The page renders two navigators (drawer + desktop) sharing one
   // openSections. A toggle would race them open/closed forever and hang the
   // page; section-reveal is an idempotent set, so it converges.
