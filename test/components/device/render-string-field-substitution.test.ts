@@ -17,6 +17,7 @@ import { makeRenderCtx } from "./_renderer-fixtures.js";
 const YAML = [
   "substitutions:",
   "  upper_devicename: Driveway Gate",
+  "  wifi_password: hunter2",
   "binary_sensor:",
   "  - platform: gpio",
   "    name: ${upper_devicename} Moving",
@@ -63,5 +64,20 @@ describe("renderStringField — substitution preview", () => {
       renderStringField(makeEntry(), "text", ["name"], ctxFor("${unknown} Moving"))
     );
     expect(json).not.toContain("substitution-note");
+  });
+
+  it("never previews a concealed (password) field, to avoid leaking a secret", () => {
+    const ctx = makeRenderCtx(
+      { password: "${wifi_password}" },
+      { board: null, overrides: { sectionKey: "wifi", yaml: YAML } }
+    );
+    const entry = makeConfigEntry({
+      key: "password",
+      type: ConfigEntryType.STRING,
+      label: "Password",
+    });
+    const json = serialize(renderStringField(entry, "password", ["password"], ctx));
+    expect(json).not.toContain("substitution-note");
+    expect(json).not.toContain("hunter2");
   });
 });

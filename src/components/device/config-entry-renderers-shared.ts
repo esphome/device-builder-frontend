@@ -405,7 +405,9 @@ export function renderStringField(
         : html`<div class="field-input-row">${input}${secretPicker}</div>`;
   // Picker doubles as the secret indicator; only the no-picker path hints.
   const secretHint = secretPicker === nothing ? renderSecretHint(value, ctx) : nothing;
-  const subHint = renderSubstitutionHint(value, ctx);
+  // Never preview the resolved value for concealed fields — a secret kept
+  // in `substitutions:` (e.g. a WiFi/API password) must not leak in plaintext.
+  const subHint = inputType === "password" ? nothing : renderSubstitutionHint(value, ctx);
   // When the entry carries a closed list of `suggestions`, render a
   // strict <wa-select> regardless of the underlying inputType — used
   // by featured components to pin the field to one of a few values
@@ -427,7 +429,7 @@ export function renderStringField(
     ></esphome-password-input>`;
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
-        ${renderLabel(entry, ctx)} ${withPicker(passwordInput)} ${secretHint} ${subHint}
+        ${renderLabel(entry, ctx)} ${withPicker(passwordInput)} ${secretHint}
         ${renderFieldError(path, ctx)}
       </div>
     `;
