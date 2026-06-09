@@ -35,12 +35,6 @@ export interface NavSectionView {
   onToggleGroup?: (key: string) => void;
 }
 
-/** One navigator row; shared by the filtered and unfiltered paths.
- *  ``showIcon`` adds a leading domain glyph for ungrouped rows (Core,
- *  Automations); grouped rows already carry the glyph on their subgroup
- *  header, so it's omitted there to avoid a redundant double-glyph. An
- *  automation row's ``parentKey`` is the component domain it targets, so
- *  it shows that component's glyph (binary_sensor, switch, …). */
 /** Leading domain glyph for a flat row. The ``esphome`` core gets the brand
  *  logo instead of a generic chip (it would otherwise share ``esp32``'s chip);
  *  everything else uses its registered mdi glyph. The logo is the monochrome
@@ -63,6 +57,12 @@ function renderRowGlyph(domain: string): TemplateResult {
   ></wa-icon>`;
 }
 
+/** One navigator row; shared by the filtered and unfiltered paths.
+ *  ``showIcon`` adds a leading domain glyph for ungrouped rows (Core,
+ *  Automations); grouped rows already carry the glyph on their subgroup
+ *  header, so it's omitted there to avoid a redundant double-glyph. An
+ *  automation row's ``parentKey`` is the component domain it targets, so
+ *  it shows that component's glyph (binary_sensor, switch, …). */
 function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): TemplateResult {
   const { item, labels } = row;
   const { primary, secondary } = labels;
