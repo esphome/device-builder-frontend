@@ -88,6 +88,30 @@ describe("renderNumberField — integer fields accept decimal or hex", () => {
     expect(emitChange).toHaveBeenCalledWith(["address"], "");
   });
 
+  it("mirrors raw keystrokes into the edit buffer (so reformatting doesn't fight the cursor)", () => {
+    const setEditingMagnitude = vi.fn();
+    const ctx = makeRenderCtx(
+      { address: "" },
+      { board: null, overrides: { emitChange: vi.fn(), setEditingMagnitude } }
+    );
+    fireInput(renderNumberField(intEntry(), ["address"], ctx), "0042");
+    expect(setEditingMagnitude).toHaveBeenCalledWith(["address"], "0042");
+  });
+
+  it("shows the edit buffer verbatim while it is set, overriding the committed value", () => {
+    const ctx = makeRenderCtx(
+      { address: 42 },
+      { board: null, overrides: { getEditingMagnitude: () => "0042" } }
+    );
+    expect(inputValue(renderNumberField(intEntry(), ["address"], ctx))).toBe("0042");
+  });
+
+  it("keeps a 64-bit decimal as a string (precision past 2^53)", () => {
+    const { ctx, emitChange } = makeCtx({ address: "" });
+    fireInput(renderNumberField(intEntry(), ["address"], ctx), "18446744073709551615");
+    expect(emitChange).toHaveBeenCalledWith(["address"], "18446744073709551615");
+  });
+
   it("keeps the native number input for float fields", () => {
     const { ctx, emitChange } = makeCtx({ gain: "1.5" });
     const entry = makeConfigEntry({

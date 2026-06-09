@@ -90,15 +90,14 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   );
 }
 
-// ESPHome's cv.int_ accepts decimal OR hex for every integer field, but
-// <input type="number"> rejects 0x… literals. Use a text input that takes
-// either and preserves the user's notation — unlike the hex path, which
-// canonicalizes. ``coerceIntFieldValue`` emits decimal as a number (so YAML
-// stays bare ``4369``; a string would be quoted to keep it a string) and
-// hex/anything else as the raw string (``0x1111`` round-trips bare, junk
-// reaches the validator), shared with the add-component coercer.
+// <input type="number"> rejects the 0x… literals cv.int_ accepts, so render
+// integers as text and commit through the shared ``coerceIntFieldValue``
+// (decimal → number, hex/other → verbatim string). The edit buffer keeps raw
+// keystrokes on screen while typing so the committed value's reformatting
+// (``0042`` → ``42``) doesn't fight the cursor; it clears on blur.
 function renderIntField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
-  const value = String(ctx.getAt(path) ?? "");
+  const editingText = ctx.getEditingMagnitude(path);
+  const value = editingText ?? String(ctx.getAt(path) ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   return renderFieldShell(
@@ -114,8 +113,11 @@ function renderIntField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
       ?disabled=${disabled}
       placeholder=${String(entry.default_value ?? "")}
       @input=${(e: Event) => {
-        ctx.emitChange(path, coerceIntFieldValue((e.target as HTMLInputElement).value));
+        const raw = (e.target as HTMLInputElement).value;
+        ctx.setEditingMagnitude(path, raw);
+        ctx.emitChange(path, coerceIntFieldValue(raw));
       }}
+      @blur=${() => ctx.clearEditingMagnitude(path)}
     />`
   );
 }

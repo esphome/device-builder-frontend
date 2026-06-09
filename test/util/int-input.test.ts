@@ -31,6 +31,15 @@ describe("coerceIntFieldValue", () => {
     expect(coerceIntFieldValue("  4369  ")).toBe(4369);
   });
 
+  it("keeps a 64-bit decimal as a string to preserve precision past 2^53", () => {
+    // cv.uint64_t max; Number() would round it, corrupting the value.
+    expect(coerceIntFieldValue("18446744073709551615")).toBe("18446744073709551615");
+  });
+
+  it("drops leading zeros on a safe int (avoids YAML octal ambiguity)", () => {
+    expect(coerceIntFieldValue("0042")).toBe(42);
+  });
+
   it("passes an existing number through unchanged", () => {
     expect(coerceIntFieldValue(118)).toBe(118);
   });
