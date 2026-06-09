@@ -59,6 +59,10 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   if (entry.display_format === "hex") {
     return renderHexIntField(entry, path, ctx);
   }
+  if (entry.type === ConfigEntryType.INTEGER) {
+    return renderIntField(entry, path, ctx);
+  }
+  // FLOAT keeps the native number spinner — floats don't take 0x… literals.
   const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const min = entry.range ? String(entry.range[0]) : undefined;
@@ -75,11 +79,46 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
       ?disabled=${disabled}
       min=${min ?? ""}
       max=${max ?? ""}
-      step=${entry.type === ConfigEntryType.FLOAT ? "any" : "1"}
+      step="any"
       placeholder=${String(entry.default_value ?? "")}
       @input=${(e: Event) => {
         const raw = (e.target as HTMLInputElement).value;
         ctx.emitChange(path, raw === "" ? "" : Number(raw));
+      }}
+    />`
+  );
+}
+
+// A bare decimal integer (optionally negative). Such input is emitted as a
+// number so its YAML stays unquoted; hex / anything else stays a string.
+const DECIMAL_INT_RE = /^-?\d+$/;
+
+// ESPHome's cv.int_ accepts decimal OR hex for every integer field, but
+// <input type="number"> rejects 0x… literals. Use a text input that takes
+// either and preserves the user's notation — unlike the hex path, which
+// canonicalizes. Decimal is emitted as a number (so YAML stays bare
+// ``4369``; a string would be quoted to keep it a string), hex/anything
+// else as the raw string (``0x1111`` round-trips bare, junk reaches the
+// validator). Number(String(value)) in the validator accepts both forms.
+function renderIntField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
+  const value = String(ctx.getAt(path) ?? "");
+  const invalid = ctx.errorAt(path) !== null;
+  const disabled = effectiveDisabled(entry, ctx);
+  return renderFieldShell(
+    entry,
+    path,
+    ctx,
+    html`<input
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      class=${invalid ? "invalid" : ""}
+      .value=${value}
+      ?disabled=${disabled}
+      placeholder=${String(entry.default_value ?? "")}
+      @input=${(e: Event) => {
+        const v = (e.target as HTMLInputElement).value.trim();
+        ctx.emitChange(path, v === "" ? "" : DECIMAL_INT_RE.test(v) ? Number(v) : v);
       }}
     />`
   );

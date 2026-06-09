@@ -1,0 +1,111 @@
+/**
+ * Pins that plain INTEGER fields render a text input accepting decimal
+ * or hex (ESPHome's ``cv.int_`` takes both) and emit the value verbatim
+ * so the user's notation round-trips (4369 stays 4369; 0x1111 stays
+ * 0x1111). Floats keep the native number input; the ``display_format:
+ * "hex"`` path keeps canonicalizing.
+ */
+import { describe, expect, it, vi } from "vitest";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+} from "../../../src/api/types/config-entries.js";
+import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { renderNumberField } from "../../../src/components/device/config-entry-renderers/primitives.js";
+import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
+import { findElementBindings, makeRenderCtx } from "./_renderer-fixtures.js";
+
+/** The literal HTML of the rendered ``<input>`` (static strings, real quotes). */
+const inputHtml = (tpl: unknown): string =>
+  findTemplatesByAnchor(tpl, "<input")[0].strings.join("");
+
+/** The ``.value`` property bound on the rendered input. */
+const inputValue = (tpl: unknown): unknown =>
+  findElementBindings(tpl, "input")[0][".value"];
+
+/** Fire the input's ``@input`` handler with *value*. */
+function fireInput(tpl: unknown, value: string): void {
+  const handler = findElementBindings(tpl, "input")[0]["@input"] as (e: unknown) => void;
+  handler({ target: { value } });
+}
+
+function intEntry(overrides: Partial<ConfigEntry> = {}): ConfigEntry {
+  return makeConfigEntry({
+    key: "address",
+    type: ConfigEntryType.INTEGER,
+    label: "Address",
+    ...overrides,
+  });
+}
+
+function makeCtx(values: Record<string, unknown>): {
+  ctx: RenderCtx;
+  emitChange: ReturnType<typeof vi.fn>;
+} {
+  const emitChange = vi.fn();
+  const ctx = makeRenderCtx(values, { board: null, overrides: { emitChange } });
+  return { ctx, emitChange };
+}
+
+describe("renderNumberField — integer fields accept decimal or hex", () => {
+  it("renders a text input (not a number spinner) for integers", () => {
+    const { ctx } = makeCtx({ address: "0x1111" });
+    const html = inputHtml(renderNumberField(intEntry(), ["address"], ctx));
+    expect(html).toContain('type="text"');
+    expect(html).not.toContain('type="number"');
+  });
+
+  it("displays the stored value verbatim — hex stays hex", () => {
+    const { ctx } = makeCtx({ address: "0x1111" });
+    expect(inputValue(renderNumberField(intEntry(), ["address"], ctx))).toBe("0x1111");
+  });
+
+  it("emits decimal input as a number (so YAML stays bare, not quoted)", () => {
+    const { ctx, emitChange } = makeCtx({ address: "" });
+    fireInput(renderNumberField(intEntry(), ["address"], ctx), "434343");
+    expect(emitChange).toHaveBeenCalledWith(["address"], 434343);
+  });
+
+  it("emits hex input verbatim as a string (no canonicalization)", () => {
+    const { ctx, emitChange } = makeCtx({ address: "" });
+    fireInput(renderNumberField(intEntry(), ["address"], ctx), "0x2A");
+    expect(emitChange).toHaveBeenCalledWith(["address"], "0x2A");
+  });
+
+  it("emits a negative decimal as a number (stays bare, not quoted)", () => {
+    const { ctx, emitChange } = makeCtx({ offset: "" });
+    const entry = intEntry({ key: "offset" });
+    fireInput(renderNumberField(entry, ["offset"], ctx), "-5");
+    expect(emitChange).toHaveBeenCalledWith(["offset"], -5);
+  });
+
+  it("trims surrounding whitespace and emits empty for a blank value", () => {
+    const { ctx, emitChange } = makeCtx({ address: "" });
+    fireInput(renderNumberField(intEntry(), ["address"], ctx), "  4369  ");
+    expect(emitChange).toHaveBeenCalledWith(["address"], 4369);
+    fireInput(renderNumberField(intEntry(), ["address"], ctx), "");
+    expect(emitChange).toHaveBeenCalledWith(["address"], "");
+  });
+
+  it("keeps the native number input for float fields", () => {
+    const { ctx, emitChange } = makeCtx({ gain: "1.5" });
+    const entry = makeConfigEntry({
+      key: "gain",
+      type: ConfigEntryType.FLOAT,
+      label: "Gain",
+    });
+    const tpl = renderNumberField(entry, ["gain"], ctx);
+    expect(inputHtml(tpl)).toContain('type="number"');
+    // The float path coerces to a number rather than preserving a string.
+    fireInput(tpl, "2.5");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], 2.5);
+  });
+
+  it("leaves the display_format:hex path canonicalizing", () => {
+    const { ctx, emitChange } = makeCtx({ rom: "" });
+    const entry = intEntry({ key: "rom", display_format: "hex" });
+    fireInput(renderNumberField(entry, ["rom"], ctx), "118");
+    expect(emitChange).toHaveBeenCalledWith(["rom"], "0x76");
+  });
+});
