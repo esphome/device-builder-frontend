@@ -215,6 +215,40 @@ describe("device-navigator reveal-selected", () => {
     expect(reveals).toEqual([]);
   });
 
+  // The one-shot latch is per continuous selection, not forever: moving the
+  // cursor away and clicking back to a line whose reveal never scroll-latched
+  // (its section was left closed) must reveal it again.
+  it("re-reveals a line after the selection moves away and returns", async () => {
+    const coreLine = () => {
+      const s = parseYamlTopLevelSections(YAML).find(
+        (sec) => sectionKeyOf(sec) === "wifi"
+      );
+      if (!s) throw new Error("fixture: wifi not found");
+      return s.fromLine;
+    };
+    // Leave everything collapsed so no reveal ever scroll-latches.
+    const { nav, reveals } = await mount(new Set());
+
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    expect(reveals).toEqual([1]);
+
+    // Same-line idle re-render: one-shot, no repeat.
+    nav.requestUpdate();
+    await nav.updateComplete;
+    expect(reveals).toEqual([1]);
+
+    // Move to a core line, then back to the sensor line: each move re-reveals.
+    nav.selectedKey = "wifi";
+    nav.selectedFromLine = coreLine();
+    await nav.updateComplete;
+    nav.selectedKey = "sensor.template";
+    nav.selectedFromLine = sensorLine();
+    await nav.updateComplete;
+    expect(reveals).toEqual([1, 0, 1]);
+  });
+
   // The page renders two navigators (drawer + desktop) sharing one
   // openSections. A toggle would race them open/closed forever and hang the
   // page; section-reveal is an idempotent set, so it converges.

@@ -59,6 +59,13 @@ export class NavigatorRevealController implements ReactiveController {
       this._revealedLine = null;
       return;
     }
+    // The selection genuinely moved to a different line: drop the stale latch
+    // so a line whose reveal never scroll-latched (collapsed subgroup) can
+    // reveal again when the user clicks back to it. Same-line re-renders keep
+    // the latch, which is what prevents the toggle lock-out / snap-back.
+    if (this._revealedLine !== null && this._revealedLine !== selectedLine) {
+      this._revealedLine = null;
+    }
     if (selectedLine === this._scrolledLine) return;
     const index = sectionIndexForLine(buckets, selectedLine);
     if (index === -1) {
