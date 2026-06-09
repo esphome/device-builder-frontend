@@ -32,7 +32,6 @@ import {
   hasSubstitutionReference,
   parseSubstitutions,
   resolveSubstitutions,
-  substitutionReferences,
 } from "../../util/substitutions.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
@@ -129,16 +128,14 @@ export function renderSubstitutionHint(value: string, ctx: RenderCtx) {
   if (!hasSubstitutionReference(value)) return nothing;
   const resolved = resolveSubstitutions(value, parseSubstitutions(ctx.yaml));
   if (hasSubstitutionReference(resolved)) {
-    const refs = substitutionReferences(resolved).join(", ");
     const hint = ctx.localize("device.substitution_unresolved_hint");
     return html`<span
       class="substitution-note substitution-note--external"
       role="note"
-      aria-label=${`${refs} ${ctx.localize("device.substitution_unresolved")}`}
+      aria-label=${hint}
       title=${hint}
     >
       <wa-icon library="mdi" name="code-braces"></wa-icon>
-      <code>${refs}</code>
       <wa-icon
         class="substitution-warn"
         library="mdi"

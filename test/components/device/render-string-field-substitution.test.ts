@@ -59,14 +59,12 @@ describe("renderStringField — substitution preview", () => {
     expect(json).not.toContain("substitution-note");
   });
 
-  it("flags an unresolved reference with the var name and a warning", () => {
+  it("flags an unresolved reference with a warning marker", () => {
     const json = serialize(
       renderStringField(makeEntry(), "text", ["name"], ctxFor("${unknown} Moving"))
     );
     expect(json).toContain("substitution-note--external");
     expect(json).toContain("substitution-warn");
-    // Names the unresolved reference and the short label.
-    expect(json).toContain("${unknown}");
     expect(json).toContain("device.substitution_unresolved");
   });
 

@@ -52,11 +52,6 @@ export function hasSubstitutionReference(text: string): boolean {
   return SUBSTITUTION_REF_RE.test(text);
 }
 
-/** The distinct ``${var}`` / ``$var`` reference tokens in *text*. */
-export function substitutionReferences(text: string): string[] {
-  return [...new Set(text.match(SUBSTITUTION_RE) ?? [])];
-}
-
 /** Expand ``${name}`` / ``$name`` in *text* against *subs*, leaving
  *  unknown refs literal. Iterates (capped) so chained substitutions
  *  resolve without looping on cycles. */
