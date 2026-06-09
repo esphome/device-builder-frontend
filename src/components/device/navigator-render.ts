@@ -34,8 +34,11 @@ export interface NavSectionView {
   onToggleGroup?: (key: string) => void;
 }
 
-/** One navigator row; shared by the filtered and unfiltered paths. */
-function renderNavRow(row: NavRow, v: NavSectionView): TemplateResult {
+/** One navigator row; shared by the filtered and unfiltered paths.
+ *  ``showIcon`` adds a leading domain glyph for ungrouped rows (Core,
+ *  Automations); grouped rows already carry the glyph on their subgroup
+ *  header, so it's omitted there to avoid a redundant double-glyph. */
+function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): TemplateResult {
   const { item, labels } = row;
   const { primary, secondary } = labels;
   return html`
@@ -47,11 +50,18 @@ function renderNavRow(row: NavRow, v: NavSectionView): TemplateResult {
       @mouseleave=${() => v.onItemLeave()}
       @click=${() => v.onItemClick(item)}
     >
+      ${showIcon
+        ? html`<wa-icon
+            class="nav-item-icon"
+            library="mdi"
+            name=${iconForDomain(item.key)}
+          ></wa-icon>`
+        : nothing}
       <div class="nav-item-content">
         <p>${primary}</p>
         ${secondary ? html`<span class="nav-item-subtitle">${secondary}</span>` : nothing}
       </div>
-      <wa-icon library="mdi" name="chevron-right"></wa-icon>
+      <wa-icon class="nav-item-chevron" library="mdi" name="chevron-right"></wa-icon>
     </div>
   `;
 }
@@ -98,7 +108,7 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
     </div>
     ${open
       ? html`<div id=${rowsId} class="nav-items nav-items--grouped">
-          ${group.rows.map((row) => renderNavRow(row, v))}
+          ${group.rows.map((row) => renderNavRow(row, v, false))}
         </div>`
       : nothing}
   `;
@@ -143,7 +153,7 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
             ? v.groups.map((group) => renderNavGroup(group, v))
             : v.rows.length > 0
               ? html`<div class="nav-items">
-                  ${v.rows.map((row) => renderNavRow(row, v))}
+                  ${v.rows.map((row) => renderNavRow(row, v, true))}
                 </div>`
               : nothing}
           ${v.filtering

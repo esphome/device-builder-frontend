@@ -279,7 +279,15 @@ export const deviceNavigatorStyles = css`
     text-overflow: ellipsis;
   }
 
-  .nav-item wa-icon {
+  /* Leading domain glyph on ungrouped rows (Core / Automations). Muted
+     and always visible, mirroring the subgroup header glyph. */
+  .nav-item-icon {
+    font-size: var(--wa-font-size-m);
+    color: var(--wa-color-text-quiet);
+    flex-shrink: 0;
+  }
+
+  .nav-item-chevron {
     font-size: var(--wa-font-size-l);
     color: var(--esphome-primary);
     flex-shrink: 0;
@@ -288,14 +296,14 @@ export const deviceNavigatorStyles = css`
   /* Declutter the chevron only where hover exists; on touch (no hover)
      it stays visible so the "this row navigates" cue isn't lost. */
   @media (hover: hover) {
-    .nav-item wa-icon {
+    .nav-item-chevron {
       opacity: 0;
       transition: opacity 0.1s;
     }
 
-    .nav-item:hover wa-icon,
-    .nav-item--hovered wa-icon,
-    .nav-item--selected wa-icon {
+    .nav-item:hover .nav-item-chevron,
+    .nav-item--hovered .nav-item-chevron,
+    .nav-item--selected .nav-item-chevron {
       opacity: 1;
     }
   }

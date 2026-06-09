@@ -1,0 +1,65 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * Ungrouped rows (Core configuration) carry a leading domain glyph, while
+ * grouped Component rows do not (the glyph lives on the subgroup header).
+ * Dialog + icon children are no-oped so the element constructs in happy-dom;
+ * see ``device-navigator-coalesce.test.ts``.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
+vi.mock("../../../src/components/device/add-component-dialog.js", () => ({}));
+vi.mock("../../../src/components/device/add-config-dialog.js", () => ({}));
+vi.mock("../../../src/components/device/add-script-dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+
+import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
+
+const YAML = [
+  "esphome:",
+  "  name: t",
+  "esp32:",
+  "  board: esp32dev",
+  "logger:",
+  "sensor:",
+  "  - platform: template",
+  "    id: s1",
+  "",
+].join("\n");
+
+async function mountNavigator(): Promise<ESPHomeDeviceNavigator> {
+  const nav = new ESPHomeDeviceNavigator();
+  nav.yaml = YAML;
+  nav.openSections = new Set([0, 1, 2]);
+  document.body.appendChild(nav);
+  await nav.updateComplete;
+  return nav;
+}
+
+const iconNames = (nav: ESPHomeDeviceNavigator, sel: string) =>
+  [...(nav.shadowRoot?.querySelectorAll(sel) ?? [])].map((el) => el.getAttribute("name"));
+
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+describe("device-navigator row icons", () => {
+  it("gives ungrouped Core rows a leading domain glyph", async () => {
+    const nav = await mountNavigator();
+    // esphome -> chip, esp32 -> chip, logger -> card-text-outline.
+    expect(iconNames(nav, ".nav-item-icon")).toEqual([
+      "chip",
+      "chip",
+      "card-text-outline",
+    ]);
+  });
+
+  it("keeps grouped Component rows glyph-free (the subgroup header carries it)", async () => {
+    const nav = await mountNavigator();
+    // The sensor subgroup header shows the gauge glyph...
+    expect(iconNames(nav, ".nav-subgroup-icon")).toContain("gauge");
+    // ...and its rows don't repeat a per-row glyph.
+    expect(iconNames(nav, ".nav-items--grouped .nav-item-icon")).toEqual([]);
+  });
+});
