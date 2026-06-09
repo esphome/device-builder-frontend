@@ -1,43 +1,29 @@
 /**
- * Turn a parsed block-scalar header (`parseBlockScalarHeader`) plus its
- * captured body lines into a section-editor form value. Kept out of
- * yaml-section-reader.ts (already over the file-size cap) so the reader
- * doesn't keep growing.
+ * Turn a parsed block-scalar header plus its captured body lines into a
+ * section-editor form value. Split out of yaml-section-reader.ts to keep
+ * that file under the size cap.
  */
 
 import type { LambdaValue } from "../api/types/automations.js";
 import { YamlRawValue } from "./yaml-serialize.js";
 
-/**
- * True for the canonical strip-chomped literal block (`|-`) — the only
- * marker the form's lambda editor (and the serializer) emit. Other
- * markers (folded `>`, keep `|+`) carry distinct YAML semantics the
- * editor would silently normalise to `|-`, so they stay opaque
- * YamlRawValue blocks instead of editable lambdas.
- */
+// Only the canonical strip-chomped literal block becomes an editable
+// lambda; folded (>) or keep (|+) markers carry semantics the editor
+// would normalise away, so they stay opaque YamlRawValue blocks.
 export const isEditableLambdaBlock = (header: {
   tag: string | undefined;
   marker: string;
 }): boolean => header.tag === "!lambda" && header.marker === "|-";
 
-/**
- * Build a LambdaValue sentinel from a captured `!lambda |-` block body.
- * Reuses YamlRawValue.body to strip the block's common indent (so
- * '          return 0.01;' becomes 'return 0.01;'); only trailing
- * newlines are dropped (the `|-` strip chomp), not trailing spaces or
- * tabs on the last line.
- */
+// Dedents via YamlRawValue.body and drops only trailing newlines (the
+// |- strip chomp), so trailing spaces on the last line survive.
 export const lambdaValueFromBlock = (bodyLines: string[]): LambdaValue => ({
   _lambda: new YamlRawValue(bodyLines).body.replace(/\n+$/, ""),
   _tag: "!lambda",
 });
 
-/**
- * Turn a (possibly tagged) block-scalar header + its captured body
- * lines into a form value: a LambdaValue for a canonical `!lambda |-`
- * so the value stays editable, a YamlRawValue (carrying the verbatim
- * header) for any other tag, marker, or a bare `|-` / `>` block.
- */
+// Editable LambdaValue for a canonical !lambda |-, else a YamlRawValue
+// carrying the verbatim header so any other tag/marker round-trips.
 export const blockScalarValue = (
   header: { tag: string | undefined; marker: string },
   rawHeader: string,

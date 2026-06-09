@@ -963,8 +963,8 @@ ${lambdaBlock}
     // The exact #1351 repro: a templatable filter whose value the
     // editor wrote as ``!lambda |-``. The tag sat between the colon
     // and the ``|-`` marker, which the tag-blind block-scalar
-    // detectors missed — the body was dropped and ``!lambda |-``
-    // survived as a literal string, so the editor could no longer
+    // detectors missed, so the body was dropped and ``!lambda |-``
+    // survived as a literal string; the editor could no longer
     // parse the value. It must come back as a ``LambdaValue`` so the
     // templatable lambda editor renders (not YAML-only).
     const yaml = `sensor:
@@ -996,7 +996,7 @@ ${lambdaBlock}
     // No mangled literal-string / sentinel leak.
     expect(after).not.toContain('"!lambda');
     expect(after).not.toContain("_lambda:");
-    // Re-parsing the saved YAML yields the same LambdaValue — the
+    // Re-parsing the saved YAML yields the same LambdaValue; the
     // editor's own output is readable on the next focus change.
     const reparsed = parseYamlSectionValues(after, "sensor.template", 2);
     const filters = reparsed.filters as Array<Record<string, unknown>>;

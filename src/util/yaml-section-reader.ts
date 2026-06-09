@@ -207,17 +207,15 @@ const collectBlockListMappings = (
       if (!headerMatch) return null;
       const headerKey = headerMatch[1];
       const headerRaw = headerMatch[2].trim();
-      // ``- multiply: !lambda |-`` (#1351): the body sits on the
-      // following deeper-indented lines, so capture it here rather
-      // than letting ``parseFlatMappingField`` mis-read the lone
-      // header as a scalar and drop the body. Scoped to the ``!lambda``
-      // tag so the value comes back as an editable ``LambdaValue``;
-      // a bare ``- foo: |-`` (or ``- then:`` automation sequence)
-      // still bails to the whole-list ``YamlRawValue`` fallback. The
-      // body extent is measured against the dash's key column
-      // (``dashIndent + "- "``) — the detected ``childIndent``
-      // collapses onto the body indent when there are no flat
-      // sibling sub-keys.
+      // ``- multiply: !lambda |-``: the body sits on the following
+      // deeper-indented lines, so capture it here rather than letting
+      // ``parseFlatMappingField`` mis-read the lone header as a scalar
+      // and drop the body. Scoped to ``!lambda``; a bare ``- foo: |-``
+      // (or ``- then:`` sequence) still bails to the whole-list
+      // ``YamlRawValue`` fallback. Body extent is measured against the
+      // dash key column (``dashIndent + "- "``); the detected
+      // ``childIndent`` collapses onto the body indent when there are
+      // no flat sibling sub-keys.
       const blockHeader = parseBlockScalarHeader(headerRaw);
       if (blockHeader) {
         if (!isEditableLambdaBlock(blockHeader)) return null;
@@ -424,7 +422,7 @@ export function parseSectionCore(
     // `>+`), optionally tagged (`key: !lambda |-`). The header sits
     // on this line; the body lines are indented underneath. Without
     // this branch the parser would store `raw` as a literal string
-    // `"|-"` / `"!lambda |-"` and drop the body — the serializer
+    // `"|-"` / `"!lambda |-"` and drop the body; the serializer
     // would then quote it and corrupt the field. A `!lambda` tag
     // becomes an editable `LambdaValue`; anything else round-trips
     // through `YamlRawValue` (header replayed on serialize).
