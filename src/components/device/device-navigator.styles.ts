@@ -221,7 +221,9 @@ export const deviceNavigatorStyles = css`
     display: flex;
     flex-direction: column;
     gap: 1px;
-    padding: var(--wa-space-2xs) var(--wa-space-s);
+    /* Trim the left inset so rows hug the panel edge; the icon/text reclaim
+       the wasted gutter without crowding the right scrollbar. */
+    padding: var(--wa-space-2xs) var(--wa-space-s) var(--wa-space-2xs) var(--wa-space-2xs);
   }
 
   /* Rows nested under a domain subgroup get a slight extra indent. */
