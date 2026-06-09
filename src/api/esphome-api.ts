@@ -1551,7 +1551,10 @@ export class ESPHomeAPI {
   ): Promise<AvailableAutomations> {
     const raw = await this.sendCommand<AvailableAutomations>(
       "automations/get_available",
-      { configuration, ...(yaml !== undefined ? { yaml } : {}) }
+      // Empty string is the uninitialized-draft sentinel (a load that
+      // races the page's YAML fetch); omit it so the backend falls back
+      // to disk rather than scoping off an empty document.
+      { configuration, ...(yaml ? { yaml } : {}) }
     );
     // Backend ships slim ``*Index`` shapes that drop ``config_entries``
     // entirely. Renderers (``automation-action-node``,

@@ -215,6 +215,45 @@ describe("ESPHomeAPI — sendCommand", () => {
   });
 });
 
+describe("ESPHomeAPI — getAvailableAutomations", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  const emptyResult = {
+    triggers: [],
+    actions: [],
+    conditions: [],
+    scripts: [],
+    devices: [],
+  };
+
+  it("omits the yaml arg when the draft is empty so the backend reads disk (#1348)", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.getAvailableAutomations("device.yaml", "");
+    const sent = ws.sentAs<{ command: string; message_id: string; args: unknown }>(0);
+    expect(sent.command).toBe("automations/get_available");
+    expect(sent.args).toEqual({ configuration: "device.yaml" });
+    ws.receive({ message_id: sent.message_id, result: emptyResult });
+    await pending;
+  });
+
+  it("forwards a non-empty draft so the backend scopes off it (#1348)", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const draft = "esphome:\n  name: d\n";
+    const pending = api.getAvailableAutomations("device.yaml", draft);
+    const sent = ws.sentAs<{ message_id: string; args: unknown }>(0);
+    expect(sent.args).toEqual({ configuration: "device.yaml", yaml: draft });
+    ws.receive({ message_id: sent.message_id, result: emptyResult });
+    await pending;
+  });
+});
+
 describe("ESPHomeAPI — cloneDevice", () => {
   beforeEach(() => {
     installMockWebSocket();
