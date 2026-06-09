@@ -6,28 +6,13 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/library.js", () => ({
   registerIconLibrary: vi.fn(),
 }));
 
-import {
-  iconForDomain,
-  iconForRowKey,
-} from "../../../src/components/device/navigator-row-icons.js";
-
-describe("iconForRowKey", () => {
-  it("maps the structured automation keys to their glyph", () => {
-    expect(iconForRowKey("automation:script:scr1")).toBe("script-text-outline");
-    expect(iconForRowKey("automation:interval:0")).toBe("clock-outline");
-    expect(iconForRowKey("automation:device_on:on_boot")).toBe("arrow-decision-outline");
-    expect(iconForRowKey("automation:component_action:relay:turn_on_action")).toBe(
-      "arrow-decision-outline"
-    );
-  });
-
-  it("falls through to the plain-domain lookup for non-automation keys", () => {
-    expect(iconForRowKey("esp32")).toBe(iconForDomain("esp32"));
-    expect(iconForRowKey("logger")).toBe("card-text-outline");
-  });
-});
+import { iconForDomain } from "../../../src/components/device/navigator-row-icons.js";
 
 describe("iconForDomain", () => {
+  it("maps script to the script glyph (automation parentKey lookup)", () => {
+    expect(iconForDomain("script")).toBe("script-text-outline");
+  });
+
   it("maps known domains to their glyph", () => {
     expect(iconForDomain("sensor")).toBe("gauge");
     expect(iconForDomain("switch")).toBe("toggle-switch-outline");

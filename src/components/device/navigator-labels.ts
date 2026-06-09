@@ -52,9 +52,10 @@ export function resolveNavItemLabels(
   const cached = getCachedComponent(raw, ctx.platform || undefined);
   if (cached?.name) primary = cached.name;
   if (category === "core") {
-    // Core infrastructure names carry a redundant " Component" suffix
-    // ("Native API Component", "Logger Component"); trim it for the nav.
-    primary = primary.replace(/ Component$/, "") || primary;
+    // Core infrastructure names carry a redundant suffix in the nav:
+    // " Component" ("Native API Component"), and esphome's catalog title
+    // is "ESPHome Core Configuration" — trim both so rows stay scannable.
+    primary = primary.replace(/ (Component|Configuration)$/, "") || primary;
   }
 
   // Prefer the backend-resolved node name for the esphome core section

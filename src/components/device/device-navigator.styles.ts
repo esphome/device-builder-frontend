@@ -233,7 +233,6 @@ export const deviceNavigatorStyles = css`
     border-left: 3px solid transparent;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--wa-space-2xs);
     cursor: pointer;
     user-select: none;
@@ -255,6 +254,7 @@ export const deviceNavigatorStyles = css`
   .nav-item-content {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     min-width: 0;
     padding: var(--wa-space-2xs) 0;
   }
@@ -288,6 +288,7 @@ export const deviceNavigatorStyles = css`
   }
 
   .nav-item-chevron {
+    margin-left: auto;
     font-size: var(--wa-font-size-l);
     color: var(--esphome-primary);
     flex-shrink: 0;

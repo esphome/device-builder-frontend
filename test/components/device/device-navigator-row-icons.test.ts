@@ -63,11 +63,17 @@ describe("device-navigator row icons", () => {
     expect(iconNames(nav, ".nav-items--grouped .nav-item-icon")).toEqual([]);
   });
 
-  it("gives ungrouped Automation rows their per-type glyph (not the fallback shape)", async () => {
+  it("shows each Automation row the glyph of its component domain", async () => {
     const nav = new ESPHomeDeviceNavigator();
     nav.yaml = [
       "esphome:",
       "  name: t",
+      "binary_sensor:",
+      "  - platform: gpio",
+      "    id: b1",
+      "    pin: 1",
+      "    on_press:",
+      "      - logger.log: pressed",
       "script:",
       "  - id: scr1",
       "    then:",
@@ -83,6 +89,8 @@ describe("device-navigator row icons", () => {
     await nav.updateComplete;
 
     const names = iconNames(nav, ".nav-item-icon");
+    // The on_press automation targets a binary_sensor -> its component glyph.
+    expect(names).toContain("checkbox-marked-circle-outline");
     expect(names).toContain("script-text-outline"); // script
     expect(names).toContain("clock-outline"); // interval
     expect(names).not.toContain("shape-outline");
