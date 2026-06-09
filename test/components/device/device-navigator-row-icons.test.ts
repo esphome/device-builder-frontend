@@ -49,9 +49,11 @@ afterEach(() => {
 describe("device-navigator row icons", () => {
   it("gives ungrouped Core rows a leading domain glyph", async () => {
     const nav = await mountNavigator();
-    // esphome -> chip, esp32 -> chip, logger -> card-text-outline.
-    expect(iconNames(nav, ".nav-item-icon")).toEqual([
-      "chip",
+    // esphome -> brand logo (an src, not an mdi name); esp32 -> chip;
+    // logger -> card-text-outline.
+    const icons = [...(nav.shadowRoot?.querySelectorAll(".nav-item-icon") ?? [])];
+    expect(icons[0].getAttribute("src")).toContain("logo/esphome-mono.svg");
+    expect(icons.slice(1).map((el) => el.getAttribute("name"))).toEqual([
       "chip",
       "card-text-outline",
     ]);

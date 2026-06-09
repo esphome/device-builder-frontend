@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
+import { withBase } from "../../util/base-path.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
 import type { NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
@@ -40,6 +41,28 @@ export interface NavSectionView {
  *  header, so it's omitted there to avoid a redundant double-glyph. An
  *  automation row's ``parentKey`` is the component domain it targets, so
  *  it shows that component's glyph (binary_sensor, switch, …). */
+/** Leading domain glyph for a flat row. The ``esphome`` core gets the brand
+ *  logo instead of a generic chip (it would otherwise share ``esp32``'s chip);
+ *  everything else uses its registered mdi glyph. The logo is the monochrome
+ *  ``currentColor`` mark so it mutes to the same quiet tone as the other
+ *  glyphs. The title is the hover tooltip, the glyph being the only domain cue
+ *  on a flat row. */
+function renderRowGlyph(domain: string): TemplateResult {
+  if (domain === "esphome") {
+    return html`<wa-icon
+      class="nav-item-icon"
+      src=${withBase("/assets/logo/esphome-mono.svg")}
+      title="ESPHome"
+    ></wa-icon>`;
+  }
+  return html`<wa-icon
+    class="nav-item-icon"
+    library="mdi"
+    name=${iconForDomain(domain)}
+    title=${prettyDomain(domain)}
+  ></wa-icon>`;
+}
+
 function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): TemplateResult {
   const { item, labels } = row;
   const { primary, secondary } = labels;
@@ -56,14 +79,7 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
       @mouseleave=${() => v.onItemLeave()}
       @click=${() => v.onItemClick(item)}
     >
-      ${showIcon
-        ? html`<wa-icon
-            class="nav-item-icon"
-            library="mdi"
-            name=${iconForDomain(domain)}
-            title=${prettyDomain(domain)}
-          ></wa-icon>`
-        : nothing}
+      ${showIcon ? renderRowGlyph(domain) : nothing}
       <div class="nav-item-content">
         <p>${primary}</p>
         ${secondary ? html`<span class="nav-item-subtitle">${secondary}</span>` : nothing}
