@@ -5,9 +5,10 @@
  * (``remote_build_port === 0``, i.e. no peer-link receiver bound, as an HA
  * addon advertises) and keeps real build servers.
  *
- * Runs in vitest's default ``node`` environment, calling the render method
- * against a faked host with the sibling helpers stubbed to sentinels rather
- * than mounting a DOM.
+ * Uses ``happy-dom`` only so the component module imports: it pulls in
+ * WebAwesome side-effect imports that touch ``CSSStyleSheet`` at load time.
+ * The render call itself never mounts a DOM; the sibling helpers
+ * (``_statusRow`` / ``_renderDiscoveredRow``) are stubbed to plain sentinels.
  */
 import { describe, expect, it } from "vitest";
 import type { RemoteBuildPeer } from "../../../src/api/types/remote-build.js";
