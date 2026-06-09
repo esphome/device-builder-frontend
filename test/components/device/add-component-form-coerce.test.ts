@@ -52,4 +52,12 @@ describe("coerceFields non-hex integers", () => {
   test('"5" still coerces to numeric 5', () => {
     expect(coerceFields([plainInt], { count: "5" })).toEqual({ count: 5 });
   });
+
+  test("hex 0x1111 stays a verbatim string (parseInt base 10 would truncate it to 0)", () => {
+    expect(coerceFields([plainInt], { count: "0x1111" })).toEqual({ count: "0x1111" });
+  });
+
+  test("a negative decimal coerces to a number", () => {
+    expect(coerceFields([plainInt], { count: "-5" })).toEqual({ count: -5 });
+  });
 });

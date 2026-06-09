@@ -1,0 +1,44 @@
+/**
+ * Pins ``coerceIntFieldValue``: the shared decimal-or-hex normaliser used by
+ * the integer renderer and the add-component coercer. Bare decimal becomes a
+ * number; hex / anything else stays a verbatim string so 0x.. notation
+ * survives (ESPHome's cv.int_ parses it) instead of being canonicalised or
+ * truncated to 0 by parseInt(base 10).
+ */
+import { describe, expect, it } from "vitest";
+
+import { coerceIntFieldValue } from "../../src/util/int-input.js";
+
+describe("coerceIntFieldValue", () => {
+  it("turns a bare decimal into a number", () => {
+    expect(coerceIntFieldValue("434343")).toBe(434343);
+  });
+
+  it("turns a negative decimal into a number", () => {
+    expect(coerceIntFieldValue("-5")).toBe(-5);
+  });
+
+  it("keeps a hex literal verbatim (no canonicalisation, no parseInt truncation)", () => {
+    expect(coerceIntFieldValue("0x1111")).toBe("0x1111");
+    expect(coerceIntFieldValue("0X2A")).toBe("0X2A");
+  });
+
+  it("keeps junk verbatim for the validator to flag", () => {
+    expect(coerceIntFieldValue("zzz")).toBe("zzz");
+  });
+
+  it("trims surrounding whitespace before classifying", () => {
+    expect(coerceIntFieldValue("  4369  ")).toBe(4369);
+  });
+
+  it("passes an existing number through unchanged", () => {
+    expect(coerceIntFieldValue(118)).toBe(118);
+  });
+
+  it("returns empty string for blank / nullish input", () => {
+    expect(coerceIntFieldValue("")).toBe("");
+    expect(coerceIntFieldValue("   ")).toBe("");
+    expect(coerceIntFieldValue(null)).toBe("");
+    expect(coerceIntFieldValue(undefined)).toBe("");
+  });
+});

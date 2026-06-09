@@ -11,6 +11,7 @@ import {
   visibleUnitOptions,
 } from "../../../util/float-with-unit.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
+import { coerceIntFieldValue } from "../../../util/int-input.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
@@ -89,17 +90,13 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   );
 }
 
-// A bare decimal integer (optionally negative). Such input is emitted as a
-// number so its YAML stays unquoted; hex / anything else stays a string.
-const DECIMAL_INT_RE = /^-?\d+$/;
-
 // ESPHome's cv.int_ accepts decimal OR hex for every integer field, but
 // <input type="number"> rejects 0x… literals. Use a text input that takes
 // either and preserves the user's notation — unlike the hex path, which
-// canonicalizes. Decimal is emitted as a number (so YAML stays bare
-// ``4369``; a string would be quoted to keep it a string), hex/anything
-// else as the raw string (``0x1111`` round-trips bare, junk reaches the
-// validator). Number(String(value)) in the validator accepts both forms.
+// canonicalizes. ``coerceIntFieldValue`` emits decimal as a number (so YAML
+// stays bare ``4369``; a string would be quoted to keep it a string) and
+// hex/anything else as the raw string (``0x1111`` round-trips bare, junk
+// reaches the validator), shared with the add-component coercer.
 function renderIntField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const value = String(ctx.getAt(path) ?? "");
   const invalid = ctx.errorAt(path) !== null;
@@ -117,8 +114,7 @@ function renderIntField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
       ?disabled=${disabled}
       placeholder=${String(entry.default_value ?? "")}
       @input=${(e: Event) => {
-        const v = (e.target as HTMLInputElement).value.trim();
-        ctx.emitChange(path, v === "" ? "" : DECIMAL_INT_RE.test(v) ? Number(v) : v);
+        ctx.emitChange(path, coerceIntFieldValue((e.target as HTMLInputElement).value));
       }}
     />`
   );

@@ -1,12 +1,14 @@
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
+import { coerceIntFieldValue } from "../../util/int-input.js";
 import { parseYamlBoolean } from "../../util/yaml-serialize.js";
 
 /**
  * Coerce raw form values for the WS payload: numbers / booleans to
- * their proper types so the backend sees `5`, not `"5"`. Hex-display
- * integers stay strings; the renderer's canonical `"0x..."` survives
- * to YAML and `cv.hex_int` accepts both forms on parse.
+ * their proper types so the backend sees `5`, not `"5"`. Decimal
+ * integers become numbers; hex (`0x..`, including hex-display fields)
+ * stays a verbatim string so `cv.int_` / `cv.hex_int` parse it rather
+ * than `parseInt(..., 10)` silently truncating `0x1111` to `0`.
  */
 export function coerceFields(
   entries: ConfigEntry[],
@@ -39,8 +41,7 @@ export function coerceFields(
     }
 
     if (entry.type === ConfigEntryType.INTEGER && entry.display_format !== "hex") {
-      const n = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
-      if (!Number.isNaN(n)) out[entry.key] = n;
+      out[entry.key] = coerceIntFieldValue(raw);
     } else if (entry.type === ConfigEntryType.FLOAT) {
       const n = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
       if (!Number.isNaN(n)) out[entry.key] = n;
