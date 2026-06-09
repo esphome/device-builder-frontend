@@ -9,12 +9,17 @@
 import { css } from "lit";
 
 /**
- * Compact search-field control sizing, shared so the dashboard toolbar
- * search and the device-navigator search stay in lockstep. Inline into a
- * selector that targets the native search ``<input>``.
+ * Compact search-field height, shared so the dashboard and navigator
+ * searches stay in lockstep. Inline into whichever element draws the
+ * border (the dashboard ``input``, the navigator ``.search`` wrapper).
  */
-export const searchControlSizing = css`
+export const searchControlBox = css`
   min-height: var(--esphome-control-height);
+  box-sizing: border-box;
+`;
+
+/** Search-field text sizing, paired with {@link searchControlBox} on the input. */
+export const searchControlText = css`
   font-size: var(--wa-font-size-s);
   line-height: var(--wa-form-control-value-line-height);
 `;

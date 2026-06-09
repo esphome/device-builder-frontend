@@ -1,6 +1,10 @@
 import { css } from "lit";
 
-import { inputFocusRing, searchControlSizing } from "../../styles/inputs.js";
+import {
+  inputFocusRing,
+  searchControlBox,
+  searchControlText,
+} from "../../styles/inputs.js";
 
 /**
  * Styles for <esphome-navigator-search>. Kept in its own file to mirror
@@ -24,6 +28,8 @@ export const navigatorSearchStyles = css`
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-m);
     background: var(--wa-color-surface-default);
+    /* Wrapper draws the border, so it carries the shared control height. */
+    ${searchControlBox}
   }
 
   .search:focus-within {
@@ -36,7 +42,7 @@ export const navigatorSearchStyles = css`
     border: none;
     background: transparent;
     color: var(--wa-color-text-normal);
-    ${searchControlSizing}
+    ${searchControlText}
     font-family: inherit;
     padding: 0;
     outline: none;

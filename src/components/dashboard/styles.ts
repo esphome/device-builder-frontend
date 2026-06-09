@@ -1,7 +1,7 @@
 import { css } from "lit";
 
 import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
-import { searchControlSizing } from "../../styles/inputs.js";
+import { searchControlBox, searchControlText } from "../../styles/inputs.js";
 
 /** Dashboard shell layout, search toolbar, view toggle, and empty-search state. */
 export const dashboardStyles = css`
@@ -178,8 +178,9 @@ export const dashboardStyles = css`
     /* Share the toolbar control height so the search box matches the
        view-toggle / facet pills beside it (the input's default is the
        taller --wa-form-control-height); kept in lockstep with the
-       device-navigator search via searchControlSizing. */
-    ${searchControlSizing}
+       device-navigator search via the shared search-control styles. */
+    ${searchControlBox}
+    ${searchControlText}
   }
 
   /* Hide the native type="search" × so it doesn't double our own. */
