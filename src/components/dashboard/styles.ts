@@ -48,8 +48,10 @@ export const dashboardStyles = css`
     /* Inter-row gap inside the toolbar. Card view's .toolbar and the
        table view's .toolbar-stack both use it, and the table count
        row mirrors it as padding-top, so the rows line up identically
-       when toggling between views. */
-    --toolbar-row-gap: 2px;
+       when toggling between views. Matches .toolbar-row's wrap
+       row-gap so every stacked toolbar row (search, wrapped Filters,
+       count) shares one even gap when the controls wrap on mobile. */
+    --toolbar-row-gap: var(--wa-space-xs);
   }
 
   /* YAML mode renders over any underlying view, so it shares this
