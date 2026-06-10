@@ -1,11 +1,13 @@
 /**
+ * @vitest-environment happy-dom
+ *
  * Pins the #1038 fix: every column renders the same "no data" placeholder
  * (muted proportional em dash), instead of embedding the dash in a
  * column's value font where monospace made it render as a narrow,
  * hyphen-looking glyph. Populated cells keep their own font.
  */
 import type { CellContext } from "@tanstack/lit-table";
-import type { TemplateResult } from "lit";
+import { render, type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
 import {
   createDeviceColumns,
@@ -84,7 +86,10 @@ describe("device table empty-cell placeholder (#1038)", () => {
 
 describe("device table actions", () => {
   it("renders the edit pencil with the accent (action) color", () => {
-    const html = rendered(renderActionsCell());
-    expect(html).toContain("cell-action-btn--accent cell-action-btn--edit");
+    const container = document.createElement("div");
+    render(renderActionsCell(), container);
+    const edit = container.querySelector(".cell-action-btn--edit");
+    expect(edit).not.toBeNull();
+    expect(edit?.classList.contains("cell-action-btn--accent")).toBe(true);
   });
 });
