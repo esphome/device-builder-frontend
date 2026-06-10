@@ -1,6 +1,10 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice } from "../../../api/types/devices.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
+import {
+  getEncryptionVisual,
+  type EncryptionState,
+} from "../../../util/encryption-state.js";
 import { formatFileSize } from "../../../util/format-file-size.js";
 import { splitIntegrations } from "../../../util/integration-split.js";
 import { buildWebUiUrl } from "../../../util/web-ui-url.js";
@@ -43,38 +47,12 @@ export function renderRow(
 
 export function renderEncryptionBadge(
   localize: LocalizeFunc,
-  state: "active" | "plaintext" | "pending" | "mismatch" | "none"
+  state: EncryptionState
 ): TemplateResult | typeof nothing {
-  const variants = {
-    active: {
-      cls: "status-badge--encrypted",
-      icon: "lock",
-      labelKey: "dashboard.table_status_encrypted",
-      titleKey: "dashboard.table_status_encrypted_tooltip",
-    },
-    plaintext: {
-      cls: "status-badge--unencrypted",
-      icon: "lock-open-variant",
-      labelKey: "dashboard.table_status_unencrypted",
-      titleKey: "dashboard.table_status_unencrypted_tooltip",
-    },
-    pending: {
-      cls: "status-badge--encryption-pending",
-      icon: "lock-clock",
-      labelKey: "dashboard.table_status_encryption_pending",
-      titleKey: "dashboard.table_status_encryption_pending_tooltip",
-    },
-    mismatch: {
-      cls: "status-badge--encryption-mismatch",
-      icon: "lock-alert",
-      labelKey: "dashboard.table_status_encryption_mismatch",
-      titleKey: "dashboard.table_status_encryption_mismatch_tooltip",
-    },
-  } as const;
-  if (state === "none") return nothing;
-  const v = variants[state];
-  return html`<span class="status-badge ${v.cls}" title=${localize(v.titleKey)}>
-    <wa-icon library="mdi" name=${v.icon}></wa-icon>
+  const v = getEncryptionVisual(state);
+  if (!v) return nothing;
+  return html`<span class="status-badge ${v.badgeClass}" title=${localize(v.tooltipKey)}>
+    <wa-icon library="mdi" name=${v.iconName}></wa-icon>
     ${localize(v.labelKey)}
   </span>`;
 }
