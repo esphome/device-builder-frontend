@@ -131,10 +131,7 @@ export function renderDeviceCountRow(
   total: number
 ): TemplateResult {
   const q = host._search.trim();
-  const unit =
-    matchCount === 1
-      ? host._localize("dashboard.device_singular")
-      : host._localize("dashboard.device_plural");
+  const unit = host._localize("dashboard.device_count", { count: matchCount });
   const suffix = q ? " " + host._localize("dashboard.search_of", { total }) : "";
   return html`
     <div class="device-count-row">
@@ -169,10 +166,7 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   const hits = host._yamlSearch.hits;
   const matchCount =
     hits === null ? null : hits.reduce((sum, hit) => sum + hit.matches.length, 0);
-  const unit =
-    matchCount === 1
-      ? host._localize("yaml_search.match_count_singular")
-      : host._localize("yaml_search.match_count_plural");
+  const unit = host._localize("yaml_search.match_count", { count: matchCount ?? 0 });
   return html`
     <div class="toolbar">
       <div class="toolbar-row">${renderSearchInput(host)} ${renderViewToggle(host)}</div>

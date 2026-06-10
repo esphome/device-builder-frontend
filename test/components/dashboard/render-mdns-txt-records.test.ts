@@ -202,29 +202,20 @@ describe("renderMdnsTxtRecords", () => {
     expect(allValues).toContain("<key>");
   });
 
-  // Switch keys at the call site (matches the codebase's
-  // ``discovered_count_singular`` / ``_plural`` pattern) — a
-  // single-record summary picks the singular key, multi-record
-  // picks plural. Avoids the "Show 1 mDNS TXT records"
-  // ungrammatical fallback that a single-template ``record(s)``
-  // shorthand would produce. One parametrised test covers both
-  // branches so adding a third (e.g. zero-record, if we ever
-  // surface that) lands as a single row rather than another
-  // copy-pasted body.
+  // The summary passes the raw record count to a single ICU plural key;
+  // IntlMessageFormat picks the grammatical form per locale.
   it.each([
     {
-      label: "singular for one record",
+      label: "one record",
       records: { version: "1.0" } as Record<string, string>,
-      expectedKey: "dashboard.drawer_show_mdns_txt_records_singular",
       expectedCount: 1,
     },
     {
-      label: "plural for two or more records",
+      label: "two or more records",
       records: { version: "1.0", mac: "aa:bb:cc" } as Record<string, string>,
-      expectedKey: "dashboard.drawer_show_mdns_txt_records_plural",
       expectedCount: 2,
     },
-  ])("uses the $label summary key", ({ records, expectedKey, expectedCount }) => {
+  ])("passes the $label count to the summary key", ({ records, expectedCount }) => {
     const calls: Array<[string, Record<string, unknown> | undefined]> = [];
     const localize = (key: string, args?: Record<string, unknown>): string => {
       calls.push([key, args]);
@@ -232,6 +223,9 @@ describe("renderMdnsTxtRecords", () => {
     };
     renderMdnsTxtRecords(records, localize);
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual([expectedKey, { count: expectedCount }]);
+    expect(calls[0]).toEqual([
+      "dashboard.drawer_show_mdns_txt_records",
+      { count: expectedCount },
+    ]);
   });
 });

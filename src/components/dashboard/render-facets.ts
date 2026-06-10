@@ -128,12 +128,9 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
         .activeCount=${host._activeFacetCount}
         button-label=${host._localize("dashboard.filter_menu_button")}
         clear-label=${clearLabel}
-        count-label=${host._localize(
-          host._activeFacetCount === 1
-            ? "dashboard.filter_menu_active_singular"
-            : "dashboard.filter_menu_active_plural",
-          { count: String(host._activeFacetCount) }
-        )}
+        count-label=${host._localize("dashboard.filter_menu_active", {
+          count: host._activeFacetCount,
+        })}
         @clear-filters=${host._clearAllFilters}
       >
         ${facetPills}

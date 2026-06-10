@@ -22,13 +22,6 @@ describe("defaultLocalize", () => {
     expect(defaultLocalize("wizard.tag")).toBe("wizard.tag");
   });
 
-  it("interpolates {variable} placeholders", () => {
-    const out = defaultLocalize("dashboard.discovered_count_plural", {
-      count: 3,
-    });
-    expect(out).toBe("Discovered 3 devices");
-  });
-
   it("interpolates multiple placeholders", () => {
     const out = defaultLocalize("dashboard.pagination_page_of", {
       current: 2,
@@ -38,13 +31,53 @@ describe("defaultLocalize", () => {
   });
 
   it("leaves unknown placeholders intact", () => {
-    const out = defaultLocalize("dashboard.discovered_count_singular", {});
-    expect(out).toBe("Discovered {count} device");
+    const out = defaultLocalize("dashboard.search_of", {});
+    expect(out).toBe("of {total}");
   });
 
   it("coerces numeric values to strings", () => {
     const out = defaultLocalize("dashboard.update_selected_aria", { count: 5 });
     expect(out).toBe("Update 5 selected");
+  });
+});
+
+describe("ICU MessageFormat", () => {
+  it("selects the singular plural form (count: 1)", () => {
+    expect(defaultLocalize("dashboard.discovered_count", { count: 1 })).toBe(
+      "Discovered 1 device"
+    );
+  });
+
+  it("selects the other plural form (count: 3)", () => {
+    expect(defaultLocalize("dashboard.discovered_count", { count: 3 })).toBe(
+      "Discovered 3 devices"
+    );
+  });
+
+  it("substitutes the # token with the formatted count", () => {
+    const out = defaultLocalize("dashboard.filter_menu_active", { count: 2 });
+    expect(out).toBe("2 active filters");
+    expect(out).not.toContain("#");
+  });
+
+  it("renders word-only plural keys (no #) by count", () => {
+    expect(defaultLocalize("dashboard.device_count", { count: 1 })).toBe("device");
+    expect(defaultLocalize("dashboard.device_count", { count: 4 })).toBe("devices");
+  });
+
+  it("falls back to the raw template when the plural arg is missing", () => {
+    const out = defaultLocalize("dashboard.discovered_count", {});
+    expect(out).toBe(
+      "{count, plural, one {Discovered # device} other {Discovered # devices}}"
+    );
+  });
+
+  it("leaves non-ICU strings with apostrophes untouched", () => {
+    // ICU treats `'` as an escape char; these strings must never reach the
+    // parser, so the apostrophe survives verbatim.
+    expect(defaultLocalize("wizard.dont_know_board")).toBe(
+      "I don't know what board I have"
+    );
   });
 });
 
