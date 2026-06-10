@@ -163,7 +163,11 @@ export const deviceNavigatorStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-xs);
-    padding: var(--wa-space-2xs) var(--wa-space-m);
+    /* Match the flat rows' inter-block gap with margin-top (not vertical
+       padding) so a header sits the same distance below the previous block
+       as the rows do; the header-to-rows gap lives on .nav-items--grouped. */
+    padding: 0 var(--wa-space-m);
+    margin-top: var(--wa-space-2xs);
     cursor: pointer;
     user-select: none;
     flex-shrink: 0;
@@ -228,17 +232,17 @@ export const deviceNavigatorStyles = css`
   }
 
   /* Rows nested under a domain subgroup; the box edge keeps the shared
-     var(--wa-space-m) inset. Drop the vertical pad so the first row tucks
-     under its header and a following single row keeps the same inter-box
-     gap instead of stacking the container pad on the single's margin. */
+     var(--wa-space-m) inset. padding-top is the header-to-first-row gap;
+     padding-bottom is 0 so the next block's own margin sets the gap. */
   .nav-items--grouped {
-    padding-top: 0;
+    padding-top: var(--wa-space-2xs);
     padding-bottom: 0;
   }
 
-  /* A single-of-a-kind domain collapses to one flat row in place of its
-     subgroup header; keep the shared box inset and only drop the vertical
-     pad. margin-top carries the inter-box gap the list cannot, since each
+  /* A lone config-block domain (no "platform:", e.g. i2c / bluetooth_proxy)
+     renders as one flat row in place of a header; platform components keep
+     their header even with one item. Keep the shared box inset and only drop
+     the vertical pad; margin-top carries the inter-block gap, since each
      single is its own one-row container. */
   .nav-items--single {
     padding-top: 0;
