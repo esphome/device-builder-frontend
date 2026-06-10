@@ -465,13 +465,26 @@ export const tableLayoutStyles = css`
       padding: 0;
     }
 
-    /* Select checkbox sits at the top of the card. */
+    /* Select checkbox pins to the card's top-left corner, mirroring
+       the kebab at top-right, instead of stacking as its own
+       full-width row above the title. */
     td.select-col {
-      order: -2;
+      position: absolute;
+      top: var(--wa-space-xs);
+      left: var(--wa-space-xs);
       width: auto;
       min-width: 0;
       max-width: none;
-      justify-content: flex-start;
+      padding: 0;
+    }
+    td.select-col .row-checkbox {
+      width: var(--table-kebab-size);
+      height: var(--table-kebab-size);
+    }
+    /* Reserve title room for the pinned checkbox, matching the
+       kebab reservation on the right. */
+    :host([select-mode]) td.col-name {
+      padding-left: calc(var(--table-kebab-size) + var(--wa-space-xs));
     }
   }
 `;
