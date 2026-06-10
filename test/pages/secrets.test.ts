@@ -27,11 +27,9 @@ interface PageView {
   _savedYaml: string;
   _saving: boolean;
   _api: ESPHomeAPI;
-  _layout: "form" | "split" | "yaml";
-  _narrow: boolean;
-  readonly _effectiveLayout: "form" | "split" | "yaml";
-  _readStoredLayout(): "form" | "split" | "yaml";
-  _setLayout(layout: "form" | "split" | "yaml"): void;
+  _layout: "form" | "yaml";
+  _readStoredLayout(): "form" | "yaml";
+  _setLayout(layout: "form" | "yaml"): void;
   _onYamlChange(e: CustomEvent<{ value: string }>): void;
   _confirmLeave(): Promise<boolean>;
   _onUnsavedSave(): void;
@@ -310,8 +308,8 @@ describe("esphome-page-secrets layout persistence", () => {
   });
 
   test("reads a stored valid layout", () => {
-    localStorage.setItem("esphome-secrets-layout", "split");
-    expect(makePage()._readStoredLayout()).toBe("split");
+    localStorage.setItem("esphome-secrets-layout", "yaml");
+    expect(makePage()._readStoredLayout()).toBe("yaml");
   });
 
   test("_setLayout updates state and persists the choice", () => {
@@ -321,20 +319,10 @@ describe("esphome-page-secrets layout persistence", () => {
     expect(localStorage.getItem("esphome-secrets-layout")).toBe("yaml");
   });
 
-  test("a persisted split layout presents as the form below the breakpoint", () => {
-    const page = makePage({ _layout: "split", _narrow: true });
-    expect(page._effectiveLayout).toBe("form");
-  });
-
-  test("split stays split above the breakpoint", () => {
-    const page = makePage({ _layout: "split", _narrow: false });
-    expect(page._effectiveLayout).toBe("split");
-  });
-
   test("both panes bind the same buffer and either change advances it", () => {
     const page = makePage({
       _loaded: true,
-      _layout: "split",
+      _layout: "form",
       _yaml: "wifi_ssid: home\n",
     });
     const editors = findTemplatesByAnchor(

@@ -1303,7 +1303,6 @@
     "hide_values": "Hide values",
     "layout_label": "Editor layout",
     "layout_form": "Form",
-    "layout_split": "Split",
     "layout_yaml": "YAML",
     "add_secret": "Add secret",
     "key_placeholder": "Name",

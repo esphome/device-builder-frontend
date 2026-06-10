@@ -170,30 +170,6 @@ export const secretsStructuredEditorStyles = css`
     margin-top: var(--wa-space-m);
   }
 
-  .add-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border: var(--wa-border-width-s) dashed var(--esphome-primary);
-    background: var(--esphome-tint);
-    color: var(--esphome-primary);
-    border-radius: var(--wa-border-radius-m);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-bold);
-    transition: background 0.12s;
-  }
-
-  .add-btn:hover {
-    background: var(--esphome-tint-strong);
-  }
-
-  .add-btn wa-icon {
-    font-size: 16px;
-  }
-
   .empty {
     padding: var(--wa-space-l) 0;
     color: var(--wa-color-text-quiet);
