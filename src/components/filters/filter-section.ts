@@ -132,7 +132,7 @@ export class ESPHomeFilterSection extends LitElement {
           ? html`<div class="facet-empty" role="status">
               ${query ? this.noMatchesLabel : this.emptyLabel}
             </div>`
-          : html`<div class="facet-list" role="listbox" aria-label=${this.name}>
+          : html`<div class="facet-list" role="group" aria-label=${this.name}>
               ${visible.map((option) => {
                 const checked = selectedSet.has(option.id);
                 return html`<button

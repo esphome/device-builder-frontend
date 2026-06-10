@@ -109,7 +109,7 @@ export class ESPHomeLabelsFilterSection extends LitElement {
             </div>`
           : html`<div
               class="facet-list"
-              role="listbox"
+              role="group"
               aria-label=${this._localize("dashboard.filter_labels")}
             >
               ${this._catalog.map((label) => this._renderRow(label, selectedSet))}
