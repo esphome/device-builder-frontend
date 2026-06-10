@@ -290,12 +290,12 @@ export const dashboardStyles = css`
      table's below-controls slot so the row spans the full table
      width. Horizontal padding matches .controls and .table-wrap
      above/below so the count and toggle line up with the leftmost
-     column header and the search box above. 2px top padding mirrors
-     card view's .toolbar gap so the inter-row spacing reads
-     identically between views. Horizontal padding and top gap draw
-     from the shared --content-gutter / --toolbar-row-gap tokens, so
-     the count row trims on mobile and lines up with the toolbar
-     above it without a separate @media rule. */
+     column header and the search box above. Top padding draws from
+     --toolbar-row-gap, mirroring card view's .toolbar gap so the
+     inter-row spacing reads identically between views. Horizontal
+     padding and top gap draw from the shared --content-gutter /
+     --toolbar-row-gap tokens, so the count row trims on mobile and
+     lines up with the toolbar above it without a separate @media rule. */
   .table-device-count-row {
     padding: var(--toolbar-row-gap) var(--content-gutter) var(--wa-space-xs);
   }
