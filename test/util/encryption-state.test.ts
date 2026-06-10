@@ -163,6 +163,8 @@ describe("getEncryptionVisual", () => {
       expect(seen.has(v!.iconName)).toBe(false);
       seen.add(v!.iconName);
       expect(v!.cssClass).toBeTruthy();
+      expect(v!.badgeClass).toMatch(/^status-badge--/);
+      expect(v!.labelKey).toMatch(/^dashboard\./);
       expect(v!.tooltipKey).toMatch(/^dashboard\./);
     }
   });
@@ -179,12 +181,12 @@ describe("getCompactEncryptionVisual", () => {
     ).toBeNull();
   });
 
-  it("keeps the lock when YAML enables encryption but mDNS hasn't broadcast", () => {
-    // active state with null api_encryption_active is the
-    // "waiting / unknown" case the issue explicitly wants visible.
-    const v = getCompactEncryptionVisual(inputs({ api_encryption_active: null }));
-    expect(v).not.toBeNull();
-    expect(v!.cssClass).toBe("secure");
+  it("hides the lock for every active state, including unconfirmed mDNS", () => {
+    // No green lock in compact views at all; the YAML-encrypted but
+    // not-yet-broadcast device is still "active" and stays hidden.
+    expect(
+      getCompactEncryptionVisual(inputs({ api_encryption_active: null }))
+    ).toBeNull();
   });
 
   it("keeps showing the icon for plaintext / pending / mismatch states", () => {

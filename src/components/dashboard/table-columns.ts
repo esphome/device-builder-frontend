@@ -145,13 +145,8 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       header: localize("dashboard.table_col_name"),
       cell: (info) => {
         const row = info.row.original;
-        // Compact-view variant: hides the green lock for
-        // mDNS-confirmed-encrypted devices (the noisy steady
-        // state on a healthy fleet) but keeps the icon for
-        // every other state, including "waiting / unknown"
-        // when mDNS hasn't broadcast yet. The drawer uses
-        // the full ``getEncryptionVisual`` for single-device
-        // inspection. (issue #141)
+        // Compact view: no lock for encrypted devices, only the
+        // attention states (plaintext / pending / mismatch) get an icon.
         const encVisual = getCompactEncryptionVisual({
           api_enabled: row.api_enabled,
           api_encrypted: row.api_encrypted,
@@ -306,7 +301,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         // out; the row-end kebab keeps every action reachable.
         return html`<span class="cell-actions">
           <button
-            class="cell-action-btn cell-action-btn--edit"
+            class="cell-action-btn cell-action-btn--accent cell-action-btn--edit"
             aria-label=${localize("dashboard.table_action_edit")}
             title=${localize("dashboard.table_action_edit")}
             ?disabled=${row.busy}

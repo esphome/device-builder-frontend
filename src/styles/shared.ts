@@ -64,6 +64,8 @@ export const espHomeStyles = css`
        view-toggle, facet pills, clear-filters) so the search row stays
        pixel-aligned from one source. */
     --esphome-control-height: 36px;
+    /* Shared action-button padding; 18px has no spacing-scale token. */
+    --esphome-button-padding: var(--wa-space-xs) 18px;
 
     font-family: var(--wa-font-family-body);
   }
