@@ -55,23 +55,20 @@ describe("renderFacets", () => {
     expect(container.querySelector(".filter-clear")).toBeNull();
   });
 
-  // _localize is stubbed to echo its key, so the count-label attribute
-  // reveals which singular/plural key was chosen. The badge tracks facet
+  // The count-label is a single ICU plural key fed the active count; the
+  // grammatical form is IntlMessageFormat's job. The badge tracks facet
   // selections only — a lone search term isn't counted here (#1160).
-  it("uses the singular count label for exactly one active facet", () => {
-    const menu = renderInto(makeHost({ _activeFacetCount: 1 })).querySelector(
-      "esphome-filters-menu"
-    );
-    expect(menu?.getAttribute("count-label")).toBe(
-      "dashboard.filter_menu_active_singular"
-    );
-  });
-
-  it("uses the plural count label for multiple active facets", () => {
-    const menu = renderInto(makeHost({ _activeFacetCount: 3 })).querySelector(
-      "esphome-filters-menu"
-    );
-    expect(menu?.getAttribute("count-label")).toBe("dashboard.filter_menu_active_plural");
+  it.each([1, 3])("passes the active facet count (%i) to the count label", (count) => {
+    const calls: Array<[string, Record<string, unknown> | undefined]> = [];
+    const localize = (key: string, args?: Record<string, unknown>): string => {
+      calls.push([key, args]);
+      return key;
+    };
+    const menu = renderInto(
+      makeHost({ _activeFacetCount: count, _localize: localize })
+    ).querySelector("esphome-filters-menu");
+    expect(menu?.getAttribute("count-label")).toBe("dashboard.filter_menu_active");
+    expect(calls).toContainEqual(["dashboard.filter_menu_active", { count }]);
   });
 
   // _localize echoes its key, so the Updates pill is identifiable by its

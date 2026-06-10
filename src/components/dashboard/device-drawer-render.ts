@@ -87,19 +87,11 @@ export function renderMdnsTxtRecords(
   // be deterministic regardless of how the device serialised
   // its TXT entries (or which order zeroconf cached them).
   entries.sort(([a], [b]) => a.localeCompare(b));
-  // Pick the singular / plural variant at the call site (the
-  // pattern this codebase already uses for ``discovered_count_*``)
-  // — the localize helper has no plural-rules support, so a single
-  // ``record(s)``-style template would render ungrammatically for
-  // any locale that needs different word forms beyond English's
-  // simple ±s rule.
-  const summaryKey =
-    entries.length === 1
-      ? "dashboard.drawer_show_mdns_txt_records_singular"
-      : "dashboard.drawer_show_mdns_txt_records_plural";
   return html`
     <details class="mdns-txt-details">
-      <summary>${localize(summaryKey, { count: entries.length })}</summary>
+      <summary>
+        ${localize("dashboard.drawer_show_mdns_txt_records", { count: entries.length })}
+      </summary>
       <dl class="mdns-txt-list">
         ${entries.map(
           ([key, value]) => html`

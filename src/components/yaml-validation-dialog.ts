@@ -124,12 +124,8 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   };
 
   protected render() {
-    const messageKey =
-      this.errorCount === 1
-        ? "device.yaml_invalid_message_singular"
-        : "device.yaml_invalid_message_plural";
-    const message = this._localize(messageKey, {
-      count: String(this.errorCount),
+    const message = this._localize("device.yaml_invalid_message", {
+      count: this.errorCount,
     });
     const canGoToError = this.firstErrorLine > 0;
     return html`

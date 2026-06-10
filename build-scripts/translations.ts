@@ -125,8 +125,9 @@ class LokaliseClient {
       // The strings use `{placeholder}` tokens directly; don't let Lokalise
       // rewrite them into its universal placeholder format.
       convert_placeholders: false,
-      // Keys use manual _singular/_plural suffixes, not ICU plurals.
-      detect_icu_plurals: false,
+      // Plural strings are authored as ICU MessageFormat; let Lokalise parse
+      // them into plural keys so translators get per-form editing.
+      detect_icu_plurals: true,
       // Push reworded English copy for existing keys, not just new keys —
       // en.json is the source of truth for the base language. Only the
       // English file is uploaded (lang_iso: en), so this updates English
@@ -200,6 +201,12 @@ class LokaliseClient {
       json_unescaped_slashes: true,
       replace_breaks: false,
       indentation: "2sp",
+      // Re-serialize plural keys as a single ICU string ({count, plural, …})
+      // and keep `{name}` token style, so the frontend's string-only resolve()
+      // renders them through IntlMessageFormat rather than seeing a nested
+      // plural object it would drop.
+      plural_format: "icu",
+      placeholder_format: "icu",
       // No filter_langs: export whatever languages the project has, so
       // adding a locale in Lokalise round-trips with no code change.
     };

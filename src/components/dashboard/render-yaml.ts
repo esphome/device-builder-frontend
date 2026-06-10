@@ -122,11 +122,7 @@ function renderYamlHits(
       ${hits.map((hit) => {
         const blocks = buildYamlSnippetBlocks(hit.matches);
         const matchCount = hit.matches.length;
-        const countUnit = localize(
-          matchCount === 1
-            ? "yaml_search.match_count_singular"
-            : "yaml_search.match_count_plural"
-        );
+        const countUnit = localize("yaml_search.match_count", { count: matchCount });
         const trailing = html`<span class="yaml-hit-group-count"
           >${matchCount} ${countUnit}</span
         >`;
@@ -159,11 +155,6 @@ export function renderYamlPreviewPivot(
   if (previewCount === 0) return "";
   return html`<button class="empty-search-yaml-pivot" @click=${onPivot}>
     <wa-icon library="mdi" name="code-braces"></wa-icon>
-    ${localize(
-      previewCount === 1
-        ? "yaml_search.no_match_yaml_preview"
-        : "yaml_search.no_match_yaml_preview_plural",
-      { count: previewCount }
-    )}
+    ${localize("yaml_search.no_match_yaml_preview", { count: previewCount })}
   </button>`;
 }

@@ -9,6 +9,8 @@
  * Translation files use nested objects; keys are accessed with dot-notation,
  * e.g. `localize("dashboard.title")`.
  */
+import { IntlMessageFormat } from "intl-messageformat";
+
 import languageManifest from "../generated/language-manifest.json";
 import enMessages from "../translations/en.json";
 
@@ -195,7 +197,43 @@ function resolve(obj: Record<string, unknown>, key: string): string | undefined 
   return typeof current === "string" ? current : undefined;
 }
 
-function interpolate(template: string, values?: Record<string, string | number>): string {
+// Matches an ICU formatter/selector argument — `{n, plural ...}`,
+// `{x, select ...}`, `{v, number}`, etc. Deliberately does NOT match a bare
+// `{placeholder}`, so simple strings (and English copy with apostrophes,
+// which ICU treats as an escape char) never reach the ICU parser.
+const ICU_PATTERN = /\{\s*\w+\s*,\s*(?:plural|selectordinal|select|number|date|time)\b/;
+
+// Compiled message formatters cached per locale+template. Compilation is the
+// expensive step; format() is cheap.
+const icuCache = new Map<string, IntlMessageFormat>();
+
+function formatICU(
+  template: string,
+  locale: string,
+  values?: Record<string, string | number>
+): string {
+  const cacheKey = `${locale} ${template}`;
+  try {
+    let mf = icuCache.get(cacheKey);
+    if (!mf) {
+      mf = new IntlMessageFormat(template, locale);
+      icuCache.set(cacheKey, mf);
+    }
+    const out = mf.format(values);
+    return Array.isArray(out) ? out.join("") : String(out);
+  } catch {
+    // Malformed ICU or a missing required argument — degrade to the raw
+    // template rather than crash the render.
+    return template;
+  }
+}
+
+function interpolate(
+  template: string,
+  locale: string,
+  values?: Record<string, string | number>
+): string {
+  if (ICU_PATTERN.test(template)) return formatICU(template, locale, values);
   if (!values) return template;
   return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? `{${key}}`));
 }
@@ -226,13 +264,14 @@ function deepMerge(
   return result;
 }
 
-function buildLocalize(messages: Record<string, unknown>): LocalizeFunc {
-  return (key, values) => interpolate(resolve(messages, key) ?? key, values);
+function buildLocalize(messages: Record<string, unknown>, locale: string): LocalizeFunc {
+  return (key, values) => interpolate(resolve(messages, key) ?? key, locale, values);
 }
 
 /** Synchronous English fallback — safe to use as an initial context value. */
 export const defaultLocalize: LocalizeFunc = buildLocalize(
-  enMessages as Record<string, unknown>
+  enMessages as Record<string, unknown>,
+  BASE_LOCALE
 );
 
 /**
@@ -261,5 +300,8 @@ export async function loadLocalize(force?: SupportedLocale): Promise<LocalizeFun
     // than render raw keys.
     return defaultLocalize;
   }
-  return buildLocalize(deepMerge(enMessages as Record<string, unknown>, asMessages(mod)));
+  return buildLocalize(
+    deepMerge(enMessages as Record<string, unknown>, asMessages(mod)),
+    normalizeLocale(locale)
+  );
 }

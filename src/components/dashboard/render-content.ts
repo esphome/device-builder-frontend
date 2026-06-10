@@ -38,12 +38,9 @@ export function renderDiscoveredSection(
       <header class="discovered-section-header">
         <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
         <span class="discovered-section-count"
-          >${host._localize(
-            visible.length === 1
-              ? "dashboard.discovered_count_singular"
-              : "dashboard.discovered_count_plural",
-            { count: visible.length }
-          )}</span
+          >${host._localize("dashboard.discovered_count", {
+            count: visible.length,
+          })}</span
         >
         <button
           class="discovered-section-toggle"
