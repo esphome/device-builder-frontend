@@ -86,6 +86,12 @@ export const filtersPopoverStyles = css`
     outline: none;
   }
 
+  /* One scroll region, not two: the closed headers keep their
+     natural height and stay visible, and the single expanded
+     section flexes into whatever room is left, scrolling its
+     option list internally. The container itself only scrolls in
+     the degenerate case where the expanded section's floor plus
+     the headers outgrow a very short viewport (landscape phone). */
   .filters-sections {
     overflow-y: auto;
     min-height: 0;
@@ -95,7 +101,12 @@ export const filtersPopoverStyles = css`
 
   ::slotted(esphome-filter-section),
   ::slotted(esphome-labels-filter-section) {
-    display: block;
-    flex-shrink: 0;
+    flex: 0 0 auto;
+  }
+
+  ::slotted(esphome-filter-section[expanded]),
+  ::slotted(esphome-labels-filter-section[expanded]) {
+    flex: 1 1 auto;
+    min-height: 176px;
   }
 `;

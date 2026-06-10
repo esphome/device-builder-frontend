@@ -10,6 +10,15 @@ export const filterSectionStyles = css`
     display: block;
   }
 
+  /* The popover gives the one expanded section all the spare room
+     (flex sizing lives on its ::slotted rules); lay out as a column
+     so the header keeps its height and the option list is the only
+     thing that scrolls. */
+  :host([expanded]) {
+    display: flex;
+    flex-direction: column;
+  }
+
   :host(:not(:first-of-type)) {
     border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
   }
@@ -19,6 +28,7 @@ export const filterSectionStyles = css`
     align-items: center;
     gap: 8px;
     width: 100%;
+    flex-shrink: 0;
     padding: 8px 10px;
     border: none;
     border-radius: var(--wa-border-radius-m);
@@ -80,13 +90,8 @@ export const filterSectionStyles = css`
   .section-body {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
     padding: 0 0 var(--wa-space-2xs);
-  }
-
-  /* Cap the option list so one populous section scrolls inside
-     itself instead of pushing the other section headers out of the
-     popover's viewport. */
-  .section-body .facet-list {
-    max-height: 280px;
   }
 `;
