@@ -274,21 +274,21 @@ export const dashboardStyles = css`
 
   /* Pairs the count with the Select-multiple toggle on a row of
      their own — both reference the device list, so they belong
-     side-by-side. justify-content:space-between puts the count on
-     the left and the toggle on the right at every width. */
+     side-by-side. Grouped at the start so the toggle anchors to the
+     count (and the search box above) in both card and table views
+     rather than floating against the far edge. */
   .device-count-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--wa-space-m);
+    justify-content: flex-start;
+    gap: var(--wa-space-s);
   }
 
   /* Table view slots the device-count-row through esphome-device-
      table's below-controls slot so the row spans the full table
-     width and Select-multiple right-aligns with Columns / Create
-     device in the row above. Horizontal padding matches .controls
-     and .table-wrap above/below so the count and toggle line up
-     with the column headers on the right. 2px top padding mirrors
+     width. Horizontal padding matches .controls and .table-wrap
+     above/below so the count and toggle line up with the leftmost
+     column header and the search box above. 2px top padding mirrors
      card view's .toolbar gap so the inter-row spacing reads
      identically between views. Horizontal padding and top gap draw
      from the shared --content-gutter / --toolbar-row-gap tokens, so
