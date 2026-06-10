@@ -220,35 +220,43 @@ export const deviceNavigatorStyles = css`
   .nav-items {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    /* Trim the left inset so rows hug the panel edge; the icon/text reclaim
-       the wasted gutter without crowding the right scrollbar. */
-    padding: var(--wa-space-2xs) var(--wa-space-s) var(--wa-space-2xs) var(--wa-space-2xs);
+    /* Bordered rows need breathing room so adjacent boxes don't touch. */
+    gap: var(--wa-space-2xs);
+    /* var(--wa-space-m) horizontal inset lines the row boxes' left/right
+       edges up under the section headers' content. */
+    padding: var(--wa-space-xs) var(--wa-space-m);
   }
 
-  /* Rows nested under a domain subgroup get a slight extra indent. */
+  /* Rows nested under a domain subgroup; the box edge keeps the shared
+     var(--wa-space-m) inset. Drop the vertical pad so the first row tucks
+     under its header and a following single row keeps the same inter-box
+     gap instead of stacking the container pad on the single's margin. */
   .nav-items--grouped {
     padding-top: 0;
-    padding-left: var(--wa-space-m);
+    padding-bottom: 0;
   }
 
   /* A single-of-a-kind domain collapses to one flat row in place of its
-     subgroup header; align its glyph with the other subgroup-header glyphs by
-     backing out the nav-item's own left padding and its transparent selection
-     border (the header inset is the larger wa-space-m). */
+     subgroup header; keep the shared box inset and only drop the vertical
+     pad. margin-top carries the inter-box gap the list cannot, since each
+     single is its own one-row container. */
   .nav-items--single {
     padding-top: 0;
     padding-bottom: 0;
-    padding-left: calc(var(--wa-space-xs) - var(--wa-border-width-l));
+    margin-top: var(--wa-space-2xs);
   }
 
   .nav-item {
-    padding: 0 var(--wa-space-xs);
+    padding: 0 var(--wa-space-2xs);
     border-radius: var(--wa-border-radius-m);
-    border-left: var(--wa-border-width-l) solid transparent;
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    /* Uniform row height: matches the natural two-line (title + description)
+       height so a description-less row pads up to the same box instead of
+       rendering shorter. */
+    min-height: 2.75rem;
     display: flex;
     align-items: center;
-    gap: var(--wa-space-2xs);
+    gap: var(--wa-space-xs);
     cursor: pointer;
     user-select: none;
     transition:
@@ -257,13 +265,10 @@ export const deviceNavigatorStyles = css`
   }
 
   .nav-item:hover,
-  .nav-item--hovered {
-    background: var(--esphome-tint);
-  }
-
+  .nav-item--hovered,
   .nav-item--selected {
     background: var(--esphome-tint);
-    border-left-color: var(--esphome-primary);
+    border-color: var(--esphome-primary);
   }
 
   .nav-item-content {
