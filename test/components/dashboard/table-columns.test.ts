@@ -39,6 +39,22 @@ function rendered(t: TemplateResult): string {
   );
 }
 
+function renderActionsCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResult {
+  const col = columns.find((c) => "id" in c && c.id === "actions");
+  if (!col?.cell || typeof col.cell !== "function") {
+    throw new Error("no cell renderer for actions column");
+  }
+  const row = {
+    busy: false,
+    hasUpdateAvailable: false,
+    hasPendingChanges: false,
+    _device: { web_port: null },
+    ...rowOverrides,
+  } as unknown as DeviceRow;
+  const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;
+  return col.cell(info) as TemplateResult;
+}
+
 const DATA_COLUMNS = ["address", "ip", "version", "comment", "area", "mac_address"];
 
 describe("device table empty-cell placeholder (#1038)", () => {
@@ -63,5 +79,12 @@ describe("device table empty-cell placeholder (#1038)", () => {
     const html = rendered(renderCell("ip", "192.168.1.42"));
     expect(html).toContain("cell-mono");
     expect(html).toContain("192.168.1.42");
+  });
+});
+
+describe("device table actions", () => {
+  it("renders the edit pencil with the accent (action) color", () => {
+    const html = rendered(renderActionsCell());
+    expect(html).toContain("cell-action-btn--accent cell-action-btn--edit");
   });
 });

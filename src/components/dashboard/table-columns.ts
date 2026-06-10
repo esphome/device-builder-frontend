@@ -306,7 +306,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         // out; the row-end kebab keeps every action reachable.
         return html`<span class="cell-actions">
           <button
-            class="cell-action-btn cell-action-btn--edit"
+            class="cell-action-btn cell-action-btn--accent cell-action-btn--edit"
             aria-label=${localize("dashboard.table_action_edit")}
             title=${localize("dashboard.table_action_edit")}
             ?disabled=${row.busy}
