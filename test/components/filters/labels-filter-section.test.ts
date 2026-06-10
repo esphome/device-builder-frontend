@@ -1,11 +1,9 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the labels accordion section: catalog rows with usage counts
- * and chip styling, selection via ``labels-filter-change``, the
- * empty-catalog state, and the management contract — pencil / trash /
- * create each emit ``request-popover-close`` *before* their action
- * event so the shell is closed by the time any dialog opens.
+ * Pins the labels section: rows with counts and chip styling,
+ * ``labels-filter-change``, the empty-catalog state, and the
+ * close-before-action ordering of the management request events.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

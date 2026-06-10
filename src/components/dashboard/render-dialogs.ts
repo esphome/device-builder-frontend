@@ -173,9 +173,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       ?open=${host._labelDialogOpen}
       .editing=${host._labelDialogEditing}
       @label-created=${(e: CustomEvent<Label>) => {
-        // Auto-select the freshly-minted label so the filter is
-        // immediately useful — a user who just typed a name and hit
-        // Create clearly intends to filter by it.
+        // Auto-select: whoever just created a label intends to filter by it.
         if (!host._selectedLabels.includes(e.detail.id)) {
           host._selectedLabels = [...host._selectedLabels, e.detail.id];
         }

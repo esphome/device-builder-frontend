@@ -1,11 +1,9 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the Filters popover shell: the active-count badge, the
- * open/close lifecycle (trigger click, Escape with focus handback,
- * outside-click, request-popover-close), the header "Clear all"
- * that surfaces a bubbling ``clear-filters`` event, and the
- * exclusive-open accordion coordination over slotted sections.
+ * Pins the popover shell: badge, open/close lifecycle (trigger,
+ * Escape with focus handback, outside-click, request-popover-close),
+ * the header Clear all, and exclusive-open accordion coordination.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

@@ -22,8 +22,8 @@ export const filterStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    /* Shared with the search input / view-toggle / clear-filters so the
-       toolbar row reads as one consistent control strip. */
+    /* Shared with the search input / view-toggle so the toolbar
+       row reads as one consistent control strip. */
     min-height: var(--esphome-control-height);
     padding: 4px 10px 4px 12px;
     border-radius: var(--wa-border-radius-m);

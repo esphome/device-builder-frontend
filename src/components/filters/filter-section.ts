@@ -1,18 +1,13 @@
 /**
- * Generic accordion section inside the dashboard's Filters popover.
+ * Generic accordion section inside the dashboard's Filters popover:
+ * a collapsible header over a checkbox list of ``options``, with an
+ * inline search field when ``searchable``.
  *
- * Renders one filter dimension as a collapsible header (name +
- * active-selection count chip + chevron) over a checkbox list of
- * the supplied ``options``. When ``searchable`` is true an inline
- * text field filters the list by display name.
- *
- * The section is a dumb disclosure widget: it never mutates its own
- * ``expanded`` — header clicks emit a bubbling
+ * Never mutates its own ``expanded`` — header clicks emit a bubbling
  * ``filter-section-toggle`` and the popover shell writes ``expanded``
- * back, keeping exclusive-open coordination in one place. Selection
- * state lives on the dashboard: ``selected`` is a one-way prop and
- * changes are emitted as a bubbling ``facet-change``
- * ``CustomEvent<string[]>`` carrying the full new id set.
+ * back. ``selected`` is a one-way prop; changes emit a bubbling
+ * ``facet-change`` ``CustomEvent<string[]>`` with the full new id
+ * set.
  */
 import { mdiCheck, mdiChevronDown, mdiMagnify } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";

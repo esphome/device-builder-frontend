@@ -1,24 +1,14 @@
 /**
- * Labels accordion section inside the dashboard's Filters popover.
+ * Labels accordion section: ``<esphome-filter-section>``'s shape
+ * plus colour chips, per-row rename / delete, and a create CTA. It
+ * always renders — an empty catalog is the discovery path for
+ * creating the first label. Selection changes emit a bubbling
+ * ``labels-filter-change`` ``CustomEvent<string[]>``.
  *
- * Same disclosure shape as ``<esphome-filter-section>`` but rows
- * render colour-tinted label chips with per-row rename / delete
- * actions and a trailing "Create new label" CTA. The section always
- * renders — even on an empty catalog — because it is the discovery
- * path for creating the first label.
- *
- * Label management happens *outside* the popover: rename / create
- * open the dashboard-mounted ``<esphome-label-dialog>`` and delete
- * routes to the dashboard's shared confirm dialog. Each management
- * action therefore emits a bubbling ``request-popover-close`` first
- * (the shell closes) and then its own request event
- * (``request-edit-label`` / ``request-create-label`` /
- * ``request-delete-label``), so the dialog never coexists with the
- * popover's document-click dismissal.
- *
- * Selection changes are emitted as a bubbling
- * ``labels-filter-change`` ``CustomEvent<string[]>`` carrying the
- * new full set of selected ids (AND semantics applied upstream).
+ * Label management lives outside the popover (the dashboard's label
+ * dialog / confirm dialog), so every management action emits
+ * ``request-popover-close`` before its request event — a modal must
+ * never coexist with the popover's document-click dismissal.
  */
 import { consume } from "@lit/context";
 import {
@@ -215,8 +205,6 @@ export class ESPHomeLabelsFilterSection extends LitElement {
     );
   };
 
-  /** Ask the shell to close before any dialog opens, so the modal
-   *  never coexists with the popover's document-click dismissal. */
   private _requestPopoverClose() {
     this.dispatchEvent(
       new CustomEvent("request-popover-close", { bubbles: true, composed: true })

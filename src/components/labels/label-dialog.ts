@@ -1,19 +1,10 @@
 /**
  * Dashboard-mounted modal hosting ``<esphome-label-form>`` for both
- * creating a label and editing an existing one.
- *
- * Mounted at the dashboard level (not inside the Filters popover)
- * because popover content is unrendered while the popover is
- * closed — a dialog owned by a section would vanish mid-flow. The
- * popover closes first, then this dialog opens; mirrors how delete
- * routes to the dashboard's shared confirm dialog.
- *
- * ``editing`` is the mode switch: ``null`` renders the create form,
- * a ``Label`` renders the pre-filled edit form. ``label-created`` /
- * ``label-saved`` bubble composed out of the form through this host;
- * the dialog re-emits ``after-hide`` (the inner dialog's own event
- * doesn't compose) so the owner can clear its open/editing state on
- * any close path.
+ * create and edit (``editing`` is the mode switch). Lives on the
+ * dashboard because popover content is unrendered while the popover
+ * is closed — a dialog owned by a section would vanish mid-flow.
+ * Re-emits the inner dialog's ``after-hide`` (which doesn't compose)
+ * so the owner can clear its state on any close path.
  */
 import { consume } from "@lit/context";
 import { LitElement, css, html } from "lit";

@@ -1,13 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins renderFacets: every dimension renders as an accordion section
- * inside a single <esphome-filters-popover>, the popover's
- * count-label picks the ICU plural key off the active count, the
- * Updates section only renders when the fleet has something to
- * update, the Area section turns searchable past 8 options, and the
- * labels section's edit / create requests drive the dashboard's
- * label-dialog state.
+ * Pins renderFacets: one <esphome-filters-popover> of accordion
+ * sections, per-dimension visibility rules, the Area searchable
+ * threshold, the count-label wiring, and the labels section's edit /
+ * create requests driving the dashboard's label-dialog state.
  */
 import { render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -1,12 +1,9 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the generic accordion section: header aria-expanded + count
- * chip, body gated on ``expanded``, ``facet-change`` payloads
- * carrying the full new id set, search filtering with its two empty
- * states, the per-section clear link, and the query reset on
- * collapse. The section never flips ``expanded`` itself — headers
- * emit ``filter-section-toggle`` for the shell.
+ * Pins the generic section: header state + count chip, body gated on
+ * ``expanded`` (never self-flipped), ``facet-change`` payloads, and
+ * search filtering with its empty states and reset-on-collapse.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

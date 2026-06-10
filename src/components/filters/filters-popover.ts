@@ -1,15 +1,10 @@
 /**
- * Single "Filters" trigger + popover hosting the per-dimension
- * accordion sections, which the dashboard slots in unchanged. Owns
- * open state, the active-count badge, the header "Clear all" action
- * (a bubbling ``clear-filters`` event the page already handles) and
- * exclusive-open accordion coordination.
- *
- * The shell is the single writer of every section's ``expanded``:
- * sections emit ``filter-section-toggle`` from their headers and the
- * shell flips the dispatching section while collapsing the rest.
- * Sections are reached through ``this.children`` (light DOM) rather
- * than slot assignment, which is empty while the popover is closed.
+ * Single "Filters" trigger + popover hosting the slotted accordion
+ * sections. Owns open state, the count badge, the header "Clear all"
+ * (a bubbling ``clear-filters``), and exclusive-open coordination:
+ * the shell is the single writer of every section's ``expanded``,
+ * reached through ``this.children`` because slot assignment is empty
+ * while the popover is closed.
  *
  * Popover / dismiss are hand-rolled (not ``wa-popover``) so the
  * document-level dismissal can't fight the modal dialogs that label

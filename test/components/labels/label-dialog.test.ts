@@ -1,11 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the label dialog's reactive open/close contract: the owner's
- * ``open`` flows to the inner base-dialog, ``request-close`` /
- * ``after-hide`` re-emit at the host so any close path clears owner
- * state, the title key tracks create vs edit mode, and the dialog
- * bails out when a catalog push drops the label being edited.
+ * Pins the label dialog: ``open`` flows to the inner base-dialog,
+ * ``request-close`` / ``after-hide`` re-emit at the host, the title
+ * tracks create vs edit, and a catalog push dropping the edited
+ * label requests close.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
