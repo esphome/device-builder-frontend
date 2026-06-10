@@ -252,10 +252,13 @@ export function renderIpAddressRow(
 ): TemplateResult {
   const list = d.ip_addresses;
   const label = host._localize("dashboard.drawer_ip_address");
-  if (list.length === 0) {
+  // ip_addresses isn't persisted across restarts but the primary d.ip is, so
+  // fall back to it on a cold scan to keep the IP row and its visit link.
+  const primary = list[0] ?? d.ip;
+  if (!primary) {
     return renderRow("ip-network-outline", label, "", true);
   }
-  if (list.length === 1) {
+  if (list.length <= 1) {
     return html`
       <div class="row">
         <div class="icon">
@@ -264,8 +267,8 @@ export function renderIpAddressRow(
         <div class="content">
           <div class="label">${label}</div>
           ${renderIpValue(
-            list[0],
-            buildWebUiUrlForHost(list[0], d.web_port),
+            primary,
+            buildWebUiUrlForHost(primary, d.web_port),
             host._localize
           )}
         </div>
