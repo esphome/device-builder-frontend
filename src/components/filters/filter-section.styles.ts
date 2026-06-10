@@ -19,7 +19,10 @@ export const filterSectionStyles = css`
     flex-direction: column;
   }
 
-  :host(:not(:first-of-type)) {
+  /* :first-child, not :first-of-type — the sections are two element
+     types (labels + generic), and a per-type match would skip the
+     divider between the labels section and the one after it. */
+  :host(:not(:first-child)) {
     border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
   }
 
