@@ -96,17 +96,17 @@ export const deviceDrawerContentStyles = css`
     font-size: 14px;
   }
 
-  .ip-value {
+  .address-value {
     display: inline-flex;
     align-items: center;
     gap: var(--wa-space-xs);
     max-width: 100%;
   }
-  .ip-value-text {
+  .address-value-text {
     min-width: 0;
     overflow-wrap: anywhere;
   }
-  .ip-visit-link {
+  .address-visit-link {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -120,16 +120,16 @@ export const deviceDrawerContentStyles = css`
       background 0.12s,
       color 0.12s;
   }
-  .ip-visit-link:hover {
+  .address-visit-link:hover {
     background: var(--wa-color-surface-lowered);
     color: var(--esphome-primary);
   }
-  .ip-visit-link:focus-visible {
+  .address-visit-link:focus-visible {
     outline: 2px solid var(--esphome-primary);
     outline-offset: 2px;
     color: var(--esphome-primary);
   }
-  .ip-visit-link wa-icon {
+  .address-visit-link wa-icon {
     font-size: 14px;
   }
 

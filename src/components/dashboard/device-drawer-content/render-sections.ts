@@ -9,7 +9,7 @@ import { formatFileSize } from "../../../util/format-file-size.js";
 import { splitIntegrations } from "../../../util/integration-split.js";
 import { buildWebUiUrlForHost } from "../../../util/web-ui-url.js";
 import type { ESPHomeDeviceDrawerContent } from "../device-drawer-content.js";
-import { renderIpValue } from "../device-drawer-render.js";
+import { renderAddressValue } from "../device-drawer-render.js";
 
 // Whitelist docs URLs to https://esphome.io. The map is backend-populated;
 // a compromised entry interpolating a javascript: / data: scheme would run
@@ -234,7 +234,7 @@ export function renderHostnameRow(
       </div>
       <div class="content">
         <div class="label">${host._localize("dashboard.drawer_hostname")}</div>
-        ${renderIpValue(
+        ${renderAddressValue(
           d.address,
           buildWebUiUrlForHost(d.address, d.web_port),
           host._localize
@@ -266,7 +266,7 @@ export function renderIpAddressRow(
         </div>
         <div class="content">
           <div class="label">${label}</div>
-          ${renderIpValue(
+          ${renderAddressValue(
             primary,
             buildWebUiUrlForHost(primary, d.web_port),
             host._localize
@@ -284,7 +284,7 @@ export function renderIpAddressRow(
       </div>
       <div class="content">
         <div class="label">${label}</div>
-        ${renderIpValue(
+        ${renderAddressValue(
           list[0],
           buildWebUiUrlForHost(list[0], d.web_port),
           host._localize
@@ -293,7 +293,11 @@ export function renderIpAddressRow(
           ? list
               .slice(1)
               .map((ip) =>
-                renderIpValue(ip, buildWebUiUrlForHost(ip, d.web_port), host._localize)
+                renderAddressValue(
+                  ip,
+                  buildWebUiUrlForHost(ip, d.web_port),
+                  host._localize
+                )
               )
           : nothing}
         <button

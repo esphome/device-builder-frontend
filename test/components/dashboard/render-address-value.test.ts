@@ -1,14 +1,10 @@
 /**
- * Tests for the drawer's IP-value renderer.
+ * Tests for the drawer's address-value renderer (Hostname + IP rows).
  *
- * The renderer is the helper behind the IP Address row in the
- * device drawer's "Network" section: it stamps the IP text and,
- * when ``buildWebUiUrl`` produced a URL for the device, an
- * ``open-in-new`` icon-link to the device's web UI. The empty-IP
- * branch is the interesting one — the affordance has to render
- * even before the first resolved A-record arrives so a freshly-
- * adopted device with only a YAML mDNS hostname (``device.address``)
- * still gets a visit link.
+ * It stamps the host text and, when ``buildWebUiUrl`` produced a URL,
+ * the shared ``open-in-new`` visit link. The empty-value branch is the
+ * interesting one: the placeholder renders alongside the link so the
+ * affordance isn't gated on the first resolved value.
  *
  * Vitest runs in the ``node`` environment so we don't mount Lit;
  * the existing template-walker (``test/_lit-template-walker.ts``)
@@ -17,7 +13,7 @@
  * placeholder text — without a DOM.
  */
 import { describe, expect, it } from "vitest";
-import { renderIpValue } from "../../../src/components/dashboard/device-drawer-render.js";
+import { renderAddressValue } from "../../../src/components/dashboard/device-drawer-render.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
@@ -25,11 +21,11 @@ import {
 
 const _identityLocalize: (key: string) => string = (key) => key;
 
-describe("renderIpValue", () => {
+describe("renderAddressValue", () => {
   it("omits the visit link when url is empty", () => {
-    const result = renderIpValue("192.168.1.42", "", _identityLocalize);
+    const result = renderAddressValue("192.168.1.42", "", _identityLocalize);
     expect(findTemplatesByAnchor(result, "<a").length).toBe(0);
-    expect(findTemplatesByAnchor(result, "ip-visit-link").length).toBe(0);
+    expect(findTemplatesByAnchor(result, "address-visit-link").length).toBe(0);
     // Still emits the IP value cell.
     const valueCells = findTemplatesByAnchor(result, "value mono");
     expect(valueCells.length).toBeGreaterThan(0);
@@ -37,7 +33,7 @@ describe("renderIpValue", () => {
 
   it("renders the visit-web link when url is set", () => {
     const url = "http://kitchen.local";
-    const result = renderIpValue("192.168.1.42", url, _identityLocalize);
+    const result = renderAddressValue("192.168.1.42", url, _identityLocalize);
     const anchors = findTemplatesByAnchor(result, "<a");
     expect(anchors.length).toBe(1);
     const bindings = extractAttributeBindings(anchors[0]);
@@ -53,7 +49,7 @@ describe("renderIpValue", () => {
   it("uses the localised visit-web label for aria-label and title", () => {
     const localize = (key: string): string =>
       key === "dashboard.action_visit_web_ui" ? "Visit web UI" : key;
-    const result = renderIpValue("192.168.1.42", "http://kitchen.local", localize);
+    const result = renderAddressValue("192.168.1.42", "http://kitchen.local", localize);
     const [anchor] = findTemplatesByAnchor(result, "<a");
     const bindings = extractAttributeBindings(anchor);
     expect(bindings["aria-label"]).toBe("Visit web UI");
@@ -62,14 +58,14 @@ describe("renderIpValue", () => {
 
   it("renders the em-dash placeholder when ip is empty", () => {
     // No URL: render the bare placeholder cell with the muted class.
-    const noUrl = renderIpValue("", "", _identityLocalize);
+    const noUrl = renderAddressValue("", "", _identityLocalize);
     const noUrlValues = noUrl.values.flat(Infinity);
     expect(noUrlValues).toContain("—");
 
     // With URL: still render the placeholder, plus the visit link
     // alongside it so the affordance isn't blocked on the first
     // mDNS A-record.
-    const withUrl = renderIpValue("", "http://kitchen.local", _identityLocalize);
+    const withUrl = renderAddressValue("", "http://kitchen.local", _identityLocalize);
     const withUrlValues = withUrl.values.flat(Infinity);
     expect(withUrlValues).toContain("—");
     expect(findTemplatesByAnchor(withUrl, "<a").length).toBe(1);
@@ -79,10 +75,10 @@ describe("renderIpValue", () => {
     // The class string is built via ``class="value mono ${expr}"``,
     // so ``muted`` lives in ``values`` (an empty string when
     // populated; ``"muted"`` when the placeholder is rendering).
-    const placeholder = renderIpValue("", "", _identityLocalize);
+    const placeholder = renderAddressValue("", "", _identityLocalize);
     expect(placeholder.values).toContain("muted");
 
-    const populated = renderIpValue("192.168.1.42", "", _identityLocalize);
+    const populated = renderAddressValue("192.168.1.42", "", _identityLocalize);
     expect(populated.values).not.toContain("muted");
   });
 });

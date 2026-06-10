@@ -26,7 +26,7 @@ describe("renderIpAddressRow", () => {
       _host,
       _device({ web_port: 80, ip: "10.0.0.5", ip_addresses: [] })
     );
-    const valueText = findTemplatesByAnchor(result, "ip-value-text");
+    const valueText = findTemplatesByAnchor(result, "address-value-text");
     expect(valueText.flatMap((t) => t.values)).toContain("10.0.0.5");
     expect(hrefs(result)).toEqual(["http://10.0.0.5"]);
   });

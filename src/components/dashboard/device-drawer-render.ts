@@ -10,40 +10,28 @@
  */
 import { html, nothing } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 
 /**
- * Render the primary IP cell, optionally suffixed with a "Visit web UI"
- * icon-link.
+ * Render a hostname or IP value cell, optionally suffixed with a
+ * "Visit web UI" icon-link.
  *
- * *url* is the precomputed ``buildWebUiUrl`` result for the device —
- * passed in (rather than recomputed) so the empty-IP guard in the
+ * *url* is the precomputed ``buildWebUiUrl`` result for the host —
+ * passed in (rather than recomputed) so the empty-value guard in the
  * caller and this render share a single URL parse. An empty *url*
- * suppresses the link, mirroring the original "no link" branch.
- * Pass an empty *ip* to render the ``—`` placeholder alongside the
- * link; used in the "no resolved IPs yet but ``device.address`` is
- * known" branch so the visit affordance isn't gated on the first
- * mDNS A-record.
+ * suppresses the link. Pass an empty *value* to render the ``—``
+ * placeholder alongside the link.
  */
-export function renderIpValue(ip: string, url: string, localize: LocalizeFunc) {
-  const isPlaceholder = !ip;
-  const display = ip || "—";
+export function renderAddressValue(value: string, url: string, localize: LocalizeFunc) {
+  const isPlaceholder = !value;
+  const display = value || "—";
   if (!url) {
     return html`<div class="value mono ${isPlaceholder ? "muted" : ""}">${display}</div>`;
   }
-  const visitLabel = localize("dashboard.action_visit_web_ui");
   return html`
-    <div class="value mono ip-value ${isPlaceholder ? "muted" : ""}">
-      <span class="ip-value-text">${display}</span>
-      <a
-        class="ip-visit-link"
-        href=${url}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label=${visitLabel}
-        title=${visitLabel}
-      >
-        <wa-icon library="mdi" name="open-in-new"></wa-icon>
-      </a>
+    <div class="value mono address-value ${isPlaceholder ? "muted" : ""}">
+      <span class="address-value-text">${display}</span>
+      ${renderVisitWebUiLink(url, localize, { className: "address-visit-link" })}
     </div>
   `;
 }
