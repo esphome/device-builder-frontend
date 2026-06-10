@@ -29,6 +29,14 @@ export const espHomeStyles = css`
     --esphome-focus-ring-tight: 0 0 0 2px
       color-mix(in srgb, var(--esphome-primary), transparent 70%);
 
+    /* Hover affordance for clickable rows / cards / option tiles: a primary
+       ring plus the focus-ring glow, matching a focused input. Bundled into
+       one box-shadow (inset ring + outer glow) so a :hover only sets
+       box-shadow + border-color: transparent — no per-site border juggling. */
+    --esphome-hover-ring:
+      inset 0 0 0 var(--wa-border-width-s) var(--esphome-primary),
+      var(--esphome-focus-ring);
+
     /* Elevation glow for raised primary action buttons (save, add,
        etc.); rest + hover pair so the lift on hover stays consistent.
        Bigger floating surfaces (the FAB, the round add-device badge)

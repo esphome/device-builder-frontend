@@ -125,15 +125,19 @@ export class ESPHomeFeedbackDialog extends LitElement {
         text-decoration: none;
         transition:
           background 0.12s,
-          border-color 0.12s;
+          border-color 0.12s,
+          box-shadow 0.12s;
       }
 
+      /* Shared hover affordance (shared.ts): primary ring + focus-ring glow,
+         same as focusing the toolbar search box. No background swap. */
       .link:hover {
-        background: var(--esphome-tint);
-        border-color: var(--esphome-tint-border);
+        border-color: transparent;
+        box-shadow: var(--esphome-hover-ring);
       }
 
-      .link:hover .link-icon {
+      .link:hover .link-icon,
+      .link:hover .link-external {
         color: var(--esphome-primary);
       }
 
@@ -163,6 +167,9 @@ export class ESPHomeFeedbackDialog extends LitElement {
       .link.featured:hover {
         background: var(--esphome-primary-hover);
         border-color: var(--esphome-primary-hover);
+        /* The filled CTA darkens on hover; the row glow would be invisible
+           on it and is suppressed so it doesn't bleed past the edges. */
+        box-shadow: none;
       }
 
       .link.featured .link-icon,
