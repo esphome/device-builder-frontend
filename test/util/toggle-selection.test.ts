@@ -15,8 +15,9 @@ describe("toggleSelection", () => {
     expect(toggleSelection(["a", "b"], "a", false)).toEqual(["b"]);
   });
 
-  it("deselect of an absent id leaves the contents intact", () => {
-    expect(toggleSelection(["a"], "x", false)).toEqual(["a"]);
+  it("returns the input array unchanged when deselecting an absent id", () => {
+    const selected = ["a"];
+    expect(toggleSelection(selected, "x", false)).toBe(selected);
   });
 
   it("does not mutate the input", () => {
