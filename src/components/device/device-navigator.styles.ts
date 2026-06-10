@@ -250,10 +250,10 @@ export const deviceNavigatorStyles = css`
     padding: 0 var(--wa-space-2xs);
     border-radius: var(--wa-border-radius-m);
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    /* Uniform row height: matches the natural two-line (title + description)
-       height so a description-less row pads up to the same box instead of
-       rendering shorter. */
-    min-height: 2.75rem;
+    /* Uniform row height tracked off the type scale (two text lines plus the
+       row's own breathing room) so a description-less row pads up to the same
+       box as a title + description one instead of rendering shorter. */
+    min-height: calc(2 * var(--wa-font-size-s) + var(--wa-space-m));
     display: flex;
     align-items: center;
     gap: var(--wa-space-xs);
@@ -265,7 +265,12 @@ export const deviceNavigatorStyles = css`
   }
 
   .nav-item:hover,
-  .nav-item--hovered,
+  .nav-item--hovered {
+    background: var(--esphome-tint);
+  }
+
+  /* Selected adds the primary border so the open row stays distinct from a
+     row that is merely hovered (which only tints the background). */
   .nav-item--selected {
     background: var(--esphome-tint);
     border-color: var(--esphome-primary);
