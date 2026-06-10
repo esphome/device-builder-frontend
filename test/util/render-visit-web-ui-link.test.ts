@@ -1,5 +1,5 @@
 /**
- * Pins the shared visit-Web-UI anchor: the target=_blank + rel=noopener
+ * Pins the shared visit-Web-UI anchor: the target="_blank" + rel="noopener noreferrer"
  * security pair, the open-in-new glyph, the passed class/href/onClick, and
  * the icon-only (aria/title) vs withLabel (visible text, no aria) shapes.
  */
