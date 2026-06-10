@@ -2,6 +2,7 @@ import {
   ensureSyntaxTree,
   foldable,
   getIndentation,
+  IndentContext,
   indentUnit,
 } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
@@ -95,6 +96,49 @@ describe("esphome-yaml indent service", () => {
     expect(indentAt("on_boot:\n  - lambda: |-\n")).toBe(6);
     expect(indentAt("foo:\n  bar: >+\n")).toBe(4);
     expect(indentAt("foo:\n  bar: |\n")).toBe(4);
+  });
+});
+
+/**
+ * Reproduce the real Enter flow: `insertNewlineAndIndent` calls
+ * `getIndentation` with `pos` at the END of the current line plus a
+ * `simulateBreak` there — it does NOT move `pos` to a new empty line. The
+ * `indentAt` helper above masks that by ending the doc in `\n`; this one
+ * pins the actual keypress so the #744 off-by-one can't come back.
+ */
+function indentOnEnter(yaml: string): number | null {
+  const state = EditorState.create({
+    doc: yaml,
+    extensions: [indentUnit.of(ESPHOME_YAML_INDENT), esphomeYaml()],
+  });
+  const pos = state.doc.length; // cursor at the end of the last content line
+  const cx = new IndentContext(state, { simulateBreak: pos });
+  return getIndentation(cx, pos);
+}
+
+describe("esphome-yaml auto-indent on Enter (simulated break)", () => {
+  it("indents +step after a top-level colon", () => {
+    expect(indentOnEnter("wifi:")).toBe(2);
+  });
+
+  it("indents +step under a nested colon", () => {
+    expect(indentOnEnter("wifi:\n  networks:")).toBe(4);
+  });
+
+  it("aligns a continuation under a list-item dash", () => {
+    expect(indentOnEnter("button:\n  - platform: a")).toBe(4);
+  });
+
+  it("combines list-item dash with a trailing colon", () => {
+    expect(indentOnEnter("button:\n  - on_press:")).toBe(6);
+  });
+
+  it("keeps a content line at its sibling indent", () => {
+    expect(indentOnEnter("esphome:\n  name: x")).toBe(2);
+  });
+
+  it("returns 0 after a top-level content line", () => {
+    expect(indentOnEnter("esphome: test")).toBe(0);
   });
 });
 
