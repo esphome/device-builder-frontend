@@ -132,7 +132,7 @@ import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dial
 import "../components/install-method-dialog.js";
 import "../components/labels/bulk-labels-dialog.js";
 import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
-import "../components/labels/labels-filter.js";
+import "../components/labels/label-dialog.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/rename-device-dialog.js";
@@ -231,6 +231,9 @@ export class ESPHomePageDashboard extends LitElement {
   @state() _cardContextDevice: ConfiguredDevice | null = null;
   @state() _cardContextPosition: { x: number; y: number } | null = null;
   @state() _pendingConfirm: PendingConfirm | null = null;
+  @state() _labelDialogOpen = false;
+  /** Label being edited in the label dialog; ``null`` = create mode. */
+  @state() _labelDialogEditing: Label | null = null;
   @state() _recentlyAdopted: string | null = null;
   @state() _showIgnored = false;
   @state() _view: DashboardView = DashboardView.CARDS;
@@ -504,7 +507,14 @@ export class ESPHomePageDashboard extends LitElement {
     // "changed" because Lit treats initial assignment as a change) —
     // the initial state already came from the URL via
     // ``_hydrateFromUrl``, so writing it back is a no-op.
-    if (ESPHomePageDashboard._urlSyncedFields.some((f) => changed.has(f))) {
+    if (
+      ESPHomePageDashboard._urlSyncedFields.some((f) => changed.has(f)) ||
+      // Label ids serialize to the URL by *name* through the catalog,
+      // and a catalog push (create / rename) can land after the
+      // selection change that referenced it — re-sync so the URL
+      // picks up the resolved / renamed names.
+      (changed.has("_labelsCatalog") && this._selectedLabels.length > 0)
+    ) {
       this._syncUrl();
     }
   }

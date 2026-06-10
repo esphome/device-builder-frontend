@@ -1,5 +1,5 @@
 /**
- * Dashboard facet-filter row rendering (split out of render-toolbar.ts
+ * Dashboard facet-filter rendering (split out of render-toolbar.ts
  * to keep the facet concern in one place).
  */
 import { html, nothing, type TemplateResult } from "lit";
@@ -11,15 +11,15 @@ import {
   computeStateFacet,
   computeUpdateFacet,
 } from "../../util/facets.js";
-import "../facets/facet-filter.js";
-import "./filters-menu.js";
+import "../filters/filter-section.js";
+import "../filters/filters-popover.js";
+import "../filters/labels-filter-section.js";
 
 export function renderLabelsFilter(host: ESPHomePageDashboard): TemplateResult {
-  // Labels facet keeps its own component because its popover
-  // hosts the inline rename / delete / create affordances that
-  // the generic ``<esphome-facet-filter>`` doesn't expose. Visual
-  // language is shared via the ``facetStyles`` stylesheet.
-  return html`<esphome-labels-filter
+  // Labels keeps its own section component because its rows carry
+  // colour chips and the rename / delete / create affordances that
+  // the generic ``<esphome-filter-section>`` doesn't expose.
+  return html`<esphome-labels-filter-section
     .selected=${host._selectedLabels}
     .usageCounts=${host._computeLabelUsage()}
     @labels-filter-change=${(e: CustomEvent<string[]>) => {
@@ -28,26 +28,33 @@ export function renderLabelsFilter(host: ESPHomePageDashboard): TemplateResult {
     @request-delete-label=${(e: CustomEvent<Label>) => {
       host._openConfirm({ kind: "delete-label", label: e.detail });
     }}
-  ></esphome-labels-filter>`;
+    @request-edit-label=${(e: CustomEvent<Label>) => {
+      host._labelDialogEditing = e.detail;
+      host._labelDialogOpen = true;
+    }}
+    @request-create-label=${() => {
+      host._labelDialogEditing = null;
+      host._labelDialogOpen = true;
+    }}
+  ></esphome-labels-filter-section>`;
 }
 
-/** Facets row — every facet pill collapses into a single "Filters"
- *  button + popover so the toolbar stays one line regardless of how
- *  many facets or selections are active (an inline pill row overflows
- *  once selection badges widen the pills). The labels pill always
- *  renders inside the popover (its popover is the create path even
- *  when the catalog is empty); area / platform / status only render
- *  when the configured-device list has at least one usable value to
- *  filter by, so a fresh dashboard with a single-platform fleet
- *  doesn't sprout an empty / single-bucket pill that adds no signal.
+/** Facets — one "Filters" trigger + popover of accordion sections,
+ *  one per dimension, so the toolbar stays one line regardless of
+ *  how many dimensions or selections are active. The labels section
+ *  always renders (it is the create path even when the catalog is
+ *  empty); area / platform only render when the configured-device
+ *  list has at least one usable value to filter by, so a fresh
+ *  dashboard with a single-platform fleet doesn't sprout an empty /
+ *  single-bucket section that adds no signal.
  *
  *  In YAML-search mode the *labels*, *status*, and *updates*
- *  facets are suppressed — labels are device metadata (not in the
+ *  sections are suppressed — labels are device metadata (not in the
  *  YAML), and online/offline plus update/modified state are runtime
  *  (also not in the YAML), so filtering YAML matches by any of them
  *  is misleading. Area and platform stay because both come from the
- *  YAML itself. The updates facet additionally renders only when the
- *  fleet has something to update (no 0/0 noise pill). */
+ *  YAML itself. The updates section additionally renders only when
+ *  the fleet has something to update (no 0/0 noise). */
 export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
   const areaOptions = computeAreaFacet(host._devices);
   const platformOptions = computePlatformFacet(host._devices);
@@ -57,66 +64,67 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
     host._localize,
     host._selectedUpdateStatus
   );
-  const multiSelectedLabel = host._localize("dashboard.filter_multi_selected", {
-    count: "{count}",
-  });
-  const clearLabel = host._localize("dashboard.filter_clear_all");
+  const clearLabel = host._localize("dashboard.filter_clear");
+  const emptyLabel = host._localize("dashboard.filter_no_options");
+  const noMatchesLabel = host._localize("dashboard.filter_no_matches");
   const yamlMode = host._yamlMode;
 
-  // Built once; rendered inline or slotted into the menu below so the
-  // facet wiring isn't duplicated across the two layouts.
-  const facetPills = html`
+  const facetSections = html`
     ${yamlMode ? nothing : renderLabelsFilter(host)}
     ${areaOptions.length > 0
-      ? html`<esphome-facet-filter
+      ? html`<esphome-filter-section
           name=${host._localize("dashboard.filter_area")}
           search-placeholder=${host._localize("dashboard.filter_area")}
           clear-label=${clearLabel}
-          multi-selected-label=${multiSelectedLabel}
+          empty-label=${emptyLabel}
+          no-matches-label=${noMatchesLabel}
           ?searchable=${areaOptions.length > 8}
           .options=${areaOptions}
           .selected=${host._selectedAreas}
           @facet-change=${(e: CustomEvent<string[]>) => {
             host._selectedAreas = e.detail;
           }}
-        ></esphome-facet-filter>`
+        ></esphome-filter-section>`
       : nothing}
     ${platformOptions.length > 1
-      ? html`<esphome-facet-filter
+      ? html`<esphome-filter-section
           name=${host._localize("dashboard.filter_platform")}
           search-placeholder=${host._localize("dashboard.filter_platform")}
           clear-label=${clearLabel}
-          multi-selected-label=${multiSelectedLabel}
+          empty-label=${emptyLabel}
+          no-matches-label=${noMatchesLabel}
           .options=${platformOptions}
           .selected=${host._selectedPlatforms}
           @facet-change=${(e: CustomEvent<string[]>) => {
             host._selectedPlatforms = e.detail;
           }}
-        ></esphome-facet-filter>`
+        ></esphome-filter-section>`
       : nothing}
     ${yamlMode
       ? nothing
-      : html`<esphome-facet-filter
+      : html`<esphome-filter-section
           name=${host._localize("dashboard.filter_status")}
           clear-label=${clearLabel}
-          multi-selected-label=${multiSelectedLabel}
+          empty-label=${emptyLabel}
+          no-matches-label=${noMatchesLabel}
           .options=${stateOptions}
           .selected=${host._selectedStates}
           @facet-change=${(e: CustomEvent<string[]>) => {
             host._selectedStates = e.detail;
           }}
-        ></esphome-facet-filter>`}
+        ></esphome-filter-section>`}
     ${!yamlMode && updateOptions.length > 0
-      ? html`<esphome-facet-filter
+      ? html`<esphome-filter-section
           name=${host._localize("dashboard.filter_update_status")}
           clear-label=${clearLabel}
-          multi-selected-label=${multiSelectedLabel}
+          empty-label=${emptyLabel}
+          no-matches-label=${noMatchesLabel}
           .options=${updateOptions}
           .selected=${host._selectedUpdateStatus}
           @facet-change=${(e: CustomEvent<string[]>) => {
             host._selectedUpdateStatus = e.detail;
           }}
-        ></esphome-facet-filter>`
+        ></esphome-filter-section>`
       : nothing}
   `;
 
@@ -124,17 +132,17 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
   // pill, so it's cleared from the search box's own × instead (#1160).
   return html`
     <div class="filter-group">
-      <esphome-filters-menu
+      <esphome-filters-popover
         .activeCount=${host._activeFacetCount}
         button-label=${host._localize("dashboard.filter_menu_button")}
-        clear-label=${clearLabel}
+        clear-label=${host._localize("dashboard.filter_clear_all")}
         count-label=${host._localize("dashboard.filter_menu_active", {
           count: host._activeFacetCount,
         })}
         @clear-filters=${host._clearAllFilters}
       >
-        ${facetPills}
-      </esphome-filters-menu>
+        ${facetSections}
+      </esphome-filters-popover>
     </div>
   `;
 }

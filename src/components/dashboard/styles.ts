@@ -146,16 +146,15 @@ export const dashboardStyles = css`
     min-width: 140px;
   }
 
-  /* Table view (.toolbar-stack) and YAML view (:host([yaml])) no
-     longer carry a Filters control in the search row, so the search
-     input seeds from a 0 flex-basis and fills the row the same way in
-     both, matching the device-search width. Flex line-breaking uses
-     the basis, not min-width, so the 220px basis above would push the
-     view-toggle onto a second line at ~360px; a 0 basis keeps search +
-     view-toggle on one row (search still grows to fill, floored by the
-     140px min-width). The card toolbar keeps the 220px basis since its
-     Filters control still shares this row. */
-  .toolbar-stack .search-wrap,
+  /* YAML view (:host([yaml])) carries no Filters control in the
+     search row, so the search input seeds from a 0 flex-basis and
+     fills the row, matching the device-search width. Flex
+     line-breaking uses the basis, not min-width, so the 220px basis
+     above would push the view-toggle onto a second line at ~360px; a
+     0 basis keeps search + view-toggle on one row (search still
+     grows to fill, floored by the 140px min-width). The card and
+     table toolbars keep the 220px basis since their shared Filters
+     control sits on this row. */
   :host([yaml]) .search-wrap {
     flex-basis: 0;
   }

@@ -81,13 +81,12 @@ export const tableLayoutStyles = css`
       flex: 1 1 100%;
     }
 
-    /* Row 2: Filters + Columns + Create device share one line, packed
-       at the left (margin-left was previously auto, which pinned the
+    /* Row 2: Columns + Create device share one line, packed at the
+       left (margin-left was previously auto, which pinned the
        cluster to the right and left the dead space on the left). The
        buttons keep their natural width and the row never wraps; when
        space is tight (a long locale) Columns and Create shrink and
-       ellipsize their labels rather than breaking to a second line.
-       Filters keeps its short label (does not shrink). */
+       ellipsize their labels rather than breaking to a second line. */
     .controls-right {
       flex: 1 1 100%;
       flex-wrap: nowrap;
@@ -96,10 +95,6 @@ export const tableLayoutStyles = css`
       /* Tighter inter-button gap on the mobile row than the desktop
          cluster's --wa-space-s. */
       gap: var(--wa-space-xs);
-    }
-
-    .controls-right ::slotted([slot="before-columns"]) {
-      flex: 0 0 auto;
     }
 
     .controls-right ::slotted([slot="actions"]) {

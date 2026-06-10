@@ -4,7 +4,7 @@
  * Each helper walks the configured-device list once and returns
  * an array of ``FacetOption`` (``{ id, name, count }``) sorted by
  * descending count then alphabetical. The dashboard uses these
- * arrays to feed ``<esphome-facet-filter>`` instances for area /
+ * arrays to feed ``<esphome-filter-section>`` instances for area /
  * platform / status while the labels facet uses its own
  * ``computeLabelUsage`` (since labels carry a coloured chip and
  * inline CRUD that don't fit the generic surface).
@@ -19,7 +19,18 @@
  */
 import { type ConfiguredDevice, DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { FacetOption } from "../components/facets/facet-filter.js";
+
+/** One selectable value inside a facet. */
+export interface FacetOption {
+  /** Opaque id surfaced through the ``facet-change`` event. */
+  id: string;
+  /** Display name rendered as the row label. */
+  name: string;
+  /** Right-edge badge count. ``0`` is a meaningful value (filters
+   *  with no matching devices still render so the user can see the
+   *  empty option) — pass ``-1`` to suppress the badge entirely. */
+  count: number;
+}
 
 /** Locale-aware collator used to break ties when two facet
  *  options share the same device count. Computed once and reused

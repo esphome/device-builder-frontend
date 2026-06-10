@@ -1,10 +1,13 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins renderFacets: every facet pill collapses into a single
- * <esphome-filters-menu> (no inline pill row), the menu's count-label
- * picks the singular/plural key off the active count, and the Updates
- * pill only renders when the fleet has something to update.
+ * Pins renderFacets: every dimension renders as an accordion section
+ * inside a single <esphome-filters-popover>, the popover's
+ * count-label picks the ICU plural key off the active count, the
+ * Updates section only renders when the fleet has something to
+ * update, the Area section turns searchable past 8 options, and the
+ * labels section's edit / create requests drive the dashboard's
+ * label-dialog state.
  */
 import { render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -14,10 +17,10 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 import { renderFacets } from "../../../src/components/dashboard/render-facets.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 
-// Minimal host-shaped fake. Empty _devices means the Area/Platform/
-// Status facets compute no options and self-suppress, so the menu
-// reduces to the always-present labels pill — enough to assert the
-// wrapper choice without standing up the page.
+// Minimal host-shaped fake. Empty _devices means the Area/Platform
+// facets compute no options and self-suppress, so the popover
+// reduces to the always-present labels + status sections — enough to
+// assert the wrapper choice without standing up the page.
 function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     _devices: [],
@@ -33,6 +36,8 @@ function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
     _clearAllFilters: vi.fn(),
     _computeLabelUsage: () => ({}),
     _openConfirm: vi.fn(),
+    _labelDialogOpen: false,
+    _labelDialogEditing: null,
     ...overrides,
   } as unknown as ESPHomePageDashboard;
 }
@@ -43,16 +48,23 @@ function renderInto(host: ESPHomePageDashboard): HTMLElement {
   return container;
 }
 
+const sectionByName = (root: HTMLElement, name: string) =>
+  [...root.querySelectorAll("esphome-filter-section")].find(
+    (el) => el.getAttribute("name") === name
+  );
+
 describe("renderFacets", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
 
-  it("collapses every facet into a single Filters menu", () => {
+  it("collapses every dimension into a single Filters popover", () => {
     const container = renderInto(makeHost({ _activeFacetCount: 2 }));
-    expect(container.querySelector("esphome-filters-menu")).not.toBeNull();
-    // No inline pill row / clear button — the menu owns clearing.
-    expect(container.querySelector(".filter-clear")).toBeNull();
+    expect(container.querySelector("esphome-filters-popover")).not.toBeNull();
+    expect(container.querySelector("esphome-labels-filter-section")).not.toBeNull();
+    // No legacy wrapper / inline pill row.
+    expect(container.querySelector("esphome-filters-menu")).toBeNull();
+    expect(container.querySelector("esphome-facet-filter")).toBeNull();
   });
 
   // The count-label is a single ICU plural key fed the active count; the
@@ -64,40 +76,85 @@ describe("renderFacets", () => {
       calls.push([key, args]);
       return key;
     };
-    const menu = renderInto(
+    const popover = renderInto(
       makeHost({ _activeFacetCount: count, _localize: localize })
-    ).querySelector("esphome-filters-menu");
-    expect(menu?.getAttribute("count-label")).toBe("dashboard.filter_menu_active");
+    ).querySelector("esphome-filters-popover");
+    expect(popover?.getAttribute("count-label")).toBe("dashboard.filter_menu_active");
     expect(calls).toContainEqual(["dashboard.filter_menu_active", { count }]);
   });
 
-  // _localize echoes its key, so the Updates pill is identifiable by its
+  // _localize echoes its key, so sections are identifiable by their
   // name attribute. Empty _devices means the fleet is current.
-  const updatesPill = (root: HTMLElement) =>
-    [...root.querySelectorAll("esphome-facet-filter")].find(
-      (el) => el.getAttribute("name") === "dashboard.filter_update_status"
-    );
+  const updatesSection = (root: HTMLElement) =>
+    sectionByName(root, "dashboard.filter_update_status");
 
-  it("renders the Updates pill when a device needs an update", () => {
+  it("renders the Updates section when a device needs an update", () => {
     const host = makeHost({ _devices: [{ update_available: true }] });
-    expect(updatesPill(renderInto(host))).not.toBeUndefined();
+    expect(updatesSection(renderInto(host))).not.toBeUndefined();
   });
 
-  it("suppresses the Updates pill when the fleet is current", () => {
+  it("suppresses the Updates section when the fleet is current", () => {
     const host = makeHost({ _devices: [] });
-    expect(updatesPill(renderInto(host))).toBeUndefined();
+    expect(updatesSection(renderInto(host))).toBeUndefined();
   });
 
-  it("keeps the Updates pill when a filter is selected but the fleet is current", () => {
+  it("keeps the Updates section when a filter is selected but the fleet is current", () => {
     const host = makeHost({ _devices: [], _selectedUpdateStatus: ["update_available"] });
-    expect(updatesPill(renderInto(host))).not.toBeUndefined();
+    expect(updatesSection(renderInto(host))).not.toBeUndefined();
   });
 
-  it("suppresses the Updates pill in YAML-search mode", () => {
+  it("suppresses the Updates section in YAML-search mode", () => {
     const host = makeHost({
       _devices: [{ has_pending_changes: true }],
       _yamlMode: true,
     });
-    expect(updatesPill(renderInto(host))).toBeUndefined();
+    expect(updatesSection(renderInto(host))).toBeUndefined();
+  });
+
+  it("suppresses the labels section in YAML-search mode", () => {
+    const container = renderInto(makeHost({ _yamlMode: true }));
+    expect(container.querySelector("esphome-labels-filter-section")).toBeNull();
+  });
+
+  const areaDevices = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ area: `Area ${i}` }));
+
+  it("keeps the Area section plain at 8 or fewer options", () => {
+    const container = renderInto(makeHost({ _devices: areaDevices(8) }));
+    const area = sectionByName(container, "dashboard.filter_area");
+    expect(area?.hasAttribute("searchable")).toBe(false);
+  });
+
+  it("makes the Area section searchable past 8 options", () => {
+    const container = renderInto(makeHost({ _devices: areaDevices(9) }));
+    const area = sectionByName(container, "dashboard.filter_area");
+    expect(area?.hasAttribute("searchable")).toBe(true);
+  });
+
+  it("opens the label dialog in edit mode on request-edit-label", () => {
+    const host = makeHost();
+    const container = renderInto(host);
+    const labels = container.querySelector("esphome-labels-filter-section")!;
+    const label = { id: "l1", name: "kitchen", color: null };
+    labels.dispatchEvent(
+      new CustomEvent("request-edit-label", {
+        detail: label,
+        bubbles: true,
+        composed: true,
+      })
+    );
+    expect(host._labelDialogEditing).toBe(label);
+    expect(host._labelDialogOpen).toBe(true);
+  });
+
+  it("opens the label dialog in create mode on request-create-label", () => {
+    const host = makeHost({ _labelDialogEditing: { id: "stale" } });
+    const container = renderInto(host);
+    const labels = container.querySelector("esphome-labels-filter-section")!;
+    labels.dispatchEvent(
+      new CustomEvent("request-create-label", { bubbles: true, composed: true })
+    );
+    expect(host._labelDialogEditing).toBeNull();
+    expect(host._labelDialogOpen).toBe(true);
   });
 });

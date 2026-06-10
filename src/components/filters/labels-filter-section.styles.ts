@@ -1,25 +1,13 @@
+/**
+ * Styles for <esphome-labels-filter-section>: the catalog rows with
+ * their per-row edit/delete actions and the create-label CTA.
+ */
 import { css } from "lit";
 
-/**
- * Styles for <esphome-labels-filter>. Extracted from the component
- * file to keep it under the repo's file-size cap (see README →
- * "Code structure policies"). The filter pulls these in via its
- * ``static styles`` array alongside ``espHomeStyles``,
- * ``facetStyles``, and ``labelChipStyles``. Class names map to the
- * facet pill trigger, the labels popover, the catalog rows with
- * their per-row edit/delete actions, and the inline create-label
- * dialog.
- */
-export const labelsFilterStyles = css`
-  :host {
-    display: inline-block;
-    position: relative;
-  }
-
+export const labelsFilterSectionStyles = css`
   /* Each catalog row is a button + per-row actions. The
      actions sit absolutely on the right so they overlap the
-     count badge at rest and reveal smoothly on hover, keeping
-     the visual rhythm aligned with the other facet pills. */
+     count badge at rest and reveal smoothly on hover. */
   .row-wrap {
     position: relative;
   }
@@ -123,48 +111,10 @@ export const labelsFilterStyles = css`
     font-size: 14px;
   }
 
-  /* Edit-mode header: small back arrow + label so the popover
-     doesn't lose context when the catalog list is hidden. */
-  .edit-header {
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-xs);
-    padding: 4px 6px 2px;
-  }
-
-  .edit-back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: var(--wa-border-radius-s);
-    border: none;
-    background: transparent;
-    color: var(--wa-color-text-quiet);
-    cursor: pointer;
-    padding: 0;
-  }
-
-  .edit-back:hover {
-    background: var(--wa-color-surface-lowered);
-    color: var(--wa-color-text-normal);
-  }
-
-  .edit-back wa-icon {
-    font-size: 16px;
-  }
-
-  .edit-title {
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--wa-color-text-quiet);
-  }
-
-  /* Inline create-form section. Sits below the catalog list
-     (or fills the popover when the catalog is empty) and is
-     visually separated from the list by a divider so the user
-     reads the rows + create form as distinct sections. */
+  /* Create-label CTA. Sits below the catalog list (or fills the
+     section when the catalog is empty), visually separated from
+     the rows by a divider. Primary-tinted rather than filled so it
+     reads as a call-to-action without shouting. */
   .create-section {
     border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     padding: var(--wa-space-2xs);
@@ -175,10 +125,6 @@ export const labelsFilterStyles = css`
     border-top: none;
   }
 
-  /* "Create new label" footer button — fills the create section
-     and opens the standalone dialog. Reads as a primary call-to-
-     action without committing to the loudness of a filled button:
-     primary-tinted background, primary text, hover deepens. */
   .create-trigger {
     display: inline-flex;
     align-items: center;
@@ -212,19 +158,5 @@ export const labelsFilterStyles = css`
 
   .create-trigger wa-icon {
     font-size: 16px;
-  }
-
-  /* ─── Standalone create dialog ───────────────────────────── */
-
-  .create-dialog {
-    --width: 460px;
-  }
-
-  /* Neutral header + title + footer + quiet close come from dialogChromeStyles
-     and quietCloseButtonStyles (added in labels-filter.ts's static styles).
-     There's a single esphome-base-dialog in this component, so their unscoped
-     ::part selectors land on the create dialog. */
-  .create-dialog::part(body) {
-    padding: 0 var(--wa-space-l) var(--wa-space-l);
   }
 `;
