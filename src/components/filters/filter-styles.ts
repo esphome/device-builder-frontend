@@ -10,8 +10,8 @@
  *  - ``<esphome-labels-filter-section>`` (labels section — same row
  *    shape but adds chips and rename / delete / create affordances).
  *
- * Keeping the trigger pill and the row / search / footer rules in
- * one place stops the surfaces from drifting visually.
+ * Keeping the trigger pill and the row / search rules in one
+ * place stops the surfaces from drifting visually.
  */
 import { css } from "lit";
 
@@ -119,7 +119,7 @@ export const filterStyles = css`
   /* ─── Option rows ────────────────────────────────────────────── */
 
   /* Scrollable list of rows. min-height: 0 lets it shrink inside
-     the flex column so the footer / search stay pinned. */
+     the flex column so the search / create CTA stay pinned. */
   .facet-list {
     flex: 1;
     overflow-y: auto;
@@ -210,42 +210,5 @@ export const filterStyles = css`
     text-align: center;
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
-  }
-
-  /* ─── Footer link ────────────────────────────────────────────── */
-
-  /* Quiet meta action ("Clear filter" per section, "Clear all" in
-     the popover header). Small centered text link rather than a
-     full-width chunky button so it doesn't visually compete with
-     the primary "Create new label" CTA in the labels section. */
-  .facet-footer {
-    border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    padding: var(--wa-space-2xs);
-    flex-shrink: 0;
-    display: flex;
-    justify-content: center;
-  }
-
-  .facet-clear-link {
-    background: transparent;
-    border: none;
-    padding: 4px 10px;
-    border-radius: var(--wa-border-radius-s);
-    color: var(--wa-color-text-quiet);
-    font-family: inherit;
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-normal, 400);
-    cursor: pointer;
-    text-align: center;
-    transition:
-      color 0.12s,
-      background-color 0.12s;
-  }
-
-  .facet-clear-link:hover,
-  .facet-clear-link:focus-visible {
-    color: var(--wa-color-text-normal);
-    background: color-mix(in srgb, var(--wa-color-text-normal), transparent 94%);
-    outline: none;
   }
 `;

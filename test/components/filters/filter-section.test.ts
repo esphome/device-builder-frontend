@@ -146,18 +146,4 @@ describe("esphome-filter-section", () => {
     await el.updateComplete;
     expect(rows(el)).toHaveLength(3);
   });
-
-  it("renders the clear link only with selections and emits an empty set", async () => {
-    const el = await mount({ expanded: true });
-    expect(el.shadowRoot!.querySelector(".facet-clear-link")).toBeNull();
-
-    el.selected = ["esp32"];
-    await el.updateComplete;
-    const changes: string[][] = [];
-    el.addEventListener("facet-change", (e) =>
-      changes.push((e as CustomEvent<string[]>).detail)
-    );
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".facet-clear-link")!.click();
-    expect(changes).toEqual([[]]);
-  });
 });

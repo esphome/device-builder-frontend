@@ -51,9 +51,6 @@ export class ESPHomeFilterSection extends LitElement {
    *  so callers don't have to localise twice. */
   @property({ attribute: "search-placeholder" }) searchPlaceholder = "";
 
-  /** Copy for the per-section "Clear filter" footer link. */
-  @property({ attribute: "clear-label" }) clearLabel = "Clear filter";
-
   /** Empty-state copy when the dimension has no options at all. */
   @property({ attribute: "empty-label" }) emptyLabel = "";
 
@@ -164,13 +161,6 @@ export class ESPHomeFilterSection extends LitElement {
                 </button>`;
               })}
             </div>`}
-        ${this.selected.length > 0
-          ? html`<div class="facet-footer">
-              <button class="facet-clear-link" type="button" @click=${this._clear}>
-                ${this.clearLabel}
-              </button>
-            </div>`
-          : nothing}
       </div>
     `;
   }
@@ -186,10 +176,6 @@ export class ESPHomeFilterSection extends LitElement {
     if (next === this.selected) return;
     this._emit([...next]);
   }
-
-  private _clear = () => {
-    this._emit([]);
-  };
 
   private _emit(next: string[]) {
     this.dispatchEvent(

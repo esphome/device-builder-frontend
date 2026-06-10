@@ -57,13 +57,17 @@ export const filterSectionStyles = css`
   }
 
   /* Per-dimension active-selection count. Carries the signal the
-     old per-pill trigger badges used to. */
+     old per-pill trigger badges used to. The negative vertical
+     margins cancel the chip's 18px height so its appearance can't
+     grow the header row — selecting an option must not shift the
+     rows below by even a pixel. */
   .section-count {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 18px;
     height: 18px;
+    margin: -9px 0;
     padding: 0 5px;
     border-radius: 9px;
     background: var(--esphome-primary);
@@ -93,5 +97,12 @@ export const filterSectionStyles = css`
     flex: 1 1 auto;
     min-height: 0;
     padding: 0 0 var(--wa-space-2xs);
+  }
+
+  /* Content stacks at the top: the list may shrink (and scroll)
+     when the popover clamps, but never stretches — stretching opens
+     a void between the rows and whatever follows them. */
+  .section-body .facet-list {
+    flex: 0 1 auto;
   }
 `;

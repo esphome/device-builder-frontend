@@ -107,6 +107,16 @@ export const filtersPopoverStyles = css`
   ::slotted(esphome-filter-section[expanded]),
   ::slotted(esphome-labels-filter-section[expanded]) {
     flex: 1 1 auto;
-    min-height: 176px;
+    min-height: 0;
+  }
+
+  /* On very short viewports (landscape phone) the headers alone can
+     eat the whole popover; floor the expanded section so its list
+     keeps a usable height, letting the container scroll instead. */
+  @media (max-height: 500px) {
+    ::slotted(esphome-filter-section[expanded]),
+    ::slotted(esphome-labels-filter-section[expanded]) {
+      min-height: 176px;
+    }
   }
 `;

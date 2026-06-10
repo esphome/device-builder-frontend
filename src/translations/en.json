@@ -311,7 +311,6 @@
     "labels_suggestions": "Smart plug,Light bulb,Light switch,Relay,Displays",
     "labels_suggestions_hint": "Suggestions",
     "filter_labels": "Labels",
-    "filter_clear": "Clear filter",
     "filter_clear_all": "Clear filters",
     "filter_menu_button": "Filters",
     "filter_menu_active": "{count, plural, one {# active filter} other {# active filters}}",

@@ -64,7 +64,6 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
     host._localize,
     host._selectedUpdateStatus
   );
-  const clearLabel = host._localize("dashboard.filter_clear");
   const emptyLabel = host._localize("dashboard.filter_no_options");
   const noMatchesLabel = host._localize("dashboard.filter_no_matches");
   const yamlMode = host._yamlMode;
@@ -75,7 +74,6 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
       ? html`<esphome-filter-section
           name=${host._localize("dashboard.filter_area")}
           search-placeholder=${host._localize("dashboard.filter_area")}
-          clear-label=${clearLabel}
           empty-label=${emptyLabel}
           no-matches-label=${noMatchesLabel}
           ?searchable=${areaOptions.length > 8}
@@ -90,7 +88,6 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
       ? html`<esphome-filter-section
           name=${host._localize("dashboard.filter_platform")}
           search-placeholder=${host._localize("dashboard.filter_platform")}
-          clear-label=${clearLabel}
           empty-label=${emptyLabel}
           no-matches-label=${noMatchesLabel}
           .options=${platformOptions}
@@ -104,7 +101,6 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
       ? nothing
       : html`<esphome-filter-section
           name=${host._localize("dashboard.filter_status")}
-          clear-label=${clearLabel}
           empty-label=${emptyLabel}
           no-matches-label=${noMatchesLabel}
           .options=${stateOptions}
@@ -116,7 +112,6 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
     ${!yamlMode && updateOptions.length > 0
       ? html`<esphome-filter-section
           name=${host._localize("dashboard.filter_update_status")}
-          clear-label=${clearLabel}
           empty-label=${emptyLabel}
           no-matches-label=${noMatchesLabel}
           .options=${updateOptions}

@@ -124,13 +124,6 @@ export class ESPHomeLabelsFilterSection extends LitElement {
             >
               ${this._catalog.map((label) => this._renderRow(label, selectedSet))}
             </div>`}
-        ${this.selected.length > 0
-          ? html`<div class="facet-footer">
-              <button class="facet-clear-link" type="button" @click=${this._clear}>
-                ${this._localize("dashboard.filter_clear")}
-              </button>
-            </div>`
-          : nothing}
         <div class="create-section ${isEmpty ? "create-section--empty" : ""}">
           <button class="create-trigger" type="button" @click=${this._onCreateClick}>
             <wa-icon library="mdi" name="plus"></wa-icon>
@@ -235,10 +228,6 @@ export class ESPHomeLabelsFilterSection extends LitElement {
     if (next === this.selected) return;
     this._emit([...next]);
   }
-
-  private _clear = () => {
-    this._emit([]);
-  };
 
   private _emit(next: string[]) {
     this.dispatchEvent(
