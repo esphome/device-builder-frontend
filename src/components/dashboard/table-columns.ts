@@ -187,7 +187,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
     },
     {
       accessorKey: "address",
-      header: localize("dashboard.table_col_address"),
+      header: localize("dashboard.table_col_hostname"),
       cell: (info) => valueCell("cell-mono", info.getValue() as string),
       size: 180,
       enableHiding: true,

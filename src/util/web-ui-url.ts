@@ -94,10 +94,17 @@ function _bracketIpv6(host: string): string {
  * skip-render with a truthy check.
  */
 export function buildWebUiUrl(device: ConfiguredDevice): string {
-  if (device.web_port == null) return "";
-  const host = device.address || device.ip;
-  if (!host) return "";
+  return buildWebUiUrlForHost(device.address || device.ip, device.web_port);
+}
+
+/**
+ * Build the web-UI URL for one specific *host* (a hostname or a single IP),
+ * or ``""`` when *webPort* is null or *host* is empty. Lets the drawer point
+ * each address row's link at its own host instead of the device's preferred one.
+ */
+export function buildWebUiUrlForHost(host: string, webPort: number | null): string {
+  if (webPort == null || !host) return "";
   return safeWebUiUrl(
-    `http://${_bracketIpv6(host)}${device.web_port === 80 ? "" : `:${device.web_port}`}`
+    `http://${_bracketIpv6(host)}${webPort === 80 ? "" : `:${webPort}`}`
   );
 }

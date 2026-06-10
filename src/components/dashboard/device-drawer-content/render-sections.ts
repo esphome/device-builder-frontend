@@ -7,7 +7,7 @@ import {
 } from "../../../util/encryption-state.js";
 import { formatFileSize } from "../../../util/format-file-size.js";
 import { splitIntegrations } from "../../../util/integration-split.js";
-import { buildWebUiUrl } from "../../../util/web-ui-url.js";
+import { buildWebUiUrlForHost } from "../../../util/web-ui-url.js";
 import type { ESPHomeDeviceDrawerContent } from "../device-drawer-content.js";
 import { renderIpValue } from "../device-drawer-render.js";
 
@@ -222,28 +222,38 @@ export function renderConfigHashSection(
   `;
 }
 
+// The hostname row's visit link points at the hostname (http://<name>.local).
+export function renderHostnameRow(
+  host: ESPHomeDeviceDrawerContent,
+  d: ConfiguredDevice
+): TemplateResult {
+  return html`
+    <div class="row">
+      <div class="icon">
+        <wa-icon library="mdi" name="network-outline"></wa-icon>
+      </div>
+      <div class="content">
+        <div class="label">${host._localize("dashboard.drawer_hostname")}</div>
+        ${renderIpValue(
+          d.address,
+          buildWebUiUrlForHost(d.address, d.web_port),
+          host._localize
+        )}
+      </div>
+    </div>
+  `;
+}
+
 // Single IP renders as a plain row; multi-IP (IPv6+IPv4) collapses to the
-// primary with a chevron toggle so the drawer stays scannable.
+// primary with a chevron toggle. Each IP's visit link points at that IP.
 export function renderIpAddressRow(
   host: ESPHomeDeviceDrawerContent,
   d: ConfiguredDevice
 ): TemplateResult {
   const list = d.ip_addresses;
   const label = host._localize("dashboard.drawer_ip_address");
-  const webUrl = buildWebUiUrl(d);
   if (list.length === 0) {
-    if (!webUrl) return renderRow("ip-network-outline", label, "", true);
-    return html`
-      <div class="row">
-        <div class="icon">
-          <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
-        </div>
-        <div class="content">
-          <div class="label">${label}</div>
-          ${renderIpValue("", webUrl, host._localize)}
-        </div>
-      </div>
-    `;
+    return renderRow("ip-network-outline", label, "", true);
   }
   if (list.length === 1) {
     return html`
@@ -253,7 +263,11 @@ export function renderIpAddressRow(
         </div>
         <div class="content">
           <div class="label">${label}</div>
-          ${renderIpValue(list[0], webUrl, host._localize)}
+          ${renderIpValue(
+            list[0],
+            buildWebUiUrlForHost(list[0], d.web_port),
+            host._localize
+          )}
         </div>
       </div>
     `;
@@ -267,9 +281,17 @@ export function renderIpAddressRow(
       </div>
       <div class="content">
         <div class="label">${label}</div>
-        ${renderIpValue(list[0], webUrl, host._localize)}
+        ${renderIpValue(
+          list[0],
+          buildWebUiUrlForHost(list[0], d.web_port),
+          host._localize
+        )}
         ${expanded
-          ? list.slice(1).map((ip) => html`<div class="value mono">${ip}</div>`)
+          ? list
+              .slice(1)
+              .map((ip) =>
+                renderIpValue(ip, buildWebUiUrlForHost(ip, d.web_port), host._localize)
+              )
           : nothing}
         <button
           class="ip-toggle"

@@ -58,6 +58,7 @@ import {
   renderConfigHashSection,
   renderEncryptionBadge,
   renderEthernetMacRow,
+  renderHostnameRow,
   renderIpAddressRow,
   renderLabelsSection,
   renderLoadedIntegrationsSection,
@@ -189,13 +190,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           this._localize("dashboard.drawer_name"),
           d.friendly_name || d.name
         )}
-        ${renderRow(
-          "network-outline",
-          this._localize("dashboard.drawer_address"),
-          d.address,
-          true
-        )}
-        ${renderIpAddressRow(this, d)} ${renderMacAddressRow(d, this._localize)}
+        ${renderHostnameRow(this, d)} ${renderIpAddressRow(this, d)}
+        ${renderMacAddressRow(d, this._localize)}
         ${renderEthernetMacRow(d, this._localize)}
         ${renderBluetoothMacRow(d, this._localize)}
         ${renderRow(
