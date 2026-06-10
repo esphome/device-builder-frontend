@@ -259,10 +259,11 @@ export class ESPHomePageSecrets extends LitElement {
         border: none;
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
-        padding: 8px 16px;
+        /* Match the shared .btn size so Save aligns with Add secret. */
+        padding: var(--esphome-button-padding);
         border-radius: var(--wa-border-radius-m);
         cursor: pointer;
-        font-size: var(--wa-font-size-xs);
+        font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
         box-shadow: var(--esphome-primary-shadow);
@@ -373,10 +374,10 @@ export class ESPHomePageSecrets extends LitElement {
         min-height: 0;
       }
 
-      /* The structured editor is its own scroll container (and owns the
-         Save-button clearance padding), so the pane just frames it. */
+      /* The editor scrolls itself and owns its padding, so its scrollbar
+         sits at the card edge, not over the row controls. */
       .editor-pane--form {
-        padding: var(--wa-space-m);
+        padding: 0;
       }
 
       .editor-layout--yaml .editor-pane--form,
