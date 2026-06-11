@@ -49,8 +49,10 @@ export const dashboardStyles = css`
     /* Inter-row gap inside the toolbar. Card view's .toolbar and the
        table view's .toolbar-stack both use it, and the table count
        row mirrors it as padding-top, so the rows line up identically
-       when toggling between views. */
-    --toolbar-row-gap: 2px;
+       when toggling between views. Matches .toolbar-row's wrap
+       row-gap so every stacked toolbar row (search, wrapped Filters,
+       count) shares one even gap when the controls wrap on mobile. */
+    --toolbar-row-gap: var(--wa-space-xs);
   }
 
   /* YAML mode renders over any underlying view, so it shares this
@@ -147,16 +149,15 @@ export const dashboardStyles = css`
     min-width: 140px;
   }
 
-  /* Table view (.toolbar-stack) and YAML view (:host([yaml])) no
-     longer carry a Filters control in the search row, so the search
-     input seeds from a 0 flex-basis and fills the row the same way in
-     both, matching the device-search width. Flex line-breaking uses
-     the basis, not min-width, so the 220px basis above would push the
-     view-toggle onto a second line at ~360px; a 0 basis keeps search +
-     view-toggle on one row (search still grows to fill, floored by the
-     140px min-width). The card toolbar keeps the 220px basis since its
-     Filters control still shares this row. */
-  .toolbar-stack .search-wrap,
+  /* YAML view (:host([yaml])) carries no Filters control in the
+     search row, so the search input seeds from a 0 flex-basis and
+     fills the row, matching the device-search width. Flex
+     line-breaking uses the basis, not min-width, so the 220px basis
+     above would push the view-toggle onto a second line at ~360px; a
+     0 basis keeps search + view-toggle on one row (search still
+     grows to fill, floored by the 140px min-width). The card and
+     table toolbars keep the 220px basis since their shared Filters
+     control sits on this row. */
   :host([yaml]) .search-wrap {
     flex-basis: 0;
   }
@@ -277,26 +278,26 @@ export const dashboardStyles = css`
 
   /* Pairs the count with the Select-multiple toggle on a row of
      their own — both reference the device list, so they belong
-     side-by-side. justify-content:space-between puts the count on
-     the left and the toggle on the right at every width. */
+     side-by-side. Grouped at the start so the toggle anchors to the
+     count (and the search box above) in both card and table views
+     rather than floating against the far edge. */
   .device-count-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--wa-space-m);
+    justify-content: flex-start;
+    gap: var(--wa-space-s);
   }
 
   /* Table view slots the device-count-row through esphome-device-
      table's below-controls slot so the row spans the full table
-     width and Select-multiple right-aligns with Columns / Create
-     device in the row above. Horizontal padding matches .controls
-     and .table-wrap above/below so the count and toggle line up
-     with the column headers on the right. 2px top padding mirrors
-     card view's .toolbar gap so the inter-row spacing reads
-     identically between views. Horizontal padding and top gap draw
-     from the shared --content-gutter / --toolbar-row-gap tokens, so
-     the count row trims on mobile and lines up with the toolbar
-     above it without a separate @media rule. */
+     width. Horizontal padding matches .controls and .table-wrap
+     above/below so the count and toggle line up with the leftmost
+     column header and the search box above. Top padding draws from
+     --toolbar-row-gap, mirroring card view's .toolbar gap so the
+     inter-row spacing reads identically between views. Horizontal
+     padding and top gap draw from the shared --content-gutter /
+     --toolbar-row-gap tokens, so the count row trims on mobile and
+     lines up with the toolbar above it without a separate @media rule. */
   .table-device-count-row {
     padding: var(--toolbar-row-gap) var(--content-gutter) var(--wa-space-xs);
   }

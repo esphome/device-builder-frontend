@@ -169,6 +169,28 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       @rename-confirm=${host._executeRename}
     ></esphome-rename-device-dialog>
     <esphome-bulk-labels-dialog></esphome-bulk-labels-dialog>
+    <esphome-label-dialog
+      ?open=${host._labelDialogOpen}
+      .editing=${host._labelDialogEditing}
+      @label-created=${(e: CustomEvent<Label>) => {
+        // Auto-select: whoever just created a label intends to filter by it.
+        if (!host._selectedLabels.includes(e.detail.id)) {
+          host._selectedLabels = [...host._selectedLabels, e.detail.id];
+        }
+        host._labelDialogOpen = false;
+      }}
+      @label-saved=${() => {
+        // LABEL_UPDATED push refreshes the catalog; just close.
+        host._labelDialogOpen = false;
+      }}
+      @request-close=${() => {
+        host._labelDialogOpen = false;
+      }}
+      @after-hide=${() => {
+        host._labelDialogOpen = false;
+        host._labelDialogEditing = null;
+      }}
+    ></esphome-label-dialog>
     <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
     <esphome-create-config-dialog></esphome-create-config-dialog>

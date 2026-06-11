@@ -133,7 +133,7 @@ export const addComponentFormStyles = css`
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px 18px;
+    padding: var(--esphome-button-padding);
     border-radius: var(--wa-border-radius-m);
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);

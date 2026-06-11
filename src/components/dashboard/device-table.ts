@@ -455,7 +455,6 @@ export class ESPHomeDeviceTable extends LitElement {
       <div class="controls">
         <slot name="toolbar"></slot>
         <div class="controls-right">
-          <slot name="before-columns"></slot>
           <esphome-table-column-toggle
             .columns=${toggleCols}
             @column-visibility-change=${(

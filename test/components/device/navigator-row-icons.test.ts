@@ -82,6 +82,7 @@ describe("iconForDomain", () => {
     expect(iconForDomain("remote_transmitter")).toBe("remote");
     expect(iconForDomain("remote_receiver")).toBe("remote");
     expect(iconForDomain("deep_sleep")).not.toBe("shape-outline");
+    expect(iconForDomain("speaker")).toBe("speaker");
     // Top-level keys that look like platforms but aren't (own YAML block).
     expect(iconForDomain("esp32_camera")).toBe(iconForDomain("camera"));
     expect(iconForDomain("syslog")).toBe(iconForDomain("logger"));

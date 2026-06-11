@@ -76,6 +76,7 @@ function renderSnippetBlock(
 
 function renderYamlDeviceTitle(
   configuration: string,
+  label: string,
   trailing: TemplateResult | string,
   body: TemplateResult | string
 ): TemplateResult {
@@ -92,7 +93,7 @@ function renderYamlDeviceTitle(
             e.preventDefault();
             navigate(deviceHref);
           }}
-          >${configuration}</a
+          >${label}</a
         >
         ${trailing}
       </header>
@@ -104,7 +105,9 @@ function renderYamlDeviceTitle(
 function renderYamlTitleList(devices: ConfiguredDevice[]): TemplateResult {
   return html`
     <div class="yaml-hits">
-      ${devices.map((d) => renderYamlDeviceTitle(d.configuration, "", ""))}
+      ${devices.map((d) =>
+        renderYamlDeviceTitle(d.configuration, d.configuration, "", "")
+      )}
     </div>
   `;
 }
@@ -119,16 +122,17 @@ function renderYamlHits(
       ${hits.map((hit) => {
         const blocks = buildYamlSnippetBlocks(hit.matches);
         const matchCount = hit.matches.length;
-        const countUnit = localize(
-          matchCount === 1
-            ? "yaml_search.match_count_singular"
-            : "yaml_search.match_count_plural"
-        );
+        const countUnit = localize("yaml_search.match_count", { count: matchCount });
         const trailing = html`<span class="yaml-hit-group-count"
           >${matchCount} ${countUnit}</span
         >`;
         const body = html`${blocks.map((block) => renderSnippetBlock(hit, block, query))}`;
-        return renderYamlDeviceTitle(yamlHitDeviceLabel(hit), trailing, body);
+        return renderYamlDeviceTitle(
+          hit.configuration,
+          yamlHitDeviceLabel(hit),
+          trailing,
+          body
+        );
       })}
     </div>
   `;
@@ -151,11 +155,6 @@ export function renderYamlPreviewPivot(
   if (previewCount === 0) return "";
   return html`<button class="empty-search-yaml-pivot" @click=${onPivot}>
     <wa-icon library="mdi" name="code-braces"></wa-icon>
-    ${localize(
-      previewCount === 1
-        ? "yaml_search.no_match_yaml_preview"
-        : "yaml_search.no_match_yaml_preview_plural",
-      { count: previewCount }
-    )}
+    ${localize("yaml_search.no_match_yaml_preview", { count: previewCount })}
   </button>`;
 }

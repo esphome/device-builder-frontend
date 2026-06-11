@@ -94,6 +94,15 @@ export interface EncryptionVisual {
    *  Maps to the ``.encryption-icon.<class>`` rules already in the
    *  card / table styles. */
   cssClass: "secure" | "insecure" | "pending" | "mismatch";
+  /** CSS class on the drawer status badge — the ``.status-badge.<class>``
+   *  rules in the drawer styles. */
+  badgeClass:
+    | "status-badge--encrypted"
+    | "status-badge--unencrypted"
+    | "status-badge--encryption-pending"
+    | "status-badge--encryption-mismatch";
+  /** Localize key for the drawer badge label text. */
+  labelKey: string;
   /** Localize key for the title / aria-label. */
   tooltipKey: string;
 }
@@ -103,24 +112,32 @@ const VISUALS: Record<Exclude<EncryptionState, "none">, EncryptionVisual> = {
     iconName: "lock",
     iconPath: mdiLock,
     cssClass: "secure",
+    badgeClass: "status-badge--encrypted",
+    labelKey: "dashboard.table_status_encrypted",
     tooltipKey: "dashboard.table_status_encrypted_tooltip",
   },
   plaintext: {
     iconName: "lock-open-variant",
     iconPath: mdiLockOpenVariant,
     cssClass: "insecure",
+    badgeClass: "status-badge--unencrypted",
+    labelKey: "dashboard.table_status_unencrypted",
     tooltipKey: "dashboard.table_status_unencrypted_tooltip",
   },
   pending: {
     iconName: "lock-clock",
     iconPath: mdiLockClock,
     cssClass: "pending",
+    badgeClass: "status-badge--encryption-pending",
+    labelKey: "dashboard.table_status_encryption_pending",
     tooltipKey: "dashboard.table_status_encryption_pending_tooltip",
   },
   mismatch: {
     iconName: "lock-alert",
     iconPath: mdiLockAlert,
     cssClass: "mismatch",
+    badgeClass: "status-badge--encryption-mismatch",
+    labelKey: "dashboard.table_status_encryption_mismatch",
     tooltipKey: "dashboard.table_status_encryption_mismatch_tooltip",
   },
 };
@@ -131,20 +148,13 @@ export function getEncryptionVisual(state: EncryptionState): EncryptionVisual | 
 }
 
 /**
- * Compact-view variant of :func:`getEncryptionVisual` for the
- * dashboard table rows and device cards. Returns ``null`` for the
- * confirmed-encrypted-by-mDNS case (truthy ``api_encryption_active``
- * combined with ``"active"`` state) — that's the steady state on
- * a healthy fleet, and repeating a green lock on every row / card
- * drowns out the rows / cards that need attention. The
- * unconfirmed-but-YAML-says-encrypted case (``api_encryption_active``
- * null/undefined) keeps its icon so "waiting / unknown" stays
- * visible. Use the full :func:`getEncryptionVisual` in
- * single-device contexts (drawer / details pane) where confirmation
- * is useful. (issue #141)
+ * Compact-view (table / card) variant of :func:`getEncryptionVisual`:
+ * returns ``null`` for every ``"active"`` device, so only the attention
+ * states (plaintext / pending / mismatch) get an icon. The drawer keeps
+ * the full visual.
  */
 export function getCompactEncryptionVisual(d: EncryptionInputs): EncryptionVisual | null {
   const state = getEncryptionState(d);
-  if (state === "active" && d.api_encryption_active) return null;
+  if (state === "active") return null;
   return getEncryptionVisual(state);
 }

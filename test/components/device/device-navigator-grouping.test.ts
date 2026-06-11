@@ -93,38 +93,39 @@ describe("device-navigator domain grouping", () => {
     expect(nav.shadowRoot?.querySelector(".nav-subgroup-header")).toBeNull();
   });
 
-  it("collapses a single-of-a-kind domain to a flat row with its glyph", async () => {
+  it("headers a lone platform component but flattens a lone config block", async () => {
     const nav = new ESPHomeDeviceNavigator();
     nav.yaml = [
       "esphome:",
       "  name: t",
-      "sensor:",
-      "  - platform: template",
-      "    id: s1",
-      "  - platform: template",
-      "    id: s2",
-      "light:", // a lone component
+      "light:", // a lone platform component -> keeps its domain header
       "  - platform: binary",
       "    id: led",
       "    name: Status LED",
       "    output: o1",
+      "i2c:", // a top-level config block -> stays a flat single row
+      "  sda: GPIO1",
+      "  scl: GPIO2",
       "",
     ].join("\n");
     nav.openSections = new Set([1]); // Components open
     document.body.appendChild(nav);
     await nav.updateComplete;
 
-    // Multi-item Sensor keeps its subgroup header; lone Light does not.
-    expect(subTitles(nav)).toEqual(["Sensor"]);
-    // The Light renders as a flat single row carrying the domain glyph, with
-    // the instance name on the subtitle line (the primary is the catalog name,
-    // which falls back to the raw key with no catalog loaded in the test).
+    // The lone Light (a "- platform:" list) gets a header with count 1; the
+    // i2c config block does not.
+    expect(subTitles(nav)).toEqual(["Light"]);
+    expect(subCounts(nav)).toEqual(["1"]);
+    // The Light row still shows the instance name on its subtitle line.
+    expect(
+      [...nav.shadowRoot!.querySelectorAll(".nav-item-subtitle")].map((el) =>
+        el.textContent?.trim()
+      )
+    ).toContain("Status LED");
+    // i2c renders as a flat single row carrying its domain glyph.
     const single = nav.shadowRoot!.querySelector(".nav-items--single");
     expect(single).toBeTruthy();
     expect(single!.querySelector(".nav-item-icon")).toBeTruthy();
-    expect(single!.querySelector(".nav-item-subtitle")?.textContent?.trim()).toBe(
-      "Status LED"
-    );
   });
 
   it("force-opens a collapsed domain while filtering and drops empty ones", async () => {

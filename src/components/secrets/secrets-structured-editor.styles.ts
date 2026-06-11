@@ -6,9 +6,11 @@ export const secretsStructuredEditorStyles = css`
     height: 100%;
     box-sizing: border-box;
     overflow-y: auto;
-    /* This element is the single scroll container for the form pane, so
-       the clearance for the floating Save button has to live here — the
-       wrapping pane never scrolls. */
+    /* Reserve the gutter so the scrollbar clears the row controls. */
+    scrollbar-gutter: stable;
+    /* Sole scroll container for the form pane; owns its padding plus
+       bottom clearance for the floating Save button. */
+    padding: var(--wa-space-m);
     padding-bottom: calc(var(--wa-space-m) * 2 + 2.25rem);
   }
 
@@ -168,30 +170,6 @@ export const secretsStructuredEditorStyles = css`
 
   .add-row {
     margin-top: var(--wa-space-m);
-  }
-
-  .add-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border: var(--wa-border-width-s) dashed var(--esphome-primary);
-    background: var(--esphome-tint);
-    color: var(--esphome-primary);
-    border-radius: var(--wa-border-radius-m);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-bold);
-    transition: background 0.12s;
-  }
-
-  .add-btn:hover {
-    background: var(--esphome-tint-strong);
-  }
-
-  .add-btn wa-icon {
-    font-size: 16px;
   }
 
   .empty {

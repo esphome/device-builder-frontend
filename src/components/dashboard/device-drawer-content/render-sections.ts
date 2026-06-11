@@ -1,11 +1,15 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice } from "../../../api/types/devices.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
+import {
+  getEncryptionVisual,
+  type EncryptionState,
+} from "../../../util/encryption-state.js";
 import { formatFileSize } from "../../../util/format-file-size.js";
 import { splitIntegrations } from "../../../util/integration-split.js";
-import { buildWebUiUrl } from "../../../util/web-ui-url.js";
+import { buildWebUiUrlForHost } from "../../../util/web-ui-url.js";
 import type { ESPHomeDeviceDrawerContent } from "../device-drawer-content.js";
-import { renderIpValue } from "../device-drawer-render.js";
+import { renderAddressValue } from "../device-drawer-render.js";
 
 // Whitelist docs URLs to https://esphome.io. The map is backend-populated;
 // a compromised entry interpolating a javascript: / data: scheme would run
@@ -43,38 +47,12 @@ export function renderRow(
 
 export function renderEncryptionBadge(
   localize: LocalizeFunc,
-  state: "active" | "plaintext" | "pending" | "mismatch" | "none"
+  state: EncryptionState
 ): TemplateResult | typeof nothing {
-  const variants = {
-    active: {
-      cls: "status-badge--encrypted",
-      icon: "lock",
-      labelKey: "dashboard.table_status_encrypted",
-      titleKey: "dashboard.table_status_encrypted_tooltip",
-    },
-    plaintext: {
-      cls: "status-badge--unencrypted",
-      icon: "lock-open-variant",
-      labelKey: "dashboard.table_status_unencrypted",
-      titleKey: "dashboard.table_status_unencrypted_tooltip",
-    },
-    pending: {
-      cls: "status-badge--encryption-pending",
-      icon: "lock-clock",
-      labelKey: "dashboard.table_status_encryption_pending",
-      titleKey: "dashboard.table_status_encryption_pending_tooltip",
-    },
-    mismatch: {
-      cls: "status-badge--encryption-mismatch",
-      icon: "lock-alert",
-      labelKey: "dashboard.table_status_encryption_mismatch",
-      titleKey: "dashboard.table_status_encryption_mismatch_tooltip",
-    },
-  } as const;
-  if (state === "none") return nothing;
-  const v = variants[state];
-  return html`<span class="status-badge ${v.cls}" title=${localize(v.titleKey)}>
-    <wa-icon library="mdi" name=${v.icon}></wa-icon>
+  const v = getEncryptionVisual(state);
+  if (!v) return nothing;
+  return html`<span class="status-badge ${v.badgeClass}" title=${localize(v.tooltipKey)}>
+    <wa-icon library="mdi" name=${v.iconName}></wa-icon>
     ${localize(v.labelKey)}
   </span>`;
 }
@@ -244,30 +222,43 @@ export function renderConfigHashSection(
   `;
 }
 
+// The hostname row's visit link points at the hostname (http://<name>.local).
+export function renderHostnameRow(
+  host: ESPHomeDeviceDrawerContent,
+  d: ConfiguredDevice
+): TemplateResult {
+  return html`
+    <div class="row">
+      <div class="icon">
+        <wa-icon library="mdi" name="network-outline"></wa-icon>
+      </div>
+      <div class="content">
+        <div class="label">${host._localize("dashboard.drawer_hostname")}</div>
+        ${renderAddressValue(
+          d.address,
+          buildWebUiUrlForHost(d.address, d.web_port),
+          host._localize
+        )}
+      </div>
+    </div>
+  `;
+}
+
 // Single IP renders as a plain row; multi-IP (IPv6+IPv4) collapses to the
-// primary with a chevron toggle so the drawer stays scannable.
+// primary with a chevron toggle. Each IP's visit link points at that IP.
 export function renderIpAddressRow(
   host: ESPHomeDeviceDrawerContent,
   d: ConfiguredDevice
 ): TemplateResult {
   const list = d.ip_addresses;
   const label = host._localize("dashboard.drawer_ip_address");
-  const webUrl = buildWebUiUrl(d);
-  if (list.length === 0) {
-    if (!webUrl) return renderRow("ip-network-outline", label, "", true);
-    return html`
-      <div class="row">
-        <div class="icon">
-          <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
-        </div>
-        <div class="content">
-          <div class="label">${label}</div>
-          ${renderIpValue("", webUrl, host._localize)}
-        </div>
-      </div>
-    `;
+  // ip_addresses isn't persisted across restarts but the primary d.ip is, so
+  // fall back to it on a cold scan to keep the IP row and its visit link.
+  const primary = list[0] ?? d.ip;
+  if (!primary) {
+    return renderRow("ip-network-outline", label, "", true);
   }
-  if (list.length === 1) {
+  if (list.length <= 1) {
     return html`
       <div class="row">
         <div class="icon">
@@ -275,7 +266,11 @@ export function renderIpAddressRow(
         </div>
         <div class="content">
           <div class="label">${label}</div>
-          ${renderIpValue(list[0], webUrl, host._localize)}
+          ${renderAddressValue(
+            primary,
+            buildWebUiUrlForHost(primary, d.web_port),
+            host._localize
+          )}
         </div>
       </div>
     `;
@@ -289,9 +284,21 @@ export function renderIpAddressRow(
       </div>
       <div class="content">
         <div class="label">${label}</div>
-        ${renderIpValue(list[0], webUrl, host._localize)}
+        ${renderAddressValue(
+          list[0],
+          buildWebUiUrlForHost(list[0], d.web_port),
+          host._localize
+        )}
         ${expanded
-          ? list.slice(1).map((ip) => html`<div class="value mono">${ip}</div>`)
+          ? list
+              .slice(1)
+              .map((ip) =>
+                renderAddressValue(
+                  ip,
+                  buildWebUiUrlForHost(ip, d.web_port),
+                  host._localize
+                )
+              )
           : nothing}
         <button
           class="ip-toggle"

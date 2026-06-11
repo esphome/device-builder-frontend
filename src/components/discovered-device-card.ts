@@ -7,6 +7,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
 import { safeWebUiUrl } from "../util/web-ui-url.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -286,17 +287,10 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
                 </button>
               `}
           ${safeWebUrl && !this.compact
-            ? html`<a
-                class="btn btn--ghost btn--icon"
-                href=${safeWebUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title=${this._localize("dashboard.action_visit_web_ui")}
-                aria-label=${this._localize("dashboard.action_visit_web_ui")}
-                @click=${(e: Event) => e.stopPropagation()}
-              >
-                <wa-icon library="mdi" name="open-in-new"></wa-icon>
-              </a>`
+            ? renderVisitWebUiLink(safeWebUrl, this._localize, {
+                className: "btn btn--ghost btn--icon",
+                onClick: (e) => e.stopPropagation(),
+              })
             : nothing}
           <button
             class="btn btn--ghost"

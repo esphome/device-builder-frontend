@@ -1,11 +1,13 @@
 /**
+ * @vitest-environment happy-dom
+ *
  * Pins the #1038 fix: every column renders the same "no data" placeholder
  * (muted proportional em dash), instead of embedding the dash in a
  * column's value font where monospace made it render as a narrow,
  * hyphen-looking glyph. Populated cells keep their own font.
  */
 import type { CellContext } from "@tanstack/lit-table";
-import type { TemplateResult } from "lit";
+import { render, type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
 import {
   createDeviceColumns,
@@ -39,6 +41,22 @@ function rendered(t: TemplateResult): string {
   );
 }
 
+function renderActionsCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResult {
+  const col = columns.find((c) => "id" in c && c.id === "actions");
+  if (!col?.cell || typeof col.cell !== "function") {
+    throw new Error("no cell renderer for actions column");
+  }
+  const row = {
+    busy: false,
+    hasUpdateAvailable: false,
+    hasPendingChanges: false,
+    _device: { web_port: null },
+    ...rowOverrides,
+  } as unknown as DeviceRow;
+  const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;
+  return col.cell(info) as TemplateResult;
+}
+
 const DATA_COLUMNS = ["address", "ip", "version", "comment", "area", "mac_address"];
 
 describe("device table empty-cell placeholder (#1038)", () => {
@@ -63,5 +81,15 @@ describe("device table empty-cell placeholder (#1038)", () => {
     const html = rendered(renderCell("ip", "192.168.1.42"));
     expect(html).toContain("cell-mono");
     expect(html).toContain("192.168.1.42");
+  });
+});
+
+describe("device table actions", () => {
+  it("renders the edit pencil with the accent (action) color", () => {
+    const container = document.createElement("div");
+    render(renderActionsCell(), container);
+    const edit = container.querySelector(".cell-action-btn--edit");
+    expect(edit).not.toBeNull();
+    expect(edit?.classList.contains("cell-action-btn--accent")).toBe(true);
   });
 });

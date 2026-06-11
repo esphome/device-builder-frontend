@@ -247,6 +247,12 @@ export const deviceCardStyles = [
       color: var(--wa-color-text-quiet);
       flex-shrink: 0;
       transition: color 0.12s;
+      /* Box the glyph to the title's first-line height so it centers
+         on the device name while the header keeps align-items:
+         flex-start (the status badge stays top-anchored). */
+      display: flex;
+      align-items: center;
+      height: calc(var(--wa-font-size-m) * var(--wa-line-height-normal));
     }
 
     .device-checkbox--checked {

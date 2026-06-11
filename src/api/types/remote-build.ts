@@ -268,12 +268,10 @@ export interface RemoteBuildPeer {
   pin_sha256: string;
   /**
    * Receiver's peer-link Noise WS port from the TXT
-   * `remote_build_port` key, NOT the SRV-advertised dashboard
-   * HTTP port (`port` above). The discovered-row Pair button
-   * pre-fills this into the wizard so operators on a non-default
-   * `--remote-build-port` don't have to retype it on every pair.
-   * `0` for receivers that haven't bound the peer-link listener
-   * yet; the wizard falls back to its 6055 default in that case.
+   * `remote_build_port` key, NOT the SRV dashboard HTTP `port` above.
+   * `0` when no peer-link listener is bound (default-off, e.g. HA addon),
+   * i.e. the host can't accept builds. The Send Builds → Known Dashboards
+   * list filters those out; the Pair button there pre-fills a `> 0` port.
    */
   remote_build_port: number;
 }

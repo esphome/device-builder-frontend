@@ -85,7 +85,7 @@ export class ESPHomeLabelForm extends LitElement {
 
   /** Hide the form's surrounding "Create new label" / "Edit
    *  label" header. The standalone toggle-button text is enough
-   *  context in the labels-filter empty state, where the popover
+   *  context in the labels section's empty state, where the popover
    *  already says "Labels". */
   @property({ type: Boolean, attribute: "compact" })
   compact = false;

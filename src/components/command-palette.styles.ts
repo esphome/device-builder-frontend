@@ -110,7 +110,7 @@ export const commandPaletteStyles = css`
 
   .mode-toggle:hover,
   .mode-toggle:focus-visible {
-    background: var(--esphome-surface-hover);
+    background: var(--esphome-tint);
     color: var(--wa-color-text-normal);
     border-color: var(--esphome-primary);
     outline: none;

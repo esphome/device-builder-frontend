@@ -24,6 +24,7 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -399,23 +400,11 @@ export class ESPHomeTableRowMenu extends LitElement {
     if (this.device == null) return nothing;
     const url = buildWebUiUrl(this.device);
     if (!url) return nothing;
-    // Anchor element with ``rel="noopener noreferrer"`` is the
-    // codebase's standard external-link pattern; the browser enforces
-    // the security defaults instead of relying on
-    // ``window.open(..., "noopener")`` which doesn't suppress the
-    // Referer header and isn't honoured uniformly across browsers.
-    return html`
-      <a
-        class="menu-item menu-item--link menu-item--visit-web"
-        href=${url}
-        target="_blank"
-        rel="noopener noreferrer"
-        @click=${this._close}
-      >
-        <wa-icon library="mdi" name="open-in-new"></wa-icon>
-        ${this._localize("dashboard.action_visit_web_ui")}
-      </a>
-    `;
+    return renderVisitWebUiLink(url, this._localize, {
+      className: "menu-item menu-item--link menu-item--visit-web",
+      onClick: this._close,
+      withLabel: true,
+    });
   }
 }
 

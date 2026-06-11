@@ -39,10 +39,8 @@ export function renderLabels(card: ESPHomeDeviceCard): TemplateResult | typeof n
   </div>`;
 }
 
-// Compact-view variant: same gate the dashboard table uses, hiding the
-// green lock when mDNS has confirmed encryption (steady state on a healthy
-// fleet) while keeping every other state including "waiting / unknown"
-// visible. (issue #141)
+// Compact view: no lock for encrypted devices, only the attention
+// states (plaintext / pending / mismatch) get an icon.
 export function renderEncryptionIcon(
   card: ESPHomeDeviceCard
 ): TemplateResult | typeof nothing {

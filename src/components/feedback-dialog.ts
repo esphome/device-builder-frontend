@@ -33,33 +33,57 @@ const SURVEY_LINK = {
   href: "https://usabi.li/do/3wv9cloipto9/wadwk6",
 } as const;
 
-const LINKS = [
+interface FeedbackLink {
+  icon: string;
+  labelKey: string;
+  href: string;
+}
+
+const SECTIONS: ReadonlyArray<{
+  labelKey: string;
+  links: ReadonlyArray<FeedbackLink>;
+}> = [
   {
-    icon: "magnify",
-    labelKey: "feedback.browse_issues",
-    href: "https://github.com/esphome/device-builder/issues",
+    labelKey: "feedback.group_bug",
+    links: [
+      {
+        icon: "magnify",
+        labelKey: "feedback.browse_issues",
+        href: "https://github.com/esphome/device-builder/issues",
+      },
+      {
+        icon: "bug-outline",
+        labelKey: "feedback.new_issue",
+        href: "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml",
+      },
+    ],
   },
   {
-    icon: "bug-outline",
-    labelKey: "feedback.new_issue",
-    href: "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml",
+    labelKey: "feedback.group_feature",
+    links: [
+      {
+        icon: "magnify",
+        labelKey: "feedback.browse_features",
+        href: "https://github.com/orgs/esphome/discussions/categories/builder-features-or-enhancements?discussions_q=is%3Aopen+category%3A%22Builder+features+or+enhancements%22+sort%3Atop",
+      },
+      {
+        icon: "lightbulb-outline",
+        labelKey: "feedback.new_feature",
+        href: "https://github.com/orgs/esphome/discussions/new?category=builder-features-or-enhancements",
+      },
+    ],
   },
   {
-    icon: "magnify",
-    labelKey: "feedback.browse_features",
-    href: "https://github.com/orgs/esphome/discussions/categories/builder-features-or-enhancements?discussions_q=is%3Aopen+category%3A%22Builder+features+or+enhancements%22+sort%3Atop",
+    labelKey: "feedback.group_community",
+    links: [
+      {
+        icon: "forum-outline",
+        labelKey: "feedback.discord",
+        href: "https://discord.gg/Rf2jWGVjaK",
+      },
+    ],
   },
-  {
-    icon: "lightbulb-outline",
-    labelKey: "feedback.new_feature",
-    href: "https://github.com/orgs/esphome/discussions/new?category=builder-features-or-enhancements",
-  },
-  {
-    icon: "forum-outline",
-    labelKey: "feedback.discord",
-    href: "https://discord.gg/Rf2jWGVjaK",
-  },
-] as const;
+];
 
 const NEW_ISSUE_LABEL_KEY = "feedback.new_issue";
 
@@ -76,7 +100,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
   @state()
   private _open = false;
 
-  private _hrefFor(link: (typeof LINKS)[number]): string {
+  private _hrefFor(link: FeedbackLink): string {
     if (link.labelKey !== NEW_ISSUE_LABEL_KEY || !this._serverVersion) {
       return link.href;
     }
@@ -112,14 +136,25 @@ export class ESPHomeFeedbackDialog extends LitElement {
         gap: var(--wa-space-2xs);
       }
 
+      .section-header {
+        margin: var(--wa-space-m) 0 var(--wa-space-2xs);
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--wa-color-text-quiet);
+      }
+
       .link {
         display: flex;
         align-items: center;
         gap: var(--wa-space-s);
-        padding: 10px var(--wa-space-m);
+        padding: var(--wa-space-xs) var(--wa-space-s);
         border-radius: var(--wa-border-radius-m);
+        /* A faint grey outline at rest gives each row a quiet edge; the brand
+           wash takes over on hover. No glow, no ring. */
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-lowered);
+        background: transparent;
         color: var(--wa-color-text-normal);
         font-size: var(--wa-font-size-s);
         text-decoration: none;
@@ -129,17 +164,18 @@ export class ESPHomeFeedbackDialog extends LitElement {
       }
 
       .link:hover {
+        border-color: transparent;
         background: var(--esphome-tint);
-        border-color: var(--esphome-tint-border);
       }
 
-      .link:hover .link-icon {
-        color: var(--esphome-primary);
+      .link:hover .link-external,
+      .link:focus-visible .link-external {
+        opacity: 1;
       }
 
       .link-icon {
-        font-size: 18px;
-        color: var(--wa-color-text-quiet);
+        font-size: 20px;
+        color: var(--esphome-primary);
         flex-shrink: 0;
       }
 
@@ -151,24 +187,29 @@ export class ESPHomeFeedbackDialog extends LitElement {
         font-size: 14px;
         color: var(--wa-color-text-quiet);
         flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.12s;
       }
 
       .link.featured {
-        background: var(--esphome-primary);
+        padding: var(--wa-space-s) var(--wa-space-m);
         border-color: var(--esphome-primary);
+        background: var(--esphome-primary);
         color: var(--esphome-on-primary);
-        margin-bottom: var(--wa-space-s);
       }
 
       .link.featured:hover {
-        background: var(--esphome-primary-hover);
         border-color: var(--esphome-primary-hover);
+        background: var(--esphome-primary-hover);
       }
 
       .link.featured .link-icon,
-      .link.featured .link-external,
-      .link.featured:hover .link-icon {
+      .link.featured .link-external {
         color: var(--esphome-on-primary);
+      }
+
+      .link.featured .link-external {
+        opacity: 1;
       }
 
       .link.featured .link-label {
@@ -195,6 +236,22 @@ export class ESPHomeFeedbackDialog extends LitElement {
     this._open = false;
   };
 
+  private _renderLink(link: FeedbackLink, featured = false) {
+    return html`
+      <a
+        class=${featured ? "link featured" : "link"}
+        href=${featured ? link.href : this._hrefFor(link)}
+        target="_blank"
+        rel="noopener noreferrer"
+        @click=${this.close}
+      >
+        <wa-icon class="link-icon" library="mdi" name=${link.icon}></wa-icon>
+        <span class="link-label">${this._localize(link.labelKey)}</span>
+        <wa-icon class="link-external" library="mdi" name="open-in-new"></wa-icon>
+      </a>
+    `;
+  }
+
   protected render() {
     return html`
       <esphome-base-dialog
@@ -205,30 +262,11 @@ export class ESPHomeFeedbackDialog extends LitElement {
       >
         <p class="description">${this._localize("feedback.description")}</p>
         <div class="links">
-          <a
-            class="link featured"
-            href=${SURVEY_LINK.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            @click=${this.close}
-          >
-            <wa-icon class="link-icon" library="mdi" name=${SURVEY_LINK.icon}></wa-icon>
-            <span class="link-label">${this._localize(SURVEY_LINK.labelKey)}</span>
-            <wa-icon class="link-external" library="mdi" name="open-in-new"></wa-icon>
-          </a>
-          ${LINKS.map(
-            (link) => html`
-              <a
-                class="link"
-                href=${this._hrefFor(link)}
-                target="_blank"
-                rel="noopener noreferrer"
-                @click=${this.close}
-              >
-                <wa-icon class="link-icon" library="mdi" name=${link.icon}></wa-icon>
-                <span class="link-label">${this._localize(link.labelKey)}</span>
-                <wa-icon class="link-external" library="mdi" name="open-in-new"></wa-icon>
-              </a>
+          ${this._renderLink(SURVEY_LINK, true)}
+          ${SECTIONS.map(
+            (section) => html`
+              <h3 class="section-header">${this._localize(section.labelKey)}</h3>
+              ${section.links.map((link) => this._renderLink(link))}
             `
           )}
         </div>

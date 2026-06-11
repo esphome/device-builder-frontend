@@ -131,10 +131,7 @@ export function renderDeviceCountRow(
   total: number
 ): TemplateResult {
   const q = host._search.trim();
-  const unit =
-    matchCount === 1
-      ? host._localize("dashboard.device_singular")
-      : host._localize("dashboard.device_plural");
+  const unit = host._localize("dashboard.device_count", { count: matchCount });
   const suffix = q ? " " + host._localize("dashboard.search_of", { total }) : "";
   return html`
     <div class="device-count-row">
@@ -150,11 +147,12 @@ export function renderToolbar(
   total: number
 ): TemplateResult {
   // Layout: [search] [view-toggle] [facets…]
-  //         [X devices]                 [Select multiple]
+  //         [X devices] [Select multiple]
   // Select-multiple sits paired with the device-count on its own
   // row — both reference the device list ("operate on these N
-  // devices") so semantically they belong together. Frees the
-  // toolbar-row above for filter-related controls only.
+  // devices") so semantically they belong together, grouped at the
+  // start under the search box. Frees the toolbar-row above for
+  // filter-related controls only.
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
@@ -169,10 +167,7 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   const hits = host._yamlSearch.hits;
   const matchCount =
     hits === null ? null : hits.reduce((sum, hit) => sum + hit.matches.length, 0);
-  const unit =
-    matchCount === 1
-      ? host._localize("yaml_search.match_count_singular")
-      : host._localize("yaml_search.match_count_plural");
+  const unit = host._localize("yaml_search.match_count", { count: matchCount ?? 0 });
   return html`
     <div class="toolbar">
       <div class="toolbar-row">${renderSearchInput(host)} ${renderViewToggle(host)}</div>

@@ -1,13 +1,6 @@
 import { consume } from "@lit/context";
-import {
-  mdiContentSave,
-  mdiDockLeft,
-  mdiDockRight,
-  mdiEye,
-  mdiEyeOff,
-  mdiViewSplitHorizontal,
-} from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
+import { mdiContentSave, mdiDockLeft, mdiDockRight, mdiEye, mdiEyeOff } from "@mdi/js";
+import { css, html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { apiErrorDetails } from "../api/api-error.js";
@@ -34,15 +27,14 @@ registerMdiIcons({
   "dock-right": mdiDockRight,
   eye: mdiEye,
   "eye-off": mdiEyeOff,
-  "view-split": mdiViewSplitHorizontal,
 });
 
 const SECRETS_FILE = "secrets.yaml";
 
-type SecretsLayout = "form" | "split" | "yaml";
+type SecretsLayout = "form" | "yaml";
 
 const LAYOUT_STORAGE_KEY = "esphome-secrets-layout";
-const LAYOUTS: readonly SecretsLayout[] = ["form", "split", "yaml"];
+const LAYOUTS: readonly SecretsLayout[] = ["form", "yaml"];
 
 @customElement("esphome-page-secrets")
 export class ESPHomePageSecrets extends LitElement {
@@ -71,18 +63,10 @@ export class ESPHomePageSecrets extends LitElement {
   @state()
   private _revealSensitive = false;
 
-  // Persisted form | split | yaml choice; defaults to the structured
-  // form on first visit since raw YAML is beyond many users.
+  // Persisted form | yaml choice; defaults to the structured form on
+  // first visit since raw YAML is beyond many users.
   @state()
   private _layout: SecretsLayout = "form";
-
-  // True below the 900px breakpoint where the split pane collapses to a
-  // single column; drives the effective layout so the toggle's pressed
-  // state matches what's shown when the split button is hidden.
-  @state()
-  private _narrow = false;
-
-  private _narrowMq: MediaQueryList | null = null;
 
   @query("esphome-unsaved-changes-dialog")
   private _unsavedDialog?: ESPHomeUnsavedChangesDialog;
@@ -96,11 +80,6 @@ export class ESPHomePageSecrets extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     this._layout = this._readStoredLayout();
-    if (typeof window.matchMedia === "function") {
-      this._narrowMq = window.matchMedia("(max-width: 900px)");
-      this._narrow = this._narrowMq.matches;
-      this._narrowMq.addEventListener("change", this._onNarrowChange);
-    }
     setLeaveGuard(this._confirmLeave);
     window.addEventListener("beforeunload", this._onBeforeUnload);
     window.addEventListener("popstate", this._onPopState, { capture: true });
@@ -121,18 +100,7 @@ export class ESPHomePageSecrets extends LitElement {
     localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
   }
 
-  private _onNarrowChange = (e: MediaQueryListEvent) => {
-    this._narrow = e.matches;
-  };
-
-  // Below the breakpoint the split pane collapses to the form, so the
-  // hidden split choice presents as the form for both layout and ARIA.
-  private get _effectiveLayout(): SecretsLayout {
-    return this._narrow && this._layout === "split" ? "form" : this._layout;
-  }
-
   disconnectedCallback() {
-    this._narrowMq?.removeEventListener("change", this._onNarrowChange);
     setLeaveGuard(null);
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
@@ -291,10 +259,11 @@ export class ESPHomePageSecrets extends LitElement {
         border: none;
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
-        padding: 8px 16px;
+        /* Match the shared .btn size so Save aligns with Add secret. */
+        padding: var(--esphome-button-padding);
         border-radius: var(--wa-border-radius-m);
         cursor: pointer;
-        font-size: var(--wa-font-size-xs);
+        font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
         box-shadow: var(--esphome-primary-shadow);
@@ -388,10 +357,6 @@ export class ESPHomePageSecrets extends LitElement {
         gap: 0;
       }
 
-      .editor-layout--split {
-        grid-template-columns: 1fr 1px 1fr;
-      }
-
       .editor-layout--form,
       .editor-layout--yaml {
         grid-template-columns: 1fr;
@@ -409,10 +374,10 @@ export class ESPHomePageSecrets extends LitElement {
         min-height: 0;
       }
 
-      /* The structured editor is its own scroll container (and owns the
-         Save-button clearance padding), so the pane just frames it. */
+      /* The editor scrolls itself and owns its padding, so its scrollbar
+         sits at the card edge, not over the row controls. */
       .editor-pane--form {
-        padding: var(--wa-space-m);
+        padding: 0;
       }
 
       .editor-layout--yaml .editor-pane--form,
@@ -420,16 +385,6 @@ export class ESPHomePageSecrets extends LitElement {
         display: none;
       }
 
-      .pane-divider {
-        background: var(--wa-color-surface-border);
-        width: 1px;
-        align-self: stretch;
-      }
-
-      /* Below the breakpoint the split button is hidden; the collapse of
-         the split layout itself is driven by the effective-layout getter
-         in JS (matching the device editor), so no layout rules are
-         duplicated here. */
       @media (max-width: 900px) {
         .page {
           padding-block: var(--wa-space-s);
@@ -439,9 +394,6 @@ export class ESPHomePageSecrets extends LitElement {
         }
         .page-title {
           flex-basis: 100%;
-        }
-        .layout-toggle .split-btn {
-          display: none;
         }
       }
 
@@ -474,7 +426,7 @@ export class ESPHomePageSecrets extends LitElement {
           >
             <button
               type="button"
-              aria-pressed=${this._effectiveLayout === "form"}
+              aria-pressed=${this._layout === "form"}
               aria-label=${this._localize("secrets.layout_form")}
               title=${this._localize("secrets.layout_form")}
               @click=${() => this._setLayout("form")}
@@ -483,17 +435,7 @@ export class ESPHomePageSecrets extends LitElement {
             </button>
             <button
               type="button"
-              class="split-btn"
-              aria-pressed=${this._effectiveLayout === "split"}
-              aria-label=${this._localize("secrets.layout_split")}
-              title=${this._localize("secrets.layout_split")}
-              @click=${() => this._setLayout("split")}
-            >
-              <wa-icon library="mdi" name="view-split"></wa-icon>
-            </button>
-            <button
-              type="button"
-              aria-pressed=${this._effectiveLayout === "yaml"}
+              aria-pressed=${this._layout === "yaml"}
               aria-label=${this._localize("secrets.layout_yaml")}
               title=${this._localize("secrets.layout_yaml")}
               @click=${() => this._setLayout("yaml")}
@@ -530,7 +472,7 @@ export class ESPHomePageSecrets extends LitElement {
                     ? this._localize("secrets.saving")
                     : this._localize("secrets.save")}
                 </button>
-                <div class=${`editor-layout editor-layout--${this._effectiveLayout}`}>
+                <div class=${`editor-layout editor-layout--${this._layout}`}>
                   <div class="editor-pane editor-pane--form">
                     <esphome-secrets-structured-editor
                       .value=${this._yaml}
@@ -538,9 +480,6 @@ export class ESPHomePageSecrets extends LitElement {
                       @yaml-change=${this._onYamlChange}
                     ></esphome-secrets-structured-editor>
                   </div>
-                  ${this._effectiveLayout === "split"
-                    ? html`<div class="pane-divider"></div>`
-                    : nothing}
                   <div class="editor-pane editor-pane--yaml">
                     <esphome-yaml-editor
                       .value=${this._yaml}
