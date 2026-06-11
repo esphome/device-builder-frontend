@@ -213,7 +213,16 @@ describe("validateEntry", () => {
     // value must not surface an error that blocks finishing the edit.
     const entry = makeEntry({ type: ConfigEntryType.FLOAT });
     expect(validateEntry(entry, "${voltage_div")).toBeNull();
-    expect(validateEntry(entry, "$")).toBeNull();
+    expect(validateEntry(entry, "${")).toBeNull();
+  });
+
+  it("still flags numeric junk with a stray or escaped $ (#773 review)", () => {
+    // A bare includes("$") bypass would let these through; only real
+    // ${var}/$var syntax should suppress the not-a-number error.
+    const entry = makeEntry({ type: ConfigEntryType.FLOAT });
+    expect(validateEntry(entry, "12$34")?.code).toBe("validation.not_a_number");
+    expect(validateEntry(entry, "$$5")?.code).toBe("validation.not_a_number");
+    expect(validateEntry(entry, "5$")?.code).toBe("validation.not_a_number");
   });
 
   it("rejects values not in options list", () => {

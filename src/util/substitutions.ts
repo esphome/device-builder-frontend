@@ -52,12 +52,17 @@ export function hasSubstitutionReference(text: string): boolean {
   return SUBSTITUTION_REF_RE.test(text);
 }
 
-/** True when *text* holds a ``$``: a complete or in-progress reference.
- *  Looser than ``hasSubstitutionReference`` so a typed field stays in the
- *  text editor mid-edit (``${voltage_div`` after the brace is deleted)
- *  instead of snapping back to a widget that blanks the partial. */
+// A complete or in-progress reference start (``${`` or ``$<letter>``) that
+// isn't an escaped ``$$``. Looser than SUBSTITUTION_REF_RE (accepts an
+// unclosed ``${...``) so a field stays editable mid-keystroke, but tight
+// enough to skip ``$$`` escapes and a stray mid-string ``$`` (``12$34``).
+const SUBSTITUTION_LIKE_RE = /(?:^|[^$])\$(?:\{|[a-zA-Z_])/;
+
+/** True when *text* is or is becoming a ``${var}`` / ``$var`` reference
+ *  (mid-edit partials included); keeps such values in the editable text
+ *  field and out of numeric validation. */
 export function looksLikeSubstitution(text: string): boolean {
-  return text.includes("$");
+  return SUBSTITUTION_LIKE_RE.test(text);
 }
 
 /** Expand ``${name}`` / ``$name`` in *text* against *subs*, leaving
