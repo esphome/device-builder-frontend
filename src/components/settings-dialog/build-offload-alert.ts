@@ -43,7 +43,7 @@ export function renderOffloaderAlert(
           </button>
           <button
             type="button"
-            class="btn-unpair"
+            class="offloader-alert-unpair"
             aria-label=${localize("settings.offloader_alert_unpair_aria", {
               label: alert.receiver_label,
             })}
@@ -73,7 +73,7 @@ export function renderOffloaderAlert(
       <div class="offloader-alert-actions">
         <button
           type="button"
-          class="btn-unpair"
+          class="offloader-alert-unpair"
           aria-label=${localize("settings.offloader_alert_unpair_aria", {
             label: alert.receiver_label,
           })}

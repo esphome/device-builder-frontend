@@ -13,16 +13,18 @@ import {
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { DeviceState } from "../api/types/devices.js";
-import type { SerialPort } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { inputStyles } from "../styles/inputs.js";
+import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { SerialPortsPollController } from "../util/serial-ports-poll-controller.js";
 import {
   secureLoopbackUrl,
   webSerialAvailability,
@@ -81,8 +83,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   deviceCurrentAddress = "";
 
   @state() private _view: DialogView = "method";
-  @state() private _ports: SerialPort[] = [];
-  @state() private _loadingPorts = false;
+
+  private _portsPoll = new SerialPortsPollController(this, () => this._api);
   /**
    * `true` when the user has opened the "Advanced options"
    * disclosure at the bottom of the method list. Holds the
@@ -128,17 +130,18 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // resolved to, where the user just edits a single octet).
     if (changed.has("open") && this.open) {
       this._view = "method";
-      this._ports = [];
       this._advancedExpanded = false;
       this._otaAddressCardExpanded = false;
       this._otaAddressValue = this.deviceCurrentAddress;
     }
+    this._portsPoll.set(this.open && this._view === "port-select");
   }
 
   static styles = [
     espHomeStyles,
     primaryDialogHeaderStyles,
     inputStyles,
+    newItemHighlightStyles,
     installMethodDialogStyles,
   ];
 
@@ -373,7 +376,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   }
 
   private _renderPortList() {
-    if (this._loadingPorts) {
+    if (this._portsPoll.loading) {
       return html`
         <div class="loading">
           <wa-spinner></wa-spinner>
@@ -392,20 +395,31 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         <wa-icon library="mdi" name="arrow-left"></wa-icon>
         ${this._localize("dashboard.install_method_back")}
       </button>
-      ${this._ports.length === 0
+      ${this._portsPoll.ports.length === 0
         ? html`<div class="empty">
             ${this._localize("dashboard.install_method_no_ports")}
           </div>`
         : html`
             <div class="list">
-              ${this._ports.map(
+              ${this._portsPoll.ports.map(
                 (p) => html`
-                  <div class="option" @click=${() => this._selectPort(p.port)}>
+                  <div
+                    class=${classMap({
+                      option: true,
+                      "is-new": this._portsPoll.newPorts.has(p.port),
+                    })}
+                    @click=${() => this._selectPort(p.port)}
+                  >
                     <wa-icon library="mdi" name="serial-port"></wa-icon>
                     <div class="info">
                       <span class="title">${p.port}</span>
                       ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
                     </div>
+                    ${this._portsPoll.newPorts.has(p.port)
+                      ? html`<span class="new-badge"
+                          >${this._localize("dashboard.serial_port_new")}</span
+                        >`
+                      : nothing}
                   </div>
                 `
               )}
@@ -571,15 +585,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     this._selectMethod("ota", port);
   };
 
-  private async _onServerSerial() {
+  private _onServerSerial() {
     this._view = "port-select";
-    this._loadingPorts = true;
-    try {
-      this._ports = await this._api.getSerialPorts();
-    } catch {
-      this._ports = [];
-    }
-    this._loadingPorts = false;
   }
 
   private _selectMethod(method: string, port?: string) {

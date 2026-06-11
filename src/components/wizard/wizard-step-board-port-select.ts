@@ -2,10 +2,12 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiSerialPort } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 import type { SerialPort } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
+import { newItemHighlightStyles } from "../../styles/new-item-highlight.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { DeploymentEnvironment } from "../../util/environment.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -38,6 +40,9 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
   @property({ attribute: false })
   ports: SerialPort[] = [];
 
+  @property({ attribute: false })
+  newPorts: ReadonlySet<string> = new Set();
+
   @property({ type: Boolean })
   loading = false;
 
@@ -50,6 +55,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    newItemHighlightStyles,
     css`
       :host {
         display: flex;
@@ -211,12 +217,21 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       <div class="list">
         ${this.ports.map(
           (p) => html`
-            <button type="button" class="option" @click=${() => this._onSelect(p.port)}>
+            <button
+              type="button"
+              class=${classMap({ option: true, "is-new": this.newPorts.has(p.port) })}
+              @click=${() => this._onSelect(p.port)}
+            >
               <wa-icon library="mdi" name="serial-port"></wa-icon>
               <div class="info">
                 <span class="title">${p.port}</span>
                 ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
               </div>
+              ${this.newPorts.has(p.port)
+                ? html`<span class="new-badge"
+                    >${this._localize("dashboard.serial_port_new")}</span
+                  >`
+                : nothing}
             </button>
           `
         )}
