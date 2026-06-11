@@ -389,6 +389,9 @@ export class ESPHomeDeviceEditor extends LitElement {
                   aria-valuemin=${Math.round(MIN_SPLIT_RATIO * 100)}
                   aria-valuemax=${Math.round(MAX_SPLIT_RATIO * 100)}
                   aria-valuenow=${Math.round(this._splitRatio * 100)}
+                  aria-valuetext=${this._localize("device.resize_panes_value", {
+                    percent: Math.round(this._splitRatio * 100),
+                  })}
                   tabindex="0"
                   @pointerdown=${this._onDividerPointerDown}
                   @keydown=${this._onDividerKeydown}
