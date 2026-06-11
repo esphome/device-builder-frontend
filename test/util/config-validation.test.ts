@@ -183,6 +183,31 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, undefined)).toBeNull();
   });
 
+  it("never flags a numeric field holding a ${var} substitution (#1391)", () => {
+    // A substitution resolves at build time; its value is unknowable here,
+    // so it must not surface "Must be a number" on the structured form.
+    expect(
+      validateEntry(makeEntry({ type: ConfigEntryType.FLOAT }), "${voltage_div}")
+    ).toBeNull();
+    expect(
+      validateEntry(makeEntry({ type: ConfigEntryType.FLOAT }), "$voltage_div")
+    ).toBeNull();
+    expect(
+      validateEntry(makeEntry({ type: ConfigEntryType.INTEGER }), "${count}")
+    ).toBeNull();
+    expect(
+      validateEntry(
+        makeEntry({ type: ConfigEntryType.FLOAT_WITH_UNIT, unit_options: ["Ω"] }),
+        "${current_res}"
+      )
+    ).toBeNull();
+  });
+
+  it("treats a required field as satisfied when it holds a ${var} (#1391)", () => {
+    const entry = makeEntry({ type: ConfigEntryType.FLOAT, required: true });
+    expect(validateEntry(entry, "${current_res}")).toBeNull();
+  });
+
   it("rejects values not in options list", () => {
     const entry = makeEntry({
       type: ConfigEntryType.SELECT,

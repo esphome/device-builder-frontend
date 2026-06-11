@@ -4,6 +4,7 @@ import { parseFloatWithUnit } from "./float-with-unit.js";
 import { parseHexInt } from "./hex-int.js";
 import { parseIntInput } from "./int-input.js";
 import { asMappingList, asRecord } from "./nested-values.js";
+import { hasSubstitutionReference } from "./substitutions.js";
 import { YamlRawValue } from "./yaml-serialize.js";
 
 /**
@@ -132,6 +133,10 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
     return { key: entry.key, code: "validation.required" };
   }
   if (isEmpty) return null;
+
+  // A ${var} reference resolves at build time, so its value is unknowable
+  // here; never flag the literal as "not a number" (#1391).
+  if (typeof raw === "string" && hasSubstitutionReference(raw)) return null;
 
   if (entry.type === ConfigEntryType.INTEGER && entry.display_format === "hex") {
     // BigInt-route the hex-typed integer check so cv.hex_uint64_t
