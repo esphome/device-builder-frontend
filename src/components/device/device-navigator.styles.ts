@@ -67,7 +67,7 @@ export const deviceNavigatorStyles = css`
   }
 
   .collapse-btn wa-icon {
-    font-size: 16px;
+    font-size: 18px;
   }
 
   .card-body {
