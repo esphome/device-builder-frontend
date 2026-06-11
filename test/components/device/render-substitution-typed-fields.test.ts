@@ -51,6 +51,18 @@ describe("leaf dispatch routes ${var} values to an editable text field (#1391)",
     expect(json).toContain("0.05");
   });
 
+  it("keeps a mid-edit partial substitution (${voltage_div) on the text input", () => {
+    // Deleting the closing brace must not snap the field back to the number
+    // widget (which blanks the partial and reblocks editing) (#1391).
+    const result = renderLeaf(
+      makeConfigEntry({ key: "field", type: ConfigEntryType.FLOAT }),
+      "${voltage_div"
+    );
+    const inputs = findElementBindings(result, "input");
+    expect(inputs[0]["type"]).toBe("text");
+    expect(inputs[0][".value"]).toBe("${voltage_div");
+  });
+
   it("leaves a plain FLOAT value on the number input (no fallback, no hint)", () => {
     const result = renderLeaf(
       makeConfigEntry({ key: "field", type: ConfigEntryType.FLOAT }),

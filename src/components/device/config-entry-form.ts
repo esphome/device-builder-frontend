@@ -47,10 +47,7 @@ import {
 } from "../../util/pin-registry-modes-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
-import {
-  hasSubstitutionReference,
-  parseSubstitutions,
-} from "../../util/substitutions.js";
+import { looksLikeSubstitution, parseSubstitutions } from "../../util/substitutions.js";
 import {
   _isStructuralType,
   filterRenderable,
@@ -512,9 +509,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _renderEntryLeaf(entry: ConfigEntry, path: string[], ctx: RenderCtx): unknown {
     // A ${var} value can't drive a typed widget (number/select/switch): it
     // blanks the literal and the first interaction clobbers it. Edit it as
-    // text so the token round-trips; SECURE_STRING stays masked (#1391).
+    // text so the token round-trips and stays editable mid-keystroke;
+    // SECURE_STRING stays masked (#1391).
     const raw = ctx.getAt(path);
-    if (typeof raw === "string" && hasSubstitutionReference(raw)) {
+    if (typeof raw === "string" && looksLikeSubstitution(raw)) {
       const inputType =
         entry.type === ConfigEntryType.SECURE_STRING ? "password" : "text";
       return renderStringField(entry, inputType, path, ctx);

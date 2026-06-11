@@ -52,6 +52,14 @@ export function hasSubstitutionReference(text: string): boolean {
   return SUBSTITUTION_REF_RE.test(text);
 }
 
+/** True when *text* holds a ``$``: a complete or in-progress reference.
+ *  Looser than ``hasSubstitutionReference`` so a typed field stays in the
+ *  text editor mid-edit (``${voltage_div`` after the brace is deleted)
+ *  instead of snapping back to a widget that blanks the partial. */
+export function looksLikeSubstitution(text: string): boolean {
+  return text.includes("$");
+}
+
 /** Expand ``${name}`` / ``$name`` in *text* against *subs*, leaving
  *  unknown refs literal. Iterates (capped) so chained substitutions
  *  resolve without looping on cycles. */

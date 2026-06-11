@@ -208,6 +208,14 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, "${current_res}")).toBeNull();
   });
 
+  it("does not flag a mid-edit partial substitution as not-a-number (#1391)", () => {
+    // While the user is editing ${voltage_div} (e.g. the brace is gone), the
+    // value must not surface an error that blocks finishing the edit.
+    const entry = makeEntry({ type: ConfigEntryType.FLOAT });
+    expect(validateEntry(entry, "${voltage_div")).toBeNull();
+    expect(validateEntry(entry, "$")).toBeNull();
+  });
+
   it("rejects values not in options list", () => {
     const entry = makeEntry({
       type: ConfigEntryType.SELECT,
