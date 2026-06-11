@@ -1,17 +1,9 @@
-import type { ReactiveControllerHost } from "lit";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { SessionBlobCacheController } from "../../src/util/session-blob-cache-controller.js";
 import { createSessionBlobCache } from "../../src/util/session-blob-cache.js";
-
-const fakeHost = (): ReactiveControllerHost =>
-  ({
-    addController: vi.fn(),
-    removeController: vi.fn(),
-    requestUpdate: vi.fn(),
-    updateComplete: Promise.resolve(true),
-  }) as unknown as ReactiveControllerHost;
+import { fakeHost } from "../_fake-host.js";
 
 const fakeApi = (): ESPHomeAPI => ({}) as unknown as ESPHomeAPI;
 

@@ -1,4 +1,3 @@
-import type { ReactiveControllerHost } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
@@ -9,14 +8,7 @@ import {
   fetchAutomationTriggers,
   getCachedAutomationTriggers,
 } from "../../../src/util/automation-catalog-cache.js";
-
-const fakeHost = (): ReactiveControllerHost =>
-  ({
-    addController: vi.fn(),
-    removeController: vi.fn(),
-    requestUpdate: vi.fn(),
-    updateComplete: Promise.resolve(true),
-  }) as unknown as ReactiveControllerHost;
+import { fakeHost } from "../../_fake-host.js";
 
 const trigger = (id: string, name: string): AutomationTrigger => ({
   id,

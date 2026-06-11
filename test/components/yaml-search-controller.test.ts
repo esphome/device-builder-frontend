@@ -1,23 +1,8 @@
-import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { YamlSearchHit } from "../../src/api/types/devices.js";
 import { YamlSearchController } from "../../src/components/yaml-search-controller.js";
-
-class FakeHost implements ReactiveControllerHost {
-  controllers: ReactiveController[] = [];
-  updates = 0;
-  addController(c: ReactiveController) {
-    this.controllers.push(c);
-  }
-  removeController() {
-    /* no-op */
-  }
-  requestUpdate() {
-    this.updates++;
-  }
-  updateComplete = Promise.resolve(true);
-}
+import { FakeHost } from "../_fake-host.js";
 
 /* The controller's only API surface is ``hits``, ``scheduleQuery``,
    ``clear``, and the host-lifecycle hooks. Tests stub the API and
