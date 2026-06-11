@@ -79,6 +79,27 @@ describe("FileDropController", () => {
     expect(ctrl.dragging).toBe(false);
   });
 
+  it("clears the highlight on a dragleave with no dataTransfer", () => {
+    const { target, ctrl } = make();
+    target.dispatchEvent(dragEvent("dragenter"));
+    expect(ctrl.dragging).toBe(true);
+    target.dispatchEvent(new Event("dragleave", { bubbles: true, cancelable: true }));
+    expect(ctrl.dragging).toBe(false);
+  });
+
+  it('recognizes a file drop whose types lack "Files" but whose files are populated', () => {
+    const { target, onFile } = make();
+    const yaml = new File(["esphome:"], "a.yaml");
+    const drop = dragEvent("drop", { files: [yaml], types: [] });
+    target.dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true);
+    expect(onFile).toHaveBeenCalledExactlyOnceWith(yaml);
+
+    const winDrop = dragEvent("drop", { files: [yaml], types: [] });
+    window.dispatchEvent(winDrop);
+    expect(winDrop.defaultPrevented).toBe(true);
+  });
+
   it("hands the first accepted file to onFile on drop", () => {
     const { target, onFile, ctrl } = make();
     target.dispatchEvent(dragEvent("dragenter"));

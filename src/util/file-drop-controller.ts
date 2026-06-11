@@ -74,9 +74,12 @@ export class FileDropController implements ReactiveController {
     this._setDragging(true);
   };
 
-  private _onDragLeave = (e: DragEvent) => {
-    if (!hasFiles(e)) return;
-    this._depth = Math.max(0, this._depth - 1);
+  /* No hasFiles guard: ``dataTransfer`` can arrive null/stripped on
+     leave, and ``_depth`` only ever increments for file drags — an
+     early return here would leave the highlight stuck. Clearing at
+     depth 0 also covers a drag that only ever fired dragover. */
+  private _onDragLeave = () => {
+    if (this._depth > 0) this._depth--;
     if (this._depth === 0) this._setDragging(false);
   };
 
@@ -115,8 +118,12 @@ export class FileDropController implements ReactiveController {
   }
 }
 
+/* ``files.length`` fallback: this also gates the window navigation
+   guard, so a UA delivering a file drop without the "Files" type must
+   still be caught. ``files`` stays empty for text drags. */
 function hasFiles(e: DragEvent): boolean {
-  return e.dataTransfer?.types.includes("Files") ?? false;
+  if (!e.dataTransfer) return false;
+  return e.dataTransfer.types.includes("Files") || e.dataTransfer.files.length > 0;
 }
 
 function isVisible(el: HTMLElement): boolean {
