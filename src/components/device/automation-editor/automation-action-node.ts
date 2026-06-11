@@ -333,6 +333,21 @@ export class ESPHomeAutomationActionNode extends LitElement {
   }
 
   /**
+   * Label a nested action list. ``then`` / ``else`` keep their
+   * control-flow wording; triggered-action keys (``on_response`` /
+   * ``on_error`` on ``http_request.get`` …) title-case so each list
+   * is self-describing.
+   */
+  private _nestedListLabel(key: string): string {
+    if (key === "else") return this._localize("device.automation_else");
+    if (key === "then") return this._localize("device.automation_action");
+    return key
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
+  /**
    * Render one nested action list per entry in
    * ``def.accepts_action_list``. ``"then"`` / ``"else"`` for
    * ``if``, ``"then"`` for ``while`` / ``repeat`` / ``wait_until``.
@@ -348,11 +363,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
     return def.accepts_action_list.map(
       (key) =>
         html`<div class="ae-nested">
-          <p class="ae-nested-label">
-            ${key === "else"
-              ? this._localize("device.automation_else")
-              : this._localize("device.automation_action")}
-          </p>
+          <p class="ae-nested-label">${this._nestedListLabel(key)}</p>
           <esphome-automation-action-list
             no-header
             .actions=${this.value.children?.[key] ?? []}
