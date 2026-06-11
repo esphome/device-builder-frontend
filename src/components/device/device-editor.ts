@@ -18,6 +18,14 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, yamlDiffButtonContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import {
+  clampSplitRatio,
+  loadSplitRatio,
+  MAX_SPLIT_RATIO,
+  MIN_SPLIT_RATIO,
+  nextSplitRatioForKey,
+  saveSplitRatio,
+} from "../../util/split-ratio.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
 
@@ -44,36 +52,6 @@ export type DeviceLayoutMode = "both" | "left" | "right";
 
 /** Cap the errors listed in the invalid banner; the rest collapse to "+N more". */
 const MAX_BANNER_ERRORS = 6;
-const MIN_SPLIT_RATIO = 0.25;
-const MAX_SPLIT_RATIO = 0.75;
-const SPLIT_KEY_STEP = 0.02;
-
-const clampSplitRatio = (ratio: number): number =>
-  Math.min(MAX_SPLIT_RATIO, Math.max(MIN_SPLIT_RATIO, ratio));
-
-const SPLIT_RATIO_STORAGE_KEY = "esphome-editor-split-ratio";
-
-const loadSplitRatio = (): number => {
-  try {
-    const raw = localStorage.getItem(SPLIT_RATIO_STORAGE_KEY);
-    const parsed = raw === null ? NaN : Number.parseFloat(raw);
-    return Number.isFinite(parsed) ? clampSplitRatio(parsed) : 0.5;
-  } catch {
-    // localStorage can throw in private mode / sandboxed iframes /
-    // when quota is exhausted. Persistence is a nicety here, so fall
-    // back to the default ratio rather than breaking editor render.
-    return 0.5;
-  }
-};
-
-const saveSplitRatio = (ratio: number): void => {
-  try {
-    localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(ratio));
-  } catch {
-    // Same restricted-storage cases as loadSplitRatio — drop the write
-    // so resizing (drag or keyboard) always completes cleanly.
-  }
-};
 
 @customElement("esphome-device-editor")
 export class ESPHomeDeviceEditor extends LitElement {
@@ -557,16 +535,11 @@ export class ESPHomeDeviceEditor extends LitElement {
     const rect = layout.getBoundingClientRect();
     this._dragging = true;
 
-    // Capture the pointer on the divider so move/up/cancel keep firing
-    // on it even as the pointer leaves the element, instead of leaking
-    // global window listeners. Capture releases automatically on
-    // pointerup/pointercancel, and the cancel path makes sure a
-    // cancelled gesture still clears `_dragging` and the listeners.
+    // Pointer capture keeps move/up/cancel on the divider (no global
+    // listener leak) and auto-releases on up/cancel.
     const divider = e.currentTarget as HTMLElement;
     divider.setPointerCapture(e.pointerId);
-    // `preventDefault` above suppresses the click's default focus, so
-    // focus the divider explicitly — otherwise the keyboard resize
-    // (Arrow/Home/End) is hard to discover after a mouse drag.
+    // preventDefault suppressed focus; set it so keyboard resize works.
     divider.focus();
 
     const onMove = (ev: PointerEvent) => {
@@ -586,14 +559,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   };
 
   private _onDividerKeydown = (e: KeyboardEvent) => {
-    let next: number | null = null;
-    if (e.key === "ArrowLeft") next = this._splitRatio - SPLIT_KEY_STEP;
-    else if (e.key === "ArrowRight") next = this._splitRatio + SPLIT_KEY_STEP;
-    else if (e.key === "Home") next = MIN_SPLIT_RATIO;
-    else if (e.key === "End") next = MAX_SPLIT_RATIO;
+    const next = nextSplitRatioForKey(this._splitRatio, e.key);
     if (next === null) return;
     e.preventDefault();
-    this._splitRatio = clampSplitRatio(next);
+    this._splitRatio = next;
     saveSplitRatio(this._splitRatio);
   };
 
