@@ -42,6 +42,7 @@ export const deviceNavigatorStyles = css`
     font-weight: var(--wa-font-weight-bold);
     line-height: 1;
     white-space: nowrap;
+    overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
   }

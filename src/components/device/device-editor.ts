@@ -541,18 +541,28 @@ export class ESPHomeDeviceEditor extends LitElement {
     const rect = layout.getBoundingClientRect();
     this._dragging = true;
 
+    // Capture the pointer on the divider so move/up/cancel keep firing
+    // on it even as the pointer leaves the element, instead of leaking
+    // global window listeners. Capture releases automatically on
+    // pointerup/pointercancel, and the cancel path makes sure a
+    // cancelled gesture still clears `_dragging` and the listeners.
+    const divider = e.currentTarget as HTMLElement;
+    divider.setPointerCapture(e.pointerId);
+
     const onMove = (ev: PointerEvent) => {
       if (rect.width === 0) return;
       this._splitRatio = clampSplitRatio((ev.clientX - rect.left) / rect.width);
     };
-    const onUp = () => {
+    const onEnd = () => {
       this._dragging = false;
       localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(this._splitRatio));
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      divider.removeEventListener("pointermove", onMove);
+      divider.removeEventListener("pointerup", onEnd);
+      divider.removeEventListener("pointercancel", onEnd);
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    divider.addEventListener("pointermove", onMove);
+    divider.addEventListener("pointerup", onEnd);
+    divider.addEventListener("pointercancel", onEnd);
   };
 
   private _onDividerKeydown = (e: KeyboardEvent) => {
