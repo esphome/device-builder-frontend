@@ -39,14 +39,9 @@ export const devicePageStyles = css`
     display: none;
   }
 
+  /* Box + hover come from .ghost-icon-btn (shared.ts); this button uses
+     a square 4px pad, a trailing margin, and a smaller (14px) icon. */
   .back-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    color: var(--esphome-primary);
-    cursor: pointer;
     padding: 4px;
     border-radius: var(--wa-border-radius-m);
     margin-right: var(--wa-space-xs);
@@ -56,34 +51,16 @@ export const devicePageStyles = css`
     font-size: 14px;
   }
 
-  .back-btn:hover {
-    background: var(--esphome-tint-border);
-  }
-
   .header-start-group {
     display: inline-flex;
     align-items: center;
     gap: 2px;
   }
 
-  .nav-toggle-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    color: var(--esphome-primary);
-    cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 4px;
-  }
-
+  /* Box + hover + padding all come from .ghost-icon-btn (shared.ts);
+     only the icon size is per-site. */
   .nav-toggle-btn wa-icon {
     font-size: 18px;
-  }
-
-  .nav-toggle-btn:hover {
-    background: var(--esphome-tint-border);
   }
 
   @media (max-width: 900px) {

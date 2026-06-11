@@ -47,23 +47,15 @@ export const deviceNavigatorStyles = css`
     min-width: 0;
   }
 
+  /* Box + hover come from .ghost-icon-btn (shared.ts). This button
+     swaps the shared padding for a fixed width/height and adds a hover
+     transition; the icon size is per-site. */
   .collapse-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
     width: 30px;
     height: 22px;
     padding: 0;
-    background: transparent;
-    color: var(--esphome-primary);
-    cursor: pointer;
     border-radius: var(--wa-border-radius-m);
     transition: background 0.12s;
-  }
-
-  .collapse-btn:hover {
-    background: var(--esphome-tint-border);
   }
 
   .collapse-btn wa-icon {

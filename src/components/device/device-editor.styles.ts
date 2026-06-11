@@ -218,32 +218,8 @@ export const deviceEditorStyles = css`
     gap: var(--wa-space-s);
   }
 
-  .diff-toggle {
-    border: none;
-    background: transparent;
-    color: var(--esphome-primary);
-    padding: 2px 4px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .diff-toggle:hover:not(:disabled) {
-    background: var(--esphome-tint-border);
-  }
-
-  .diff-toggle[aria-pressed="true"] {
-    background: var(--esphome-primary);
-    color: var(--esphome-on-primary);
-  }
-
-  .diff-toggle:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-
+  /* Box + hover + pressed + disabled come from .ghost-icon-btn
+     (shared.ts); only the icon size is per-site here. */
   .diff-toggle wa-icon {
     font-size: 18px;
   }
@@ -252,32 +228,6 @@ export const deviceEditorStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 2px;
-  }
-
-  .layout-toggle button {
-    border: none;
-    background: transparent;
-    color: var(--esphome-primary);
-    padding: 2px 4px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .layout-toggle button:hover:not(:disabled) {
-    background: var(--esphome-tint-border);
-  }
-
-  .layout-toggle button[aria-pressed="true"] {
-    background: var(--esphome-primary);
-    color: var(--esphome-on-primary);
-  }
-
-  .layout-toggle button:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
   }
 
   .layout-toggle wa-icon {

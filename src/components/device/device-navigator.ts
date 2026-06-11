@@ -388,7 +388,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
           <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
           <button
             type="button"
-            class="collapse-btn"
+            class="ghost-icon-btn collapse-btn"
             @click=${this._onCollapseClick}
             title=${this._localize("device.hide_navigator")}
             aria-label=${this._localize("device.hide_navigator")}

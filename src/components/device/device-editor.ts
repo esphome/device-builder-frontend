@@ -244,7 +244,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                   );
                   return html`<button
                     type="button"
-                    class="diff-toggle"
+                    class="ghost-icon-btn diff-toggle"
                     aria-pressed=${this._revealSensitive}
                     aria-label=${sensitiveLabel}
                     @click=${this._toggleRevealSensitive}
@@ -260,7 +260,7 @@ export class ESPHomeDeviceEditor extends LitElement {
             ${this._showDiffButton
               ? html`<button
                   type="button"
-                  class="diff-toggle"
+                  class="ghost-icon-btn diff-toggle"
                   aria-pressed=${this._showDiff}
                   ?disabled=${this.yaml === this.savedYaml && !this._showDiff}
                   @click=${this._toggleDiff}
@@ -277,6 +277,7 @@ export class ESPHomeDeviceEditor extends LitElement {
             >
               <button
                 type="button"
+                class="ghost-icon-btn"
                 aria-pressed=${effectiveLayout === "left"}
                 @click=${() => this._setLayout("left")}
                 title=${this._localize("device.layout_components_only")}
@@ -284,7 +285,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 <wa-icon library="mdi" name="layout-left"></wa-icon>
               </button>
               <button
-                class="split-btn"
+                class="ghost-icon-btn split-btn"
                 type="button"
                 aria-pressed=${effectiveLayout === "both"}
                 @click=${() => this._setLayout("both")}
@@ -294,6 +295,7 @@ export class ESPHomeDeviceEditor extends LitElement {
               </button>
               <button
                 type="button"
+                class="ghost-icon-btn"
                 aria-pressed=${effectiveLayout === "right"}
                 @click=${() => this._setLayout("right")}
                 title=${this._localize("device.layout_yaml_only")}

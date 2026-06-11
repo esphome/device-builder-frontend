@@ -114,6 +114,45 @@ export const espHomeStyles = css`
     background-color: color-mix(in srgb, var(--esphome-primary-light), black 5%);
   }
 
+  /* ─── Ghost icon button ───
+     Transparent, icon-only button used in headers and toolbars (the
+     device page's back / nav-expand buttons, the editor's diff and
+     layout toggles, the navigator's collapse button). The box + hover +
+     pressed + disabled states are shared here so the half-dozen
+     near-identical copies that used to live in three separate shadow
+     roots (page, editor, navigator) stay in sync.
+
+     Per-site overrides stay at the call site: icon font-size, container
+     gaps, and the few buttons that swap padding for a fixed width/height
+     or add a margin. The [aria-pressed="true"] filled state is harmless
+     on the plain (non-toggle) buttons — they never set aria-pressed — so
+     it lives in the shared base too. */
+  .ghost-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--esphome-primary);
+    padding: 2px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .ghost-icon-btn:hover:not(:disabled) {
+    background: var(--esphome-tint-border);
+  }
+
+  .ghost-icon-btn[aria-pressed="true"] {
+    background: var(--esphome-primary);
+    color: var(--esphome-on-primary);
+  }
+
+  .ghost-icon-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
   /* ─── Inline markdown rendering ─── */
   /* Used by util/markdown.ts for links and inline code inside any
      description (config field, board, component, section). */
