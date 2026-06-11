@@ -43,16 +43,3 @@ describe("device-navigator section header icons", () => {
     ]);
   });
 });
-
-describe("device-navigator overview button", () => {
-  it("clears the selection when the title is clicked", async () => {
-    const nav = await mountNavigator();
-    const events: Array<{ sectionKey: string | null }> = [];
-    nav.addEventListener("section-select", (e) => events.push((e as CustomEvent).detail));
-    const title = nav.shadowRoot?.querySelector<HTMLButtonElement>(".card-title-btn");
-    expect(title).toBeTruthy();
-    title!.click();
-    expect(events).toHaveLength(1);
-    expect(events[0].sectionKey).toBeNull();
-  });
-});

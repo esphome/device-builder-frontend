@@ -2,7 +2,6 @@
  * Unit tests for ``ParseErrorController.resolve`` — the classify step
  * behind the editors' read-only-on-parse-error behaviour (#1050).
  */
-import type { ReactiveControllerHost } from "lit";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -10,14 +9,7 @@ import type {
   ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
 import { ParseErrorController } from "../../../../src/components/device/automation-editor/parse-error-controller.js";
-
-const fakeHost = (): ReactiveControllerHost =>
-  ({
-    addController: vi.fn(),
-    removeController: vi.fn(),
-    requestUpdate: vi.fn(),
-    updateComplete: Promise.resolve(true),
-  }) as unknown as ReactiveControllerHost;
+import { fakeHost } from "../../../_fake-host.js";
 
 const SCRIPT: AutomationLocation = {
   kind: "script",

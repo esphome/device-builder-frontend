@@ -7,9 +7,12 @@ export const deviceEditorStyles = css`
 
   .card {
     background: var(--wa-color-surface-default);
-    border-radius: var(--wa-border-radius-l);
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    box-shadow: var(--wa-elevation-02);
+    border-radius: var(--editor-border-radius, var(--wa-border-radius-l));
+    border: var(
+      --editor-border,
+      var(--wa-border-width-s) solid var(--wa-color-surface-border)
+    );
+    box-shadow: var(--editor-shadow, var(--wa-elevation-02));
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -20,8 +23,13 @@ export const deviceEditorStyles = css`
     align-items: center;
     justify-content: space-between;
     padding: var(--wa-space-s) var(--wa-space-m);
-    background: var(--esphome-primary);
-    color: var(--esphome-on-primary);
+    background: var(--esphome-tint);
+    color: var(--esphome-primary);
+    border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+  }
+
+  :host([navcollapsed]) .card-header {
+    padding-left: var(--wa-space-2xs);
   }
 
   /* Navigator hidden + YAML-only layout = the title bar is the only
@@ -73,7 +81,7 @@ export const deviceEditorStyles = css`
   .editor-header-file {
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-normal);
-    color: color-mix(in srgb, var(--esphome-on-primary), transparent 25%);
+    color: var(--esphome-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -213,7 +221,7 @@ export const deviceEditorStyles = css`
   .diff-toggle {
     border: none;
     background: transparent;
-    color: var(--esphome-on-primary);
+    color: var(--esphome-primary);
     padding: 2px 4px;
     border-radius: 4px;
     cursor: pointer;
@@ -222,8 +230,13 @@ export const deviceEditorStyles = css`
     justify-content: center;
   }
 
+  .diff-toggle:hover:not(:disabled) {
+    background: var(--esphome-tint-border);
+  }
+
   .diff-toggle[aria-pressed="true"] {
-    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+    background: var(--esphome-primary);
+    color: var(--esphome-on-primary);
   }
 
   .diff-toggle:disabled {
@@ -244,7 +257,7 @@ export const deviceEditorStyles = css`
   .layout-toggle button {
     border: none;
     background: transparent;
-    color: var(--esphome-on-primary);
+    color: var(--esphome-primary);
     padding: 2px 4px;
     border-radius: 4px;
     cursor: pointer;
@@ -253,8 +266,13 @@ export const deviceEditorStyles = css`
     justify-content: center;
   }
 
+  .layout-toggle button:hover:not(:disabled) {
+    background: var(--esphome-tint-border);
+  }
+
   .layout-toggle button[aria-pressed="true"] {
-    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+    background: var(--esphome-primary);
+    color: var(--esphome-on-primary);
   }
 
   .layout-toggle button:disabled {
@@ -280,10 +298,16 @@ export const deviceEditorStyles = css`
     min-height: 0;
     display: grid;
     gap: 0;
+    --pane-divider-width: 9px;
   }
 
   .editor-layout--both {
-    grid-template-columns: 1fr 1px 1fr;
+    grid-template-columns: 1fr var(--pane-divider-width) 1fr;
+  }
+
+  .editor-layout.dragging {
+    cursor: col-resize;
+    user-select: none;
   }
 
   .editor-layout--left {
@@ -379,9 +403,36 @@ export const deviceEditorStyles = css`
   }
 
   .pane-divider {
-    background: var(--wa-color-surface-border);
-    width: 1px;
     align-self: stretch;
+    position: relative;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .pane-divider::before {
+    content: "";
+    position: absolute;
+    inset: 0 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: var(--wa-color-surface-border);
+    transition:
+      background 0.12s,
+      width 0.12s;
+  }
+
+  .pane-divider:hover::before,
+  .pane-divider:focus-visible::before,
+  .pane-divider.dragging::before {
+    background: var(--esphome-primary);
+    width: 2px;
+  }
+
+  .pane-divider:focus-visible {
+    /* Transparent outline keeps a ring in forced-colors mode. */
+    outline: 2px solid transparent;
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .editor-layout--left .editor-pane--right,
@@ -402,6 +453,10 @@ export const deviceEditorStyles = css`
       border: none;
       border-radius: 0;
       box-shadow: none;
+    }
+
+    .card-header {
+      padding-left: calc(var(--wa-space-l) - var(--wa-space-2xs) + var(--wa-space-s));
     }
   }
 `;

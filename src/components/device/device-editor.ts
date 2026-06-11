@@ -12,12 +12,20 @@ import {
   mdiViewSplitHorizontal,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, yamlDiffButtonContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import {
+  clampSplitRatio,
+  loadSplitRatio,
+  MAX_SPLIT_RATIO,
+  MIN_SPLIT_RATIO,
+  nextSplitRatioForKey,
+  saveSplitRatio,
+} from "../../util/split-ratio.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
 
@@ -172,6 +180,15 @@ export class ESPHomeDeviceEditor extends LitElement {
    *  "configuration invalid" banner above the editor. */
   @state()
   private _liveErrors: string[] = [];
+
+  @state()
+  private _splitRatio = loadSplitRatio();
+
+  @state()
+  private _dragging = false;
+
+  @query(".editor-layout")
+  private _layoutEl?: HTMLElement;
 
   static styles = [espHomeStyles, deviceEditorStyles];
 
@@ -344,7 +361,12 @@ export class ESPHomeDeviceEditor extends LitElement {
               ${this._localize("device.save")}
             </button>
           </div>
-          <div class=${`editor-layout ${layoutClass}`}>
+          <div
+            class="editor-layout ${layoutClass} ${this._dragging ? "dragging" : ""}"
+            style=${effectiveLayout === "both"
+              ? `grid-template-columns: ${this._splitRatio}fr var(--pane-divider-width) ${1 - this._splitRatio}fr`
+              : ""}
+          >
             <div class="editor-pane editor-pane--left">
               <esphome-device-board-info
                 .board=${this.board}
@@ -359,7 +381,21 @@ export class ESPHomeDeviceEditor extends LitElement {
               ></esphome-device-board-info>
             </div>
             ${effectiveLayout === "both"
-              ? html`<div class="pane-divider"></div>`
+              ? html`<div
+                  class="pane-divider ${this._dragging ? "dragging" : ""}"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label=${this._localize("device.resize_panes")}
+                  aria-valuemin=${Math.round(MIN_SPLIT_RATIO * 100)}
+                  aria-valuemax=${Math.round(MAX_SPLIT_RATIO * 100)}
+                  aria-valuenow=${Math.round(this._splitRatio * 100)}
+                  aria-valuetext=${this._localize("device.resize_panes_value", {
+                    percent: Math.round(this._splitRatio * 100),
+                  })}
+                  tabindex="0"
+                  @pointerdown=${this._onDividerPointerDown}
+                  @keydown=${this._onDividerKeydown}
+                ></div>`
               : nothing}
             <div class="editor-pane editor-pane--right">
               ${!this._showDiff && this._liveErrors.length > 0
@@ -494,6 +530,56 @@ export class ESPHomeDeviceEditor extends LitElement {
       })
     );
   }
+
+  private _onDividerPointerDown = (e: PointerEvent) => {
+    // Primary button only; let right/middle click through (context menu).
+    if (e.button !== 0) return;
+    const layout = this._layoutEl;
+    if (!layout) return;
+    e.preventDefault();
+    const rect = layout.getBoundingClientRect();
+    this._dragging = true;
+
+    // Pointer capture keeps move/up/cancel on the divider (no global
+    // listener leak) and auto-releases on up/cancel.
+    const divider = e.currentTarget as HTMLElement;
+    divider.setPointerCapture(e.pointerId);
+
+    // The fr tracks split the width left after the fixed divider column,
+    // so normalize against that (minus half the divider) for the bar to
+    // track the cursor instead of drifting a couple px.
+    const dividerPx = divider.getBoundingClientRect().width;
+    const usable = rect.width - dividerPx;
+
+    const onMove = (ev: PointerEvent) => {
+      if (usable <= 0) return;
+      this._splitRatio = clampSplitRatio(
+        (ev.clientX - rect.left - dividerPx / 2) / usable
+      );
+    };
+    // lostpointercapture covers up/cancel plus OS/browser interrupts
+    // that release capture without firing either.
+    const onEnd = () => {
+      this._dragging = false;
+      saveSplitRatio(this._splitRatio);
+      divider.removeEventListener("pointermove", onMove);
+      divider.removeEventListener("pointerup", onEnd);
+      divider.removeEventListener("pointercancel", onEnd);
+      divider.removeEventListener("lostpointercapture", onEnd);
+    };
+    divider.addEventListener("pointermove", onMove);
+    divider.addEventListener("pointerup", onEnd);
+    divider.addEventListener("pointercancel", onEnd);
+    divider.addEventListener("lostpointercapture", onEnd);
+  };
+
+  private _onDividerKeydown = (e: KeyboardEvent) => {
+    const next = nextSplitRatioForKey(this._splitRatio, e.key);
+    if (next === null) return;
+    e.preventDefault();
+    this._splitRatio = next;
+    saveSplitRatio(this._splitRatio);
+  };
 
   /**
    * Called when a "Show YAML editor" CTA bubbles up from the section

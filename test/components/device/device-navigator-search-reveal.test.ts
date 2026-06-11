@@ -21,11 +21,11 @@ const sensors = (n: number) =>
     [`  - platform: template`, `    name: "S${i}"`, `    id: s${i}`].join("\n")
   );
 
-// 3 items: under the toggle threshold (10).
+// 3 items: under the toggle threshold (15).
 const SMALL_YAML = ["esphome:", "  name: t", "wifi:", "logger:", ""].join("\n");
 
-// ~14 items: above the toggle threshold.
-const MID_YAML = ["esphome:", "  name: t", "wifi:", "sensor:", ...sensors(12), ""].join(
+// ~18 items: above the toggle threshold.
+const MID_YAML = ["esphome:", "  name: t", "wifi:", "sensor:", ...sensors(16), ""].join(
   "\n"
 );
 

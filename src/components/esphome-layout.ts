@@ -83,6 +83,8 @@ export class ESPHomeLayout extends LitElement {
            dashboard page and the device-table inherit it through the slot;
            trims on mobile to match the tighter body gutter. */
         --content-gutter: var(--wa-space-l);
+        /* Shared with .header-back padding so the arrow's edge aligns. */
+        --header-edge-inset: 6px;
       }
       @media (max-width: ${MOBILE_BREAKPOINT}px) {
         :host {
@@ -94,7 +96,8 @@ export class ESPHomeLayout extends LitElement {
         display: flex;
         align-items: center;
         gap: var(--wa-space-m);
-        padding: 0 var(--content-gutter);
+        padding-right: var(--content-gutter);
+        padding-left: var(--header-edge-inset);
         background: var(--esphome-primary);
         height: var(--esphome-header-height);
         box-sizing: border-box;
@@ -118,7 +121,7 @@ export class ESPHomeLayout extends LitElement {
         border: none;
         background: none;
         color: var(--esphome-on-primary);
-        padding: 6px;
+        padding: var(--header-edge-inset);
         border-radius: var(--wa-border-radius-m);
         opacity: 0.85;
         cursor: pointer;

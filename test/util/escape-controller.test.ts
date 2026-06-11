@@ -1,16 +1,6 @@
-import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import { EscapeController } from "../../src/util/escape-controller.js";
-
-class FakeHost implements ReactiveControllerHost {
-  controllers: ReactiveController[] = [];
-  addController(c: ReactiveController) {
-    this.controllers.push(c);
-  }
-  removeController() {}
-  requestUpdate() {}
-  updateComplete = Promise.resolve(true);
-}
+import { FakeHost } from "../_fake-host.js";
 
 /* The runtime test environment is plain Node (no jsdom), so we feed
    the controller our own EventTarget and dispatch raw ``Event``s with

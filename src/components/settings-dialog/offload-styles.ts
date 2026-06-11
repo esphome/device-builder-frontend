@@ -107,42 +107,41 @@ export const pairingRowStyles = css`
     font-size: 14px;
   }
 
-  .btn-unpair {
+  /* Shared chrome for the section's secondary action buttons: the
+     pairing row's icon-only squares and the alert's text Unpair
+     (.offloader-alert-unpair markup lives in build-offload-alert.ts;
+     its chrome stays here with its siblings). */
+  .btn-unpair,
+  .btn-edit-endpoint,
+  .offloader-alert-unpair {
     height: 32px;
-    width: 32px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-s);
     background: var(--wa-color-surface-default);
     color: var(--wa-color-text-quiet);
     cursor: pointer;
     flex-shrink: 0;
   }
 
-  .btn-unpair:hover {
-    background: color-mix(in srgb, var(--esphome-error), white 90%);
-    color: var(--esphome-error);
-    border-color: var(--esphome-error);
+  .btn-unpair,
+  .btn-edit-endpoint {
+    width: 32px;
+    border-radius: var(--wa-border-radius-s);
   }
 
-  .btn-unpair wa-icon {
+  .btn-unpair wa-icon,
+  .btn-edit-endpoint wa-icon {
     font-size: 16px;
   }
 
-  .btn-edit-endpoint {
-    height: 32px;
-    width: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-s);
-    background: var(--wa-color-surface-default);
-    color: var(--wa-color-text-quiet);
-    cursor: pointer;
-    flex-shrink: 0;
+  /* Destructive actions tint error on hover; edit tints primary. */
+  .btn-unpair:hover,
+  .offloader-alert-unpair:hover {
+    background: color-mix(in srgb, var(--esphome-error), white 90%);
+    color: var(--esphome-error);
+    border-color: var(--esphome-error);
   }
 
   .btn-edit-endpoint:hover {
@@ -151,8 +150,19 @@ export const pairingRowStyles = css`
     border-color: var(--esphome-primary);
   }
 
-  .btn-edit-endpoint wa-icon {
-    font-size: 16px;
+  /* Text variant — the alert spells the action out next to the
+     Re-pair pill, so it gets padding and the pill's radius. */
+  .offloader-alert-unpair {
+    padding: 0 12px;
+    border-radius: var(--wa-border-radius-m);
+    font: inherit;
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+  }
+
+  .offloader-alert-unpair:focus-visible {
+    outline: none;
+    box-shadow: var(--esphome-focus-ring);
   }
 
   /* The per-pairing enable toggle stays on the title line beside

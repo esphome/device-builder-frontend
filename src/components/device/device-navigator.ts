@@ -1,11 +1,11 @@
 import { consume } from "@lit/context";
 import {
   mdiChevronDown,
-  mdiChevronLeft,
   mdiChevronRight,
   mdiChevronUp,
   mdiCog,
   mdiMagnify,
+  mdiMenu,
   mdiPlusCircleOutline,
   mdiScriptTextOutline,
 } from "@mdi/js";
@@ -57,17 +57,17 @@ import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
-  "chevron-left": mdiChevronLeft,
   "chevron-up": mdiChevronUp,
   "chevron-right": mdiChevronRight,
   cog: mdiCog,
   magnify: mdiMagnify,
+  menu: mdiMenu,
   "plus-circle-outline": mdiPlusCircleOutline,
   "script-text-outline": mdiScriptTextOutline,
 });
 
 /** Items across all sections above which the search toggle is offered. */
-const SEARCH_TOGGLE_THRESHOLD = 10;
+const SEARCH_TOGGLE_THRESHOLD = 15;
 
 @customElement("esphome-device-navigator")
 export class ESPHomeDeviceNavigator extends LitElement {
@@ -432,7 +432,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
               title=${this._localize("device.hide_navigator")}
               aria-label=${this._localize("device.hide_navigator")}
             >
-              <wa-icon library="mdi" name="chevron-left"></wa-icon>
+              <wa-icon library="mdi" name="menu"></wa-icon>
             </button>
           </div>
         </header>
