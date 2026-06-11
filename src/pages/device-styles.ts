@@ -60,6 +60,32 @@ export const devicePageStyles = css`
     background: var(--esphome-tint-border);
   }
 
+  .header-start-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .nav-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--esphome-primary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--wa-border-radius-m);
+  }
+
+  .nav-toggle-btn wa-icon {
+    font-size: 18px;
+  }
+
+  .nav-toggle-btn:hover {
+    background: var(--esphome-tint-border);
+  }
+
   .page {
     position: relative;
   }

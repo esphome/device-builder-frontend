@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiArrowLeft, mdiChevronRight } from "@mdi/js";
+import { mdiArrowLeft, mdiChevronRight, mdiMenu } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -61,6 +61,7 @@ import "../components/yaml-validation-dialog.js";
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,
   "chevron-right": mdiChevronRight,
+  menu: mdiMenu,
 });
 
 @customElement("esphome-page-device")
@@ -924,30 +925,33 @@ export class ESPHomePageDevice extends LitElement {
             ?hasUpdateAvailable=${this._device?.update_available === true}
             ?busy=${this._activeJobs.has(this.id)}
           >
-            ${this._selectedSection
-              ? html`<button
-                  slot="header-start"
-                  class="back-btn"
-                  @click=${this._onBack}
-                  title=${backLabel}
-                  aria-label=${backLabel}
-                >
-                  <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                </button>`
+            ${showEdgeTab || this._selectedSection
+              ? html`<div slot="header-start" class="header-start-group">
+                  ${showEdgeTab
+                    ? html`<button
+                        type="button"
+                        class="nav-toggle-btn"
+                        @click=${this._onNavExpand}
+                        title=${this._localize("device.show_navigator")}
+                        aria-label=${this._localize("device.show_navigator")}
+                      >
+                        <wa-icon library="mdi" name="menu"></wa-icon>
+                      </button>`
+                    : nothing}
+                  ${this._selectedSection
+                    ? html`<button
+                        class="back-btn"
+                        @click=${this._onBack}
+                        title=${backLabel}
+                        aria-label=${backLabel}
+                      >
+                        <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                      </button>`
+                    : nothing}
+                </div>`
               : nothing}
           </esphome-device-editor>
         </div>
-        ${showEdgeTab
-          ? html`<button
-              type="button"
-              class="nav-edge-tab"
-              @click=${this._onNavExpand}
-              title=${this._localize("device.show_navigator")}
-              aria-label=${this._localize("device.show_navigator")}
-            >
-              <wa-icon library="mdi" name="chevron-right"></wa-icon>
-            </button>`
-          : nothing}
         <esphome-unsaved-changes-dialog
           @discard=${this._onUnsavedDiscard}
           @save=${this._onUnsavedSave}

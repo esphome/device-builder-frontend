@@ -29,7 +29,7 @@ export const deviceEditorStyles = css`
   }
 
   :host([navcollapsed]) .card-header {
-    padding-left: calc(var(--wa-space-l) - var(--wa-space-2xs) + var(--wa-space-s));
+    padding-left: var(--wa-space-2xs);
   }
 
   /* Navigator hidden + YAML-only layout = the title bar is the only

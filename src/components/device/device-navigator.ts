@@ -5,6 +5,7 @@ import {
   mdiChevronRight,
   mdiChevronUp,
   mdiCog,
+  mdiMenu,
   mdiPlusCircleOutline,
   mdiScriptTextOutline,
 } from "@mdi/js";
@@ -59,6 +60,7 @@ registerMdiIcons({
   "chevron-up": mdiChevronUp,
   "chevron-right": mdiChevronRight,
   cog: mdiCog,
+  menu: mdiMenu,
   "plus-circle-outline": mdiPlusCircleOutline,
   "script-text-outline": mdiScriptTextOutline,
 });
@@ -391,7 +393,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
             title=${this._localize("device.hide_navigator")}
             aria-label=${this._localize("device.hide_navigator")}
           >
-            <wa-icon library="mdi" name="chevron-left"></wa-icon>
+            <wa-icon library="mdi" name="menu"></wa-icon>
           </button>
         </header>
         <div class="card-body">
