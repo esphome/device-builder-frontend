@@ -74,8 +74,8 @@ export const devicePageStyles = css`
     background: transparent;
     color: var(--esphome-primary);
     cursor: pointer;
-    padding: 4px;
-    border-radius: var(--wa-border-radius-m);
+    padding: 2px 4px;
+    border-radius: 4px;
   }
 
   .nav-toggle-btn wa-icon {
