@@ -41,6 +41,36 @@ export const offloaderAlertStyles = css`
     gap: var(--wa-space-xs);
     flex-shrink: 0;
   }
+
+  /* Text variant of the pairing row's icon-only .btn-unpair — the
+     alert spells the action out next to the Re-pair pill. */
+  .offloader-alert-unpair {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 12px;
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-default);
+    color: var(--wa-color-text-quiet);
+    font: inherit;
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .offloader-alert-unpair:hover {
+    background: color-mix(in srgb, var(--esphome-error), white 90%);
+    color: var(--esphome-error);
+    border-color: var(--esphome-error);
+  }
+
+  .offloader-alert-unpair:focus-visible {
+    outline: none;
+    box-shadow: var(--esphome-focus-ring);
+  }
 `;
 
 export const pairingRowStyles = css`
