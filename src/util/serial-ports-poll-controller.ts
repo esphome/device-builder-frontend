@@ -4,12 +4,6 @@ import type { SerialPort } from "../api/types/system.js";
 
 export const SERIAL_PORTS_POLL_INTERVAL_MS = 5000;
 
-export interface SerialPortsPollControllerOptions {
-  /** Called when the first fetch of an active cycle fails. Later
-   *  poll failures are swallowed, keeping the last good list. */
-  onInitialError?: (err: unknown) => void;
-}
-
 /**
  * Reactive controller that polls ``config/serial_ports`` while a
  * port-picker surface is visible. Hosts call ``set(visible)`` from
@@ -22,6 +16,11 @@ export interface SerialPortsPollControllerOptions {
 export class SerialPortsPollController implements ReactiveController {
   ports: SerialPort[] = [];
   loading = false;
+  /** First-fetch failure of the active cycle; cleared by the next
+   *  successful poll so the recovered list isn't hidden behind a
+   *  stale error. Poll failures after a success are swallowed,
+   *  keeping the last good list. */
+  error: unknown = null;
   newPorts: ReadonlySet<string> = new Set();
 
   private _active = false;
@@ -34,8 +33,7 @@ export class SerialPortsPollController implements ReactiveController {
 
   constructor(
     private readonly _host: ReactiveControllerHost,
-    private readonly _getApi: () => ESPHomeAPI,
-    private readonly _options: SerialPortsPollControllerOptions = {}
+    private readonly _getApi: () => ESPHomeAPI
   ) {
     _host.addController(this);
   }
@@ -51,6 +49,7 @@ export class SerialPortsPollController implements ReactiveController {
     if (active) {
       this.ports = [];
       this.newPorts = new Set();
+      this.error = null;
       this._seen = null;
       this.loading = true;
       void this._poll();
@@ -65,6 +64,9 @@ export class SerialPortsPollController implements ReactiveController {
   }
 
   private async _poll() {
+    // An interval callback already queued when set(false) ran still
+    // fires after clearInterval — don't let it fetch.
+    if (!this._active) return;
     const cycle = this._cycle;
     if (this._inFlightCycle === cycle) return;
     this._inFlightCycle = cycle;
@@ -77,8 +79,9 @@ export class SerialPortsPollController implements ReactiveController {
       // First fetch of the cycle failed. ``_seen`` stays null so the
       // next successful poll seeds the baseline instead of flagging
       // every port as new.
+      console.error("Failed to load serial ports:", err);
       this.loading = false;
-      this._options.onInitialError?.(err);
+      this.error = err;
       this._host.requestUpdate();
     } finally {
       if (this._inFlightCycle === cycle) this._inFlightCycle = null;
@@ -96,6 +99,7 @@ export class SerialPortsPollController implements ReactiveController {
     );
     const changed =
       this.loading ||
+      this.error !== null ||
       ports.length !== this.ports.length ||
       ports.some(
         (p, i) => p.port !== this.ports[i].port || p.desc !== this.ports[i].desc
@@ -108,6 +112,7 @@ export class SerialPortsPollController implements ReactiveController {
     this.ports = ports;
     this.newPorts = fresh;
     this.loading = false;
+    this.error = null;
     this._host.requestUpdate();
   }
 }

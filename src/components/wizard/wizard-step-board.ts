@@ -114,15 +114,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @state()
   private _view: "boards" | "select-port" = "boards";
 
-  private _portsPoll = new SerialPortsPollController(this, () => this._api, {
-    onInitialError: (e) => {
-      console.error("Failed to load server serial ports:", e);
-      this._detectError = this._extractErrorDetail(
-        e,
-        this._localize("wizard.connect_your_board_detect_failed")
-      );
-    },
-  });
+  private _portsPoll = new SerialPortsPollController(this, () => this._api);
 
   @state()
   private _detectingChip = false;
@@ -192,7 +184,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
           .newPorts=${this._portsPoll.newPorts}
           .loading=${this._portsPoll.loading}
           .detecting=${this._detectingChip}
-          .errorMessage=${this._detectError}
+          .errorMessage=${this._detectError || this._portsError()}
           @select-port=${this._onServerPortSelected}
           @back=${this._onBackFromPortSelect}
         ></esphome-wizard-step-board-port-select>
@@ -536,6 +528,20 @@ export class ESPHomeWizardStepBoard extends LitElement {
       this._detectingChip = false;
     }
   };
+
+  /**
+   * Port-list fetch failure from the poller. Kept separate from
+   * ``_detectError`` (chip-detect failures) so a recovering poll
+   * clears only its own error, not a detect error shown mid-list.
+   */
+  private _portsError(): string {
+    return this._portsPoll.error === null
+      ? ""
+      : this._extractErrorDetail(
+          this._portsPoll.error,
+          this._localize("wizard.connect_your_board_detect_failed")
+        );
+  }
 
   /**
    * Prefer ``APIError.details`` (the human-readable bit) over
