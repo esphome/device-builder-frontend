@@ -539,8 +539,6 @@ export class ESPHomeDeviceEditor extends LitElement {
     // listener leak) and auto-releases on up/cancel.
     const divider = e.currentTarget as HTMLElement;
     divider.setPointerCapture(e.pointerId);
-    // preventDefault suppressed focus; set it so keyboard resize works.
-    divider.focus();
 
     // The fr tracks split the width left after the fixed divider column,
     // so normalize against that (minus half the divider) for the bar to
@@ -554,16 +552,20 @@ export class ESPHomeDeviceEditor extends LitElement {
         (ev.clientX - rect.left - dividerPx / 2) / usable
       );
     };
+    // lostpointercapture covers up/cancel plus OS/browser interrupts
+    // that release capture without firing either.
     const onEnd = () => {
       this._dragging = false;
       saveSplitRatio(this._splitRatio);
       divider.removeEventListener("pointermove", onMove);
       divider.removeEventListener("pointerup", onEnd);
       divider.removeEventListener("pointercancel", onEnd);
+      divider.removeEventListener("lostpointercapture", onEnd);
     };
     divider.addEventListener("pointermove", onMove);
     divider.addEventListener("pointerup", onEnd);
     divider.addEventListener("pointercancel", onEnd);
+    divider.addEventListener("lostpointercapture", onEnd);
   };
 
   private _onDividerKeydown = (e: KeyboardEvent) => {
