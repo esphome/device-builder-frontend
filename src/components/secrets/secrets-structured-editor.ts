@@ -104,7 +104,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
               ${entries.map((entry) => this._renderRow(entry, entries))}
             </div>`}
       <div class="add-row">
-        <button type="button" class="add-btn" @click=${this._openAdd}>
+        <button type="button" class="btn btn--add" @click=${this._openAdd}>
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("secrets.add_secret")}
         </button>

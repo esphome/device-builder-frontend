@@ -183,10 +183,12 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
           ${v.filtering ? nothing : html`<p class="italic">${v.desc}</p>`}
           ${v.groups
             ? v.groups.map((group) =>
-                // Collapse a single-of-a-kind domain to a flat row only when
-                // browsing; while filtering, keep the subgroup header so a
-                // lone search match still shows its domain context.
-                !v.filtering && group.rows.length === 1
+                // Collapse a lone config-block domain (a top-level mapping like
+                // bluetooth_proxy or i2c) to a flat row; a platform component
+                // (a "- platform:" list) always keeps its domain header even
+                // with one item. While filtering, keep every header so a lone
+                // search match still shows its domain context.
+                !v.filtering && group.rows.length === 1 && !group.rows[0].item.platform
                   ? renderNavSingleGroup(group, v)
                   : renderNavGroup(group, v)
               )

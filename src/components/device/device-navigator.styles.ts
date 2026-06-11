@@ -163,7 +163,11 @@ export const deviceNavigatorStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-xs);
-    padding: var(--wa-space-2xs) var(--wa-space-m);
+    /* Match the flat rows' inter-block gap with margin-top (not vertical
+       padding) so a header sits the same distance below the previous block
+       as the rows do; the header-to-rows gap lives on .nav-items--grouped. */
+    padding: 0 var(--wa-space-m);
+    margin-top: var(--wa-space-2xs);
     cursor: pointer;
     user-select: none;
     flex-shrink: 0;
@@ -220,35 +224,43 @@ export const deviceNavigatorStyles = css`
   .nav-items {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    /* Trim the left inset so rows hug the panel edge; the icon/text reclaim
-       the wasted gutter without crowding the right scrollbar. */
-    padding: var(--wa-space-2xs) var(--wa-space-s) var(--wa-space-2xs) var(--wa-space-2xs);
+    /* Bordered rows need breathing room so adjacent boxes don't touch. */
+    gap: var(--wa-space-2xs);
+    /* var(--wa-space-m) horizontal inset lines the row boxes' left/right
+       edges up under the section headers' content. */
+    padding: var(--wa-space-xs) var(--wa-space-m);
   }
 
-  /* Rows nested under a domain subgroup get a slight extra indent. */
+  /* Rows nested under a domain subgroup; the box edge keeps the shared
+     var(--wa-space-m) inset. padding-top is the header-to-first-row gap;
+     padding-bottom is 0 so the next block's own margin sets the gap. */
   .nav-items--grouped {
-    padding-top: 0;
-    padding-left: var(--wa-space-m);
+    padding-top: var(--wa-space-2xs);
+    padding-bottom: 0;
   }
 
-  /* A single-of-a-kind domain collapses to one flat row in place of its
-     subgroup header; align its glyph with the other subgroup-header glyphs by
-     backing out the nav-item's own left padding and its transparent selection
-     border (the header inset is the larger wa-space-m). */
+  /* A lone config-block domain (no "platform:", e.g. i2c / bluetooth_proxy)
+     renders as one flat row in place of a header; platform components keep
+     their header even with one item. Keep the shared box inset and only drop
+     the vertical pad; margin-top carries the inter-block gap, since each
+     single is its own one-row container. */
   .nav-items--single {
     padding-top: 0;
     padding-bottom: 0;
-    padding-left: calc(var(--wa-space-xs) - var(--wa-border-width-l));
+    margin-top: var(--wa-space-2xs);
   }
 
   .nav-item {
-    padding: 0 var(--wa-space-xs);
+    padding: 0 var(--wa-space-2xs);
     border-radius: var(--wa-border-radius-m);
-    border-left: var(--wa-border-width-l) solid transparent;
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    /* Uniform row height tracked off the type scale (two text lines plus the
+       row's own breathing room) so a description-less row pads up to the same
+       box as a title + description one instead of rendering shorter. */
+    min-height: calc(2 * var(--wa-font-size-s) + var(--wa-space-m));
     display: flex;
     align-items: center;
-    gap: var(--wa-space-2xs);
+    gap: var(--wa-space-xs);
     cursor: pointer;
     user-select: none;
     transition:
@@ -261,9 +273,11 @@ export const deviceNavigatorStyles = css`
     background: var(--esphome-tint);
   }
 
+  /* Selected adds the primary border so the open row stays distinct from a
+     row that is merely hovered (which only tints the background). */
   .nav-item--selected {
     background: var(--esphome-tint);
-    border-left-color: var(--esphome-primary);
+    border-color: var(--esphome-primary);
   }
 
   .nav-item-content {

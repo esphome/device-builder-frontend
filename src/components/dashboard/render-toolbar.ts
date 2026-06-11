@@ -147,11 +147,12 @@ export function renderToolbar(
   total: number
 ): TemplateResult {
   // Layout: [search] [view-toggle] [facets…]
-  //         [X devices]                 [Select multiple]
+  //         [X devices] [Select multiple]
   // Select-multiple sits paired with the device-count on its own
   // row — both reference the device list ("operate on these N
-  // devices") so semantically they belong together. Frees the
-  // toolbar-row above for filter-related controls only.
+  // devices") so semantically they belong together, grouped at the
+  // start under the search box. Frees the toolbar-row above for
+  // filter-related controls only.
   return html`
     <div class="toolbar">
       <div class="toolbar-row">

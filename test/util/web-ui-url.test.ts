@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildWebUiUrl, safeWebUiUrl } from "../../src/util/web-ui-url.js";
+import {
+  buildWebUiUrl,
+  buildWebUiUrlForHost,
+  safeWebUiUrl,
+} from "../../src/util/web-ui-url.js";
 import { makeConfiguredDevice as _device } from "../_make-configured-device.js";
 
 describe("safeWebUiUrl", () => {
@@ -176,5 +180,25 @@ describe("buildWebUiUrl", () => {
     expect(buildWebUiUrl(_device({ web_port: 8080, address: "kitchen.local" }))).toBe(
       "http://kitchen.local:8080"
     );
+  });
+});
+
+describe("buildWebUiUrlForHost", () => {
+  it("returns empty string when webPort is null or host is empty", () => {
+    expect(buildWebUiUrlForHost("kitchen.local", null)).toBe("");
+    expect(buildWebUiUrlForHost("", 80)).toBe("");
+  });
+
+  it("builds the URL for the given host, omitting the default port", () => {
+    expect(buildWebUiUrlForHost("kitchen.local", 80)).toBe("http://kitchen.local");
+    expect(buildWebUiUrlForHost("10.0.0.5", 8080)).toBe("http://10.0.0.5:8080");
+  });
+
+  it("brackets IPv6 hosts so the port suffix stays unambiguous", () => {
+    expect(buildWebUiUrlForHost("fe80::1", 8080)).toBe("http://[fe80::1]:8080");
+  });
+
+  it("rejects a host smuggling a userinfo @", () => {
+    expect(buildWebUiUrlForHost("1.2.3.4@evil.com", 80)).toBe("");
   });
 });

@@ -64,7 +64,7 @@ describe("esphome-secrets-structured-editor", () => {
     const el = await mount("");
     expect(rows(el)).toHaveLength(0);
     expect(el.shadowRoot!.querySelector(".empty")).not.toBeNull();
-    expect(el.shadowRoot!.querySelector(".add-btn")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector(".add-row .btn--add")).not.toBeNull();
   });
 
   test("the value field is a password input whose reveal follows the prop", async () => {
@@ -133,14 +133,14 @@ describe("esphome-secrets-structured-editor", () => {
   test("Add secret opens the dialog and writes name: value only on confirm", async () => {
     const el = await mount("wifi_ssid: home\n");
     const captured = onChange(el);
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".add-btn")!.click();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".add-row .btn--add")!.click();
     await el.updateComplete;
     // The dialog is open and nothing has been written yet.
     expect(captured.value).toBeNull();
     const view = el as unknown as AddView;
     view._addName = "api_key";
     view._addValue = "abc";
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--add")!.click();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".actions .btn--add")!.click();
     expect(captured.value).toBe("wifi_ssid: home\napi_key: abc\n");
   });
 

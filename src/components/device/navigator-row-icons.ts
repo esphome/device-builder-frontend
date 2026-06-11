@@ -246,6 +246,7 @@ const DOMAIN_ICON: Record<string, readonly [string, string]> = {
   microphone: ["microphone", mdiMicrophone],
   micro_wake_word: ["microphone", mdiMicrophone],
   voice_assistant: ["microphone-message", mdiMicrophoneMessage],
+  speaker: ["speaker", mdiSpeaker],
   dfplayer: ["speaker", mdiSpeaker],
   rtttl: ["speaker", mdiSpeaker],
 

@@ -28,6 +28,7 @@ import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
   renderEncryptionIcon,
@@ -211,17 +212,10 @@ export class ESPHomeDeviceCard extends LitElement {
                   <wa-icon library="mdi" name="text-box-outline"></wa-icon>
                 </button>
                 ${this.webUrl
-                  ? html`<a
-                      class="action-btn action-btn--ghost action-btn--tile"
-                      href=${this.webUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label=${this._localize("dashboard.action_visit_web_ui")}
-                      title=${this._localize("dashboard.action_visit_web_ui")}
-                      @click=${(e: Event) => e.stopPropagation()}
-                    >
-                      <wa-icon library="mdi" name="open-in-new"></wa-icon>
-                    </a>`
+                  ? renderVisitWebUiLink(this.webUrl, this._localize, {
+                      className: "action-btn action-btn--ghost action-btn--tile",
+                      onClick: (e) => e.stopPropagation(),
+                    })
                   : nothing}
                 <button
                   class="action-btn action-btn--ghost action-btn--icon-only"

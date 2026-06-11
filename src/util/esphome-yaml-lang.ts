@@ -19,8 +19,16 @@ import {
 import type { Input, SyntaxNodeRef } from "@lezer/common";
 import { parseMixed } from "@lezer/common";
 import { parser as yamlParser } from "@lezer/yaml";
+import { indentOf, stripComment } from "./yaml-line-walker.js";
 
 const LAMBDA_TAG = "!lambda";
+
+/** Line is a YAML list item: optional indent then ``- ``. */
+const RE_LIST_ITEM = /^ *-\s/;
+/** Trailing-colon block opener (``key:``). */
+const RE_BLOCK_OPENER = /:\s*$/;
+/** Block-scalar header (``key: |-`` / ``key: >+`` / ``lambda: |``). */
+const RE_BLOCK_SCALAR_OPENER = /:\s*[|>][+-]?\s*$/;
 
 /**
  * Single source of truth for ESPHome YAML's indent width. Two
@@ -111,53 +119,47 @@ export const esphomeYamlLanguage = LRLanguage.define({
  * YAML auto-indent service. Mirrors the legacy esphome dashboard's
  * Monaco rule (``beforeText: /:\s*$/`` → ``IndentAction.Indent``)
  * plus list-item continuation handling: pressing Enter under a
- * line that ends with ``:`` opens a child block (indent + 2), and
+ * line that ends with ``:`` opens a child block (indent + step), and
  * continuation lines inside a ``- item`` list are aligned to the
- * dash's content column (``dash + 2``) so siblings of the first
- * key in a list item land at the right depth automatically.
+ * dash's content column (``dash + step``) so siblings of the first
+ * key in a list item land at the right depth automatically (#134).
  *
- * Without this the new editor required the user to manually
- * Tab/space every nested line — a real regression from the
- * legacy editor (issue #134).
- *
- * Walks back over blank lines to find the nearest non-blank
- * predecessor so a stray blank between sections doesn't reset
- * indent to 0.
+ * Honors the simulated line break ``insertNewlineAndIndent`` sets at
+ * ``pos`` (via ``context.lineAt(pos, -1)``), so the reference line is the
+ * one the user is splitting — not the raw ``doc.lineAt(pos)``, which was
+ * one line too high and gave the wrong indent on Enter (#744). Walks back
+ * over blank lines so a stray blank between sections doesn't reset to 0.
  */
 const yamlIndentService = indentService.of((context, pos) => {
   // ``context.unit`` is the editor's configured indent width (the
-  // ``indentUnit`` facet, in columns). Deriving the step from it
-  // means the service tracks any future change to the editor's
-  // indent configuration instead of hard-coding ``+ 2``. The dash
-  // continuation also uses ``unit`` because YAML's ``- key`` is
-  // exactly one indent step deeper than the dash's column.
+  // ``indentUnit`` facet, in columns), so the step tracks any future
+  // change to the indent config instead of hard-coding ``+ 2``. A dash
+  // continuation uses the same unit: YAML's ``- key`` is exactly one step
+  // deeper than the dash's column.
   const step = context.unit;
-  const currentLineNumber = context.state.doc.lineAt(pos).number;
-  for (let n = currentLineNumber - 1; n >= 1; n--) {
-    const text = context.state.doc.line(n).text;
+  // ``lineAt(pos, -1)`` is the content up to the (simulated) break — the
+  // line being split. Anchoring the walk-back here (inclusive) is the
+  // #744 fix.
+  const breakLine = context.lineAt(pos, -1);
+  const startNumber = context.state.doc.lineAt(breakLine.from).number;
+  for (let n = startNumber; n >= 1; n--) {
+    // Start line: break-aware text (before the break). Earlier lines:
+    // their full text.
+    const text = n === startNumber ? breakLine.text : context.state.doc.line(n).text;
     if (!text.trim()) continue;
-    // A line of the form ``  - <something>``: the natural
-    // continuation column is one indent step past the dash's column,
-    // not the dash's leading whitespace. Without this, a
-    // continuation under ``  - platform: gpio`` would land at
-    // column 2 instead of 4.
-    const dashMatch = text.match(/^( *)-\s/);
-    const baseIndent = dashMatch
-      ? dashMatch[1].length + step
-      : (text.match(/^( *)/)?.[1].length ?? 0);
-    // Trailing-colon line opens a child block. Strip a trailing
-    // ``# comment`` first so ``key:  # note`` still triggers
-    // (ESPHome configs sprinkle inline comments freely).
-    const noComment = text.replace(/\s+#.*$/, "");
-    // Two block-opener shapes:
-    //   1. ``key:`` — plain mapping → child indent + step
-    //   2. ``key: |-`` / ``key: >+`` / ``lambda: |`` etc. — YAML
-    //      block-scalar header. The next line is the scalar's
-    //      content, which lives one step deeper than the key.
-    //      Crucial for ESPHome's ``lambda: |-`` and ``!lambda |-``
-    //      patterns, which would otherwise force the user to
-    //      hand-indent every line of C++.
-    if (/:\s*$/.test(noComment) || /:\s*[|>][+-]?\s*$/.test(noComment)) {
+    // A ``  - <something>`` line: the natural continuation column is one
+    // step past the dash's column (e.g. a sibling under
+    // ``  - platform: gpio`` lands at 4, not 2).
+    const baseIndent = RE_LIST_ITEM.test(text) ? indentOf(text) + step : indentOf(text);
+    // Strip a trailing ``# comment`` so ``key:  # note`` still triggers
+    // the block-opener rule (ESPHome configs sprinkle inline comments).
+    const noComment = stripComment(text);
+    // Two block-opener shapes, both opening a child one step deeper:
+    //   1. ``key:`` — plain mapping.
+    //   2. ``key: |-`` / ``key: >+`` / ``lambda: |`` — YAML block-scalar
+    //      header whose next line is the scalar content (ESPHome's
+    //      ``lambda: |-`` / ``!lambda |-`` shape).
+    if (RE_BLOCK_OPENER.test(noComment) || RE_BLOCK_SCALAR_OPENER.test(noComment)) {
       return baseIndent + step;
     }
     return baseIndent;
