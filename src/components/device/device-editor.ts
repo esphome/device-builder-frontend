@@ -542,9 +542,17 @@ export class ESPHomeDeviceEditor extends LitElement {
     // preventDefault suppressed focus; set it so keyboard resize works.
     divider.focus();
 
+    // The fr tracks split the width left after the fixed divider column,
+    // so normalize against that (minus half the divider) for the bar to
+    // track the cursor instead of drifting a couple px.
+    const dividerPx = divider.getBoundingClientRect().width;
+    const usable = rect.width - dividerPx;
+
     const onMove = (ev: PointerEvent) => {
-      if (rect.width === 0) return;
-      this._splitRatio = clampSplitRatio((ev.clientX - rect.left) / rect.width);
+      if (usable <= 0) return;
+      this._splitRatio = clampSplitRatio(
+        (ev.clientX - rect.left - dividerPx / 2) / usable
+      );
     };
     const onEnd = () => {
       this._dragging = false;
