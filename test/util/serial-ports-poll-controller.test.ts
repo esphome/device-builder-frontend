@@ -1,4 +1,3 @@
-import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { SerialPort } from "../../src/api/types/system.js";
@@ -6,19 +5,7 @@ import {
   SERIAL_PORTS_POLL_INTERVAL_MS,
   SerialPortsPollController,
 } from "../../src/util/serial-ports-poll-controller.js";
-
-class FakeHost implements ReactiveControllerHost {
-  controllers: ReactiveController[] = [];
-  updates = 0;
-  addController(c: ReactiveController) {
-    this.controllers.push(c);
-  }
-  removeController() {}
-  requestUpdate() {
-    this.updates++;
-  }
-  updateComplete = Promise.resolve(true);
-}
+import { FakeHost } from "../_fake-host.js";
 
 const A: SerialPort = { port: "/dev/ttyUSB0", desc: "CP2102" };
 const B: SerialPort = { port: "/dev/ttyUSB1", desc: "CH340" };

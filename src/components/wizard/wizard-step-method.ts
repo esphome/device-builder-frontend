@@ -2,9 +2,11 @@ import { consume } from "@lit/context";
 import { mdiChevronDown, mdiChevronRight, mdiCog } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { FileDropController } from "../../util/file-drop-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { ACCEPTED_UPLOAD_EXTENSIONS } from "../../util/upload-file-types.js";
 
@@ -27,6 +29,8 @@ export class ESPHomeWizardStepMethod extends LitElement {
 
   @state()
   private _advancedOpen = false;
+
+  private _drop = new FileDropController(this, (file) => this._sendImportFile(file));
 
   static styles = [
     espHomeStyles,
@@ -144,50 +148,72 @@ export class ESPHomeWizardStepMethod extends LitElement {
         color: var(--wa-color-text-quiet);
         font-style: italic;
       }
+
+      /* Negative margin + matching padding keep the highlight outline
+         from shifting the step content when a file drag hovers. */
+      .drop-zone {
+        margin: calc(-1 * var(--wa-space-s));
+        padding: var(--wa-space-s);
+        border-radius: var(--wa-border-radius-l);
+      }
+
+      .drop-zone--active {
+        outline: var(--wa-border-width-m) dashed var(--esphome-primary);
+        outline-offset: calc(-1 * var(--wa-border-width-m));
+        background: var(--esphome-tint-faint);
+      }
+
+      .drop-zone--active .drop-hint {
+        color: var(--esphome-primary);
+      }
     `,
   ];
 
   protected render() {
     return html`
-      <div class="step-heading">
-        <wa-icon library="mdi" name="cog"></wa-icon>
-        <h2>${this._localize("wizard.how_create")}</h2>
-      </div>
-
-      <div class="method-layout">
-        <div class="option-cards">
-          <button class="option-card" @click=${this._goToBoard}>
-            <div class="option-card-text">
-              <h3>${this._localize("wizard.create_new")}</h3>
-              <p>${this._localize("wizard.create_new_desc")}</p>
-            </div>
-            <wa-icon library="mdi" name="chevron-right"></wa-icon>
-          </button>
+      <div
+        class=${classMap({ "drop-zone": true, "drop-zone--active": this._drop.dragging })}
+      >
+        <div class="step-heading">
+          <wa-icon library="mdi" name="cog"></wa-icon>
+          <h2>${this._localize("wizard.how_create")}</h2>
         </div>
 
-        <button
-          class="advanced-toggle"
-          aria-expanded=${this._advancedOpen}
-          @click=${this._toggleAdvanced}
-        >
-          ${this._localize("wizard.advanced_options")}
-          <wa-icon library="mdi" name="chevron-down"></wa-icon>
-        </button>
+        <div class="method-layout">
+          <div class="option-cards">
+            <button class="option-card" @click=${this._goToBoard}>
+              <div class="option-card-text">
+                <h3>${this._localize("wizard.create_new")}</h3>
+                <p>${this._localize("wizard.create_new_desc")}</p>
+              </div>
+              <wa-icon library="mdi" name="chevron-right"></wa-icon>
+            </button>
+          </div>
 
-        ${this._advancedOpen
-          ? html`<div class="option-cards">${this._renderAdvancedOptions()}</div>`
-          : nothing}
+          <button
+            class="advanced-toggle"
+            aria-expanded=${this._advancedOpen}
+            @click=${this._toggleAdvanced}
+          >
+            ${this._localize("wizard.advanced_options")}
+            <wa-icon library="mdi" name="chevron-down"></wa-icon>
+          </button>
+
+          ${this._advancedOpen
+            ? html`<div class="option-cards">${this._renderAdvancedOptions()}</div>`
+            : nothing}
+        </div>
+
+        <p class="drop-hint">${this._localize("wizard.drop_yaml")}</p>
+
+        <input
+          id="file-input"
+          type="file"
+          accept=${ACCEPTED_UPLOAD_EXTENSIONS.join(",")}
+          hidden
+          @change=${this._onFileSelected}
+        />
       </div>
-
-      <p class="drop-hint">${this._localize("wizard.drop_yaml")}</p>
-
-      <input
-        id="file-input"
-        type="file"
-        accept=${ACCEPTED_UPLOAD_EXTENSIONS.join(",")}
-        hidden
-        @change=${this._onFileSelected}
-      />
     `;
   }
 
@@ -231,7 +257,10 @@ export class ESPHomeWizardStepMethod extends LitElement {
 
     // Reset so the same file can be re-selected if needed
     this._fileInput.value = "";
+    this._sendImportFile(file);
+  }
 
+  private _sendImportFile(file: File) {
     // Imports don't ask for a board — the YAML already declares its platform.
     // The dialog reads the file and creates the device immediately.
     this.dispatchEvent(
