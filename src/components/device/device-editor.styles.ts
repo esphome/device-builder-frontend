@@ -430,7 +430,9 @@ export const deviceEditorStyles = css`
   }
 
   .pane-divider:focus-visible {
-    outline: none;
+    /* Transparent outline keeps a ring in forced-colors mode. */
+    outline: 2px solid transparent;
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .editor-layout--left .editor-pane--right,

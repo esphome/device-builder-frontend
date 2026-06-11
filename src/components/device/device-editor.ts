@@ -554,16 +554,20 @@ export class ESPHomeDeviceEditor extends LitElement {
         (ev.clientX - rect.left - dividerPx / 2) / usable
       );
     };
+    // lostpointercapture covers up/cancel plus OS/browser interrupts
+    // that release capture without firing either.
     const onEnd = () => {
       this._dragging = false;
       saveSplitRatio(this._splitRatio);
       divider.removeEventListener("pointermove", onMove);
       divider.removeEventListener("pointerup", onEnd);
       divider.removeEventListener("pointercancel", onEnd);
+      divider.removeEventListener("lostpointercapture", onEnd);
     };
     divider.addEventListener("pointermove", onMove);
     divider.addEventListener("pointerup", onEnd);
     divider.addEventListener("pointercancel", onEnd);
+    divider.addEventListener("lostpointercapture", onEnd);
   };
 
   private _onDividerKeydown = (e: KeyboardEvent) => {
