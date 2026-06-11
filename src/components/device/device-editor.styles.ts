@@ -455,8 +455,10 @@ export const deviceEditorStyles = css`
       box-shadow: none;
     }
 
+    /* Hug the always-present leading menu/back control to the edge on
+       mobile, not the wide title indent of the pre-hamburger design. */
     .card-header {
-      padding-left: calc(var(--wa-space-l) - var(--wa-space-2xs) + var(--wa-space-s));
+      padding-left: var(--wa-space-2xs);
     }
   }
 `;
