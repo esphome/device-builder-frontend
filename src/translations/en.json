@@ -165,6 +165,7 @@
     "install_method_no_ports": "No serial ports found. Make sure the device is connected to the server.",
     "install_method_loading_ports": "Scanning for serial ports…",
     "install_method_back": "Back",
+    "serial_port_new": "New",
     "table_columns": "Columns",
     "table_toggle_columns": "Toggle columns",
     "view_cards": "Card view",

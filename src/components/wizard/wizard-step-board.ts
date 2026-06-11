@@ -13,7 +13,6 @@ import memoizeOne from "memoize-one";
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { SerialPort } from "../../api/types/system.js";
 import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -23,6 +22,7 @@ import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
 import {
   detectChip,
   disconnect,
@@ -114,11 +114,15 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @state()
   private _view: "boards" | "select-port" = "boards";
 
-  @state()
-  private _serverPorts: SerialPort[] = [];
-
-  @state()
-  private _loadingServerPorts = false;
+  private _portsPoll = new SerialPortsPollController(this, () => this._api, {
+    onInitialError: (e) => {
+      console.error("Failed to load server serial ports:", e);
+      this._detectError = this._extractErrorDetail(
+        e,
+        this._localize("wizard.connect_your_board_detect_failed")
+      );
+    },
+  });
 
   @state()
   private _detectingChip = false;
@@ -155,6 +159,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       this._filterFromDetection = true;
       void this._fetchBoards();
     }
+    this._portsPoll.set(this._view === "select-port");
   }
 
   private async _fetchBoards() {
@@ -183,8 +188,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
       return html`
         <esphome-wizard-step-board-port-select
           .environment=${this._environment}
-          .ports=${this._serverPorts}
-          .loading=${this._loadingServerPorts}
+          .ports=${this._portsPoll.ports}
+          .newPorts=${this._portsPoll.newPorts}
+          .loading=${this._portsPoll.loading}
           .detecting=${this._detectingChip}
           .errorMessage=${this._detectError}
           @select-port=${this._onServerPortSelected}
@@ -435,7 +441,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       void this._connectViaWebSerial();
       return;
     }
-    void this._openServerPortPicker();
+    this._openServerPortPicker();
   };
 
   private async _connectViaWebSerial() {
@@ -482,27 +488,14 @@ export class ESPHomeWizardStepBoard extends LitElement {
   }
 
   /**
-   * Open the server-side port picker, populate the port list via
-   * ``config/serial_ports``. The actual detection runs once the
-   * user picks a port (in ``_onServerPortSelected``).
+   * Open the server-side port picker. ``_portsPoll`` populates and
+   * refreshes the list while the view is showing; the actual
+   * detection runs once the user picks a port (in
+   * ``_onServerPortSelected``).
    */
-  private async _openServerPortPicker() {
+  private _openServerPortPicker() {
     this._view = "select-port";
     this._detectError = "";
-    this._serverPorts = [];
-    this._loadingServerPorts = true;
-    try {
-      this._serverPorts = await this._api.getSerialPorts();
-    } catch (e) {
-      console.error("Failed to load server serial ports:", e);
-      this._serverPorts = [];
-      this._detectError = this._extractErrorDetail(
-        e,
-        this._localize("wizard.connect_your_board_detect_failed")
-      );
-    } finally {
-      this._loadingServerPorts = false;
-    }
   }
 
   private _onServerPortSelected = async (e: CustomEvent<{ port: string }>) => {
