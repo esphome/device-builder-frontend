@@ -34,17 +34,23 @@ const peerRevoked: OffloaderPeerRevokedAlert = {
 
 const ctx = () => ({ localize, onRepair: vi.fn(), onUnpair: vi.fn() });
 
+/** All class tokens used across the template's static markup. */
+const classTokens = (markup: string): string[] =>
+  [...markup.matchAll(/class="([^"]*)"/g)]
+    .flatMap((m) => m[1].split(/\s+/))
+    .filter(Boolean);
+
 describe("renderOffloaderAlert", () => {
   it("styles the pin-mismatch actions as a primary Re-pair and a text Unpair", () => {
-    const markup = renderOffloaderAlert(pinMismatch, ctx()).strings.join("");
-    expect(markup).toContain('class="btn-pair-build-server"');
-    expect(markup).toContain('class="offloader-alert-unpair"');
-    expect(markup).not.toContain('class="btn-unpair"');
+    const tokens = classTokens(renderOffloaderAlert(pinMismatch, ctx()).strings.join(""));
+    expect(tokens).toContain("btn-pair-build-server");
+    expect(tokens).toContain("offloader-alert-unpair");
+    expect(tokens).not.toContain("btn-unpair");
   });
 
   it("styles the peer-revoked Unpair as a text button", () => {
-    const markup = renderOffloaderAlert(peerRevoked, ctx()).strings.join("");
-    expect(markup).toContain('class="offloader-alert-unpair"');
-    expect(markup).not.toContain('class="btn-unpair"');
+    const tokens = classTokens(renderOffloaderAlert(peerRevoked, ctx()).strings.join(""));
+    expect(tokens).toContain("offloader-alert-unpair");
+    expect(tokens).not.toContain("btn-unpair");
   });
 });
