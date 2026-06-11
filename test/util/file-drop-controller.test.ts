@@ -1,39 +1,10 @@
 /**
  * @vitest-environment happy-dom
  */
-import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FileDropController } from "../../src/util/file-drop-controller.js";
-
-class FakeHost implements ReactiveControllerHost {
-  controllers: ReactiveController[] = [];
-  updates = 0;
-  addController(c: ReactiveController) {
-    this.controllers.push(c);
-  }
-  removeController() {}
-  requestUpdate() {
-    this.updates++;
-  }
-  updateComplete = Promise.resolve(true);
-}
-
-/* happy-dom lacks DragEvent; the controller only reads ``dataTransfer``
-   and ``defaultPrevented``, so a plain Event with a stub suffices. */
-function dragEvent(
-  type: string,
-  opts: { files?: File[]; types?: string[] } = {}
-): Event & { dataTransfer: { types: string[]; files: File[]; dropEffect: string } } {
-  const e = new Event(type, { bubbles: true, cancelable: true });
-  Object.defineProperty(e, "dataTransfer", {
-    value: {
-      types: opts.types ?? ["Files"],
-      files: opts.files ?? [],
-      dropEffect: "",
-    },
-  });
-  return e as ReturnType<typeof dragEvent>;
-}
+import { dragEvent } from "../_drag-event.js";
+import { FakeHost } from "../_fake-host.js";
 
 function make(opts: { visible?: boolean } = {}) {
   const host = new FakeHost();

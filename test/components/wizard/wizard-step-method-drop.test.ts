@@ -11,6 +11,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { defaultLocalize } from "../../../src/common/localize.js";
 import { ESPHomeWizardStepMethod } from "../../../src/components/wizard/wizard-step-method.js";
+import { dragEvent } from "../../_drag-event.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mount(): Promise<ESPHomeWizardStepMethod> {
@@ -22,14 +23,6 @@ async function mount(): Promise<ESPHomeWizardStepMethod> {
   return el;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
-
-function dragEvent(type: string, files: File[] = []): Event {
-  const e = new Event(type, { bubbles: true, cancelable: true });
-  Object.defineProperty(e, "dataTransfer", {
-    value: { types: ["Files"], files, dropEffect: "" },
-  });
-  return e;
-}
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -54,7 +47,7 @@ describe("wizard-step-method drag and drop", () => {
       seen.push((e as CustomEvent<{ file: File }>).detail.file)
     );
     const yaml = new File(["esphome:"], "kitchen.yaml");
-    const drop = dragEvent("drop", [yaml]);
+    const drop = dragEvent("drop", { files: [yaml] });
     el.dispatchEvent(drop);
     expect(drop.defaultPrevented).toBe(true);
     expect(seen).toEqual([yaml]);
