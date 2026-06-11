@@ -12,7 +12,7 @@ import {
   mdiViewSplitHorizontal,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, yamlDiffButtonContext } from "../../context/index.js";
@@ -44,6 +44,20 @@ export type DeviceLayoutMode = "both" | "left" | "right";
 
 /** Cap the errors listed in the invalid banner; the rest collapse to "+N more". */
 const MAX_BANNER_ERRORS = 6;
+const MIN_SPLIT_RATIO = 0.25;
+const MAX_SPLIT_RATIO = 0.75;
+const SPLIT_KEY_STEP = 0.02;
+
+const clampSplitRatio = (ratio: number): number =>
+  Math.min(MAX_SPLIT_RATIO, Math.max(MIN_SPLIT_RATIO, ratio));
+
+const SPLIT_RATIO_STORAGE_KEY = "esphome-editor-split-ratio";
+
+const loadSplitRatio = (): number => {
+  const raw = localStorage.getItem(SPLIT_RATIO_STORAGE_KEY);
+  const parsed = raw === null ? NaN : Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? clampSplitRatio(parsed) : 0.5;
+};
 
 @customElement("esphome-device-editor")
 export class ESPHomeDeviceEditor extends LitElement {
@@ -172,6 +186,15 @@ export class ESPHomeDeviceEditor extends LitElement {
    *  "configuration invalid" banner above the editor. */
   @state()
   private _liveErrors: string[] = [];
+
+  @state()
+  private _splitRatio = loadSplitRatio();
+
+  @state()
+  private _dragging = false;
+
+  @query(".editor-layout")
+  private _layoutEl?: HTMLElement;
 
   static styles = [espHomeStyles, deviceEditorStyles];
 
@@ -344,7 +367,12 @@ export class ESPHomeDeviceEditor extends LitElement {
               ${this._localize("device.save")}
             </button>
           </div>
-          <div class=${`editor-layout ${layoutClass}`}>
+          <div
+            class="editor-layout ${layoutClass} ${this._dragging ? "dragging" : ""}"
+            style=${effectiveLayout === "both"
+              ? `grid-template-columns: ${this._splitRatio}fr var(--pane-divider-width) ${1 - this._splitRatio}fr`
+              : ""}
+          >
             <div class="editor-pane editor-pane--left">
               <esphome-device-board-info
                 .board=${this.board}
@@ -359,7 +387,18 @@ export class ESPHomeDeviceEditor extends LitElement {
               ></esphome-device-board-info>
             </div>
             ${effectiveLayout === "both"
-              ? html`<div class="pane-divider"></div>`
+              ? html`<div
+                  class="pane-divider ${this._dragging ? "dragging" : ""}"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label=${this._localize("device.resize_panes")}
+                  aria-valuemin=${Math.round(MIN_SPLIT_RATIO * 100)}
+                  aria-valuemax=${Math.round(MAX_SPLIT_RATIO * 100)}
+                  aria-valuenow=${Math.round(this._splitRatio * 100)}
+                  tabindex="0"
+                  @pointerdown=${this._onDividerPointerDown}
+                  @keydown=${this._onDividerKeydown}
+                ></div>`
               : nothing}
             <div class="editor-pane editor-pane--right">
               ${!this._showDiff && this._liveErrors.length > 0
@@ -494,6 +533,39 @@ export class ESPHomeDeviceEditor extends LitElement {
       })
     );
   }
+
+  private _onDividerPointerDown = (e: PointerEvent) => {
+    const layout = this._layoutEl;
+    if (!layout) return;
+    e.preventDefault();
+    const rect = layout.getBoundingClientRect();
+    this._dragging = true;
+
+    const onMove = (ev: PointerEvent) => {
+      if (rect.width === 0) return;
+      this._splitRatio = clampSplitRatio((ev.clientX - rect.left) / rect.width);
+    };
+    const onUp = () => {
+      this._dragging = false;
+      localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(this._splitRatio));
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  private _onDividerKeydown = (e: KeyboardEvent) => {
+    let next: number | null = null;
+    if (e.key === "ArrowLeft") next = this._splitRatio - SPLIT_KEY_STEP;
+    else if (e.key === "ArrowRight") next = this._splitRatio + SPLIT_KEY_STEP;
+    else if (e.key === "Home") next = MIN_SPLIT_RATIO;
+    else if (e.key === "End") next = MAX_SPLIT_RATIO;
+    if (next === null) return;
+    e.preventDefault();
+    this._splitRatio = clampSplitRatio(next);
+    localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(this._splitRatio));
+  };
 
   /**
    * Called when a "Show YAML editor" CTA bubbles up from the section

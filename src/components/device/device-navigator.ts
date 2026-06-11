@@ -5,7 +5,6 @@ import {
   mdiChevronRight,
   mdiChevronUp,
   mdiCog,
-  mdiHomeOutline,
   mdiPlusCircleOutline,
   mdiScriptTextOutline,
 } from "@mdi/js";
@@ -60,7 +59,6 @@ registerMdiIcons({
   "chevron-up": mdiChevronUp,
   "chevron-right": mdiChevronRight,
   cog: mdiCog,
-  "home-outline": mdiHomeOutline,
   "plus-circle-outline": mdiPlusCircleOutline,
   "script-text-outline": mdiScriptTextOutline,
 });
@@ -385,17 +383,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
           @automation-added=${this._onAutomationAdded}
         ></esphome-add-script-dialog>
         <header class="card-header">
-          <h2 class="card-title">
-            <button
-              type="button"
-              class="card-title-btn"
-              @click=${this._goToOverview}
-              title=${this._localize("device.navigator_home")}
-            >
-              <wa-icon library="mdi" name="home-outline"></wa-icon>
-              <span>${this._localize("device.navigator_title")}</span>
-            </button>
-          </h2>
+          <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
           <button
             type="button"
             class="collapse-btn"
@@ -471,18 +459,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
     if (!next.delete(key)) next.add(key);
     this._collapsedGroups = next;
   }
-
-  /** Clear the current section selection so the editor pane returns to
-   *  the device overview (board image + "Change board"). Mirrors the
-   *  deselect branch of ``_onItemClick`` without a row to toggle. */
-  private _goToOverview = () => {
-    this.selectedKey = null;
-    this._selectedLine = null;
-    this._selectedRange = null;
-    this._hoveredLine = null;
-    this._emitHighlight(null, false);
-    this._emitSectionSelect(null, undefined);
-  };
 
   /** Ask the page to hide the navigator. The page decides between
    *  desktop (set ``_navCollapsed`` + persist) and mobile (close the

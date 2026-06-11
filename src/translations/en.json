@@ -551,7 +551,6 @@
   },
   "device": {
     "navigator_title": "Device navigator",
-    "navigator_home": "Back to device overview",
     "navigator_search_placeholder": "Filter by name or ID…",
     "navigator_search_clear": "Clear filter",
     "navigator_search_count": "{count} of {total}",
@@ -568,6 +567,7 @@
     "layout_components_only": "Show components only",
     "layout_split": "Split view",
     "layout_yaml_only": "Show YAML editor only",
+    "resize_panes": "Resize panes",
     "yaml_reveal_sensitive": "Reveal sensitive values",
     "yaml_mask_sensitive": "Hide sensitive values",
     "yaml_editor": "YAML editor",

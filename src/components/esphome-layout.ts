@@ -94,7 +94,8 @@ export class ESPHomeLayout extends LitElement {
         display: flex;
         align-items: center;
         gap: var(--wa-space-m);
-        padding: 0 var(--content-gutter);
+        padding-right: var(--content-gutter);
+        padding-left: 6px;
         background: var(--esphome-primary);
         height: var(--esphome-header-height);
         box-sizing: border-box;

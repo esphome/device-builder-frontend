@@ -948,39 +948,39 @@ export class ESPHomePageDevice extends LitElement {
               <wa-icon library="mdi" name="chevron-right"></wa-icon>
             </button>`
           : nothing}
+        <esphome-unsaved-changes-dialog
+          @discard=${this._onUnsavedDiscard}
+          @save=${this._onUnsavedSave}
+          @cancel=${this._onUnsavedCancel}
+        ></esphome-unsaved-changes-dialog>
+        <esphome-command-dialog
+          @request-show-logs-after-install=${this._onPostInstallShowLogs}
+          @request-open-editor=${this._onRequestOpenEditor}
+        ></esphome-command-dialog>
+        <esphome-firmware-install-dialog
+          @request-show-logs-after-install=${this._onPostInstallShowLogs}
+          @clean-build=${this._onCleanBuild}
+          @request-open-editor=${this._onRequestOpenEditor}
+        ></esphome-firmware-install-dialog>
+        <esphome-logs-dialog></esphome-logs-dialog>
+        <esphome-install-method-dialog
+          ?open=${this._installCtrl.installMethodOpen}
+          .deviceState=${this._installCtrl.deviceState}
+          .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
+          .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
+          @close=${this._installCtrl.onInstallMethodClose}
+          @select-method=${this._installCtrl.onInstallMethodSelect}
+        ></esphome-install-method-dialog>
+        <esphome-yaml-validation-dialog
+          .errorCount=${this._validationErrorCount}
+          .firstErrorLine=${this._validationFirstLine}
+          .firstErrorCol=${this._validationFirstCol}
+          .firstErrorMessage=${this._validationFirstMessage}
+          @save-anyway=${this._onValidationSaveAnyway}
+          @goto=${this._onValidationGoTo}
+          @cancel=${this._onValidationCancel}
+        ></esphome-yaml-validation-dialog>
       </div>
-      <esphome-unsaved-changes-dialog
-        @discard=${this._onUnsavedDiscard}
-        @save=${this._onUnsavedSave}
-        @cancel=${this._onUnsavedCancel}
-      ></esphome-unsaved-changes-dialog>
-      <esphome-command-dialog
-        @request-show-logs-after-install=${this._onPostInstallShowLogs}
-        @request-open-editor=${this._onRequestOpenEditor}
-      ></esphome-command-dialog>
-      <esphome-firmware-install-dialog
-        @request-show-logs-after-install=${this._onPostInstallShowLogs}
-        @clean-build=${this._onCleanBuild}
-        @request-open-editor=${this._onRequestOpenEditor}
-      ></esphome-firmware-install-dialog>
-      <esphome-logs-dialog></esphome-logs-dialog>
-      <esphome-install-method-dialog
-        ?open=${this._installCtrl.installMethodOpen}
-        .deviceState=${this._installCtrl.deviceState}
-        .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
-        .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
-        @close=${this._installCtrl.onInstallMethodClose}
-        @select-method=${this._installCtrl.onInstallMethodSelect}
-      ></esphome-install-method-dialog>
-      <esphome-yaml-validation-dialog
-        .errorCount=${this._validationErrorCount}
-        .firstErrorLine=${this._validationFirstLine}
-        .firstErrorCol=${this._validationFirstCol}
-        .firstErrorMessage=${this._validationFirstMessage}
-        @save-anyway=${this._onValidationSaveAnyway}
-        @goto=${this._onValidationGoTo}
-        @cancel=${this._onValidationCancel}
-      ></esphome-yaml-validation-dialog>
     `;
   }
 

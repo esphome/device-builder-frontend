@@ -18,7 +18,7 @@ export const deviceNavigatorStyles = css`
       --navigator-border,
       var(--wa-border-width-s) solid var(--wa-color-surface-border)
     );
-    box-shadow: var(--wa-elevation-02);
+    box-shadow: var(--navigator-shadow, var(--wa-elevation-02));
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -30,43 +30,20 @@ export const deviceNavigatorStyles = css`
     justify-content: space-between;
     gap: var(--wa-space-s);
     padding: var(--wa-space-s) var(--wa-space-m);
-    background: var(--esphome-primary);
-    color: var(--esphome-on-primary);
+    background: var(--esphome-tint);
+    color: var(--esphome-primary);
+    border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     flex-shrink: 0;
   }
 
   .card-title {
     margin: 0;
-    line-height: 1;
-    min-width: 0;
-  }
-
-  .card-title-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--wa-space-2xs);
-    border: none;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    padding: var(--wa-space-2xs) var(--wa-space-xs);
-    margin-left: calc(-1 * var(--wa-space-xs));
-    border-radius: var(--wa-border-radius-s);
-    min-width: 0;
-    line-height: 1;
-    font-family: inherit;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
-  }
-
-  .card-title-btn:hover {
-    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-  }
-
-  .card-title-btn wa-icon {
-    display: block;
-    font-size: 18px;
-    flex-shrink: 0;
+    line-height: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .collapse-btn {
@@ -74,19 +51,22 @@ export const deviceNavigatorStyles = css`
     align-items: center;
     justify-content: center;
     border: none;
+    width: 30px;
+    height: 22px;
+    padding: 0;
     background: transparent;
-    color: var(--esphome-on-primary);
+    color: var(--esphome-primary);
     cursor: pointer;
-    padding: 2px 4px;
-    border-radius: var(--wa-border-radius-s);
+    border-radius: var(--wa-border-radius-m);
+    transition: background 0.12s;
   }
 
   .collapse-btn:hover {
-    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+    background: var(--esphome-tint-border);
   }
 
   .collapse-btn wa-icon {
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .card-body {
