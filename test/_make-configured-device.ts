@@ -42,6 +42,7 @@ const _BASE = {
   deployed_config_hash: "",
   has_pending_changes: false,
   update_available: false,
+  has_publish_command: false,
   api_enabled: false,
   api_encrypted: false,
   api_encryption_active: null,

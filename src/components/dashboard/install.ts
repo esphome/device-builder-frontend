@@ -29,6 +29,8 @@ export function onInstallMethodSelect(
     openCommand(host, device, "install", port ?? "OTA");
   } else if (method === "server-serial") {
     openCommand(host, device, "install", port!);
+  } else if (method === "publish") {
+    openCommand(host, device, "install", "PUBLISH");
   } else if (method === "web-serial") {
     host._firmwareDialog.installWebSerial(device);
   } else if (method === "web-download") {

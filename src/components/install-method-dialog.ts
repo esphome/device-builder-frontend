@@ -7,6 +7,7 @@ import {
   mdiCloudDownload,
   mdiDownload,
   mdiIpNetworkOutline,
+  mdiPublish,
   mdiSerialPort,
   mdiUsb,
   mdiWifi,
@@ -45,6 +46,7 @@ registerMdiIcons({
   "cloud-download": mdiCloudDownload,
   download: mdiDownload,
   "ip-network-outline": mdiIpNetworkOutline,
+  publish: mdiPublish,
 });
 
 type DialogView = "method" | "port-select";
@@ -66,6 +68,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
 
   @property()
   deviceTargetPlatform = "";
+
+  @property({ type: Boolean })
+  hasPublishCommand = false;
 
   @property()
   mode: "install" | "logs" = "install";
@@ -209,6 +214,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
                 <span class="desc">${this._localize(serverSerialKeys.desc)}</span>
               </div>
             </div>`
+          : nothing}
+        ${this.hasPublishCommand && this.mode === "install"
+          ? this._renderPublishOption()
           : nothing}
       </div>
       ${this._renderAdvancedSection()}
@@ -570,6 +578,20 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     if (!port || port === "OTA") return;
     this._selectMethod("ota", port);
   };
+
+  private _renderPublishOption() {
+    return html`
+      <div class="option" @click=${() => this._selectMethod("publish")}>
+        <wa-icon library="mdi" name="publish"></wa-icon>
+        <div class="info">
+          <span class="title">${this._localize("dashboard.install_method_publish")}</span>
+          <span class="desc"
+            >${this._localize("dashboard.install_method_publish_desc")}</span
+          >
+        </div>
+      </div>
+    `;
+  }
 
   private async _onServerSerial() {
     this._view = "port-select";

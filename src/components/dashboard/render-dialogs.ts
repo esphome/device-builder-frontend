@@ -185,6 +185,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
     <esphome-logs-dialog></esphome-logs-dialog>
     <esphome-install-method-dialog
       ?open=${host._installMethodOpen}
+      .hasPublishCommand=${host._installMethodDevice?.has_publish_command ?? false}
       .deviceState=${host._installMethodDevice?.state ?? DeviceState.UNKNOWN}
       .deviceTargetPlatform=${host._installMethodDevice?.target_platform ?? ""}
       .deviceCurrentAddress=${host._installMethodDevice?.ip ||

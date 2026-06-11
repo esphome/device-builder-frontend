@@ -37,6 +37,10 @@ export class DeviceInstallController implements ReactiveController {
     return this._host.device?.ip || this._host.device?.address || "";
   }
 
+  get hasPublishCommand(): boolean {
+    return this._host.device?.has_publish_command ?? false;
+  }
+
   /** "Install" entry point — opens the install-method picker. */
   onInstall = () => {
     if (!this._host.device) return;
@@ -70,6 +74,8 @@ export class DeviceInstallController implements ReactiveController {
       this._openCommand(device, "install", port ?? "OTA");
     } else if (method === "server-serial") {
       this._openCommand(device, "install", port!);
+    } else if (method === "publish") {
+      this._openCommand(device, "install", "PUBLISH");
     } else if (method === "web-serial") {
       this._host.firmwareDialog?.installWebSerial(device);
     } else if (method === "web-download") {

@@ -24,6 +24,9 @@ export interface ConfiguredDevice {
    *  declare one. Surfaced in the drawer and as an opt-in table
    *  column. */
   area: string;
+  /** True when ``esphome.publish_shell_command`` is set in the YAML — the
+   *  install dialog should offer a "Publish" option. */
+  has_publish_command: boolean;
   board_id: string;
   target_platform: string;
   /** mDNS hostname from StorageJSON (e.g. "my_device.local"). */

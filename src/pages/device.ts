@@ -966,6 +966,7 @@ export class ESPHomePageDevice extends LitElement {
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog
         ?open=${this._installCtrl.installMethodOpen}
+        .hasPublishCommand=${this._installCtrl.hasPublishCommand}
         .deviceState=${this._installCtrl.deviceState}
         .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
         .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
