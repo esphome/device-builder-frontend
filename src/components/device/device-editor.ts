@@ -529,6 +529,8 @@ export class ESPHomeDeviceEditor extends LitElement {
   }
 
   private _onDividerPointerDown = (e: PointerEvent) => {
+    // Primary button only; let right/middle click through (context menu).
+    if (e.button !== 0) return;
     const layout = this._layoutEl;
     if (!layout) return;
     e.preventDefault();
