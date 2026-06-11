@@ -86,44 +86,6 @@ export const devicePageStyles = css`
     background: var(--esphome-tint-border);
   }
 
-  .page {
-    position: relative;
-  }
-
-  .nav-edge-tab {
-    position: absolute;
-    left: 0;
-    top: calc(var(--wa-space-s) - 1px);
-    z-index: 5;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: calc(var(--wa-space-l) - var(--wa-space-2xs));
-    height: 24px;
-    padding: 0;
-    border: none;
-    border-radius: 0 var(--wa-border-radius-m) var(--wa-border-radius-m) 0;
-    background: var(--esphome-primary);
-    color: var(--esphome-on-primary);
-    cursor: pointer;
-    box-shadow: var(--wa-elevation-02);
-    transition: background 0.12s;
-  }
-
-  .nav-edge-tab:hover {
-    background: color-mix(in srgb, var(--esphome-primary), black 8%);
-  }
-
-  .nav-edge-tab wa-icon {
-    font-size: 16px;
-  }
-
-  @media (max-width: 900px) {
-    .nav-edge-tab {
-      width: 24px;
-    }
-  }
-
   @media (max-width: 900px) {
     /* Drop the page padding on mobile so the editor goes edge-to-edge.
        The card itself is already small at this width — wasting ~16px

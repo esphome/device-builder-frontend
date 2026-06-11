@@ -54,9 +54,25 @@ const clampSplitRatio = (ratio: number): number =>
 const SPLIT_RATIO_STORAGE_KEY = "esphome-editor-split-ratio";
 
 const loadSplitRatio = (): number => {
-  const raw = localStorage.getItem(SPLIT_RATIO_STORAGE_KEY);
-  const parsed = raw === null ? NaN : Number.parseFloat(raw);
-  return Number.isFinite(parsed) ? clampSplitRatio(parsed) : 0.5;
+  try {
+    const raw = localStorage.getItem(SPLIT_RATIO_STORAGE_KEY);
+    const parsed = raw === null ? NaN : Number.parseFloat(raw);
+    return Number.isFinite(parsed) ? clampSplitRatio(parsed) : 0.5;
+  } catch {
+    // localStorage can throw in private mode / sandboxed iframes /
+    // when quota is exhausted. Persistence is a nicety here, so fall
+    // back to the default ratio rather than breaking editor render.
+    return 0.5;
+  }
+};
+
+const saveSplitRatio = (ratio: number): void => {
+  try {
+    localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(ratio));
+  } catch {
+    // Same restricted-storage cases as loadSplitRatio — drop the write
+    // so resizing (drag or keyboard) always completes cleanly.
+  }
 };
 
 @customElement("esphome-device-editor")
@@ -548,6 +564,10 @@ export class ESPHomeDeviceEditor extends LitElement {
     // cancelled gesture still clears `_dragging` and the listeners.
     const divider = e.currentTarget as HTMLElement;
     divider.setPointerCapture(e.pointerId);
+    // `preventDefault` above suppresses the click's default focus, so
+    // focus the divider explicitly — otherwise the keyboard resize
+    // (Arrow/Home/End) is hard to discover after a mouse drag.
+    divider.focus();
 
     const onMove = (ev: PointerEvent) => {
       if (rect.width === 0) return;
@@ -555,7 +575,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     };
     const onEnd = () => {
       this._dragging = false;
-      localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(this._splitRatio));
+      saveSplitRatio(this._splitRatio);
       divider.removeEventListener("pointermove", onMove);
       divider.removeEventListener("pointerup", onEnd);
       divider.removeEventListener("pointercancel", onEnd);
@@ -574,7 +594,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     if (next === null) return;
     e.preventDefault();
     this._splitRatio = clampSplitRatio(next);
-    localStorage.setItem(SPLIT_RATIO_STORAGE_KEY, String(this._splitRatio));
+    saveSplitRatio(this._splitRatio);
   };
 
   /**
