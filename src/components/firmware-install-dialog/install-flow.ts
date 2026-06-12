@@ -5,6 +5,7 @@ import {
 } from "../../api/types/firmware-jobs.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import {
   connectToPort,
@@ -58,10 +59,7 @@ export async function startWebSerialInstall(
     }
     // The picker succeeded but the chip never answered — fail loud with
     // the esptool log expanded instead of silently closing (#1414).
-    host._fail(
-      host._localize("serial.connect_failed"),
-      err instanceof Error ? err.message : String(err)
-    );
+    host._fail(host._localize("serial.connect_failed"), getErrorMessage(err));
     return;
   }
   host._detected = detected;
