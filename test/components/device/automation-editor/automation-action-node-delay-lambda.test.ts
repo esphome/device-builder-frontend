@@ -90,7 +90,7 @@ function valueInput(el: ESPHomeAutomationActionNode): HTMLInputElement | null {
 function selectedUnit(el: ESPHomeAutomationActionNode): string | null {
   return (
     el
-      .shadowRoot!.querySelector("#ae-delay-unit-select option[selected]")
+      .shadowRoot!.querySelector("#ae-delay-unit-select wa-option[selected]")
       ?.getAttribute("value") ?? null
   );
 }

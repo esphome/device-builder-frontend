@@ -483,7 +483,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
         <label class="field-label" for="ae-delay-unit-select">
           ${this._localize("device.automation_action_delay_unit")}
         </label>
-        <select
+        <wa-select
           id="ae-delay-unit-select"
           ?disabled=${this.disabled}
           @change=${(e: Event) =>
@@ -494,11 +494,11 @@ export class ESPHomeAutomationActionNode extends LitElement {
         >
           ${DELAY_UNITS.map(
             (u) =>
-              html`<option value=${u} ?selected=${u === unit}>
+              html`<wa-option value=${u} ?selected=${u === unit}>
                 ${this._localize(`device.automation_action_delay_unit_${u}`)}
-              </option>`
+              </wa-option>`
           )}
-        </select>
+        </wa-select>
       </div>
     </div>`;
   }
