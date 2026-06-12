@@ -121,8 +121,9 @@ export class ESPHomeLayout extends LitElement {
         background: none;
         color: var(--esphome-on-primary);
         padding: var(--header-edge-inset);
-        /* Hug the bar edge without costing no-arrow routes the gutter. */
-        margin-left: calc(var(--header-edge-inset) - var(--content-gutter));
+        /* Pull only the arrow to the bar edge; routes without an
+           arrow keep the header's content-gutter inset. */
+        margin-inline-start: calc(var(--header-edge-inset) - var(--content-gutter));
         border-radius: var(--wa-border-radius-m);
         opacity: 0.85;
         cursor: pointer;
