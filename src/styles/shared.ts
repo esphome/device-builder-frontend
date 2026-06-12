@@ -115,18 +115,11 @@ export const espHomeStyles = css`
   }
 
   /* ─── Ghost icon button ───
-     Transparent, icon-only button used in headers and toolbars (the
-     device page's back / nav-expand buttons, the editor's diff and
-     layout toggles, the navigator's collapse button). The box + hover +
-     pressed + disabled states are shared here so the half-dozen
-     near-identical copies that used to live in three separate shadow
-     roots (page, editor, navigator) stay in sync.
-
-     Per-site overrides stay at the call site: icon font-size, container
-     gaps, and the few buttons that swap padding for a fixed width/height
-     or add a margin. The [aria-pressed="true"] filled state is harmless
-     on the plain (non-toggle) buttons — they never set aria-pressed — so
-     it lives in the shared base too. */
+     Transparent icon-only button for headers and toolbars; the box,
+     hover, pressed, and disabled states live here so the per-site copies
+     in the page, editor, and navigator shadow roots stay in sync. Call
+     sites keep only their real differences, such as icon size, fixed
+     dimensions, and margin. */
   .ghost-icon-btn {
     display: inline-flex;
     align-items: center;
