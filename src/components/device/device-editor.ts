@@ -258,18 +258,22 @@ export class ESPHomeDeviceEditor extends LitElement {
                 })()
               : nothing}
             ${this._showDiffButton
-              ? html`<button
-                  type="button"
-                  class="ghost-icon-btn diff-toggle"
-                  aria-pressed=${this._showDiff}
-                  ?disabled=${this.yaml === this.savedYaml && !this._showDiff}
-                  @click=${this._toggleDiff}
-                  title=${this._showDiff
+              ? (() => {
+                  const diffLabel = this._showDiff
                     ? this._localize("device.diff_view_editor")
-                    : this._localize("device.diff_view_diff")}
-                >
-                  <wa-icon library="mdi" name="vector-difference"></wa-icon>
-                </button>`
+                    : this._localize("device.diff_view_diff");
+                  return html`<button
+                    type="button"
+                    class="ghost-icon-btn diff-toggle"
+                    aria-pressed=${this._showDiff}
+                    ?disabled=${this.yaml === this.savedYaml && !this._showDiff}
+                    aria-label=${diffLabel}
+                    @click=${this._toggleDiff}
+                    title=${diffLabel}
+                  >
+                    <wa-icon library="mdi" name="vector-difference"></wa-icon>
+                  </button>`;
+                })()
               : nothing}
             <div
               class="layout-toggle"
@@ -280,6 +284,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 class="ghost-icon-btn"
                 aria-pressed=${effectiveLayout === "left"}
                 @click=${() => this._setLayout("left")}
+                aria-label=${this._localize("device.layout_components_only")}
                 title=${this._localize("device.layout_components_only")}
               >
                 <wa-icon library="mdi" name="layout-left"></wa-icon>
@@ -289,6 +294,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 type="button"
                 aria-pressed=${effectiveLayout === "both"}
                 @click=${() => this._setLayout("both")}
+                aria-label=${this._localize("device.layout_split")}
                 title=${this._localize("device.layout_split")}
               >
                 <wa-icon library="mdi" name="layout-split"></wa-icon>
@@ -298,6 +304,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 class="ghost-icon-btn"
                 aria-pressed=${effectiveLayout === "right"}
                 @click=${() => this._setLayout("right")}
+                aria-label=${this._localize("device.layout_yaml_only")}
                 title=${this._localize("device.layout_yaml_only")}
               >
                 <wa-icon library="mdi" name="layout-right"></wa-icon>

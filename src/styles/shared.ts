@@ -139,7 +139,9 @@ export const espHomeStyles = css`
     cursor: pointer;
   }
 
-  .ghost-icon-btn:hover:not(:disabled) {
+  /* Exclude the pressed state, whose filled background would otherwise be
+     out-specified by this hover rule and disappear while hovered. */
+  .ghost-icon-btn:hover:not(:disabled):not([aria-pressed="true"]) {
     background: var(--esphome-tint-border);
   }
 
