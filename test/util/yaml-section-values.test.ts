@@ -2432,6 +2432,89 @@ describe("globals list section (LIST_SECTIONS)", () => {
   });
 });
 
+describe("globals list section — zero-indented sequence", () => {
+  // device-builder-frontend#788: column-0 dashes read as empty, and a
+  // save after adding a row replaced the whole block.
+  const COL0 =
+    "globals:\n" +
+    "- id: my_int\n" +
+    "  type: int\n" +
+    "  initial_value: '0'\n" +
+    "- id: my_bool\n" +
+    "  type: bool\n" +
+    "  restore_value: true\n";
+
+  it("parses a column-0 globals block into an item array", () => {
+    const parsed = parseYamlSectionValues(COL0, "globals");
+    const items = parsed.globals as Record<string, unknown>[];
+    expect(Array.isArray(items)).toBe(true);
+    expect(items).toHaveLength(2);
+    expect(items[0].id).toBe("my_int");
+    expect(items[0].type).toBe("int");
+    expect(items[0].initial_value).toBe("0");
+    expect(items[1].id).toBe("my_bool");
+    expect(items[1].restore_value).toBe(true);
+  });
+
+  it("keeps items as mappings, not scalar strings", () => {
+    const items = parseYamlSectionValues(COL0, "globals").globals as unknown[];
+    for (const item of items) expect(typeof item).toBe("object");
+  });
+
+  it("round-trips adding a row without losing the existing items", () => {
+    const items = parseYamlSectionValues(COL0, "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    items.push({ id: "my_str", type: "std::string" });
+    const out = updateSectionInYaml(COL0, "globals", { globals: items });
+    const ritems = parseYamlSectionValues(out + "\n", "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    expect(ritems.map((i) => i.id)).toEqual(["my_int", "my_bool", "my_str"]);
+  });
+
+  it("round-trips editing one item, keeping every entry", () => {
+    const items = parseYamlSectionValues(COL0, "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    items[0].initial_value = "42";
+    const out = updateSectionInYaml(COL0, "globals", { globals: items });
+    const ritems = parseYamlSectionValues(out + "\n", "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    expect(ritems).toHaveLength(2);
+    expect(ritems[0].initial_value).toBe("42");
+    expect(ritems[1].id).toBe("my_bool");
+  });
+
+  it("preserves a sibling section on round-trip", () => {
+    const WITH_SIBLING = COL0 + "wifi:\n  ssid: home\n";
+    const items = parseYamlSectionValues(WITH_SIBLING, "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    items[0].initial_value = "7";
+    const out = updateSectionInYaml(WITH_SIBLING, "globals", { globals: items });
+    expect(out).toContain("wifi:");
+    expect(out).toContain("ssid: home");
+  });
+
+  it("keeps a column-0 bare-dash placeholder row as an empty item", () => {
+    const WITH_BARE = "globals:\n- id: my_int\n  type: int\n-\n";
+    const items = parseYamlSectionValues(WITH_BARE, "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    expect(items).toHaveLength(2);
+    expect(items[0].id).toBe("my_int");
+    expect(items[1]).toEqual({});
+  });
+});
+
 describe("LIST_SECTIONS is membership-driven, not hardcoded to globals", () => {
   // Pins genericity: parse/serialize key off membership, so a future
   // top-level list section is one allowlist edit.

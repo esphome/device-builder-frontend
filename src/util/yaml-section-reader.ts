@@ -392,9 +392,13 @@ export function parseSectionCore(
   // Top-level list-bodied section (globals): the item array lives at
   // [sectionKey], where the wrapper's multi_value entry reads it.
   if (!isListItem && LIST_SECTIONS.has(sectionKey)) {
+    // Peek and parse against the header's own indent, not the detected
+    // child indent: a zero-indented sequence puts its dashes at the
+    // header's column, below the child-indent fallback.
+    const headerIndent = _leadingIndent(lines[startIdx]);
     const peek = _skipBlankAndCommentLines(lines, startIdx + 1);
-    if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {
-      values[sectionKey] = parseListBlock(lines, startIdx + 1, childIndent).value;
+    if (peek < lines.length && isChildListItemLine(lines[peek], headerIndent)) {
+      values[sectionKey] = parseListBlock(lines, startIdx + 1, headerIndent).value;
       // No per-key spans — `updateSectionInYaml` re-emits this whole
       // list through its dedicated LIST_SECTIONS branch.
       return { values, spans, comments, childIndent, isListItem, startIdx };
