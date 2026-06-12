@@ -88,7 +88,7 @@ describe("automation-action-node trigger labels (esphome/device-builder#1390)", 
     expect(el.shadowRoot!.querySelector("esphome-config-entry-form")).not.toBeNull();
   });
 
-  it("keeps else routed through the control-flow localization key", async () => {
+  it("keeps then and else routed through the control-flow localization keys", async () => {
     const ifAction = {
       id: "if",
       name: "If",
@@ -107,5 +107,8 @@ describe("automation-action-node trigger labels (esphome/device-builder#1390)", 
     const labels = nestedLabels(el);
     expect(labels).toContain("device.automation_else");
     expect(labels).not.toContain("Else");
+    // then keeps its control-flow wording, not a title-cased "Then".
+    expect(labels).toContain("device.automation_action");
+    expect(labels).not.toContain("Then");
   });
 });

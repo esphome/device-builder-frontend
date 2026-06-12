@@ -332,15 +332,13 @@ export class ESPHomeAutomationActionNode extends LitElement {
     </div>`;
   }
 
-  /**
-   * Label a nested action list. ``then`` / ``else`` keep their
-   * control-flow wording; triggered-action keys (``on_response`` /
-   * ``on_error`` on ``http_request.get`` …) title-case so each list
-   * is self-describing.
-   */
+  /** Label a nested action list: ``then`` / ``else`` keep their
+   *  control-flow wording, other keys title-case so each is distinct. */
   private _nestedListLabel(key: string): string {
     if (key === "else") return this._localize("device.automation_else");
     if (key === "then") return this._localize("device.automation_action");
+    // Backend-driven trigger keys have no fixed localization key;
+    // title-case for now (English only).
     return key
       .split("_")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
