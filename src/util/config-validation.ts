@@ -54,6 +54,8 @@ export function isEntryVisible(
   }
 
   if (!entry.depends_on) return true;
+  // The backend sets at most one of the three gate fields, so the
+  // check order below is immaterial.
   const depValue = values[entry.depends_on];
   if (entry.depends_on_value !== null && entry.depends_on_value !== undefined) {
     return depValue === entry.depends_on_value;
