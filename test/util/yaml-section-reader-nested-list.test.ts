@@ -133,3 +133,39 @@ describe("updateSectionInYaml — list item whose first field is a nested mappin
     expect(v.id).toBe("my_font");
   });
 });
+
+describe("parseYamlSectionValues — inline comment on the dash-line key", () => {
+  it("captures the nested mapping when the dash key carries a comment", () => {
+    const yaml = `font:
+  - file:  # gfonts source
+      type: gfonts
+      family: Roboto
+    id: f
+`;
+    const v = parseYamlSectionValues(yaml, "font", 2);
+    expect(v.file).toEqual({ type: "gfonts", family: "Roboto" });
+    expect(v.id).toBe("f");
+  });
+
+  it("keeps a scalar value that begins with # (no preceding space)", () => {
+    // ``#`` is a comment only when preceded by whitespace, so an unspaced
+    // ``#`` is part of the value, not a comment to drop.
+    const yaml = `font:
+  - file:#fragment
+    id: f
+`;
+    const v = parseYamlSectionValues(yaml, "font", 2);
+    expect(v.file).toBe("#fragment");
+    expect(v.id).toBe("f");
+  });
+
+  it("strips a trailing comment from an inline scalar dash key", () => {
+    const yaml = `font:
+  - file: gfonts://Roboto  # cached locally
+    id: f
+`;
+    const v = parseYamlSectionValues(yaml, "font", 2);
+    expect(v.file).toBe("gfonts://Roboto");
+    expect(v.id).toBe("f");
+  });
+});

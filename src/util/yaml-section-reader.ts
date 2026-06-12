@@ -407,17 +407,21 @@ export function parseSectionCore(
   if (isListItem) {
     const firstMatch = lines[startIdx].match(LIST_ITEM_INLINE_KEY_RE);
     if (firstMatch) {
-      const raw = firstMatch[2].trim();
-      if (raw !== "") {
-        const { comment } = splitInlineComment(raw);
+      // Re-read the value WITH its leading whitespace (the shared regex's
+      // ``\s*`` drops it) so ``splitInlineComment`` can tell a real comment
+      // (``#`` after whitespace) from a value that merely starts with ``#``
+      // (``- file:#fragment``). The first ``:`` after the dash is the key's.
+      const head = lines[startIdx];
+      const afterColon = head.slice(head.indexOf(":", head.indexOf("-")) + 1);
+      const { value: rawValue, comment } = splitInlineComment(afterColon);
+      const scalar = rawValue.trim();
+      if (scalar !== "") {
         if (comment) comments.set(firstMatch[1], comment);
-        values[firstMatch[1]] = parseScalar(raw);
+        values[firstMatch[1]] = parseScalar(scalar);
       } else {
-        // ``- file:`` with the value as a nested mapping on the following
-        // deeper-indented lines. The key rides on the dash line, so the
-        // main loop (which starts below it) never sees this value; capture
-        // it here so a list item whose first field is a nested mapping
-        // (font.file's structured form) round-trips into the form (#1389).
+        // No scalar: the key's value is the nested mapping below. It rides on
+        // the dash line, so the main loop (which starts under it) never sees
+        // it (#1389). A standalone comment is dropped, as the rewrite does.
         const sub = readNestedMappingAfter(startIdx + 1);
         if (sub && Object.keys(sub.values).length > 0) values[firstMatch[1]] = sub.values;
       }
