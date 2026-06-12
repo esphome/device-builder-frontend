@@ -8,16 +8,19 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 import { ESPHomeCommandPalette } from "../../src/components/command-palette.js";
 
 /**
- * Pins the palette's wa-dialog close contract: ``_onAfterHide`` syncs
- * ``_open`` and drops the content only for the palette's own wa-dialog
- * (not a bubbled descendant), and ``close()`` keeps the content
- * rendered so the hide animation doesn't run on an empty card.
+ * Pins the palette's wa-dialog close contract: ``_onHide`` syncs
+ * ``_open`` / clears the YAML search on the initiating hide (so a
+ * queued ``yaml/search`` can't flush during the hide animation),
+ * ``_onAfterHide`` drops the content only once hidden and only when
+ * not reopened mid-animation, and both ignore bubbled events from
+ * descendants.
  */
 
 interface PaletteView extends EventTarget {
   _open: boolean;
   _contentRendered: boolean;
   _yamlSearch: { clear: () => void };
+  _onHide(e: Event): void;
   _onAfterHide(e: Event): void;
   open(): void;
   close(): void;
@@ -27,8 +30,8 @@ function makePalette(): PaletteView {
   return new ESPHomeCommandPalette() as unknown as PaletteView;
 }
 
-function afterHideEvent(sameTarget: boolean): Event {
-  const event = new Event("wa-after-hide", { bubbles: true });
+function hideEvent(type: string, sameTarget: boolean): Event {
+  const event = new Event(type, { bubbles: true });
   const own = document.createElement("wa-dialog");
   const target = sameTarget ? own : document.createElement("wa-dialog");
   Object.defineProperty(event, "currentTarget", { value: own });
@@ -36,26 +39,50 @@ function afterHideEvent(sameTarget: boolean): Event {
   return event;
 }
 
-describe("esphome-command-palette wa-after-hide contract", () => {
-  test("own wa-after-hide closes, drops content, clears yaml search", () => {
+describe("esphome-command-palette wa-dialog close contract", () => {
+  test("own wa-hide closes immediately and clears yaml search", () => {
     const palette = makePalette();
     palette.open();
     expect(palette._open).toBe(true);
     expect(palette._contentRendered).toBe(true);
     const clear = vi.spyOn(palette._yamlSearch, "clear");
 
-    palette._onAfterHide(afterHideEvent(true));
+    palette._onHide(hideEvent("wa-hide", true));
 
     expect(palette._open).toBe(false);
-    expect(palette._contentRendered).toBe(false);
     expect(clear).toHaveBeenCalled();
+    // Content survives until the hide animation finishes.
+    expect(palette._contentRendered).toBe(true);
   });
 
-  test("bubbled wa-after-hide from a descendant is ignored", () => {
+  test("own wa-after-hide drops the content once hidden", () => {
+    const palette = makePalette();
+    palette.open();
+    palette._onHide(hideEvent("wa-hide", true));
+
+    palette._onAfterHide(hideEvent("wa-after-hide", true));
+
+    expect(palette._contentRendered).toBe(false);
+  });
+
+  test("wa-after-hide keeps the content when reopened mid-animation", () => {
+    const palette = makePalette();
+    palette.open();
+    palette._onHide(hideEvent("wa-hide", true));
+    palette.open();
+
+    palette._onAfterHide(hideEvent("wa-after-hide", true));
+
+    expect(palette._open).toBe(true);
+    expect(palette._contentRendered).toBe(true);
+  });
+
+  test("bubbled events from a descendant are ignored", () => {
     const palette = makePalette();
     palette.open();
 
-    palette._onAfterHide(afterHideEvent(false));
+    palette._onHide(hideEvent("wa-hide", false));
+    palette._onAfterHide(hideEvent("wa-after-hide", false));
 
     expect(palette._open).toBe(true);
     expect(palette._contentRendered).toBe(true);

@@ -161,12 +161,19 @@ export class ESPHomeCommandPalette extends LitElement {
     else this.open();
   }
 
-  // Esc and light-dismiss close the wa-dialog on their own; sync our
-  // flag, then drop the content now that the hide animation is done.
-  private _onAfterHide = (e: Event) => {
+  // Esc and light-dismiss close the wa-dialog on their own; sync state
+  // on the initiating hide so a queued yaml/search can't flush during
+  // the hide animation.
+  private _onHide = (e: Event) => {
     if (e.target !== e.currentTarget) return;
     this.close();
-    this._contentRendered = false;
+  };
+
+  // Drop the content once the hide animation ends; keep it when the
+  // palette was reopened mid-animation.
+  private _onAfterHide = (e: Event) => {
+    if (e.target !== e.currentTarget) return;
+    if (!this._open) this._contentRendered = false;
   };
 
   private _allCommands(): CommandAction[] {
@@ -345,6 +352,7 @@ export class ESPHomeCommandPalette extends LitElement {
         label=${this._localize("command_palette.title")}
         light-dismiss
         ?open=${this._open}
+        @wa-hide=${this._onHide}
         @wa-after-hide=${this._onAfterHide}
       >
         ${this._contentRendered ? this._renderContent() : nothing}
