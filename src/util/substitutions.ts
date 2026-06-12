@@ -52,11 +52,10 @@ export function hasSubstitutionReference(text: string): boolean {
   return SUBSTITUTION_REF_RE.test(text);
 }
 
-// A complete or in-progress reference start (``${`` or ``$<letter>``) that
-// isn't an escaped ``$$``. Looser than SUBSTITUTION_REF_RE (accepts an
-// unclosed ``${...``) so a field stays editable mid-keystroke, but tight
-// enough to skip ``$$`` escapes and a stray mid-string ``$`` (``12$34``).
-const SUBSTITUTION_LIKE_RE = /(?:^|[^$])\$(?:\{|[a-zA-Z_])/;
+// A ``$`` beginning a reference (followed by ``{`` or a letter). Looser than
+// SUBSTITUTION_REF_RE (accepts an unclosed ``${...``) so a field stays editable
+// mid-keystroke; a stray mid-string ``$`` (``12$34``) doesn't match.
+const SUBSTITUTION_LIKE_RE = /\$(?:\{|[a-zA-Z_])/;
 
 /** True when *text* is or is becoming a ``${var}`` / ``$var`` reference
  *  (mid-edit partials included); keeps such values in the editable text

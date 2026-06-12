@@ -135,8 +135,8 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
   if (isEmpty) return null;
 
   // A ${var} reference resolves at build time, so its value is unknowable
-  // here; never flag the literal (or a mid-edit partial) as "not a number"
-  // (#1391).
+  // here; skip all validation (range, options, not-a-number) for the literal
+  // or a mid-edit partial (#1391).
   if (typeof raw === "string" && looksLikeSubstitution(raw)) return null;
 
   if (entry.type === ConfigEntryType.INTEGER && entry.display_format === "hex") {

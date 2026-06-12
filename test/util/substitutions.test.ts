@@ -117,11 +117,12 @@ describe("looksLikeSubstitution", () => {
     expect(looksLikeSubstitution("${")).toBe(true);
     expect(looksLikeSubstitution("$var")).toBe(true);
     expect(looksLikeSubstitution("a ${x} b")).toBe(true);
+    // Agrees with hasSubstitutionReference: the inner ${x} still counts.
+    expect(looksLikeSubstitution("$${x}")).toBe(true);
   });
 
-  it("excludes $$ escapes and stray mid-string $ (#773 review)", () => {
-    expect(looksLikeSubstitution("$$5")).toBe(false); // escaped literal $
-    expect(looksLikeSubstitution("$${x}")).toBe(false);
+  it("excludes a stray mid-string $ and $$ literals (#773 review)", () => {
+    expect(looksLikeSubstitution("$$5")).toBe(false); // no { or letter after a $
     expect(looksLikeSubstitution("12$34")).toBe(false);
     expect(looksLikeSubstitution("5$")).toBe(false);
     expect(looksLikeSubstitution("$5.00")).toBe(false);
