@@ -73,10 +73,27 @@ describe("component-targets", () => {
 });
 
 describe("instance label helpers", () => {
-  it("instanceName falls back from name to id", () => {
+  it("instanceName falls back name → catalog title → id", () => {
+    // A user name always wins.
     expect(instanceName(inst({ id: "x", component_id: "sensor", name: "Kit" }))).toBe(
       "Kit"
     );
+    // No name → the catalog title, with the core suffix trimmed like the navigator.
+    expect(
+      instanceName(inst({ id: "wifi", component_id: "wifi", title: "WiFi Component" }))
+    ).toBe("WiFi");
+    expect(
+      instanceName(
+        inst({ id: "api", component_id: "api", title: "Native API Component" })
+      )
+    ).toBe("Native API");
+    // A non-core title keeps its " Component" tail (e.g. a nameless copy sensor).
+    expect(
+      instanceName(
+        inst({ id: "s", component_id: "binary_sensor.copy", title: "Copy Component" })
+      )
+    ).toBe("Copy Component");
+    // No name and no title → the raw id.
     expect(instanceName(inst({ id: "x", component_id: "sensor" }))).toBe("x");
   });
 

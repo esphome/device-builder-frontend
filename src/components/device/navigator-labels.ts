@@ -7,6 +7,13 @@ import type { TriggerCatalogController } from "./trigger-catalog-controller.js";
 
 export type NavCategory = "core" | "component" | "automation";
 
+/** Trim a core catalog title's redundant tail (" Component" / esphome's
+ *  "ESPHome Core Configuration") so rows stay scannable. Core-only — many
+ *  non-core titles legitimately end in " Component" (e.g. "Copy Component"). */
+export function stripRedundantComponentSuffix(name: string): string {
+  return name.replace(/ (Component|Configuration)$/, "") || name;
+}
+
 export interface NavItemLabels {
   primary: string;
   secondary?: string;
@@ -55,12 +62,7 @@ export function resolveNavItemLabels(
   let primary = raw;
   const cached = getCachedComponent(raw, ctx.platform || undefined);
   if (cached?.name) primary = cached.name;
-  if (category === "core") {
-    // Core infrastructure names carry a redundant suffix in the nav:
-    // " Component" ("Native API Component"), and esphome's catalog title
-    // is "ESPHome Core Configuration" — trim both so rows stay scannable.
-    primary = primary.replace(/ (Component|Configuration)$/, "") || primary;
-  }
+  if (category === "core") primary = stripRedundantComponentSuffix(primary);
 
   // Prefer the backend-resolved node name for the esphome core section
   // so a `name: $devicename` substitution shows the expanded hostname,
