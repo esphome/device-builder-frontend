@@ -32,7 +32,7 @@ import {
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { downloadAnsiText } from "../util/download-text.js";
+import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
@@ -404,7 +404,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   _downloadOutput = () => {
     this._flushPendingLines();
-    const stem = this.configuration.replace(/\.ya?ml$/, "") || "output";
+    const stem = configurationStem(this.configuration, "output");
     downloadAnsiText(this._lines, `${stem}-${this._commandType}.txt`);
   };
 

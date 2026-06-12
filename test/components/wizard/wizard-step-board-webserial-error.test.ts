@@ -13,12 +13,15 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 const wsSerial = vi.hoisted(() => ({
   detectChip: vi.fn(),
   disconnect: vi.fn(),
-  isPortPickerCancel: (err: unknown) =>
-    err instanceof DOMException && err.name === "NotFoundError",
   isWebSerialSupported: () => true,
   readDeviceManifest: vi.fn(),
 }));
-vi.mock("../../../src/util/web-serial.js", () => wsSerial);
+// Keep the rest of the module real — notably the genuine isPortPickerCancel
+// driving the cancel-vs-fail split under test.
+vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/util/web-serial.js")>()),
+  ...wsSerial,
+}));
 
 import { defaultLocalize } from "../../../src/common/localize.js";
 import { ESPHomeWizardStepBoard } from "../../../src/components/wizard/wizard-step-board.js";

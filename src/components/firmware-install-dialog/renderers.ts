@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
-import { downloadAnsiText } from "../../util/download-text.js";
+import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import type { ProcessTerminalState } from "../process-terminal/process-terminal.js";
 import {
@@ -208,7 +208,7 @@ export function renderStatusExtra(
 }
 
 function downloadInstallLogs(host: ESPHomeFirmwareInstallDialog): void {
-  const stem = host._device?.configuration.replace(/\.ya?ml$/, "") || "install";
+  const stem = configurationStem(host._device?.configuration, "install");
   downloadAnsiText(host._logLines, `${stem}-install.txt`);
 }
 

@@ -20,7 +20,7 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { downloadAnsiText } from "../util/download-text.js";
+import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
@@ -458,7 +458,7 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _downloadLogs() {
-    const stem = this.configuration.replace(/\.ya?ml$/, "") || "logs";
+    const stem = configurationStem(this.configuration, "logs");
     downloadAnsiText(this._lines, `${stem}-logs.txt`);
   }
 

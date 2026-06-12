@@ -52,6 +52,19 @@ export function triggerDownload(url: string, filename: string): void {
 }
 
 /**
+ * Download-filename stem for a device configuration: the YAML name
+ * without its extension, or ``fallback`` when the configuration is
+ * missing/empty. Shared by the logs / command / install download
+ * buttons so ``device.yaml`` consistently saves as ``device-*.txt``.
+ */
+export function configurationStem(
+  configuration: string | undefined,
+  fallback: string
+): string {
+  return configuration?.replace(/\.ya?ml$/, "") || fallback;
+}
+
+/**
  * Save terminal-style output to a plain text file.
  *
  * Used by the logs and command dialogs' download buttons. ANSI

@@ -11,13 +11,14 @@ const wsSerial = vi.hoisted(() => ({
   detectChip: vi.fn(),
   disconnect: vi.fn(),
   flashFirmware: vi.fn(),
-  // Real implementation — one line, and the cancel-vs-fail split under
-  // test routes through it.
-  isPortPickerCancel: (err: unknown) =>
-    err instanceof DOMException && err.name === "NotFoundError",
   resetAndDisconnect: vi.fn(),
 }));
-vi.mock("../../src/util/web-serial.js", () => wsSerial);
+// Keep the rest of the module real — the cancel-vs-fail split under test
+// routes through the genuine isPortPickerCancel.
+vi.mock("../../src/util/web-serial.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/web-serial.js")>()),
+  ...wsSerial,
+}));
 vi.mock("../../src/util/download-text.js", () => ({ triggerDownload: vi.fn() }));
 vi.mock("../../src/util/post-install-logs.js", () => ({
   dispatchShowLogsAfterInstall: vi.fn(() => false),
