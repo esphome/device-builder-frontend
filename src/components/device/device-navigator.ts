@@ -206,7 +206,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _query = "";
 
-/** Whether the user manually revealed the search box via the header toggle. */
+  /** Whether the user manually revealed the search box via the header toggle. */
   @state()
   private _searchOpen = false;
 
