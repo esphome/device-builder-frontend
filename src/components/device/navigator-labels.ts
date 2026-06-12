@@ -1,18 +1,12 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getCachedComponent } from "../../util/component-name-cache.js";
+import { stripRedundantComponentSuffix } from "../../util/component-title.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
 import { type YamlSection, sectionKeyOf } from "../../util/yaml-sections.js";
 import type { NavigatorBuckets } from "./navigator-buckets.js";
 import type { TriggerCatalogController } from "./trigger-catalog-controller.js";
 
 export type NavCategory = "core" | "component" | "automation";
-
-/** Trim a core catalog title's redundant tail (" Component" / esphome's
- *  "ESPHome Core Configuration") so rows stay scannable. Core-only — many
- *  non-core titles legitimately end in " Component" (e.g. "Copy Component"). */
-export function stripRedundantComponentSuffix(name: string): string {
-  return name.replace(/ (Component|Configuration)$/, "") || name;
-}
 
 export interface NavItemLabels {
   primary: string;
