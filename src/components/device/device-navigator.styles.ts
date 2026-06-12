@@ -38,52 +38,13 @@ export const deviceNavigatorStyles = css`
 
   .card-title {
     margin: 0;
-    line-height: 1;
-    min-width: 0;
-    /* Flex container (not the default block) so the inline-flex button gets
-       a real width to fill; otherwise its ellipsis span collapses and the
-       title truncates even with free space beside it. Grow to claim that
-       space; ellipsis only kicks in once a long locale outgrows the row. */
-    display: flex;
-    flex: 1 1 auto;
-  }
-
-  .card-title-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--wa-space-2xs);
-    border: none;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    padding: var(--wa-space-2xs) var(--wa-space-xs);
-    margin-left: calc(-1 * var(--wa-space-xs));
-    border-radius: var(--wa-border-radius-s);
-    min-width: 0;
-    max-width: 100%;
-    line-height: 1;
-    font-family: inherit;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
-  }
-
-  /* Keep the title on one line; ellipsis only if the panel is too narrow.
-     The ellipsis needs overflow:hidden, which would clip descenders (the g
-     in navigator); extend the clip box down with padding and cancel the
-     added height with a negative margin so the header still lines up with
-     the editor header beside it. */
-  .card-title-btn span {
-    min-width: 0;
+    line-height: 1;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 1;
-    padding-bottom: 4px;
-    margin-bottom: -4px;
-  }
-
-  .card-title-btn:hover {
-    background: var(--esphome-tint-border);
+    min-width: 0;
   }
 
   .header-actions {

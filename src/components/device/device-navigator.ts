@@ -66,7 +66,8 @@ registerMdiIcons({
   "script-text-outline": mdiScriptTextOutline,
 });
 
-/** Items across all sections above which the search toggle is offered. */
+/** Item count across all sections at or above which the search toggle is
+ * offered (15 is where the header bar starts to overflow). */
 const SEARCH_TOGGLE_THRESHOLD = 15;
 
 @customElement("esphome-device-navigator")
@@ -359,7 +360,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // the header magnifier until the user (or a query) reveals it.
     // Offer the toggle only once the list is long enough to be worth
     // filtering; keep it while open so an expanded box can still be closed.
-    const showSearchToggle = totalItems > SEARCH_TOGGLE_THRESHOLD || this._searchOpen;
+    const showSearchToggle = totalItems >= SEARCH_TOGGLE_THRESHOLD || this._searchOpen;
     const showSearch = this._searchOpen || filtering;
     const matchCount = matches ? matches.reduce((n, m) => n + m.length, 0) : 0;
     // Stay silent on zero matches; the "No matches" empty state speaks.
@@ -402,16 +403,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
           @automation-added=${this._onAutomationAdded}
         ></esphome-add-script-dialog>
         <header class="card-header">
-          <h2 class="card-title">
-            <button
-              type="button"
-              class="card-title-btn"
-              @click=${this._goToOverview}
-              title=${this._localize("device.navigator_home")}
-            >
-              <span>${this._localize("device.navigator_title")}</span>
-            </button>
-          </h2>
+          <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
           <div class="header-actions">
             ${showSearchToggle
               ? html`<button
@@ -513,18 +505,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
     if (!next.delete(key)) next.add(key);
     this._collapsedGroups = next;
   }
-
-  /** Clear the current section selection so the editor pane returns to
-   *  the device overview (board image + "Change board"). Mirrors the
-   *  deselect branch of ``_onItemClick`` without a row to toggle. */
-  private _goToOverview = () => {
-    this.selectedKey = null;
-    this._selectedLine = null;
-    this._selectedRange = null;
-    this._hoveredLine = null;
-    this._emitHighlight(null, false);
-    this._emitSectionSelect(null, undefined);
-  };
 
   /** Ask the page to hide the navigator. The page decides between
    *  desktop (set ``_navCollapsed`` + persist) and mobile (close the
