@@ -135,16 +135,11 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _scrollToHighlight = false;
 
-  /** The current ``_highlightRange`` came from the validation prompt's
-   *  "Go to error" jump; eligible for auto-clear once the user edits
-   *  and the inline lint pass completes, or a save succeeds. Navigation
-   *  and field-focus highlights never set this. */
-  private _errorHighlight = false;
-
-  /** The user edited the YAML while an error highlight was active;
-   *  gates the lint-complete clear so the lint pass that *produced*
-   *  the error doesn't immediately wipe the just-set highlight. */
-  private _errorHighlightEditPending = false;
+  /** Lifecycle of an error-jump highlight (the validation prompt's
+   *  "Go to error"): "active" until the user edits, "edited" after,
+   *  which arms the next lint pass to clear the highlight. Navigation
+   *  and field-focus highlights stay "none". */
+  private _errorHighlight: "none" | "active" | "edited" = "none";
 
   @state()
   private _selectedSection: string | null = this._readUrlParam("section", null);
@@ -771,7 +766,7 @@ export class ESPHomePageDevice extends LitElement {
     // A committed save ends the fix-the-error errand the error-jump
     // highlight was guiding (validation passed, or the user chose
     // "Save anyway"), so drop it. A failed save keeps it.
-    if (saved && this._errorHighlight) {
+    if (saved && this._errorHighlight !== "none") {
       this._setHighlight(null, false);
     }
     const message = saved ? "device.yaml_saved" : "device.yaml_save_error";
@@ -1132,7 +1127,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onYamlChange(e: CustomEvent<{ value: string }>) {
     this._yaml = e.detail.value;
-    if (this._errorHighlight) this._errorHighlightEditPending = true;
+    if (this._errorHighlight === "active") this._errorHighlight = "edited";
     this._retryPendingFieldLine();
   }
 
@@ -1144,7 +1139,7 @@ export class ESPHomePageDevice extends LitElement {
     e: CustomEvent<{ errors: string[]; configuration: string }>
   ) {
     if (e.detail.configuration !== this.id) return;
-    if (this._errorHighlight && this._errorHighlightEditPending) {
+    if (this._errorHighlight === "edited") {
       this._setHighlight(null, false);
     }
   }
@@ -1296,8 +1291,7 @@ export class ESPHomePageDevice extends LitElement {
   private _setHighlight(range: HighlightRange | null, scroll: boolean, isError = false) {
     this._highlightRange = range;
     this._scrollToHighlight = scroll;
-    this._errorHighlight = isError && range !== null;
-    this._errorHighlightEditPending = false;
+    this._errorHighlight = isError && range !== null ? "active" : "none";
   }
 
   private _onYamlUpdated(e: CustomEvent<{ yaml: string }>) {
