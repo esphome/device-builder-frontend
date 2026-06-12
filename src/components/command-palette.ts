@@ -23,7 +23,6 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
@@ -35,6 +34,7 @@ import {
 import { commandPaletteStyles } from "./command-palette.styles.js";
 import { YamlSearchController } from "./yaml-search-controller.js";
 
+import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
@@ -114,21 +114,15 @@ export class ESPHomeCommandPalette extends LitElement {
 
   static styles = [espHomeStyles, commandPaletteStyles];
 
+  /* Cmd+K is always-on (it opens the palette), so it stays on a
+     dedicated keydown listener. Esc is wa-dialog's job: its
+     dismissible stack closes only the topmost open dialog. */
   private _onGlobalKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       this._toggle();
     }
   };
-
-  /* Cmd+K is always-on (it opens the palette), so it stays on a
-     dedicated keydown listener. Esc only matters while the palette is
-     open and is handled by EscapeController, which attaches/detaches
-     in lockstep with ``_open``. */
-  private _escape = new EscapeController(this, (e) => {
-    e.preventDefault();
-    this.close();
-  });
 
   connectedCallback() {
     super.connectedCallback();
@@ -141,24 +135,20 @@ export class ESPHomeCommandPalette extends LitElement {
   }
 
   open() {
-    // Any open wa-select / wa-dropdown sits in the browser top layer
-    // via the popover API and would float above us regardless of
-    // z-index. Walk the document + every shadow root and close them
-    // before showing the palette.
+    // Close any open wa-select / wa-dropdown popover so it doesn't
+    // linger inert under the modal backdrop.
     closeAllOpenPopovers(document);
     this._open = true;
     this._query = "";
     this._selectedId = "";
     this._yamlSearch.clear();
-    requestAnimationFrame(() => this._searchInput?.focus());
   }
 
   close() {
     this._open = false;
-    // The palette is hidden by ``render() → nothing``, not by
-    // disconnecting from the DOM, so ``hostDisconnected`` doesn't
-    // fire and a pending debounce timer / queued dispatcher input
-    // would otherwise still flush a ``yaml/search`` after close.
+    // wa-dialog hides via its close animation, not by disconnecting,
+    // so a pending debounce timer / queued dispatcher input would
+    // otherwise still flush a ``yaml/search`` after close.
     this._yamlSearch.clear();
   }
 
@@ -166,6 +156,12 @@ export class ESPHomeCommandPalette extends LitElement {
     if (this._open) this.close();
     else this.open();
   }
+
+  // Esc and light-dismiss close the wa-dialog on their own; sync our flag.
+  private _onAfterHide = () => {
+    this._open = false;
+    this._yamlSearch.clear();
+  };
 
   private _allCommands(): CommandAction[] {
     const t = this._localize;
@@ -323,7 +319,6 @@ export class ESPHomeCommandPalette extends LitElement {
   }
 
   protected willUpdate(changed: Map<string, unknown>) {
-    if (changed.has("_open")) this._escape.set(this._open);
     if (changed.has("_open") || changed.has("_query")) {
       const items = this._filtered();
       if (items.length && !items.find((i) => i.id === this._selectedId)) {
@@ -332,9 +327,24 @@ export class ESPHomeCommandPalette extends LitElement {
     }
   }
 
+  /* wa-dialog shows via showModal(), so the palette lives in the top
+     layer and stacks above an already-open dialog (Settings, Firmware
+     Tasks, ...) instead of painting behind it. Content stays rendered
+     while closed so the hide animation doesn't run on an empty card. */
   protected render() {
-    if (!this._open) return nothing;
+    return html`
+      <wa-dialog
+        without-header
+        light-dismiss
+        ?open=${this._open}
+        @wa-after-hide=${this._onAfterHide}
+      >
+        ${this._renderContent()}
+      </wa-dialog>
+    `;
+  }
 
+  private _renderContent() {
     const items = this._filtered();
     const groups: { name: string; items: CommandAction[] }[] = [];
     let cursor = "";
@@ -355,21 +365,20 @@ export class ESPHomeCommandPalette extends LitElement {
     const inYamlMode = this._isYamlMode;
     const searchIcon = inYamlMode ? "code-braces" : "magnify";
     return html`
-      <div class="backdrop" @click=${this.close}></div>
-      <div class="dialog" role="dialog" aria-modal="true">
-        <div class="search">
-          <wa-icon library="mdi" name=${searchIcon}></wa-icon>
-          <input
-            class="search-input"
-            type="text"
-            .value=${this._query}
-            placeholder=${this._localize("command_palette.placeholder")}
-            @input=${this._onQueryInput}
-            @keydown=${this._onInputKeyDown}
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <!--
+      <div class="search">
+        <wa-icon library="mdi" name=${searchIcon}></wa-icon>
+        <input
+          class="search-input"
+          type="text"
+          .value=${this._query}
+          placeholder=${this._localize("command_palette.placeholder")}
+          @input=${this._onQueryInput}
+          @keydown=${this._onInputKeyDown}
+          autocomplete="off"
+          spellcheck="false"
+          autofocus
+        />
+        <!--
             Mode toggle: explicit switch-to-YAML / switch-to-commands
             button next to the input. Same effect as typing or removing
             the leading slash but discoverable for users who haven't
@@ -377,52 +386,48 @@ export class ESPHomeCommandPalette extends LitElement {
             mode so the affordance reads as an action rather than a
             status badge.
           -->
-          <button
-            class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
-            type="button"
-            title=${this._localize(
-              inYamlMode
-                ? "command_palette.switch_to_commands"
-                : "command_palette.switch_to_yaml"
+        <button
+          class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
+          type="button"
+          title=${this._localize(
+            inYamlMode
+              ? "command_palette.switch_to_commands"
+              : "command_palette.switch_to_yaml"
+          )}
+          aria-label=${this._localize(
+            inYamlMode
+              ? "command_palette.switch_to_commands"
+              : "command_palette.switch_to_yaml"
+          )}
+          aria-pressed=${inYamlMode ? "true" : "false"}
+          @click=${this._onToggleMode}
+        >
+          <wa-icon library="mdi" name=${inYamlMode ? "magnify" : "code-braces"}></wa-icon>
+        </button>
+      </div>
+      <div class="list" role="listbox">
+        ${items.length === 0
+          ? html`<div class="empty">${this._renderEmptyMessage()}</div>`
+          : groups.map(
+              (g) => html`
+                <div class="group">
+                  <div class="group-heading">${g.name}</div>
+                  ${g.items.map((item) => this._renderItem(item))}
+                </div>
+              `
             )}
-            aria-label=${this._localize(
-              inYamlMode
-                ? "command_palette.switch_to_commands"
-                : "command_palette.switch_to_yaml"
-            )}
-            aria-pressed=${inYamlMode ? "true" : "false"}
-            @click=${this._onToggleMode}
-          >
-            <wa-icon
-              library="mdi"
-              name=${inYamlMode ? "magnify" : "code-braces"}
-            ></wa-icon>
-          </button>
-        </div>
-        <div class="list" role="listbox">
-          ${items.length === 0
-            ? html`<div class="empty">${this._renderEmptyMessage()}</div>`
-            : groups.map(
-                (g) => html`
-                  <div class="group">
-                    <div class="group-heading">${g.name}</div>
-                    ${g.items.map((item) => this._renderItem(item))}
-                  </div>
-                `
-              )}
-        </div>
-        <div class="footer">
-          <span
-            ><kbd>↑</kbd><kbd>↓</kbd> ${this._localize(
-              "command_palette.navigate_hint"
-            )}</span
-          >
-          <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
-          <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
-          <span class="yaml-hint">
-            <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
-          </span>
-        </div>
+      </div>
+      <div class="footer">
+        <span
+          ><kbd>↑</kbd><kbd>↓</kbd> ${this._localize(
+            "command_palette.navigate_hint"
+          )}</span
+        >
+        <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
+        <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
+        <span class="yaml-hint">
+          <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
+        </span>
       </div>
     `;
   }

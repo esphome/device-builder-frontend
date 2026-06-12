@@ -1,62 +1,29 @@
 import { css } from "lit";
 
 export const commandPaletteStyles = css`
-  :host {
-    position: fixed;
-    inset: 0;
-    /* Above WA component overlays (wa-popup is 899, wa-select is 900).
-       Note: top-layer popovers are above any z-index — open() also
-       force-closes them so this matters mainly for non-popover layers. */
-    z-index: 10000;
-    pointer-events: none;
+  wa-dialog {
+    --width: min(640px, calc(100vw - var(--wa-space-l)));
+    --spacing: 0;
+    --backdrop-filter: blur(2px);
+    --wa-color-overlay-modal: rgba(0, 0, 0, 0.45);
+    --show-duration: 140ms;
+    --hide-duration: 120ms;
   }
 
-  :host([hidden]) {
-    display: none;
-  }
-
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(2px);
-    pointer-events: auto;
-    animation: fade-in 0.12s ease-out;
-  }
-
-  .dialog {
-    position: fixed;
-    top: 18%;
-    left: 50%;
-    transform: translate(-50%, 0);
-    width: min(640px, calc(100vw - var(--wa-space-l)));
-    background: var(--wa-color-surface-raised);
+  /* Pin the card at 18% from the top instead of wa-dialog's
+     vertical centering. */
+  wa-dialog::part(dialog) {
+    margin-block: 18vh auto;
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-l);
     box-shadow: 0 24px 56px rgba(0, 0, 0, 0.25);
     overflow: hidden;
-    pointer-events: auto;
-    animation: pop-in 0.14s ease-out;
   }
 
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  @keyframes pop-in {
-    from {
-      opacity: 0;
-      transform: translate(-50%, -8px) scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: translate(-50%, 0) scale(1);
-    }
+  wa-dialog::part(body) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .search {
