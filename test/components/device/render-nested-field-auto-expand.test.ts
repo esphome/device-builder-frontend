@@ -39,4 +39,17 @@ describe("renderNestedField auto-expand", () => {
     renderNestedField(rawEntry(), ["raw"], ctx);
     expect(open.has("raw")).toBe(false);
   });
+
+  it("seeds a required group open even with no value", () => {
+    // ethernet's clk: required group whose required children would
+    // otherwise hide behind a collapsed header.
+    const entry = makeEntry(ConfigEntryType.NESTED, {
+      key: "clk",
+      required: true,
+      config_entries: [makeEntry(ConfigEntryType.PIN, { key: "pin", required: true })],
+    });
+    const { ctx, open } = ctxWithOpenSet({});
+    renderNestedField(entry, ["clk"], ctx);
+    expect(open.has("clk")).toBe(true);
+  });
 });

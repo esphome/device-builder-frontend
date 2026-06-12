@@ -53,11 +53,12 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
     `;
   }
   const key = path.join(".");
-  // A group that already carries a value in the YAML opens once so its
-  // filled fields are visible without a manual expand (advanced groups
-  // like remote_receiver's raw are otherwise collapsed). seedNestedOpen is
+  // A group that already carries a value in the YAML, or is itself
+  // required (its required children must be filled), opens once so its
+  // fields are visible without a manual expand (advanced groups like
+  // remote_receiver's raw are otherwise collapsed). seedNestedOpen is
   // one-shot, so a later user collapse sticks.
-  if (hasSerializableValue(raw)) ctx.seedNestedOpen(key);
+  if (entry.required || hasSerializableValue(raw)) ctx.seedNestedOpen(key);
   const inSet = ctx.nestedOpenSections.has(key);
   const isOpen = ctx.requiredOnly ? !inSet : inSet;
   // Optional entity sub-readings (a debug component's per-metric sensors,
