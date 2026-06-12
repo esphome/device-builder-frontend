@@ -128,6 +128,36 @@ describe("device-navigator domain grouping", () => {
     expect(single!.querySelector(".nav-item-icon")).toBeTruthy();
   });
 
+  it("flattens a lone config block while filtering, keeps a lone platform header", async () => {
+    const nav = new ESPHomeDeviceNavigator();
+    nav.yaml = [
+      "esphome:",
+      "  name: t",
+      "light:", // lone platform component
+      "  - platform: binary",
+      "    id: led",
+      "    name: Status LED",
+      "    output: o1",
+      "i2c:", // lone config block
+      "  sda: GPIO1",
+      "  scl: GPIO2",
+      "",
+    ].join("\n");
+    nav.openSections = new Set([1]); // Components open
+    document.body.appendChild(nav);
+    await nav.updateComplete;
+
+    // Filtered down to the lone i2c config block: flat single row, no header,
+    // same as the unfiltered view.
+    await setQuery(nav, "i2c");
+    expect(nav.shadowRoot!.querySelector(".nav-subgroup-header")).toBeNull();
+    expect(nav.shadowRoot!.querySelector(".nav-items--single")).toBeTruthy();
+
+    // Filtered down to the lone Light platform component: header stays.
+    await setQuery(nav, "status");
+    expect(subTitles(nav)).toEqual(["Light"]);
+  });
+
   it("force-opens a collapsed domain while filtering and drops empty ones", async () => {
     const nav = await mountNavigator([1]);
     // Collapse Sensor, then filter for a Sensor id.
