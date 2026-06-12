@@ -68,6 +68,17 @@ describe("findAddedSection", () => {
     expect(findAddedSection(TWO_DHT, "sensor.dht", "missing")?.fromLine).toBe(7);
   });
 
+  it("treats regex metacharacters in the id literally", () => {
+    // `dht.one` must not wildcard-match the first candidate's `dhtxone`.
+    const yaml = `sensor:
+  - platform: dht
+    id: dhtxone
+  - platform: dht
+    id: dht_two
+`;
+    expect(findAddedSection(yaml, "sensor.dht", "dht.one")?.fromLine).toBe(4);
+  });
+
   it("returns null when nothing matches", () => {
     expect(findAddedSection("logger:\n", "sensor.dht", undefined)).toBeNull();
   });
