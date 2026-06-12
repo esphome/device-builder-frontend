@@ -128,6 +128,23 @@ export const headerActionsStyles = css`
     text-align: center;
   }
 
+  .menu-item-shortcut {
+    margin-left: auto;
+    font-family: var(--wa-font-family-code, monospace);
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+    background: var(--esphome-tint);
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+
+  /* Touch-primary viewports have no hardware keyboard to teach. */
+  @media (hover: none) {
+    .menu-item-shortcut {
+      display: none;
+    }
+  }
+
   .menu-divider {
     height: 1px;
     background: var(--wa-color-surface-border);

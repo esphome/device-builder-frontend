@@ -25,7 +25,11 @@ import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { yamlEmptyMessageKey } from "../util/yaml-search-helpers.js";
 import type { CommandAction } from "./command-palette-actions.js";
-import { buildCommands, buildYamlHitActions } from "./command-palette-actions.js";
+import {
+  OPEN_COMMAND_PALETTE_EVENT,
+  buildCommands,
+  buildYamlHitActions,
+} from "./command-palette-actions.js";
 import { commandPaletteStyles } from "./command-palette.styles.js";
 import { YamlSearchController } from "./yaml-search-controller.js";
 
@@ -107,14 +111,20 @@ export class ESPHomeCommandPalette extends LitElement {
     }
   };
 
+  /* The kebab menu's Search item fires this so a visible affordance opens
+     the same palette as Cmd+K. */
+  private _onOpenEvent = () => this.open();
+
   connectedCallback() {
     super.connectedCallback();
     window.addEventListener("keydown", this._onGlobalKeyDown);
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, this._onOpenEvent);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener("keydown", this._onGlobalKeyDown);
+    window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, this._onOpenEvent);
   }
 
   open() {

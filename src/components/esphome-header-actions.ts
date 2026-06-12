@@ -9,6 +9,7 @@ import {
   mdiEyeOffOutline,
   mdiEyeOutline,
   mdiKeyVariant,
+  mdiMagnify,
   mdiPlaylistCheck,
   mdiWifiCog,
 } from "@mdi/js";
@@ -30,6 +31,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-actions.js";
 import { headerActionsStyles } from "./esphome-header-actions.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -44,9 +46,20 @@ registerMdiIcons({
   "eye-off-outline": mdiEyeOffOutline,
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
+  magnify: mdiMagnify,
   "playlist-check": mdiPlaylistCheck,
   "wifi-cog": mdiWifiCog,
 });
+
+/** Cmd+K on Apple platforms, Ctrl K elsewhere — matches the command
+ *  palette binding. ``userAgentData`` first; ``navigator.platform`` is
+ *  deprecated but remains the only signal on Firefox and Safari. */
+const SEARCH_SHORTCUT = /mac|iphone|ipad/i.test(
+  (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+    navigator.platform
+)
+  ? "⌘K"
+  : "Ctrl K";
 
 @customElement("esphome-header-actions")
 export class ESPHomeHeaderActions extends LitElement {
@@ -258,6 +271,17 @@ export class ESPHomeHeaderActions extends LitElement {
                     >`
                   : nothing}
               </div>
+              <div
+                class="menu-item"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openSearch}
+                @keydown=${this._onMenuItemKeydown}
+              >
+                <wa-icon library="mdi" name="magnify"></wa-icon>
+                <span class="menu-item-label">${this._localize("layout.search")}</span>
+                <kbd class="menu-item-shortcut">${SEARCH_SHORTCUT}</kbd>
+              </div>
               <div class="menu-divider" role="separator"></div>
               <div
                 class="menu-item"
@@ -370,6 +394,11 @@ export class ESPHomeHeaderActions extends LitElement {
         composed: true,
       })
     );
+  }
+
+  private _openSearch() {
+    this._close();
+    window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
   }
 
   private _offloaderAlertsCount(): number {

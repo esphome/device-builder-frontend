@@ -8,6 +8,9 @@ import {
   yamlHitLabel,
 } from "../util/yaml-search-helpers.js";
 
+/** Window event that opens the palette from outside (kebab Search item). */
+export const OPEN_COMMAND_PALETTE_EVENT = "esphome-open-command-palette";
+
 export interface CommandAction {
   id: string;
   group: string;
