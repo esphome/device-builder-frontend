@@ -79,6 +79,28 @@ describe("error-jump highlight lifecycle (#1404)", () => {
     expect(internals(page)._scrollToHighlight).toBe(false);
   });
 
+  it("clears after a form draft edit once the lint pass completes", () => {
+    const page = makePage();
+    goToError(page);
+
+    internals(page)._onYamlDraft(
+      new CustomEvent("yaml-draft", { detail: { yaml: YAML + "    pin: GPIO11\n" } })
+    );
+    lintCompleted(page);
+    expect(internals(page)._highlightRange).toBeNull();
+  });
+
+  it("clears after a completed component edit once the lint pass completes", () => {
+    const page = makePage();
+    goToError(page);
+
+    internals(page)._onYamlUpdated(
+      new CustomEvent("yaml-updated", { detail: { yaml: YAML + "    pin: GPIO11\n" } })
+    );
+    lintCompleted(page);
+    expect(internals(page)._highlightRange).toBeNull();
+  });
+
   it("survives a lint pass with no intervening edit", () => {
     const page = makePage();
     goToError(page);

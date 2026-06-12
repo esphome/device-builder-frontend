@@ -1125,9 +1125,16 @@ export class ESPHomePageDevice extends LitElement {
     ></esphome-device-navigator>`;
   }
 
-  private _onYamlChange(e: CustomEvent<{ value: string }>) {
-    this._yaml = e.detail.value;
+  /** Advance the YAML buffer. Any mutation while an error-jump
+   *  highlight is active (YAML-pane typing, form drafts, completed
+   *  component edits) arms the next lint pass to clear it. */
+  private _setYaml(value: string) {
+    this._yaml = value;
     if (this._errorHighlight === "active") this._errorHighlight = "edited";
+  }
+
+  private _onYamlChange(e: CustomEvent<{ value: string }>) {
+    this._setYaml(e.detail.value);
     this._retryPendingFieldLine();
   }
 
@@ -1305,7 +1312,7 @@ export class ESPHomePageDevice extends LitElement {
      * ``yaml-draft`` event (see ``_onYamlDraft`` below) which
      * advances only ``_yaml`` — those are committed via the right-
      * pane Save button. */
-    this._yaml = e.detail.yaml;
+    this._setYaml(e.detail.yaml);
     this._savedYaml = e.detail.yaml;
   }
 
@@ -1315,7 +1322,7 @@ export class ESPHomePageDevice extends LitElement {
      * in the YAML pane. Only ``_yaml`` advances; ``_savedYaml``
      * stays put so the right-pane Save button activates and the
      * user sees the buffer is dirty. */
-    this._yaml = e.detail.yaml;
+    this._setYaml(e.detail.yaml);
     this._retryPendingFieldLine();
   }
 
