@@ -146,6 +146,8 @@ export class ESPHomeCommandPalette extends LitElement {
     this._query = "";
     this._selectedId = "";
     this._yamlSearch.clear();
+    // Belt and braces with wa-dialog's own [autofocus] handling.
+    requestAnimationFrame(() => this._searchInput?.focus());
   }
 
   close() {
