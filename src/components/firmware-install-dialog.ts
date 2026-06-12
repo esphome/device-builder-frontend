@@ -5,6 +5,7 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiClose,
+  mdiDownload,
   mdiTextBoxOutline,
 } from "@mdi/js";
 import { LitElement, html } from "lit";
@@ -47,6 +48,7 @@ registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
   close: mdiClose,
+  download: mdiDownload,
   "text-box-outline": mdiTextBoxOutline,
 });
 

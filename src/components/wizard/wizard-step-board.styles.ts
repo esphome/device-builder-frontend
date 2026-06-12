@@ -39,6 +39,12 @@ export const wizardStepBoardStyles = css`
     text-decoration: none;
   }
 
+  .detect-error {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-danger-text-normal);
+    margin-top: calc(-1 * var(--wa-space-2xs));
+  }
+
   .connect-board-btn {
     display: inline-flex;
     align-items: center;

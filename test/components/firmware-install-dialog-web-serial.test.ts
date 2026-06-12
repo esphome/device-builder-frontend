@@ -11,6 +11,10 @@ const wsSerial = vi.hoisted(() => ({
   detectChip: vi.fn(),
   disconnect: vi.fn(),
   flashFirmware: vi.fn(),
+  // Real implementation — one line, and the cancel-vs-fail split under
+  // test routes through it.
+  isPortPickerCancel: (err: unknown) =>
+    err instanceof DOMException && err.name === "NotFoundError",
   resetAndDisconnect: vi.fn(),
 }));
 vi.mock("../../src/util/web-serial.js", () => wsSerial);
@@ -64,6 +68,7 @@ function makeHost() {
     _compileReject: null as null | ((e: unknown) => void),
     _localize: (key: string) => key,
     _fail: vi.fn(),
+    _close: vi.fn(),
   };
   host._fail = vi.fn((msg: string) => {
     host._step = "error";
@@ -121,6 +126,33 @@ describe("Web Serial install — HTTP byte download", () => {
     // esptool output never reached the log buffer.
     expect(host._logLines).toContain("Detecting chip type... ESP32");
     expect(host._logLines).toContain("Writing at 0x00010000...");
+  });
+
+  it("closes silently when the user cancels the port picker", async () => {
+    const { host } = makeHost();
+    wsSerial.detectChip.mockRejectedValueOnce(
+      new DOMException("No port selected by the user.", "NotFoundError")
+    );
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._close).toHaveBeenCalledTimes(1);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a connect failure instead of closing the dialog (#1414)", async () => {
+    const { host } = makeHost();
+    wsSerial.detectChip.mockRejectedValueOnce(
+      new Error("Failed to connect with the device")
+    );
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._close).not.toHaveBeenCalled();
+    expect(host._fail).toHaveBeenCalledWith(
+      "serial.connect_failed",
+      "Failed to connect with the device"
+    );
   });
 
   it("fails cleanly when the HTTP byte fetch errors", async () => {

@@ -53,6 +53,16 @@ export function isWebSerialSupported(): boolean {
 }
 
 /**
+ * True when the user dismissed the browser's port picker —
+ * ``requestPort()`` rejects with DOMException ``NotFoundError``.
+ * Anything else out of ``detectChip`` is a real connect failure and
+ * must be surfaced, not treated as a cancel (#1414).
+ */
+export function isPortPickerCancel(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "NotFoundError";
+}
+
+/**
  * The ``127.0.0.1`` equivalent of a dashboard opened on ``0.0.0.0`` — same
  * port and path. ``0.0.0.0`` is reachable only from the same machine (it
  * resolves to loopback) but is NOT a secure context, so Web Serial is hidden;

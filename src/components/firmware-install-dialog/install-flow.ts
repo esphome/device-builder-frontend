@@ -11,6 +11,7 @@ import {
   detectChip,
   disconnect,
   flashFirmware,
+  isPortPickerCancel,
   resetAndDisconnect,
   type DetectedChip,
 } from "../../util/web-serial.js";
@@ -50,8 +51,17 @@ export async function startWebSerialInstall(
   let detected: DetectedChip;
   try {
     detected = await detectChip(onLog);
-  } catch {
-    host._close(); // User cancelled port selection
+  } catch (err) {
+    if (isPortPickerCancel(err)) {
+      host._close();
+      return;
+    }
+    // The picker succeeded but the chip never answered — fail loud with
+    // the esptool log expanded instead of silently closing (#1414).
+    host._fail(
+      host._localize("serial.connect_failed"),
+      err instanceof Error ? err.message : String(err)
+    );
     return;
   }
   host._detected = detected;

@@ -26,6 +26,7 @@ import { SerialPortsPollController } from "../../util/serial-ports-poll-controll
 import {
   detectChip,
   disconnect,
+  isPortPickerCancel,
   isWebSerialSupported,
   readDeviceManifest,
 } from "../../util/web-serial.js";
@@ -252,6 +253,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
                 ${this._localize("wizard.dont_know_board")}
               </a>
             </div>
+            ${this._detectError
+              ? html`<div class="detect-error" role="alert">${this._detectError}</div>`
+              : nothing}
           `}
 
       <div class="boards-scroll">
@@ -437,6 +441,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
   };
 
   private async _connectViaWebSerial() {
+    this._detectError = "";
     try {
       const detected = await detectChip();
       // e.g. "ESP32-S3 (QFN56) (revision v0.2)"
@@ -474,8 +479,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
         this._search = "";
         void this._fetchBoards();
       }
-    } catch {
-      // User cancelled the port picker or detection failed
+    } catch (err) {
+      if (isPortPickerCancel(err)) return;
+      this._detectError = this._extractErrorDetail(
+        err,
+        this._localize("wizard.connect_your_board_detect_failed")
+      );
     }
   }
 

@@ -11,6 +11,7 @@ import {
   connectToPort,
   detectChip,
   disconnect,
+  isPortPickerCancel,
   readDeviceManifest,
   readMacAddress,
 } from "../../util/web-serial.js";
@@ -359,7 +360,18 @@ export async function detectAndOpenWizard(
     }
 
     createDialog.openAtBoardStep(chipNameToFilterLabel(chipName) ?? undefined);
-  } catch {
+  } catch (err) {
+    // Detection failed (or the picker was cancelled) — the wizard still
+    // opens so the user can pick a board by hand, but a real connect
+    // failure gets named instead of vanishing (#1414).
+    if (!isPortPickerCancel(err) && options.localize) {
+      toast.error(
+        options.localize("dashboard.serial_connect_failed", {
+          error: getErrorMessage(err),
+        }),
+        { richColors: true }
+      );
+    }
     createDialog.open("board");
   }
 }

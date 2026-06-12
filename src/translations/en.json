@@ -100,6 +100,7 @@
     "action_visit_web_ui": "Visit web UI",
     "serial_recognized": "Recognized \"{name}\"",
     "serial_starterkit_detected": "Detected {name}",
+    "serial_connect_failed": "Could not connect to the device: {error}",
     "action_download_yaml_failed": "Failed to download YAML for \"{name}\"",
     "action_rename_title": "Rename device",
     "action_rename_label": "Device name",
@@ -443,7 +444,8 @@
     "no_firmware": "No firmware binary found — compile the device first.",
     "downloading": "Downloading {file}…",
     "flashing": "Flashing firmware…",
-    "resetting": "Resetting device…"
+    "resetting": "Resetting device…",
+    "connect_failed": "Could not connect to the device. Unplug and replug the cable, hold the BOOT button while plugging in, or try another USB port or browser."
   },
   "wizard": {
     "title_create": "Create configuration",

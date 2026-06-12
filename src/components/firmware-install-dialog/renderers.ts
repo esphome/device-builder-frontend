@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
+import { downloadAnsiText } from "../../util/download-text.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import type { ProcessTerminalState } from "../process-terminal/process-terminal.js";
 import {
@@ -206,6 +207,11 @@ export function renderStatusExtra(
   return html`<div slot="status-extra">${binaryList} ${downloadExtra} ${logs}</div>`;
 }
 
+function downloadInstallLogs(host: ESPHomeFirmwareInstallDialog): void {
+  const stem = host._device?.configuration.replace(/\.ya?ml$/, "") || "install";
+  downloadAnsiText(host._logLines, `${stem}-install.txt`);
+}
+
 export function renderLogs(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
@@ -225,6 +231,10 @@ export function renderLogs(
         ${host._logsExpanded
           ? host._localize("firmware.hide_details")
           : host._localize("firmware.show_details")}
+      </button>
+      <button class="logs-toggle" @click=${() => downloadInstallLogs(host)}>
+        <wa-icon library="mdi" name="download"></wa-icon>
+        ${host._localize("dashboard.logs_download")}
       </button>
     </div>
     ${host._logsExpanded

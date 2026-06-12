@@ -3,6 +3,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  isPortPickerCancel,
   isWebSerialSupported,
   secureLoopbackUrl,
   webSerialAvailability,
@@ -58,6 +59,27 @@ describe("webSerialAvailability", () => {
     setSerial(false);
     setSecure(true);
     expect(webSerialAvailability()).toBe("unsupported");
+  });
+});
+
+describe("isPortPickerCancel", () => {
+  it("true for requestPort's NotFoundError cancel rejection", () => {
+    expect(
+      isPortPickerCancel(
+        new DOMException("No port selected by the user.", "NotFoundError")
+      )
+    ).toBe(true);
+  });
+
+  it("false for esptool connect failures and other errors", () => {
+    expect(isPortPickerCancel(new Error("Failed to connect with the device"))).toBe(
+      false
+    );
+    expect(isPortPickerCancel(new DOMException("open failed", "NetworkError"))).toBe(
+      false
+    );
+    expect(isPortPickerCancel(undefined)).toBe(false);
+    expect(isPortPickerCancel("timeout")).toBe(false);
   });
 });
 
