@@ -110,6 +110,18 @@ describe("parseYamlTopLevelSections — list-item indents", () => {
     expect(sections).toHaveLength(1);
     expect(sections[0].id).toBe("my_uart");
   });
+
+  it("ignores a block scalar's dash line and keeps the singleton's id", () => {
+    const yaml = `foo:
+  bar: |
+    - looks like a list
+  id: real_id
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].parentKey).toBeUndefined();
+    expect(sections[0].id).toBe("real_id");
+  });
 });
 
 describe("section helpers on column-0 items", () => {
