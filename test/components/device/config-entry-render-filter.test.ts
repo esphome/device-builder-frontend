@@ -359,6 +359,65 @@ describe("filterRenderable", () => {
     ).toEqual(["mode", "advanced_opt"]);
   });
 
+  it("respects depends_on_value_any subset gating", () => {
+    // Typed-schema shape (ethernet): one entry per unique field, gated
+    // on the set of variants carrying it.
+    const entries = [
+      makeEntry({ key: "type", required: true }),
+      makeEntry({
+        key: "mdc_pin",
+        required: true,
+        depends_on: "type",
+        depends_on_value_any: ["LAN8720", "RTL8201"],
+      }),
+      makeEntry({
+        key: "cs_pin",
+        required: true,
+        depends_on: "type",
+        depends_on_value_any: ["W5500"],
+      }),
+    ];
+    const visible = (values: Record<string, unknown>) =>
+      filterRenderable(entries, values, {
+        requiredOnly: true,
+        showAdvanced: false,
+      }).map((e) => e.key);
+    expect(visible({ type: "LAN8720" })).toEqual(["type", "mdc_pin"]);
+    expect(visible({ type: "RTL8201" })).toEqual(["type", "mdc_pin"]);
+    expect(visible({ type: "W5500" })).toEqual(["type", "cs_pin"]);
+    expect(visible({})).toEqual(["type"]);
+  });
+
+  it("shows at most one of two same-key entries with disjoint gates", () => {
+    // Per-variant copies of a field whose definition differs (required
+    // local path vs optional git path) share one value slot; disjoint
+    // gates mean only one renders for any discriminator value.
+    const entries = [
+      makeEntry({ key: "type", required: true }),
+      makeEntry({
+        key: "path",
+        required: true,
+        depends_on: "type",
+        depends_on_value_any: ["local"],
+      }),
+      makeEntry({
+        key: "path",
+        depends_on: "type",
+        depends_on_value_any: ["git"],
+      }),
+    ];
+    const paths = (values: Record<string, unknown>) =>
+      filterRenderable(entries, values, {
+        requiredOnly: false,
+        showAdvanced: true,
+      }).filter((e) => e.key === "path");
+    expect(paths({ type: "local" })).toHaveLength(1);
+    expect(paths({ type: "local" })[0].required).toBe(true);
+    expect(paths({ type: "git" })).toHaveLength(1);
+    expect(paths({ type: "git" })[0].required).toBe(false);
+    expect(paths({ type: "other" })).toHaveLength(0);
+  });
+
   it("respects depends_on_component visibility", () => {
     const entries = [
       makeEntry({

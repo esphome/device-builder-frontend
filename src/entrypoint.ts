@@ -28,7 +28,7 @@ import { withBase } from "./util/base-path.js";
 // the same index.html for ``/device/<id>``, which would then look
 // for ``/device/assets/...``).
 const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-if (favicon) favicon.href = withBase("/assets/logo/esphome.svg");
+if (favicon) favicon.href = withBase("/assets/logo/esphome-favicon.svg");
 
 import { installWaComboboxLeakFix } from "./util/wa-combobox-leak-fix.js";
 

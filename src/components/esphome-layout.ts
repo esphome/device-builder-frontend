@@ -96,8 +96,7 @@ export class ESPHomeLayout extends LitElement {
         display: flex;
         align-items: center;
         gap: var(--wa-space-m);
-        padding-right: var(--content-gutter);
-        padding-left: var(--header-edge-inset);
+        padding: 0 var(--content-gutter);
         background: var(--esphome-primary);
         height: var(--esphome-header-height);
         box-sizing: border-box;
@@ -122,6 +121,9 @@ export class ESPHomeLayout extends LitElement {
         background: none;
         color: var(--esphome-on-primary);
         padding: var(--header-edge-inset);
+        /* Pull only the arrow to the bar edge; routes without an
+           arrow keep the header's content-gutter inset. */
+        margin-inline-start: calc(var(--header-edge-inset) - var(--content-gutter));
         border-radius: var(--wa-border-radius-m);
         opacity: 0.85;
         cursor: pointer;
