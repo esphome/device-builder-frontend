@@ -377,12 +377,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           @change=${this._onConfigurationChange}
         >
           ${this._devices.map(
-            (d) =>
-              html`<wa-option
-                value=${d.configuration}
-                ?selected=${d.configuration === this._configuration}
-                >${d.name}</wa-option
-              >`
+            (d) => html`<wa-option value=${d.configuration}>${d.name}</wa-option>`
           )}
         </wa-select>
       </div>
@@ -396,13 +391,10 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           value=${this._target}
           @change=${this._onTargetChange}
         >
-          <wa-option
-            value=${JobType.COMPILE}
-            ?selected=${this._target === JobType.COMPILE}
-          >
+          <wa-option value=${JobType.COMPILE}>
             ${this._localize("settings.remote_build_submit_target_compile")}
           </wa-option>
-          <wa-option value=${JobType.UPLOAD} ?selected=${this._target === JobType.UPLOAD}>
+          <wa-option value=${JobType.UPLOAD}>
             ${this._localize("settings.remote_build_submit_target_upload")}
           </wa-option>
         </wa-select>

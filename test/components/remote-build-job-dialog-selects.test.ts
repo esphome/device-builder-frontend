@@ -49,11 +49,11 @@ describe("remote-build-job-dialog submit form selects", () => {
     expect(el.shadowRoot!.querySelector("#rb-target-label")).not.toBeNull();
   });
 
-  test("the configured device's option is marked selected", async () => {
+  test("the wa-select value drives the selection, one option per device", async () => {
     const el = await mountInputStep();
-    const selected = el
-      .shadowRoot!.querySelector("wa-select#rb-config wa-option[selected]")
-      ?.getAttribute("value");
-    expect(selected).toBe("kitchen.yaml");
+    const config = el.shadowRoot!.querySelector("wa-select#rb-config");
+    // value= is the canonical selection source (no per-option ?selected).
+    expect(config!.getAttribute("value")).toBe("kitchen.yaml");
+    expect(config!.querySelectorAll("wa-option").length).toBe(2);
   });
 });
