@@ -71,22 +71,14 @@ export const secretsStructuredEditorStyles = css`
     color: var(--wa-color-text-normal);
   }
 
+  /* .add-select (wa-select) chrome comes from the shared inputStyles
+     combobox rule, keyed on --wa-form-control-height, so it matches the
+     name input beside it without hand-rolled duplication. */
   .add-field input,
   .add-field esphome-password-input,
   .add-select {
     width: 100%;
     box-sizing: border-box;
-  }
-
-  .add-select {
-    min-height: var(--wa-form-control-height);
-    padding: 0 12px;
-    font-family: inherit;
-    font-size: var(--wa-font-size-s);
-    color: var(--wa-color-text-normal);
-    background: var(--wa-color-surface-raised);
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-m);
   }
 
   .btn--add {

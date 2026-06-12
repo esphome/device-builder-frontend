@@ -7,6 +7,8 @@ import toast from "sonner-js";
 // implement; stub them so the add-secret dialog can render in the test.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
@@ -280,6 +282,20 @@ describe("esphome-secrets-structured-editor", () => {
     expect(view._addError).not.toBeNull();
     await changeTarget(el, "bw15"); // bw15__api is unique
     expect(view._addError).toBeNull();
+  });
+
+  test("target picker is a labelled wa-select", async () => {
+    const el = await mount("api: x\n", false, [
+      { name: "bw15", configuration: "bw15.yaml", friendly_name: "BW15" },
+    ]);
+    (el as unknown as AddView)._openAdd();
+    await el.updateComplete;
+    const select = el.shadowRoot!.querySelector("wa-select.add-select");
+    expect(select).not.toBeNull();
+    expect(select!.getAttribute("aria-labelledby")).toBe("secret-target-label");
+    expect(el.shadowRoot!.querySelector("#secret-target-label")).not.toBeNull();
+    // Shared "" target plus one option per device.
+    expect(select!.querySelectorAll("wa-option").length).toBe(2);
   });
 
   test("switching target keeps an invalid-name error it can't fix", async () => {
