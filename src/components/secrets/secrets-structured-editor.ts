@@ -185,14 +185,10 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
               if (this._addError) this._addError = this._addKeyError();
             }}
           >
-            <wa-option value="" ?selected=${this._addTarget === ""}
-              >${this._localize("secrets.group_shared")}</wa-option
-            >
+            <wa-option value="">${this._localize("secrets.group_shared")}</wa-option>
             ${this._devices.map(
               (d) =>
-                html`<wa-option value=${d.name} ?selected=${d.name === this._addTarget}
-                  >${d.friendly_name || d.name}</wa-option
-                >`
+                html`<wa-option value=${d.name}>${d.friendly_name || d.name}</wa-option>`
             )}
           </wa-select>
         </div>
