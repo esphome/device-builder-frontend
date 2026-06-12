@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasSubstitutionReference,
+  looksLikeSubstitution,
   parseSubstitutions,
   resolveSubstitutions,
 } from "../../src/util/substitutions.js";
@@ -106,5 +107,25 @@ describe("hasSubstitutionReference", () => {
   it("is false for plain text and dollar amounts", () => {
     expect(hasSubstitutionReference("Front Door")).toBe(false);
     expect(hasSubstitutionReference("costs $5.00")).toBe(false);
+  });
+});
+
+describe("looksLikeSubstitution", () => {
+  it("matches complete and mid-edit references", () => {
+    expect(looksLikeSubstitution("${voltage_div}")).toBe(true);
+    expect(looksLikeSubstitution("${voltage_div")).toBe(true); // brace deleted
+    expect(looksLikeSubstitution("${")).toBe(true);
+    expect(looksLikeSubstitution("$var")).toBe(true);
+    expect(looksLikeSubstitution("a ${x} b")).toBe(true);
+    // Agrees with hasSubstitutionReference: the inner ${x} still counts.
+    expect(looksLikeSubstitution("$${x}")).toBe(true);
+  });
+
+  it("excludes a stray mid-string $ and $$ literals (#773 review)", () => {
+    expect(looksLikeSubstitution("$$5")).toBe(false); // no { or letter after a $
+    expect(looksLikeSubstitution("12$34")).toBe(false);
+    expect(looksLikeSubstitution("5$")).toBe(false);
+    expect(looksLikeSubstitution("$5.00")).toBe(false);
+    expect(looksLikeSubstitution("0.05")).toBe(false);
   });
 });

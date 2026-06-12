@@ -416,7 +416,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
             ${showSearchToggle
               ? html`<button
                   type="button"
-                  class="search-btn"
+                  class="ghost-icon-btn search-btn"
                   aria-pressed=${showSearch}
                   @click=${this._toggleSearch}
                   title=${this._localize("device.navigator_search_toggle")}
@@ -427,7 +427,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
               : nothing}
             <button
               type="button"
-              class="collapse-btn"
+              class="ghost-icon-btn collapse-btn"
               @click=${this._onCollapseClick}
               title=${this._localize("device.hide_navigator")}
               aria-label=${this._localize("device.hide_navigator")}

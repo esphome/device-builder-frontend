@@ -183,6 +183,48 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, undefined)).toBeNull();
   });
 
+  it("never flags a numeric field holding a ${var} substitution (#1391)", () => {
+    // A substitution resolves at build time; its value is unknowable here,
+    // so it must not surface "Must be a number" on the structured form.
+    expect(
+      validateEntry(makeEntry({ type: ConfigEntryType.FLOAT }), "${voltage_div}")
+    ).toBeNull();
+    expect(
+      validateEntry(makeEntry({ type: ConfigEntryType.FLOAT }), "$voltage_div")
+    ).toBeNull();
+    expect(
+      validateEntry(makeEntry({ type: ConfigEntryType.INTEGER }), "${count}")
+    ).toBeNull();
+    expect(
+      validateEntry(
+        makeEntry({ type: ConfigEntryType.FLOAT_WITH_UNIT, unit_options: ["Ω"] }),
+        "${current_res}"
+      )
+    ).toBeNull();
+  });
+
+  it("treats a required field as satisfied when it holds a ${var} (#1391)", () => {
+    const entry = makeEntry({ type: ConfigEntryType.FLOAT, required: true });
+    expect(validateEntry(entry, "${current_res}")).toBeNull();
+  });
+
+  it("does not flag a mid-edit partial substitution as not-a-number (#1391)", () => {
+    // While the user is editing ${voltage_div} (e.g. the brace is gone), the
+    // value must not surface an error that blocks finishing the edit.
+    const entry = makeEntry({ type: ConfigEntryType.FLOAT });
+    expect(validateEntry(entry, "${voltage_div")).toBeNull();
+    expect(validateEntry(entry, "${")).toBeNull();
+  });
+
+  it("still flags numeric junk with a stray or escaped $ (#773 review)", () => {
+    // A bare includes("$") bypass would let these through; only real
+    // ${var}/$var syntax should suppress the not-a-number error.
+    const entry = makeEntry({ type: ConfigEntryType.FLOAT });
+    expect(validateEntry(entry, "12$34")?.code).toBe("validation.not_a_number");
+    expect(validateEntry(entry, "$$5")?.code).toBe("validation.not_a_number");
+    expect(validateEntry(entry, "5$")?.code).toBe("validation.not_a_number");
+  });
+
   it("rejects values not in options list", () => {
     const entry = makeEntry({
       type: ConfigEntryType.SELECT,

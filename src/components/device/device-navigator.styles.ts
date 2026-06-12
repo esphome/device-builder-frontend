@@ -92,29 +92,23 @@ export const deviceNavigatorStyles = css`
     gap: 0;
   }
 
+  /* Box + hover come from .ghost-icon-btn (shared.ts). Both buttons swap
+     the shared padding for a fixed width/height and add a hover
+     transition; the icon size is per-site. */
   .collapse-btn,
   .search-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
     width: 30px;
     height: 22px;
     padding: 0;
-    background: transparent;
-    color: var(--esphome-primary);
-    cursor: pointer;
     border-radius: var(--wa-border-radius-m);
     transition: background 0.12s;
   }
 
-  .collapse-btn:hover,
-  .search-btn:hover {
-    background: var(--esphome-tint-border);
-  }
-
+  /* Active search toggle gets a subtle tint, not the ghost-icon-btn filled
+     state; reset the color too so the icon stays primary, not on-primary. */
   .search-btn[aria-pressed="true"] {
     background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    color: var(--esphome-primary);
   }
 
   .collapse-btn wa-icon,

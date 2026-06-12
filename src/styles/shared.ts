@@ -114,6 +114,40 @@ export const espHomeStyles = css`
     background-color: color-mix(in srgb, var(--esphome-primary-light), black 5%);
   }
 
+  /* ─── Ghost icon button ───
+     Transparent icon-only button for headers and toolbars; the box,
+     hover, pressed, and disabled states live here so the per-site copies
+     in the page, editor, and navigator shadow roots stay in sync. Call
+     sites keep only their real differences, such as icon size, fixed
+     dimensions, and margin. */
+  .ghost-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--esphome-primary);
+    padding: 2px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  /* Exclude the pressed state, whose filled background would otherwise be
+     out-specified by this hover rule and disappear while hovered. */
+  .ghost-icon-btn:hover:not(:disabled):not([aria-pressed="true"]) {
+    background: var(--esphome-tint-border);
+  }
+
+  .ghost-icon-btn[aria-pressed="true"] {
+    background: var(--esphome-primary);
+    color: var(--esphome-on-primary);
+  }
+
+  .ghost-icon-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
   /* ─── Inline markdown rendering ─── */
   /* Used by util/markdown.ts for links and inline code inside any
      description (config field, board, component, section). */

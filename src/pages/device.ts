@@ -930,7 +930,7 @@ export class ESPHomePageDevice extends LitElement {
                   ${showEdgeTab
                     ? html`<button
                         type="button"
-                        class="nav-toggle-btn"
+                        class="ghost-icon-btn nav-toggle-btn"
                         @click=${this._onNavExpand}
                         title=${this._localize("device.show_navigator")}
                         aria-label=${this._localize("device.show_navigator")}
@@ -940,7 +940,7 @@ export class ESPHomePageDevice extends LitElement {
                     : nothing}
                   ${this._selectedSection
                     ? html`<button
-                        class="back-btn"
+                        class="ghost-icon-btn back-btn"
                         @click=${this._onBack}
                         title=${backLabel}
                         aria-label=${backLabel}
