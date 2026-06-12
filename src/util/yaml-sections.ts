@@ -154,7 +154,7 @@ export function findAddedSection(
   // (the common "I added a second sensor.dht" case).
   if (newId) {
     const lines = yaml.split("\n");
-    const idRe = new RegExp(`^\\s+(?:-\\s+)?id:\\s*["']?${newId}["']?\\s*$`);
+    const idRe = new RegExp(`^\\s*(?:-\\s+)?id:\\s*["']?${newId}["']?\\s*$`);
     for (const s of candidates) {
       for (let i = s.fromLine - 1; i < s.toLine && i < lines.length; i++) {
         if (idRe.test(lines[i])) {
