@@ -480,11 +480,12 @@ export class ESPHomeAutomationActionNode extends LitElement {
         />
       </div>
       <div class="ae-delay-unit">
-        <label class="field-label" for="ae-delay-unit-select">
+        <label class="field-label" id="ae-delay-unit-label">
           ${this._localize("device.automation_action_delay_unit")}
         </label>
         <wa-select
           id="ae-delay-unit-select"
+          aria-labelledby="ae-delay-unit-label"
           value=${unit}
           ?disabled=${this.disabled}
           @change=${(e: Event) =>
