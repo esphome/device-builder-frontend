@@ -5,6 +5,8 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 // own button markup is what's under test.
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
 
 import { ESPHomeRemoteBuildJobDialog } from "../../src/components/remote-build-job-dialog.js";
 
