@@ -485,6 +485,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
         </label>
         <wa-select
           id="ae-delay-unit-select"
+          value=${unit}
           ?disabled=${this.disabled}
           @change=${(e: Event) =>
             this._writeDelay(

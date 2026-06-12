@@ -85,14 +85,15 @@ function valueInput(el: ESPHomeAutomationActionNode): HTMLInputElement | null {
   return el.shadowRoot!.querySelector<HTMLInputElement>("#ae-delay-value-input");
 }
 
-/** The unit the renderer marked ``selected`` (read the attribute Lit's
- *  ``?selected`` binding sets; happy-dom's ``select.value`` ignores it). */
+/** The unit on the wa-select's own ``value`` attribute — the control's
+ *  canonical selection source — cross-checked against the option the
+ *  renderer marked ``selected``. */
 function selectedUnit(el: ESPHomeAutomationActionNode): string | null {
-  return (
-    el
-      .shadowRoot!.querySelector("#ae-delay-unit-select wa-option[selected]")
-      ?.getAttribute("value") ?? null
-  );
+  const select = el.shadowRoot!.querySelector("#ae-delay-unit-select");
+  const value = select?.getAttribute("value") ?? null;
+  const marked =
+    select?.querySelector("wa-option[selected]")?.getAttribute("value") ?? null;
+  return value === marked ? value : `value=${value} selected=${marked}`;
 }
 
 function toggleButtons(el: ESPHomeAutomationActionNode): HTMLButtonElement[] {
