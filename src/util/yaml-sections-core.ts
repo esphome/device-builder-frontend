@@ -14,7 +14,7 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
-import { endsBlockAtIndent } from "./yaml-section-lexer.js";
+import { endsBlockAtIndent, isBlankOrCommentLine } from "./yaml-section-lexer.js";
 
 /** A YAML list-item line: leading indent, a dash, then a space or EOL. */
 export const RE_LIST_ITEM = /^\s*-(\s|$)/;
@@ -187,7 +187,7 @@ export function _clearYamlSectionsMemo(): void {
 }
 
 /**
- * If a top-level section contains YAML list items (`  - `), expand each into
+ * If a top-level section contains YAML list items, expand each into
  * its own YamlSection with name, platform, and parentKey metadata.
  * Otherwise return the section as-is.
  */
@@ -211,11 +211,23 @@ function _expandListItems(
   const keyIdx = section.fromLine - 1; // 0-indexed line of the top-level key
   const endIdx = section.toLine - 1; // 0-indexed last line (inclusive)
 
-  // Find list item starts (`  - ` or `  -\n`)
+  // The section is a list iff its first content line is a dash. Its
+  // indent — column 0 (YAML's zero-indented sequence), 2, 4, ... —
+  // is the item indent; deeper dashes belong to nested sequences.
+  let firstContentIdx = keyIdx + 1;
+  while (firstContentIdx <= endIdx && isBlankOrCommentLine(lines[firstContentIdx])) {
+    firstContentIdx++;
+  }
+  const firstContentIndent =
+    firstContentIdx <= endIdx ? lineIndent(lines[firstContentIdx]) : -1;
+  const isList = firstContentIdx <= endIdx && RE_LIST_ITEM.test(lines[firstContentIdx]);
+
   const listStarts: number[] = [];
-  for (let i = keyIdx + 1; i <= endIdx; i++) {
-    if (/^  -\s/.test(lines[i]) || /^  -$/.test(lines[i])) {
-      listStarts.push(i);
+  if (isList) {
+    for (let i = firstContentIdx; i <= endIdx; i++) {
+      if (lineIndent(lines[i]) === firstContentIndent && RE_LIST_ITEM.test(lines[i])) {
+        listStarts.push(i);
+      }
     }
   }
 
@@ -227,9 +239,11 @@ function _expandListItems(
     let name = "";
     let id = "";
     for (let i = keyIdx + 1; i <= endIdx; i++) {
-      // Only the block's own direct keys; deeper nested keys aren't the
-      // singleton's id/name.
-      if (lineIndent(lines[i]) !== ESPHOME_YAML_INDENT.length) continue;
+      // Only the block's own direct keys; deeper nested keys aren't
+      // the singleton's id/name, and a compact child sequence's
+      // `- id:` at the direct-child indent isn't either.
+      if (lineIndent(lines[i]) !== firstContentIndent) continue;
+      if (RE_LIST_ITEM.test(lines[i])) continue;
       name = readInstanceScalar(lines[i], "name") ?? name;
       id = readInstanceScalar(lines[i], "id") ?? id;
     }

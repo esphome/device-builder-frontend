@@ -49,7 +49,7 @@ export const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_]/;
  * "inline key" means; sharing the regex makes that a compile-time
  * fact.
  */
-export const LIST_ITEM_INLINE_KEY_RE = new RegExp(`^\\s+-\\s+(${KEY_PATTERN}):\\s*(.*)$`);
+export const LIST_ITEM_INLINE_KEY_RE = new RegExp(`^\\s*-\\s+(${KEY_PATTERN}):\\s*(.*)$`);
 
 /**
  * Detect a YAML list-item start. Accepts both the standard
@@ -60,9 +60,11 @@ export const LIST_ITEM_INLINE_KEY_RE = new RegExp(`^\\s+-\\s+(${KEY_PATTERN}):\\
  * Loosened from a stricter `/^\s+-\s/` so the parser agrees with
  * what the serializer (`updateSectionInYaml` in `yaml-section-values.ts`) emits. ESPHome's
  * own YAML output never produces a bare-`-` outside that
- * round-trip path, so this is the only realistic source.
+ * round-trip path, so this is the only realistic source. The indent
+ * is `\s*`, not `\s+`: a zero-indented sequence puts dashes at
+ * column 0.
  */
-export const LIST_ITEM_START_RE = /^\s+-(\s|$)/;
+export const LIST_ITEM_START_RE = /^\s*-(\s|$)/;
 
 /**
  * Block-scalar header on a YAML line: `key: |`, `key: |-`, `key: >`,

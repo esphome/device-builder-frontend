@@ -210,10 +210,10 @@ export function updateSectionInYaml(
           // trailing comment / original quoting survive.
           if (!yamlValueEqual(values[inlineKey], parsed.values[inlineKey])) {
             // The match always succeeds here: we entered via
-            // `LIST_ITEM_INLINE_KEY_RE`, which requires `\s+` both
-            // before and after the dash. The non-null assertion
-            // makes that invariant local.
-            const dashPrefixMatch = dashLine.match(/^(\s+)-(\s+)/)!;
+            // `LIST_ITEM_INLINE_KEY_RE`, which requires `\s*` before
+            // and `\s+` after the dash. The non-null assertion makes
+            // that invariant local.
+            const dashPrefixMatch = dashLine.match(/^(\s*)-(\s+)/)!;
             const dashPrefix = `${dashPrefixMatch[1]}-${dashPrefixMatch[2]}`;
             const comment = parsed.comments.get(inlineKey) ?? "";
             dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(values[inlineKey])}${comment}`;
@@ -222,7 +222,7 @@ export function updateSectionInYaml(
           // Non-scalar form value: drop the inline key from the
           // dash and let the body serializer emit everything,
           // including the now-non-inline key.
-          const dashIndent = (dashLine.match(/^(\s+)-/) ?? ["", ""])[1];
+          const dashIndent = (dashLine.match(/^(\s*)-/) ?? ["", ""])[1];
           dashLine = `${dashIndent}-`;
         }
       }
