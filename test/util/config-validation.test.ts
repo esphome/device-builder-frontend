@@ -260,6 +260,22 @@ describe("validateEntries", () => {
     expect(errors.size).toBe(0);
   });
 
+  it("skips required entries gated out by depends_on_value_any", () => {
+    const entries = [
+      makeEntry({ key: "type", required: true }),
+      makeEntry({
+        key: "cs_pin",
+        required: true,
+        depends_on: "type",
+        depends_on_value_any: ["W5500", "W6100"],
+      }),
+    ];
+    expect(validateEntries(entries, { type: "LAN8720" }).size).toBe(0);
+    expect(validateEntries(entries, { type: "W5500" }).get("cs_pin")?.code).toBe(
+      "validation.required"
+    );
+  });
+
   it("recurses into NESTED entries with dotted error keys", () => {
     const entries = [
       makeEntry({

@@ -1,4 +1,4 @@
-import type { ConfigEntry } from "../api/types/config-entries.js";
+import type { ConfigEntry, ConfigPrimitive } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
 import { parseHexInt } from "./hex-int.js";
@@ -60,6 +60,9 @@ export function isEntryVisible(
   }
   if (entry.depends_on_value_not !== null && entry.depends_on_value_not !== undefined) {
     return depValue !== entry.depends_on_value_not;
+  }
+  if (entry.depends_on_value_any != null) {
+    return entry.depends_on_value_any.includes(depValue as ConfigPrimitive);
   }
   return true;
 }
