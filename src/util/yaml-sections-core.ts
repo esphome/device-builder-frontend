@@ -20,9 +20,6 @@ import {
   LIST_ITEM_START_RE,
 } from "./yaml-section-lexer.js";
 
-/** A YAML list-item line — the lexer's definition, re-exported so the
- *  splitter and the reader can't drift apart on what counts as one. */
-export const RE_LIST_ITEM = LIST_ITEM_START_RE;
 /** A field-path segment that addresses a list index (``["areas","0",…]``). */
 const RE_PATH_INDEX = /^\d+$/;
 
@@ -224,9 +221,12 @@ function _expandListItems(
     firstContentIdx <= endIdx ? lineIndent(lines[firstContentIdx]) : -1;
 
   const listStarts: number[] = [];
-  if (firstContentIdx <= endIdx && RE_LIST_ITEM.test(lines[firstContentIdx])) {
+  if (firstContentIdx <= endIdx && LIST_ITEM_START_RE.test(lines[firstContentIdx])) {
     for (let i = firstContentIdx; i <= endIdx; i++) {
-      if (RE_LIST_ITEM.test(lines[i]) && lineIndent(lines[i]) === firstContentIndent) {
+      if (
+        LIST_ITEM_START_RE.test(lines[i]) &&
+        lineIndent(lines[i]) === firstContentIndent
+      ) {
         listStarts.push(i);
       }
     }
@@ -244,7 +244,7 @@ function _expandListItems(
       // the singleton's id/name, and a compact child sequence's
       // `- id:` at the direct-child indent isn't either.
       if (lineIndent(lines[i]) !== firstContentIndent) continue;
-      if (RE_LIST_ITEM.test(lines[i])) continue;
+      if (LIST_ITEM_START_RE.test(lines[i])) continue;
       name = readInstanceScalar(lines[i], "name") ?? name;
       id = readInstanceScalar(lines[i], "id") ?? id;
     }
@@ -410,7 +410,7 @@ export function findFieldLine(
   // A dash item's inline key (``- name: x``) sits at the content column
   // after ``- ``, not the dash column.
   const keyIndentOf = (line: string): number =>
-    RE_LIST_ITEM.test(line) ? listItemChildIndent(line) : indentOf(line);
+    LIST_ITEM_START_RE.test(line) ? listItemChildIndent(line) : indentOf(line);
   const firstChildIndent = (lo: number, hi: number): number | null => {
     for (let i = lo; i <= hi; i++) {
       const s = stripComment(lines[i]);
@@ -433,7 +433,7 @@ export function findFieldLine(
       const dashes: number[] = [];
       for (let i = lo; i <= hi; i++) {
         const s = stripComment(lines[i]);
-        if (s.trim() && indentOf(s) === baseIndent && RE_LIST_ITEM.test(s))
+        if (s.trim() && indentOf(s) === baseIndent && LIST_ITEM_START_RE.test(s))
           dashes.push(i);
       }
       // A numeric segment is a list index only where this level actually has
@@ -468,7 +468,7 @@ export function findFieldLine(
     return null;
   };
 
-  if (RE_LIST_ITEM.test(lines[start])) {
+  if (LIST_ITEM_START_RE.test(lines[start])) {
     // List-item section: keys live at the item's child indent, and the
     // header line itself carries the inline key.
     return descend(start, end, listItemChildIndent(lines[start]), relPath);

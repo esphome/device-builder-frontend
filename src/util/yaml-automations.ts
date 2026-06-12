@@ -5,13 +5,16 @@
  * unaffected; import from there or from here directly.
  */
 
-import { endsBlockAtIndent, isBlankOrCommentLine } from "./yaml-section-lexer.js";
+import {
+  endsBlockAtIndent,
+  isBlankOrCommentLine,
+  LIST_ITEM_START_RE,
+} from "./yaml-section-lexer.js";
 import {
   instanceComponentId,
   lineIndent,
   listItemChildIndent,
   parseYamlTopLevelSections,
-  RE_LIST_ITEM,
   readInstanceScalar,
   smallestContainingSection,
   type YamlSection,
@@ -329,7 +332,7 @@ function _subEntity(
     // Only the block's direct mapping fields are its id/name. Deeper lines are
     // the handler body, and a dash line at the field indent is a zero-depth
     // list (``filters:\n- ...``) — neither is the sub-entity's own id.
-    if (ind !== subChildIndent || RE_LIST_ITEM.test(lines[k])) continue;
+    if (ind !== subChildIndent || LIST_ITEM_START_RE.test(lines[k])) continue;
     id = readInstanceScalar(lines[k], "id") ?? id;
     name = readInstanceScalar(lines[k], "name") ?? name;
   }
