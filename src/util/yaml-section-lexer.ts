@@ -125,6 +125,15 @@ export const parseBlockScalarHeader = (raw: string): BlockScalarHeader | null =>
 export const LIST_ITEM_BARE_DASH_RE = /^\s+-\s*$/;
 
 /**
+ * Capture the ``<indent>-<spaces>`` prefix up to the first non-space of a
+ * list item's inline key (``  - file:`` → ``"  - "``). Its length is the
+ * column the item's child keys align to, which `_detectSectionChildIndent`
+ * uses so a first field that is itself a nested mapping doesn't pull the
+ * child column down to its grandchildren. No match for a bare dash.
+ */
+export const LIST_ITEM_INLINE_KEY_PREFIX_RE = /^(\s*-\s*)\S/;
+
+/**
  * Match a list item whose value is a key-style sub-dict header
  * (`- then:`, `- lambda:`, `- logger.log: pressed`,
  * `- switch.turn_on: relay`). The dash + key + colon shape is the
@@ -220,6 +229,18 @@ export const _detectSectionChildIndent = (
   // child key (at ``dash + 2``) clears it while a sibling dash
   // (same column as ours) doesn't.
   const headLine = lines[startIdx];
+  // An inline key on the dash line (``- key:``) fixes the item's child
+  // column at that key — even when the key's own value is a deeper nested
+  // block (``- file:\n      type: …``). Scanning the next line would then
+  // read the grandchild's indent and mis-level the item's sibling keys,
+  // dropping them and the nested value (#1389 follow-up). The bare-dash
+  // case (value on the next line) still falls through to the scan below.
+  if (isListItem) {
+    // The inline key's column is where the item's child keys align — even
+    // when that first field is itself a nested mapping (#1389 follow-up).
+    const inlineKey = headLine.match(LIST_ITEM_INLINE_KEY_PREFIX_RE);
+    if (inlineKey) return " ".repeat(inlineKey[1].length);
+  }
   const floor = isListItem ? headLine.indexOf("-") + 1 : _leadingIndent(headLine).length;
   const fallback = isListItem
     ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`

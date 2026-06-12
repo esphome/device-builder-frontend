@@ -375,6 +375,20 @@ export function parseSectionCore(
   const childIndent = _detectSectionChildIndent(lines, startIdx, isListItem);
   const childRegex = childRegexFor(childIndent);
 
+  // Parse a ``key:``-with-nested-mapping value: the block on the lines after
+  // *afterIdx* indented deeper than this section's child column. Returns
+  // ``null`` when there's no such block. Shared by the dash-line inline key
+  // and the in-loop ``key:`` paths so both read a nested mapping identically.
+  const readNestedMappingAfter = (
+    afterIdx: number
+  ): { values: Record<string, unknown>; endIdx: number } | null => {
+    const peek = _skipBlankAndCommentLines(lines, afterIdx);
+    if (peek >= lines.length) return null;
+    const peekLead = _leadingIndent(lines[peek]);
+    if (peekLead.length <= childIndent.length) return null;
+    return parseNestedBlock(lines, afterIdx, peekLead);
+  };
+
   // Top-level list-bodied section (globals): the item array lives at
   // [sectionKey], where the wrapper's multi_value entry reads it.
   if (!isListItem && LIST_SECTIONS.has(sectionKey)) {
@@ -398,6 +412,14 @@ export function parseSectionCore(
         const { comment } = splitInlineComment(raw);
         if (comment) comments.set(firstMatch[1], comment);
         values[firstMatch[1]] = parseScalar(raw);
+      } else {
+        // ``- file:`` with the value as a nested mapping on the following
+        // deeper-indented lines. The key rides on the dash line, so the
+        // main loop (which starts below it) never sees this value; capture
+        // it here so a list item whose first field is a nested mapping
+        // (font.file's structured form) round-trips into the form (#1389).
+        const sub = readNestedMappingAfter(startIdx + 1);
+        if (sub && Object.keys(sub.values).length > 0) values[firstMatch[1]] = sub.values;
       }
     }
   }
@@ -465,11 +487,10 @@ export function parseSectionCore(
         continue;
       }
 
-      // Read the deeper indent from the peek line itself so a
-      // user-typed 4-space file recurses correctly.
-      const peekLead = _leadingIndent(peekLine);
-      if (peekLead.length > childIndent.length) {
-        const result = parseNestedBlock(lines, i + 1, peekLead);
+      // Nested mapping under ``key:`` (deeper indent read from the block
+      // itself so a user-typed 4-space file recurses correctly).
+      const result = readNestedMappingAfter(i + 1);
+      if (result) {
         if (Object.keys(result.values).length > 0) {
           values[key] = result.values;
           recordSpan(key, i, result.endIdx);
