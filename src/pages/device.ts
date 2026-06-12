@@ -135,6 +135,17 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _scrollToHighlight = false;
 
+  /** The current ``_highlightRange`` came from the validation prompt's
+   *  "Go to error" jump; eligible for auto-clear once the user edits
+   *  and the inline lint pass completes, or a save succeeds. Navigation
+   *  and field-focus highlights never set this. */
+  private _errorHighlight = false;
+
+  /** The user edited the YAML while an error highlight was active;
+   *  gates the lint-complete clear so the lint pass that *produced*
+   *  the error doesn't immediately wipe the just-set highlight. */
+  private _errorHighlightEditPending = false;
+
   @state()
   private _selectedSection: string | null = this._readUrlParam("section", null);
 
@@ -618,8 +629,7 @@ export class ESPHomePageDevice extends LitElement {
     // event, but the navigator's update-from-prop-change path
     // doesn't emit, so URL-only arrivals would otherwise mount
     // the editor without ever scrolling.
-    this._highlightRange = resolved.range;
-    this._scrollToHighlight = true;
+    this._setHighlight(resolved.range, true);
   }
 
   /** Promise resolver wired up while the validation dialog is open.
@@ -758,6 +768,12 @@ export class ESPHomePageDevice extends LitElement {
         console.error("Failed to save YAML:", e);
       }
     }
+    // A committed save ends the fix-the-error errand the error-jump
+    // highlight was guiding (validation passed, or the user chose
+    // "Save anyway"), so drop it. A failed save keeps it.
+    if (saved && this._errorHighlight) {
+      this._setHighlight(null, false);
+    }
     const message = saved ? "device.yaml_saved" : "device.yaml_save_error";
     const variant = saved ? toast.success : toast.error;
     variant(this._localize(message), { richColors: true });
@@ -785,8 +801,7 @@ export class ESPHomePageDevice extends LitElement {
         this._layout = "both";
         localStorage.setItem("esphome-editor-layout", "both");
       }
-      this._highlightRange = { fromLine: line, toLine: line };
-      this._scrollToHighlight = true;
+      this._setHighlight({ fromLine: line, toLine: line }, true, true);
       const resolved = resolveSectionForUrlLine(this._yaml, line, null);
       if (resolved) {
         this._selectedSection = resolved.sectionKey;
@@ -887,6 +902,7 @@ export class ESPHomePageDevice extends LitElement {
           @section-reveal=${this._onSectionReveal}
           @layout-change=${this._onLayoutChange}
           @yaml-change=${this._onYamlChange}
+          @yaml-diagnostics=${this._onYamlDiagnostics}
           @yaml-cursor-line=${this._onYamlCursorLine}
           @yaml-highlight=${this._onYamlHighlight}
           @yaml-updated=${this._onYamlUpdated}
@@ -1005,8 +1021,7 @@ export class ESPHomePageDevice extends LitElement {
         this._selectedSection = null;
         this._selectedFromLine = undefined;
       }
-      this._highlightRange = null;
-      this._scrollToHighlight = false;
+      this._setHighlight(null, false);
       this._updateUrl();
     });
   };
@@ -1117,7 +1132,21 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onYamlChange(e: CustomEvent<{ value: string }>) {
     this._yaml = e.detail.value;
+    if (this._errorHighlight) this._errorHighlightEditPending = true;
     this._retryPendingFieldLine();
+  }
+
+  /** Inline lint pass completed. If the user has edited since jumping
+   *  to the error, the highlight has served its purpose; clear it
+   *  rather than leave a stale blue line the user can't dismiss
+   *  (esphome/device-builder#1404). */
+  private _onYamlDiagnostics(
+    e: CustomEvent<{ errors: string[]; configuration: string }>
+  ) {
+    if (e.detail.configuration !== this.id) return;
+    if (this._errorHighlight && this._errorHighlightEditPending) {
+      this._setHighlight(null, false);
+    }
   }
 
   /**
@@ -1208,8 +1237,7 @@ export class ESPHomePageDevice extends LitElement {
     const section = this._focusedSection();
     const line = section ? findFieldLine(this._yaml, section, path) : null;
     if (line !== null) {
-      this._highlightRange = { fromLine: line, toLine: line };
-      this._scrollToHighlight = true;
+      this._setHighlight({ fromLine: line, toLine: line }, true);
     }
     return { section, found: line !== null };
   }
@@ -1230,10 +1258,10 @@ export class ESPHomePageDevice extends LitElement {
       section: this._selectedSection,
       fromLine: this._selectedFromLine,
     };
-    this._highlightRange = section
-      ? { fromLine: section.fromLine, toLine: section.toLine }
-      : null;
-    this._scrollToHighlight = section !== undefined;
+    this._setHighlight(
+      section ? { fromLine: section.fromLine, toLine: section.toLine } : null,
+      section !== undefined
+    );
   }
 
   /** Once the pending field's YAML line exists (debounced write landed),
@@ -1260,8 +1288,16 @@ export class ESPHomePageDevice extends LitElement {
   private _onYamlHighlight(
     e: CustomEvent<{ range: HighlightRange | null; scroll: boolean }>
   ) {
-    this._highlightRange = e.detail.range;
-    this._scrollToHighlight = e.detail.scroll;
+    this._setHighlight(e.detail.range, e.detail.scroll);
+  }
+
+  /** Single write path for the editor highlight, so the error-jump
+   *  flag can't leak into navigation / field-focus highlights. */
+  private _setHighlight(range: HighlightRange | null, scroll: boolean, isError = false) {
+    this._highlightRange = range;
+    this._scrollToHighlight = scroll;
+    this._errorHighlight = isError && range !== null;
+    this._errorHighlightEditPending = false;
   }
 
   private _onYamlUpdated(e: CustomEvent<{ yaml: string }>) {
