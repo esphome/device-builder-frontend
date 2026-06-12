@@ -80,6 +80,23 @@ describe("automation-action-node trigger labels (esphome/device-builder#1390)", 
     expect(nestedLabels(el)).toEqual(["On Response", "On Error"]);
   });
 
+  it("humanizes a multi-word trigger key", async () => {
+    const action = {
+      id: "binary_sensor.x",
+      name: "X",
+      description: "",
+      config_entries: [],
+      accepts_action_list: ["on_multi_click"],
+    } as unknown as AutomationAction;
+    const node = {
+      action_id: "binary_sensor.x",
+      params: {},
+      children: { on_multi_click: [] },
+    } as unknown as ActionNode;
+    const el = await mount(action, node);
+    expect(nestedLabels(el)).toEqual(["On Multi Click"]);
+  });
+
   it("renders one nested action list per trigger key alongside the params form", async () => {
     const el = await mount(httpGetAction, httpGetNode);
     expect(
