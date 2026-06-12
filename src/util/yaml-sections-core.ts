@@ -14,10 +14,15 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
-import { endsBlockAtIndent, isBlankOrCommentLine } from "./yaml-section-lexer.js";
+import {
+  _skipBlankAndCommentLines,
+  endsBlockAtIndent,
+  LIST_ITEM_START_RE,
+} from "./yaml-section-lexer.js";
 
-/** A YAML list-item line: leading indent, a dash, then a space or EOL. */
-export const RE_LIST_ITEM = /^\s*-(\s|$)/;
+/** A YAML list-item line — the lexer's definition, re-exported so the
+ *  splitter and the reader can't drift apart on what counts as one. */
+export const RE_LIST_ITEM = LIST_ITEM_START_RE;
 /** A field-path segment that addresses a list index (``["areas","0",…]``). */
 const RE_PATH_INDEX = /^\d+$/;
 
@@ -214,18 +219,14 @@ function _expandListItems(
   // The section is a list iff its first content line is a dash. Its
   // indent — column 0 (YAML's zero-indented sequence), 2, 4, ... —
   // is the item indent; deeper dashes belong to nested sequences.
-  let firstContentIdx = keyIdx + 1;
-  while (firstContentIdx <= endIdx && isBlankOrCommentLine(lines[firstContentIdx])) {
-    firstContentIdx++;
-  }
+  const firstContentIdx = _skipBlankAndCommentLines(lines, keyIdx + 1);
   const firstContentIndent =
     firstContentIdx <= endIdx ? lineIndent(lines[firstContentIdx]) : -1;
-  const isList = firstContentIdx <= endIdx && RE_LIST_ITEM.test(lines[firstContentIdx]);
 
   const listStarts: number[] = [];
-  if (isList) {
+  if (firstContentIdx <= endIdx && RE_LIST_ITEM.test(lines[firstContentIdx])) {
     for (let i = firstContentIdx; i <= endIdx; i++) {
-      if (lineIndent(lines[i]) === firstContentIndent && RE_LIST_ITEM.test(lines[i])) {
+      if (RE_LIST_ITEM.test(lines[i]) && lineIndent(lines[i]) === firstContentIndent) {
         listStarts.push(i);
       }
     }
