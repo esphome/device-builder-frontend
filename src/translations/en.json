@@ -943,6 +943,7 @@
     "discord": "Chat on the ESPHome Discord"
   },
   "command_palette": {
+    "title": "Command palette",
     "placeholder": "Type a command — or / to search YAML content",
     "no_results": "No results found",
     "group_navigation": "Navigation",

@@ -92,6 +92,9 @@ export class ESPHomeCommandPalette extends LitElement {
   private _api!: ESPHomeAPI;
 
   @state() private _open = false;
+  /* True from open() until the hide animation ends; gates content so a
+     closed palette doesn't re-render the command list on device events. */
+  @state() private _contentRendered = false;
   @state() private _query = "";
   @state() private _selectedId = "";
 
@@ -139,6 +142,7 @@ export class ESPHomeCommandPalette extends LitElement {
     // linger inert under the modal backdrop.
     closeAllOpenPopovers(document);
     this._open = true;
+    this._contentRendered = true;
     this._query = "";
     this._selectedId = "";
     this._yamlSearch.clear();
@@ -157,10 +161,12 @@ export class ESPHomeCommandPalette extends LitElement {
     else this.open();
   }
 
-  // Esc and light-dismiss close the wa-dialog on their own; sync our flag.
-  private _onAfterHide = () => {
-    this._open = false;
-    this._yamlSearch.clear();
+  // Esc and light-dismiss close the wa-dialog on their own; sync our
+  // flag, then drop the content now that the hide animation is done.
+  private _onAfterHide = (e: Event) => {
+    if (e.target !== e.currentTarget) return;
+    this.close();
+    this._contentRendered = false;
   };
 
   private _allCommands(): CommandAction[] {
@@ -329,17 +335,19 @@ export class ESPHomeCommandPalette extends LitElement {
 
   /* wa-dialog shows via showModal(), so the palette lives in the top
      layer and stacks above an already-open dialog (Settings, Firmware
-     Tasks, ...) instead of painting behind it. Content stays rendered
-     while closed so the hide animation doesn't run on an empty card. */
+     Tasks, ...) instead of painting behind it. Raw wa-dialog on purpose:
+     base-dialog's header / close-button / busy chrome isn't wanted here.
+     The header is hidden via ::part(header) rather than without-header
+     so ``label`` still gives the dialog its accessible name. */
   protected render() {
     return html`
       <wa-dialog
-        without-header
+        label=${this._localize("command_palette.title")}
         light-dismiss
         ?open=${this._open}
         @wa-after-hide=${this._onAfterHide}
       >
-        ${this._renderContent()}
+        ${this._contentRendered ? this._renderContent() : nothing}
       </wa-dialog>
     `;
   }
@@ -372,6 +380,7 @@ export class ESPHomeCommandPalette extends LitElement {
           type="text"
           .value=${this._query}
           placeholder=${this._localize("command_palette.placeholder")}
+          aria-label=${this._localize("command_palette.placeholder")}
           @input=${this._onQueryInput}
           @keydown=${this._onInputKeyDown}
           autocomplete="off"

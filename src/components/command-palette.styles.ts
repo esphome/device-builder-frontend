@@ -20,6 +20,12 @@ export const commandPaletteStyles = css`
     overflow: hidden;
   }
 
+  /* Hidden, not without-header: the label inside still names the
+     dialog through its aria-labelledby. */
+  wa-dialog::part(header) {
+    display: none;
+  }
+
   wa-dialog::part(body) {
     display: flex;
     flex-direction: column;
