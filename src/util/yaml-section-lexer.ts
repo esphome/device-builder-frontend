@@ -122,8 +122,8 @@ export const parseBlockScalarHeader = (raw: string): BlockScalarHeader | null =>
  * dropped from the values dict, and the user's empty row vanishes
  * on save. Marking it complex routes the block through
  * ``collectBlockListMappings`` which already treats bare dashes
- * as ``{}`` placeholders. Indent is ``\s*`` — a zero-indented
- * sequence puts dashes at column 0, like ``LIST_ITEM_START_RE``.
+ * as ``{}`` placeholders. Indent is ``\s*`` for
+ * ``LIST_ITEM_START_RE``'s column-0 reason.
  */
 export const LIST_ITEM_BARE_DASH_RE = /^\s*-\s*$/;
 
@@ -153,8 +153,8 @@ export const LIST_ITEM_INLINE_KEY_PREFIX_RE = /^(\s*-\s*)\S/;
  *
  * Allows zero trailing whitespace after the colon (header-only
  * line) AND content after it (`- lambda: |-`); both forms are
- * complex. Indent is ``\s*`` — a zero-indented sequence puts
- * dashes at column 0, like ``LIST_ITEM_START_RE``.
+ * complex. Indent is ``\s*`` for ``LIST_ITEM_START_RE``'s
+ * column-0 reason.
  */
 export const LIST_ITEM_DICT_KEY_RE = /^\s*-\s+[a-zA-Z_][\w.]*:(?:\s|$)/;
 

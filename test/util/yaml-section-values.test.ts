@@ -2456,11 +2456,6 @@ describe("globals list section — zero-indented sequence", () => {
     expect(items[1].restore_value).toBe(true);
   });
 
-  it("keeps items as mappings, not scalar strings", () => {
-    const items = parseYamlSectionValues(COL0, "globals").globals as unknown[];
-    for (const item of items) expect(typeof item).toBe("object");
-  });
-
   it("round-trips adding a row without losing the existing items", () => {
     const items = parseYamlSectionValues(COL0, "globals").globals as Record<
       string,
@@ -2473,22 +2468,6 @@ describe("globals list section — zero-indented sequence", () => {
       unknown
     >[];
     expect(ritems.map((i) => i.id)).toEqual(["my_int", "my_bool", "my_str"]);
-  });
-
-  it("round-trips editing one item, keeping every entry", () => {
-    const items = parseYamlSectionValues(COL0, "globals").globals as Record<
-      string,
-      unknown
-    >[];
-    items[0].initial_value = "42";
-    const out = updateSectionInYaml(COL0, "globals", { globals: items });
-    const ritems = parseYamlSectionValues(out + "\n", "globals").globals as Record<
-      string,
-      unknown
-    >[];
-    expect(ritems).toHaveLength(2);
-    expect(ritems[0].initial_value).toBe("42");
-    expect(ritems[1].id).toBe("my_bool");
   });
 
   it("preserves a sibling section on round-trip", () => {

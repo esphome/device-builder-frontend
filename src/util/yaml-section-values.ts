@@ -123,7 +123,8 @@ export function updateSectionInYaml(
 
   // Top-level list-bodied section (globals): re-emit through the
   // mapping serializer's array branch — { sectionKey: array } yields
-  // `sectionKey:` plus the dash items at the section's child indent.
+  // `sectionKey:` plus the dash items at the detected child indent
+  // (canonical 2-space when the body was a zero-indented sequence).
   if (LIST_SECTIONS.has(sectionKey)) {
     const raw = values[sectionKey];
     // No array → leave the YAML untouched rather than collapse the
