@@ -1,5 +1,7 @@
 import { consume } from "@lit/context";
 import {
+  mdiAccountCog,
+  mdiAccountCogOutline,
   mdiClose,
   mdiHandshake,
   mdiHandshakeOutline,
@@ -10,7 +12,6 @@ import {
   mdiServerNetwork,
   mdiServerNetworkOutline,
   mdiTranslate,
-  mdiVectorDifference,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -34,11 +35,13 @@ import "./base-dialog.js";
 import "./settings-dialog/appearance-section.js";
 import "./settings-dialog/build-offload-section.js";
 import "./settings-dialog/build-server-section.js";
-import "./settings-dialog/editor-section.js";
+import "./settings-dialog/experience-section.js";
 import "./settings-dialog/language-section.js";
 import "./settings-dialog/pairing-requests-section.js";
 
 registerMdiIcons({
+  "account-cog": mdiAccountCog,
+  "account-cog-outline": mdiAccountCogOutline,
   close: mdiClose,
   handshake: mdiHandshake,
   "handshake-outline": mdiHandshakeOutline,
@@ -49,7 +52,6 @@ registerMdiIcons({
   "server-network": mdiServerNetwork,
   "server-network-outline": mdiServerNetworkOutline,
   translate: mdiTranslate,
-  "vector-difference": mdiVectorDifference,
 });
 
 @customElement("esphome-settings-dialog")
@@ -176,10 +178,10 @@ export class ESPHomeSettingsDialog extends LitElement {
     switch (this._section) {
       case "appearance":
         return html`<esphome-settings-appearance></esphome-settings-appearance>`;
+      case "experience":
+        return html`<esphome-settings-experience></esphome-settings-experience>`;
       case "language":
         return html`<esphome-settings-language></esphome-settings-language>`;
-      case "editor":
-        return html`<esphome-settings-editor></esphome-settings-editor>`;
       case "build_server":
         return html`<esphome-settings-build-server></esphome-settings-build-server>`;
       case "pairing_requests":

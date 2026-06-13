@@ -27,14 +27,12 @@ export interface CommandAction {
 export interface CommandActionContext {
   t: LocalizeFunc;
   devices: ConfiguredDevice[];
-  yamlDiffEnabled: boolean;
   setTheme: (theme: string) => void;
   setLanguage: (lang: LanguageChoice) => void;
-  toggleDiffButton: () => void;
 }
 
 /** The default (non-YAML-mode) command list: navigation, devices,
- *  themes, languages, editor toggles. */
+ *  themes, languages. */
 export function buildCommands(ctx: CommandActionContext): CommandAction[] {
   const { t } = ctx;
 
@@ -95,19 +93,6 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
     },
   ];
 
-  const editor: CommandAction[] = [
-    {
-      id: "editor.yaml_diff_button",
-      group: t("layout.editor"),
-      label: ctx.yamlDiffEnabled
-        ? t("command_palette.hide_yaml_diff_button")
-        : t("command_palette.show_yaml_diff_button"),
-      icon: "vector-difference",
-      keywords: ["diff", "yaml", "compare"],
-      run: () => ctx.toggleDiffButton(),
-    },
-  ];
-
   const languageGroup = t("command_palette.group_language");
   const languages: CommandAction[] = LANGUAGES.map((l) => ({
     id: `language.${l.value}`,
@@ -118,7 +103,7 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
     run: () => ctx.setLanguage(l.value),
   }));
 
-  return [...nav, ...devices, ...themes, ...languages, ...editor];
+  return [...nav, ...devices, ...themes, ...languages];
 }
 
 /**

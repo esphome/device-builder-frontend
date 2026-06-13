@@ -92,6 +92,7 @@ import {
   labelsContext,
   localizeContext,
   recentJobsContext,
+  remoteComputeOnlyContext,
   versionContext,
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
@@ -182,6 +183,13 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: labelsContext, subscribe: true }) @state() _labelsCatalog: Label[] =
     [];
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
+
+  // When true this install is a remote build node: every device-creation
+  // affordance (New device card, FAB, table Create, Adopt, serial wizard)
+  // is hidden.
+  @consume({ context: remoteComputeOnlyContext, subscribe: true })
+  @state()
+  _remoteComputeOnly = false;
 
   // Used by the NO_COMPATIBLE_PEER toast classifier — see
   // classifyNoCompatiblePeerReason. Same context the settings
@@ -285,6 +293,9 @@ export class ESPHomePageDashboard extends LitElement {
   ];
 
   private _onSerialSetup = (event: Event) => {
+    // Remote-compute installs don't create devices; a plugged-in board
+    // shouldn't pop the creation wizard.
+    if (this._remoteComputeOnly) return;
     const port = (event as CustomEvent<{ port: SerialPort | null }>).detail?.port ?? null;
     void detectAndOpenWizard(this._api, this._createDialog, {
       port,

@@ -1,5 +1,6 @@
+import { OnboardingStepId } from "../../api/types/system.js";
 import {
-  isOnboardingPending,
+  isWifiSetupPending,
   shouldAutoShowOnboarding,
 } from "../../util/onboarding-gate.js";
 import type { ESPHomeApp } from "../app-shell.js";
@@ -7,7 +8,10 @@ import type { ESPHomeApp } from "../app-shell.js";
 export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
   try {
     const state = await host._api.getOnboardingState();
-    host._onboardingPending = isOnboardingPending(state);
+    host._onboardingPending = isWifiSetupPending(state);
+    host._onboardingHasUseCase = state.steps.some(
+      (s) => s.id === OnboardingStepId.USE_CASE
+    );
     host._onboardingShouldShow = shouldAutoShowOnboarding(
       state,
       host._onboardingSessionDismissed
@@ -55,6 +59,8 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
     const prefs = await host._api.getPreferences();
     host.applyTheme(prefs.theme);
     host._yamlDiffButton = prefs.yaml_diff_button;
+    host._experienceLevel = prefs.experience_level;
+    host._remoteComputeOnly = prefs.remote_compute_only;
   } catch {
     // Preferences not critical — keep localStorage value.
   }

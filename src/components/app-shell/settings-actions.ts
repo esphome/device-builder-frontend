@@ -6,7 +6,7 @@ import {
   CLEANUP_TTL_MIN_SECONDS,
   type PairingSummary,
 } from "../../api/types/remote-build.js";
-import type { Theme } from "../../api/types/system.js";
+import { ExperienceLevel, type Theme } from "../../api/types/system.js";
 import {
   clearStoredLocale,
   loadLocalize,
@@ -22,10 +22,40 @@ export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   host._api.updatePreferences({ theme }).catch(() => {});
 }
 
-export function onSetYamlDiffButton(host: ESPHomeApp, e: CustomEvent<boolean>): void {
+// Experience seeds the YAML diff button (beginners get none; UI / YAML users
+// get it) and the editor's first-open layout. Revert + toast on failure so the
+// stored level can't silently diverge from the UI.
+export function onSetExperienceLevel(
+  host: ESPHomeApp,
+  e: CustomEvent<ExperienceLevel>
+): void {
+  const level = e.detail;
+  const previousLevel = host._experienceLevel;
+  const previousDiff = host._yamlDiffButton;
+  const yamlDiff = level !== ExperienceLevel.BEGINNER;
+  host._experienceLevel = level;
+  host._yamlDiffButton = yamlDiff;
+  host._api
+    .updatePreferences({ experience_level: level, yaml_diff_button: yamlDiff })
+    .catch(() => {
+      host._experienceLevel = previousLevel;
+      host._yamlDiffButton = previousDiff;
+      toast.error(host._localize("settings.experience_save_failed"), {
+        richColors: true,
+      });
+    });
+}
+
+export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>): void {
   const enabled = e.detail;
-  host._yamlDiffButton = enabled;
-  host._api.updatePreferences({ yaml_diff_button: enabled }).catch(() => {});
+  const previous = host._remoteComputeOnly;
+  host._remoteComputeOnly = enabled;
+  host._api.updatePreferences({ remote_compute_only: enabled }).catch(() => {
+    host._remoteComputeOnly = previous;
+    toast.error(host._localize("settings.experience_save_failed"), {
+      richColors: true,
+    });
+  });
 }
 
 // Optimistic flip with revert-on-failure for security-sensitive toggles.

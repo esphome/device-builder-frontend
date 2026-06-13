@@ -51,6 +51,21 @@ export enum SortDirection {
   DESC = "desc",
 }
 
+/**
+ * How much ESPHome the user knows — tailors UI weight. Chosen in
+ * onboarding, changeable in Settings. ``null`` (a fresh install that
+ * hasn't picked) is distinct from any level. Keep in lockstep with
+ * the backend's ``ExperienceLevel`` enum.
+ */
+export enum ExperienceLevel {
+  /** New to ESPHome — keep it light (no YAML diff, no YAML pane). */
+  BEGINNER = "beginner",
+  /** ESPHome user who prefers the UI (YAML diff, no first-open pane). */
+  UI = "ui",
+  /** ESPHome user who prefers YAML (YAML diff + first-open pane). */
+  YAML = "yaml",
+}
+
 export interface UserPreferences {
   dashboard_view: DashboardView;
   theme: Theme;
@@ -60,6 +75,12 @@ export interface UserPreferences {
   table_column_visibility: Record<string, boolean>;
   table_sort_column: string | null;
   table_sort_direction: SortDirection | null;
+  /** Experience level chosen in onboarding (``null`` until chosen).
+   *  Seeds ``yaml_diff_button`` and the editor's first-open layout. */
+  experience_level: ExperienceLevel | null;
+  /** This install is only a remote build node: onboarding skips the
+   *  Wi-Fi step and device-creation entry points are hidden. */
+  remote_compute_only: boolean;
   /** Highest onboarding-flow version the user has acknowledged.
    *  ``0`` ⇒ never gone through onboarding. The dashboard surfaces
    *  the wizard whenever this is below the server's
@@ -73,6 +94,8 @@ export interface UserPreferences {
  * through the wire as-is.
  */
 export enum OnboardingStepId {
+  USE_CASE = "use_case",
+  EXPERIENCE_LEVEL = "experience_level",
   WIFI_CREDENTIALS = "wifi_credentials",
 }
 

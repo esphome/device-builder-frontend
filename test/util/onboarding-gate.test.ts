@@ -16,11 +16,17 @@ import {
 } from "../../src/api/types/system.js";
 import {
   isOnboardingPending,
+  isWifiSetupPending,
   shouldAutoShowOnboarding,
 } from "../../src/util/onboarding-gate.js";
 
 const wifi = (status: OnboardingStepStatus) => ({
   id: OnboardingStepId.WIFI_CREDENTIALS,
+  status,
+});
+
+const experience = (status: OnboardingStepStatus) => ({
+  id: OnboardingStepId.EXPERIENCE_LEVEL,
   status,
 });
 
@@ -47,6 +53,38 @@ describe("isOnboardingPending", () => {
 
   it("returns false on an empty step list", () => {
     expect(isOnboardingPending(stateWith([]))).toBe(false);
+  });
+});
+
+describe("isWifiSetupPending", () => {
+  it("is true only when the wifi step itself is pending", () => {
+    expect(
+      isWifiSetupPending(
+        stateWith([
+          experience(OnboardingStepStatus.PENDING),
+          wifi(OnboardingStepStatus.PENDING),
+        ])
+      )
+    ).toBe(true);
+  });
+
+  it("ignores a pending experience step when wifi is done", () => {
+    // The kebab Wi-Fi badge must not light up just because the
+    // experience pick is still outstanding.
+    expect(
+      isWifiSetupPending(
+        stateWith([
+          experience(OnboardingStepStatus.PENDING),
+          wifi(OnboardingStepStatus.DONE),
+        ])
+      )
+    ).toBe(false);
+  });
+
+  it("is false when there is no wifi step (remote-compute install)", () => {
+    expect(
+      isWifiSetupPending(stateWith([experience(OnboardingStepStatus.PENDING)]))
+    ).toBe(false);
   });
 });
 

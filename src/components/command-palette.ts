@@ -6,7 +6,6 @@ import {
   mdiKeyVariant,
   mdiMagnify,
   mdiThemeLightDark,
-  mdiVectorDifference,
   mdiWeatherNight,
   mdiWeatherSunny,
 } from "@mdi/js";
@@ -15,12 +14,7 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LanguageChoice, LocalizeFunc } from "../common/localize.js";
-import {
-  apiContext,
-  devicesContext,
-  localizeContext,
-  yamlDiffButtonContext,
-} from "../context/index.js";
+import { apiContext, devicesContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { yamlEmptyMessageKey } from "../util/yaml-search-helpers.js";
@@ -39,7 +33,6 @@ registerMdiIcons({
   "key-variant": mdiKeyVariant,
   magnify: mdiMagnify,
   "theme-light-dark": mdiThemeLightDark,
-  "vector-difference": mdiVectorDifference,
   "weather-night": mdiWeatherNight,
   "weather-sunny": mdiWeatherSunny,
 });
@@ -63,10 +56,6 @@ export class ESPHomeCommandPalette extends LitElement {
   @consume({ context: devicesContext, subscribe: true })
   @state()
   private _devices: ConfiguredDevice[] = [];
-
-  @consume({ context: yamlDiffButtonContext, subscribe: true })
-  @state()
-  private _yamlDiffEnabled = false;
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
@@ -162,10 +151,8 @@ export class ESPHomeCommandPalette extends LitElement {
     return buildCommands({
       t: this._localize,
       devices: this._devices,
-      yamlDiffEnabled: this._yamlDiffEnabled,
       setTheme: (theme) => this._setTheme(theme),
       setLanguage: (lang) => this._setLanguage(lang),
-      toggleDiffButton: () => this._toggleDiffButton(),
     });
   }
 
@@ -467,16 +454,6 @@ export class ESPHomeCommandPalette extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-language", {
         detail: lang,
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  private _toggleDiffButton() {
-    this.dispatchEvent(
-      new CustomEvent("set-yaml-diff-button", {
-        detail: !this._yamlDiffEnabled,
         bubbles: true,
         composed: true,
       })

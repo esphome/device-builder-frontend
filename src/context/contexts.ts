@@ -21,6 +21,7 @@ import type {
   PeerSummary,
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
+import type { ExperienceLevel } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /** Context for the ESPHome API client instance. */
@@ -86,6 +87,29 @@ export const firmwareJobsContext = createContext<Map<string, FirmwareJob>>(
 /** Context for whether the YAML diff button is enabled in the editor. */
 export const yamlDiffButtonContext = createContext<boolean>(
   Symbol("esphome-yaml-diff-button")
+);
+
+/**
+ * Context for the chosen experience level (``null`` until picked).
+ *
+ * App shell loads it from ``config/get_preferences`` on boot and
+ * updates it when the user re-picks in Settings → Experience. The
+ * editor reads it to seed the YAML pane on first open; the Settings
+ * section reads it to highlight the active choice.
+ */
+export const experienceLevelContext = createContext<ExperienceLevel | null>(
+  Symbol("esphome-experience-level")
+);
+
+/**
+ * Context for whether this install is remote-compute-only.
+ *
+ * When ``true`` the device-creation entry points (New device, Adopt,
+ * Import, serial auto-wizard) are hidden. Loaded from
+ * ``config/get_preferences`` on boot, toggled in Settings → Experience.
+ */
+export const remoteComputeOnlyContext = createContext<boolean>(
+  Symbol("esphome-remote-compute-only")
 );
 
 /**

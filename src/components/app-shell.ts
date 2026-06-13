@@ -16,7 +16,7 @@ import type {
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
 import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
-import { Theme } from "../api/types/system.js";
+import { type ExperienceLevel, Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import {
@@ -32,6 +32,7 @@ import {
   darkModeContext,
   devicesContext,
   devicesLoadedContext,
+  experienceLevelContext,
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
@@ -44,6 +45,7 @@ import {
   recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
+  remoteComputeOnlyContext,
   serverVersionContext,
   versionContext,
   yamlDiffButtonContext,
@@ -69,14 +71,15 @@ import {
   onPairRequestSent,
   onRemoteBuildJobDismissed,
   onRemoteBuildJobSubmitted,
+  onSetExperienceLevel,
   onSetLanguage,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
+  onSetRemoteComputeOnly,
   onSetTheme,
-  onSetYamlDiffButton,
 } from "./app-shell/settings-actions.js";
 
 import "../pages/dashboard.js";
@@ -88,6 +91,7 @@ import type { ESPHomeFeedbackDialog } from "./feedback-dialog.js";
 import "./firmware-jobs-dialog.js";
 import type { ESPHomeFirmwareJobsDialog } from "./firmware-jobs-dialog.js";
 import "./onboarding-wifi-dialog.js";
+import "./onboarding/onboarding-wizard-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
 
@@ -120,6 +124,12 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: localizeContext }) @state() _localize: LocalizeFunc =
     defaultLocalize;
   @provide({ context: yamlDiffButtonContext }) @state() _yamlDiffButton = false;
+  @provide({ context: experienceLevelContext })
+  @state()
+  _experienceLevel: ExperienceLevel | null = null;
+  @provide({ context: remoteComputeOnlyContext })
+  @state()
+  _remoteComputeOnly = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
     CLEANUP_TTL_DEFAULT_SECONDS;
@@ -162,6 +172,9 @@ export class ESPHomeApp extends LitElement {
 
   @state() _onboardingShouldShow = false;
   @state() _onboardingSessionDismissed = false;
+  // Whether the first-run wizard should ask the remote-compute use-case
+  // question (non-HA only). Seeded from the onboarding state's step list.
+  @state() _onboardingHasUseCase = false;
   @state() _authState: AuthState = "connecting";
   @state() _authError: string | null = null;
   @state() _rateLimitedUntil = 0;
@@ -180,6 +193,8 @@ export class ESPHomeApp extends LitElement {
   @query("esphome-feedback-dialog") private _feedbackDialog!: ESPHomeFeedbackDialog;
   @query("esphome-onboarding-wifi-dialog")
   private _onboardingDialog?: HTMLElement & { open(): void };
+  @query("esphome-onboarding-wizard-dialog")
+  private _onboardingWizard?: HTMLElement & { open(): void };
 
   static styles = [
     espHomeStyles,
@@ -497,7 +512,6 @@ export class ESPHomeApp extends LitElement {
     return html`
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @set-yaml-diff-button=${(e: CustomEvent<boolean>) => onSetYamlDiffButton(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @open-settings=${() => this._settingsDialog?.open()}
@@ -510,13 +524,15 @@ export class ESPHomeApp extends LitElement {
       </esphome-layout>
       <esphome-command-palette
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @set-yaml-diff-button=${(e: CustomEvent<boolean>) => onSetYamlDiffButton(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
       ></esphome-command-palette>
       <esphome-settings-dialog
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @set-yaml-diff-button=${(e: CustomEvent<boolean>) => onSetYamlDiffButton(this, e)}
+        @set-experience-level=${(e: CustomEvent<ExperienceLevel>) =>
+          onSetExperienceLevel(this, e)}
+        @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
+          onSetRemoteComputeOnly(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>
           onSetRemoteBuildEnabled(this, e)}
         @set-remote-build-cleanup-ttl=${(e: CustomEvent<number>) =>
@@ -550,15 +566,25 @@ export class ESPHomeApp extends LitElement {
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
         @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
       ></esphome-onboarding-wifi-dialog>
+      <esphome-onboarding-wizard-dialog
+        .hasUseCase=${this._onboardingHasUseCase}
+        @set-experience-level=${(e: CustomEvent<ExperienceLevel>) =>
+          onSetExperienceLevel(this, e)}
+        @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
+          onSetRemoteComputeOnly(this, e)}
+        @onboarding-acknowledged=${this._onOnboardingAcknowledged}
+        @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
+      ></esphome-onboarding-wizard-dialog>
     `;
   }
 
-  // When _onboardingShouldShow flips true, programmatically open the dialog.
-  // The dialog is mounted unconditionally (so listeners are wired) but starts closed.
+  // When _onboardingShouldShow flips true, programmatically open the wizard.
+  // The dialogs are mounted unconditionally (so listeners are wired) but start
+  // closed; the standalone Wi-Fi dialog is opened only from the kebab menu.
   protected updated(changed: PropertyValues) {
     super.updated?.(changed);
     if (changed.has("_onboardingShouldShow") && this._onboardingShouldShow) {
-      this._onboardingDialog?.open();
+      this._onboardingWizard?.open();
     }
   }
 }

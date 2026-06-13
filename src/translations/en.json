@@ -903,6 +903,36 @@
       "decline_failed": "Couldn't update onboarding preferences",
       "dismiss_session": "Maybe later",
       "decline_permanent": "I don't use Wi-Fi — skip this step"
+    },
+    "wizard": {
+      "back": "Back",
+      "continue": "Continue",
+      "finish": "Finish",
+      "skip": "Skip",
+      "dismiss": "Maybe later",
+      "saving": "Saving…",
+      "use_case": {
+        "title": "How will you use this?",
+        "intro": "This helps tailor the dashboard to what you need.",
+        "devices_title": "Build and manage devices",
+        "devices_desc": "Create, configure, and flash ESPHome devices from this dashboard.",
+        "remote_title": "Only for remote compute",
+        "remote_desc": "Use this install purely as a remote build server for other dashboards. Device creation stays hidden."
+      },
+      "experience": {
+        "title": "Pick your experience",
+        "intro": "You can change this any time in Settings.",
+        "beginner_title": "New to ESPHome",
+        "beginner_desc": "Keep it simple and guided, the lightest interface.",
+        "ui_title": "I prefer the UI",
+        "ui_desc": "Comfortable with ESPHome; edit through the visual editor.",
+        "yaml_title": "I prefer YAML",
+        "yaml_desc": "Open the editor with the YAML pane and diff tools ready."
+      },
+      "wifi": {
+        "title": "Set up Wi-Fi",
+        "intro": "Your devices use these to join your network. They're stored once in secrets.yaml and shared across every config you create."
+      }
     }
   },
   "layout": {
@@ -928,7 +958,6 @@
     "feedback_menu": "Found a bug? Have an idea?",
     "back": "Back",
     "close": "Close",
-    "editor": "Editor",
     "yaml_diff_button": "YAML diff button",
     "more_options_with_count": "More options ({count} firmware task(s) active)",
     "preview_badge": "Beta"
@@ -955,8 +984,6 @@
     "group_yaml_matches": "YAML matches",
     "go_dashboard": "Go to dashboard",
     "group_language": "Language",
-    "show_yaml_diff_button": "Show YAML diff button",
-    "hide_yaml_diff_button": "Hide YAML diff button",
     "navigate_hint": "to navigate",
     "select_hint": "to select",
     "close_hint": "to close",
@@ -997,13 +1024,16 @@
   "settings": {
     "title": "Settings",
     "appearance": "Appearance",
+    "experience": "Experience",
+    "experience_intro": "Tailor the dashboard to how you work. This changes how much the interface shows by default; you can always reveal more.",
+    "experience_save_failed": "Failed to save your preference",
+    "remote_compute_only": "Only use this for remote compute",
+    "remote_compute_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards.",
     "editor": "Editor",
     "language": "Language",
     "language_desc": "Choose the language used across the interface.",
     "language_system": "System",
     "theme_desc": "Choose between light, dark, or follow your system preference.",
-    "show_yaml_diff_button": "Show YAML diff button",
-    "show_yaml_diff_button_desc": "Toggle on to see the YAML diff button in the editor toolbar. It lets you compare your unsaved changes against the last saved version.",
     "build_server": "Build server",
     "pairing_requests": "Pairing requests",
     "build_offload": "Send builds",

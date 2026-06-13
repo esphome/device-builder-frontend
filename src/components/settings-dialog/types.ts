@@ -1,7 +1,7 @@
 export type Section =
   | "appearance"
+  | "experience"
   | "language"
-  | "editor"
   | "build_server"
   | "pairing_requests"
   | "build_offload";
@@ -28,8 +28,13 @@ export const SECTIONS: SectionDef[] = [
     iconActive: "palette",
     labelKey: "settings.appearance",
   },
+  {
+    id: "experience",
+    icon: "account-cog-outline",
+    iconActive: "account-cog",
+    labelKey: "settings.experience",
+  },
   { id: "language", icon: "translate", labelKey: "settings.language" },
-  { id: "editor", icon: "vector-difference", labelKey: "layout.editor" },
   {
     id: "build_server",
     icon: "server-network-outline",
