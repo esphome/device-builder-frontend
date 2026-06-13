@@ -58,24 +58,37 @@ export async function loadIntegrationDocs(host: ESPHomeApp): Promise<void> {
   }
 }
 
+const PREFS_LOAD_MAX_RETRIES = 3;
+const PREFS_LOAD_RETRY_DELAY_MS = 1000;
+
 export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
-  // Skip while a preference write is in flight — the optimistic value is the
-  // source of truth until it completes (a reconnect mid-write would otherwise
-  // reload the pre-write snapshot and revert experience / remote-compute).
-  if (host._prefsWritesInFlight > 0) return;
-  try {
-    const prefs = await host._api.getPreferences();
-    host.applyTheme(prefs.theme);
-    host._yamlDiffButton = prefs.yaml_diff_button;
-    host._experienceLevel = prefs.experience_level;
-    host._remoteComputeOnly = prefs.remote_compute_only;
-    // Mark prefs known so the dashboard can stop failing creation closed.
-    host._prefsLoaded = true;
-  } catch (err) {
-    // Non-fatal: the last successfully-loaded values are kept (none are
-    // reset here), and theme also has a localStorage fallback. Logged for
-    // diagnostics rather than toasted, since this runs on every reconnect
-    // and a toast would be noisy during WS flapping.
-    console.warn("Failed to load preferences:", err);
+  // Until prefs load once, _hideDeviceCreation gates creation closed for every
+  // install (not just remote-compute), so a transient first-load failure would
+  // otherwise strip creation UI from a normal install until the next reconnect.
+  // Retry the first load a few times to recover on a healthy socket; once
+  // loaded, a reconnect miss keeps the last good values, so don't spin.
+  for (let attempt = 0; ; attempt++) {
+    // Skip while a preference write is in flight — the optimistic value is the
+    // source of truth until it completes (a reconnect mid-write would otherwise
+    // reload the pre-write snapshot and revert experience / remote-compute).
+    if (host._prefsWritesInFlight > 0) return;
+    try {
+      const prefs = await host._api.getPreferences();
+      host.applyTheme(prefs.theme);
+      host._yamlDiffButton = prefs.yaml_diff_button;
+      host._experienceLevel = prefs.experience_level;
+      host._remoteComputeOnly = prefs.remote_compute_only;
+      // Mark prefs known so the dashboard can stop failing creation closed.
+      host._prefsLoaded = true;
+      return;
+    } catch (err) {
+      // Non-fatal: the last successfully-loaded values are kept (none are
+      // reset here), and theme also has a localStorage fallback. Logged for
+      // diagnostics rather than toasted, since this runs on every reconnect
+      // and a toast would be noisy during WS flapping.
+      console.warn("Failed to load preferences:", err);
+      if (host._prefsLoaded || attempt >= PREFS_LOAD_MAX_RETRIES) return;
+      await new Promise((resolve) => setTimeout(resolve, PREFS_LOAD_RETRY_DELAY_MS));
+    }
   }
 }

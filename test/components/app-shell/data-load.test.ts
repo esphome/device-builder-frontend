@@ -135,12 +135,41 @@ describe("loadThemePreference in-flight gate", () => {
     expect(host._prefsLoaded).toBe(true);
   });
 
-  it("leaves prefs unloaded when the fetch fails so creation stays closed", async () => {
-    const host = makePrefsHost();
-    host._api.getPreferences = vi.fn(async () => {
-      throw new Error("boom");
-    });
-    await loadThemePreference(host as unknown as ESPHomeApp);
-    expect(host._prefsLoaded).toBe(false);
+  it("leaves prefs unloaded after exhausting retries when the fetch keeps failing", async () => {
+    vi.useFakeTimers();
+    try {
+      const host = makePrefsHost();
+      host._api.getPreferences = vi.fn(async () => {
+        throw new Error("boom");
+      });
+      const pending = loadThemePreference(host as unknown as ESPHomeApp);
+      await vi.runAllTimersAsync();
+      await pending;
+      expect(host._prefsLoaded).toBe(false);
+      // Initial attempt plus three retries.
+      expect(host._api.getPreferences).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries a transient first-load failure and loads once it succeeds", async () => {
+    vi.useFakeTimers();
+    try {
+      const host = makePrefsHost();
+      let calls = 0;
+      host._api.getPreferences = vi.fn(async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("transient");
+        return prefs;
+      });
+      const pending = loadThemePreference(host as unknown as ESPHomeApp);
+      await vi.runAllTimersAsync();
+      await pending;
+      expect(host._prefsLoaded).toBe(true);
+      expect(host._remoteComputeOnly).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
