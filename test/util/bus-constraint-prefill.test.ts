@@ -66,4 +66,23 @@ describe("busConstraintPrefill", () => {
   test("returns null when nothing applies", () => {
     expect(busConstraintPrefill(uartEntries, { data_bits: 8 })).toBeNull();
   });
+
+  test("formats the clamped frequency within the entry's unit options", () => {
+    const hzOnly = [
+      makeConfigEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT_WITH_UNIT,
+        default_value: "50000Hz",
+        unit_options: ["Hz"],
+      }),
+    ];
+    expect(busConstraintPrefill(hzOnly, { max_frequency: 15000 })).toEqual({
+      fields: { frequency: "15000Hz" },
+      required: [],
+    });
+  });
+
+  test("skips a constraint key with no matching bus field", () => {
+    expect(busConstraintPrefill(uartEntries, { rx_buffer_size: 512 })).toBeNull();
+  });
 });

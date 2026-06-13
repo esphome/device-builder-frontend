@@ -1,6 +1,6 @@
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
-import { floatWithUnitToBase } from "./float-with-unit.js";
+import { floatWithUnitToBase, formatInBestUnit } from "./float-with-unit.js";
 
 export interface BusPrefill {
   /** Field values the dep-added bus form starts with. */
@@ -41,27 +41,27 @@ export function busConstraintPrefill(
       continue;
     }
     const entry = entryOf(key);
-    const dflt = entry?.default_value;
+    if (!entry) continue;
+    const dflt = entry.default_value;
     if (dflt === null || dflt === undefined || String(dflt) !== String(value)) {
       // Options-style fields ('stop_bits', 'parity') match on strings.
-      fields[key] = entry?.type === ConfigEntryType.STRING ? String(value) : value;
+      fields[key] = entry.type === ConfigEntryType.STRING ? String(value) : value;
     }
   }
 
   if (minHz !== null || maxHz !== null) {
     const entry = entryOf("frequency");
-    const hz = floatWithUnitToBase(entry?.default_value, entry?.unit_options ?? ["Hz"]);
+    const unitOptions = entry?.unit_options?.length ? entry.unit_options : ["Hz"];
+    const hz = floatWithUnitToBase(entry?.default_value, unitOptions);
     let target: number | null = null;
     if (hz === null) target = maxHz ?? minHz;
     else if (maxHz !== null && hz > maxHz) target = maxHz;
     else if (minHz !== null && hz < minHz) target = minHz;
-    if (target !== null) fields.frequency = _formatHz(target);
+    // Formatting through the entry's own units keeps the prefill
+    // inside the option set validateEntries checks against.
+    if (target !== null) fields.frequency = formatInBestUnit(target, unitOptions);
   }
 
   if (Object.keys(fields).length === 0 && required.length === 0) return null;
   return { fields, required };
-}
-
-function _formatHz(hz: number): string {
-  return hz % 1000 === 0 ? `${hz / 1000}kHz` : `${hz}Hz`;
 }
