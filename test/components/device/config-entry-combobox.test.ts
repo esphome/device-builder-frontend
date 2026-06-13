@@ -41,6 +41,19 @@ describe("renderSelectField — allow_custom_value combobox", () => {
     expect(ctx.emitChange).toHaveBeenCalledWith(["board"], "cr3l");
   });
 
+  it("passes invalid and disabled through to the combobox", () => {
+    const ctx = makeRenderCtx(
+      { board: "bw15" },
+      { overrides: { disabled: true, errorAt: () => ({ message: "bad" }) as never } }
+    );
+    const [b] = findElementBindings(
+      renderSelectField(comboEntry(), ["board"], ctx),
+      "esphome-options-combobox"
+    );
+    expect(b["?disabled"]).toBe(true);
+    expect(b["?invalid"]).toBe(true);
+  });
+
   it("uses a strict wa-select (not the combobox) when allow_custom_value is unset", () => {
     const entry = makeEntry(ConfigEntryType.STRING, { key: "board", options: BOARDS });
     const tpl = renderSelectField(entry, ["board"], makeRenderCtx({ board: "bw15" }));

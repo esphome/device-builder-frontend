@@ -434,6 +434,9 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
     `;
   }
   if (entry.allow_custom_value && entry.options && entry.options.length > 0) {
+    // ``label`` only names the combobox's shadow-DOM input (renderLabel's
+    // visible label isn't associated via for=); the combobox draws no label
+    // chrome of its own, so this isn't a duplicate visible label.
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
