@@ -19,7 +19,7 @@ import {
   type TimePeriodUnit,
 } from "../../../util/time-period.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
-import type { ComboboxValueChangedDetail } from "../../options-combobox.js";
+import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -447,7 +447,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
           placeholder=${String(entry.default_value ?? "")}
           ?disabled=${disabled}
           ?invalid=${invalid}
-          @value-changed=${(e: CustomEvent<ComboboxValueChangedDetail>) =>
+          @options-combobox-change=${(e: CustomEvent<OptionsComboboxValueChange>) =>
             ctx.emitChange(path, e.detail.value)}
         ></esphome-options-combobox>
         ${renderFieldError(path, ctx)}

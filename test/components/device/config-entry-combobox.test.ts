@@ -31,12 +31,12 @@ describe("renderSelectField — allow_custom_value combobox", () => {
     expect(b["label"]).toBe("Board");
   });
 
-  it("wires value-changed to emitChange, including a custom typed value", () => {
+  it("wires options-combobox-change to emitChange, including a custom typed value", () => {
     const ctx = makeRenderCtx({ board: "bw15" });
     const tpl = renderSelectField(comboEntry(), ["board"], ctx);
     const [b] = findElementBindings(tpl, "esphome-options-combobox");
-    (b["@value-changed"] as (e: CustomEvent) => void)(
-      new CustomEvent("value-changed", { detail: { value: "cr3l" } })
+    (b["@options-combobox-change"] as (e: CustomEvent) => void)(
+      new CustomEvent("options-combobox-change", { detail: { value: "cr3l" } })
     );
     expect(ctx.emitChange).toHaveBeenCalledWith(["board"], "cr3l");
   });
