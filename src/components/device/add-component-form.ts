@@ -26,6 +26,7 @@ import {
   parseTopLevelComponents,
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
+import { findMissingDependencies } from "./add-component-deps.js";
 import { coerceFields } from "./add-component-form-coerce.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
@@ -292,12 +293,14 @@ export class ESPHomeAddComponentForm extends LitElement {
   protected render() {
     const disabled = this.submitting;
     const presentComponents = parseTopLevelComponents(this.yaml);
-    // Top-level dependencies the catalog entry declares as required.
-    // For example a `light.binary` light needs an `output:` block
-    // configured first. Surface these to the user instead of letting
-    // them submit a config that won't validate.
-    const missingDeps = (this.component.dependencies ?? []).filter(
-      (d) => !presentComponents.has(d)
+    // Dependencies the catalog entry declares as required but the YAML
+    // doesn't satisfy yet — a top-level block (`output:`, `i2c:`) or a
+    // configured platform for hub-style deps (`atm90e32` under
+    // `sensor:`). Surface these instead of letting the user submit a
+    // config that won't validate.
+    const missingDeps = findMissingDependencies(
+      this.component.dependencies ?? [],
+      this.yaml
     );
 
     // The shared form filters its own visibility — but we still need
@@ -522,11 +525,12 @@ export class ESPHomeAddComponentForm extends LitElement {
     // own message; the success path leaves it cleared.
     this._localBlockMessage = "";
     const presentComponents = parseTopLevelComponents(this.yaml);
-    // Block submit when there are missing top-level dependencies.
-    // The button should already be disabled in that case, but defend
-    // here too in case the YAML changed under us between renders.
-    const missingDeps = (this.component.dependencies ?? []).filter(
-      (d) => !presentComponents.has(d)
+    // Block submit when a declared dependency isn't satisfied. The
+    // button should already be disabled in that case, but defend here
+    // too in case the YAML changed under us between renders.
+    const missingDeps = findMissingDependencies(
+      this.component.dependencies ?? [],
+      this.yaml
     );
     if (missingDeps.length > 0) {
       // Should be unreachable — the button-disabled predicate uses the
