@@ -61,3 +61,23 @@ describe("coerceFields non-hex integers", () => {
     expect(coerceFields([plainInt], { count: "-5" })).toEqual({ count: -5 });
   });
 });
+
+describe("coerceFields nested entity readings", () => {
+  const tvoc = makeConfigEntry({
+    key: "tvoc",
+    type: ConfigEntryType.NESTED,
+    required: true,
+    platform_type: "sensor",
+    config_entries: [makeConfigEntry({ key: "name", type: ConfigEntryType.STRING })],
+  });
+
+  test("a required nested entity with a seeded name survives", () => {
+    expect(coerceFields([tvoc], { tvoc: { name: "TVOC" } })).toEqual({
+      tvoc: { name: "TVOC" },
+    });
+  });
+
+  test("an empty nested group is pruned from the payload", () => {
+    expect(coerceFields([tvoc], { tvoc: {} })).toEqual({});
+  });
+});

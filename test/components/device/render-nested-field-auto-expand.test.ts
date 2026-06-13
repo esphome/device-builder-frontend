@@ -52,4 +52,28 @@ describe("renderNestedField auto-expand", () => {
     renderNestedField(entry, ["clk"], ctx);
     expect(open.has("clk")).toBe(true);
   });
+
+  it("collapses an optional empty group in the add dialog (#1423)", () => {
+    // requiredOnly no longer forces every group open; an optional empty
+    // reading (ags10's resistance) stays collapsed so it doesn't overload
+    // the dialog.
+    const entry = makeEntry(ConfigEntryType.NESTED, {
+      key: "resistance",
+      platform_type: "sensor",
+      config_entries: [makeEntry(ConfigEntryType.STRING, { key: "name" })],
+    });
+    const open = new Set<string>();
+    const ctx = makeRenderCtx(
+      {},
+      {
+        overrides: {
+          requiredOnly: true,
+          nestedOpenSections: open,
+          seedNestedOpen: (k: string) => open.add(k),
+        },
+      }
+    );
+    renderNestedField(entry, ["resistance"], ctx);
+    expect(open.has("resistance")).toBe(false);
+  });
 });

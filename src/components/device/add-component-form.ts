@@ -227,6 +227,18 @@ export class ESPHomeAddComponentForm extends LitElement {
     for (const entry of entries) {
       if (entry.type === ConfigEntryType.NESTED) {
         const sub = this._seedDefaults(entry.config_entries ?? [], seedAll);
+        // A required entity sub-reading (ags10's tvoc) serializes only
+        // once it holds a value; seed its name (the label) so an
+        // untouched Add still produces a valid sensor, matching the
+        // optional-entity enable toggle.
+        if (
+          entry.required &&
+          entry.platform_type != null &&
+          sub.name === undefined &&
+          sub.id === undefined
+        ) {
+          sub.name = resolveEntryLabel(entry, this._localize);
+        }
         if (Object.keys(sub).length > 0) out[entry.key] = sub;
         continue;
       }

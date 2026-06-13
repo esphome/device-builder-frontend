@@ -272,11 +272,21 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   protected render() {
     const ctx = this._buildCtx();
+    // In the add-component dialog, float required entries above optional
+    // ones (stable, so each keeps its catalog order) so the user fills the
+    // mandatory fields first. The section editor mirrors the on-disk YAML
+    // order, so it's left untouched.
+    const entries = this.requiredOnly
+      ? [
+          ...this.entries.filter((e) => e.required),
+          ...this.entries.filter((e) => !e.required),
+        ]
+      : this.entries;
     // Each exclusive_group renders as one always-shown dropdown at its
     // first member's slot; other entries keep the advanced/visibility
     // filter (the Set preserves order while dropping filtered-out ones).
-    const ordered = orderExclusiveGroups(this.entries);
-    const nonExclusive = this.entries.filter((entry) => !entry.exclusive_group);
+    const ordered = orderExclusiveGroups(entries);
+    const nonExclusive = entries.filter((entry) => !entry.exclusive_group);
     const visible = new Set(this._filterRenderable(nonExclusive, this.values));
     // An empty key means "this entry IS the whole values dict" —
     // used by top-level user-keyed sections (substitutions:) where
@@ -707,9 +717,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   }
 
   private _toggleNested(key: string) {
-    // The set's semantics depend on `requiredOnly` — see
-    // `renderNestedField` — but the toggle is the same either way:
-    // membership flips between "tracked" and "untracked".
+    // The set tracks open groups; flip membership to expand/collapse.
     const next = new Set(this._nestedOpenSections);
     if (next.has(key)) next.delete(key);
     else next.add(key);
@@ -720,13 +728,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * Force a nested group open. Used by parent forms (e.g. section
    * editor scrolling to a validation error) to make sure a deep field
    * is rendered before searching the DOM. Idempotent.
-   *
-   * Only meaningful in normal (non-requiredOnly) mode where the set
-   * tracks "open" entries; in `requiredOnly` mode groups default open
-   * already so this is a no-op.
    */
   public openNested(key: string) {
-    if (this.requiredOnly) return;
     if (this._nestedOpenSections.has(key)) return;
     const next = new Set(this._nestedOpenSections);
     next.add(key);
@@ -739,7 +742,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * keeps it to one shot.
    */
   private _seedNestedOpen(key: string) {
-    if (this.requiredOnly || this._seededNestedOpen.has(key)) return;
+    if (this._seededNestedOpen.has(key)) return;
     this._seededNestedOpen.add(key);
     this._nestedOpenSections.add(key);
   }
