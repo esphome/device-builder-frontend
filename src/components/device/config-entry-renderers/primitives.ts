@@ -461,8 +461,9 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   // still flags as selected.
   const valueLower = value.toLowerCase();
   const defaultStr = entry.default_value != null ? String(entry.default_value) : "";
+  const defaultLower = defaultStr.toLowerCase();
   const defaultOption = entry.options?.find(
-    (o) => o.value.toLowerCase() === defaultStr.toLowerCase()
+    (o) => o.value.toLowerCase() === defaultLower
   );
   const placeholder = defaultOption?.label ?? defaultStr;
   const { clearable, visibleOptions } = selectOptions(entry);
@@ -480,14 +481,31 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         ${clearable
           ? html`<wa-icon slot="clear-icon" library="mdi" name="close"></wa-icon>`
           : nothing}
-        ${visibleOptions.map(
-          (opt) =>
-            html`<wa-option
-              value=${opt.value}
-              ?selected=${opt.value.toLowerCase() === valueLower}
+        ${visibleOptions.map((opt) => {
+          const selected = opt.value.toLowerCase() === valueLower;
+          const isDefault = defaultStr !== "" && opt.value.toLowerCase() === defaultLower;
+          if (!isDefault) {
+            return html`<wa-option value=${opt.value} ?selected=${selected}
               >${opt.label}</wa-option
-            >`
-        )}
+            >`;
+          }
+          // wa-select activates the first option when nothing is committed,
+          // so give the default a muted second line (like the pin menu's
+          // notes) — the honest "this applies if you leave it" signal.
+          // `.label` keeps the closed control showing just the label.
+          return html`<wa-option
+            value=${opt.value}
+            .label=${opt.label}
+            ?selected=${selected}
+          >
+            <span class="option-default-stack">
+              <span>${opt.label}</span>
+              <small class="option-default-note"
+                >${ctx.localize("device.default_option_tag")}</small
+              >
+            </span>
+          </wa-option>`;
+        })}
       </wa-select>
       ${renderFieldError(path, ctx)}
     </div>
