@@ -25,6 +25,7 @@ import { renderChoiceCard } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
 import { wifiFieldsStyles } from "./wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./wifi-fields.js";
+import { type WizardScreen, wizardScreens } from "./wizard-screens.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
@@ -37,8 +38,6 @@ registerMdiIcons({
   "cursor-default-click-outline": mdiCursorDefaultClickOutline,
   "code-braces": mdiCodeBraces,
 });
-
-type WizardScreen = "use_case" | "experience" | "wifi";
 
 /**
  * First-run onboarding wizard.
@@ -113,11 +112,10 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   /** Ordered screens for the current choices. */
   private get _screens(): WizardScreen[] {
-    const screens: WizardScreen[] = [];
-    if (this.hasUseCase) screens.push("use_case");
-    screens.push("experience");
-    if (!this._remoteCompute) screens.push("wifi");
-    return screens;
+    return wizardScreens({
+      hasUseCase: this.hasUseCase,
+      remoteCompute: this._remoteCompute,
+    });
   }
 
   private get _screen(): WizardScreen {
