@@ -37,6 +37,25 @@ export function categoryChipLabel(category: string): string {
 }
 
 /**
+ * Compose the Add-Component dialog header for a selected entry,
+ * appending the platform label (the same string the card chip
+ * shows) so same-name entries from different platforms stay
+ * distinguishable once the form view drops the chip. The
+ * core-config flow keeps the bare name: its components are
+ * unique top-level domains with no same-name collisions, where a
+ * "Wi-Fi · Wifi" suffix would be pure redundancy.
+ */
+export function componentDialogTitle(
+  name: string,
+  category: string,
+  opts: { core: boolean }
+): string {
+  if (opts.core) return name;
+  const label = categoryChipLabel(category);
+  return label ? `${name} · ${label}` : name;
+}
+
+/**
  * Whether the catalog card should render the category chip
  * given the current sidebar filter. Only useful under the
  * "All" filter where the category VARIES across visible

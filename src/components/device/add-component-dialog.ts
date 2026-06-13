@@ -25,6 +25,7 @@ import {
   type SelectionHost,
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
+import { componentDialogTitle } from "./component-card-category-label.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -218,7 +219,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // hide it with `hidden` rather than swapping it out of the DOM. The form
     // is fine to mount/unmount on demand since each selection starts fresh.
     const title = isForm
-      ? this._selected!.name
+      ? componentDialogTitle(this._selected!.name, this._selected!.category, {
+          core: isCore,
+        })
       : this.boardName
         ? this._localize(headerKey, { name: this.boardName })
         : this._localize(headerKey);
