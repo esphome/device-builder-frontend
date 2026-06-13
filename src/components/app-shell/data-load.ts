@@ -66,10 +66,10 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
     host._experienceLevel = prefs.experience_level;
     host._remoteComputeOnly = prefs.remote_compute_only;
   } catch (err) {
-    // Theme falls back to the localStorage value, but experience and
-    // remote-compute have no local backing, so surface the failure rather
-    // than silently leaving device creation visible on an install that
-    // wanted it hidden.
+    // Non-fatal: the last successfully-loaded values are kept (none are
+    // reset here), and theme also has a localStorage fallback. Logged for
+    // diagnostics rather than toasted, since this runs on every reconnect
+    // and a toast would be noisy during WS flapping.
     console.warn("Failed to load preferences:", err);
   }
 }

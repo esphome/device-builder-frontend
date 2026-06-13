@@ -958,7 +958,6 @@
     "feedback_menu": "Found a bug? Have an idea?",
     "back": "Back",
     "close": "Close",
-    "yaml_diff_button": "YAML diff button",
     "more_options_with_count": "More options ({count} firmware task(s) active)",
     "preview_badge": "Beta"
   },
@@ -1029,7 +1028,6 @@
     "experience_save_failed": "Failed to save your preference",
     "remote_compute_only": "Only use this for remote compute",
     "remote_compute_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards.",
-    "editor": "Editor",
     "language": "Language",
     "language_desc": "Choose the language used across the interface.",
     "language_system": "System",
