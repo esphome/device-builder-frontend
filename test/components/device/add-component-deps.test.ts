@@ -54,4 +54,10 @@ describe("findMissingDependencies", () => {
   it("treats an empty dependency list as satisfied", () => {
     expect(findMissingDependencies([], "")).toEqual([]);
   });
+
+  it("honours a precomputed presentComponents set over the yaml", () => {
+    // Caller passes its already-parsed top-level set; the empty yaml
+    // would otherwise report ld2410 missing.
+    expect(findMissingDependencies(["ld2410"], "", new Set(["ld2410"]))).toEqual([]);
+  });
 });

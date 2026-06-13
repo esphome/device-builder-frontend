@@ -300,7 +300,8 @@ export class ESPHomeAddComponentForm extends LitElement {
     // config that won't validate.
     const missingDeps = findMissingDependencies(
       this.component.dependencies ?? [],
-      this.yaml
+      this.yaml,
+      presentComponents
     );
 
     // The shared form filters its own visibility — but we still need
@@ -530,7 +531,8 @@ export class ESPHomeAddComponentForm extends LitElement {
     // too in case the YAML changed under us between renders.
     const missingDeps = findMissingDependencies(
       this.component.dependencies ?? [],
-      this.yaml
+      this.yaml,
+      presentComponents
     );
     if (missingDeps.length > 0) {
       // Should be unreachable — the button-disabled predicate uses the

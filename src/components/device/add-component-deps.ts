@@ -19,12 +19,18 @@ const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCat
  *  - a configured platform's stem equals the dep and the dep isn't a
  *    platform domain — platform-style hubs (`atm90e32`) live under a
  *    domain (`sensor: - platform: atm90e32`), not at the top level.
+ *
+ * `presentComponents` may be passed precomputed to avoid re-parsing
+ * the top-level blocks when the caller already has them.
  */
 export function findMissingDependencies(
   dependencies: readonly string[],
-  yaml: string
+  yaml: string,
+  presentComponents?: ReadonlySet<string>
 ): string[] {
-  const present = parseTopLevelComponents(yaml);
+  // Most components declare no dependencies — skip the YAML scans.
+  if (dependencies.length === 0) return [];
+  const present = presentComponents ?? parseTopLevelComponents(yaml);
   const configured = parseConfiguredPlatforms(yaml);
   const platformStems = new Set<string>();
   for (const id of configured) {
