@@ -462,6 +462,10 @@ export class ESPHomeApp extends LitElement {
     this._onboardingSessionDismissed = true;
     this._onboardingShouldShow = false;
     this._onboardingShowWifi = false;
+    // Skip-Wi-Fi persists the experience pick without acknowledging; refresh
+    // prefs so the contexts (yaml-diff button, experience-gated UI) reflect it
+    // this session rather than waiting for the next reconnect.
+    void loadThemePreference(this);
   };
 
   // Kebab "Set up Wi-Fi" — explicit user intent, overrides both gates.
