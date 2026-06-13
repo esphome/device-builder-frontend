@@ -15,7 +15,21 @@ import {
 } from "../../common/localize.js";
 import { yamlDiffForExperience } from "../../util/experience.js";
 import type { ESPHomeApp } from "../app-shell.js";
+import { loadThemePreference } from "./data-load.js";
 import { patchOffloadPairing } from "./events.js";
+
+/**
+ * Release the in-flight-write gate after a preference write settles, then learn
+ * the real preferences if the initial load never landed: a completed round-trip
+ * proves the socket is healthy, so re-run the load to clear the fail-closed
+ * creation gate (loadThemePreference no-ops once prefs are loaded).
+ */
+function afterPrefWrite(host: ESPHomeApp): void {
+  host._prefsWritesInFlight -= 1;
+  if (!host._prefsLoaded && host._prefsWritesInFlight === 0) {
+    void loadThemePreference(host);
+  }
+}
 
 export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   const theme = e.detail as Theme;
@@ -28,9 +42,7 @@ export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   host._api
     .updatePreferences({ theme })
     .catch((err) => console.warn("Failed to save theme:", err))
-    .finally(() => {
-      host._prefsWritesInFlight -= 1;
-    });
+    .finally(() => afterPrefWrite(host));
 }
 
 // Experience seeds the YAML diff button (beginners get none; UI / YAML users
@@ -58,9 +70,7 @@ export function onSetExperienceLevel(
         richColors: true,
       });
     })
-    .finally(() => {
-      host._prefsWritesInFlight -= 1;
-    });
+    .finally(() => afterPrefWrite(host));
 }
 
 export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>): void {
@@ -76,9 +86,7 @@ export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>
         richColors: true,
       });
     })
-    .finally(() => {
-      host._prefsWritesInFlight -= 1;
-    });
+    .finally(() => afterPrefWrite(host));
 }
 
 // Optimistic flip with revert-on-failure for security-sensitive toggles.

@@ -186,6 +186,23 @@ describe("loadThemePreference in-flight gate", () => {
     }
   });
 
+  it("does not toast a load failure while a write stays in flight", async () => {
+    vi.useFakeTimers();
+    try {
+      const host = makePrefsHost();
+      host._prefsWritesInFlight = 1; // never settles within the attempt budget
+      const pending = loadThemePreference(host as unknown as ESPHomeApp);
+      await vi.runAllTimersAsync();
+      await pending;
+      expect(host._prefsLoaded).toBe(false);
+      expect(host._api.getPreferences).not.toHaveBeenCalled();
+      // A pending write isn't a load failure, so the terminal toast stays quiet.
+      expect(toastError).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("retries a transient first-load failure and loads once it succeeds", async () => {
     vi.useFakeTimers();
     try {

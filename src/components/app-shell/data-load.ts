@@ -103,8 +103,14 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
   }
   // Terminal: prefs never loaded, so creation is gated closed for the whole
   // install. Surface it once (not per reconnect) since the UI vanished without
-  // a visible cause.
-  if (!host._prefsLoaded && !host._prefsLoadErrorNotified) {
+  // a visible cause. A still-pending write isn't a load failure — it shares the
+  // attempt budget and a slow write would otherwise toast falsely — so a
+  // successful write re-runs this load instead (see afterPrefWrite).
+  if (
+    !host._prefsLoaded &&
+    !host._prefsLoadErrorNotified &&
+    host._prefsWritesInFlight === 0
+  ) {
     host._prefsLoadErrorNotified = true;
     toast.error(host._localize("settings.preferences_load_failed"), { richColors: true });
   }
