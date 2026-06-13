@@ -6,13 +6,14 @@ import {
   CLEANUP_TTL_MIN_SECONDS,
   type PairingSummary,
 } from "../../api/types/remote-build.js";
-import { ExperienceLevel, type Theme } from "../../api/types/system.js";
+import type { ExperienceLevel, Theme } from "../../api/types/system.js";
 import {
   clearStoredLocale,
   loadLocalize,
   type SupportedLocale,
   writeStoredLocale,
 } from "../../common/localize.js";
+import { yamlDiffForExperience } from "../../util/experience.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { patchOffloadPairing } from "./events.js";
 
@@ -32,7 +33,7 @@ export function onSetExperienceLevel(
   const level = e.detail;
   const previousLevel = host._experienceLevel;
   const previousDiff = host._yamlDiffButton;
-  const yamlDiff = level !== ExperienceLevel.BEGINNER;
+  const yamlDiff = yamlDiffForExperience(level);
   host._experienceLevel = level;
   host._yamlDiffButton = yamlDiff;
   // Gate loadThemePreference so a reconnect mid-write can't reload the

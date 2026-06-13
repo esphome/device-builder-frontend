@@ -11,6 +11,7 @@ import {
   remoteComputeOnlyContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "../onboarding/choice-card-styles.js";
 import { renderChoiceCard } from "../onboarding/choice-card.js";
@@ -58,11 +59,6 @@ export class ESPHomeSettingsExperience extends LitElement {
   ];
 
   protected render() {
-    const options: Array<[ExperienceLevel, string]> = [
-      [ExperienceLevel.BEGINNER, "sprout"],
-      [ExperienceLevel.UI, "cursor-default-click-outline"],
-      [ExperienceLevel.YAML, "code-braces"],
-    ];
     return html`
       <p class="section-intro">${this._localize("settings.experience_intro")}</p>
       <div
@@ -70,7 +66,7 @@ export class ESPHomeSettingsExperience extends LitElement {
         role="radiogroup"
         aria-label=${this._localize("settings.experience")}
       >
-        ${options.map(([level, icon]) =>
+        ${EXPERIENCE_OPTIONS.map(([level, icon]) =>
           renderChoiceCard({
             icon,
             title: this._localize(`onboarding.wizard.experience.${level}_title`),

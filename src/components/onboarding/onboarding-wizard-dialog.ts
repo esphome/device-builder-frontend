@@ -18,6 +18,7 @@ import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js"
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
+import { EXPERIENCE_OPTIONS, yamlDiffForExperience } from "../../util/experience.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { renderChoiceCard } from "./choice-card.js";
@@ -255,11 +256,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   }
 
   private _renderExperience() {
-    const options: Array<[ExperienceLevel, string]> = [
-      [ExperienceLevel.BEGINNER, "sprout"],
-      [ExperienceLevel.UI, "cursor-default-click-outline"],
-      [ExperienceLevel.YAML, "code-braces"],
-    ];
     return html`
       <p class="intro">${this._localize("onboarding.wizard.experience.intro")}</p>
       <div
@@ -267,7 +263,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         role="radiogroup"
         aria-label=${this._localize("onboarding.wizard.experience.title")}
       >
-        ${options.map(([level, icon]) =>
+        ${EXPERIENCE_OPTIONS.map(([level, icon]) =>
           renderChoiceCard({
             icon,
             title: this._localize(`onboarding.wizard.experience.${level}_title`),
@@ -368,7 +364,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     try {
       await this._api.updatePreferences({
         experience_level: this._experience,
-        yaml_diff_button: this._experience !== ExperienceLevel.BEGINNER,
+        yaml_diff_button: yamlDiffForExperience(this._experience),
         remote_compute_only: this._remoteCompute,
       });
     } catch (err) {
