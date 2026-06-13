@@ -6,7 +6,7 @@
  * ``Café`` survives unchanged. The escape *format* follows PyYAML's
  * emitter (uppercase hex; ``\x`` / ``\u`` / ``\U`` chosen by width).
  *
- * Two layers share the predicate below:
+ * Three layers share the predicate below:
  *   - ``escapeYamlDoubleQuoted`` / ``unescapeYamlDoubleQuoted`` model a
  *     YAML double-quoted *scalar* — the short escapes the serializer emits
  *     (``\\`` ``\"`` ``\n`` ``\r`` ``\t``) plus numeric escapes; used by
@@ -16,6 +16,10 @@
  *     form inputs: only numeric (``\x`` / ``\u`` / ``\U``) escapes and the
  *     backslash, so editing a non-glyph multi_value field never rewrites
  *     a literal ``\t`` / quote / path the user typed.
+ *   - ``escapeControlForInput`` / ``unescapeControlForInput`` are the
+ *     single-line text-field pair: the ``\n`` ``\r`` ``\t`` short forms
+ *     (so a uart.write CRLF reads as ``\r\n``) plus numeric escapes, but
+ *     no quote escaping.
  */
 
 /** True for control / Private-Use code points that are written as escapes. */
@@ -79,6 +83,20 @@ const BACKSLASH_ONLY_UNESCAPE: Record<string, string> = { "\\": "\\" };
 const YAML_SHORT_UNESCAPE: Record<string, string> = {
   "\\": "\\",
   '"': '"',
+  n: "\n",
+  r: "\r",
+  t: "\t",
+};
+
+// Short escapes for a free-text form input: the control forms, but not
+// the quote (a literal ``"`` is visible and stays raw in a text field).
+const CONTROL_SHORT_ESCAPE: Record<string, string> = {
+  "\n": "\\n",
+  "\r": "\\r",
+  "\t": "\\t",
+};
+const CONTROL_SHORT_UNESCAPE: Record<string, string> = {
+  "\\": "\\",
   n: "\n",
   r: "\r",
   t: "\t",
@@ -157,4 +175,20 @@ export function escapeForInput(s: string): string {
  */
 export function unescapeForInput(s: string): string {
   return unescapeBody(s, BACKSLASH_ONLY_UNESCAPE);
+}
+
+/**
+ * Show a stored value in a single-line text field: render ``\r`` ``\n``
+ * ``\t`` as the readable short forms (so a ``uart.write`` payload with a
+ * trailing CRLF is visible and editable) and other escape-worthy code
+ * points numerically. Leaves quotes raw; pair with
+ * :func:`unescapeControlForInput`.
+ */
+export function escapeControlForInput(s: string): string {
+  return escapeBody(s, CONTROL_SHORT_ESCAPE);
+}
+
+/** Inverse of :func:`escapeControlForInput`. */
+export function unescapeControlForInput(s: string): string {
+  return unescapeBody(s, CONTROL_SHORT_UNESCAPE);
 }

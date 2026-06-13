@@ -32,6 +32,10 @@ import {
   hasSubstitutionReference,
   resolveSubstitutions,
 } from "../../util/substitutions.js";
+import {
+  escapeControlForInput,
+  unescapeControlForInput,
+} from "../../util/yaml-escape.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
@@ -465,13 +469,17 @@ export function renderStringField(
       </div>
     `;
   }
+  // A single-line input can't show control characters, so reveal them as
+  // ``\r`` / ``\n`` / ``\t`` and decode on edit; a CRLF in a uart.write
+  // payload stays visible and round-trips instead of silently vanishing.
   const textInput = html`<input
     type=${inputType}
     class=${invalid ? "invalid" : ""}
-    .value=${value}
+    .value=${escapeControlForInput(value)}
     ?disabled=${disabled}
     placeholder=${placeholder}
-    @input=${(e: Event) => ctx.emitChange(path, (e.target as HTMLInputElement).value)}
+    @input=${(e: Event) =>
+      ctx.emitChange(path, unescapeControlForInput((e.target as HTMLInputElement).value))}
   />`;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>

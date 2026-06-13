@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  escapeControlForInput,
   escapeForInput,
   escapeYamlDoubleQuoted,
   hasEscapeWorthyChar,
   isEscapeWorthy,
+  unescapeControlForInput,
   unescapeForInput,
   unescapeYamlDoubleQuoted,
 } from "../../src/util/yaml-escape.js";
@@ -97,6 +99,43 @@ describe("escapeForInput / unescapeForInput (form input)", () => {
     // back unchanged rather than decoding ``\x41`` to ``A`` (#647 review).
     for (const s of ["C:\\x41bc", "plain", MDI, "\\Users", "a\\b", "\\U0001"]) {
       expect(unescapeForInput(escapeForInput(s))).toBe(s);
+    }
+  });
+});
+
+describe("escapeControlForInput / unescapeControlForInput (text field)", () => {
+  it("shows CR / LF / tab as readable short forms and decodes them back", () => {
+    expect(escapeControlForInput("saveConfig\r\n")).toBe("saveConfig\\r\\n");
+    expect(unescapeControlForInput("saveConfig\\r\\n")).toBe("saveConfig\r\n");
+    expect(escapeControlForInput("a\tb")).toBe("a\\tb");
+  });
+
+  it("escapes other control bytes (ESC / NUL / DEL) numerically", () => {
+    // A uart.write payload can carry arbitrary escapes; only \r \n \t get
+    // the short form, everything else escape-worthy stays editable as \xNN.
+    expect(escapeControlForInput("setRange\x1B")).toBe("setRange\\x1B");
+    expect(escapeControlForInput("a\x00b")).toBe("a\\x00b");
+    expect(escapeControlForInput("x\x7Fy")).toBe("x\\x7Fy");
+  });
+
+  it("leaves quotes raw and escapes a PUA glyph numerically", () => {
+    expect(escapeControlForInput('a"b')).toBe('a"b');
+    expect(escapeControlForInput(MDI)).toBe("\\U000F058F");
+  });
+
+  it("is invertible, so a no-op edit of escape-like text round-trips", () => {
+    // ``C:\x41bc`` is a literally-typed backslash-x-41, not the byte 0x41;
+    // doubling the backslash on display stops a no-op edit decoding it to A.
+    for (const s of [
+      "saveConfig\r\n",
+      "AT\r\n\x1B[2J",
+      "C:\\x41bc",
+      "a\\nb",
+      'q"q',
+      MDI,
+      "plain",
+    ]) {
+      expect(unescapeControlForInput(escapeControlForInput(s))).toBe(s);
     }
   });
 });
