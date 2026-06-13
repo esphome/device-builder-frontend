@@ -40,24 +40,6 @@ import {
  * button's `on_press` lambda body persisting verbatim after the
  * form-side save mangled the on_press header.
  */
-/** Indent of the last non-blank, non-comment line in ``[start, end)`` —
- *  the section's deepest real value line, used to tell a trailing
- *  comment apart from block-scalar body text. Falls back to the
- *  section's child indent when the section has no such line. */
-function _lastValueLineIndent(
-  lines: string[],
-  start: number,
-  end: number,
-  fallback: number
-): number {
-  for (let i = end - 1; i > start; i--) {
-    const line = lines[i];
-    if (line.trim() === "" || isCommentLine(line)) continue;
-    return _leadingIndent(line).length;
-  }
-  return fallback;
-}
-
 export function findSectionRange(
   lines: string[],
   sectionKey: string,
@@ -88,6 +70,24 @@ export function findSectionRange(
     }
   }
   return { start, end };
+}
+
+/** Indent of the last non-blank, non-comment line in ``[start, end)`` —
+ *  the section's deepest real value line, used to tell a trailing
+ *  comment apart from block-scalar body text. Falls back to the
+ *  section's child indent when the section has no such line. */
+function _lastValueLineIndent(
+  lines: string[],
+  start: number,
+  end: number,
+  fallback: number
+): number {
+  for (let i = end - 1; i > start; i--) {
+    const line = lines[i];
+    if (line.trim() === "" || isCommentLine(line)) continue;
+    return _leadingIndent(line).length;
+  }
+  return fallback;
 }
 
 /**
@@ -132,10 +132,12 @@ export function updateSectionInYaml(
     const prev = lines[runStart - 1];
     if (prev.trim() === "") {
       runStart--;
-    } else if (
+      continue;
+    }
+    const prevIndent = _leadingIndent(prev).length;
+    if (
       isCommentLine(prev) &&
-      (_leadingIndent(prev).length <= childIndent.length ||
-        _leadingIndent(prev).length < bodyIndent)
+      (prevIndent <= childIndent.length || prevIndent < bodyIndent)
     ) {
       runStart--;
     } else {

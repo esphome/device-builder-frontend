@@ -233,6 +233,23 @@ describe("block-scalar body extent matches PyYAML 6.0.3", () => {
     expect(blockText(parseYamlSectionValues(after, c.key, c.from).lambda)).toBe(c.pyyaml);
   });
 
+  it("bounds a folded `>-` marker the same way (extent is marker-independent)", () => {
+    // Folding is a value transform; the body extent rule is the same, so the
+    // trailing comment is excluded and the block round-trips opaquely.
+    const before = `mqtt:
+  log_format: >-
+    line one
+    line two
+
+# next
+sensor:
+`;
+    const values = parseYamlSectionValues(before, "mqtt", 1);
+    expect(blockText(values.log_format)).not.toContain("# next");
+    expect(blockText(values.log_format)).toContain("line one");
+    expect(updateSectionInYaml(before, "mqtt", values, 1)).toBe(before);
+  });
+
   it("keeps both of two stacked trailing comments after an edit", () => {
     const before = `mqtt:
   log_format: |-
