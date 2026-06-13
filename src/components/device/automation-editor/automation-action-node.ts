@@ -43,6 +43,7 @@ import { actionAdvancedState } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import {
+  looksLikeTimePeriodScalar,
   parseTimePeriodScalar,
   TIME_PERIOD_UNITS,
   type TimePeriodUnit,
@@ -554,13 +555,12 @@ export class ESPHomeAutomationActionNode extends LitElement {
     // Backend shortcut form: ``delay: 2s`` → ``params.id = "2s"``.
     // Split into numeric value + canonical unit (honouring ESPHome's
     // ``sec`` / ``seconds`` / ... aliases) so the picker doesn't blank
-    // out for round-tripped values.
+    // out for round-tripped values. Requires an explicit unit — ESPHome
+    // rejects a bare-number delay, so we don't pretend ``5`` is seconds.
     const shortcut = params.id;
-    if (typeof shortcut === "string") {
+    if (typeof shortcut === "string" && looksLikeTimePeriodScalar(shortcut)) {
       const parsed = parseTimePeriodScalar(shortcut);
-      if (parsed.parseable && parsed.value !== "") {
-        return { value: parsed.value, unit: parsed.unit };
-      }
+      return { value: parsed.value, unit: parsed.unit };
     }
     return { value: "", unit: "s" };
   }

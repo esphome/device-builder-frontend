@@ -187,6 +187,12 @@ describe("automation-action-node delay lambda", () => {
     expect(selectedUnit(el)).toBe("s");
   });
 
+  it("blanks the picker for a bare-number shortcut (ESPHome needs a unit)", async () => {
+    const { el } = await mountDelay({ id: "5" });
+    expect(valueInput(el)!.value).toBe("");
+    expect(selectedUnit(el)).toBe("s");
+  });
+
   it("normalizes an aliased shorthand to the canonical field on edit", async () => {
     const { el, emitted } = await mountDelay({ id: "1sec" });
     const input = valueInput(el)!;
