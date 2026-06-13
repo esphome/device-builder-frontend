@@ -67,6 +67,7 @@ import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
+import "../options-combobox.js";
 import {
   fieldRendererStyles,
   labelFor,

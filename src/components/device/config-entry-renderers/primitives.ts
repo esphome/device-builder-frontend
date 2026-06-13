@@ -19,6 +19,7 @@ import {
   type TimePeriodUnit,
 } from "../../../util/time-period.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
+import type { ComboboxValueChangedDetail } from "../../options-combobox.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -433,25 +434,19 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
     `;
   }
   if (entry.allow_custom_value && entry.options && entry.options.length > 0) {
-    const listId = `combobox-${path.join("-")}`;
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
-        <input
-          type="text"
-          class="combobox-input ${invalid ? "invalid" : ""}"
-          list=${listId}
+        <esphome-options-combobox
+          .options=${entry.options}
           .value=${value}
-          ?disabled=${disabled}
+          label=${entry.label}
           placeholder=${String(entry.default_value ?? "")}
-          @input=${(e: Event) =>
-            ctx.emitChange(path, (e.target as HTMLInputElement).value)}
-        />
-        <datalist id=${listId}>
-          ${entry.options.map(
-            (opt) => html`<option value=${opt.value}>${opt.label}</option>`
-          )}
-        </datalist>
+          ?disabled=${disabled}
+          ?invalid=${invalid}
+          @value-changed=${(e: CustomEvent<ComboboxValueChangedDetail>) =>
+            ctx.emitChange(path, e.detail.value)}
+        ></esphome-options-combobox>
         ${renderFieldError(path, ctx)}
       </div>
     `;
