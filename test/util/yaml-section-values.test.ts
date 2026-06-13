@@ -636,6 +636,46 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     expect(after.match(/lambda:/g)).toHaveLength(1);
   });
 
+  it("stops a list-item lambda block at a less-indented trailing comment", () => {
+    // The block scalar must end where its indentation does; the blank
+    // lines and the column-0 `# ...` belong to the next section, not the
+    // lambda body (which would otherwise become literal C++ on save).
+    const before = `binary_sensor:
+  - platform: template
+    id: opening_sensor
+    lambda: |-
+      return id(x) && id(y);
+
+
+# Enable logging
+logger:
+  level: DEBUG
+`;
+    const values = parseYamlSectionValues(before, "binary_sensor.template", 2);
+    expect(JSON.stringify(values.lambda)).not.toContain("Enable logging");
+    const after = updateSectionInYaml(before, "binary_sensor.template", values, 2);
+    expect(after).toBe(before);
+    expect(after.match(/# Enable logging/g)).toHaveLength(1);
+  });
+
+  it("stops a direct block scalar at a less-indented trailing comment", () => {
+    // Same boundary for the `key: |-` (non-list) path; the comment stays
+    // outside the raw block and isn't duplicated on round-trip.
+    const before = `mqtt:
+  topic: foo
+  log_format: |-
+    line one
+    line two
+
+# next section
+sensor:
+`;
+    const values = parseYamlSectionValues(before, "mqtt", 1);
+    const after = updateSectionInYaml(before, "mqtt", values, 1);
+    expect(after).toBe(before);
+    expect(after.match(/# next section/g)).toHaveLength(1);
+  });
+
   it("overrides raw preservation when the form writes a new value to that key", () => {
     // Contract pin: YamlRawValue is the parser's "I can't model
     // this, paste it back unchanged" sentinel. If the form does

@@ -12,6 +12,7 @@ import {
   stripQuotes,
 } from "./yaml-scalar.js";
 import {
+  _leadingIndent,
   BLOCK_SCALAR_RE,
   endsBlockAtIndent,
   isBlankOrCommentLine,
@@ -177,4 +178,42 @@ export const _scanValueBlock = (
     }
   }
   return { endIdx: lines.length, isComplex };
+};
+
+/**
+ * Exclusive end index of a block scalar's body (the lines after a
+ * ``key: |-`` / ``!lambda |-`` header), one past the last content line.
+ *
+ * A block scalar terminates on indentation alone, unlike a mapping
+ * value block: the first non-blank line less-indented than the body's
+ * own content indent ends it, *even when it's a comment*. A ``#``
+ * indented at or past the body's content indent is literal scalar text
+ * and stays in the block; a column-0 ``# ...`` before the next
+ * top-level key does not (it would otherwise be swallowed into the
+ * lambda). Trailing blank lines are excluded — they belong to the
+ * inter-section gap that ``updateSectionInYaml`` preserves, so the
+ * round-trip neither drops nor duplicates them; interior blanks between
+ * content lines are kept. The content indent is set by the first
+ * non-blank line; a header with no deeper line (indent <=
+ * *parentIndentLen*) has an empty body.
+ */
+export const _blockScalarBodyEnd = (
+  lines: string[],
+  startIdx: number,
+  parentIndentLen: number
+): number => {
+  let contentIndent = -1;
+  let lastContent = startIdx - 1;
+  for (let i = startIdx; i < lines.length; i++) {
+    if (lines[i].trim() === "") continue;
+    const indent = _leadingIndent(lines[i]).length;
+    if (contentIndent === -1) {
+      if (indent <= parentIndentLen) break;
+      contentIndent = indent;
+    } else if (indent < contentIndent) {
+      break;
+    }
+    lastContent = i;
+  }
+  return lastContent + 1;
 };

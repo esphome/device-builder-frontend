@@ -40,6 +40,24 @@ import {
  * button's `on_press` lambda body persisting verbatim after the
  * form-side save mangled the on_press header.
  */
+/** Indent of the last non-blank, non-comment line in ``[start, end)`` —
+ *  the section's deepest real value line, used to tell a trailing
+ *  comment apart from block-scalar body text. Falls back to the
+ *  section's child indent when the section has no such line. */
+function _lastValueLineIndent(
+  lines: string[],
+  start: number,
+  end: number,
+  fallback: number
+): number {
+  for (let i = end - 1; i > start; i--) {
+    const line = lines[i];
+    if (line.trim() === "" || isCommentLine(line)) continue;
+    return _leadingIndent(line).length;
+  }
+  return fallback;
+}
+
 export function findSectionRange(
   lines: string[],
   sectionKey: string,
@@ -99,27 +117,32 @@ export function updateSectionInYaml(
   const childIndent = _detectSectionChildIndent(lines, start, isListItem);
 
   // The range runs to the next top-level key, swallowing trailing
-  // comments the splice would then wipe. Walk the trailing run back
-  // from `end`; if it holds a section-level comment, stop the splice
-  // before the run so those lines survive. A `#` line indented deeper
-  // than the section's children is block-scalar body content, not a
-  // YAML comment — break there so it stays on the byte-identical path
-  // rather than being duplicated. Pure-blank runs (incl. the terminal
-  // newline) also stay on that path. (`> start + 1` keeps the header.)
+  // blank lines and trailing comments the splice would then wipe.
+  // Walk that run back from `end` and stop the splice before it so
+  // those lines survive verbatim. A trailing comment counts as a YAML
+  // comment (preserve) when it's at the section's child indent or
+  // shallower OR shallower than the last value line's indent (a block
+  // scalar's body sits deeper than its key, so a comment between the
+  // two is a real comment, not block text). A `#` at or past the body
+  // indent is literal block-scalar text, already inside the field
+  // value, so the walk stops there. (`> start + 1` keeps the header.)
+  const bodyIndent = _lastValueLineIndent(lines, start, end, childIndent.length);
   let runStart = end;
-  let trailingHasComment = false;
   while (runStart > start + 1) {
     const prev = lines[runStart - 1];
     if (prev.trim() === "") {
       runStart--;
-    } else if (isCommentLine(prev) && _leadingIndent(prev).length <= childIndent.length) {
-      trailingHasComment = true;
+    } else if (
+      isCommentLine(prev) &&
+      (_leadingIndent(prev).length <= childIndent.length ||
+        _leadingIndent(prev).length < bodyIndent)
+    ) {
       runStart--;
     } else {
       break;
     }
   }
-  const spliceEnd = trailingHasComment ? runStart : end;
+  const spliceEnd = runStart;
 
   // Top-level list-bodied section (globals): re-emit through the
   // mapping serializer's array branch — { sectionKey: array } yields
