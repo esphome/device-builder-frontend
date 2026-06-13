@@ -22,6 +22,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { renderChoiceCard } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
+import { wifiFieldsStyles } from "./wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./wifi-fields.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -105,6 +106,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     inputStyles,
     dialogActionButtonStyles,
     choiceCardStyles,
+    wifiFieldsStyles,
     onboardingWizardStyles,
   ];
 
@@ -203,7 +205,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   }
 
   private _renderSteps() {
-    return html`<div class="steps">
+    // Purely decorative progress dots; the step itself is announced via the
+    // dialog label, so keep these out of the accessibility tree.
+    return html`<div class="steps" aria-hidden="true">
       ${this._screens.map(
         (_s, i) =>
           html`<span class="step-dot ${i === this._index ? "active" : ""}"></span>`
@@ -225,7 +229,11 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   private _renderUseCase() {
     return html`
       <p class="intro">${this._localize("onboarding.wizard.use_case.intro")}</p>
-      <div class="choices" role="radiogroup">
+      <div
+        class="choices"
+        role="radiogroup"
+        aria-label=${this._localize("onboarding.wizard.use_case.title")}
+      >
         ${renderChoiceCard({
           icon: "chip",
           title: this._localize("onboarding.wizard.use_case.devices_title"),
@@ -254,7 +262,11 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     ];
     return html`
       <p class="intro">${this._localize("onboarding.wizard.experience.intro")}</p>
-      <div class="choices" role="radiogroup">
+      <div
+        class="choices"
+        role="radiogroup"
+        aria-label=${this._localize("onboarding.wizard.experience.title")}
+      >
         ${options.map(([level, icon]) =>
           renderChoiceCard({
             icon,
@@ -306,11 +318,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._error = null;
     switch (this._screen) {
       case "use_case":
-        this._commitUseCase();
         this._index += 1;
         return;
       case "experience":
-        this._commitExperience();
         if (this._isLast) {
           await this._finish();
         } else {
@@ -321,29 +331,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         await this._finishWithWifi();
         return;
     }
-  }
-
-  /** Remote-compute choice flows up so the app shell persists it and the
-   *  device-creation entry points react live. */
-  private _commitUseCase() {
-    this.dispatchEvent(
-      new CustomEvent("set-remote-compute-only", {
-        detail: this._remoteCompute,
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  private _commitExperience() {
-    if (this._experience === null) return;
-    this.dispatchEvent(
-      new CustomEvent("set-experience-level", {
-        detail: this._experience,
-        bubbles: true,
-        composed: true,
-      })
-    );
   }
 
   private async _onSkipWifi() {
@@ -374,6 +361,21 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   }
 
   private async _acknowledgeAndClose() {
+    // Persist the picks BEFORE acknowledging, so a failed write can't leave
+    // the wizard marked done with experience / remote-compute unset (which
+    // would never re-pop). The app shell refreshes its context from these
+    // prefs on the onboarding-acknowledged event.
+    try {
+      await this._api.updatePreferences({
+        experience_level: this._experience,
+        yaml_diff_button: this._experience !== ExperienceLevel.BEGINNER,
+        remote_compute_only: this._remoteCompute,
+      });
+    } catch (err) {
+      this._error = this._formatError(err, "settings.experience_save_failed");
+      this._saving = false;
+      return;
+    }
     try {
       await this._api.markOnboardingAcknowledged();
     } catch (err) {

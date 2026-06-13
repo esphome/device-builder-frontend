@@ -35,6 +35,9 @@ export function onSetExperienceLevel(
   const yamlDiff = level !== ExperienceLevel.BEGINNER;
   host._experienceLevel = level;
   host._yamlDiffButton = yamlDiff;
+  // Gate loadThemePreference so a reconnect mid-write can't reload the
+  // pre-write snapshot over the optimistic value.
+  host._prefsSetInFlight = true;
   host._api
     .updatePreferences({ experience_level: level, yaml_diff_button: yamlDiff })
     .catch(() => {
@@ -43,6 +46,9 @@ export function onSetExperienceLevel(
       toast.error(host._localize("settings.experience_save_failed"), {
         richColors: true,
       });
+    })
+    .finally(() => {
+      host._prefsSetInFlight = false;
     });
 }
 
@@ -50,12 +56,18 @@ export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>
   const enabled = e.detail;
   const previous = host._remoteComputeOnly;
   host._remoteComputeOnly = enabled;
-  host._api.updatePreferences({ remote_compute_only: enabled }).catch(() => {
-    host._remoteComputeOnly = previous;
-    toast.error(host._localize("settings.experience_save_failed"), {
-      richColors: true,
+  host._prefsSetInFlight = true;
+  host._api
+    .updatePreferences({ remote_compute_only: enabled })
+    .catch(() => {
+      host._remoteComputeOnly = previous;
+      toast.error(host._localize("settings.experience_save_failed"), {
+        richColors: true,
+      });
+    })
+    .finally(() => {
+      host._prefsSetInFlight = false;
     });
-  });
 }
 
 // Optimistic flip with revert-on-failure for security-sensitive toggles.

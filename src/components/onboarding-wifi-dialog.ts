@@ -12,6 +12,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -100,6 +101,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     dialogActionButtonStyles,
+    wifiFieldsStyles,
     css`
       esphome-base-dialog {
         --width: 480px;
@@ -123,23 +125,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         vertical-align: -3px;
         margin-right: var(--wa-space-2xs);
         color: var(--esphome-primary);
-      }
-
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-      }
-
-      label {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
-      .error {
-        color: var(--esphome-error);
-        font-size: var(--wa-font-size-s);
       }
 
       /* Decline-permanent is rendered as a low-emphasis text link

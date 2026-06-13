@@ -184,6 +184,9 @@ export class ESPHomeApp extends LitElement {
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
+  // Set while an experience / remote-compute / yaml-diff preference write is
+  // in flight so a reconnect's loadThemePreference can't clobber it.
+  _prefsSetInFlight = false;
 
   private _router = createRouter(this);
 
@@ -435,6 +438,9 @@ export class ESPHomeApp extends LitElement {
   _onOnboardingAcknowledged = () => {
     this._onboardingShouldShow = false;
     void loadOnboardingState(this);
+    // The wizard persists experience / remote-compute before acknowledging;
+    // refresh prefs so the contexts (and the gated UI) reflect the picks.
+    void loadThemePreference(this);
   };
 
   _onOnboardingDismissedSession = () => {
@@ -568,10 +574,6 @@ export class ESPHomeApp extends LitElement {
       ></esphome-onboarding-wifi-dialog>
       <esphome-onboarding-wizard-dialog
         .hasUseCase=${this._onboardingHasUseCase}
-        @set-experience-level=${(e: CustomEvent<ExperienceLevel>) =>
-          onSetExperienceLevel(this, e)}
-        @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
-          onSetRemoteComputeOnly(this, e)}
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
         @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
       ></esphome-onboarding-wizard-dialog>

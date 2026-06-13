@@ -55,13 +55,21 @@ export async function loadIntegrationDocs(host: ESPHomeApp): Promise<void> {
 }
 
 export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
+  // Skip while a preference write is in flight — the optimistic value is the
+  // source of truth until it completes (a reconnect mid-write would otherwise
+  // reload the pre-write snapshot and revert experience / remote-compute).
+  if (host._prefsSetInFlight) return;
   try {
     const prefs = await host._api.getPreferences();
     host.applyTheme(prefs.theme);
     host._yamlDiffButton = prefs.yaml_diff_button;
     host._experienceLevel = prefs.experience_level;
     host._remoteComputeOnly = prefs.remote_compute_only;
-  } catch {
-    // Preferences not critical — keep localStorage value.
+  } catch (err) {
+    // Theme falls back to the localStorage value, but experience and
+    // remote-compute have no local backing, so surface the failure rather
+    // than silently leaving device creation visible on an install that
+    // wanted it hidden.
+    console.warn("Failed to load preferences:", err);
   }
 }

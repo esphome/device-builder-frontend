@@ -65,7 +65,11 @@ export class ESPHomeSettingsExperience extends LitElement {
     ];
     return html`
       <p class="section-intro">${this._localize("settings.experience_intro")}</p>
-      <div class="choices" role="radiogroup">
+      <div
+        class="choices"
+        role="radiogroup"
+        aria-label=${this._localize("settings.experience")}
+      >
         ${options.map(([level, icon]) =>
           renderChoiceCard({
             icon,

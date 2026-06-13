@@ -25,23 +25,6 @@ export const onboardingWizardStyles = css`
     color: var(--esphome-primary);
   }
 
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--wa-space-2xs);
-  }
-
-  label {
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--wa-color-text-normal);
-  }
-
-  .error {
-    color: var(--esphome-error);
-    font-size: var(--wa-font-size-s);
-  }
-
   /* Step dots show progress through the wizard without numbering, which
      would be wrong when the step count varies by environment / use-case. */
   .steps {
