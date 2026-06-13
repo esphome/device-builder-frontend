@@ -75,6 +75,19 @@ wifi:
     expect(sectionKeyOf(sections[0])).toBe("logger");
   });
 
+  it("ignores a nested platform: deeper than the singleton's direct keys", () => {
+    // The direct-child indent guard must keep a nested ``platform:``
+    // from overriding the section's own (mirrors the id/name guard).
+    const yaml = `ota:
+  platform: esphome
+  some_block:
+    platform: bogus
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections[0].platform).toBe("esphome");
+    expect(sectionKeyOf(sections[0])).toBe("ota.esphome");
+  });
+
   it("extracts continuation id/name when the dash has extra spaces", () => {
     // ``-   platform`` pushes the child column past dash+2; id/name on
     // continuation lines must still be picked up (a fixed +2 missed them).
