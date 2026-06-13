@@ -62,7 +62,7 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
   // Skip while a preference write is in flight — the optimistic value is the
   // source of truth until it completes (a reconnect mid-write would otherwise
   // reload the pre-write snapshot and revert experience / remote-compute).
-  if (host._prefsSetInFlight) return;
+  if (host._prefsWritesInFlight > 0) return;
   try {
     const prefs = await host._api.getPreferences();
     host.applyTheme(prefs.theme);

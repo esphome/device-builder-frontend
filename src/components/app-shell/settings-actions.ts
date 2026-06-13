@@ -38,7 +38,7 @@ export function onSetExperienceLevel(
   host._yamlDiffButton = yamlDiff;
   // Gate loadThemePreference so a reconnect mid-write can't reload the
   // pre-write snapshot over the optimistic value.
-  host._prefsSetInFlight = true;
+  host._prefsWritesInFlight += 1;
   host._api
     .updatePreferences({ experience_level: level, yaml_diff_button: yamlDiff })
     .catch(() => {
@@ -49,7 +49,7 @@ export function onSetExperienceLevel(
       });
     })
     .finally(() => {
-      host._prefsSetInFlight = false;
+      host._prefsWritesInFlight -= 1;
     });
 }
 
@@ -57,7 +57,7 @@ export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>
   const enabled = e.detail;
   const previous = host._remoteComputeOnly;
   host._remoteComputeOnly = enabled;
-  host._prefsSetInFlight = true;
+  host._prefsWritesInFlight += 1;
   host._api
     .updatePreferences({ remote_compute_only: enabled })
     .catch(() => {
@@ -67,7 +67,7 @@ export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>
       });
     })
     .finally(() => {
-      host._prefsSetInFlight = false;
+      host._prefsWritesInFlight -= 1;
     });
 }
 

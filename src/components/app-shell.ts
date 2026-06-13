@@ -189,9 +189,11 @@ export class ESPHomeApp extends LitElement {
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
-  // Set while an experience / remote-compute / yaml-diff preference write is
-  // in flight so a reconnect's loadThemePreference can't clobber it.
-  _prefsSetInFlight = false;
+  // Count of in-flight experience / remote-compute / yaml-diff preference
+  // writes so a reconnect's loadThemePreference can't clobber an optimistic
+  // value. A counter, not a boolean: it guards more than one write path, so
+  // two overlapping writes must both settle before the gate reopens.
+  _prefsWritesInFlight = 0;
 
   private _router = createRouter(this);
 
