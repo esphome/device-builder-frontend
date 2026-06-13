@@ -473,6 +473,7 @@ export function parseSectionCore(
       const endIdx = _blockScalarBodyEnd(lines, i + 1, childIndent.length);
       values[key] = blockScalarValue(blockHeader, raw, lines.slice(i + 1, endIdx));
       recordSpan(key, i, endIdx);
+      // Auto-increment ``for`` loop: resume so the next ``i++`` lands on endIdx.
       i = endIdx - 1;
       continue;
     }
@@ -599,7 +600,10 @@ function parseNestedBlock(
     if (nestedBlockHeader) {
       const endIdx = _blockScalarBodyEnd(lines, i + 1, indent.length);
       values[key] = blockScalarValue(nestedBlockHeader, raw, lines.slice(i + 1, endIdx));
-      i = endIdx - 1;
+      // This is a manual-increment ``while`` loop; ``continue`` skips the
+      // trailing ``i++``, so resume *at* endIdx (not endIdx - 1) or the last
+      // body line gets re-scanned as a nested key.
+      i = endIdx;
       continue;
     }
 

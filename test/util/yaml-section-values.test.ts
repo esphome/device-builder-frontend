@@ -2130,6 +2130,34 @@ sensor:
     });
   });
 
+  it("bounds a block scalar nested under a mapping key by indent", () => {
+    // ``parseNestedBlock``'s block-scalar branch slices the body with
+    // ``_blockScalarBodyEnd`` and resumes the manual-increment ``while``
+    // loop *at* endIdx (not endIdx - 1) so the last body line isn't
+    // re-scanned as a key. Pin the contract: the nested ``inner: |-``
+    // stops at its two body lines, ``sibling`` parses as its own field,
+    // there is no spurious key from the body, and the section round-trips
+    // byte-identically with the next top-level key untouched.
+    const yaml = [
+      "outer:",
+      "  level1:",
+      "    inner: |-",
+      "      body one",
+      "      body two",
+      "    sibling: keep",
+      "next_section:",
+      "  level: DEBUG",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "outer");
+    const level1 = values.level1 as Record<string, unknown>;
+    expect(Object.keys(level1)).toEqual(["inner", "sibling"]);
+    const inner = level1.inner as YamlRawValue;
+    expect(inner.body.replace(/\n+$/, "")).toBe("body one\nbody two");
+    expect(level1.sibling).toBe("keep");
+    expect(updateSectionInYaml(yaml, "outer", values)).toBe(yaml);
+  });
+
   it("round-trips 4-space user YAML through update without mixing indents", () => {
     // The save path detects the user's indent step and threads it
     // through the serializer so the rewritten section keeps the
