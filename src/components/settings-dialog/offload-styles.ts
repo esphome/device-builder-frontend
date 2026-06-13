@@ -108,11 +108,14 @@ export const pairingRowStyles = css`
   }
 
   /* Shared chrome for the section's secondary action buttons: the
-     pairing row's icon-only squares and the alert's text Unpair
-     (.offloader-alert-unpair markup lives in build-offload-alert.ts;
-     its chrome stays here with its siblings). */
+     pairing row's icon-only squares, its Build-remote / View-build
+     text actions, and the alert's text Unpair (.offloader-alert-unpair
+     markup lives in build-offload-alert.ts; its chrome stays here with
+     its siblings). */
   .btn-unpair,
   .btn-edit-endpoint,
+  .btn-build-remote,
+  .btn-view-remote-build,
   .offloader-alert-unpair {
     height: 32px;
     display: inline-flex;
@@ -144,14 +147,19 @@ export const pairingRowStyles = css`
     border-color: var(--esphome-error);
   }
 
-  .btn-edit-endpoint:hover {
+  .btn-edit-endpoint:hover,
+  .btn-build-remote:hover,
+  .btn-view-remote-build:hover {
     background: color-mix(in srgb, var(--esphome-primary), white 90%);
     color: var(--esphome-primary);
     border-color: var(--esphome-primary);
   }
 
-  /* Text variant — the alert spells the action out next to the
-     Re-pair pill, so it gets padding and the pill's radius. */
+  /* Text variant — the pairing row's Build-remote / View-build actions
+     and the alert's spelled-out Unpair (next to the Re-pair pill) get
+     padding and the pill's radius instead of the icon-square shape. */
+  .btn-build-remote,
+  .btn-view-remote-build,
   .offloader-alert-unpair {
     padding: 0 12px;
     border-radius: var(--wa-border-radius-m);
@@ -160,6 +168,8 @@ export const pairingRowStyles = css`
     font-weight: var(--wa-font-weight-semibold);
   }
 
+  .btn-build-remote:focus-visible,
+  .btn-view-remote-build:focus-visible,
   .offloader-alert-unpair:focus-visible {
     outline: none;
     box-shadow: var(--esphome-focus-ring);
