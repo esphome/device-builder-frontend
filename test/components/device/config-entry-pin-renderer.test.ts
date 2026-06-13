@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type ConfigEntry,
   ConfigEntryType,
+  PinFeature,
 } from "../../../src/api/types/config-entries.js";
 import {
   formatPinValue,
@@ -291,6 +292,47 @@ describe("renderPinField rtl87xx pin values", () => {
     const onChange = extractAttributeBindings(select)["@change"] as (e: Event) => void;
     onChange({ target: { value: "GPIO2" } } as never);
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "GPIO2");
+  });
+});
+
+describe("renderPinField ESP8266 named aliases", () => {
+  // ESP8266 configs name pins by alias (`RX` = GPIO3); the catalog carries
+  // the alias on the pin so the option still selects.
+  const esp8266Board = () =>
+    makeTestBoard({
+      pins: [makeBoardPin(3, { label: "GPIO3", features: ["uart_rx"], aliases: ["RX"] })],
+      overrides: { esphome: { platform: "esp8266", board: "esp01_1m" } as never },
+    });
+
+  it("selects the GPIO option for an aliased value", () => {
+    const ctx = makeRenderCtx({ rx_pin: "RX" }, { board: esp8266Board() });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "rx_pin",
+        pin_features: [PinFeature.UART_RX],
+      }),
+      ["rx_pin"],
+      ctx
+    );
+    const option = findElementBindings(result, "wa-option")[0];
+    expect(option.value).toBe("GPIO3");
+    expect(option["?selected"]).toBe(true);
+  });
+
+  it("matches the alias case-insensitively and through a long-form block", () => {
+    for (const value of ["rx", { number: "RX", inverted: true }]) {
+      const ctx = makeRenderCtx({ rx_pin: value }, { board: esp8266Board() });
+      const result = renderPinField(
+        makeEntry(ConfigEntryType.PIN, {
+          key: "rx_pin",
+          pin_features: [PinFeature.UART_RX],
+        }),
+        ["rx_pin"],
+        ctx
+      );
+      const option = findElementBindings(result, "wa-option")[0];
+      expect(option["?selected"]).toBe(true);
+    }
   });
 });
 

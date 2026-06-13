@@ -29,6 +29,9 @@ export interface BoardPin {
   available: boolean | null;
   occupied_by: string | null;
   notes: string | null;
+  /** Named forms a config may refer to this pin by (``RX``, ``D1``); the
+   *  catalog omits the key when there are none. */
+  aliases?: string[];
 }
 
 /**

@@ -47,6 +47,24 @@ interface PinOptionView {
   supported: boolean;
 }
 
+/** Resolve a pin value that names a pin by alias (ESP8266 ``RX``, ``D1``)
+ *  to its GPIO, so the option still selects when the value isn't a
+ *  ``GPIOn`` form ``parsePinGpio`` recognises. Reads the bare string or a
+ *  long-form block's ``number``; matches the catalog's per-pin ``aliases``
+ *  case-insensitively. ``null`` when nothing matches. */
+function gpioFromAlias(rawValue: unknown, pins: BoardPin[]): number | null {
+  const name =
+    typeof rawValue === "string"
+      ? rawValue.trim()
+      : isPlainObject(rawValue) && typeof rawValue.number === "string"
+        ? rawValue.number.trim()
+        : "";
+  if (!name) return null;
+  const lower = name.toLowerCase();
+  const match = pins.find((p) => p.aliases?.some((a) => a.toLowerCase() === lower));
+  return match ? match.gpio : null;
+}
+
 function buildPinOption(
   pin: BoardPin,
   entry: ConfigEntry,
@@ -182,7 +200,10 @@ export function renderPinField(
   // for nRF52), so normalise before comparing or the disabled select renders
   // blank.
   const rawValue = ctx.getAt(path);
-  const valueGpio = parsePinGpio(rawValue);
+  // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
+  // `GPIOn` form; this drives both the selected option and the re-add of a
+  // filtered-out active pin below.
+  const valueGpio = parsePinGpio(rawValue) ?? gpioFromAlias(rawValue, ctx.board.pins);
   const platform = ctx.board.esphome.platform;
   // Fallback to ``String(rawValue)`` only when the value is a
   // primitive — js-yaml emits null-prototype maps for partial /
