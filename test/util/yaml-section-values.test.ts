@@ -2158,6 +2158,26 @@ sensor:
     expect(updateSectionInYaml(yaml, "outer", values)).toBe(yaml);
   });
 
+  it("preserves an oddly-indented trailing comment when the deepest line is an earlier nested mapping", () => {
+    // The trailing-comment trim keys off the section's *deepest* value
+    // line, not its last one. A nested mapping (deep) followed by a
+    // shallow scalar leaves the last value shallower than the deepest;
+    // a trailing comment indented between the shallow last value and the
+    // deeper nested line is a real comment, so it must survive the save.
+    const yaml = [
+      "esphome:",
+      "  nested:",
+      "    deep: 1",
+      "  name: test",
+      "   # weird trailing comment at indent 3",
+      "logger:",
+      "  level: DEBUG",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(updateSectionInYaml(yaml, "esphome", values)).toBe(yaml);
+  });
+
   it("round-trips 4-space user YAML through update without mixing indents", () => {
     // The save path detects the user's indent step and threads it
     // through the serializer so the rewritten section keeps the

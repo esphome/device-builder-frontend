@@ -72,22 +72,27 @@ export function findSectionRange(
   return { start, end };
 }
 
-/** Indent of the last non-blank, non-comment line in ``[start, end)`` —
- *  the section's deepest real value line, used to tell a trailing
- *  comment apart from block-scalar body text. Falls back to the
+/** Indent of the deepest non-blank, non-comment line in ``[start, end)``
+ *  — the section's deepest real value line, used to tell a trailing
+ *  comment apart from block-scalar body text. Must be the maximum, not
+ *  the last line's: a nested mapping earlier in the section can be deeper
+ *  than the final value, and a trailing comment between the two indents
+ *  is a real comment to preserve, not block text. Falls back to the
  *  section's child indent when the section has no such line. */
-function _lastValueLineIndent(
+function _deepestValueLineIndent(
   lines: string[],
   start: number,
   end: number,
   fallback: number
 ): number {
-  for (let i = end - 1; i > start; i--) {
+  let deepest = -1;
+  for (let i = start + 1; i < end; i++) {
     const line = lines[i];
     if (line.trim() === "" || isCommentLine(line)) continue;
-    return _leadingIndent(line).length;
+    const indent = _leadingIndent(line).length;
+    if (indent > deepest) deepest = indent;
   }
-  return fallback;
+  return deepest < 0 ? fallback : deepest;
 }
 
 /**
@@ -121,12 +126,12 @@ export function updateSectionInYaml(
   // Walk that run back from `end` and stop the splice before it so
   // those lines survive verbatim. A trailing comment counts as a YAML
   // comment (preserve) when it's at the section's child indent or
-  // shallower OR shallower than the last value line's indent (a block
+  // shallower OR shallower than the deepest value line's indent (a block
   // scalar's body sits deeper than its key, so a comment between the
   // two is a real comment, not block text). A `#` at or past the body
   // indent is literal block-scalar text, already inside the field
   // value, so the walk stops there. (`> start + 1` keeps the header.)
-  const bodyIndent = _lastValueLineIndent(lines, start, end, childIndent.length);
+  const bodyIndent = _deepestValueLineIndent(lines, start, end, childIndent.length);
   let runStart = end;
   while (runStart > start + 1) {
     const prev = lines[runStart - 1];
