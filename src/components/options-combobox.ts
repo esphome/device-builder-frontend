@@ -168,6 +168,10 @@ export class ESPHomeOptionsCombobox extends LitElement {
   private _close = () => {
     this._open = false;
     this._active = -1;
+    // Clear the edit flag too: a close that left it set (Escape / blur after
+    // typing) would make the next keystroke filter against the stale query
+    // before the reopen resets it. _open_ sets it false on every open anyway.
+    this._dirty = false;
   };
 
   private _toggle = () => {

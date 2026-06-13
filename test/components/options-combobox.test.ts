@@ -148,6 +148,26 @@ describe("esphome-options-combobox", () => {
     );
   });
 
+  test("ArrowDown right after Escape activates the first option on one press", async () => {
+    // Custom committed value matches no option, so a leftover _dirty would
+    // make the post-Escape ArrowDown filter to an empty list and select nothing.
+    const el = await mount("cr3l");
+    await open(el);
+    const field = input(el);
+    field.value = "zz";
+    field.dispatchEvent(new Event("input"));
+    await el.updateComplete;
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await el.updateComplete;
+    field.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
+    );
+    await el.updateComplete;
+    const opts = options(el);
+    expect(opts).toHaveLength(OPTIONS.length);
+    expect(opts[0].classList.contains("option--active")).toBe(true);
+  });
+
   test("the change event is namespaced (no generic value-changed)", () => {
     expect(OPTIONS_COMBOBOX_CHANGE_EVENT).toBe("options-combobox-change");
   });
