@@ -564,8 +564,11 @@ export class ESPHomePageDevice extends LitElement {
       if (!hasSavedLayout) {
         this._layout = prefs.experience_level === ExperienceLevel.YAML ? "both" : "left";
       }
-    } catch {
-      // Preferences not critical — use defaults
+    } catch (err) {
+      // Preferences not critical; fall back to defaults. Logged so a YAML
+      // user silently dropped into the non-YAML first-open layout is
+      // diagnosable.
+      console.warn("Failed to load device preferences:", err);
     }
   }
 

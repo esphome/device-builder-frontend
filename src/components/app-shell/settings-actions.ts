@@ -20,7 +20,17 @@ import { patchOffloadPairing } from "./events.js";
 export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   const theme = e.detail as Theme;
   host.applyTheme(theme);
-  host._api.updatePreferences({ theme }).catch(() => {});
+  // Count the write like the other prefs writes so a reconnect can't reload
+  // and revert the optimistic theme mid-flight. Theme has a localStorage
+  // fallback and self-corrects on the next successful load, so a failure is
+  // logged rather than reverted + toasted.
+  host._prefsWritesInFlight += 1;
+  host._api
+    .updatePreferences({ theme })
+    .catch((err) => console.warn("Failed to save theme:", err))
+    .finally(() => {
+      host._prefsWritesInFlight -= 1;
+    });
 }
 
 // Experience seeds the YAML diff button (beginners get none; UI / YAML users

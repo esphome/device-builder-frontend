@@ -6,6 +6,7 @@ import {
   onSetExperienceLevel,
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteComputeOnly,
+  onSetTheme,
 } from "../../../src/components/app-shell/settings-actions.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
@@ -165,6 +166,30 @@ describe("onSetRemoteComputeOnly", () => {
     await flush();
     expect(host._remoteComputeOnly).toBe(false);
     expect(toastError).toHaveBeenCalledOnce();
+  });
+});
+
+describe("onSetTheme", () => {
+  beforeEach(() => toastError.mockClear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("counts the write in flight and logs (not toasts) on failure", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = {
+      ...makePrefsHost(
+        vi.fn(async () => {
+          throw new Error("no");
+        })
+      ),
+      applyTheme: vi.fn(),
+    };
+    onSetTheme(host as unknown as ESPHomeApp, new CustomEvent("x", { detail: "dark" }));
+    expect(host.applyTheme).toHaveBeenCalledWith("dark");
+    expect(host._prefsWritesInFlight).toBe(1);
+    await flush();
+    expect(host._prefsWritesInFlight).toBe(0);
+    expect(warn).toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 });
 
