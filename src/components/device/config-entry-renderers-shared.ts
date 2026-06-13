@@ -34,6 +34,7 @@ import {
 } from "../../util/substitutions.js";
 import {
   escapeControlForInput,
+  hasEscapeWorthyChar,
   unescapeControlForInput,
 } from "../../util/yaml-escape.js";
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
@@ -469,17 +470,23 @@ export function renderStringField(
       </div>
     `;
   }
-  // A single-line input can't show control characters, so reveal them as
-  // ``\r`` / ``\n`` / ``\t`` and decode on edit; a CRLF in a uart.write
-  // payload stays visible and round-trips instead of silently vanishing.
+  // A single-line input can't show control characters. Only when the
+  // stored value actually contains one (a CRLF in a uart.write payload, an
+  // invisible glyph) do we reveal them as ``\r`` / ``\n`` / ``\xNN`` and
+  // decode on edit; an ordinary string renders verbatim so a typed path
+  // like ``C:\temp`` is never rewritten into control bytes. Display and
+  // decode stay coupled on this one flag.
+  const escapeMode = hasEscapeWorthyChar(value);
   const textInput = html`<input
     type=${inputType}
     class=${invalid ? "invalid" : ""}
-    .value=${escapeControlForInput(value)}
+    .value=${escapeMode ? escapeControlForInput(value) : value}
     ?disabled=${disabled}
     placeholder=${placeholder}
-    @input=${(e: Event) =>
-      ctx.emitChange(path, unescapeControlForInput((e.target as HTMLInputElement).value))}
+    @input=${(e: Event) => {
+      const raw = (e.target as HTMLInputElement).value;
+      ctx.emitChange(path, escapeMode ? unescapeControlForInput(raw) : raw);
+    }}
   />`;
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>

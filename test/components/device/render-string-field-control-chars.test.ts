@@ -32,11 +32,24 @@ describe("renderStringField — control characters", () => {
   });
 
   it("decodes the escaped edit back to literal control characters", () => {
-    const { ctx, emitChange } = ctxFor("");
+    // Escape mode is keyed on the stored value, so seed one with a control char.
+    const { ctx, emitChange } = ctxFor("saveConfig\r\n");
     const tpl = renderStringField(makeEntry(), "text", ["data"], ctx);
     const [input] = findElementBindings(tpl, "input");
     const onInput = input["@input"] as (e: Event) => void;
     onInput({ target: { value: "saveConfig\\r\\n" } } as unknown as Event);
     expect(emitChange).toHaveBeenCalledWith(["data"], "saveConfig\r\n");
+  });
+
+  it("leaves an ordinary value verbatim and never rewrites a typed path", () => {
+    // No control char stored → no escape mode, so a literal ``C:\temp`` is
+    // shown as-is and a typed ``\t`` / ``\n`` is not decoded to a control byte.
+    const { ctx, emitChange } = ctxFor("C:\\temp");
+    const tpl = renderStringField(makeEntry(), "text", ["data"], ctx);
+    const [input] = findElementBindings(tpl, "input");
+    expect(input[".value"]).toBe("C:\\temp");
+    const onInput = input["@input"] as (e: Event) => void;
+    onInput({ target: { value: "C:\\new" } } as unknown as Event);
+    expect(emitChange).toHaveBeenCalledWith(["data"], "C:\\new");
   });
 });
