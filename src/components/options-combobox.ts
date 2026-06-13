@@ -72,6 +72,9 @@ export class ESPHomeOptionsCombobox extends LitElement {
   @query("input")
   private _input?: HTMLInputElement;
 
+  @query(".option--active")
+  private _activeOption?: HTMLElement;
+
   static styles = [inputStyles, optionsComboboxStyles];
 
   protected render() {
@@ -252,11 +255,10 @@ export class ESPHomeOptionsCombobox extends LitElement {
   }
 
   private _scrollActiveIntoView(): void {
-    requestAnimationFrame(() => {
-      this.shadowRoot
-        ?.querySelector(".option--active")
-        ?.scrollIntoView({ block: "nearest" });
-    });
+    // Wait for the re-render so the @query ref resolves to the new active row.
+    void this.updateComplete.then(() =>
+      this._activeOption?.scrollIntoView({ block: "nearest" })
+    );
   }
 }
 
