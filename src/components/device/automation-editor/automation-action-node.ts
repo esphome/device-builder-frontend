@@ -42,6 +42,12 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { actionAdvancedState } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import {
+  looksLikeTimePeriodScalar,
+  parseTimePeriodScalar,
+  TIME_PERIOD_UNITS,
+  type TimePeriodUnit,
+} from "../../../util/time-period.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
@@ -74,12 +80,10 @@ registerMdiIcons({
   "pencil-outline": mdiPencilOutline,
 });
 
-/** Time units the Delay action picker offers. Ordered from
- *  least → most coarse so the dropdown opens with the most
- *  common pick (seconds) near the top of the visible options
- *  without making the list feel reversed. */
-const DELAY_UNITS = ["us", "ms", "s", "min", "h", "d"] as const;
-type DelayUnit = (typeof DELAY_UNITS)[number];
+/** Time units the Delay action picker offers (the shared canonical
+ *  set, least → most coarse). */
+const DELAY_UNITS = TIME_PERIOD_UNITS;
+type DelayUnit = TimePeriodUnit;
 
 /** Maps each picker unit to the catalog field key the backend's
  *  YAML writer expects. ESPHome's time_period coercer accepts any
@@ -480,11 +484,13 @@ export class ESPHomeAutomationActionNode extends LitElement {
         />
       </div>
       <div class="ae-delay-unit">
-        <label class="field-label" for="ae-delay-unit-select">
+        <label class="field-label" id="ae-delay-unit-label">
           ${this._localize("device.automation_action_delay_unit")}
         </label>
-        <select
+        <wa-select
           id="ae-delay-unit-select"
+          aria-labelledby="ae-delay-unit-label"
+          value=${unit}
           ?disabled=${this.disabled}
           @change=${(e: Event) =>
             this._writeDelay(
@@ -494,11 +500,11 @@ export class ESPHomeAutomationActionNode extends LitElement {
         >
           ${DELAY_UNITS.map(
             (u) =>
-              html`<option value=${u} ?selected=${u === unit}>
+              html`<wa-option value=${u} ?selected=${u === unit}>
                 ${this._localize(`device.automation_action_delay_unit_${u}`)}
-              </option>`
+              </wa-option>`
           )}
-        </select>
+        </wa-select>
       </div>
     </div>`;
   }
@@ -547,15 +553,14 @@ export class ESPHomeAutomationActionNode extends LitElement {
       }
     }
     // Backend shortcut form: ``delay: 2s`` → ``params.id = "2s"``.
-    // Split into numeric prefix + unit suffix so the picker
-    // doesn't blank out for round-tripped historic values.
+    // Split into numeric value + canonical unit (honouring ESPHome's
+    // ``sec`` / ``seconds`` / ... aliases) so the picker doesn't blank
+    // out for round-tripped values. Requires an explicit unit — ESPHome
+    // rejects a bare-number delay, so we don't pretend ``5`` is seconds.
     const shortcut = params.id;
-    if (typeof shortcut === "string") {
-      const m = shortcut.match(/^(\d+(?:\.\d+)?)(us|ms|s|min|h|d)$/);
-      if (m) {
-        const [, num, suf] = m;
-        return { value: num, unit: suf as DelayUnit };
-      }
+    if (typeof shortcut === "string" && looksLikeTimePeriodScalar(shortcut)) {
+      const parsed = parseTimePeriodScalar(shortcut);
+      return { value: parsed.value, unit: parsed.unit };
     }
     return { value: "", unit: "s" };
   }

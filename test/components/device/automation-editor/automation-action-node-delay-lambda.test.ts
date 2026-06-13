@@ -85,14 +85,15 @@ function valueInput(el: ESPHomeAutomationActionNode): HTMLInputElement | null {
   return el.shadowRoot!.querySelector<HTMLInputElement>("#ae-delay-value-input");
 }
 
-/** The unit the renderer marked ``selected`` (read the attribute Lit's
- *  ``?selected`` binding sets; happy-dom's ``select.value`` ignores it). */
+/** The unit on the wa-select's own ``value`` attribute — the control's
+ *  canonical selection source — cross-checked against the option the
+ *  renderer marked ``selected``. */
 function selectedUnit(el: ESPHomeAutomationActionNode): string | null {
-  return (
-    el
-      .shadowRoot!.querySelector("#ae-delay-unit-select option[selected]")
-      ?.getAttribute("value") ?? null
-  );
+  const select = el.shadowRoot!.querySelector("#ae-delay-unit-select");
+  const value = select?.getAttribute("value") ?? null;
+  const marked =
+    select?.querySelector("wa-option[selected]")?.getAttribute("value") ?? null;
+  return value === marked ? value : `value=${value} selected=${marked}`;
 }
 
 function toggleButtons(el: ESPHomeAutomationActionNode): HTMLButtonElement[] {
@@ -177,5 +178,27 @@ describe("automation-action-node delay lambda", () => {
     const { el } = await mountDelay({ seconds: "5" });
     expect(valueInput(el)!.value).toBe("5");
     expect(selectedUnit(el)).toBe("s");
+  });
+
+  it("parses an aliased shorthand (1sec) as value + seconds", async () => {
+    const { el } = await mountDelay({ id: "1sec" });
+    expect(lambdaEditor(el)).toBeNull();
+    expect(valueInput(el)!.value).toBe("1");
+    expect(selectedUnit(el)).toBe("s");
+  });
+
+  it("blanks the picker for a bare-number shortcut (ESPHome needs a unit)", async () => {
+    const { el } = await mountDelay({ id: "5" });
+    expect(valueInput(el)!.value).toBe("");
+    expect(selectedUnit(el)).toBe("s");
+  });
+
+  it("normalizes an aliased shorthand to the canonical field on edit", async () => {
+    const { el, emitted } = await mountDelay({ id: "1sec" });
+    const input = valueInput(el)!;
+    input.value = "2";
+    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(emitted[emitted.length - 1].params).toEqual({ seconds: "2" });
   });
 });

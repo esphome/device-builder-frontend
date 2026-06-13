@@ -27,29 +27,22 @@ export const remoteBuildJobDialogStyles = css`
     margin-top: var(--wa-space-xs);
   }
 
-  /* Destructive variant for the per-row Cancel-this-job
-     button. Mirrors confirm-dialog's destructive btn tint
-     without dragging the whole confirm-dialog style block in.
-     The other two buttons in this dialog (.btn-primary /
-     .btn-secondary) inherit browser-default chrome. */
-  .btn-danger {
+  /* Destructive variant for the per-row Cancel-this-job button —
+     just the danger tint over the shared .btn base from
+     dialogActionButtonStyles, per that module's "destructive
+     variants stay in the consumer's local styles" contract. */
+  .btn--danger {
     background: var(--esphome-error);
     color: var(--esphome-on-primary);
     border: var(--wa-border-width-s) solid var(--esphome-error);
-    border-radius: var(--wa-border-radius-m);
-    padding: 0 var(--wa-space-m);
-    min-height: var(--wa-form-control-height);
-    font-family: inherit;
-    font-size: var(--wa-font-size-s);
-    cursor: pointer;
   }
 
-  .btn-danger:hover:not(:disabled) {
+  .btn--danger:hover:not(:disabled) {
     background: color-mix(in srgb, var(--esphome-error), black 10%);
     border-color: color-mix(in srgb, var(--esphome-error), black 10%);
   }
 
-  .btn-danger:disabled {
+  .btn--danger:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }

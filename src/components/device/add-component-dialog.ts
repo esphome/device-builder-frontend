@@ -11,6 +11,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
@@ -25,6 +26,7 @@ import {
   type SelectionHost,
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
+import { componentDialogTitle } from "./component-card-category-label.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -118,6 +120,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @state()
   private _prefillReference: { domain: string; id: string } | null = null;
 
+  /** Bus-form prefill + forced fields for the dep detour, derived from
+   *  the requesting component's `bus_constraints`. */
+  @state()
+  private _depPrefill: BusPrefill | null = null;
+
   /**
    * Featured-component ids waiting to be added as part of the current
    * bundle, excluding the one currently in `_selected`. Each id is
@@ -191,6 +198,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._returnTo = null;
     this._depDomain = null;
     this._prefillReference = null;
+    this._depPrefill = null;
     this._bundleQueue = [];
     this._bundleProgress = null;
     this._depNavSeq++;
@@ -218,7 +226,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // hide it with `hidden` rather than swapping it out of the DOM. The form
     // is fine to mount/unmount on demand since each selection starts fresh.
     const title = isForm
-      ? this._selected!.name
+      ? componentDialogTitle(this._selected!.name, this._selected!.category, {
+          core: isCore,
+        })
       : this.boardName
         ? this._localize(headerKey, { name: this.boardName })
         : this._localize(headerKey);
@@ -287,6 +297,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
               .board=${this.board}
               .yaml=${this.yaml}
               .prefillReference=${this._prefillReference}
+              .prefillFields=${this._depPrefill?.fields ?? null}
+              .extraRequired=${this._depPrefill?.required ?? null}
               .submitting=${this._submitting}
               .submitError=${this._submitError}
             ></esphome-add-component-form>`
@@ -382,6 +394,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._returnTo = null;
     this._depDomain = null;
     this._prefillReference = null;
+    this._depPrefill = null;
     this._bundleQueue = rest;
     this._bundleProgress = {
       current: 1,
@@ -503,6 +516,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         }
         this._returnTo = null;
         this._depDomain = null;
+        this._depPrefill = null;
         this._selected = restore;
       } else if (this._bundleQueue.length > 0 && this._bundleProgress) {
         // Bundle in flight — pop the next featured id and refresh the

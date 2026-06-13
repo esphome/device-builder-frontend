@@ -201,14 +201,9 @@ export const automationEditorRowStyles = css`
     margin-bottom: var(--wa-space-2xs);
     display: block;
   }
-  .ae-delay-row input,
-  .ae-delay-row select {
+  /* Input and wa-select chrome both come from the shared inputStyles,
+     keyed on --wa-form-control-height, so the pair stays equal-height. */
+  .ae-delay-row wa-select {
     width: 100%;
-    padding: var(--wa-space-2xs) var(--wa-space-s);
-    border: 1px solid var(--wa-color-neutral-border-quiet, #d1d5db);
-    border-radius: var(--wa-border-radius-s);
-    background: var(--wa-color-surface-default);
-    font-size: var(--wa-font-size-s);
-    box-sizing: border-box;
   }
 `;

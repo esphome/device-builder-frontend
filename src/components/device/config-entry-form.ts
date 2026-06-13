@@ -67,6 +67,7 @@ import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
+import "../options-combobox.js";
 import {
   fieldRendererStyles,
   labelFor,
@@ -272,11 +273,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   protected render() {
     const ctx = this._buildCtx();
+    // In the add-component dialog, float required entries above optional
+    // ones (stable, so each keeps its catalog order) so the user fills the
+    // mandatory fields first. The section editor mirrors the on-disk YAML
+    // order, so it's left untouched.
+    const entries = this.requiredOnly
+      ? this._floatRequiredFirst(this.entries)
+      : this.entries;
     // Each exclusive_group renders as one always-shown dropdown at its
     // first member's slot; other entries keep the advanced/visibility
     // filter (the Set preserves order while dropping filtered-out ones).
-    const ordered = orderExclusiveGroups(this.entries);
-    const nonExclusive = this.entries.filter((entry) => !entry.exclusive_group);
+    const ordered = orderExclusiveGroups(entries);
+    const nonExclusive = entries.filter((entry) => !entry.exclusive_group);
     const visible = new Set(this._filterRenderable(nonExclusive, this.values));
     // An empty key means "this entry IS the whole values dict" —
     // used by top-level user-keyed sections (substitutions:) where
@@ -289,6 +297,24 @@ export class ESPHomeConfigEntryForm extends LitElement {
           ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
           : nothing
     )}`;
+  }
+
+  /** Stable-partition so required entries lead. An exclusive_group is
+   *  treated atomically (required if any member is) so its members stay
+   *  contiguous and ``orderExclusiveGroups`` folds them at the same slot. */
+  private _floatRequiredFirst(entries: ConfigEntry[]): ConfigEntry[] {
+    const groupRequired = new Map<string, boolean>();
+    for (const e of entries) {
+      if (e.exclusive_group) {
+        groupRequired.set(
+          e.exclusive_group,
+          (groupRequired.get(e.exclusive_group) ?? false) || !!e.required
+        );
+      }
+    }
+    const isRequired = (e: ConfigEntry): boolean =>
+      e.exclusive_group ? groupRequired.get(e.exclusive_group)! : !!e.required;
+    return [...entries.filter(isRequired), ...entries.filter((e) => !isRequired(e))];
   }
 
   protected willUpdate(changed: PropertyValues) {
@@ -707,9 +733,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   }
 
   private _toggleNested(key: string) {
-    // The set's semantics depend on `requiredOnly` — see
-    // `renderNestedField` — but the toggle is the same either way:
-    // membership flips between "tracked" and "untracked".
+    // The set tracks open groups; flip membership to expand/collapse.
     const next = new Set(this._nestedOpenSections);
     if (next.has(key)) next.delete(key);
     else next.add(key);
@@ -720,13 +744,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * Force a nested group open. Used by parent forms (e.g. section
    * editor scrolling to a validation error) to make sure a deep field
    * is rendered before searching the DOM. Idempotent.
-   *
-   * Only meaningful in normal (non-requiredOnly) mode where the set
-   * tracks "open" entries; in `requiredOnly` mode groups default open
-   * already so this is a no-op.
    */
   public openNested(key: string) {
-    if (this.requiredOnly) return;
     if (this._nestedOpenSections.has(key)) return;
     const next = new Set(this._nestedOpenSections);
     next.add(key);
@@ -739,7 +758,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * keeps it to one shot.
    */
   private _seedNestedOpen(key: string) {
-    if (this.requiredOnly || this._seededNestedOpen.has(key)) return;
+    if (this._seededNestedOpen.has(key)) return;
     this._seededNestedOpen.add(key);
     this._nestedOpenSections.add(key);
   }

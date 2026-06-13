@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   categoryChipLabel,
+  componentDialogTitle,
   shouldShowCategoryChip,
 } from "../../../src/components/device/component-card-category-label.js";
 
@@ -49,6 +50,35 @@ describe("categoryChipLabel", () => {
     expect(categoryChipLabel("_sensor")).toBe("Sensor");
     expect(categoryChipLabel("sensor_")).toBe("Sensor");
     expect(categoryChipLabel("sensor__platform")).toBe("Sensor Platform");
+  });
+});
+
+describe("componentDialogTitle", () => {
+  it("appends the platform label so same-name entries stay distinct", () => {
+    // All four ``*.atm90e32`` platforms ship the name "ATM90E32
+    // Power Sensor"; the form view drops the card chip, so the
+    // header is the only thing left to tell them apart
+    // (device-builder#1424 follow-up).
+    expect(componentDialogTitle("ATM90E32 Power Sensor", "button", { core: false })).toBe(
+      "ATM90E32 Power Sensor · Button"
+    );
+    expect(
+      componentDialogTitle("ATM90E32 Power Sensor", "text_sensor", {
+        core: false,
+      })
+    ).toBe("ATM90E32 Power Sensor · Text Sensor");
+  });
+
+  it("keeps the bare name in the core-config flow", () => {
+    // Core components are unique top-level domains, so "Wi-Fi ·
+    // Wifi" would be redundant noise.
+    expect(componentDialogTitle("Wi-Fi", "wifi", { core: true })).toBe("Wi-Fi");
+  });
+
+  it("keeps the bare name when the category is empty", () => {
+    expect(componentDialogTitle("Some Component", "", { core: false })).toBe(
+      "Some Component"
+    );
   });
 });
 

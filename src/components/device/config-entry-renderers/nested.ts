@@ -31,9 +31,9 @@ function _enableStash(ctx: RenderCtx): Map<string, Record<string, unknown>> {
   return m;
 }
 
-// In requiredOnly mode (add-component dialog) groups default open and the
-// set tracks groups the user explicitly *collapsed*. Otherwise groups default
-// closed and the set tracks groups they *opened*.
+// The set tracks groups that are *open*. A group seeds open once when it's
+// required or already carries a value (see seedNestedOpen below); optional
+// empty groups stay collapsed until the user expands them.
 export function renderNestedField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   // A scalar at a NESTED key (an unmodellable shorthand the user set in
   // YAML) renders read-only with its value, not as an empty flag group.
@@ -59,8 +59,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   // remote_receiver's raw are otherwise collapsed). seedNestedOpen is
   // one-shot, so a later user collapse sticks.
   if (entry.required || hasSerializableValue(raw)) ctx.seedNestedOpen(key);
-  const inSet = ctx.nestedOpenSections.has(key);
-  const isOpen = ctx.requiredOnly ? !inSet : inSet;
+  const isOpen = ctx.nestedOpenSections.has(key);
   // Optional entity sub-readings (a debug component's per-metric sensors,
   // a DHT's temperature/humidity, …) are only written to YAML once their
   // group holds a value, so an untouched one is silently "off". Give those

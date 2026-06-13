@@ -33,6 +33,8 @@ import type { PasswordInputValueChange } from "../device/password-input-event.js
 import { secretsStructuredEditorStyles } from "./secrets-structured-editor.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/option/option.js";
+import "@home-assistant/webawesome/dist/components/select/select.js";
 import "../base-dialog.js";
 import "../device/password-input.js";
 
@@ -167,13 +169,14 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
       @after-hide=${this._closeAdd}
     >
       <div class="body add-body">
-        <label class="add-field">
-          <span class="add-field-label"
+        <div class="add-field">
+          <span class="add-field-label" id="secret-target-label"
             >${this._localize("secrets.add_dialog_target")}</span
           >
-          <select
+          <wa-select
             class="add-select"
-            .value=${live(this._addTarget)}
+            aria-labelledby="secret-target-label"
+            value=${this._addTarget}
             @change=${(e: Event) => {
               this._addTarget = (e.target as HTMLSelectElement).value;
               // A new target can resolve (or re-introduce) a duplicate via the
@@ -182,12 +185,13 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
               if (this._addError) this._addError = this._addKeyError();
             }}
           >
-            <option value="">${this._localize("secrets.group_shared")}</option>
+            <wa-option value="">${this._localize("secrets.group_shared")}</wa-option>
             ${this._devices.map(
-              (d) => html`<option value=${d.name}>${d.friendly_name || d.name}</option>`
+              (d) =>
+                html`<wa-option value=${d.name}>${d.friendly_name || d.name}</wa-option>`
             )}
-          </select>
-        </label>
+          </wa-select>
+        </div>
         <label class="add-field">
           <span class="add-field-label"
             >${this._localize("secrets.key_placeholder")}</span

@@ -1,5 +1,6 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getCachedComponent } from "../../util/component-name-cache.js";
+import { stripRedundantComponentSuffix } from "../../util/component-title.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
 import { type YamlSection, sectionKeyOf } from "../../util/yaml-sections.js";
 import type { NavigatorBuckets } from "./navigator-buckets.js";
@@ -55,12 +56,7 @@ export function resolveNavItemLabels(
   let primary = raw;
   const cached = getCachedComponent(raw, ctx.platform || undefined);
   if (cached?.name) primary = cached.name;
-  if (category === "core") {
-    // Core infrastructure names carry a redundant suffix in the nav:
-    // " Component" ("Native API Component"), and esphome's catalog title
-    // is "ESPHome Core Configuration" — trim both so rows stay scannable.
-    primary = primary.replace(/ (Component|Configuration)$/, "") || primary;
-  }
+  if (category === "core") primary = stripRedundantComponentSuffix(primary);
 
   // Prefer the backend-resolved node name for the esphome core section
   // so a `name: $devicename` substitution shows the expanded hostname,

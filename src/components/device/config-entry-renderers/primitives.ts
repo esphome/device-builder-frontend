@@ -12,7 +12,14 @@ import {
 } from "../../../util/float-with-unit.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
+import {
+  parseTimePeriodScalar,
+  serializeTimePeriod,
+  TIME_PERIOD_UNITS,
+  type TimePeriodUnit,
+} from "../../../util/time-period.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
+import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -186,66 +193,18 @@ function hexDisplayOrFallback(rawValue: unknown): string {
  * backend's parser handles it the same as if the user had typed
  * it raw into YAML.
  */
-const TIME_PERIOD_UNITS = ["us", "ms", "s", "min", "h", "d"] as const;
-type TimePeriodUnit = (typeof TIME_PERIOD_UNITS)[number];
-
-/** Detect a polymorphic time-period scalar shorthand (``50ms``,
- *  ``2.5s``); requires an explicit unit suffix so unitless numbers
- *  like ``delta: 0.5`` don't false-positive. Units are escaped when
- *  building the regex so a future entry with regex metacharacters
- *  doesn't quietly malform the pattern. */
-const TIME_PERIOD_SCALAR_RE = new RegExp(
-  `^\\d+(?:\\.\\d+)?(?:${TIME_PERIOD_UNITS.map((u) =>
-    u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  ).join("|")})$`
-);
-export function looksLikeTimePeriodScalar(raw: unknown): boolean {
-  return typeof raw === "string" && TIME_PERIOD_SCALAR_RE.test(raw.trim());
-}
-
-function parseTimePeriod(raw: unknown): {
-  value: string;
-  unit: TimePeriodUnit;
-  parseable: boolean;
-} {
-  if (raw === undefined || raw === null || raw === "") {
-    return { value: "", unit: "s", parseable: true };
-  }
-  const text = String(raw).trim();
-  // Single "<number><unit>" form. Number can be a fraction. Unit is
-  // optional — a bare number is interpreted as seconds by ESPHome.
-  const m = text.match(/^(\d+(?:\.\d+)?)(us|ms|s|min|h|d)?$/);
-  if (m) {
-    const [, num, suf] = m;
-    return {
-      value: num,
-      unit: (suf as TimePeriodUnit) ?? "s",
-      parseable: true,
-    };
-  }
-  // Compound form ("1h30s") or unrecognised — surface the raw string
-  // so the user can edit it as plain text without us mangling it.
-  return { value: text, unit: "s", parseable: false };
-}
-
-function serializeTimePeriod(value: string, unit: TimePeriodUnit): string {
-  const trimmed = value.trim();
-  if (trimmed === "") return "";
-  return `${trimmed}${unit}`;
-}
-
 export function renderTimePeriodField(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx
 ) {
   const raw = ctx.getAt(path);
-  // Bail above parseTimePeriod — its ``String(raw).trim()`` would
+  // Bail above parseTimePeriodScalar — its ``String(raw).trim()`` would
   // turn a single-element list ``["5s"]`` into the parseable string
   // ``"5s"`` and a save would clobber the original list.
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
-  const parsed = parseTimePeriod(raw);
+  const parsed = parseTimePeriodScalar(raw);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   // Compound / unparseable strings fall through to a plain text
@@ -258,7 +217,7 @@ export function renderTimePeriodField(
   // number, the unit lives in the dropdown beside it.
   const defaultParsed =
     entry.default_value !== undefined && entry.default_value !== null
-      ? parseTimePeriod(entry.default_value)
+      ? parseTimePeriodScalar(entry.default_value)
       : null;
   const placeholderText =
     defaultParsed && defaultParsed.parseable ? defaultParsed.value : "";
@@ -475,25 +434,22 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
     `;
   }
   if (entry.allow_custom_value && entry.options && entry.options.length > 0) {
-    const listId = `combobox-${path.join("-")}`;
+    // ``label`` only names the combobox's shadow-DOM input (renderLabel's
+    // visible label isn't associated via for=); the combobox draws no label
+    // chrome of its own, so this isn't a duplicate visible label.
     return html`
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
-        <input
-          type="text"
-          class="combobox-input ${invalid ? "invalid" : ""}"
-          list=${listId}
+        <esphome-options-combobox
+          .options=${entry.options}
           .value=${value}
-          ?disabled=${disabled}
+          label=${entry.label}
           placeholder=${String(entry.default_value ?? "")}
-          @input=${(e: Event) =>
-            ctx.emitChange(path, (e.target as HTMLInputElement).value)}
-        />
-        <datalist id=${listId}>
-          ${entry.options.map(
-            (opt) => html`<option value=${opt.value}>${opt.label}</option>`
-          )}
-        </datalist>
+          ?disabled=${disabled}
+          ?invalid=${invalid}
+          @options-combobox-change=${(e: CustomEvent<OptionsComboboxValueChange>) =>
+            ctx.emitChange(path, e.detail.value)}
+        ></esphome-options-combobox>
         ${renderFieldError(path, ctx)}
       </div>
     `;
@@ -503,8 +459,9 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   // still flags as selected.
   const valueLower = value.toLowerCase();
   const defaultStr = entry.default_value != null ? String(entry.default_value) : "";
+  const defaultLower = defaultStr.toLowerCase();
   const defaultOption = entry.options?.find(
-    (o) => o.value.toLowerCase() === defaultStr.toLowerCase()
+    (o) => o.value.toLowerCase() === defaultLower
   );
   const placeholder = defaultOption?.label ?? defaultStr;
   const { clearable, visibleOptions } = selectOptions(entry);
@@ -522,14 +479,31 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         ${clearable
           ? html`<wa-icon slot="clear-icon" library="mdi" name="close"></wa-icon>`
           : nothing}
-        ${visibleOptions.map(
-          (opt) =>
-            html`<wa-option
-              value=${opt.value}
-              ?selected=${opt.value.toLowerCase() === valueLower}
+        ${visibleOptions.map((opt) => {
+          const selected = opt.value.toLowerCase() === valueLower;
+          const isDefault = defaultStr !== "" && opt.value.toLowerCase() === defaultLower;
+          if (!isDefault) {
+            return html`<wa-option value=${opt.value} ?selected=${selected}
               >${opt.label}</wa-option
-            >`
-        )}
+            >`;
+          }
+          // wa-select activates the first option when nothing is committed,
+          // so give the default a muted second line (like the pin menu's
+          // notes) — the honest "this applies if you leave it" signal.
+          // `.label` keeps the closed control showing just the label.
+          return html`<wa-option
+            value=${opt.value}
+            .label=${opt.label}
+            ?selected=${selected}
+          >
+            <span class="option-default-stack">
+              <span>${opt.label}</span>
+              <small class="option-default-note"
+                >${ctx.localize("device.default_option_tag")}</small
+              >
+            </span>
+          </wa-option>`;
+        })}
       </wa-select>
       ${renderFieldError(path, ctx)}
     </div>

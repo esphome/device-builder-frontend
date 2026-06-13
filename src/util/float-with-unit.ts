@@ -118,6 +118,52 @@ export function serializeFloatWithUnit(parsed: FloatWithUnit): string {
 }
 
 /**
+ * Format a base-unit value with the largest listed unit dividing it
+ * cleanly: 15000 with Hz-based options yields '15kHz'. Falls back to
+ * the base unit so the result always validates against the options.
+ */
+export function formatInBestUnit(
+  baseValue: number,
+  unitOptions: readonly string[]
+): string {
+  const base = unitOptions[0] ?? "";
+  let bestUnit = base;
+  let bestMult = 1;
+  for (const option of unitOptions) {
+    if (option === base || !option.endsWith(base)) continue;
+    const prefix = option.slice(0, option.length - base.length);
+    if (!Object.prototype.hasOwnProperty.call(METRIC_PREFIX_MULTIPLIERS, prefix))
+      continue;
+    const mult = METRIC_PREFIX_MULTIPLIERS[prefix];
+    if (mult > bestMult && baseValue % mult === 0) {
+      bestMult = mult;
+      bestUnit = option;
+    }
+  }
+  return `${baseValue / bestMult}${bestUnit}`;
+}
+
+/**
+ * Parse to the base (first) unit's scale: '50kHz' with Hz-based options
+ * yields 50000. Null when valueless or the unit isn't metric-prefixed.
+ */
+export function floatWithUnitToBase(
+  raw: unknown,
+  unitOptions: readonly string[]
+): number | null {
+  const { value, unit } = parseFloatWithUnit(raw, unitOptions);
+  if (value === null) return null;
+  const base = unitOptions[0] ?? "";
+  if (unit === base) return value;
+  if (!unit.endsWith(base)) return null;
+  const prefix = unit.slice(0, unit.length - base.length);
+  if (!Object.prototype.hasOwnProperty.call(METRIC_PREFIX_MULTIPLIERS, prefix)) {
+    return null;
+  }
+  return value * METRIC_PREFIX_MULTIPLIERS[prefix];
+}
+
+/**
  * Compute the numeric placeholder shown in the FLOAT_WITH_UNIT
  * field's number input from the catalog's `default_value`.
  *

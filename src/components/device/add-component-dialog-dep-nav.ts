@@ -1,5 +1,9 @@
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
+import {
+  busConstraintPrefill,
+  type BusPrefill,
+} from "../../util/bus-constraint-prefill.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
 
 /** Slice of ``ESPHomeAddComponentDialog`` state ``navigateToDep`` reads / writes. */
@@ -11,6 +15,7 @@ export interface DepNavHost {
   _selected: ComponentCatalogEntry | null;
   _returnTo: ComponentCatalogEntry | null;
   _depDomain: string | null;
+  _depPrefill: BusPrefill | null;
   _submitError: string;
   _submitting: boolean;
   _depNavSeq: number;
@@ -49,6 +54,12 @@ export async function navigateToDep(host: DepNavHost, domain: string): Promise<v
     host._depDomain = domain;
   }
   if (direct) {
+    // The requester's bus constraints become the new bus's starting
+    // values (ags10 caps i2c at 15kHz, most uart devices pin a baud).
+    const constraints = previousSelected?.bus_constraints?.[domain];
+    host._depPrefill = constraints
+      ? busConstraintPrefill(direct.config_entries, constraints)
+      : null;
     host._selected = direct;
     return;
   }

@@ -108,6 +108,11 @@ export interface ComponentCatalogEntry {
   /** Interfaces this component can be referenced *as* beyond its own domain
    *  (an `adc` sensor provides `voltage_sampler`). */
   provides?: string[];
+  /** Requirements this component imposes on the bus it attaches to, keyed
+   *  by bus id ('i2c' / 'spi' / 'uart'): exact-match values (baud_rate,
+   *  parity, ...), range bounds (min/max_frequency in Hz) and required
+   *  pins (require_tx / require_mosi / ...). Drives dep-add prefill. */
+  bus_constraints?: Record<string, Record<string, unknown>>;
   /** The component's configuration schema. May contain `nested` entries
    *  (`type === "nested"`) whose `config_entries` recurse. */
   config_entries: ConfigEntry[];

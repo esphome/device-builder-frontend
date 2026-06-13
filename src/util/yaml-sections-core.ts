@@ -236,9 +236,13 @@ function _expandListItems(
     // Single-instance section (e.g. `uart:` configured as a flat
     // dict with `id:`, `tx_pin:` etc. directly under it). Extract a
     // top-level `id:`/`name:` so the navigator can show them as the
-    // primary label instead of falling back to the bare key.
+    // primary label instead of falling back to the bare key, and a
+    // top-level `platform:` so a bare-mapping platform component (the
+    // legacy `ota:\n  platform: esphome` form) resolves to its
+    // `<key>.<platform>` editor like the `- platform:` list form does.
     let name = "";
     let id = "";
+    let platform = "";
     for (let i = keyIdx + 1; i <= endIdx; i++) {
       // Only the block's own direct keys; deeper nested keys aren't
       // the singleton's id/name, and a compact child sequence's
@@ -247,6 +251,7 @@ function _expandListItems(
       if (LIST_ITEM_START_RE.test(lines[i])) continue;
       name = readInstanceScalar(lines[i], "name") ?? name;
       id = readInstanceScalar(lines[i], "id") ?? id;
+      platform = readInstanceScalar(lines[i], "platform") ?? platform;
     }
     return [
       {
@@ -255,6 +260,7 @@ function _expandListItems(
         toLine: section.toLine,
         name: name || undefined,
         id: id || undefined,
+        platform: platform || undefined,
       },
     ];
   }

@@ -6,11 +6,20 @@ import type {
   AutomationTrigger,
   AvailableComponentInstance,
 } from "../../../api/types/automations.js";
+import { stripRedundantComponentSuffix } from "../../../util/component-title.js";
 import { parseCatalogId } from "../../../util/config-entry-yaml-scan.js";
+import { CORE_KEYS } from "../../../util/yaml-sections.js";
 
-/** The instance's display label: its ``name:`` when set, else its id. */
+/** The instance's display label: its ``name:`` when set, else the catalog
+ *  title (core titles trimmed like the navigator), else its id. */
 export function instanceName(device: AvailableComponentInstance): string {
-  return device.name ?? device.id;
+  if (device.name) return device.name;
+  if (device.title) {
+    return CORE_KEYS.has(componentDomain(device.component_id))
+      ? stripRedundantComponentSuffix(device.title)
+      : device.title;
+  }
+  return device.id;
 }
 
 /** Bare domain of a ``component_id`` (``sensor.aht10`` → ``sensor``). */

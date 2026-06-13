@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import { mdiAlertCircleOutline } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
@@ -25,6 +26,7 @@ import {
   parseTopLevelComponents,
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
+import { findMissingDependencies } from "./add-component-deps.js";
 import { coerceFields } from "./add-component-form-coerce.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
@@ -67,6 +69,16 @@ export class ESPHomeAddComponentForm extends LitElement {
   @property({ attribute: false })
   prefillReference: { domain: string; id: string } | null = null;
 
+  /** Initial field values for a dep-added bus, derived from the
+   *  requesting component's `bus_constraints` (ags10 -> i2c at 15kHz). */
+  @property({ attribute: false })
+  prefillFields: Record<string, unknown> | null = null;
+
+  /** Bus fields the requesting component forces (require_tx -> tx_pin);
+   *  overlaid as `required` so the form gates submit on them. */
+  @property({ attribute: false })
+  extraRequired: string[] | null = null;
+
   @property({ type: Boolean })
   submitting = false;
 
@@ -100,6 +112,22 @@ export class ESPHomeAddComponentForm extends LitElement {
   );
 
   static styles = [espHomeStyles, inputStyles, addComponentFormStyles];
+
+  /** Schema with `extraRequired` keys overlaid as required. Memoized so
+   *  the shared form's `.entries` identity is render-stable. */
+  private _overlayRequired = memoizeOne(
+    (entries: ConfigEntry[], extra: string[] | null): ConfigEntry[] => {
+      if (!extra?.length) return entries;
+      const keys = new Set(extra);
+      return entries.map((e) =>
+        keys.has(e.key) && !e.required ? { ...e, required: true } : e
+      );
+    }
+  );
+
+  private get _entries(): ConfigEntry[] {
+    return this._overlayRequired(this.component.config_entries, this.extraRequired);
+  }
 
   /** True once we've seeded `_values` for the current component. */
   private _initialized = false;
@@ -142,9 +170,9 @@ export class ESPHomeAddComponentForm extends LitElement {
     // field actually emits its preset on submit — otherwise the
     // backend's locked-validation would reject the empty payload.
     const seedAll = this.component.id.startsWith("featured.");
-    let next = this._seedDefaults(this.component.config_entries, seedAll);
+    let next = this._seedDefaults(this._entries, seedAll);
 
-    const idEntry = this.component.config_entries.find(
+    const idEntry = this._entries.find(
       (e) => e.key === "id" && e.type === ConfigEntryType.ID
     );
     if (idEntry && next["id"] === undefined) {
@@ -159,22 +187,22 @@ export class ESPHomeAddComponentForm extends LitElement {
     // either invalid or wrong-numbered: i2c on C3 emits an
     // "Invalid pin number: 22" squiggle because the bus block
     // falls back to ESP32 GPIO22/21.
-    next = seedBoardPinDefaults(
-      this.component.id,
-      this.component.config_entries,
-      this.board,
-      next
-    );
+    next = seedBoardPinDefaults(this.component.id, this._entries, this.board, next);
 
     if (this.prefillReference) {
       const targetPath = this._findReferencePath(
-        this.component.config_entries,
+        this._entries,
         this.prefillReference.domain,
         []
       );
       if (targetPath) {
         next = setIn(next, targetPath, this.prefillReference.id);
       }
+    }
+
+    // Last so a constraint-derived value beats the bare catalog default.
+    if (this.prefillFields) {
+      next = { ...next, ...this.prefillFields };
     }
 
     this._values = next;
@@ -227,6 +255,18 @@ export class ESPHomeAddComponentForm extends LitElement {
     for (const entry of entries) {
       if (entry.type === ConfigEntryType.NESTED) {
         const sub = this._seedDefaults(entry.config_entries ?? [], seedAll);
+        // A required entity sub-reading (ags10's tvoc) serializes only
+        // once it holds a value; seed its name (the label) so an
+        // untouched Add still produces a valid sensor, matching the
+        // optional-entity enable toggle.
+        if (
+          entry.required &&
+          entry.platform_type != null &&
+          sub.name === undefined &&
+          sub.id === undefined
+        ) {
+          sub.name = resolveEntryLabel(entry, this._localize);
+        }
         if (Object.keys(sub).length > 0) out[entry.key] = sub;
         continue;
       }
@@ -253,12 +293,15 @@ export class ESPHomeAddComponentForm extends LitElement {
   protected render() {
     const disabled = this.submitting;
     const presentComponents = parseTopLevelComponents(this.yaml);
-    // Top-level dependencies the catalog entry declares as required.
-    // For example a `light.binary` light needs an `output:` block
-    // configured first. Surface these to the user instead of letting
-    // them submit a config that won't validate.
-    const missingDeps = (this.component.dependencies ?? []).filter(
-      (d) => !presentComponents.has(d)
+    // Dependencies the catalog entry declares as required but the YAML
+    // doesn't satisfy yet — a top-level block (`output:`, `i2c:`) or a
+    // configured platform for hub-style deps (`atm90e32` under
+    // `sensor:`). Surface these instead of letting the user submit a
+    // config that won't validate.
+    const missingDeps = findMissingDependencies(
+      this.component.dependencies ?? [],
+      this.yaml,
+      presentComponents
     );
 
     // The shared form filters its own visibility — but we still need
@@ -266,7 +309,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // submit button. Run validation against the current values; if
     // any required errors come back, the form is incomplete.
     const validation = validateEntries(
-      this.component.config_entries,
+      this._entries,
       this._values,
       presentComponents,
       this.board?.esphome.platform ?? null
@@ -278,7 +321,7 @@ export class ESPHomeAddComponentForm extends LitElement {
         <p class="form-desc">${renderMarkdown(this.component.description)}</p>
         ${missingDeps.length > 0 ? this._renderMissingDeps(missingDeps) : nothing}
         <esphome-config-entry-form
-          .entries=${this.component.config_entries}
+          .entries=${this._entries}
           .values=${this._values}
           .errors=${this._errors}
           .board=${this.board}
@@ -406,7 +449,7 @@ export class ESPHomeAddComponentForm extends LitElement {
    */
   private _labelForErrorKey(errKey: string): string {
     const segments = errKey.split(".");
-    let entries: ConfigEntry[] | null = this.component.config_entries;
+    let entries: ConfigEntry[] | null = this._entries;
     let entry: ConfigEntry | undefined;
     for (const seg of segments) {
       if (!entries) break;
@@ -437,16 +480,12 @@ export class ESPHomeAddComponentForm extends LitElement {
     // ``errors.size > 0``, but we keep the guard so the helper is
     // safe to call from anywhere.
     if (errors.size === 0) return false;
-    const renderedPaths = collectRenderablePaths(
-      this.component.config_entries,
-      this._values,
-      {
-        requiredOnly: true,
-        showAdvanced: false,
-        presentComponents,
-        targetPlatform: this.board?.esphome.platform ?? null,
-      }
-    );
+    const renderedPaths = collectRenderablePaths(this._entries, this._values, {
+      requiredOnly: true,
+      showAdvanced: false,
+      presentComponents,
+      targetPlatform: this.board?.esphome.platform ?? null,
+    });
     for (const key of errors.keys()) {
       if (renderedPaths.has(key)) return true;
     }
@@ -487,11 +526,13 @@ export class ESPHomeAddComponentForm extends LitElement {
     // own message; the success path leaves it cleared.
     this._localBlockMessage = "";
     const presentComponents = parseTopLevelComponents(this.yaml);
-    // Block submit when there are missing top-level dependencies.
-    // The button should already be disabled in that case, but defend
-    // here too in case the YAML changed under us between renders.
-    const missingDeps = (this.component.dependencies ?? []).filter(
-      (d) => !presentComponents.has(d)
+    // Block submit when a declared dependency isn't satisfied. The
+    // button should already be disabled in that case, but defend here
+    // too in case the YAML changed under us between renders.
+    const missingDeps = findMissingDependencies(
+      this.component.dependencies ?? [],
+      this.yaml,
+      presentComponents
     );
     if (missingDeps.length > 0) {
       // Should be unreachable — the button-disabled predicate uses the
@@ -507,7 +548,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // Validate the entire schema. If anything fails, surface the
     // errors inline (the shared form will pick them up by path).
     const errors = validateEntries(
-      this.component.config_entries,
+      this._entries,
       this._values,
       presentComponents,
       this.board?.esphome.platform ?? null
@@ -541,7 +582,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     this._errors = new Map();
     this._localBlockMessage = "";
 
-    const fields = coerceFields(this.component.config_entries, this._values);
+    const fields = coerceFields(this._entries, this._values);
 
     this.dispatchEvent(
       new CustomEvent("form-submit", {

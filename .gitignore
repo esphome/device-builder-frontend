@@ -40,3 +40,6 @@ build/
 /*.yaml
 /*.yml
 !/.pre-commit-config.yaml
+
+# Local puppeteer/debug eyeballing scripts — never commit
+scratch-*

@@ -655,6 +655,7 @@
     "password_reveal": "Show password",
     "password_hide": "Hide password",
     "value_from_secret": "Using stored secret:",
+    "default_option_tag": "default",
     "substitution_resolves_to": "Resolved substitution value",
     "substitution_unresolved": "Not defined in this file",
     "substitution_unresolved_hint": "Substitutions from packages, included files, or the command line aren't previewed here; they're still resolved when the device is built.",

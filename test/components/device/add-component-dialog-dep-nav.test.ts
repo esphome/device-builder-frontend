@@ -5,6 +5,7 @@ import {
   ComponentCategory,
   type ComponentCatalogEntry,
 } from "../../../src/api/types/components.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
   matchesDepDomain,
   navigateToDep,
@@ -12,6 +13,7 @@ import {
 } from "../../../src/components/device/add-component-dialog-dep-nav.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
+import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 function makeHost(
   getComponentBodies: (...args: unknown[]) => unknown,
@@ -25,6 +27,7 @@ function makeHost(
     _selected: null,
     _returnTo: null,
     _depDomain: null,
+    _depPrefill: null,
     _submitError: "",
     _submitting: false,
     _depNavSeq: 0,
@@ -186,5 +189,41 @@ describe("matchesDepDomain", () => {
       category: ComponentCategory.SENSOR,
     });
     expect(matchesDepDomain(sensor, "output")).toBe(false);
+  });
+});
+
+describe("navigateToDep bus-constraint prefill", () => {
+  afterEach(() => _clearComponentCache());
+
+  const i2cWithFrequency = () =>
+    makeComponentEntry("i2c", {
+      config_entries: [
+        makeConfigEntry({
+          key: "frequency",
+          type: ConfigEntryType.FLOAT_WITH_UNIT,
+          default_value: "50kHz",
+          unit_options: ["Hz", "kHz", "MHz"],
+        }),
+      ],
+    });
+
+  test("stashes a prefill when the requester constrains the bus", async () => {
+    const host = makeHost(respond(i2cWithFrequency()));
+    host._selected = makeComponentEntry("sensor.ags10", {
+      bus_constraints: { i2c: { max_frequency: 15000 } },
+    });
+
+    await navigateToDep(host, "i2c");
+
+    expect(host._depPrefill).toEqual({ fields: { frequency: "15kHz" }, required: [] });
+  });
+
+  test("leaves the prefill null for an unconstrained requester", async () => {
+    const host = makeHost(respond(i2cWithFrequency()));
+    host._selected = makeComponentEntry("sensor.dht");
+
+    await navigateToDep(host, "i2c");
+
+    expect(host._depPrefill).toBeNull();
   });
 });
