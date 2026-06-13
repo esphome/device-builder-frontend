@@ -168,6 +168,8 @@ export const pairingRowStyles = css`
     font-weight: var(--wa-font-weight-semibold);
   }
 
+  .btn-unpair:focus-visible,
+  .btn-edit-endpoint:focus-visible,
   .btn-build-remote:focus-visible,
   .btn-view-remote-build:focus-visible,
   .offloader-alert-unpair:focus-visible {
