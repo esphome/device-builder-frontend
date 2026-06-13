@@ -180,6 +180,25 @@ describe("esphome-options-combobox", () => {
     expect(input(el).getAttribute("aria-invalid")).toBe("true");
   });
 
+  test("aria-activedescendant never points past the rendered options", async () => {
+    const el = await mount("bw15");
+    await open(el);
+    const field = input(el);
+    field.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
+    );
+    field.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
+    );
+    await el.updateComplete;
+    expect(field.getAttribute("aria-activedescendant")).toBe("option-1");
+    // Options shrink under the still-open list; the now-stale index must not
+    // leak a reference to a non-existent row.
+    el.options = [{ label: "afw121t", value: "afw121t" }];
+    await el.updateComplete;
+    expect(field.getAttribute("aria-activedescendant")).toBeNull();
+  });
+
   test("mousedown inside the listbox doesn't blur the input", async () => {
     const el = await mount("bw15");
     await open(el);

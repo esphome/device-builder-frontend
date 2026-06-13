@@ -83,6 +83,12 @@ export class ESPHomeOptionsCombobox extends LitElement {
     // Reflects whether the listbox is actually shown — the popup only
     // activates with matches, so ARIA must track the same condition.
     const expanded = this._open && filtered.length > 0;
+    // Only point aria-activedescendant at a row that's actually rendered —
+    // never when collapsed, never out of the (possibly newly-filtered) range.
+    const activeId =
+      expanded && this._active >= 0 && this._active < filtered.length
+        ? `option-${this._active}`
+        : nothing;
     return html`
       <wa-popup placement="bottom-start" sync="width" distance="4" ?active=${expanded}>
         <div slot="anchor" class="control">
@@ -94,9 +100,7 @@ export class ESPHomeOptionsCombobox extends LitElement {
             aria-invalid=${this.invalid ? "true" : nothing}
             aria-expanded=${expanded ? "true" : "false"}
             aria-controls=${expanded ? "listbox" : nothing}
-            aria-activedescendant=${this._active >= 0
-              ? `option-${this._active}`
-              : nothing}
+            aria-activedescendant=${activeId}
             aria-label=${this.label || nothing}
             .value=${display}
             placeholder=${this.placeholder}
