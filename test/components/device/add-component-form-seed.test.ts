@@ -59,3 +59,45 @@ describe("add-component-form seeds required nested entity names (#1423)", () => 
     expect(values.resistance).toBeUndefined();
   });
 });
+
+describe("add-component-form dep-add bus prefill (#1425)", () => {
+  function busForm() {
+    const form = new ESPHomeAddComponentForm();
+    const internals = form as unknown as {
+      component: ComponentCatalogEntry;
+      _localize: (key: string) => string;
+      prefillFields: Record<string, unknown> | null;
+      extraRequired: string[] | null;
+      _initValues: () => void;
+      _values: Record<string, unknown>;
+      _entries: Array<{ key: string; required?: boolean | null }>;
+    };
+    internals.component = {
+      id: "i2c",
+      config_entries: [
+        makeConfigEntry({
+          key: "frequency",
+          type: ConfigEntryType.STRING,
+          default_value: "50kHz",
+        }),
+        makeConfigEntry({ key: "sda", type: ConfigEntryType.PIN }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    internals._localize = (key) => key;
+    return internals;
+  }
+
+  it("merges prefillFields over the seeded defaults", () => {
+    const form = busForm();
+    form.prefillFields = { frequency: "15kHz" };
+    form._initValues();
+    expect(form._values.frequency).toBe("15kHz");
+  });
+
+  it("overlays extraRequired keys as required entries", () => {
+    const form = busForm();
+    form.extraRequired = ["sda"];
+    expect(form._entries.find((e) => e.key === "sda")?.required).toBe(true);
+    expect(form._entries.find((e) => e.key === "frequency")?.required).toBeFalsy();
+  });
+});

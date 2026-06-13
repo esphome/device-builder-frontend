@@ -118,6 +118,26 @@ export function serializeFloatWithUnit(parsed: FloatWithUnit): string {
 }
 
 /**
+ * Parse to the base (first) unit's scale: '50kHz' with Hz-based options
+ * yields 50000. Null when valueless or the unit isn't metric-prefixed.
+ */
+export function floatWithUnitToBase(
+  raw: unknown,
+  unitOptions: readonly string[]
+): number | null {
+  const { value, unit } = parseFloatWithUnit(raw, unitOptions);
+  if (value === null) return null;
+  const base = unitOptions[0] ?? "";
+  if (unit === base) return value;
+  if (!unit.endsWith(base)) return null;
+  const prefix = unit.slice(0, unit.length - base.length);
+  if (!Object.prototype.hasOwnProperty.call(METRIC_PREFIX_MULTIPLIERS, prefix)) {
+    return null;
+  }
+  return value * METRIC_PREFIX_MULTIPLIERS[prefix];
+}
+
+/**
  * Compute the numeric placeholder shown in the FLOAT_WITH_UNIT
  * field's number input from the catalog's `default_value`.
  *
