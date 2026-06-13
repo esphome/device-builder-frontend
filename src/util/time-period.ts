@@ -34,9 +34,9 @@ const TIME_PERIOD_UNIT_ALIASES: Record<string, TimePeriodUnit> = {
   days: "d",
 };
 
-// Longest-first so the alternation prefers `seconds` over `sec` over `s`.
+// The trailing `$` forces a full match, so the alternation captures the
+// whole suffix (`seconds`, not just `s`) regardless of key order.
 const _UNIT_PATTERN = Object.keys(TIME_PERIOD_UNIT_ALIASES)
-  .sort((a, b) => b.length - a.length)
   .map((u) => u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
   .join("|");
 
