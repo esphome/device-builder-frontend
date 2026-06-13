@@ -334,6 +334,23 @@ describe("renderPinField ESP8266 named aliases", () => {
       expect(option["?selected"]).toBe(true);
     }
   });
+
+  it("greys the schema default in the box when unset, resolving an alias default", () => {
+    const board = makeTestBoard({
+      pins: [
+        makeBoardPin(4, { label: "GPIO4", features: ["i2c_sda"], aliases: ["SDA"] }),
+      ],
+      overrides: { esphome: { platform: "esp8266", board: "esp01_1m" } as never },
+    });
+    const ctx = makeRenderCtx({}, { board });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "sda", default_value: "SDA" }),
+      ["sda"],
+      ctx
+    );
+    const select = findElementBindings(result, "wa-select")[0];
+    expect(select.placeholder).toBe("GPIO4");
+  });
 });
 
 describe("renderPinField wa-select binding", () => {

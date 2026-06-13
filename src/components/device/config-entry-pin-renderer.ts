@@ -219,6 +219,19 @@ export function renderPinField(
         ? String(rawValue ?? "")
         : "";
   const invalid = ctx.errorAt(path) !== null;
+  // When the field is unset, grey the schema default in the box (parity with
+  // the select renderer). A default named by alias (i2c ``sda: SDA``) resolves
+  // to its GPIO so the box shows the real pin label rather than the raw name.
+  const defaultGpio =
+    entry.default_value != null
+      ? (parsePinGpio(entry.default_value) ??
+        gpioFromAlias(entry.default_value, ctx.board.pins))
+      : null;
+  const defaultPlaceholder =
+    defaultGpio !== null
+      ? (ctx.board.pins.find((p) => p.gpio === defaultGpio)?.label ??
+        formatPinValue(defaultGpio, platform))
+      : "";
   // Show every board pin; a pin that doesn't match the field's required
   // features (or direction) isn't hidden — it's grouped under "Other pins"
   // and stays selectable (issue #1012). Only a direction conflict
@@ -291,6 +304,7 @@ export function renderPinField(
       <wa-select
         data-no-value-sync
         class=${invalid ? "invalid" : ""}
+        placeholder=${defaultPlaceholder}
         ?disabled=${fieldDisabled}
         @change=${onPinChange}
       >
