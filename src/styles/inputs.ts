@@ -122,6 +122,22 @@ export const inputStyles = css`
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-error), transparent 80%);
   }
 
+  /* Default option in a select menu: a label with a quiet second line, so
+     the default stays identifiable even though wa-select activates the
+     first option when nothing is committed. Mirrors the pin menu's notes. */
+  .option-default-stack {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.25;
+  }
+
+  .option-default-note {
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+    font-style: italic;
+  }
+
   wa-select::part(listbox) {
     padding-block: 0;
   }
