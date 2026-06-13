@@ -2225,6 +2225,31 @@ sensor:
     expect(after.match(/# shallow/g)).toHaveLength(1);
   });
 
+  it("keeps a literal # line at the block content indent inside the value when a deeper body line precedes it", () => {
+    // A deeper non-comment body line (`b`) must not inflate the splice's
+    // idea of where the body ends: the `# literal` at the block content
+    // indent is scalar text (PyYAML 6.0.3: 'a\n  b\n# literal'), so it
+    // stays in the value and is emitted exactly once, never pulled out as
+    // a trailing comment.
+    const yaml = [
+      "mqtt:",
+      "  log_format: |-",
+      "    a",
+      "      b",
+      "    # literal",
+      "sensor:",
+      "  x: 1",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "mqtt");
+    expect((values.log_format as YamlRawValue).body.replace(/\n+$/, "")).toBe(
+      "a\n  b\n# literal"
+    );
+    const after = updateSectionInYaml(yaml, "mqtt", values);
+    expect(after).toBe(yaml);
+    expect(after.match(/# literal/g)).toHaveLength(1);
+  });
+
   it("round-trips 4-space user YAML through update without mixing indents", () => {
     // The save path detects the user's indent step and threads it
     // through the serializer so the rewritten section keeps the

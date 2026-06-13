@@ -16,7 +16,7 @@ import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 /** A block-scalar field value (LambdaValue or YamlRawValue) as the
  *  dedented, trailing-newline-stripped string PyYAML would produce. */
 function blockText(v: unknown): string {
-  if (v && typeof v === "object" && "_lambda" in (v as object)) {
+  if (v && typeof v === "object" && Object.prototype.hasOwnProperty.call(v, "_lambda")) {
     return String((v as { _lambda: string })._lambda).replace(/\n+$/, "");
   }
   if (v instanceof YamlRawValue) return v.body.replace(/\n+$/, "");
