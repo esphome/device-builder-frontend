@@ -2178,6 +2178,53 @@ sensor:
     expect(updateSectionInYaml(yaml, "esphome", values)).toBe(yaml);
   });
 
+  it("preserves a trailing comment after a block scalar whose body is all # lines", () => {
+    // The splice boundary comes from the parser's exact value end, not an
+    // indent heuristic that skips `#` lines. PyYAML 6.0.3 parses `key` as
+    // exactly the indent-6 line ('# body is only comment lines'); the
+    // less-indented indent-4 `#` is a real trailing comment, so it must
+    // survive a no-op save.
+    const yaml = [
+      "parent:",
+      "  key: |-",
+      "      # body is only comment lines",
+      "    # trailing comment, indent 4",
+      "next:",
+      "  level: DEBUG",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "parent");
+    expect((values.key as YamlRawValue).body.replace(/\n+$/, "")).toBe(
+      "# body is only comment lines"
+    );
+    expect(updateSectionInYaml(yaml, "parent", values)).toBe(yaml);
+  });
+
+  it("does not duplicate a # body line shallower than a deeper one on save", () => {
+    // A block body of `x` / deeper `# deep` / shallower `# shallow` is
+    // entirely literal text (PyYAML 6.0.3: 'x\n  # deep\n# shallow'); the
+    // splice must keep all of it inside the value, never pulling the
+    // shallower `# shallow` out as a trailing comment and emitting it
+    // twice.
+    const yaml = [
+      "mqtt:",
+      "  log_format: |-",
+      "    x",
+      "      # deep",
+      "    # shallow",
+      "next:",
+      "  level: DEBUG",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "mqtt");
+    expect((values.log_format as YamlRawValue).body.replace(/\n+$/, "")).toBe(
+      "x\n  # deep\n# shallow"
+    );
+    const after = updateSectionInYaml(yaml, "mqtt", values);
+    expect(after).toBe(yaml);
+    expect(after.match(/# shallow/g)).toHaveLength(1);
+  });
+
   it("round-trips 4-space user YAML through update without mixing indents", () => {
     // The save path detects the user's indent step and threads it
     // through the serializer so the rewritten section keeps the
