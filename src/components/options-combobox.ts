@@ -1,0 +1,329 @@
+/**
+ * Reusable combobox: a dropdown of options that shows the whole list on
+ * open, filters as you type, and accepts arbitrary typed values
+ * (pre-filled with the current value). Fills the gap left by the native
+ * `<input list=datalist>`, which filters its suggestions by the text
+ * already in the field, so a pre-filled field can't browse the full
+ * list. `<wa-combobox>` is not available in HA's webawesome fork.
+ *
+ * `wa-popup` is pure positioning (the input keeps focus, unlike
+ * `wa-dropdown` which moves focus into the menu). Emits `value-changed`
+ * on every keystroke and on option select.
+ */
+import { mdiChevronDown } from "@mdi/js";
+import { LitElement, css, html, nothing } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
+import { inputStyles } from "../styles/inputs.js";
+import { registerMdiIcons } from "../util/register-icons.js";
+
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/popup/popup.js";
+
+registerMdiIcons({ "chevron-down": mdiChevronDown });
+
+export interface ComboboxOption {
+  label: string;
+  value: string;
+}
+
+/** Detail for the ``value-changed`` event. */
+export interface ComboboxValueChangedDetail {
+  value: string;
+}
+
+@customElement("esphome-options-combobox")
+export class ESPHomeOptionsCombobox extends LitElement {
+  /** Selectable options; the list also accepts free-text not in here. */
+  @property({ attribute: false })
+  options: ComboboxOption[] = [];
+
+  /** Committed value — an option value or arbitrary typed text. */
+  @property()
+  value = "";
+
+  @property()
+  placeholder = "";
+
+  @property({ type: Boolean })
+  disabled = false;
+
+  /** Error styling on the control border. */
+  @property({ type: Boolean })
+  invalid = false;
+
+  /** Accessible name for the input. */
+  @property()
+  label = "";
+
+  /** Open state of the dropdown. */
+  @state() private _open = false;
+
+  /** Text shown while editing; the closed field shows ``value``. */
+  @state() private _query = "";
+
+  /** Typed since opening — gates show-all (false) vs substring filter. */
+  @state() private _dirty = false;
+
+  /** Keyboard-active option index into the filtered list, or -1. */
+  @state() private _active = -1;
+
+  @query("input")
+  private _input?: HTMLInputElement;
+
+  static styles = [
+    inputStyles,
+    css`
+      :host {
+        display: block;
+      }
+
+      .control {
+        position: relative;
+        display: block;
+      }
+
+      /* Leave room for the chevron sitting over the input's right edge. */
+      input {
+        padding-right: 34px;
+      }
+
+      .chevron {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        width: 32px;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        color: var(--wa-color-text-quiet);
+        font-size: 18px;
+        cursor: pointer;
+      }
+
+      .chevron:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      .listbox {
+        max-height: 280px;
+        overflow-y: auto;
+        background: var(--wa-color-surface-raised);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-m);
+        box-shadow: var(--wa-shadow-m);
+        padding: var(--wa-space-2xs);
+      }
+
+      .option {
+        padding: var(--wa-space-2xs) var(--wa-space-s);
+        border-radius: var(--wa-border-radius-s);
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-normal);
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .option--active {
+        background: var(--esphome-tint, var(--wa-color-surface-border));
+      }
+
+      .option-label {
+        display: block;
+      }
+    `,
+  ];
+
+  protected render() {
+    const filtered = this._filtered;
+    const display = this._open ? this._query : this.value;
+    return html`
+      <wa-popup
+        placement="bottom-start"
+        sync="width"
+        distance="4"
+        ?active=${this._open && filtered.length > 0}
+      >
+        <div slot="anchor" class="control">
+          <input
+            type="text"
+            class=${this.invalid ? "invalid" : ""}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded=${this._open ? "true" : "false"}
+            aria-controls="listbox"
+            aria-activedescendant=${this._active >= 0
+              ? `option-${this._active}`
+              : nothing}
+            aria-label=${this.label || nothing}
+            .value=${display}
+            placeholder=${this.placeholder}
+            ?disabled=${this.disabled}
+            autocomplete="off"
+            spellcheck="false"
+            @focus=${this._open_}
+            @input=${this._onInput}
+            @keydown=${this._onKeyDown}
+            @blur=${this._close}
+          />
+          <button
+            class="chevron"
+            type="button"
+            tabindex="-1"
+            ?disabled=${this.disabled}
+            aria-hidden="true"
+            @mousedown=${this._preventBlur}
+            @click=${this._toggle}
+          >
+            <wa-icon library="mdi" name="chevron-down"></wa-icon>
+          </button>
+        </div>
+        ${this._open
+          ? html`<div id="listbox" class="listbox" role="listbox">
+              ${filtered.map(
+                (opt, i) =>
+                  html`<div
+                    id="option-${i}"
+                    class="option ${i === this._active ? "option--active" : ""}"
+                    role="option"
+                    aria-selected=${opt.value === this.value ? "true" : "false"}
+                    @mousedown=${this._preventBlur}
+                    @click=${() => this._select(opt)}
+                    @mouseenter=${() => (this._active = i)}
+                  >
+                    <span class="option-label">${opt.label}</span>
+                  </div>`
+              )}
+            </div>`
+          : nothing}
+      </wa-popup>
+    `;
+  }
+
+  private get _filtered(): ComboboxOption[] {
+    if (!this._dirty) return this.options;
+    const q = this._query.trim().toLowerCase();
+    if (!q) return this.options;
+    return this.options.filter(
+      (o) => o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q)
+    );
+  }
+
+  private _open_ = () => {
+    if (this.disabled || this._open) return;
+    this._open = true;
+    this._query = this.value;
+    this._dirty = false;
+    this._active = -1;
+  };
+
+  private _close = () => {
+    this._open = false;
+    this._active = -1;
+  };
+
+  private _toggle = () => {
+    if (this.disabled) return;
+    if (this._open) {
+      this._close();
+    } else {
+      this._open_();
+      this._input?.focus();
+    }
+  };
+
+  /** Keep focus on the input so a click on the chevron / an option doesn't
+   *  blur-close the popup before the click registers. */
+  private _preventBlur = (e: Event) => e.preventDefault();
+
+  private _onInput = (e: Event) => {
+    const value = (e.target as HTMLInputElement).value;
+    this._query = value;
+    this._dirty = true;
+    this._open = true;
+    this._active = -1;
+    this._emit(value);
+  };
+
+  private _onKeyDown = (e: KeyboardEvent) => {
+    const filtered = this._filtered;
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        if (!this._open) this._open_();
+        if (filtered.length) {
+          this._active = this._active >= filtered.length - 1 ? 0 : this._active + 1;
+          this._scrollActiveIntoView();
+        }
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (!this._open) this._open_();
+        if (filtered.length) {
+          this._active = this._active <= 0 ? filtered.length - 1 : this._active - 1;
+          this._scrollActiveIntoView();
+        }
+        break;
+      case "Enter":
+        if (this._open && this._active >= 0 && filtered[this._active]) {
+          e.preventDefault();
+          this._select(filtered[this._active]);
+        } else {
+          this._close();
+        }
+        break;
+      case "Escape":
+        if (this._open) {
+          // Don't let Escape bubble to a parent dialog's dismiss handler.
+          e.preventDefault();
+          e.stopPropagation();
+          this._query = this.value;
+          this._close();
+        }
+        break;
+      case "Tab":
+        this._close();
+        break;
+    }
+  };
+
+  private _select(opt: ComboboxOption): void {
+    // The input keeps focus on its own (option rows preventDefault the
+    // blur), so no refocus here — refocusing would re-fire ``@focus`` and
+    // reopen the popup we're closing.
+    this.value = opt.value;
+    this._query = opt.value;
+    this._emit(opt.value);
+    this._close();
+  }
+
+  private _emit(value: string): void {
+    this.dispatchEvent(
+      new CustomEvent<ComboboxValueChangedDetail>("value-changed", {
+        detail: { value },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _scrollActiveIntoView(): void {
+    requestAnimationFrame(() => {
+      this.shadowRoot
+        ?.querySelector(".option--active")
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "esphome-options-combobox": ESPHomeOptionsCombobox;
+  }
+}
