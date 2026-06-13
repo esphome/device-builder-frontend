@@ -19,7 +19,7 @@ export function renderDiscoveredSection(
 ): TemplateResult | string {
   // Adopting a discovery creates a device, so hide the whole section on a
   // remote-compute-only install.
-  if (host._remoteComputeOnly) return "";
+  if (host._hideDeviceCreation) return "";
   if (host._importableDevices.length === 0) return "";
   // Non-ignored discoveries first, then ignored ones — both
   // alphabetical by friendly name (fallback hostname) within each
@@ -192,7 +192,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       <div slot="below-controls" class="table-device-count-row">
         ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
       </div>
-      ${host._remoteComputeOnly
+      ${host._hideDeviceCreation
         ? ""
         : html`<button
             slot="actions"

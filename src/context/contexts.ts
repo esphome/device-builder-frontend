@@ -113,6 +113,17 @@ export const remoteComputeOnlyContext = createContext<boolean>(
 );
 
 /**
+ * Context for whether preferences have loaded at least once this session.
+ *
+ * ``false`` until the first successful ``config/get_preferences``. The
+ * dashboard fails the device-creation gate closed while it's ``false`` so a
+ * remote-compute-only install can't flash creation UI if the initial prefs
+ * fetch fails (``remote_compute_only`` would still be at its permissive
+ * default).
+ */
+export const prefsLoadedContext = createContext<boolean>(Symbol("esphome-prefs-loaded"));
+
+/**
  * Context for the receiver-side remote-build master switch.
  *
  * Phase 2 of the remote-build feature (issue #106). Off by

@@ -69,6 +69,8 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
     host._yamlDiffButton = prefs.yaml_diff_button;
     host._experienceLevel = prefs.experience_level;
     host._remoteComputeOnly = prefs.remote_compute_only;
+    // Mark prefs known so the dashboard can stop failing creation closed.
+    host._prefsLoaded = true;
   } catch (err) {
     // Non-fatal: the last successfully-loaded values are kept (none are
     // reset here), and theme also has a localStorage fallback. Logged for

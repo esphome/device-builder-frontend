@@ -42,6 +42,7 @@ import {
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
+  prefsLoadedContext,
   recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
@@ -130,6 +131,12 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: remoteComputeOnlyContext })
   @state()
   _remoteComputeOnly = false;
+  // False until the first successful preferences load; the dashboard fails
+  // device creation closed while it's false so a remote-compute install can't
+  // flash creation UI when the initial prefs fetch fails.
+  @provide({ context: prefsLoadedContext })
+  @state()
+  _prefsLoaded = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
     CLEANUP_TTL_DEFAULT_SECONDS;

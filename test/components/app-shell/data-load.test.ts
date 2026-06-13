@@ -106,6 +106,7 @@ describe("loadThemePreference in-flight gate", () => {
       _yamlDiffButton: false,
       _experienceLevel: null as ExperienceLevel | null,
       _remoteComputeOnly: false,
+      _prefsLoaded: false,
       applyTheme: vi.fn(),
       _api: { getPreferences: vi.fn(async () => prefs) },
     };
@@ -126,5 +127,20 @@ describe("loadThemePreference in-flight gate", () => {
     expect(host._experienceLevel).toBe(ExperienceLevel.YAML);
     expect(host._remoteComputeOnly).toBe(true);
     expect(host._yamlDiffButton).toBe(true);
+  });
+
+  it("marks prefs loaded on success so creation stops failing closed", async () => {
+    const host = makePrefsHost();
+    await loadThemePreference(host as unknown as ESPHomeApp);
+    expect(host._prefsLoaded).toBe(true);
+  });
+
+  it("leaves prefs unloaded when the fetch fails so creation stays closed", async () => {
+    const host = makePrefsHost();
+    host._api.getPreferences = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    await loadThemePreference(host as unknown as ESPHomeApp);
+    expect(host._prefsLoaded).toBe(false);
   });
 });

@@ -21,6 +21,7 @@ export {
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
+  prefsLoadedContext,
   recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
