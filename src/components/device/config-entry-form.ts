@@ -277,10 +277,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // mandatory fields first. The section editor mirrors the on-disk YAML
     // order, so it's left untouched.
     const entries = this.requiredOnly
-      ? [
-          ...this.entries.filter((e) => e.required),
-          ...this.entries.filter((e) => !e.required),
-        ]
+      ? this._floatRequiredFirst(this.entries)
       : this.entries;
     // Each exclusive_group renders as one always-shown dropdown at its
     // first member's slot; other entries keep the advanced/visibility
@@ -299,6 +296,24 @@ export class ESPHomeConfigEntryForm extends LitElement {
           ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
           : nothing
     )}`;
+  }
+
+  /** Stable-partition so required entries lead. An exclusive_group is
+   *  treated atomically (required if any member is) so its members stay
+   *  contiguous and ``orderExclusiveGroups`` folds them at the same slot. */
+  private _floatRequiredFirst(entries: ConfigEntry[]): ConfigEntry[] {
+    const groupRequired = new Map<string, boolean>();
+    for (const e of entries) {
+      if (e.exclusive_group) {
+        groupRequired.set(
+          e.exclusive_group,
+          (groupRequired.get(e.exclusive_group) ?? false) || !!e.required
+        );
+      }
+    }
+    const isRequired = (e: ConfigEntry): boolean =>
+      e.exclusive_group ? groupRequired.get(e.exclusive_group)! : !!e.required;
+    return [...entries.filter(isRequired), ...entries.filter((e) => !isRequired(e))];
   }
 
   protected willUpdate(changed: PropertyValues) {
