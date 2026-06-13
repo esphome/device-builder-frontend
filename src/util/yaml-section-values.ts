@@ -184,7 +184,7 @@ export function updateSectionInYaml(
   // `_blockScalarBodyEnd`, so a `#` indented at/past the block content
   // indent is body and a less-indented one is a trailing comment. The
   // last value's span end is therefore the real start of the trailing
-  // run, exact where the indent heuristic above can only approximate
+  // run, exactly where the indent heuristic above can only approximate
   // (it underestimates an all-`#` block body and can't see a nested
   // mapping deeper than the final value). Use it so the splice boundary
   // and the parse extent agree on every block body.
