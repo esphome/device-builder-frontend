@@ -1,5 +1,6 @@
 import { OnboardingStepId } from "../../api/types/system.js";
 import {
+  isExperienceChosen,
   isWifiSetupPending,
   shouldAutoShowOnboarding,
 } from "../../util/onboarding-gate.js";
@@ -12,10 +13,13 @@ export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
     host._onboardingHasUseCase = state.steps.some(
       (s) => s.id === OnboardingStepId.USE_CASE
     );
-    host._onboardingShouldShow = shouldAutoShowOnboarding(
-      state,
-      host._onboardingSessionDismissed
-    );
+    const show = shouldAutoShowOnboarding(state, host._onboardingSessionDismissed);
+    // Fresh install (experience not chosen) gets the full wizard; an existing
+    // install that already has an experience but is missing Wi-Fi gets only the
+    // standalone Wi-Fi dialog, so it still onboards Wi-Fi unless they decline.
+    const experienceChosen = isExperienceChosen(state);
+    host._onboardingShouldShow = show && !experienceChosen;
+    host._onboardingShowWifi = show && experienceChosen && isWifiSetupPending(state);
   } catch (err) {
     // Non-critical — clear the badge (latest data unknown, "no nudge" is safer
     // than a stale red dot) but leave _onboardingShouldShow alone so a

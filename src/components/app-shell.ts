@@ -170,7 +170,12 @@ export class ESPHomeApp extends LitElement {
     RemoteBuildJobState
   > = new Map();
 
+  // Fresh install: auto-pop the full experience wizard.
   @state() _onboardingShouldShow = false;
+  // Existing / migrated install missing Wi-Fi: auto-pop the standalone Wi-Fi
+  // dialog only (experience is already chosen), so they still get onboarded
+  // for Wi-Fi unless they decline.
+  @state() _onboardingShowWifi = false;
   @state() _onboardingSessionDismissed = false;
   // Whether the first-run wizard should ask the remote-compute use-case
   // question (non-HA only). Seeded from the onboarding state's step list.
@@ -437,6 +442,7 @@ export class ESPHomeApp extends LitElement {
   // Refresh state so the badge reflects new data.
   _onOnboardingAcknowledged = () => {
     this._onboardingShouldShow = false;
+    this._onboardingShowWifi = false;
     void loadOnboardingState(this);
     // The wizard persists experience / remote-compute before acknowledging;
     // refresh prefs so the contexts (and the gated UI) reflect the picks.
@@ -446,6 +452,7 @@ export class ESPHomeApp extends LitElement {
   _onOnboardingDismissedSession = () => {
     this._onboardingSessionDismissed = true;
     this._onboardingShouldShow = false;
+    this._onboardingShowWifi = false;
   };
 
   // Kebab "Set up Wi-Fi" — explicit user intent, overrides both gates.
@@ -580,13 +587,17 @@ export class ESPHomeApp extends LitElement {
     `;
   }
 
-  // When _onboardingShouldShow flips true, programmatically open the wizard.
-  // The dialogs are mounted unconditionally (so listeners are wired) but start
-  // closed; the standalone Wi-Fi dialog is opened only from the kebab menu.
+  // Auto-pop the right onboarding surface: the full wizard for a fresh
+  // install, or the standalone Wi-Fi dialog for an existing install that's
+  // only missing Wi-Fi. Both dialogs are mounted unconditionally (so listeners
+  // are wired) but start closed.
   protected updated(changed: PropertyValues) {
     super.updated?.(changed);
     if (changed.has("_onboardingShouldShow") && this._onboardingShouldShow) {
       this._onboardingWizard?.open();
+    }
+    if (changed.has("_onboardingShowWifi") && this._onboardingShowWifi) {
+      this._onboardingDialog?.open();
     }
   }
 }

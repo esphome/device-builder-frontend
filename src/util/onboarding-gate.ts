@@ -26,6 +26,17 @@ export function isWifiSetupPending(state: OnboardingState): boolean {
   );
 }
 
+/** True when the experience step is already ``done`` (a stored experience
+ *  level). Distinguishes an existing / migrated install, which should only
+ *  ever be auto-prompted for Wi-Fi, from a fresh one that still needs the
+ *  full wizard. */
+export function isExperienceChosen(state: OnboardingState): boolean {
+  return state.steps.some(
+    (s) =>
+      s.id === OnboardingStepId.EXPERIENCE_LEVEL && s.status === OnboardingStepStatus.DONE
+  );
+}
+
 /**
  * True when the wizard should auto-pop on load.
  *

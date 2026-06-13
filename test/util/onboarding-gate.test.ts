@@ -15,6 +15,7 @@ import {
   OnboardingStepStatus,
 } from "../../src/api/types/system.js";
 import {
+  isExperienceChosen,
   isOnboardingPending,
   isWifiSetupPending,
   shouldAutoShowOnboarding,
@@ -84,6 +85,25 @@ describe("isWifiSetupPending", () => {
   it("is false when there is no wifi step (remote-compute install)", () => {
     expect(
       isWifiSetupPending(stateWith([experience(OnboardingStepStatus.PENDING)]))
+    ).toBe(false);
+  });
+});
+
+describe("isExperienceChosen", () => {
+  it("is true when the experience step is done", () => {
+    expect(
+      isExperienceChosen(
+        stateWith([
+          experience(OnboardingStepStatus.DONE),
+          wifi(OnboardingStepStatus.PENDING),
+        ])
+      )
+    ).toBe(true);
+  });
+
+  it("is false when the experience step is still pending (fresh install)", () => {
+    expect(
+      isExperienceChosen(stateWith([experience(OnboardingStepStatus.PENDING)]))
     ).toBe(false);
   });
 });
