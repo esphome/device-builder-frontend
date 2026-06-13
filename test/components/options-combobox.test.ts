@@ -9,6 +9,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/library.js", () => ({
   registerIconLibrary: () => {},
 }));
 
+import { OPTIONS_COMBOBOX_CHANGE_EVENT } from "../../src/components/options-combobox-event.js";
 import { ESPHomeOptionsCombobox } from "../../src/components/options-combobox.js";
 
 const OPTIONS = [
@@ -35,10 +36,12 @@ function options(el: ESPHomeOptionsCombobox): HTMLElement[] {
   return [...el.shadowRoot!.querySelectorAll<HTMLElement>(".option")];
 }
 
-/** Collect every value-changed detail the element emits. */
+/** Collect every change-event detail the element emits. */
 function track(el: ESPHomeOptionsCombobox): string[] {
   const seen: string[] = [];
-  el.addEventListener("value-changed", (e) => seen.push((e as CustomEvent).detail.value));
+  el.addEventListener(OPTIONS_COMBOBOX_CHANGE_EVENT, (e) =>
+    seen.push((e as CustomEvent).detail.value)
+  );
   return seen;
 }
 
@@ -120,8 +123,8 @@ describe("esphome-options-combobox", () => {
 
   test("Escape cancels the edit even when the host commits each keystroke", async () => {
     const el = await mount("bw15");
-    // Mirror renderSelectField: every value-changed is committed back to value.
-    el.addEventListener("value-changed", (e) => {
+    // Mirror renderSelectField: every change is committed back to value.
+    el.addEventListener(OPTIONS_COMBOBOX_CHANGE_EVENT, (e) => {
       el.value = (e as CustomEvent).detail.value;
     });
     await open(el);
@@ -143,5 +146,26 @@ describe("esphome-options-combobox", () => {
     expect(options(el).map((o) => o.textContent?.trim())).toEqual(
       OPTIONS.map((o) => o.label)
     );
+  });
+
+  test("the change event is namespaced (no generic value-changed)", () => {
+    expect(OPTIONS_COMBOBOX_CHANGE_EVENT).toBe("options-combobox-change");
+  });
+
+  test("invalid is exposed to assistive tech via aria-invalid", async () => {
+    const el = await mount("bw15");
+    expect(input(el).getAttribute("aria-invalid")).toBeNull();
+    el.invalid = true;
+    await el.updateComplete;
+    expect(input(el).getAttribute("aria-invalid")).toBe("true");
+  });
+
+  test("mousedown inside the listbox doesn't blur the input", async () => {
+    const el = await mount("bw15");
+    await open(el);
+    const listbox = el.shadowRoot!.querySelector("#listbox")!;
+    const ev = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    listbox.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true); // keeps focus so the popup stays open
   });
 });

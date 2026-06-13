@@ -15,6 +15,7 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { inputStyles } from "../styles/inputs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { buildOptionsComboboxChangeEvent } from "./options-combobox-event.js";
 import { optionsComboboxStyles } from "./options-combobox.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -24,11 +25,6 @@ registerMdiIcons({ "chevron-down": mdiChevronDown });
 
 export interface ComboboxOption {
   label: string;
-  value: string;
-}
-
-/** Detail for the ``value-changed`` event. */
-export interface ComboboxValueChangedDetail {
   value: string;
 }
 
@@ -92,6 +88,7 @@ export class ESPHomeOptionsCombobox extends LitElement {
             class=${this.invalid ? "invalid" : ""}
             role="combobox"
             aria-autocomplete="list"
+            aria-invalid=${this.invalid ? "true" : nothing}
             aria-expanded=${expanded ? "true" : "false"}
             aria-controls=${expanded ? "listbox" : nothing}
             aria-activedescendant=${this._active >= 0
@@ -121,7 +118,12 @@ export class ESPHomeOptionsCombobox extends LitElement {
           </button>
         </div>
         ${expanded
-          ? html`<div id="listbox" class="listbox" role="listbox">
+          ? html`<div
+              id="listbox"
+              class="listbox"
+              role="listbox"
+              @mousedown=${this._preventBlur}
+            >
               ${filtered.map(
                 (opt, i) =>
                   html`<div
@@ -246,13 +248,7 @@ export class ESPHomeOptionsCombobox extends LitElement {
   }
 
   private _emit(value: string): void {
-    this.dispatchEvent(
-      new CustomEvent<ComboboxValueChangedDetail>("value-changed", {
-        detail: { value },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    this.dispatchEvent(buildOptionsComboboxChangeEvent(value));
   }
 
   private _scrollActiveIntoView(): void {
