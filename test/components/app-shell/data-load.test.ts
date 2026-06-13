@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ExperienceLevel,
   type OnboardingState,
@@ -11,6 +11,11 @@ import {
   loadOnboardingState,
   loadThemePreference,
 } from "../../../src/components/app-shell/data-load.js";
+
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
+vi.mock("sonner-js", () => ({
+  default: { error: (...args: unknown[]) => toastError(...args) },
+}));
 
 const DONE = OnboardingStepStatus.DONE;
 const PENDING = OnboardingStepStatus.PENDING;
@@ -107,18 +112,44 @@ describe("loadThemePreference in-flight gate", () => {
       _experienceLevel: null as ExperienceLevel | null,
       _remoteComputeOnly: false,
       _prefsLoaded: false,
+      _prefsLoadErrorNotified: false,
+      _localize: ((key: string) => key) as ESPHomeApp["_localize"],
       applyTheme: vi.fn(),
       _api: { getPreferences: vi.fn(async () => prefs) },
     };
   }
 
-  it("skips the load while a preference write is in flight", async () => {
+  beforeEach(() => toastError.mockClear());
+
+  it("does not reload over an in-flight write once prefs have loaded", async () => {
     const host = makePrefsHost();
+    host._prefsLoaded = true;
     host._prefsWritesInFlight = 1;
     await loadThemePreference(host as unknown as ESPHomeApp);
     expect(host._api.getPreferences).not.toHaveBeenCalled();
     expect(host._remoteComputeOnly).toBe(false);
-    expect(host._experienceLevel).toBeNull();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("waits for an in-flight write then completes the first load", async () => {
+    vi.useFakeTimers();
+    try {
+      const host = makePrefsHost();
+      host._prefsWritesInFlight = 1;
+      const pending = loadThemePreference(host as unknown as ESPHomeApp);
+      // First iteration defers without reading over the optimistic write.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(host._api.getPreferences).not.toHaveBeenCalled();
+      // Write settles; the next retry tick performs the first load.
+      host._prefsWritesInFlight = 0;
+      await vi.advanceTimersByTimeAsync(1000);
+      await pending;
+      expect(host._prefsLoaded).toBe(true);
+      expect(host._remoteComputeOnly).toBe(true);
+      expect(toastError).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("loads experience and remote-compute when no write is in flight", async () => {
@@ -148,6 +179,8 @@ describe("loadThemePreference in-flight gate", () => {
       expect(host._prefsLoaded).toBe(false);
       // Initial attempt plus three retries.
       expect(host._api.getPreferences).toHaveBeenCalledTimes(4);
+      // Terminal first-load failure surfaces once instead of hiding silently.
+      expect(toastError).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
@@ -168,6 +201,7 @@ describe("loadThemePreference in-flight gate", () => {
       await pending;
       expect(host._prefsLoaded).toBe(true);
       expect(host._remoteComputeOnly).toBe(true);
+      expect(toastError).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

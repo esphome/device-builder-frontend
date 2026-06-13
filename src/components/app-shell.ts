@@ -137,6 +137,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: prefsLoadedContext })
   @state()
   _prefsLoaded = false;
+  // Guards the one-shot "preferences failed to load" toast so it isn't repeated
+  // on every reconnect; re-armed on the next successful load.
+  _prefsLoadErrorNotified = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
     CLEANUP_TTL_DEFAULT_SECONDS;
