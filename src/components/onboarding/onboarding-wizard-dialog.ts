@@ -45,11 +45,12 @@ registerMdiIcons({
  * Auto-popped by the app shell for a fresh install. Walks a short stepped
  * flow whose shape depends on the environment and the user's use-case
  * choice: non-HA installs lead with the remote-compute question; choosing
- * remote-compute drops the Wi-Fi step. The experience pick and the
- * remote-compute choice flow up as ``set-experience-level`` /
- * ``set-remote-compute-only`` events (app shell persists + updates context);
- * the Wi-Fi step writes ``secrets.yaml`` directly, and the final step
- * acknowledges the flow so it never auto-pops again.
+ * remote-compute drops the Wi-Fi step. The experience pick and remote-compute
+ * choice are persisted directly via ``updatePreferences``; the Wi-Fi step
+ * writes ``secrets.yaml`` directly. The final step emits
+ * ``onboarding-acknowledged`` (or ``onboarding-dismissed-session`` when Wi-Fi
+ * is skipped) so the app shell reloads preferences into context and the flow
+ * does not auto-pop again.
  *
  * Standalone Wi-Fi credential rotation stays in ``esphome-onboarding-wifi-dialog``;
  * this component is the first-run flow only.

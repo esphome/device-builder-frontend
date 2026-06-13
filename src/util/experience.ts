@@ -12,10 +12,10 @@ export const EXPERIENCE_OPTIONS: ReadonlyArray<readonly [ExperienceLevel, string
 ];
 
 /**
- * Whether the YAML diff button is on for an experience level: beginners off,
- * UI and YAML on. Single source of truth for the wizard's finish path and the
- * Settings handler.
+ * Whether the YAML diff button is on for an experience level: UI and YAML on,
+ * beginners (and an unchosen level) off. Single source of truth for the
+ * wizard's finish path and the Settings handler.
  */
 export function yamlDiffForExperience(level: ExperienceLevel | null): boolean {
-  return level !== ExperienceLevel.BEGINNER;
+  return level === ExperienceLevel.UI || level === ExperienceLevel.YAML;
 }

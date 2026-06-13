@@ -9,9 +9,8 @@ describe("yamlDiffForExperience", () => {
     expect(yamlDiffForExperience(ExperienceLevel.YAML)).toBe(true);
   });
 
-  it("treats an unchosen level (null) as not-beginner", () => {
-    // null seeds like UI/YAML (on); only an explicit BEGINNER turns it off.
-    expect(yamlDiffForExperience(null)).toBe(true);
+  it("treats an unchosen level (null) as off", () => {
+    expect(yamlDiffForExperience(null)).toBe(false);
   });
 });
 
