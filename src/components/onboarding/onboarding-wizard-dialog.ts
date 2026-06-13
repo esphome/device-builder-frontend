@@ -328,7 +328,17 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   }
 
   private async _onSkipWifi() {
-    await this._finish();
+    if (this._saving) return;
+    this._saving = true;
+    this._error = null;
+    // "Skip" is "remind me later", not a permanent decline. Persist the
+    // experience pick but do NOT acknowledge, so the standalone Wi-Fi dialog
+    // (which carries the explicit "I don't use Wi-Fi" decline) re-asks on the
+    // next login while Wi-Fi is still unconfigured. Session-dismiss so it
+    // doesn't immediately re-pop this session.
+    if (!(await this._persistChoices())) return;
+    this._saving = false;
+    this._dismissForSession();
   }
 
   private async _finishWithWifi() {
@@ -354,22 +364,29 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     await this._acknowledgeAndClose();
   }
 
-  private async _acknowledgeAndClose() {
-    // Persist the picks BEFORE acknowledging, so a failed write can't leave
-    // the wizard marked done with experience / remote-compute unset (which
-    // would never re-pop). The app shell refreshes its context from these
-    // prefs on the onboarding-acknowledged event.
+  /** Persist the experience / remote-compute picks; returns false and shows an
+   *  inline error on failure. */
+  private async _persistChoices(): Promise<boolean> {
     try {
       await this._api.updatePreferences({
         experience_level: this._experience,
         yaml_diff_button: yamlDiffForExperience(this._experience),
         remote_compute_only: this._remoteCompute,
       });
+      return true;
     } catch (err) {
       this._error = this._formatError(err, "settings.experience_save_failed");
       this._saving = false;
-      return;
+      return false;
     }
+  }
+
+  private async _acknowledgeAndClose() {
+    // Persist the picks BEFORE acknowledging, so a failed write can't leave
+    // the wizard marked done with experience / remote-compute unset (which
+    // would never re-pop). The app shell refreshes its context from these
+    // prefs on the onboarding-acknowledged event.
+    if (!(await this._persistChoices())) return;
     try {
       await this._api.markOnboardingAcknowledged();
     } catch (err) {
