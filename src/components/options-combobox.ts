@@ -7,8 +7,8 @@
  * list. `<wa-combobox>` is not available in HA's webawesome fork.
  *
  * `wa-popup` is pure positioning (the input keeps focus, unlike
- * `wa-dropdown` which moves focus into the menu). Emits `value-changed`
- * on every keystroke and on option select.
+ * `wa-dropdown` which moves focus into the menu). Emits
+ * `options-combobox-change` on every keystroke and on option select.
  */
 import { mdiChevronDown } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
@@ -65,8 +65,8 @@ export class ESPHomeOptionsCombobox extends LitElement {
   @state() private _active = -1;
 
   /** Committed value snapshotted when the dropdown opened, so Escape can
-   *  restore it even after per-keystroke ``value-changed`` has driven the
-   *  host to update ``value``. */
+   *  restore it even after per-keystroke ``options-combobox-change`` has
+   *  driven the host to update ``value``. */
   private _committed = "";
 
   @query("input")
