@@ -164,6 +164,19 @@ describe("renderTimePeriodField / renderFloatWithUnitField — bail on non-primi
     expect(json).toContain("time-period");
   });
 
+  it("renders the split UI for an aliased unit (1sec), not the text fallback", () => {
+    const entry = makeConfigEntry({
+      key: "delay",
+      type: ConfigEntryType.TIME_PERIOD,
+      label: "Delay",
+    });
+    const { ctx } = makeCtx({ delay: "1sec" });
+    const tpl = renderTimePeriodField(entry, ["delay"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(json).toContain("time-period");
+    expect(json).toContain('"1"');
+  });
+
   it("bails on a list value for a float-with-unit field", () => {
     const entry = makeConfigEntry({
       key: "frequency",

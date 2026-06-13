@@ -12,6 +12,12 @@ import {
 } from "../../../util/float-with-unit.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
+import {
+  parseTimePeriodScalar,
+  serializeTimePeriod,
+  TIME_PERIOD_UNITS,
+  type TimePeriodUnit,
+} from "../../../util/time-period.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
@@ -186,54 +192,6 @@ function hexDisplayOrFallback(rawValue: unknown): string {
  * backend's parser handles it the same as if the user had typed
  * it raw into YAML.
  */
-const TIME_PERIOD_UNITS = ["us", "ms", "s", "min", "h", "d"] as const;
-type TimePeriodUnit = (typeof TIME_PERIOD_UNITS)[number];
-
-/** Detect a polymorphic time-period scalar shorthand (``50ms``,
- *  ``2.5s``); requires an explicit unit suffix so unitless numbers
- *  like ``delta: 0.5`` don't false-positive. Units are escaped when
- *  building the regex so a future entry with regex metacharacters
- *  doesn't quietly malform the pattern. */
-const TIME_PERIOD_SCALAR_RE = new RegExp(
-  `^\\d+(?:\\.\\d+)?(?:${TIME_PERIOD_UNITS.map((u) =>
-    u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  ).join("|")})$`
-);
-export function looksLikeTimePeriodScalar(raw: unknown): boolean {
-  return typeof raw === "string" && TIME_PERIOD_SCALAR_RE.test(raw.trim());
-}
-
-function parseTimePeriod(raw: unknown): {
-  value: string;
-  unit: TimePeriodUnit;
-  parseable: boolean;
-} {
-  if (raw === undefined || raw === null || raw === "") {
-    return { value: "", unit: "s", parseable: true };
-  }
-  const text = String(raw).trim();
-  // Single "<number><unit>" form. Number can be a fraction. Unit is
-  // optional — a bare number is interpreted as seconds by ESPHome.
-  const m = text.match(/^(\d+(?:\.\d+)?)(us|ms|s|min|h|d)?$/);
-  if (m) {
-    const [, num, suf] = m;
-    return {
-      value: num,
-      unit: (suf as TimePeriodUnit) ?? "s",
-      parseable: true,
-    };
-  }
-  // Compound form ("1h30s") or unrecognised — surface the raw string
-  // so the user can edit it as plain text without us mangling it.
-  return { value: text, unit: "s", parseable: false };
-}
-
-function serializeTimePeriod(value: string, unit: TimePeriodUnit): string {
-  const trimmed = value.trim();
-  if (trimmed === "") return "";
-  return `${trimmed}${unit}`;
-}
-
 export function renderTimePeriodField(
   entry: ConfigEntry,
   path: string[],
@@ -245,7 +203,7 @@ export function renderTimePeriodField(
   // ``"5s"`` and a save would clobber the original list.
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
-  const parsed = parseTimePeriod(raw);
+  const parsed = parseTimePeriodScalar(raw);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   // Compound / unparseable strings fall through to a plain text
@@ -258,7 +216,7 @@ export function renderTimePeriodField(
   // number, the unit lives in the dropdown beside it.
   const defaultParsed =
     entry.default_value !== undefined && entry.default_value !== null
-      ? parseTimePeriod(entry.default_value)
+      ? parseTimePeriodScalar(entry.default_value)
       : null;
   const placeholderText =
     defaultParsed && defaultParsed.parseable ? defaultParsed.value : "";

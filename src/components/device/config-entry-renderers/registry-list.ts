@@ -24,6 +24,7 @@ import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { apiContext } from "../../../context/index.js";
 import { subscribeAutomationCatalogCache } from "../../../util/automation-catalog-cache.js";
 import { makeConfigEntry } from "../../../util/config-entry-defaults.js";
+import { looksLikeTimePeriodScalar } from "../../../util/time-period.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
@@ -38,7 +39,6 @@ import {
   renderListEmptyHint,
   renderListRemoveButton,
 } from "./lists.js";
-import { looksLikeTimePeriodScalar } from "./primitives.js";
 import {
   asList,
   editableEntries,

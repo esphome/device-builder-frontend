@@ -179,4 +179,20 @@ describe("automation-action-node delay lambda", () => {
     expect(valueInput(el)!.value).toBe("5");
     expect(selectedUnit(el)).toBe("s");
   });
+
+  it("parses an aliased shorthand (1sec) as value + seconds", async () => {
+    const { el } = await mountDelay({ id: "1sec" });
+    expect(lambdaEditor(el)).toBeNull();
+    expect(valueInput(el)!.value).toBe("1");
+    expect(selectedUnit(el)).toBe("s");
+  });
+
+  it("normalizes an aliased shorthand to the canonical field on edit", async () => {
+    const { el, emitted } = await mountDelay({ id: "1sec" });
+    const input = valueInput(el)!;
+    input.value = "2";
+    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(emitted[emitted.length - 1].params).toEqual({ seconds: "2" });
+  });
 });
