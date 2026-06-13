@@ -8,6 +8,7 @@ import {
   parseYamlTopLevelSections,
   resolveCurrentFromLine,
   sectionAtLine,
+  sectionKeyOf,
   type YamlSection,
 } from "../../src/util/yaml-sections.js";
 
@@ -50,6 +51,28 @@ wifi:
     expect(sections[0].parentKey).toBe("sensor");
     expect(sections[1].platform).toBe("bme280");
     expect(sections[1].name).toBe("bedroom");
+  });
+
+  it("resolves a bare-mapping platform section to its platform editor (#1436)", () => {
+    const yaml = `ota:
+  platform: esphome
+  password: "x"
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].key).toBe("ota");
+    expect(sections[0].platform).toBe("esphome");
+    expect(sections[0].parentKey).toBeUndefined();
+    expect(sectionKeyOf(sections[0])).toBe("ota.esphome");
+  });
+
+  it("leaves a plain singleton without a platform key", () => {
+    const yaml = `logger:
+  level: DEBUG
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections[0].platform).toBeUndefined();
+    expect(sectionKeyOf(sections[0])).toBe("logger");
   });
 
   it("extracts continuation id/name when the dash has extra spaces", () => {
