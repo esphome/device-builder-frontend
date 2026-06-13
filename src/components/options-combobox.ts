@@ -68,6 +68,11 @@ export class ESPHomeOptionsCombobox extends LitElement {
   /** Keyboard-active option index into the filtered list, or -1. */
   @state() private _active = -1;
 
+  /** Committed value snapshotted when the dropdown opened, so Escape can
+   *  restore it even after per-keystroke ``value-changed`` has driven the
+   *  host to update ``value``. */
+  private _committed = "";
+
   @query("input")
   private _input?: HTMLInputElement;
 
@@ -76,21 +81,19 @@ export class ESPHomeOptionsCombobox extends LitElement {
   protected render() {
     const filtered = this._filtered;
     const display = this._open ? this._query : this.value;
+    // Reflects whether the listbox is actually shown — the popup only
+    // activates with matches, so ARIA must track the same condition.
+    const expanded = this._open && filtered.length > 0;
     return html`
-      <wa-popup
-        placement="bottom-start"
-        sync="width"
-        distance="4"
-        ?active=${this._open && filtered.length > 0}
-      >
+      <wa-popup placement="bottom-start" sync="width" distance="4" ?active=${expanded}>
         <div slot="anchor" class="control">
           <input
             type="text"
             class=${this.invalid ? "invalid" : ""}
             role="combobox"
             aria-autocomplete="list"
-            aria-expanded=${this._open ? "true" : "false"}
-            aria-controls="listbox"
+            aria-expanded=${expanded ? "true" : "false"}
+            aria-controls=${expanded ? "listbox" : nothing}
             aria-activedescendant=${this._active >= 0
               ? `option-${this._active}`
               : nothing}
@@ -117,7 +120,7 @@ export class ESPHomeOptionsCombobox extends LitElement {
             <wa-icon library="mdi" name="chevron-down"></wa-icon>
           </button>
         </div>
-        ${this._open
+        ${expanded
           ? html`<div id="listbox" class="listbox" role="listbox">
               ${filtered.map(
                 (opt, i) =>
@@ -151,6 +154,7 @@ export class ESPHomeOptionsCombobox extends LitElement {
   private _open_ = () => {
     if (this.disabled || this._open) return;
     this._open = true;
+    this._committed = this.value;
     this._query = this.value;
     this._dirty = false;
     this._active = -1;
@@ -216,7 +220,12 @@ export class ESPHomeOptionsCombobox extends LitElement {
           // Don't let Escape bubble to a parent dialog's dismiss handler.
           e.preventDefault();
           e.stopPropagation();
-          this._query = this.value;
+          // Restore the value the field held when it opened and emit it, so
+          // a host that committed each keystroke reverts too (Escape cancels
+          // the edit, not just the local text).
+          this.value = this._committed;
+          this._query = this._committed;
+          this._emit(this._committed);
           this._close();
         }
         break;

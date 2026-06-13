@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-// happy-dom can't host webawesome's custom elements; we only assert the
-// component's own light-DOM markup (input + option rows).
+// happy-dom can't host webawesome's custom elements; we assert the
+// component's own shadow-DOM markup (input + option rows).
 vi.mock("@home-assistant/webawesome/dist/components/popup/popup.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/library.js", () => ({
@@ -115,6 +115,24 @@ describe("esphome-options-combobox", () => {
     field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await el.updateComplete;
     expect(options(el)).toHaveLength(0);
+    expect(input(el).value).toBe("bw15");
+  });
+
+  test("Escape cancels the edit even when the host commits each keystroke", async () => {
+    const el = await mount("bw15");
+    // Mirror renderSelectField: every value-changed is committed back to value.
+    el.addEventListener("value-changed", (e) => {
+      el.value = (e as CustomEvent).detail.value;
+    });
+    await open(el);
+    const field = input(el);
+    field.value = "zz";
+    field.dispatchEvent(new Event("input"));
+    await el.updateComplete;
+    expect(el.value).toBe("zz"); // host committed the typed text
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await el.updateComplete;
+    expect(el.value).toBe("bw15"); // Escape restored & re-emitted the pre-edit value
     expect(input(el).value).toBe("bw15");
   });
 
