@@ -198,7 +198,7 @@ export function renderTimePeriodField(
   ctx: RenderCtx
 ) {
   const raw = ctx.getAt(path);
-  // Bail above parseTimePeriod — its ``String(raw).trim()`` would
+  // Bail above parseTimePeriodScalar — its ``String(raw).trim()`` would
   // turn a single-element list ``["5s"]`` into the parseable string
   // ``"5s"`` and a save would clobber the original list.
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
