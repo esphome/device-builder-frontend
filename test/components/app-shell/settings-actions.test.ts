@@ -140,7 +140,8 @@ describe("onSetExperienceLevel", () => {
     await flush();
   });
 
-  it("reverts level + diff button and toasts on backend rejection", async () => {
+  it("reverts level + diff button, logs, and toasts on backend rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const host = makePrefsHost(
       vi.fn(async () => {
         throw new Error("no");
@@ -155,6 +156,7 @@ describe("onSetExperienceLevel", () => {
     expect(host._experienceLevel).toBe(ExperienceLevel.BEGINNER);
     expect(host._yamlDiffButton).toBe(false);
     expect(toastError).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
     expect(host._prefsWritesInFlight).toBe(0);
   });
 });
@@ -163,7 +165,8 @@ describe("onSetRemoteComputeOnly", () => {
   beforeEach(() => toastError.mockClear());
   afterEach(() => vi.restoreAllMocks());
 
-  it("reverts and toasts on backend rejection", async () => {
+  it("reverts, logs, and toasts on backend rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const host = makePrefsHost(
       vi.fn(async () => {
         throw new Error("no");
@@ -177,6 +180,7 @@ describe("onSetRemoteComputeOnly", () => {
     await flush();
     expect(host._remoteComputeOnly).toBe(false);
     expect(toastError).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
   });
 });
 

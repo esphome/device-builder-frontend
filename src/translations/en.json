@@ -911,6 +911,7 @@
       "skip": "Skip",
       "dismiss": "Maybe later",
       "saving": "Saving…",
+      "ack_failed": "Saved your choices, but the wizard couldn't be marked as completed — it may reappear next time.",
       "use_case": {
         "title": "How will you use this?",
         "intro": "This helps tailor the dashboard to what you need.",

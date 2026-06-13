@@ -398,7 +398,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     } catch (err) {
       // Prefs already landed; a failed ack only re-pops the wizard next load.
       console.warn("Failed to mark onboarding acknowledged:", err);
-      toast.warning(this._localize("onboarding.wifi.ack_failed"));
+      toast.warning(this._localize("onboarding.wizard.ack_failed"));
     }
     this._exitedExplicitly = true;
     this._emitAcknowledged();

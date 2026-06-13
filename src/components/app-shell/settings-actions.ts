@@ -63,7 +63,8 @@ export function onSetExperienceLevel(
   host._prefsWritesInFlight += 1;
   host._api
     .updatePreferences({ experience_level: level, yaml_diff_button: yamlDiff })
-    .catch(() => {
+    .catch((err) => {
+      console.warn("Failed to save experience level:", err);
       host._experienceLevel = previousLevel;
       host._yamlDiffButton = previousDiff;
       toast.error(host._localize("settings.experience_save_failed"), {
@@ -80,7 +81,8 @@ export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>
   host._prefsWritesInFlight += 1;
   host._api
     .updatePreferences({ remote_compute_only: enabled })
-    .catch(() => {
+    .catch((err) => {
+      console.warn("Failed to save remote-compute-only:", err);
       host._remoteComputeOnly = previous;
       toast.error(host._localize("settings.experience_save_failed"), {
         richColors: true,
