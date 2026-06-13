@@ -7,7 +7,6 @@ import type { ESPHomeAPI } from "../api/index.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
-import { ExperienceLevel } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { NavSectionName } from "../components/device/device-board-info.js";
@@ -31,6 +30,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
+import { editorLayoutForExperience } from "../util/experience.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -557,12 +557,11 @@ export class ESPHomePageDevice extends LitElement {
     try {
       const prefs = await this._api.getPreferences();
       this._navCollapsed = !prefs.navigator_visible;
-      // First editor open (no stored layout yet): seed the YAML pane from
-      // the experience level. YAML users land in the split view; everyone
-      // else starts on the navigator with the pane hidden. Once the user
-      // touches the layout toggle it persists to localStorage and wins.
+      // First editor open (no stored layout yet): seed the YAML pane from the
+      // experience level. Once the user touches the layout toggle it persists
+      // to localStorage and wins.
       if (!hasSavedLayout) {
-        this._layout = prefs.experience_level === ExperienceLevel.YAML ? "both" : "left";
+        this._layout = editorLayoutForExperience(prefs.experience_level);
       }
     } catch (err) {
       // Preferences not critical; fall back to defaults. Logged so a YAML

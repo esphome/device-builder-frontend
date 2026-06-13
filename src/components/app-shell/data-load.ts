@@ -10,7 +10,8 @@ import type { ESPHomeApp } from "../app-shell.js";
 export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
   try {
     const state = await host._api.getOnboardingState();
-    host._onboardingPending = isWifiSetupPending(state);
+    const wifiPending = isWifiSetupPending(state);
+    host._onboardingPending = wifiPending;
     host._onboardingHasUseCase = state.steps.some(
       (s) => s.id === OnboardingStepId.USE_CASE
     );
@@ -20,7 +21,7 @@ export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
     // standalone Wi-Fi dialog, so it still onboards Wi-Fi unless they decline.
     const experienceChosen = isExperienceChosen(state);
     host._onboardingShouldShow = show && !experienceChosen;
-    host._onboardingShowWifi = show && experienceChosen && isWifiSetupPending(state);
+    host._onboardingShowWifi = show && experienceChosen && wifiPending;
   } catch (err) {
     // Non-critical — clear the badge (latest data unknown, "no nudge" is safer
     // than a stale red dot) but leave _onboardingShouldShow alone so a

@@ -10,7 +10,7 @@ import {
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
-import { APIError, type ESPHomeAPI } from "../../api/index.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import { ExperienceLevel } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -19,6 +19,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { EXPERIENCE_OPTIONS, yamlDiffForExperience } from "../../util/experience.js";
+import { formatApiError } from "../../util/format-api-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { renderChoiceCard } from "./choice-card.js";
@@ -350,7 +351,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     try {
       await this._api.setOnboardingWifi(this._ssid, this._password);
     } catch (err) {
-      this._error = this._formatError(err, "onboarding.wifi.save_failed");
+      this._error = formatApiError(err, this._localize, "onboarding.wifi.save_failed");
       this._saving = false;
       return;
     }
@@ -376,7 +377,11 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
       });
       return true;
     } catch (err) {
-      this._error = this._formatError(err, "settings.experience_save_failed");
+      this._error = formatApiError(
+        err,
+        this._localize,
+        "settings.experience_save_failed"
+      );
       this._saving = false;
       return false;
     }
@@ -409,12 +414,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   private _onRequestClose = (): void => {
     this._open = false;
   };
-
-  private _formatError(err: unknown, fallbackKey: string): string {
-    if (err instanceof APIError) return err.details || this._localize(fallbackKey);
-    if (err instanceof Error) return err.message;
-    return this._localize(fallbackKey);
-  }
 
   private _dismissForSession = () => {
     this._exitedExplicitly = true;

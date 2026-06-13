@@ -4,13 +4,13 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { APIError } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
+import { formatApiError } from "../util/format-api-error.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
@@ -249,7 +249,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       // The wifi write itself failed — the user's credentials
       // never landed on disk. Surface the error inline so they
       // can correct and retry.
-      this._error = this._formatError(err, "onboarding.wifi.save_failed");
+      this._error = formatApiError(err, this._localize, "onboarding.wifi.save_failed");
       this._saving = false;
       return;
     }
@@ -296,7 +296,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       // happened. Use the decline-specific fallback so the user
       // doesn't see "Couldn't save Wi-Fi credentials" when
       // nothing of theirs was being saved in the first place.
-      this._error = this._formatError(err, "onboarding.wifi.decline_failed");
+      this._error = formatApiError(err, this._localize, "onboarding.wifi.decline_failed");
     } finally {
       this._saving = false;
     }
@@ -328,27 +328,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   private _onRequestClose = (): void => {
     this._open = false;
   };
-
-  /**
-   * Surface a backend error in user-facing prose. ``APIError``
-   * carries a structured ``errorCode`` + ``details`` pair; its
-   * ``Error.message`` is the wire form ``"INVALID_ARGS: …"`` —
-   * fine for logs, leaks an internal code into the dialog's
-   * inline error if rendered raw. Show ``details`` directly when
-   * we have an ``APIError``, fall back to ``message`` for native
-   * errors, and fall back to the *caller-supplied* localization
-   * key when we have neither — different code paths (save vs
-   * decline) want different fallback copy so the user isn't told
-   * "Couldn't save Wi-Fi credentials" when the failing call
-   * wasn't the wifi save.
-   */
-  private _formatError(err: unknown, fallbackKey: string): string {
-    if (err instanceof APIError) {
-      return err.details || this._localize(fallbackKey);
-    }
-    if (err instanceof Error) return err.message;
-    return this._localize(fallbackKey);
-  }
 
   private _dismissForSession = () => {
     // Idempotent — wa-after-hide also routes here, and an explicit
