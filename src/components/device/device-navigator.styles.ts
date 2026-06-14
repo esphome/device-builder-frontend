@@ -40,13 +40,17 @@ export const deviceNavigatorStyles = css`
     margin: 0;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
-    /* Not line-height 1: the ellipsis overflow:hidden would crop descenders
-       (the 'g' in #827). 1.4 leaves room and stays under the 22px header. */
-    line-height: 1.4;
+    line-height: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    /* line-height 1 keeps the title baseline aligned with the editor header.
+       The ellipsis overflow:hidden would crop descenders (the 'g' in #827), so
+       extend the clip box downward without changing the centered layout box:
+       the padding adds paint room, the negative margin cancels its layout. */
+    padding-bottom: 0.3em;
+    margin-bottom: -0.3em;
   }
 
   .header-actions {
