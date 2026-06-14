@@ -12,7 +12,7 @@ import {
 import { MOBILE_BREAKPOINT } from "../styles/breakpoints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { stripBase, withBase } from "../util/base-path.js";
-import { isDeviceBuilderBeta } from "../util/device-builder-beta.js";
+import { deviceBuilderChannel } from "../util/device-builder-channel.js";
 import { navigate, runLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -65,6 +65,13 @@ export class ESPHomeLayout extends LitElement {
 
   private get _showBack(): boolean {
     return !this._isDashboard;
+  }
+
+  /** Hardcoded (untranslated) badge label for a non-stable backend, else null. */
+  private get _versionBadge(): string | null {
+    const channel = deviceBuilderChannel(this._serverVersion);
+    if (!channel) return null;
+    return channel === "dev" ? "Dev" : "Beta";
   }
 
   protected updated() {
@@ -342,10 +349,8 @@ export class ESPHomeLayout extends LitElement {
         <div class="header-text">
           <h1>
             <span class="header-title-text">${this._localize("dashboard.title")}</span>
-            ${isDeviceBuilderBeta(this._serverVersion)
-              ? html`<span class="preview-badge"
-                  >${this._localize("layout.preview_badge")}</span
-                >`
+            ${this._versionBadge
+              ? html`<span class="preview-badge">${this._versionBadge}</span>`
               : nothing}
           </h1>
           <p>${this._localize("dashboard.subtitle")}</p>

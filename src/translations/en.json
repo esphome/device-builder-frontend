@@ -926,8 +926,7 @@
     "close": "Close",
     "editor": "Editor",
     "yaml_diff_button": "YAML diff button",
-    "more_options_with_count": "More options ({count, plural, one {# firmware task active} other {# firmware tasks active}})",
-    "preview_badge": "Beta"
+    "more_options_with_count": "More options ({count, plural, one {# firmware task active} other {# firmware tasks active}})"
   },
   "feedback": {
     "title": "Found a bug? Have an idea?",
