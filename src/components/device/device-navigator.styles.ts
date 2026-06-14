@@ -40,7 +40,11 @@ export const deviceNavigatorStyles = css`
     margin: 0;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
-    line-height: 1;
+    /* Match the editor header title's line-height so both header bars are the
+       same height (their dividers line up) and the title baselines align.
+       line-height 1 clipped the descender 'g' (#827) and left this header about
+       0.4px shorter than the editor's, offsetting the divider by a pixel. */
+    line-height: var(--wa-line-height-normal);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

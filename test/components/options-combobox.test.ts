@@ -69,6 +69,23 @@ describe("esphome-options-combobox", () => {
     );
   });
 
+  test("opening preselects and highlights the current value", async () => {
+    const el = await mount("bw15");
+    await open(el);
+    const opts = options(el);
+    // bw15 is index 2 in OPTIONS — it opens active, not the top of the list.
+    expect(opts[2].classList.contains("option--active")).toBe(true);
+    expect(opts[2].getAttribute("aria-selected")).toBe("true");
+    expect(input(el).getAttribute("aria-activedescendant")).toBe("option-2");
+  });
+
+  test("opening a free-text value not in the list highlights nothing", async () => {
+    const el = await mount("cr3l");
+    await open(el);
+    expect(options(el).some((o) => o.classList.contains("option--active"))).toBe(false);
+    expect(input(el).getAttribute("aria-activedescendant")).toBeNull();
+  });
+
   test("typing filters to substring matches and emits the typed value", async () => {
     const el = await mount("bw15");
     const seen = track(el);
@@ -93,8 +110,8 @@ describe("esphome-options-combobox", () => {
     expect(options(el)).toHaveLength(0); // closed after select
   });
 
-  test("ArrowDown then Enter selects the active option", async () => {
-    const el = await mount("bw15");
+  test("ArrowDown then Enter moves from the preselected value and selects it", async () => {
+    const el = await mount("bw15"); // index 2; opens active there
     const seen = track(el);
     await open(el);
     const field = input(el);
@@ -104,8 +121,9 @@ describe("esphome-options-combobox", () => {
     await el.updateComplete;
     field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await el.updateComplete;
-    expect(seen[seen.length - 1]).toBe("afw121t");
-    expect(el.value).toBe("afw121t");
+    // ArrowDown advances from bw15 (2) to rtl8710bn (3).
+    expect(seen[seen.length - 1]).toBe("rtl8710bn");
+    expect(el.value).toBe("rtl8710bn");
   });
 
   test("Escape reverts the query and closes", async () => {
@@ -184,14 +202,8 @@ describe("esphome-options-combobox", () => {
     const el = await mount("bw15");
     await open(el);
     const field = input(el);
-    field.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
-    );
-    field.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })
-    );
-    await el.updateComplete;
-    expect(field.getAttribute("aria-activedescendant")).toBe("option-1");
+    // Opening preselects bw15 (index 2).
+    expect(field.getAttribute("aria-activedescendant")).toBe("option-2");
     // Options shrink under the still-open list; the now-stale index must not
     // leak a reference to a non-existent row.
     el.options = [{ label: "afw121t", value: "afw121t" }];

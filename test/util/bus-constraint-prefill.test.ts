@@ -85,4 +85,61 @@ describe("busConstraintPrefill", () => {
   test("skips a constraint key with no matching bus field", () => {
     expect(busConstraintPrefill(uartEntries, { rx_buffer_size: 512 })).toBeNull();
   });
+
+  // The catalog now gives baud_rate a 115200 default; a detour constraint
+  // (e.g. an LD2410 needing 256000) must still win over that default.
+  const baudDefaulted = [
+    makeConfigEntry({
+      key: "baud_rate",
+      type: ConfigEntryType.INTEGER,
+      required: true,
+      default_value: 115200,
+    }),
+  ];
+
+  test("prefills a baud constraint that differs from the new 115200 default", () => {
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: 256000 })).toEqual({
+      fields: { baud_rate: 256000 },
+      required: [],
+    });
+  });
+
+  test("drops a baud constraint equal to the default (seed already supplies it)", () => {
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: 115200 })).toBeNull();
+  });
+
+  test("a list baud constraint narrows the options and defaults to the first", () => {
+    // CN105's variable rate -> offer 2400/9600, default 2400.
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: [2400, 9600] })).toEqual({
+      fields: { baud_rate: 2400 },
+      required: [],
+      optionOverrides: { baud_rate: [2400, 9600] },
+    });
+  });
+
+  test("a list whose first value equals the default still narrows but skips the prefill", () => {
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: [115200, 9600] })).toEqual({
+      fields: {},
+      required: [],
+      optionOverrides: { baud_rate: [115200, 9600] },
+    });
+  });
+
+  test("an empty list contributes nothing", () => {
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: [] })).toBeNull();
+  });
+
+  test("ignores a list constraint on a multi_value field", () => {
+    const multi = [
+      makeConfigEntry({ key: "addrs", type: ConfigEntryType.STRING, multi_value: true }),
+    ];
+    expect(busConstraintPrefill(multi, { addrs: ["a", "b"] })).toBeNull();
+  });
+
+  test("drops non-primitive entries from a list constraint", () => {
+    const result = busConstraintPrefill(baudDefaulted, {
+      baud_rate: [2400, { bad: true }, 9600] as unknown as (string | number)[],
+    });
+    expect(result?.optionOverrides).toEqual({ baud_rate: [2400, 9600] });
+  });
 });

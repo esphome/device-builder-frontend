@@ -14,6 +14,10 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
+import {
+  findReferenceCandidates,
+  resolveSoleCandidate,
+} from "../../util/config-entry-yaml-scan.js";
 import { validateEntries, type ValidationError } from "../../util/config-validation.js";
 import {
   collectExistingIds,
@@ -28,6 +32,7 @@ import {
 } from "../../util/yaml-serialize.js";
 import { findMissingDependencies } from "./add-component-deps.js";
 import { coerceFields } from "./add-component-form-coerce.js";
+import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
@@ -79,6 +84,12 @@ export class ESPHomeAddComponentForm extends LitElement {
   @property({ attribute: false })
   extraRequired: string[] | null = null;
 
+  /** Per-field dropdown narrowing the requester imposes via a list
+   *  `bus_constraints` value (CN105 -> baud_rate [2400, 9600]); the
+   *  matching entry's `options` are limited to these, defaulting first. */
+  @property({ attribute: false })
+  optionOverrides: Record<string, (string | number)[]> | null = null;
+
   @property({ type: Boolean })
   submitting = false;
 
@@ -113,20 +124,15 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   static styles = [espHomeStyles, inputStyles, addComponentFormStyles];
 
-  /** Schema with `extraRequired` keys overlaid as required. Memoized so
-   *  the shared form's `.entries` identity is render-stable. */
-  private _overlayRequired = memoizeOne(
-    (entries: ConfigEntry[], extra: string[] | null): ConfigEntry[] => {
-      if (!extra?.length) return entries;
-      const keys = new Set(extra);
-      return entries.map((e) =>
-        keys.has(e.key) && !e.required ? { ...e, required: true } : e
-      );
-    }
-  );
+  // Memoized so the shared form's `.entries` identity is render-stable.
+  private _overlayRequired = memoizeOne(overlayRequired);
+  private _overlayOptions = memoizeOne(overlayOptions);
 
   private get _entries(): ConfigEntry[] {
-    return this._overlayRequired(this.component.config_entries, this.extraRequired);
+    return this._overlayOptions(
+      this._overlayRequired(this.component.config_entries, this.extraRequired),
+      this.optionOverrides
+    );
   }
 
   /** True once we've seeded `_values` for the current component. */
@@ -271,6 +277,18 @@ export class ESPHomeAddComponentForm extends LitElement {
         continue;
       }
       if (!seedAll && !entry.required) continue;
+      // Resolve an id reference against the live YAML so a stale featured
+      // preset (`i2c_bus`) can't outlive the bus it names. Locked refs are
+      // deliberate pins — keep their literal.
+      if (entry.references_component && !entry.locked) {
+        const ref = this._seedReference(entry.references_component);
+        if (ref !== undefined) {
+          out[entry.key] = entry.multi_value ? [ref] : ref;
+        } else if (entry.multi_value && entry.required) {
+          out[entry.key] = [];
+        }
+        continue;
+      }
       if (entry.default_value != null) {
         out[entry.key] = entry.multi_value
           ? [String(entry.default_value)]
@@ -280,6 +298,22 @@ export class ESPHomeAddComponentForm extends LitElement {
       }
     }
     return out;
+  }
+
+  /**
+   * Seed an unlocked id-reference field with the matching component already in
+   * the config, so a stale featured preset can't write an id that doesn't
+   * exist. Ambiguous cases — none, several, or a `packages:`/`<<:` merge that
+   * could hide one — stay unset, deferring to the dep detour or the picker.
+   */
+  private _seedReference(domain: string): string | undefined {
+    // Resolve against same-domain candidates only (i2c/spi/uart buses); the
+    // picker also folds in async interface providers. A cross-domain ref finds
+    // nothing here and defers to the picker; for a domain that is both a block
+    // and a provided interface, seeding may fill a value the picker would call
+    // ambiguous — harmless, since it's a real id the user can still change.
+    const candidates = findReferenceCandidates(this.yaml, domain, []);
+    return resolveSoleCandidate(candidates, this.yaml)?.id;
   }
 
   private _generateDefaultId(): string | null {

@@ -336,15 +336,13 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     // Otherwise the user sees "Labels for 5 devices" while the next
     // Apply only re-writes the 2 that failed — looks like a bug.
     const targetCount = this._failedConfigurations?.size ?? this.devices.length;
-    const titleKey =
-      targetCount === 1
-        ? "dashboard.labels_bulk_dialog_title_one"
-        : "dashboard.labels_bulk_dialog_title_other";
     return html`
       <esphome-base-dialog
         ?open=${this._open}
         ?busy=${this._saving}
-        .label=${this._localize(titleKey, { count: targetCount })}
+        .label=${this._localize("dashboard.labels_bulk_dialog_title", {
+          count: targetCount,
+        })}
         @after-hide=${this._onAfterHide}
       >
         ${this._catalog.length === 0
@@ -504,11 +502,9 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       if (gen !== this._applyGeneration) return;
       const failures = results.filter((r) => !r.success);
       if (failures.length === 0) {
-        const key =
-          count === 1
-            ? "dashboard.labels_bulk_saved_one"
-            : "dashboard.labels_bulk_saved_other";
-        toast.success(this._localize(key, { count }), { richColors: true });
+        toast.success(this._localize("dashboard.labels_bulk_saved", { count }), {
+          richColors: true,
+        });
         // Full success clears the retry-narrow filter so a future
         // re-open via the bulk button would target the whole new
         // selection rather than the previous failure subset.
@@ -539,30 +535,24 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         // the user is seeing.
         const succeeded = count - failures.length;
         if (succeeded > 0) {
-          const successKey =
-            succeeded === 1
-              ? "dashboard.labels_bulk_saved_one"
-              : "dashboard.labels_bulk_saved_other";
-          toast.success(this._localize(successKey, { count: succeeded }), {
-            richColors: true,
-          });
+          toast.success(
+            this._localize("dashboard.labels_bulk_saved", { count: succeeded }),
+            { richColors: true }
+          );
         }
-        const key =
-          failures.length === 1
-            ? "dashboard.labels_bulk_save_failed_one"
-            : "dashboard.labels_bulk_save_failed_other";
-        toast.error(this._localize(key, { count: failures.length }), {
-          richColors: true,
-        });
+        toast.error(
+          this._localize("dashboard.labels_bulk_save_failed", {
+            count: failures.length,
+          }),
+          { richColors: true }
+        );
       }
     } catch (err) {
       if (gen !== this._applyGeneration) return;
       console.warn("set_labels_bulk failed", err);
-      const key =
-        count === 1
-          ? "dashboard.labels_bulk_save_failed_one"
-          : "dashboard.labels_bulk_save_failed_other";
-      toast.error(this._localize(key, { count }), { richColors: true });
+      toast.error(this._localize("dashboard.labels_bulk_save_failed", { count }), {
+        richColors: true,
+      });
     } finally {
       // Only clear ``_saving`` if we're still the active session —
       // a generation bump means a new ``open()`` call already reset

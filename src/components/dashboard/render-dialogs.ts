@@ -4,7 +4,7 @@ import { DeviceState } from "../../api/types/devices.js";
 import type { ArchivedDevice } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
-import { computeLabelUsage, deleteConfirmKey } from "../../util/label-usage.js";
+import { computeLabelUsage } from "../../util/label-usage.js";
 import { archiveBulkDevices, deleteBulkDevices, deleteDevice } from "./actions.js";
 
 export type PendingConfirm =
@@ -86,7 +86,7 @@ export function confirmDialogCopy(
       const usage = labelUsage()[pending.label.id] ?? 0;
       return {
         heading: t("dashboard.labels_delete_title"),
-        message: t(deleteConfirmKey(usage), {
+        message: t("dashboard.labels_delete_confirm", {
           name: pending.label.name,
           count: usage,
         }),

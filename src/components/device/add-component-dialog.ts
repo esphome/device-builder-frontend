@@ -299,6 +299,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
               .prefillReference=${this._prefillReference}
               .prefillFields=${this._depPrefill?.fields ?? null}
               .extraRequired=${this._depPrefill?.required ?? null}
+              .optionOverrides=${this._depPrefill?.optionOverrides ?? null}
               .submitting=${this._submitting}
               .submitError=${this._submitError}
             ></esphome-add-component-form>`

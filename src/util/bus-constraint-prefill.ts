@@ -7,14 +7,19 @@ export interface BusPrefill {
   fields: Record<string, unknown>;
   /** Bus fields the requester forces (require_tx -> tx_pin). */
   required: string[];
+  /** Fields whose dropdown the requester narrows to a fixed choice set
+   *  (a list constraint, e.g. CN105 -> baud_rate [2400, 9600]); absent
+   *  when no constraint is a list. */
+  optionOverrides?: Record<string, (string | number)[]>;
 }
 
 /**
  * Bus-form prefill for a requester's `bus_constraints[bus]` dict.
  *
  * Exact-match values prefill unless the bus default already satisfies
- * them; min/max_frequency clamp the default into range; require_* map
- * to their pin fields. Returns null when nothing applies.
+ * them; a list value narrows the field to those choices and defaults to
+ * the first; min/max_frequency clamp the default into range; require_*
+ * map to their pin fields. Returns null when nothing applies.
  */
 export function busConstraintPrefill(
   busEntries: ConfigEntry[],
@@ -22,6 +27,7 @@ export function busConstraintPrefill(
 ): BusPrefill | null {
   const fields: Record<string, unknown> = {};
   const required: string[] = [];
+  const optionOverrides: Record<string, (string | number)[]> = {};
   const entryOf = (key: string): ConfigEntry | undefined =>
     busEntries.find((e) => e.key === key);
 
@@ -42,6 +48,25 @@ export function busConstraintPrefill(
     }
     const entry = entryOf(key);
     if (!entry) continue;
+    // A list constraint narrows a single-value select/combobox to those
+    // choices, default-first (CN105's variable 2400/9600 baud). Skip it for a
+    // multi_value field (a list there isn't a dropdown); otherwise keep only
+    // the primitive choices.
+    if (Array.isArray(value)) {
+      const choices = entry.multi_value
+        ? []
+        : value.filter(
+            (v): v is string | number => typeof v === "string" || typeof v === "number"
+          );
+      if (choices.length === 0) continue;
+      optionOverrides[key] = choices;
+      const first = choices[0];
+      const dflt = entry.default_value;
+      if (dflt === null || dflt === undefined || String(dflt) !== String(first)) {
+        fields[key] = entry.type === ConfigEntryType.STRING ? String(first) : first;
+      }
+      continue;
+    }
     const dflt = entry.default_value;
     if (dflt === null || dflt === undefined || String(dflt) !== String(value)) {
       // Options-style fields ('stop_bits', 'parity') match on strings.
@@ -62,6 +87,14 @@ export function busConstraintPrefill(
     if (target !== null) fields.frequency = formatInBestUnit(target, unitOptions);
   }
 
-  if (Object.keys(fields).length === 0 && required.length === 0) return null;
-  return { fields, required };
+  if (
+    Object.keys(fields).length === 0 &&
+    required.length === 0 &&
+    Object.keys(optionOverrides).length === 0
+  ) {
+    return null;
+  }
+  const prefill: BusPrefill = { fields, required };
+  if (Object.keys(optionOverrides).length > 0) prefill.optionOverrides = optionOverrides;
+  return prefill;
 }

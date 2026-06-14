@@ -39,6 +39,15 @@ describe("renderIpAddressRow", () => {
     expect(findTemplatesByAnchor(result, "<a")).toHaveLength(0);
   });
 
+  it("shows waiting-for-first-signal when no IP is known", () => {
+    const result = renderIpAddressRow(
+      _host,
+      _device({ web_port: 80, ip: "", ip_addresses: [] })
+    );
+    const texts = findTemplatesByAnchor(result, 'class="value').flatMap((t) => t.values);
+    expect(texts).toContain("dashboard.drawer_waiting_for_signal");
+  });
+
   it("links the resolved address to its own host", () => {
     const result = renderIpAddressRow(
       _host,

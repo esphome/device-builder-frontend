@@ -7,7 +7,10 @@
 
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { findReferenceCandidates } from "../../util/config-entry-yaml-scan.js";
+import {
+  findReferenceCandidates,
+  resolveSoleCandidate,
+} from "../../util/config-entry-yaml-scan.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -35,6 +38,11 @@ export function renderIdReferenceField(
   if (bail) return bail;
   const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
+
+  // Surface ESPHome's auto-resolved target as the default, but only on an
+  // empty field — a committed value isn't a "default".
+  const defaultCandidate =
+    value === "" ? resolveSoleCandidate(candidates, ctx.yaml) : null;
 
   const idOption = (optValue: string, primary: string, secondary: string) => html`
     <wa-option
@@ -115,12 +123,22 @@ export function renderIdReferenceField(
       <wa-select
         class=${invalid ? "invalid" : ""}
         ?disabled=${effectiveDisabled(entry, ctx)}
+        placeholder=${defaultCandidate
+          ? defaultCandidate.name || defaultCandidate.id
+          : nothing}
         @change=${onChange}
       >
         ${orphanOption}
-        ${candidates.map((c) =>
-          idOption(c.id, c.name || c.id, c.name ? `${c.id} · ${domain}` : domain)
-        )}
+        ${candidates.map((c) => {
+          const secondary = c.name ? `${c.id} · ${domain}` : domain;
+          return idOption(
+            c.id,
+            c.name || c.id,
+            c === defaultCandidate
+              ? `${secondary} · ${ctx.localize("device.default_option_tag")}`
+              : secondary
+          );
+        })}
         ${addOption}
       </wa-select>
       ${renderFieldError(path, ctx)}

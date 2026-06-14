@@ -21,6 +21,7 @@ import {
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
 import {
+  coerceValueToEntryType,
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,
@@ -448,7 +449,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
           ?disabled=${disabled}
           ?invalid=${invalid}
           @options-combobox-change=${(e: CustomEvent<OptionsComboboxValueChange>) =>
-            ctx.emitChange(path, e.detail.value)}
+            ctx.emitChange(path, coerceValueToEntryType(entry, e.detail.value))}
         ></esphome-options-combobox>
         ${renderFieldError(path, ctx)}
       </div>
