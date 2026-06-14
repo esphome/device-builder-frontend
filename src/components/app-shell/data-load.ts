@@ -60,11 +60,9 @@ export async function loadIntegrationDocs(host: ESPHomeApp): Promise<void> {
 }
 
 export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
-  // Boot/reconnect prefs arrive in the subscribe snapshot (see the INITIAL_STATE
-  // handler), which is what gates device creation. This refetch exists only so
-  // the onboarding wizard's direct persist is reflected in the live contexts
-  // without waiting for a reconnect. Skip while a write is in flight — the
-  // optimistic value is the source of truth until it settles.
+  // Boot/reconnect prefs come from the subscribe snapshot; this refetch exists
+  // only to reflect the onboarding wizard's direct persist in the live contexts.
+  // Skip while a write is in flight; the optimistic value wins until it settles.
   if (host._prefsWritesInFlight > 0) return;
   try {
     const prefs = await host._api.getPreferences();

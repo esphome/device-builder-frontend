@@ -69,10 +69,9 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         version_match_policy,
       } = data as InitialStateEventData;
       if (preferences) {
-        // Prefs ride the snapshot so device creation gates on the subscription,
-        // not a separate get_preferences. Mark them known either way; only apply
-        // the values when no optimistic Settings write is mid-flight, so a
-        // reconnect's snapshot can't revert it.
+        // Mark prefs known so creation gates on the subscription, not a separate
+        // get_preferences. Skip the apply while a Settings write is in flight, so
+        // a reconnect's snapshot can't revert the optimistic change.
         host._prefsLoaded = true;
         if (host._prefsWritesInFlight === 0) {
           host.applyTheme(preferences.theme);
