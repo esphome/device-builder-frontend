@@ -265,6 +265,11 @@ export class ESPHomeApp extends LitElement {
   private static readonly PORT_TOAST_DEDUP_MS = 60_000;
 
   private _onSerialConnect = (event: Event) => {
+    // Device creation is hidden on remote-compute installs (and until prefs
+    // load once), so the dashboard's serial-setup handler no-ops; don't surface
+    // a USB-connect toast whose "Set up" action would be dead. Mirrors the
+    // dashboard's _hideDeviceCreation gate.
+    if (this._remoteComputeOnly || !this._prefsLoaded) return;
     // Suppress connect events that fire as a side-effect of our own
     // serial ops. esptool-js's chip reset toggles DTR/RTS, which on
     // native-USB chips (ESP32-C6 / S3 / C3) drops the USB device and
