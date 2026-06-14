@@ -57,6 +57,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
   switch (event) {
     case DeviceEventType.INITIAL_STATE: {
       const {
+        preferences,
         devices,
         importable,
         peers,
@@ -67,6 +68,19 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         remote_builds_enabled,
         version_match_policy,
       } = data as InitialStateEventData;
+      if (preferences) {
+        // Prefs ride the snapshot so device creation gates on the subscription,
+        // not a separate get_preferences. Mark them known either way; only apply
+        // the values when no optimistic Settings write is mid-flight, so a
+        // reconnect's snapshot can't revert it.
+        host._prefsLoaded = true;
+        if (host._prefsWritesInFlight === 0) {
+          host.applyTheme(preferences.theme);
+          host._yamlDiffButton = preferences.yaml_diff_button;
+          host._experienceLevel = preferences.experience_level;
+          host._remoteComputeOnly = preferences.remote_compute_only;
+        }
+      }
       host._devices = devices;
       host._importableDevices = importable;
       host._devicesLoaded = true;

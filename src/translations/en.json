@@ -1027,7 +1027,6 @@
     "experience": "Experience",
     "experience_intro": "Tailor the dashboard to how you work. This changes how much the interface shows by default; you can always reveal more.",
     "experience_save_failed": "Failed to save your preference",
-    "preferences_load_failed": "Could not load your preferences; some features are hidden until the connection recovers.",
     "remote_compute_only": "Only use this for remote compute",
     "remote_compute_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards.",
     "language": "Language",

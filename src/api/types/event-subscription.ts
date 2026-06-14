@@ -12,6 +12,7 @@ import {
 import { JobStatus, type FirmwareJob } from "./firmware-jobs.js";
 import type { OffloaderAlertSnapshotEntry } from "./remote-build-events.js";
 import type { PairingSummary, PeerSummary, RemoteBuildPeer } from "./remote-build.js";
+import type { UserPreferences } from "./system.js";
 
 // ─── Event Subscription ─────────────────────────────────────
 
@@ -148,6 +149,12 @@ export interface JobOutputEventData {
 
 /** Data payload for initial_state event. */
 export interface InitialStateEventData {
+  /** User preferences snapshot. Always sent (the backend reads defaults when
+   *  nothing is stored). The ``experience_level`` and ``remote_compute_only``
+   *  fields gate first-paint UI, so they ride the subscription snapshot rather
+   *  than a separate ``config/get_preferences`` round-trip; the app shell marks
+   *  ``_prefsLoaded`` from this and stops failing device creation closed. */
+  preferences?: UserPreferences;
   devices: ConfiguredDevice[];
   /** Discovered factory-firmware devices the dashboard knew about
    *  before this client subscribed. The backend follows up with

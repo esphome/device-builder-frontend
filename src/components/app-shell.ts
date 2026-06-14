@@ -131,18 +131,12 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: remoteComputeOnlyContext })
   @state()
   _remoteComputeOnly = false;
-  // False until the first successful preferences load; the dashboard fails
-  // device creation closed while it's false so a remote-compute install can't
-  // flash creation UI when the initial prefs fetch fails.
+  // False until the subscribe snapshot delivers preferences; the dashboard
+  // fails device creation closed while it's false so a remote-compute install
+  // can't flash creation UI before its prefs are known.
   @provide({ context: prefsLoadedContext })
   @state()
   _prefsLoaded = false;
-  // Guards the one-shot "preferences failed to load" toast so it isn't repeated
-  // on every reconnect; re-armed on the next successful load.
-  _prefsLoadErrorNotified = false;
-  // Pending hung-write fallback timer (at most one); cleared on a successful
-  // load so it can't accumulate across reconnects.
-  _prefsLoadFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
     CLEANUP_TTL_DEFAULT_SECONDS;
@@ -445,7 +439,6 @@ export class ESPHomeApp extends LitElement {
     subscribeToFollowJobs(this);
     void loadIntegrationDocs(this);
     void loadLabels(this);
-    void loadThemePreference(this);
     void loadRemoteBuildSettings(this);
     void loadOnboardingState(this);
   }

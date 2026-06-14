@@ -1,4 +1,3 @@
-import toast from "sonner-js";
 import { OnboardingStepId } from "../../api/types/system.js";
 import {
   isExperienceChosen,
@@ -60,80 +59,23 @@ export async function loadIntegrationDocs(host: ESPHomeApp): Promise<void> {
   }
 }
 
-const PREFS_LOAD_MAX_RETRIES = 3;
-const PREFS_LOAD_RETRY_DELAY_MS = 1000;
-// Bound for how long a still-in-flight write defers the load-failure toast.
-// A successful or failed write normally re-runs the load via afterPrefWrite
-// well within this; the fallback only catches a write whose promise never
-// settles (a hung socket), so the gated UI can't stay hidden with no cause.
-const PREFS_LOAD_HUNG_WRITE_TIMEOUT_MS = 10_000;
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function surfacePrefsLoadFailure(host: ESPHomeApp): void {
-  if (host._prefsLoaded || host._prefsLoadErrorNotified) return;
-  host._prefsLoadErrorNotified = true;
-  toast.error(host._localize("settings.preferences_load_failed"), { richColors: true });
-}
-
 export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
-  // Until prefs load once, _hideDeviceCreation gates creation closed for every
-  // install (not just remote-compute), so the first load must actually land.
-  // Retry a transient failure to recover on a healthy socket, and when a racing
-  // write blocks the load wait for it to settle rather than abandoning the first
-  // load until the next reconnect. Once loaded, a reconnect miss keeps the last
-  // good values, so don't spin.
-  for (let attempt = 0; ; attempt++) {
-    if (host._prefsWritesInFlight > 0) {
-      // A preference write is in flight — its optimistic value is the source of
-      // truth, so don't reload over it (a reconnect mid-write would otherwise
-      // revert experience / remote-compute). If prefs already loaded we're done;
-      // if they never have, wait for the write to settle and retry.
-      if (host._prefsLoaded || attempt >= PREFS_LOAD_MAX_RETRIES) break;
-      await delay(PREFS_LOAD_RETRY_DELAY_MS);
-      continue;
-    }
-    try {
-      const prefs = await host._api.getPreferences();
-      host.applyTheme(prefs.theme);
-      host._yamlDiffButton = prefs.yaml_diff_button;
-      host._experienceLevel = prefs.experience_level;
-      host._remoteComputeOnly = prefs.remote_compute_only;
-      // Prefs known: stop failing creation closed, re-arm the failure toast,
-      // and cancel any pending hung-write fallback.
-      host._prefsLoaded = true;
-      host._prefsLoadErrorNotified = false;
-      if (host._prefsLoadFallbackTimer !== null) {
-        clearTimeout(host._prefsLoadFallbackTimer);
-        host._prefsLoadFallbackTimer = null;
-      }
-      return;
-    } catch (err) {
-      // Non-fatal: the last successfully-loaded values are kept (none are
-      // reset here), and theme also has a localStorage fallback. Logged per
-      // attempt rather than toasted, since this runs on every reconnect.
-      console.warn("Failed to load preferences:", err);
-      if (host._prefsLoaded || attempt >= PREFS_LOAD_MAX_RETRIES) break;
-      await delay(PREFS_LOAD_RETRY_DELAY_MS);
-    }
+  // Boot/reconnect prefs arrive in the subscribe snapshot (see the INITIAL_STATE
+  // handler), which is what gates device creation. This refetch exists only so
+  // the onboarding wizard's direct persist is reflected in the live contexts
+  // without waiting for a reconnect. Skip while a write is in flight — the
+  // optimistic value is the source of truth until it settles.
+  if (host._prefsWritesInFlight > 0) return;
+  try {
+    const prefs = await host._api.getPreferences();
+    host.applyTheme(prefs.theme);
+    host._yamlDiffButton = prefs.yaml_diff_button;
+    host._experienceLevel = prefs.experience_level;
+    host._remoteComputeOnly = prefs.remote_compute_only;
+    host._prefsLoaded = true;
+  } catch (err) {
+    // Non-fatal: the snapshot already seeded these, and theme also has a
+    // localStorage fallback. Logged for diagnostics rather than toasted.
+    console.warn("Failed to refresh preferences:", err);
   }
-  // Terminal: prefs never loaded, so creation is gated closed for the whole
-  // install. Surface it once (not per reconnect) since the UI vanished without
-  // a visible cause.
-  if (host._prefsLoaded || host._prefsLoadErrorNotified) return;
-  if (host._prefsWritesInFlight > 0) {
-    // A still-pending write isn't a load failure — it shares the attempt budget
-    // and a slow write would otherwise toast falsely; a settled write re-runs
-    // this load via afterPrefWrite. Defer the toast behind a bounded timeout so
-    // a write whose promise never settles still surfaces the gated UI. Keep at
-    // most one pending timer so reconnects can't accumulate them.
-    if (host._prefsLoadFallbackTimer === null) {
-      host._prefsLoadFallbackTimer = setTimeout(() => {
-        host._prefsLoadFallbackTimer = null;
-        surfacePrefsLoadFailure(host);
-      }, PREFS_LOAD_HUNG_WRITE_TIMEOUT_MS);
-    }
-    return;
-  }
-  surfacePrefsLoadFailure(host);
 }

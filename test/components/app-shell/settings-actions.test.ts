@@ -16,13 +16,6 @@ vi.mock("sonner-js", () => ({
   },
 }));
 
-const { loadThemePreferenceMock } = vi.hoisted(() => ({
-  loadThemePreferenceMock: vi.fn(),
-}));
-vi.mock("../../../src/components/app-shell/data-load.js", () => ({
-  loadThemePreference: loadThemePreferenceMock,
-}));
-
 /** Let pending .catch()/.finally() microtasks run. */
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -33,7 +26,6 @@ type PrefsHost = Pick<
   | "_remoteComputeOnly"
   | "_localize"
   | "_prefsWritesInFlight"
-  | "_prefsLoaded"
 > & { _api: { updatePreferences: (p: Record<string, unknown>) => Promise<unknown> } };
 
 function makePrefsHost(
@@ -45,9 +37,6 @@ function makePrefsHost(
     _remoteComputeOnly: false,
     _localize: ((key: string) => key) as ESPHomeApp["_localize"],
     _prefsWritesInFlight: 0,
-    // Prefs already loaded in the normal Settings-toggle case, so afterPrefWrite
-    // doesn't re-run loadThemePreference.
-    _prefsLoaded: true,
     _api: { updatePreferences },
   };
 }
@@ -235,31 +224,5 @@ describe("prefs-write in-flight counter", () => {
     resolvers[1]();
     await flush();
     expect(host._prefsWritesInFlight).toBe(0);
-  });
-});
-
-describe("afterPrefWrite re-loads when the first prefs load never landed", () => {
-  beforeEach(() => loadThemePreferenceMock.mockClear());
-
-  it("re-runs the prefs load after a successful write when prefs are unloaded", async () => {
-    const host = makePrefsHost(vi.fn(async () => ({})));
-    host._prefsLoaded = false;
-    onSetRemoteComputeOnly(
-      host as unknown as ESPHomeApp,
-      new CustomEvent("set", { detail: true })
-    );
-    await flush();
-    expect(host._prefsWritesInFlight).toBe(0);
-    expect(loadThemePreferenceMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not re-run the load when prefs are already loaded", async () => {
-    const host = makePrefsHost(vi.fn(async () => ({})));
-    onSetRemoteComputeOnly(
-      host as unknown as ESPHomeApp,
-      new CustomEvent("set", { detail: true })
-    );
-    await flush();
-    expect(loadThemePreferenceMock).not.toHaveBeenCalled();
   });
 });
