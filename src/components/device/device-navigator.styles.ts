@@ -40,7 +40,9 @@ export const deviceNavigatorStyles = css`
     margin: 0;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
-    line-height: 1;
+    /* Not line-height 1: the ellipsis overflow:hidden would crop descenders
+       (the 'g' in #827). 1.4 leaves room and stays under the 22px header. */
+    line-height: 1.4;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
