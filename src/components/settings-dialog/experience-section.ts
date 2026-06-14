@@ -14,7 +14,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "../onboarding/choice-card-styles.js";
-import { renderChoiceCard } from "../onboarding/choice-card.js";
+import { onChoiceGroupKeydown, renderChoiceCard } from "../onboarding/choice-card.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -65,13 +65,16 @@ export class ESPHomeSettingsExperience extends LitElement {
         class="choices"
         role="radiogroup"
         aria-label=${this._localize("settings.experience")}
+        @keydown=${onChoiceGroupKeydown}
       >
-        ${EXPERIENCE_OPTIONS.map(([level, icon]) =>
+        ${EXPERIENCE_OPTIONS.map(([level, icon], i) =>
           renderChoiceCard({
             icon,
             title: this._localize(`onboarding.wizard.experience.${level}_title`),
             description: this._localize(`onboarding.wizard.experience.${level}_desc`),
             selected: this._experience === level,
+            tabbable:
+              this._experience === level || (this._experience === null && i === 0),
             onSelect: () => this._setExperience(level),
           })
         )}
