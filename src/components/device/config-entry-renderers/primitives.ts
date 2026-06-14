@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
+import { chipNameToVariant } from "../../../util/chip-variant.js";
 import {
   chooseDisplayUnit,
   defaultUnitForFloatWithUnit,
@@ -402,6 +403,24 @@ export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: Rend
   `;
 }
 
+// esp32's variant has no static default — it follows the chosen board. Derive
+// it from the live `board:` sibling (or the saved board) so the select shows
+// the board's variant greyed out as the default, like any other default. Only
+// returns a value that's actually one of the entry's options.
+function boardDerivedVariantDefault(
+  entry: ConfigEntry,
+  ctx: RenderCtx
+): string | undefined {
+  if (entry.key !== "variant" || ctx.sectionKey !== "esp32") return undefined;
+  const board = String(ctx.getAt(["board"]) ?? "");
+  const variant = board ? chipNameToVariant(board) : (ctx.board?.esphome.variant ?? "");
+  if (!variant) return undefined;
+  const lower = variant.toLowerCase();
+  return entry.options?.some((o) => o.value.toLowerCase() === lower)
+    ? variant
+    : undefined;
+}
+
 export function renderSelectField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
@@ -459,7 +478,9 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   // (ESP32C6 vs esp32c6) — case-insensitive compare so the matching option
   // still flags as selected.
   const valueLower = value.toLowerCase();
-  const defaultStr = entry.default_value != null ? String(entry.default_value) : "";
+  const defaultStr =
+    boardDerivedVariantDefault(entry, ctx) ??
+    (entry.default_value != null ? String(entry.default_value) : "");
   const defaultLower = defaultStr.toLowerCase();
   const defaultOption = entry.options?.find(
     (o) => o.value.toLowerCase() === defaultLower
