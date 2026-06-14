@@ -346,6 +346,19 @@ export function yamlHasMergedSources(yaml: string): boolean {
 }
 
 /**
+ * The candidate ESPHome auto-resolves an omitted reference to, or null when
+ * ambiguous — several candidates, none, or a `packages:`/`<<:` merge that
+ * could hide one. Shared by the id-reference picker (shows it as the default)
+ * and featured-add seeding (writes it).
+ */
+export function resolveSoleCandidate(
+  candidates: ReadonlyArray<{ id: string; name: string }>,
+  yaml: string
+): { id: string; name: string } | null {
+  return candidates.length === 1 && !yamlHasMergedSources(yaml) ? candidates[0] : null;
+}
+
+/**
  * Test-only: clear both memos so cache state can't leak between
  * cases. Production callers don't need this — within an editor
  * session the memo's eviction-on-key-change is the right

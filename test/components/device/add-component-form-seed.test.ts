@@ -35,15 +35,20 @@ function ags10Component(): ComponentCatalogEntry {
   } as unknown as ComponentCatalogEntry;
 }
 
-function seededValues(component: ComponentCatalogEntry): Record<string, unknown> {
+function seededValues(
+  component: ComponentCatalogEntry,
+  yaml = ""
+): Record<string, unknown> {
   const form = new ESPHomeAddComponentForm();
   const internals = form as unknown as {
     component: ComponentCatalogEntry;
+    yaml: string;
     _localize: (key: string) => string;
     _initValues: () => void;
     _values: Record<string, unknown>;
   };
   internals.component = component;
+  internals.yaml = yaml;
   internals._localize = (key) => key;
   internals._initValues();
   return internals._values;
@@ -79,52 +84,33 @@ describe("add-component-form resolves featured id references to the live config"
     } as unknown as ComponentCatalogEntry;
   }
 
-  function seedWithYaml(
-    component: ComponentCatalogEntry,
-    yaml: string
-  ): Record<string, unknown> {
-    const form = new ESPHomeAddComponentForm();
-    const internals = form as unknown as {
-      component: ComponentCatalogEntry;
-      yaml: string;
-      _localize: (key: string) => string;
-      _initValues: () => void;
-      _values: Record<string, unknown>;
-    };
-    internals.component = component;
-    internals.yaml = yaml;
-    internals._localize = (key) => key;
-    internals._initValues();
-    return internals._values;
-  }
-
   const ONE_BUS = "i2c:\n  - sda: 1\n    scl: 0\n    id: i2c_1\n";
   const TWO_BUSES = `${ONE_BUS}  - sda: 3\n    scl: 2\n    id: i2c_2\n`;
 
   it("fills the field with the sole existing bus instead of the stale preset", () => {
-    expect(seedWithYaml(batteryMonitor(), ONE_BUS).i2c_id).toBe("i2c_1");
+    expect(seededValues(batteryMonitor(), ONE_BUS).i2c_id).toBe("i2c_1");
   });
 
-  it("keeps a preset that names an existing bus", () => {
+  it("fills the sole bus even when its id equals the preset", () => {
     const yaml = "i2c:\n  - id: i2c_bus\n";
-    expect(seedWithYaml(batteryMonitor(), yaml).i2c_id).toBe("i2c_bus");
+    expect(seededValues(batteryMonitor(), yaml).i2c_id).toBe("i2c_bus");
   });
 
   it("leaves the field unset when two buses exist so the user picks", () => {
-    expect(seedWithYaml(batteryMonitor(), TWO_BUSES).i2c_id).toBeUndefined();
+    expect(seededValues(batteryMonitor(), TWO_BUSES).i2c_id).toBeUndefined();
   });
 
   it("leaves the field unset (not the literal) when no bus exists", () => {
-    expect(seedWithYaml(batteryMonitor(), "").i2c_id).toBeUndefined();
+    expect(seededValues(batteryMonitor(), "").i2c_id).toBeUndefined();
   });
 
   it("leaves the field unset when a packages merge could hide a bus", () => {
     const yaml = `packages:\n  base: !include base.yaml\n${ONE_BUS}`;
-    expect(seedWithYaml(batteryMonitor(), yaml).i2c_id).toBeUndefined();
+    expect(seededValues(batteryMonitor(), yaml).i2c_id).toBeUndefined();
   });
 
   it("keeps a locked reference's literal verbatim (bundled output pin)", () => {
-    expect(seedWithYaml(batteryMonitor(true), ONE_BUS).i2c_id).toBe("i2c_bus");
+    expect(seededValues(batteryMonitor(true), ONE_BUS).i2c_id).toBe("i2c_bus");
   });
 });
 

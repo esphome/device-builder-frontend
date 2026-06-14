@@ -16,7 +16,7 @@ import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
 import {
   findReferenceCandidates,
-  yamlHasMergedSources,
+  resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
 import { validateEntries, type ValidationError } from "../../util/config-validation.js";
 import {
@@ -281,8 +281,8 @@ export class ESPHomeAddComponentForm extends LitElement {
       // preset (`i2c_bus`) can't outlive the bus it names. Locked refs are
       // deliberate pins — keep their literal.
       if (entry.references_component && !entry.locked) {
-        const ref = this._seedReference(entry);
-        if (ref !== undefined) out[entry.key] = ref;
+        const ref = this._seedReference(entry.references_component);
+        if (ref !== undefined) out[entry.key] = entry.multi_value ? [ref] : ref;
         continue;
       }
       if (entry.default_value != null) {
@@ -297,21 +297,16 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   /**
-   * Seed value for an id-reference field: a preset that names a real
-   * component, else the sole existing match. Ambiguous (none / several /
-   * merged sources) → unset, deferring to the dep detour or the picker.
+   * Seed an unlocked id-reference field with the bus already in the config, so
+   * a stale featured preset can't write an id that doesn't exist. Ambiguous
+   * cases — none, several, or a `packages:`/`<<:` merge that could hide one —
+   * stay unset, deferring to the dep detour or the picker.
    */
-  private _seedReference(entry: ConfigEntry): string | undefined {
-    const domain = entry.references_component!;
-    const preset = entry.default_value != null ? String(entry.default_value) : null;
+  private _seedReference(domain: string): string | undefined {
     // Same-domain provider covers bus refs (i2c/spi/uart); async cross-domain
     // interface providers are unavailable here, so those defer to the picker.
     const candidates = findReferenceCandidates(this.yaml, domain, []);
-    if (preset && candidates.some((c) => c.id === preset)) return preset;
-    if (candidates.length === 1 && !yamlHasMergedSources(this.yaml)) {
-      return candidates[0].id;
-    }
-    return undefined;
+    return resolveSoleCandidate(candidates, this.yaml)?.id;
   }
 
   private _generateDefaultId(): string | null {

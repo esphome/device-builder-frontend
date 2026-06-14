@@ -9,7 +9,7 @@ import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import {
   findReferenceCandidates,
-  yamlHasMergedSources,
+  resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
 import {
   effectiveDisabled,
@@ -39,14 +39,10 @@ export function renderIdReferenceField(
   const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
 
-  // ESPHome auto-resolves an omitted reference when exactly one matching
-  // component exists. Surface that target as the default — but only when the
-  // scan can see the whole config; a `packages:` / `<<:` merge could hide a
-  // second match, making "the one we see" the wrong (or ambiguous) target.
+  // Surface ESPHome's auto-resolved target as the default, but only on an
+  // empty field — a committed value isn't a "default".
   const defaultCandidate =
-    value === "" && candidates.length === 1 && !yamlHasMergedSources(ctx.yaml)
-      ? candidates[0]
-      : null;
+    value === "" ? resolveSoleCandidate(candidates, ctx.yaml) : null;
 
   const idOption = (optValue: string, primary: string, secondary: string) => html`
     <wa-option
