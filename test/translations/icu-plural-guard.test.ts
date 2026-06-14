@@ -29,12 +29,24 @@ describe("en.json plural copy uses ICU MessageFormat (#1462)", () => {
     expect(offenders, "use {count, plural, one {…} other {…}} instead").toEqual([]);
   });
 
-  it("has no `_one`/`_other` suffix key pairs", () => {
-    const offenders = [...ENTRIES.keys()]
-      .filter(
-        (path) => path.endsWith("_one") && ENTRIES.has(`${path.slice(0, -4)}_other`)
-      )
-      .map((path) => path.slice(0, -4));
+  it("has no suffix-based plural key groups", () => {
+    // Flag any stem carrying two or more plural-category suffixes
+    // (`one`/`other`, `zero`/`one`, …) — a half-migration leaves a
+    // partner behind. A lone suffix is left alone so non-plural enum
+    // labels like `pin_group_other` ("Other pins") don't false-positive.
+    const PLURAL_SUFFIXES = ["_zero", "_one", "_two", "_few", "_many", "_other"];
+    const byStem = new Map<string, Set<string>>();
+    for (const path of ENTRIES.keys()) {
+      const suffix = PLURAL_SUFFIXES.find((s) => path.endsWith(s));
+      if (!suffix) continue;
+      const stem = path.slice(0, -suffix.length);
+      let suffixes = byStem.get(stem);
+      if (!suffixes) byStem.set(stem, (suffixes = new Set()));
+      suffixes.add(suffix);
+    }
+    const offenders = [...byStem]
+      .filter(([, suffixes]) => suffixes.size >= 2)
+      .map(([stem]) => stem);
     expect(offenders, "collapse into one inline-ICU key").toEqual([]);
   });
 });
