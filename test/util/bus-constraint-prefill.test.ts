@@ -107,4 +107,25 @@ describe("busConstraintPrefill", () => {
   test("drops a baud constraint equal to the default (seed already supplies it)", () => {
     expect(busConstraintPrefill(baudDefaulted, { baud_rate: 115200 })).toBeNull();
   });
+
+  test("a list baud constraint narrows the options and defaults to the first", () => {
+    // CN105's variable rate -> offer 2400/9600, default 2400.
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: [2400, 9600] })).toEqual({
+      fields: { baud_rate: 2400 },
+      required: [],
+      optionOverrides: { baud_rate: [2400, 9600] },
+    });
+  });
+
+  test("a list whose first value equals the default still narrows but skips the prefill", () => {
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: [115200, 9600] })).toEqual({
+      fields: {},
+      required: [],
+      optionOverrides: { baud_rate: [115200, 9600] },
+    });
+  });
+
+  test("an empty list contributes nothing", () => {
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: [] })).toBeNull();
+  });
 });

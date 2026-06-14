@@ -79,6 +79,12 @@ export class ESPHomeAddComponentForm extends LitElement {
   @property({ attribute: false })
   extraRequired: string[] | null = null;
 
+  /** Per-field dropdown narrowing the requester imposes via a list
+   *  `bus_constraints` value (CN105 -> baud_rate [2400, 9600]); the
+   *  matching entry's `options` are limited to these, defaulting first. */
+  @property({ attribute: false })
+  optionOverrides: Record<string, (string | number)[]> | null = null;
+
   @property({ type: Boolean })
   submitting = false;
 
@@ -125,8 +131,34 @@ export class ESPHomeAddComponentForm extends LitElement {
     }
   );
 
+  /** Narrow an entry's dropdown to a requester-imposed choice set and
+   *  default it to the first. `allow_custom_value` is left untouched, so a
+   *  combo box (baud) keeps the dropdown to the choices but still accepts a
+   *  typed-in value (a CN105 on a non-standard rate). Memoized to keep
+   *  `.entries` render-stable. */
+  private _overlayOptions = memoizeOne(
+    (
+      entries: ConfigEntry[],
+      overrides: Record<string, (string | number)[]> | null
+    ): ConfigEntry[] => {
+      if (!overrides || Object.keys(overrides).length === 0) return entries;
+      return entries.map((e) => {
+        const choices = overrides[e.key];
+        if (!choices?.length) return e;
+        return {
+          ...e,
+          options: choices.map((v) => ({ label: String(v), value: String(v) })),
+          default_value: choices[0],
+        };
+      });
+    }
+  );
+
   private get _entries(): ConfigEntry[] {
-    return this._overlayRequired(this.component.config_entries, this.extraRequired);
+    return this._overlayOptions(
+      this._overlayRequired(this.component.config_entries, this.extraRequired),
+      this.optionOverrides
+    );
   }
 
   /** True once we've seeded `_values` for the current component. */
