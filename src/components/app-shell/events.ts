@@ -68,17 +68,16 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         remote_builds_enabled,
         version_match_policy,
       } = data as InitialStateEventData;
-      if (preferences) {
-        // Mark prefs known so creation gates on the subscription, not a separate
-        // get_preferences. Skip the apply while a Settings write is in flight, so
-        // a reconnect's snapshot can't revert the optimistic change.
-        host._prefsLoaded = true;
-        if (host._prefsWritesInFlight === 0) {
-          host.applyTheme(preferences.theme);
-          host._yamlDiffButton = preferences.yaml_diff_button;
-          host._experienceLevel = preferences.experience_level;
-          host._remoteComputeOnly = preferences.remote_compute_only;
-        }
+      // Mark prefs known so creation gates on the subscription, not a separate
+      // get_preferences (preferences is always present). Skip the apply while a
+      // Settings write is in flight, so a reconnect's snapshot can't revert the
+      // optimistic change.
+      host._prefsLoaded = true;
+      if (host._prefsWritesInFlight === 0) {
+        host.applyTheme(preferences.theme);
+        host._yamlDiffButton = preferences.yaml_diff_button;
+        host._experienceLevel = preferences.experience_level;
+        host._remoteComputeOnly = preferences.remote_compute_only;
       }
       host._devices = devices;
       host._importableDevices = importable;

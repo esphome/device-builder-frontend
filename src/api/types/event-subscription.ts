@@ -150,11 +150,12 @@ export interface JobOutputEventData {
 /** Data payload for initial_state event. */
 export interface InitialStateEventData {
   /** User preferences snapshot. Always sent (the backend reads defaults when
-   *  nothing is stored). The ``experience_level`` and ``remote_compute_only``
-   *  fields gate first-paint UI, so they ride the subscription snapshot rather
-   *  than a separate ``config/get_preferences`` round-trip; the app shell marks
+   *  nothing is stored), so the type is required — lockstep deployment rules out
+   *  version skew. The ``experience_level`` and ``remote_compute_only`` fields
+   *  gate first-paint UI, so they ride the subscription snapshot rather than a
+   *  separate ``config/get_preferences`` round-trip; the app shell marks
    *  ``_prefsLoaded`` from this and stops failing device creation closed. */
-  preferences?: UserPreferences;
+  preferences: UserPreferences;
   devices: ConfiguredDevice[];
   /** Discovered factory-firmware devices the dashboard knew about
    *  before this client subscribed. The backend follows up with

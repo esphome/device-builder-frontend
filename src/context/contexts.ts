@@ -92,10 +92,10 @@ export const yamlDiffButtonContext = createContext<boolean>(
 /**
  * Context for the chosen experience level (``null`` until picked).
  *
- * App shell loads it from ``config/get_preferences`` on boot and
- * updates it when the user re-picks in Settings → Experience. The
- * editor reads it to seed the YAML pane on first open; the Settings
- * section reads it to highlight the active choice.
+ * App shell sets it from the ``subscribe_events`` ``initial_state`` snapshot
+ * and updates it when the user re-picks in Settings → Experience. The editor
+ * reads it to seed the YAML pane on first open; the Settings section reads it
+ * to highlight the active choice.
  */
 export const experienceLevelContext = createContext<ExperienceLevel | null>(
   Symbol("esphome-experience-level")
@@ -105,21 +105,20 @@ export const experienceLevelContext = createContext<ExperienceLevel | null>(
  * Context for whether this install is remote-compute-only.
  *
  * When ``true`` the device-creation entry points (New device, Adopt,
- * Import, serial auto-wizard) are hidden. Loaded from
- * ``config/get_preferences`` on boot, toggled in Settings → Experience.
+ * Import, serial auto-wizard) are hidden. Set from the ``subscribe_events``
+ * ``initial_state`` snapshot, toggled in Settings → Experience.
  */
 export const remoteComputeOnlyContext = createContext<boolean>(
   Symbol("esphome-remote-compute-only")
 );
 
 /**
- * Context for whether preferences have loaded at least once this session.
+ * Context for whether preferences have arrived at least once this session.
  *
- * ``false`` until the first successful ``config/get_preferences``. The
- * dashboard fails the device-creation gate closed while it's ``false`` so a
- * remote-compute-only install can't flash creation UI if the initial prefs
- * fetch fails (``remote_compute_only`` would still be at its permissive
- * default).
+ * ``false`` until the first ``subscribe_events`` ``initial_state`` snapshot sets
+ * it. The dashboard fails the device-creation gate closed while it's ``false``
+ * so a remote-compute-only install can't flash creation UI before its prefs are
+ * known (``remote_compute_only`` would still be at its permissive default).
  */
 export const prefsLoadedContext = createContext<boolean>(Symbol("esphome-prefs-loaded"));
 

@@ -43,7 +43,7 @@ function makeHost() {
   };
 }
 
-function snapshot(preferences: UserPreferences | undefined): InitialStateEventData {
+function snapshot(preferences: UserPreferences): InitialStateEventData {
   return { preferences, devices: [], importable: [] };
 }
 
@@ -73,11 +73,5 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     expect(host._remoteComputeOnly).toBe(false);
     expect(host._experienceLevel).toBe(ExperienceLevel.BEGINNER);
     expect(host.applyTheme).not.toHaveBeenCalled();
-  });
-
-  it("leaves prefs unloaded when the snapshot omits preferences", () => {
-    const host = makeHost();
-    dispatch(host, snapshot(undefined));
-    expect(host._prefsLoaded).toBe(false);
   });
 });
