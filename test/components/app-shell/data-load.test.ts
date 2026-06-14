@@ -113,6 +113,7 @@ describe("loadThemePreference in-flight gate", () => {
       _remoteComputeOnly: false,
       _prefsLoaded: false,
       _prefsLoadErrorNotified: false,
+      _prefsLoadFallbackTimer: null as ReturnType<typeof setTimeout> | null,
       _localize: ((key: string) => key) as ESPHomeApp["_localize"],
       applyTheme: vi.fn(),
       _api: { getPreferences: vi.fn(async () => prefs) },
@@ -200,6 +201,30 @@ describe("loadThemePreference in-flight gate", () => {
       expect(host._api.getPreferences).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
       // After the bounded hung-write fallback elapses, the gated UI is surfaced.
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(toastError).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a single hung-write fallback timer across repeated calls", async () => {
+    vi.useFakeTimers();
+    try {
+      const host = makePrefsHost();
+      host._prefsWritesInFlight = 1; // hung write: never settles
+      // First reconnect: exhaust the retry budget, break, schedule the fallback.
+      const first = loadThemePreference(host as unknown as ESPHomeApp);
+      await vi.advanceTimersByTimeAsync(1000 * 3 + 100);
+      await first;
+      const timer = host._prefsLoadFallbackTimer;
+      expect(timer).not.toBeNull();
+      // A second reconnect must reuse the pending timer, not stack another.
+      const second = loadThemePreference(host as unknown as ESPHomeApp);
+      await vi.advanceTimersByTimeAsync(1000 * 3 + 100);
+      await second;
+      expect(host._prefsLoadFallbackTimer).toBe(timer);
+      // And the toast still fires exactly once.
       await vi.advanceTimersByTimeAsync(10_000);
       expect(toastError).toHaveBeenCalledTimes(1);
     } finally {

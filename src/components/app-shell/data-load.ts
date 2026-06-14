@@ -99,9 +99,14 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
       host._yamlDiffButton = prefs.yaml_diff_button;
       host._experienceLevel = prefs.experience_level;
       host._remoteComputeOnly = prefs.remote_compute_only;
-      // Prefs known: stop failing creation closed and re-arm the failure toast.
+      // Prefs known: stop failing creation closed, re-arm the failure toast,
+      // and cancel any pending hung-write fallback.
       host._prefsLoaded = true;
       host._prefsLoadErrorNotified = false;
+      if (host._prefsLoadFallbackTimer !== null) {
+        clearTimeout(host._prefsLoadFallbackTimer);
+        host._prefsLoadFallbackTimer = null;
+      }
       return;
     } catch (err) {
       // Non-fatal: the last successfully-loaded values are kept (none are
@@ -120,8 +125,14 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
     // A still-pending write isn't a load failure — it shares the attempt budget
     // and a slow write would otherwise toast falsely; a settled write re-runs
     // this load via afterPrefWrite. Defer the toast behind a bounded timeout so
-    // a write whose promise never settles still surfaces the gated UI.
-    setTimeout(() => surfacePrefsLoadFailure(host), PREFS_LOAD_HUNG_WRITE_TIMEOUT_MS);
+    // a write whose promise never settles still surfaces the gated UI. Keep at
+    // most one pending timer so reconnects can't accumulate them.
+    if (host._prefsLoadFallbackTimer === null) {
+      host._prefsLoadFallbackTimer = setTimeout(() => {
+        host._prefsLoadFallbackTimer = null;
+        surfacePrefsLoadFailure(host);
+      }, PREFS_LOAD_HUNG_WRITE_TIMEOUT_MS);
+    }
     return;
   }
   surfacePrefsLoadFailure(host);

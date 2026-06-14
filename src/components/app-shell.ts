@@ -140,6 +140,9 @@ export class ESPHomeApp extends LitElement {
   // Guards the one-shot "preferences failed to load" toast so it isn't repeated
   // on every reconnect; re-armed on the next successful load.
   _prefsLoadErrorNotified = false;
+  // Pending hung-write fallback timer (at most one); cleared on a successful
+  // load so it can't accumulate across reconnects.
+  _prefsLoadFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
     CLEANUP_TTL_DEFAULT_SECONDS;
