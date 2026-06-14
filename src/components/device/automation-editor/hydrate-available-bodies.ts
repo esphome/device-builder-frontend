@@ -151,10 +151,9 @@ export function resolveLoadedAvailable(
   const { missingBody, missingField, rejected } = outcome.hydration;
   const failures = missingBody + missingField + rejected;
   if (failures > 0) {
-    toast.error(
-      localize("device.automation_partial_hydration", { count: String(failures) }),
-      { richColors: true }
-    );
+    toast.error(localize("device.automation_partial_hydration", { count: failures }), {
+      richColors: true,
+    });
   }
   return { available: outcome.available };
 }

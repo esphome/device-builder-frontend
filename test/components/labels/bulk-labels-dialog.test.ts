@@ -651,7 +651,7 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     // dialog's default ``_localize`` returns the key unchanged
     // when no provider is attached). Asserts we don't regress
     // back to the single-device ``labels_save_failed`` key.
-    expect(errorSpy.mock.calls[0]?.[0]).toBe("dashboard.labels_bulk_save_failed_other");
+    expect(errorSpy.mock.calls[0]?.[0]).toBe("dashboard.labels_bulk_save_failed");
     // The dialog does NOT close on transport failure (so the user
     // can retry without losing their tri-state edits).
     expect(dialog._open).toBe(true);
@@ -677,7 +677,7 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     await dialog._apply();
 
     expect(errorSpy).toHaveBeenCalledTimes(1);
-    expect(errorSpy.mock.calls[0]?.[0]).toBe("dashboard.labels_bulk_save_failed_other");
+    expect(errorSpy.mock.calls[0]?.[0]).toBe("dashboard.labels_bulk_save_failed");
     expect(dialog._open).toBe(true);
     expect(dialog._saving).toBe(false);
   });

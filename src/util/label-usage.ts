@@ -47,22 +47,6 @@ export function computeLabelUsage(
 }
 
 /**
- * Pick the translation key for the delete-confirm body based on
- * how many devices currently carry the label.
- *
- * The filter component uses three flat keys instead of an ICU
- * plural string because the project's ``localize`` helper does
- * straight ``{name}`` interpolation only — it doesn't speak ICU.
- * Centralising the picker here keeps the cutoff in one place and
- * makes the contract testable without rendering the popover.
- */
-export function deleteConfirmKey(usage: number): string {
-  if (usage === 0) return "dashboard.labels_delete_confirm_zero";
-  if (usage === 1) return "dashboard.labels_delete_confirm_one";
-  return "dashboard.labels_delete_confirm_other";
-}
-
-/**
  * Case-insensitive duplicate-name check, with an optional
  * exclusion for "the label currently being edited".
  *

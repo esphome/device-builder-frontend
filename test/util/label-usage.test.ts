@@ -10,7 +10,6 @@
 import { describe, expect, it } from "vitest";
 import {
   computeLabelUsage,
-  deleteConfirmKey,
   isLabelNameDuplicate,
   type LabelUsageDevice,
 } from "../../src/util/label-usage.js";
@@ -57,22 +56,6 @@ describe("computeLabelUsage", () => {
     // The delete-confirm dialog reads ``usage[id] ?? 0`` so an
     // omitted key gives the same answer as an explicit 0.
     expect(usage["bedroom"] ?? 0).toBe(0);
-  });
-});
-
-describe("deleteConfirmKey", () => {
-  it("returns the zero-key when no devices carry the label", () => {
-    expect(deleteConfirmKey(0)).toBe("dashboard.labels_delete_confirm_zero");
-  });
-
-  it("returns the one-key for exactly one device", () => {
-    expect(deleteConfirmKey(1)).toBe("dashboard.labels_delete_confirm_one");
-  });
-
-  it("returns the other-key for any count > 1", () => {
-    expect(deleteConfirmKey(2)).toBe("dashboard.labels_delete_confirm_other");
-    expect(deleteConfirmKey(7)).toBe("dashboard.labels_delete_confirm_other");
-    expect(deleteConfirmKey(99)).toBe("dashboard.labels_delete_confirm_other");
   });
 });
 
