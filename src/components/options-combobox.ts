@@ -166,7 +166,12 @@ export class ESPHomeOptionsCombobox extends LitElement {
     this._committed = this.value;
     this._query = this.value;
     this._dirty = false;
-    this._active = -1;
+    // Highlight the current value and scroll it into view, so a pre-filled
+    // field opens focused on its own selection instead of the top of the
+    // list; arrow keys then move relative to it. -1 (nothing active) when
+    // the value is free text not in the options.
+    this._active = this.options.findIndex((o) => o.value === this.value);
+    if (this._active >= 0) this._scrollActiveIntoView();
   };
 
   private _close = () => {
