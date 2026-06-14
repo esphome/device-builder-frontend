@@ -211,9 +211,11 @@ export function renderEmptySearch(host: ESPHomePageDashboard): TemplateResult {
   `;
 }
 
-export function renderAddDeviceCard(host: ESPHomePageDashboard): TemplateResult | string {
+export function renderAddDeviceCard(
+  host: ESPHomePageDashboard
+): TemplateResult | typeof nothing {
   // Remote-compute installs don't create devices.
-  if (host._hideDeviceCreation) return "";
+  if (host._hideDeviceCreation) return nothing;
   return html`
     <div class="add-device-card" @click=${() => host._createDialog.open()}>
       <div class="add-device-icon-wrap">
