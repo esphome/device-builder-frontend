@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type OnboardingState,
+  type OnboardingStep,
   OnboardingStepId,
   OnboardingStepStatus,
 } from "../../src/api/types/system.js";
@@ -32,7 +33,7 @@ const experience = (status: OnboardingStepStatus) => ({
 });
 
 const stateWith = (
-  steps: ReturnType<typeof wifi>[],
+  steps: OnboardingStep[],
   current_version = 1,
   completed_version = 0
 ): OnboardingState => ({
