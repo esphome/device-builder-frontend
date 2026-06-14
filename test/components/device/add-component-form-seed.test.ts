@@ -185,5 +185,7 @@ describe("add-component-form dep-add bus prefill (#1425)", () => {
       { label: "1 bit", value: "1" },
       { label: "2 bits", value: "2" },
     ]);
+    // STRING entry keeps a string default, not a coerced number.
+    expect(stop.default_value).toBe("1");
   });
 });

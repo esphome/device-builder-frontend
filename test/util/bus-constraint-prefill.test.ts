@@ -128,4 +128,18 @@ describe("busConstraintPrefill", () => {
   test("an empty list contributes nothing", () => {
     expect(busConstraintPrefill(baudDefaulted, { baud_rate: [] })).toBeNull();
   });
+
+  test("ignores a list constraint on a multi_value field", () => {
+    const multi = [
+      makeConfigEntry({ key: "addrs", type: ConfigEntryType.STRING, multi_value: true }),
+    ];
+    expect(busConstraintPrefill(multi, { addrs: ["a", "b"] })).toBeNull();
+  });
+
+  test("drops non-primitive entries from a list constraint", () => {
+    const result = busConstraintPrefill(baudDefaulted, {
+      baud_rate: [2400, { bad: true }, 9600] as unknown as (string | number)[],
+    });
+    expect(result?.optionOverrides).toEqual({ baud_rate: [2400, 9600] });
+  });
 });

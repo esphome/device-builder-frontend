@@ -28,6 +28,7 @@ import {
 } from "../../util/yaml-serialize.js";
 import { findMissingDependencies } from "./add-component-deps.js";
 import { coerceFields } from "./add-component-form-coerce.js";
+import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
@@ -119,47 +120,9 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   static styles = [espHomeStyles, inputStyles, addComponentFormStyles];
 
-  /** Schema with `extraRequired` keys overlaid as required. Memoized so
-   *  the shared form's `.entries` identity is render-stable. */
-  private _overlayRequired = memoizeOne(
-    (entries: ConfigEntry[], extra: string[] | null): ConfigEntry[] => {
-      if (!extra?.length) return entries;
-      const keys = new Set(extra);
-      return entries.map((e) =>
-        keys.has(e.key) && !e.required ? { ...e, required: true } : e
-      );
-    }
-  );
-
-  /** Narrow an entry's dropdown to a requester-imposed choice set and
-   *  default it to the first. `allow_custom_value` is left untouched, so a
-   *  combo box (baud) keeps the dropdown to the choices but still accepts a
-   *  typed-in value (a CN105 on a non-standard rate). Memoized to keep
-   *  `.entries` render-stable. */
-  private _overlayOptions = memoizeOne(
-    (
-      entries: ConfigEntry[],
-      overrides: Record<string, (string | number)[]> | null
-    ): ConfigEntry[] => {
-      if (!overrides || Object.keys(overrides).length === 0) return entries;
-      return entries.map((e) => {
-        const choices = overrides[e.key];
-        if (!choices?.length) return e;
-        // Filter the entry's existing options to the constrained subset so a
-        // labeled field (a future `parity` / `stop_bits` with label !== value)
-        // keeps its human-readable labels; synthesize only when it had none
-        // (the baud case, where label and value are the same number).
-        const byValue = new Map((e.options ?? []).map((o) => [o.value, o]));
-        return {
-          ...e,
-          options: choices.map(
-            (v) => byValue.get(String(v)) ?? { label: String(v), value: String(v) }
-          ),
-          default_value: choices[0],
-        };
-      });
-    }
-  );
+  // Memoized so the shared form's `.entries` identity is render-stable.
+  private _overlayRequired = memoizeOne(overlayRequired);
+  private _overlayOptions = memoizeOne(overlayOptions);
 
   private get _entries(): ConfigEntry[] {
     return this._overlayOptions(

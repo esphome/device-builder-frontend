@@ -48,12 +48,18 @@ export function busConstraintPrefill(
     }
     const entry = entryOf(key);
     if (!entry) continue;
-    // A list constraint narrows the field to those choices and defaults
-    // to the first (e.g. CN105's variable 2400/9600 baud).
+    // A list constraint narrows a single-value select/combobox to those
+    // choices, default-first (CN105's variable 2400/9600 baud). A multi_value
+    // field's list isn't a dropdown; keep only primitive choices.
     if (Array.isArray(value)) {
-      if (value.length === 0) continue;
-      optionOverrides[key] = value as (string | number)[];
-      const first = value[0];
+      const choices = entry.multi_value
+        ? []
+        : value.filter(
+            (v): v is string | number => typeof v === "string" || typeof v === "number"
+          );
+      if (choices.length === 0) continue;
+      optionOverrides[key] = choices;
+      const first = choices[0];
       const dflt = entry.default_value;
       if (dflt === null || dflt === undefined || String(dflt) !== String(first)) {
         fields[key] = entry.type === ConfigEntryType.STRING ? String(first) : first;
