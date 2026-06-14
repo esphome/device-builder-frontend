@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { ConfigValueOption } from "../../../src/api/types/config-entries.js";
+import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
+import type {
+  ConfigEntry,
+  ConfigValueOption,
+} from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderSelectField } from "../../../src/components/device/config-entry-renderers/primitives.js";
 import {
@@ -23,18 +27,22 @@ const serialize = (tpl: unknown): string =>
 
 function renderVariant(
   values: unknown,
-  options: { sectionKey?: string; board?: unknown; default_value?: unknown } = {}
+  options: {
+    sectionKey?: string;
+    board?: BoardCatalogEntry | null;
+    default_value?: ConfigEntry["default_value"];
+  } = {}
 ): unknown {
   const { sectionKey = "esp32", default_value = null } = options;
   const entry = makeEntry(ConfigEntryType.SELECT, {
     key: "variant",
     options: VARIANT_OPTIONS,
-    default_value: default_value as never,
+    default_value,
   });
-  const ctxOptions: { board?: never; overrides: { sectionKey: string } } = {
+  const ctxOptions: Parameters<typeof makeRenderCtx>[1] = {
     overrides: { sectionKey },
   };
-  if ("board" in options) ctxOptions.board = options.board as never;
+  if ("board" in options) ctxOptions.board = options.board;
   return renderSelectField(entry, ["variant"], makeRenderCtx(values, ctxOptions));
 }
 
@@ -57,10 +65,25 @@ describe("renderSelectField — esp32 variant default from board", () => {
   it("falls back to the saved board's variant when nothing is typed", () => {
     const board = makeTestBoard({
       overrides: {
-        esphome: { platform: "esp32", board: "esp32-c6-devkitm-1", variant: "esp32c6" },
-      } as never,
+        esphome: {
+          platform: "esp32",
+          board: "esp32-c6-devkitm-1",
+          variant: "esp32c6",
+          framework: null,
+        },
+      },
     });
     expect(selectPlaceholder(renderVariant({}, { board }))).toBe("ESP32-C6");
+  });
+
+  it("falls back to the static default when the board's variant isn't an option", () => {
+    // esp32-s2 derives esp32s2, absent from VARIANT_OPTIONS — the membership
+    // gate must reject it so a board off the option list doesn't leak through.
+    expect(
+      selectPlaceholder(
+        renderVariant({ board: "esp32-s2-saola-1" }, { default_value: "ESP32" })
+      )
+    ).toBe("ESP32");
   });
 
   it("does not derive outside the esp32 section, so the static default wins", () => {
