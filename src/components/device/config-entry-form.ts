@@ -33,7 +33,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import {
-  parseCatalogId,
+  catalogEntryToProvider,
   type ComponentProvider,
 } from "../../util/config-entry-yaml-scan.js";
 import { type ValidationError } from "../../util/config-validation.js";
@@ -803,7 +803,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         .then((resp) => {
           this._interfaceProviders.set(
             interfaceName,
-            resp.components.map((c) => parseCatalogId(c.id))
+            resp.components.map((c) => catalogEntryToProvider(c, interfaceName))
           );
           this.requestUpdate();
         })

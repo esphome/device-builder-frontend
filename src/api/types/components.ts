@@ -108,6 +108,11 @@ export interface ComponentCatalogEntry {
   /** Interfaces this component can be referenced *as* beyond its own domain
    *  (an `adc` sensor provides `voltage_sampler`). */
   provides?: string[];
+  /** For a provided interface whose id is nested rather than the component's
+   *  own top-level id (usb_uart exposes a uart via channels[].id), the YAML
+   *  key-paths to descend, keyed by interface (one per nested location).
+   *  Absent for own-id providers. */
+  provides_id_paths?: Record<string, string[][]>;
   /** Requirements this component imposes on the bus it attaches to, keyed
    *  by bus id ('i2c' / 'spi' / 'uart'): exact-match values (baud_rate,
    *  parity, ...), range bounds (min/max_frequency in Hz) and required

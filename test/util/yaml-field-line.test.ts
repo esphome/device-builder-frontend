@@ -152,6 +152,17 @@ describe("findFieldLine", () => {
     expect(findFieldLine(yaml, section, ["substitutions", "name"])).toBe(3);
   });
 
+  it("keeps a numeric mapping key a key when a sibling holds a compact block-sequence", () => {
+    // ``0:`` is a literal key; the ``items:`` sibling's compact dashes sit at
+    // the same indent, but list-vs-mapping is decided by the *first* content
+    // line, so the numeric segment must not resolve as a list index here.
+    const yaml = ["substitutions:", "  0: zero", "  items:", "  - a", "  - b", ""].join(
+      "\n"
+    );
+    const section = sectionAt(yaml, 1);
+    expect(findFieldLine(yaml, section, ["substitutions", "0"])).toBe(2);
+  });
+
   it("targets the correct instance among duplicates", () => {
     const yaml = [
       "binary_sensor:",

@@ -22,7 +22,10 @@
 import { type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
-import { findReferenceCandidates, parseCatalogId } from "./config-entry-yaml-scan.js";
+import {
+  catalogEntryToProvider,
+  findReferenceCandidates,
+} from "./config-entry-yaml-scan.js";
 import { getConfigVarValueOptions } from "./esphome-schema.js";
 import { collectSubstitutionKeys, isUnderAutomationItem } from "./yaml-ast.js";
 import {
@@ -181,7 +184,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
         const domain = entry.references_component;
         const providers = catalog.components
           .filter((c) => c.provides?.includes(domain))
-          .map((c) => parseCatalogId(c.id));
+          .map((c) => catalogEntryToProvider(c, domain));
         const candidates = findReferenceCandidates(
           state.doc.toString(),
           domain,
