@@ -158,4 +158,32 @@ describe("add-component-form dep-add bus prefill (#1425)", () => {
     // allow_custom_value is preserved so an unknown CN105 rate can be typed.
     expect(baud.allow_custom_value).toBe(true);
   });
+
+  it("preserves an existing entry's labels when narrowing a labeled field", () => {
+    const form = uartForm() as ReturnType<typeof uartForm> & {
+      component: ComponentCatalogEntry;
+      optionOverrides: Record<string, (string | number)[]> | null;
+      _entries: ConfigEntry[];
+    };
+    form.component = {
+      id: "uart",
+      config_entries: [
+        makeConfigEntry({
+          key: "stop_bits",
+          type: ConfigEntryType.STRING,
+          options: [
+            { label: "1 bit", value: "1" },
+            { label: "2 bits", value: "2" },
+          ],
+        }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    form.optionOverrides = { stop_bits: ["1", "2"] };
+    const stop = form._entries.find((e) => e.key === "stop_bits")!;
+    // Catalog labels survive; only the constrained subset remains.
+    expect(stop.options).toEqual([
+      { label: "1 bit", value: "1" },
+      { label: "2 bits", value: "2" },
+    ]);
+  });
 });

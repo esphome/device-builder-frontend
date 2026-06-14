@@ -145,9 +145,16 @@ export class ESPHomeAddComponentForm extends LitElement {
       return entries.map((e) => {
         const choices = overrides[e.key];
         if (!choices?.length) return e;
+        // Filter the entry's existing options to the constrained subset so a
+        // labeled field (a future `parity` / `stop_bits` with label !== value)
+        // keeps its human-readable labels; synthesize only when it had none
+        // (the baud case, where label and value are the same number).
+        const byValue = new Map((e.options ?? []).map((o) => [o.value, o]));
         return {
           ...e,
-          options: choices.map((v) => ({ label: String(v), value: String(v) })),
+          options: choices.map(
+            (v) => byValue.get(String(v)) ?? { label: String(v), value: String(v) }
+          ),
           default_value: choices[0],
         };
       });
