@@ -5,6 +5,10 @@ name: Upload translations
 # the English copy of existing keys is updated; keys removed from en.json
 # are left in the project (so a moved key keeps its translations for reuse)
 # and translated locales are left untouched (see build-scripts/translations.ts).
+#
+# Automated pushes never prune. To delete keys no longer in en.json (stale
+# keys orphaned by a rename or migration), run this workflow manually from
+# the Actions tab with the `cleanup` input checked.
 
 on:
   push:
@@ -15,6 +19,11 @@ on:
       - "build-scripts/translations-lib.ts"
       - ".github/workflows/translations-upload.yml"
   workflow_dispatch:
+    inputs:
+      cleanup:
+        description: "Delete Lokalise keys no longer in en.json (prunes stale keys)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -53,4 +62,5 @@ jobs:
         env:
           LOKALISE_API_TOKEN: ${{ secrets.LOKALISE_API_TOKEN }}
           LOKALISE_PROJECT_ID: ${{ secrets.LOKALISE_PROJECT_ID }}
-        run: npm run translations:upload
+          CLEANUP: ${{ inputs.cleanup && '--cleanup' || '' }}
+        run: npm run translations:upload -- $CLEANUP
