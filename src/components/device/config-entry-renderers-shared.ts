@@ -20,6 +20,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import { coerceIntFieldValue } from "../../util/int-input.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -77,6 +78,23 @@ registerMdiIcons({
  */
 export function effectiveDisabled(entry: ConfigEntry, ctx: RenderCtx): boolean {
   return ctx.disabled || entry.locked;
+}
+
+/**
+ * Coerce a control's string value back to the entry's declared numeric
+ * type before emitting. A wa-select / combo box always hands back a
+ * string, but an INTEGER/FLOAT field's YAML must be a number or downstream
+ * validation (and the backend's locked-value compare) rejects it. INTEGER
+ * goes through ``coerceIntFieldValue`` so a >2^53 decimal stays a string
+ * (64-bit precision, #378/#944) and a ``0x…`` literal isn't truncated.
+ * Non-numeric entries, an empty string, and unparseable input pass through
+ * unchanged so the inline validator can flag them.
+ */
+export function coerceValueToEntryType(entry: ConfigEntry, raw: string): string | number {
+  if (entry.type === ConfigEntryType.INTEGER) return coerceIntFieldValue(raw);
+  if (entry.type !== ConfigEntryType.FLOAT || raw === "") return raw;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : raw;
 }
 
 /** Serialize a field path into the ``data-field-key`` attribute. JSON
@@ -514,18 +532,6 @@ function renderSuggestionSelect(
 ) {
   const valueLower = value.toLowerCase();
   const placeholder = String(entry.default_value ?? "");
-  // Coerce the picked value back to the entry's declared type before
-  // emitting — the wa-select hands us a string regardless, but a number
-  // entry's YAML value must be a number or downstream validation
-  // (and the backend's locked-value comparison) will reject it.
-  const isNumeric =
-    entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT;
-  const coerce = (raw: string): string | number => {
-    if (!isNumeric) return raw;
-    if (raw === "") return raw;
-    const n = entry.type === ConfigEntryType.INTEGER ? parseInt(raw, 10) : Number(raw);
-    return Number.isFinite(n) ? n : raw;
-  };
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
@@ -534,7 +540,10 @@ function renderSuggestionSelect(
         ?disabled=${disabled}
         placeholder=${placeholder}
         @change=${(e: Event) =>
-          ctx.emitChange(path, coerce((e.target as HTMLSelectElement).value))}
+          ctx.emitChange(
+            path,
+            coerceValueToEntryType(entry, (e.target as HTMLSelectElement).value)
+          )}
       >
         ${(entry.suggestions ?? []).map((s) => {
           const v = String(s);

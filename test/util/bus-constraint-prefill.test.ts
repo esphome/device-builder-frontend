@@ -85,4 +85,26 @@ describe("busConstraintPrefill", () => {
   test("skips a constraint key with no matching bus field", () => {
     expect(busConstraintPrefill(uartEntries, { rx_buffer_size: 512 })).toBeNull();
   });
+
+  // The catalog now gives baud_rate a 115200 default; a detour constraint
+  // (e.g. an LD2410 needing 256000) must still win over that default.
+  const baudDefaulted = [
+    makeConfigEntry({
+      key: "baud_rate",
+      type: ConfigEntryType.INTEGER,
+      required: true,
+      default_value: 115200,
+    }),
+  ];
+
+  test("prefills a baud constraint that differs from the new 115200 default", () => {
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: 256000 })).toEqual({
+      fields: { baud_rate: 256000 },
+      required: [],
+    });
+  });
+
+  test("drops a baud constraint equal to the default (seed already supplies it)", () => {
+    expect(busConstraintPrefill(baudDefaulted, { baud_rate: 115200 })).toBeNull();
+  });
 });
