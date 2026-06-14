@@ -40,6 +40,18 @@ export function renderChoiceCard(props: ChoiceCardProps): TemplateResult {
 }
 
 /**
+ * Roving-tabindex tab stop for a choice in a ``role="radiogroup"``: the checked
+ * card, or the first card when nothing in the group is checked yet.
+ */
+export function rovingTabbable(
+  selected: boolean,
+  anySelected: boolean,
+  index: number
+): boolean {
+  return selected || (!anySelected && index === 0);
+}
+
+/**
  * Arrow-key handler for a ``role="radiogroup"`` of choice cards: Up/Left and
  * Down/Right move focus and selection across the enabled cards, wrapping at the
  * ends, per the ARIA radio pattern. Attach to the group's ``@keydown``.

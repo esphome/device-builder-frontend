@@ -14,7 +14,11 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "../onboarding/choice-card-styles.js";
-import { onChoiceGroupKeydown, renderChoiceCard } from "../onboarding/choice-card.js";
+import {
+  onChoiceGroupKeydown,
+  renderChoiceCard,
+  rovingTabbable,
+} from "../onboarding/choice-card.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -73,8 +77,11 @@ export class ESPHomeSettingsExperience extends LitElement {
             title: this._localize(`onboarding.wizard.experience.${level}_title`),
             description: this._localize(`onboarding.wizard.experience.${level}_desc`),
             selected: this._experience === level,
-            tabbable:
-              this._experience === level || (this._experience === null && i === 0),
+            tabbable: rovingTabbable(
+              this._experience === level,
+              this._experience !== null,
+              i
+            ),
             onSelect: () => this._setExperience(level),
           })
         )}

@@ -22,7 +22,7 @@ import { EXPERIENCE_OPTIONS, yamlDiffForExperience } from "../../util/experience
 import { formatApiError } from "../../util/format-api-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
-import { onChoiceGroupKeydown, renderChoiceCard } from "./choice-card.js";
+import { onChoiceGroupKeydown, renderChoiceCard, rovingTabbable } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
 import { wifiFieldsStyles } from "./wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./wifi-fields.js";
@@ -243,7 +243,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           title: this._localize("onboarding.wizard.use_case.devices_title"),
           description: this._localize("onboarding.wizard.use_case.devices_desc"),
           selected: devices,
-          tabbable: devices || !this._useCaseChosen,
+          tabbable: rovingTabbable(devices, this._useCaseChosen, 0),
           disabled: this._saving,
           onSelect: () => this._chooseUseCase(false),
         })}
@@ -252,7 +252,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           title: this._localize("onboarding.wizard.use_case.remote_title"),
           description: this._localize("onboarding.wizard.use_case.remote_desc"),
           selected: remote,
-          tabbable: remote,
+          tabbable: rovingTabbable(remote, this._useCaseChosen, 1),
           disabled: this._saving,
           onSelect: () => this._chooseUseCase(true),
         })}
@@ -275,8 +275,11 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
             title: this._localize(`onboarding.wizard.experience.${level}_title`),
             description: this._localize(`onboarding.wizard.experience.${level}_desc`),
             selected: this._experience === level,
-            tabbable:
-              this._experience === level || (this._experience === null && i === 0),
+            tabbable: rovingTabbable(
+              this._experience === level,
+              this._experience !== null,
+              i
+            ),
             disabled: this._saving,
             onSelect: () => {
               this._experience = level;
