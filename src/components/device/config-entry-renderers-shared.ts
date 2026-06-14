@@ -479,6 +479,7 @@ export function renderStringField(
   const escapeMode = hasEscapeWorthyChar(value);
   const textInput = html`<input
     type=${inputType}
+    autocomplete="off"
     class=${invalid ? "invalid" : ""}
     .value=${escapeMode ? escapeControlForInput(value) : value}
     ?disabled=${disabled}
