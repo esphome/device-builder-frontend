@@ -93,10 +93,15 @@ export async function executeRename(
   let response: Awaited<ReturnType<ESPHomeAPI["renameDevice"]>>;
   try {
     response = await host._api.renameDevice(device.configuration, newName);
-  } catch {
-    toast.error(host._localize("dashboard.action_rename_failed", { name: device.name }), {
-      richColors: true,
-    });
+  } catch (err) {
+    const reason = getErrorMessage(err);
+    toast.error(
+      host._localize("dashboard.action_rename_failed", {
+        name: device.name,
+        reason,
+      }),
+      { richColors: true }
+    );
     return;
   }
   clearJustCreated();

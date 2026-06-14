@@ -106,7 +106,7 @@
     "action_rename_label": "Device name",
     "action_rename_confirm": "Rename",
     "action_rename_success": "\"{name}\" renamed successfully",
-    "action_rename_failed": "Failed to rename \"{name}\"",
+    "action_rename_failed": "Failed to rename \"{name}\": {reason}",
     "action_clone_title": "Duplicate {name}",
     "action_clone_name_label": "New hostname",
     "action_clone_friendly_name_label": "Friendly name (optional)",
