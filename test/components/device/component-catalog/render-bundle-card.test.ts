@@ -14,6 +14,7 @@ function host(failed: string[] = []): unknown {
   return {
     _imageFailed: new Set(failed),
     _onAddBundle: () => {},
+    _onImageError: () => {},
     _localize: (key: string) => key,
   };
 }
