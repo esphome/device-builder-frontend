@@ -20,6 +20,7 @@ export function renderBundleCard(
   host: ESPHomeComponentCatalog,
   bundle: FeaturedBundle
 ): TemplateResult {
+  const hasImage = !!bundle.image_url && !host._imageFailed.has(bundle.id);
   return html`
     <article
       class="component-card component-card--featured"
@@ -28,9 +29,19 @@ export function renderBundleCard(
       }}
     >
       <div class="component-card-header">
-        <div class="component-image--placeholder">
-          <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
-        </div>
+        ${hasImage
+          ? html`<div class="component-image">
+              <img
+                src=${bundle.image_url}
+                alt=${bundle.name}
+                referrerpolicy="no-referrer"
+                loading="lazy"
+                @error=${() => host._onImageError(bundle.id)}
+              />
+            </div>`
+          : html`<div class="component-image--placeholder">
+              <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+            </div>`}
         <div class="component-card-header-text">
           <h3 class="component-title">${bundle.name}</h3>
         </div>

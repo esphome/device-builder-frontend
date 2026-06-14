@@ -83,6 +83,9 @@ export interface FeaturedBundle {
   name: string;
   description: string;
   component_ids: string[];
+  // Photo of the physical module this bundle maps to; rendered on the
+  // bundle card in place of the box icon when set.
+  image_url?: string;
 }
 
 export interface BoardCatalogEntry {
