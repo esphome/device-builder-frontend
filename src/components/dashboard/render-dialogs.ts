@@ -5,6 +5,7 @@ import type { ArchivedDevice } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { computeLabelUsage } from "../../util/label-usage.js";
+import { performRename } from "./actions-ui.js";
 import { archiveBulkDevices, deleteBulkDevices, deleteDevice } from "./actions.js";
 
 export type PendingConfirm =
@@ -13,6 +14,7 @@ export type PendingConfirm =
   | { kind: "delete-bulk" }
   | { kind: "archive-single"; device: ConfiguredDevice }
   | { kind: "archive-bulk" }
+  | { kind: "rename-config-only"; device: ConfiguredDevice; newName: string }
   | { kind: "delete-label"; label: Label };
 
 interface ConfirmCopy {
@@ -82,6 +84,17 @@ export function confirmDialogCopy(
         destructive: false,
       };
     }
+    case "rename-config-only": {
+      const name = pending.device.friendly_name || pending.device.name;
+      return {
+        heading: t("dashboard.action_rename_offline_title"),
+        message: t("dashboard.action_rename_offline_desc", { name }),
+        confirm: t("dashboard.action_rename_offline_confirm"),
+        // Mark destructive so a stray Enter can't confirm an offline rename
+        // (renames the file + drops into divergence until reflash).
+        destructive: true,
+      };
+    }
     case "delete-label": {
       const usage = labelUsage()[pending.label.id] ?? 0;
       return {
@@ -136,6 +149,9 @@ export function executeConfirm(
       return;
     case "archive-single":
       void host._archiveDevice(pending.device);
+      return;
+    case "rename-config-only":
+      void performRename(host, pending.device, pending.newName, true);
       return;
     case "delete-label":
       void host._deleteLabel(pending.label);

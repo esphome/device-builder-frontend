@@ -5,6 +5,7 @@ import type {
   ConfiguredDevice,
   Label,
 } from "../../api/types/devices.js";
+import { DeviceState } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
@@ -90,9 +91,27 @@ export async function executeRename(
   if (!device) return;
   const newName = e.detail;
   if (newName === device.name) return;
+  // The default rename compiles + OTA-installs, which only works against a
+  // reachable device. Route offline/unknown devices to a confirm before a
+  // config-only rename (renames the YAML now; the device keeps its old name
+  // until reflashed, which the prompt spells out).
+  if (device.state !== DeviceState.ONLINE) {
+    host._openConfirm({ kind: "rename-config-only", device, newName });
+    return;
+  }
+  await performRename(host, device, newName, false);
+}
+
+/** Call ``devices/rename`` and surface the result (job-follow, success, or error). */
+export async function performRename(
+  host: ESPHomePageDashboard,
+  device: ConfiguredDevice,
+  newName: string,
+  configOnly: boolean
+): Promise<void> {
   let response: Awaited<ReturnType<ESPHomeAPI["renameDevice"]>>;
   try {
-    response = await host._api.renameDevice(device.configuration, newName);
+    response = await host._api.renameDevice(device.configuration, newName, configOnly);
   } catch (err) {
     const reason = getErrorMessage(err);
     toast.error(
