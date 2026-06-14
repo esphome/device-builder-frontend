@@ -228,6 +228,7 @@
     "drawer_source_active": "active",
     "drawer_round_trip_ms": "{n} ms",
     "drawer_waiting_for_signal": "Waiting for first signal…",
+    "drawer_waiting_for_mdns": "Waiting for mDNS discovery…",
     "drawer_show_mdns_txt_records": "{count, plural, one {Show # mDNS TXT record} other {Show # mDNS TXT records}}",
     "drawer_ip_address": "IP Address",
     "drawer_ip_show_more": "Show {n} more",

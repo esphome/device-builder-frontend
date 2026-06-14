@@ -27,7 +27,8 @@ export function renderRow(
   icon: string,
   label: string,
   value: string | null,
-  mono = false
+  mono = false,
+  emptyText = "—"
 ): TemplateResult {
   const empty = !value;
   return html`
@@ -38,7 +39,7 @@ export function renderRow(
       <div class="content">
         <div class="label">${label}</div>
         <div class="value ${mono ? "mono" : ""} ${empty ? "muted" : ""}">
-          ${value || "—"}
+          ${value || emptyText}
         </div>
       </div>
     </div>
@@ -163,7 +164,8 @@ export function renderVersionSection(
               "upload",
               localize("dashboard.drawer_deployed_version"),
               deployed,
-              true
+              true,
+              localize("dashboard.drawer_waiting_for_mdns")
             )}
           `}
     </div>
@@ -329,36 +331,73 @@ export function renderMacAddressRow(
     "ethernet",
     localize("dashboard.drawer_mac_address"),
     d.mac_address,
-    true
+    true,
+    localize("dashboard.drawer_waiting_for_mdns")
   );
 }
 
-// Hidden when YAML doesn't load ethernet or the derived value duplicates mac_address
-// (single-MAC RP2040 / RP2350 platforms).
+// Mirrors the backend's mac_addresses._has_ethernet / _has_bluetooth: which
+// interface MACs the YAML loads. Used only to show a "waiting" row before the
+// primary MAC is observed (the derived value is empty until then); once the
+// primary MAC is present the derived value itself tells us whether the platform
+// has a distinct MAC.
+const deviceHasEthernet = (d: ConfiguredDevice): boolean =>
+  d.loaded_integrations.includes("ethernet");
+const deviceHasBluetooth = (d: ConfiguredDevice): boolean =>
+  d.loaded_integrations.some(
+    (n) => n.startsWith("esp32_ble") || n.startsWith("bluetooth_")
+  );
+
+// Show the distinct derived MAC when known; while the primary MAC is still
+// pending mDNS, show a "waiting" row if the YAML loads the interface; otherwise
+// hide (no such interface, or a single-MAC platform whose derived value just
+// duplicates mac_address).
 export function renderEthernetMacRow(
   d: ConfiguredDevice,
   localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
-  if (!d.ethernet_mac || d.ethernet_mac === d.mac_address) return nothing;
-  return renderRow(
-    "ethernet",
-    localize("dashboard.drawer_ethernet_mac"),
-    d.ethernet_mac,
-    true
-  );
+  if (d.ethernet_mac && d.ethernet_mac !== d.mac_address) {
+    return renderRow(
+      "ethernet",
+      localize("dashboard.drawer_ethernet_mac"),
+      d.ethernet_mac,
+      true
+    );
+  }
+  if (!d.mac_address && deviceHasEthernet(d)) {
+    return renderRow(
+      "ethernet",
+      localize("dashboard.drawer_ethernet_mac"),
+      "",
+      true,
+      localize("dashboard.drawer_waiting_for_mdns")
+    );
+  }
+  return nothing;
 }
 
 export function renderBluetoothMacRow(
   d: ConfiguredDevice,
   localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
-  if (!d.bluetooth_mac || d.bluetooth_mac === d.mac_address) return nothing;
-  return renderRow(
-    "bluetooth",
-    localize("dashboard.drawer_bluetooth_mac"),
-    d.bluetooth_mac,
-    true
-  );
+  if (d.bluetooth_mac && d.bluetooth_mac !== d.mac_address) {
+    return renderRow(
+      "bluetooth",
+      localize("dashboard.drawer_bluetooth_mac"),
+      d.bluetooth_mac,
+      true
+    );
+  }
+  if (!d.mac_address && deviceHasBluetooth(d)) {
+    return renderRow(
+      "bluetooth",
+      localize("dashboard.drawer_bluetooth_mac"),
+      "",
+      true,
+      localize("dashboard.drawer_waiting_for_mdns")
+    );
+  }
+  return nothing;
 }
 
 function emitCleanBuild(
