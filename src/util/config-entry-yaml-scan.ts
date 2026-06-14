@@ -327,6 +327,24 @@ export function findReferenceCandidates(
   return findComponentsByProviders(yaml, [{ domain, stem: "" }, ...providers]);
 }
 
+// A top-level (zero-indent) `packages:` block or `<<:` merge key — the two
+// constructs that merge whole component sections in from sources the scan
+// can't see. A value-position `!include` (`wifi: !include wifi.yaml`) only
+// replaces that key's value, so it deliberately doesn't match.
+const MERGED_SOURCE_RE = /^(?:packages|<<)\s*:/;
+
+/**
+ * Whether the YAML root-merges components the scan can't enumerate.
+ *
+ * True when a top-level `packages:` block or `<<:` merge key is present —
+ * either can introduce additional `<domain>:` sections from another file, so
+ * single-candidate reference resolution can't be trusted.
+ */
+export function yamlHasMergedSources(yaml: string): boolean {
+  if (!yaml) return false;
+  return yaml.split("\n").some((line) => MERGED_SOURCE_RE.test(line));
+}
+
 /**
  * Test-only: clear both memos so cache state can't leak between
  * cases. Production callers don't need this — within an editor

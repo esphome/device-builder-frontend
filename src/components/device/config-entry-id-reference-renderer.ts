@@ -7,7 +7,10 @@
 
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { findReferenceCandidates } from "../../util/config-entry-yaml-scan.js";
+import {
+  findReferenceCandidates,
+  yamlHasMergedSources,
+} from "../../util/config-entry-yaml-scan.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -35,6 +38,15 @@ export function renderIdReferenceField(
   if (bail) return bail;
   const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
+
+  // ESPHome auto-resolves an omitted reference when exactly one matching
+  // component exists. Surface that target as the default — but only when the
+  // scan can see the whole config; a `packages:` / `<<:` merge could hide a
+  // second match, making "the one we see" the wrong (or ambiguous) target.
+  const defaultCandidate =
+    value === "" && candidates.length === 1 && !yamlHasMergedSources(ctx.yaml)
+      ? candidates[0]
+      : null;
 
   const idOption = (optValue: string, primary: string, secondary: string) => html`
     <wa-option
@@ -115,12 +127,22 @@ export function renderIdReferenceField(
       <wa-select
         class=${invalid ? "invalid" : ""}
         ?disabled=${effectiveDisabled(entry, ctx)}
+        placeholder=${defaultCandidate
+          ? defaultCandidate.name || defaultCandidate.id
+          : nothing}
         @change=${onChange}
       >
         ${orphanOption}
-        ${candidates.map((c) =>
-          idOption(c.id, c.name || c.id, c.name ? `${c.id} · ${domain}` : domain)
-        )}
+        ${candidates.map((c) => {
+          const secondary = c.name ? `${c.id} · ${domain}` : domain;
+          return idOption(
+            c.id,
+            c.name || c.id,
+            c === defaultCandidate
+              ? `${secondary} · ${ctx.localize("device.default_option_tag")}`
+              : secondary
+          );
+        })}
         ${addOption}
       </wa-select>
       ${renderFieldError(path, ctx)}

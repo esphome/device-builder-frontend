@@ -4,6 +4,7 @@ import {
   findComponentsByProviders,
   findReferenceCandidates,
   findUsedPins,
+  yamlHasMergedSources,
 } from "../../src/util/config-entry-yaml-scan.js";
 
 // The scans use module-level single-entry memos. Within a single
@@ -319,5 +320,28 @@ describe("findComponentsByProviders", () => {
       { domain: "sensor", stem: "ads1115" },
     ]);
     expect(other).toEqual([{ id: "adc_b", name: "" }]);
+  });
+});
+
+describe("yamlHasMergedSources", () => {
+  it("is true for a top-level packages: block", () => {
+    expect(yamlHasMergedSources("packages:\n  base: !include base.yaml\n")).toBe(true);
+  });
+
+  it("is true for a top-level <<: merge key", () => {
+    expect(yamlHasMergedSources("<<: !include common.yaml\nesphome:\n")).toBe(true);
+  });
+
+  it("is false for a value-position !include", () => {
+    expect(yamlHasMergedSources("wifi: !include wifi.yaml\n")).toBe(false);
+  });
+
+  it("is false for an indented packages-like token inside another block", () => {
+    expect(yamlHasMergedSources("sensor:\n  - packages: not-a-merge\n")).toBe(false);
+  });
+
+  it("is false for plain YAML and empty input", () => {
+    expect(yamlHasMergedSources("ld2410:\n  id: radar\n")).toBe(false);
+    expect(yamlHasMergedSources("")).toBe(false);
   });
 });
