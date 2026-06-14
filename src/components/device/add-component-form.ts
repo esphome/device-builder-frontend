@@ -301,10 +301,10 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   /**
-   * Seed an unlocked id-reference field with the bus already in the config, so
-   * a stale featured preset can't write an id that doesn't exist. Ambiguous
-   * cases — none, several, or a `packages:`/`<<:` merge that could hide one —
-   * stay unset, deferring to the dep detour or the picker.
+   * Seed an unlocked id-reference field with the matching component already in
+   * the config, so a stale featured preset can't write an id that doesn't
+   * exist. Ambiguous cases — none, several, or a `packages:`/`<<:` merge that
+   * could hide one — stay unset, deferring to the dep detour or the picker.
    */
   private _seedReference(domain: string): string | undefined {
     // Resolve against same-domain candidates only (i2c/spi/uart buses); the
