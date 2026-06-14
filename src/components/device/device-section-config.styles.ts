@@ -5,7 +5,9 @@ export const deviceSectionConfigStyles = css`
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-m);
-    margin-top: var(--wa-space-m);
+    /* No top margin: the shared .editor-pane padding already supplies the top
+       gap. The extra margin pushed the structured editor below the YAML pane
+       (#826); the automation/script editors never had it. */
   }
 
   .section-header {
