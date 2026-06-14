@@ -5,8 +5,8 @@ export type DeviceBuilderChannel = "dev" | "beta";
  * ``null`` for a stable release.
  *
  * Stable versions are pure dotted digits (``1.0.0``). An empty or
- * ``0.0.0`` version, or any ``dev`` marker, is ``"dev"``; any other
- * PEP 440 pre-release suffix (``0.1.0b117``, ``0.2.0rc1``) is ``"beta"``.
+ * ``0.0.0`` version, or any ``dev`` marker, is ``"dev"``; anything else
+ * with a non-numeric suffix (``0.1.0b117``, ``0.2.0rc1``) is ``"beta"``.
  */
 export function deviceBuilderChannel(version: string): DeviceBuilderChannel | null {
   const v = version.trim().replace(/^v/, "");
