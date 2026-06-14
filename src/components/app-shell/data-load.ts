@@ -62,8 +62,19 @@ export async function loadIntegrationDocs(host: ESPHomeApp): Promise<void> {
 
 const PREFS_LOAD_MAX_RETRIES = 3;
 const PREFS_LOAD_RETRY_DELAY_MS = 1000;
+// Bound for how long a still-in-flight write defers the load-failure toast.
+// A successful or failed write normally re-runs the load via afterPrefWrite
+// well within this; the fallback only catches a write whose promise never
+// settles (a hung socket), so the gated UI can't stay hidden with no cause.
+const PREFS_LOAD_HUNG_WRITE_TIMEOUT_MS = 10_000;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function surfacePrefsLoadFailure(host: ESPHomeApp): void {
+  if (host._prefsLoaded || host._prefsLoadErrorNotified) return;
+  host._prefsLoadErrorNotified = true;
+  toast.error(host._localize("settings.preferences_load_failed"), { richColors: true });
+}
 
 export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
   // Until prefs load once, _hideDeviceCreation gates creation closed for every
@@ -103,15 +114,15 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
   }
   // Terminal: prefs never loaded, so creation is gated closed for the whole
   // install. Surface it once (not per reconnect) since the UI vanished without
-  // a visible cause. A still-pending write isn't a load failure — it shares the
-  // attempt budget and a slow write would otherwise toast falsely — so a
-  // successful write re-runs this load instead (see afterPrefWrite).
-  if (
-    !host._prefsLoaded &&
-    !host._prefsLoadErrorNotified &&
-    host._prefsWritesInFlight === 0
-  ) {
-    host._prefsLoadErrorNotified = true;
-    toast.error(host._localize("settings.preferences_load_failed"), { richColors: true });
+  // a visible cause.
+  if (host._prefsLoaded || host._prefsLoadErrorNotified) return;
+  if (host._prefsWritesInFlight > 0) {
+    // A still-pending write isn't a load failure — it shares the attempt budget
+    // and a slow write would otherwise toast falsely; a settled write re-runs
+    // this load via afterPrefWrite. Defer the toast behind a bounded timeout so
+    // a write whose promise never settles still surfaces the gated UI.
+    setTimeout(() => surfacePrefsLoadFailure(host), PREFS_LOAD_HUNG_WRITE_TIMEOUT_MS);
+    return;
   }
+  surfacePrefsLoadFailure(host);
 }
