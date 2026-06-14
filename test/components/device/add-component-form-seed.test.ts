@@ -112,6 +112,22 @@ describe("add-component-form resolves featured id references to the live config"
   it("keeps a locked reference's literal verbatim (bundled output pin)", () => {
     expect(seededValues(batteryMonitor(true), ONE_BUS).i2c_id).toBe("i2c_bus");
   });
+
+  it("seeds a required multi_value reference with [] when it can't resolve", () => {
+    const component = {
+      id: "featured.x.multi_ref",
+      config_entries: [
+        makeConfigEntry({
+          key: "buses",
+          type: ConfigEntryType.ID,
+          references_component: "i2c",
+          required: true,
+          multi_value: true,
+        }),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    expect(seededValues(component, "").buses).toEqual([]);
+  });
 });
 
 describe("add-component-form dep-add bus prefill (#1425)", () => {

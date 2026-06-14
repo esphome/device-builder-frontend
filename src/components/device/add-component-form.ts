@@ -282,7 +282,11 @@ export class ESPHomeAddComponentForm extends LitElement {
       // deliberate pins — keep their literal.
       if (entry.references_component && !entry.locked) {
         const ref = this._seedReference(entry.references_component);
-        if (ref !== undefined) out[entry.key] = entry.multi_value ? [ref] : ref;
+        if (ref !== undefined) {
+          out[entry.key] = entry.multi_value ? [ref] : ref;
+        } else if (entry.multi_value && entry.required) {
+          out[entry.key] = [];
+        }
         continue;
       }
       if (entry.default_value != null) {
@@ -303,8 +307,9 @@ export class ESPHomeAddComponentForm extends LitElement {
    * stay unset, deferring to the dep detour or the picker.
    */
   private _seedReference(domain: string): string | undefined {
-    // Same-domain provider covers bus refs (i2c/spi/uart); async cross-domain
-    // interface providers are unavailable here, so those defer to the picker.
+    // Resolve against same-domain candidates only (i2c/spi/uart buses); the
+    // picker also folds in async interface providers, so a pure cross-domain
+    // ref finds nothing here and defers to it.
     const candidates = findReferenceCandidates(this.yaml, domain, []);
     return resolveSoleCandidate(candidates, this.yaml)?.id;
   }
