@@ -12,6 +12,7 @@ import {
 import { MOBILE_BREAKPOINT } from "../styles/breakpoints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { stripBase, withBase } from "../util/base-path.js";
+import { isDeviceBuilderBeta } from "../util/device-builder-beta.js";
 import { navigate, runLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -341,7 +342,11 @@ export class ESPHomeLayout extends LitElement {
         <div class="header-text">
           <h1>
             <span class="header-title-text">${this._localize("dashboard.title")}</span>
-            <span class="preview-badge">${this._localize("layout.preview_badge")}</span>
+            ${isDeviceBuilderBeta(this._serverVersion)
+              ? html`<span class="preview-badge"
+                  >${this._localize("layout.preview_badge")}</span
+                >`
+              : nothing}
           </h1>
           <p>${this._localize("dashboard.subtitle")}</p>
         </div>
