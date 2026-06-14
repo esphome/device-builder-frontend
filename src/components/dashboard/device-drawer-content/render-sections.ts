@@ -217,7 +217,8 @@ export function renderConfigHashSection(
               "fingerprint",
               localize("dashboard.drawer_config_hash_deployed"),
               deployed,
-              true
+              true,
+              localize("dashboard.drawer_waiting_for_mdns")
             )}
           `}
     </div>
@@ -258,7 +259,15 @@ export function renderIpAddressRow(
   // fall back to it on a cold scan to keep the IP row and its visit link.
   const primary = list[0] ?? d.ip;
   if (!primary) {
-    return renderRow("ip-network-outline", label, "", true);
+    // IP is learned from any source (mDNS / ping), not only mDNS, so mirror
+    // the reachability section's "Waiting for first signal" wording.
+    return renderRow(
+      "ip-network-outline",
+      label,
+      "",
+      true,
+      host._localize("dashboard.drawer_waiting_for_signal")
+    );
   }
   if (list.length <= 1) {
     return html`

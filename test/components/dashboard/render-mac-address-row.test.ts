@@ -6,6 +6,7 @@ import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 import {
   renderBluetoothMacRow,
+  renderConfigHashSection,
   renderEthernetMacRow,
   renderMacAddressRow,
   renderVersionSection,
@@ -106,6 +107,18 @@ describe("renderVersionSection deployed row", () => {
     );
     const texts = valueTexts(result);
     expect(texts).toContain("2026.5.2");
+    expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
+  });
+});
+
+describe("renderConfigHashSection deployed row", () => {
+  it("shows waiting-for-mDNS on the deployed hash when only the local hash is known", () => {
+    const result = renderConfigHashSection(
+      _device({ expected_config_hash: "abc123", deployed_config_hash: "" }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).toContain("abc123");
     expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
   });
 });
