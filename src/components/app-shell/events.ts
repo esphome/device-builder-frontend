@@ -36,6 +36,7 @@ import {
 } from "../../context/index.js";
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
+import { applyPreferences } from "./data-load.js";
 
 // Merge a partial diff into the matching offloader pairing row keyed by pin_sha256.
 // _buildOffloadPairings === null = snapshot not seeded; missing row = event raced
@@ -74,10 +75,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       // optimistic change.
       host._prefsLoaded = true;
       if (host._prefsWritesInFlight === 0) {
-        host.applyTheme(preferences.theme);
-        host._yamlDiffButton = preferences.yaml_diff_button;
-        host._experienceLevel = preferences.experience_level;
-        host._remoteComputeOnly = preferences.remote_compute_only;
+        applyPreferences(host, preferences);
       }
       host._devices = devices;
       host._importableDevices = importable;

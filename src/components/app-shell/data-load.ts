@@ -1,10 +1,18 @@
-import { OnboardingStepId } from "../../api/types/system.js";
+import { OnboardingStepId, type UserPreferences } from "../../api/types/system.js";
 import {
   isExperienceChosen,
   isWifiSetupPending,
   shouldAutoShowOnboarding,
 } from "../../util/onboarding-gate.js";
 import type { ESPHomeApp } from "../app-shell.js";
+
+/** Apply a preferences snapshot to the app-shell's live contexts. */
+export function applyPreferences(host: ESPHomeApp, prefs: UserPreferences): void {
+  host.applyTheme(prefs.theme);
+  host._yamlDiffButton = prefs.yaml_diff_button;
+  host._experienceLevel = prefs.experience_level;
+  host._remoteComputeOnly = prefs.remote_compute_only;
+}
 
 export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
   try {
@@ -65,11 +73,7 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
   // Skip while a write is in flight; the optimistic value wins until it settles.
   if (host._prefsWritesInFlight > 0) return;
   try {
-    const prefs = await host._api.getPreferences();
-    host.applyTheme(prefs.theme);
-    host._yamlDiffButton = prefs.yaml_diff_button;
-    host._experienceLevel = prefs.experience_level;
-    host._remoteComputeOnly = prefs.remote_compute_only;
+    applyPreferences(host, await host._api.getPreferences());
     host._prefsLoaded = true;
   } catch (err) {
     // Non-fatal: the snapshot already seeded these, and theme also has a
