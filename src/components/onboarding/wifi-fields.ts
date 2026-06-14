@@ -43,11 +43,11 @@ export function renderWifiFields(props: WifiFieldsProps): TemplateResult {
       />
     </div>
     <div class="field">
-      <label for="onboarding-password"
-        >${localize("onboarding.wifi.password_label")}</label
-      >
+      <!-- Plain span, not <label for>: esphome-password-input is a custom
+           element the platform won't focus on label click; its accessible name
+           comes from the .label prop (forwarded to the inner input). -->
+      <span class="field-label">${localize("onboarding.wifi.password_label")}</span>
       <esphome-password-input
-        id="onboarding-password"
         .value=${password}
         .placeholder=${localize("onboarding.wifi.password_placeholder")}
         .maxlength=${64}
