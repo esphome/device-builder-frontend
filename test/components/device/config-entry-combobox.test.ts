@@ -41,6 +41,21 @@ describe("renderSelectField — allow_custom_value combobox", () => {
     expect(ctx.emitChange).toHaveBeenCalledWith(["board"], "cr3l");
   });
 
+  it("forwards the default value and localized note so the menu can tag it", () => {
+    const entry = makeEntry(ConfigEntryType.STRING, {
+      key: "hardware_uart",
+      options: BOARDS,
+      allow_custom_value: true,
+      default_value: "bw15",
+    });
+    const [b] = findElementBindings(
+      renderSelectField(entry, ["hardware_uart"], makeRenderCtx({})),
+      "esphome-options-combobox"
+    );
+    expect(b[".defaultValue"]).toBe("bw15");
+    expect(b[".defaultNote"]).toBe("device.default_option_tag");
+  });
+
   it("passes invalid and disabled through to the combobox", () => {
     const ctx = makeRenderCtx(
       { board: "bw15" },

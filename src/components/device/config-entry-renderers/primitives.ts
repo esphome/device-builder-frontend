@@ -465,6 +465,8 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
           .value=${value}
           label=${entry.label}
           placeholder=${String(entry.default_value ?? "")}
+          .defaultValue=${String(entry.default_value ?? "")}
+          .defaultNote=${ctx.localize("device.default_option_tag")}
           ?disabled=${disabled}
           ?invalid=${invalid}
           @options-combobox-change=${(e: CustomEvent<OptionsComboboxValueChange>) =>
