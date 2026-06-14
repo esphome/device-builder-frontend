@@ -308,8 +308,10 @@ export class ESPHomeAddComponentForm extends LitElement {
    */
   private _seedReference(domain: string): string | undefined {
     // Resolve against same-domain candidates only (i2c/spi/uart buses); the
-    // picker also folds in async interface providers, so a pure cross-domain
-    // ref finds nothing here and defers to it.
+    // picker also folds in async interface providers. A cross-domain ref finds
+    // nothing here and defers to the picker; for a domain that is both a block
+    // and a provided interface, seeding may fill a value the picker would call
+    // ambiguous — harmless, since it's a real id the user can still change.
     const candidates = findReferenceCandidates(this.yaml, domain, []);
     return resolveSoleCandidate(candidates, this.yaml)?.id;
   }
