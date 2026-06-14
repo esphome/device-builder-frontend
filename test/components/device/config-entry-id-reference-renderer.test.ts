@@ -98,6 +98,12 @@ describe("renderIdReferenceField — single-candidate auto-resolve default", () 
     expect(hasDefaultTag(tmpl)).toBe(false);
   });
 
+  it("suppresses the default when a top-level <<: merge can hide another match", () => {
+    const tmpl = renderRef("ld2410", `<<: !include common.yaml\n${SINGLE_LD2410}`, "");
+    expect(placeholderOf(tmpl)).toBe(nothing);
+    expect(hasDefaultTag(tmpl)).toBe(false);
+  });
+
   it("shows no default when more than one candidate exists", () => {
     const tmpl = renderRef("script", "script:\n  - id: a\n  - id: b\n", "");
     expect(placeholderOf(tmpl)).toBe(nothing);
