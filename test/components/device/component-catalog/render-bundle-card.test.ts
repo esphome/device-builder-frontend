@@ -57,4 +57,18 @@ describe("renderBundleCard image", () => {
     expect(el.querySelector("img")).toBeNull();
     expect(el.querySelector(".component-image--placeholder")).not.toBeNull();
   });
+
+  it("calls _onImageError with the bundle id when the img fires an error", () => {
+    const failedIds: string[] = [];
+    const spyHost = {
+      _imageFailed: new Set<string>(),
+      _onAddBundle: () => {},
+      _onImageError: (id: string) => failedIds.push(id),
+      _localize: (key: string) => key,
+    };
+    const b = bundle({ image_url: "https://example.com/module.jpg" });
+    const el = renderInto(renderBundleCard(spyHost as never, b));
+    el.querySelector("img")!.dispatchEvent(new Event("error"));
+    expect(failedIds).toEqual([b.id]);
+  });
 });
