@@ -559,8 +559,10 @@ export class ESPHomePageDevice extends LitElement {
       const prefs = await this._api.getPreferences();
       this._navCollapsed = !prefs.navigator_visible;
       // No local layout yet (new browser): restore the backend choice, which
-      // defaults to the split view on a fresh install.
-      if (!hasSavedLayout) {
+      // defaults to the split view on a fresh install. Re-check localStorage
+      // after the await: a toggle during the in-flight fetch writes it, and
+      // that newer user choice must win over the seed.
+      if (!hasSavedLayout && localStorage.getItem("esphome-editor-layout") === null) {
         this._layout = prefToDeviceLayout(prefs.device_editor_layout);
       }
     } catch (err) {
@@ -1120,7 +1122,7 @@ export class ESPHomePageDevice extends LitElement {
     localStorage.setItem("esphome-editor-layout", mode);
     this._api
       .updatePreferences({ device_editor_layout: deviceLayoutToPref(mode) })
-      .catch(() => {});
+      .catch((err) => console.warn("Failed to persist device layout preference:", err));
   }
 
   /**

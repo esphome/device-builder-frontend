@@ -87,7 +87,7 @@ export class ESPHomePageSecrets extends LitElement {
       this._layout = stored;
     } else {
       // No local choice (new browser): restore from the backend pref.
-      this._seedLayoutFromBackend();
+      void this._seedLayoutFromBackend();
     }
     setLeaveGuard(this._confirmLeave);
     window.addEventListener("beforeunload", this._onBeforeUnload);
@@ -107,7 +107,11 @@ export class ESPHomePageSecrets extends LitElement {
   private async _seedLayoutFromBackend() {
     try {
       const prefs = await this._api.getPreferences();
-      this._layout = prefToSecretsLayout(prefs.secrets_editor_layout);
+      // A toggle during the in-flight fetch writes localStorage; honor that
+      // newer user choice instead of clobbering it with the stored seed.
+      if (this._readStoredLayout() === null) {
+        this._layout = prefToSecretsLayout(prefs.secrets_editor_layout);
+      }
     } catch (err) {
       // Layout is not critical; keep the default form view on failure.
       console.warn("Failed to load secrets layout preference:", err);
@@ -119,7 +123,7 @@ export class ESPHomePageSecrets extends LitElement {
     localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
     this._api
       .updatePreferences({ secrets_editor_layout: secretsLayoutToPref(layout) })
-      .catch(() => {});
+      .catch((err) => console.warn("Failed to persist secrets layout preference:", err));
   }
 
   disconnectedCallback() {

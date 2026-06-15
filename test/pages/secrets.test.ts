@@ -333,6 +333,19 @@ describe("esphome-page-secrets layout persistence", () => {
     expect(page._layout).toBe("yaml");
   });
 
+  test("_seedLayoutFromBackend defers to a layout the user toggled mid-fetch", async () => {
+    // The user clicked the toggle while getPreferences() was in flight, so a
+    // local choice now exists; the resolving seed must not clobber it.
+    const getPreferences = vi.fn(() => {
+      localStorage.setItem("esphome-secrets-layout", "form");
+      return Promise.resolve({ secrets_editor_layout: "yaml" });
+    });
+    const page = makePage({ _layout: "form" });
+    page._api = { getPreferences } as unknown as ESPHomeAPI;
+    await page._seedLayoutFromBackend();
+    expect(page._layout).toBe("form");
+  });
+
   test("both panes bind the same buffer and either change advances it", () => {
     const page = makePage({
       _loaded: true,
