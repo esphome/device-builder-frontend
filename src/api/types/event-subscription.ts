@@ -150,9 +150,9 @@ export interface JobOutputEventData {
 /** Data payload for initial_state event. */
 export interface InitialStateEventData {
   /** User preferences snapshot. Always sent (the backend reads
-   *  defaults when nothing is stored), so the app shell paints
-   *  theme and other UI state from this rather than a separate
-   *  ``config/get_preferences`` round trip. */
+   *  defaults when nothing is stored); the app shell applies theme
+   *  from it and marks preferences loaded rather than making a
+   *  separate ``config/get_preferences`` round trip. */
   preferences: UserPreferences;
   devices: ConfiguredDevice[];
   /** Discovered factory-firmware devices the dashboard knew about

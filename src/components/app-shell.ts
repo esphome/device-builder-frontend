@@ -53,11 +53,11 @@ import { espHomeStyles } from "../styles/shared.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
+  loadExpertModePreference,
   loadIntegrationDocs,
   loadLabels,
   loadOnboardingState,
   loadRemoteBuildSettings,
-  loadThemePreference,
 } from "./app-shell/data-load.js";
 import { handleEvent } from "./app-shell/events.js";
 import {
@@ -405,7 +405,7 @@ export class ESPHomeApp extends LitElement {
     subscribeToFollowJobs(this);
     void loadIntegrationDocs(this);
     void loadLabels(this);
-    void loadThemePreference(this);
+    void loadExpertModePreference(this);
     void loadRemoteBuildSettings(this);
     void loadOnboardingState(this);
   }
