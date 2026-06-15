@@ -47,9 +47,9 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
     const yaml = host.yaml;
 
     if (!component) {
-      // Custom / external component — synthesise a config with no entries
+      // External component — synthesise a config with no entries
       // so the YAML-only notice fires. Store sectionKey as title (not a
-      // localised "Custom component" label) so the delete confirm + toast
+      // localised "External component" label) so the delete confirm + toast
       // read distinctly when a device has multiple unknown sections.
       host._config = {
         section_key: host.sectionKey,

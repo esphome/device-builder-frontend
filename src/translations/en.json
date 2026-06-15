@@ -825,7 +825,7 @@
     "automation_remove": "Remove",
     "adding": "Adding…",
     "saving": "Saving…",
-    "custom_component_title": "Custom component",
+    "external_component_title": "External component",
     "load_config_error": "Failed to load section config",
     "yaml_only_section": "This section doesn't have a structured editor — edit it directly in the YAML pane on the right.",
     "security_generate": "Generate",
