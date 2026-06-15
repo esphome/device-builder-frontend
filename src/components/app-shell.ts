@@ -613,9 +613,8 @@ export class ESPHomeApp extends LitElement {
   // only missing Wi-Fi. Both dialogs are mounted unconditionally (so listeners
   // are wired) but start closed.
   protected willUpdate(changed: PropertyValues) {
-    // Expert Mode is derived: experience_level === EXPERT. Keep the provided
-    // expertModeContext in lockstep so its consumers update when the level
-    // changes (snapshot, Appearance toggle, command palette).
+    // Expert Mode is experience_level === EXPERT; keep the provided context in
+    // sync so its consumers react when the level changes.
     if (changed.has("_experienceLevel")) {
       this._expertMode = isExpert(this._experienceLevel);
     }
