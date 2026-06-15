@@ -1,4 +1,4 @@
-import { EditorLayout } from "../api/types/system.js";
+import { EditorLayout, SecretsEditorLayout } from "../api/types/system.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
 
 // The secrets editor only has two panes, so its layout never includes BOTH.
@@ -24,11 +24,10 @@ export function prefToDeviceLayout(layout: EditorLayout): DeviceLayoutMode {
   return PREF_TO_DEVICE[layout];
 }
 
-export function secretsLayoutToPref(layout: SecretsLayout): EditorLayout {
-  return layout === "yaml" ? EditorLayout.YAML : EditorLayout.VISUAL;
+export function secretsLayoutToPref(layout: SecretsLayout): SecretsEditorLayout {
+  return layout === "yaml" ? SecretsEditorLayout.YAML : SecretsEditorLayout.VISUAL;
 }
 
-export function prefToSecretsLayout(layout: EditorLayout): SecretsLayout {
-  // Secrets has no split pane; a stray BOTH falls back to the YAML pane.
-  return layout === EditorLayout.VISUAL ? "form" : "yaml";
+export function prefToSecretsLayout(layout: SecretsEditorLayout): SecretsLayout {
+  return layout === SecretsEditorLayout.YAML ? "yaml" : "form";
 }

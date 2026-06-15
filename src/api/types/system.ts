@@ -52,9 +52,8 @@ export enum SortDirection {
 }
 
 /**
- * Which editor panes are open, persisted per editor. The device editor
- * uses all three; the secrets editor only ever stores VISUAL or YAML.
- * Keep in lockstep with the backend's ``EditorLayout`` enum.
+ * Device editor pane layout: the form, the YAML pane, or both. Keep in
+ * lockstep with the backend's ``EditorLayout`` enum.
  */
 export enum EditorLayout {
   /** Form / guide only, YAML pane hidden. */
@@ -63,6 +62,16 @@ export enum EditorLayout {
   YAML = "yaml",
   /** Split: form / guide alongside the YAML pane. */
   BOTH = "both",
+}
+
+/**
+ * Secrets editor layout: the form or the YAML pane, never both. A
+ * dedicated enum keeps ``both`` off the wire. Keep in lockstep with the
+ * backend's ``SecretsEditorLayout`` enum.
+ */
+export enum SecretsEditorLayout {
+  VISUAL = "visual",
+  YAML = "yaml",
 }
 
 /**
@@ -83,9 +92,9 @@ export interface UserPreferences {
   theme: Theme;
   navigator_visible: boolean;
   /** Which editor panes the user keeps open, persisted so the choice
-   *  survives a new browser. The secrets editor never uses ``BOTH``. */
+   *  survives a new browser. The secrets editor has no split view. */
   device_editor_layout: EditorLayout;
-  secrets_editor_layout: EditorLayout;
+  secrets_editor_layout: SecretsEditorLayout;
   table_page_size: number;
   table_column_visibility: Record<string, boolean>;
   table_sort_column: string | null;

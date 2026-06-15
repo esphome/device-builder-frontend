@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EditorLayout } from "../../src/api/types/system.js";
+import { EditorLayout, SecretsEditorLayout } from "../../src/api/types/system.js";
 import type { DeviceLayoutMode } from "../../src/components/device/device-editor.js";
 import {
   deviceLayoutToPref,
@@ -32,9 +32,10 @@ describe("secrets layout mapping", () => {
     }
   });
 
-  it("never produces BOTH and falls back to yaml for a stray BOTH", () => {
-    expect(secretsLayoutToPref("form")).toBe(EditorLayout.VISUAL);
-    expect(secretsLayoutToPref("yaml")).toBe(EditorLayout.YAML);
-    expect(prefToSecretsLayout(EditorLayout.BOTH)).toBe("yaml");
+  it("maps onto the two-value secrets enum", () => {
+    expect(secretsLayoutToPref("form")).toBe(SecretsEditorLayout.VISUAL);
+    expect(secretsLayoutToPref("yaml")).toBe(SecretsEditorLayout.YAML);
+    expect(prefToSecretsLayout(SecretsEditorLayout.VISUAL)).toBe("form");
+    expect(prefToSecretsLayout(SecretsEditorLayout.YAML)).toBe("yaml");
   });
 });
