@@ -85,7 +85,6 @@ export function formatConstraintKeys(
 export interface ClusterAlternative {
   /** Stable radio value — the alternative's first member key. */
   id: string;
-  keys: string[];
   members: ConfigEntry[];
   label: string;
 }
@@ -113,7 +112,6 @@ export function buildAlternatives(
     return [
       {
         id: members[0].key,
-        keys: members.map((m) => m.key),
         members,
         label: members.map((m) => labelFor(m, ctx)).join(", "),
       },
@@ -135,7 +133,7 @@ export function selectClusterAlternative(
   if (!chosen) return;
   for (const alt of alternatives) {
     if (alt.id === newAltId) continue;
-    for (const key of alt.keys) {
+    for (const { key } of alt.members) {
       const value = ctx.getAt([key]);
       if (value !== undefined) {
         ctx.setClusterStash(clusterId, key, value);
@@ -143,7 +141,7 @@ export function selectClusterAlternative(
       }
     }
   }
-  for (const key of chosen.keys) {
+  for (const { key } of chosen.members) {
     const stashed = ctx.getClusterStash(clusterId, key);
     if (stashed !== undefined) {
       ctx.emitChange([key], stashed);
@@ -167,7 +165,7 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   // (round-trips existing YAML); else nothing selected yet.
   const selectedId =
     ctx.getClusterChoice(clusterId) ??
-    alternatives.find((a) => a.keys.some((k) => ctx.getAt([k]) !== undefined))?.id;
+    alternatives.find((a) => a.members.some((m) => ctx.getAt([m.key]) !== undefined))?.id;
   const selected = alternatives.find((a) => a.id === selectedId);
 
   // The radios below name each alternative, so the header drops the key list
