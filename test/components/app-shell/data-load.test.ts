@@ -94,10 +94,9 @@ describe("loadThemePreference (post-wizard context refresh)", () => {
     table_column_visibility: {},
     table_sort_column: null,
     table_sort_direction: null,
-    experience_level: ExperienceLevel.YAML,
+    experience_level: ExperienceLevel.EXPERT,
     remote_compute_only: true,
     onboarding_completed_version: 2,
-    expert_mode: true,
   };
 
   function makePrefsHost() {
@@ -123,7 +122,7 @@ describe("loadThemePreference (post-wizard context refresh)", () => {
   it("applies prefs and marks loaded when no write is in flight", async () => {
     const host = makePrefsHost();
     await loadThemePreference(host as unknown as ESPHomeApp);
-    expect(host._experienceLevel).toBe(ExperienceLevel.YAML);
+    expect(host._experienceLevel).toBe(ExperienceLevel.EXPERT);
     expect(host._remoteComputeOnly).toBe(true);
     expect(host._prefsLoaded).toBe(true);
   });

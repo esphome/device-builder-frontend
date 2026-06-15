@@ -58,25 +58,22 @@ export enum SortDirection {
  * the backend's ``ExperienceLevel`` enum.
  */
 export enum ExperienceLevel {
-  /** New to ESPHome — keep it light (no YAML diff, no YAML pane). */
+  /** New to ESPHome — keep it light, expert surfaces hidden. */
   BEGINNER = "beginner",
-  /** ESPHome user who prefers the UI (YAML diff, no first-open pane). */
-  UI = "ui",
-  /** ESPHome user who prefers YAML (YAML diff + first-open pane). */
-  YAML = "yaml",
+  /** Power user — unlocks the editor diff, navigator search, YAML search. */
+  EXPERT = "expert",
 }
 
 export interface UserPreferences {
   dashboard_view: DashboardView;
   theme: Theme;
   navigator_visible: boolean;
-  expert_mode: boolean;
   table_page_size: number;
   table_column_visibility: Record<string, boolean>;
   table_sort_column: string | null;
   table_sort_direction: SortDirection | null;
   /** Experience level chosen in onboarding (``null`` until chosen).
-   *  Seeds ``yaml_diff_button`` and the editor's first-open layout. */
+   *  ``EXPERT`` is the single source of truth for "expert mode". */
   experience_level: ExperienceLevel | null;
   /** This install is only a remote build node: onboarding skips the
    *  Wi-Fi step and device-creation entry points are hidden. */

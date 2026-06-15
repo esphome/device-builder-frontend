@@ -12,12 +12,11 @@ function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
     dashboard_view: "cards" as UserPreferences["dashboard_view"],
     theme: "dark" as UserPreferences["theme"],
     navigator_visible: true,
-    expert_mode: true,
     table_page_size: 25,
     table_column_visibility: {},
     table_sort_column: null,
     table_sort_direction: null,
-    experience_level: ExperienceLevel.YAML,
+    experience_level: ExperienceLevel.EXPERT,
     remote_compute_only: true,
     onboarding_completed_version: 2,
     ...over,
@@ -55,7 +54,7 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     const host = makeHost();
     dispatch(host, snapshot(prefs()));
     expect(host._prefsLoaded).toBe(true);
-    expect(host._experienceLevel).toBe(ExperienceLevel.YAML);
+    expect(host._experienceLevel).toBe(ExperienceLevel.EXPERT);
     expect(host._remoteComputeOnly).toBe(true);
     expect(host.applyTheme).toHaveBeenCalledWith("dark");
   });

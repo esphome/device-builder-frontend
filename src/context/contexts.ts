@@ -84,19 +84,19 @@ export const firmwareJobsContext = createContext<Map<string, FirmwareJob>>(
   Symbol("esphome-firmware-jobs")
 );
 
-/** Context for whether Expert Mode is enabled. A single master switch
- *  that gates the editor diff view, the device-navigator search box,
- *  and the command-palette YAML content search. Backed by the
- *  ``expert_mode`` user preference. */
+/** Context for whether Expert Mode is enabled. Gates the editor diff view,
+ *  the device-navigator search box, and the command-palette YAML content
+ *  search. Derived in the app shell from ``experience_level === EXPERT`` (the
+ *  single source of truth); there is no separate ``expert_mode`` preference. */
 export const expertModeContext = createContext<boolean>(Symbol("esphome-expert-mode"));
 
 /**
  * Context for the chosen experience level (``null`` until picked).
  *
  * App shell sets it from the ``subscribe_events`` ``initial_state`` snapshot
- * and updates it when the user re-picks in Settings → Experience. The editor
- * reads it to seed the YAML pane on first open; the Settings section reads it
- * to highlight the active choice.
+ * and updates it when the user flips the Settings → Appearance Expert Mode
+ * toggle. ``expertModeContext`` is derived from it; the editor reads it to seed
+ * the YAML pane on first open.
  */
 export const experienceLevelContext = createContext<ExperienceLevel | null>(
   Symbol("esphome-experience-level")
@@ -107,7 +107,7 @@ export const experienceLevelContext = createContext<ExperienceLevel | null>(
  *
  * When ``true`` the device-creation entry points (New device, Adopt,
  * Import, serial auto-wizard) are hidden. Set from the ``subscribe_events``
- * ``initial_state`` snapshot, toggled in Settings → Experience.
+ * ``initial_state`` snapshot, toggled in Settings → Appearance.
  */
 export const remoteComputeOnlyContext = createContext<boolean>(
   Symbol("esphome-remote-compute-only")

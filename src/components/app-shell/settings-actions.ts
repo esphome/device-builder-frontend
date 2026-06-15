@@ -6,7 +6,7 @@ import {
   CLEANUP_TTL_MIN_SECONDS,
   type PairingSummary,
 } from "../../api/types/remote-build.js";
-import type { ExperienceLevel, Theme } from "../../api/types/system.js";
+import { ExperienceLevel, type Theme } from "../../api/types/system.js";
 import {
   clearStoredLocale,
   loadLocalize,
@@ -32,14 +32,10 @@ export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
     });
 }
 
-// Experience seeds the YAML diff button (beginners get none; UI / YAML users
-// get it) and the editor's first-open layout. Revert + toast on failure so the
+// experience_level is the single source of truth; EXPERT unlocks the power-user
+// surfaces and the editor's first-open layout. Revert + toast on failure so the
 // stored level can't silently diverge from the UI.
-export function onSetExperienceLevel(
-  host: ESPHomeApp,
-  e: CustomEvent<ExperienceLevel>
-): void {
-  const level = e.detail;
+function setExperienceLevel(host: ESPHomeApp, level: ExperienceLevel): void {
   const previousLevel = host._experienceLevel;
   host._experienceLevel = level;
   // Count the write so a reconnect's INITIAL_STATE snapshot can't reload the
@@ -57,6 +53,13 @@ export function onSetExperienceLevel(
     .finally(() => {
       host._prefsWritesInFlight -= 1;
     });
+}
+
+export function onSetExperienceLevel(
+  host: ESPHomeApp,
+  e: CustomEvent<ExperienceLevel>
+): void {
+  setExperienceLevel(host, e.detail);
 }
 
 export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>): void {
@@ -78,10 +81,10 @@ export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>
     });
 }
 
+// Expert Mode is just experience_level === EXPERT; the Appearance/command-palette
+// toggle re-points the level (off → BEGINNER) through the same write path.
 export function onSetExpertMode(host: ESPHomeApp, e: CustomEvent<boolean>): void {
-  const enabled = e.detail;
-  host._expertMode = enabled;
-  host._api.updatePreferences({ expert_mode: enabled }).catch(() => {});
+  setExperienceLevel(host, e.detail ? ExperienceLevel.EXPERT : ExperienceLevel.BEGINNER);
 }
 
 // Optimistic flip with revert-on-failure for security-sensitive toggles.

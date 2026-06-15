@@ -930,10 +930,8 @@
         "intro": "You can change this any time in Settings.",
         "beginner_title": "New to ESPHome",
         "beginner_desc": "Keep it simple and guided, the lightest interface.",
-        "ui_title": "I prefer the UI",
-        "ui_desc": "Comfortable with ESPHome; edit through the visual editor.",
-        "yaml_title": "I prefer YAML",
-        "yaml_desc": "Open the editor with the YAML pane and diff tools ready."
+        "expert_title": "Expert",
+        "expert_desc": "Unlock the editor diff, navigator search, and YAML search."
       },
       "wifi": {
         "title": "Set up Wi-Fi",
@@ -1034,8 +1032,6 @@
   "settings": {
     "title": "Settings",
     "appearance": "Appearance",
-    "experience": "Experience",
-    "experience_intro": "Tailor the dashboard to how you work. This changes how much the interface shows by default; you can always reveal more.",
     "experience_save_failed": "Failed to save your preference",
     "remote_compute_only": "Only use this for remote compute",
     "remote_compute_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards.",

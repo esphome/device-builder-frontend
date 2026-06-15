@@ -4,7 +4,11 @@ import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
-import { expertModeContext, localizeContext } from "../../context/index.js";
+import {
+  expertModeContext,
+  localizeContext,
+  remoteComputeOnlyContext,
+} from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -47,6 +51,10 @@ export class ESPHomeSettingsAppearance extends LitElement {
   @consume({ context: expertModeContext, subscribe: true })
   @state()
   private _expertMode = false;
+
+  @consume({ context: remoteComputeOnlyContext, subscribe: true })
+  @state()
+  private _remoteComputeOnly = false;
 
   @state()
   private _theme: string = localStorage.getItem("esphome-theme") ?? "system";
@@ -134,7 +142,29 @@ export class ESPHomeSettingsAppearance extends LitElement {
           <wa-option value="system">${this._localize("layout.theme_system")}</wa-option>
         </wa-select>
       </div>
-      ${this._renderExpertMode()}
+      ${this._renderExpertMode()} ${this._renderRemoteCompute()}
+    `;
+  }
+
+  private _renderRemoteCompute() {
+    return html`
+      <div class="row">
+        <div class="row-label">
+          <span id="remote-compute-title" class="row-title">
+            ${this._localize("settings.remote_compute_only")}
+          </span>
+          <span class="row-desc">
+            ${this._localize("settings.remote_compute_only_desc")}
+          </span>
+        </div>
+        <button
+          class="toggle"
+          role="switch"
+          aria-labelledby="remote-compute-title"
+          aria-checked=${this._remoteComputeOnly}
+          @click=${this._onToggleRemoteCompute}
+        ></button>
+      </div>
     `;
   }
 
@@ -192,6 +222,16 @@ export class ESPHomeSettingsAppearance extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-expert-mode", {
         detail: !this._expertMode,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onToggleRemoteCompute() {
+    this.dispatchEvent(
+      new CustomEvent("set-remote-compute-only", {
+        detail: !this._remoteComputeOnly,
         bubbles: true,
         composed: true,
       })

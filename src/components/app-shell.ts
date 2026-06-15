@@ -52,6 +52,7 @@ import {
   versionContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { isExpert } from "../util/experience.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
@@ -79,6 +80,7 @@ import {
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
+  onSetRemoteComputeOnly,
   onSetTheme,
 } from "./app-shell/settings-actions.js";
 
@@ -135,6 +137,8 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: prefsLoadedContext })
   @state()
   _prefsLoaded = false;
+  // Derived from _experienceLevel in willUpdate (EXPERT ⇒ true); there is no
+  // separate expert_mode preference.
   @provide({ context: expertModeContext }) @state() _expertMode = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
@@ -561,6 +565,8 @@ export class ESPHomeApp extends LitElement {
       <esphome-settings-dialog
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
+        @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
+          onSetRemoteComputeOnly(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>
           onSetRemoteBuildEnabled(this, e)}
         @set-remote-build-cleanup-ttl=${(e: CustomEvent<number>) =>
@@ -606,6 +612,15 @@ export class ESPHomeApp extends LitElement {
   // install, or the standalone Wi-Fi dialog for an existing install that's
   // only missing Wi-Fi. Both dialogs are mounted unconditionally (so listeners
   // are wired) but start closed.
+  protected willUpdate(changed: PropertyValues) {
+    // Expert Mode is derived: experience_level === EXPERT. Keep the provided
+    // expertModeContext in lockstep so its consumers update when the level
+    // changes (snapshot, Appearance toggle, command palette).
+    if (changed.has("_experienceLevel")) {
+      this._expertMode = isExpert(this._experienceLevel);
+    }
+  }
+
   protected updated(changed: PropertyValues) {
     super.updated?.(changed);
     if (changed.has("_onboardingShouldShow") && this._onboardingShouldShow) {
