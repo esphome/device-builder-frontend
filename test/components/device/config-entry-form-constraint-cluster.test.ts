@@ -274,6 +274,18 @@ describe("renderConstraintRadioField", () => {
     // The radio enforces the choice, so the cluster never reads as unsatisfied.
     expect(out).not.toContain("unsatisfied");
   });
+
+  it("falls back to the static box when fewer than two alternatives render", () => {
+    // chipset gated off at runtime leaves one alternative, so a radio chooser
+    // makes no sense; render the static box instead.
+    const hiddenChipset = ENTRIES.map((e) =>
+      e.key === "chipset" ? { ...e, hidden: true } : e
+    );
+    const [cluster] = buildConstraintClusters(hiddenChipset, REQUIRED_GROUPS).clusters;
+    const out = serialize(renderConstraintRadioField(cluster, ctxFor({})));
+    expect(out).not.toContain("wa-radio-group");
+    expect(out).toContain("nested-group");
+  });
 });
 
 describe("selectClusterAlternative", () => {

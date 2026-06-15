@@ -179,7 +179,17 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   const clusterId = cluster.members[0].key;
   const values = ctx.scopeValues([]);
   const targetPlatform = ctx.board?.esphome.platform ?? null;
-  const alternatives = buildAlternatives(cluster, ctx);
+  const isRenderable = (m: ConfigEntry): boolean =>
+    ctx.getAt([m.key]) !== undefined ||
+    isEntryVisible(m, values, ctx.presentComponents, targetPlatform);
+
+  // Gate alternatives on renderability (a board / platform / depends_on can hide
+  // a side at runtime) and fall back to the static box when fewer than two real
+  // choices remain, mirroring exclusive_group's option gating.
+  const alternatives = buildAlternatives(cluster, ctx).filter((a) =>
+    a.members.some(isRenderable)
+  );
+  if (alternatives.length < 2) return renderConstraintClusterField(cluster, ctx);
 
   // Stored choice wins; else infer from whichever side already holds a value
   // (round-trips existing YAML); else nothing selected yet.
@@ -194,11 +204,7 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   const message = ctx.localize("device.constraint_exactly_one_radio");
   const headerId = `constraint-cluster-${clusterId}`;
 
-  const visibleMembers = (selected?.members ?? []).filter(
-    (m) =>
-      ctx.getAt([m.key]) !== undefined ||
-      isEntryVisible(m, values, ctx.presentComponents, targetPlatform)
-  );
+  const visibleMembers = (selected?.members ?? []).filter(isRenderable);
   return html`
     <div
       class="nested-group constraint-cluster"
