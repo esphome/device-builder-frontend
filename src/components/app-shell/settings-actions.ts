@@ -55,13 +55,6 @@ function setExperienceLevel(host: ESPHomeApp, level: ExperienceLevel): void {
     });
 }
 
-export function onSetExperienceLevel(
-  host: ESPHomeApp,
-  e: CustomEvent<ExperienceLevel>
-): void {
-  setExperienceLevel(host, e.detail);
-}
-
 export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>): void {
   const enabled = e.detail;
   const previous = host._remoteComputeOnly;

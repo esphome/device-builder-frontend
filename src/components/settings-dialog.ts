@@ -1,7 +1,5 @@
 import { consume } from "@lit/context";
 import {
-  mdiAccountCog,
-  mdiAccountCogOutline,
   mdiClose,
   mdiHandshake,
   mdiHandshakeOutline,
@@ -39,8 +37,6 @@ import "./settings-dialog/language-section.js";
 import "./settings-dialog/pairing-requests-section.js";
 
 registerMdiIcons({
-  "account-cog": mdiAccountCog,
-  "account-cog-outline": mdiAccountCogOutline,
   close: mdiClose,
   handshake: mdiHandshake,
   "handshake-outline": mdiHandshakeOutline,

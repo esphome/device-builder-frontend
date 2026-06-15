@@ -59,8 +59,8 @@ import {
   loadIntegrationDocs,
   loadLabels,
   loadOnboardingState,
+  loadPreferences,
   loadRemoteBuildSettings,
-  loadThemePreference,
 } from "./app-shell/data-load.js";
 import { handleEvent } from "./app-shell/events.js";
 import {
@@ -200,7 +200,7 @@ export class ESPHomeApp extends LitElement {
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
   // Count of in-flight experience / remote-compute / yaml-diff preference
-  // writes so a reconnect's loadThemePreference can't clobber an optimistic
+  // writes so a reconnect's loadPreferences can't clobber an optimistic
   // value. A counter, not a boolean: it guards more than one write path, so
   // two overlapping writes must both settle before the gate reopens.
   _prefsWritesInFlight = 0;
@@ -462,7 +462,7 @@ export class ESPHomeApp extends LitElement {
     void loadOnboardingState(this);
     // The wizard persists experience / remote-compute before acknowledging;
     // refresh prefs so the contexts (and the gated UI) reflect the picks.
-    void loadThemePreference(this);
+    void loadPreferences(this);
   };
 
   _onOnboardingDismissedSession = () => {
@@ -472,7 +472,7 @@ export class ESPHomeApp extends LitElement {
     // Skip-Wi-Fi persists the experience pick without acknowledging; refresh
     // prefs so the contexts (yaml-diff button, experience-gated UI) reflect it
     // this session rather than waiting for the next reconnect.
-    void loadThemePreference(this);
+    void loadPreferences(this);
   };
 
   // Kebab "Set up Wi-Fi" — explicit user intent, overrides both gates.

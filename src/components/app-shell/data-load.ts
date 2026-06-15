@@ -66,7 +66,7 @@ export async function loadIntegrationDocs(host: ESPHomeApp): Promise<void> {
   }
 }
 
-export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
+export async function loadPreferences(host: ESPHomeApp): Promise<void> {
   // Boot/reconnect prefs come from the subscribe snapshot; this refetch exists
   // only to reflect the onboarding wizard's direct persist in the live contexts.
   // Skip while a write is in flight; the optimistic value wins until it settles.

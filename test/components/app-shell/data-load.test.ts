@@ -9,7 +9,7 @@ import {
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
   loadOnboardingState,
-  loadThemePreference,
+  loadPreferences,
 } from "../../../src/components/app-shell/data-load.js";
 
 const DONE = OnboardingStepStatus.DONE;
@@ -85,7 +85,7 @@ describe("loadOnboardingState routing", () => {
   });
 });
 
-describe("loadThemePreference (post-wizard context refresh)", () => {
+describe("loadPreferences (post-wizard context refresh)", () => {
   const prefs: UserPreferences = {
     dashboard_view: "cards" as UserPreferences["dashboard_view"],
     theme: "dark" as UserPreferences["theme"],
@@ -113,7 +113,7 @@ describe("loadThemePreference (post-wizard context refresh)", () => {
   it("skips the refresh while a preference write is in flight", async () => {
     const host = makePrefsHost();
     host._prefsWritesInFlight = 1;
-    await loadThemePreference(host as unknown as ESPHomeApp);
+    await loadPreferences(host as unknown as ESPHomeApp);
     expect(host._api.getPreferences).not.toHaveBeenCalled();
     expect(host._remoteComputeOnly).toBe(false);
     expect(host._experienceLevel).toBeNull();
@@ -121,7 +121,7 @@ describe("loadThemePreference (post-wizard context refresh)", () => {
 
   it("applies prefs and marks loaded when no write is in flight", async () => {
     const host = makePrefsHost();
-    await loadThemePreference(host as unknown as ESPHomeApp);
+    await loadPreferences(host as unknown as ESPHomeApp);
     expect(host._experienceLevel).toBe(ExperienceLevel.EXPERT);
     expect(host._remoteComputeOnly).toBe(true);
     expect(host._prefsLoaded).toBe(true);
@@ -134,7 +134,7 @@ describe("loadThemePreference (post-wizard context refresh)", () => {
       host._api.getPreferences = vi.fn(async () => {
         throw new Error("boom");
       });
-      await loadThemePreference(host as unknown as ESPHomeApp);
+      await loadPreferences(host as unknown as ESPHomeApp);
       expect(host._prefsLoaded).toBe(false);
       expect(host._remoteComputeOnly).toBe(false);
       expect(warn).toHaveBeenCalled();

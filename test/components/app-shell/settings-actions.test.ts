@@ -3,7 +3,6 @@ import type { VersionMatchPolicy } from "../../../src/api/types/event-subscripti
 import { ExperienceLevel } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
-  onSetExperienceLevel,
   onSetExpertMode,
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteComputeOnly,
@@ -93,55 +92,8 @@ describe("onSetOffloaderVersionMatchPolicy", () => {
   });
 });
 
-describe("onSetExperienceLevel", () => {
-  beforeEach(() => toastError.mockClear());
-  afterEach(() => vi.restoreAllMocks());
-
-  it("sets the level and persists it", async () => {
-    const update = vi.fn(async () => ({}));
-    const host = makePrefsHost(update);
-    onSetExperienceLevel(
-      host as unknown as ESPHomeApp,
-      new CustomEvent("x", { detail: ExperienceLevel.EXPERT })
-    );
-    expect(host._experienceLevel).toBe(ExperienceLevel.EXPERT);
-    await flush();
-    expect(update).toHaveBeenCalledWith({
-      experience_level: ExperienceLevel.EXPERT,
-    });
-    expect(host._prefsWritesInFlight).toBe(0);
-  });
-
-  it("accepts the beginner level", async () => {
-    const host = makePrefsHost(vi.fn(async () => ({})));
-    onSetExperienceLevel(
-      host as unknown as ESPHomeApp,
-      new CustomEvent("x", { detail: ExperienceLevel.BEGINNER })
-    );
-    await flush();
-  });
-
-  it("reverts the level, logs, and toasts on backend rejection", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const host = makePrefsHost(
-      vi.fn(async () => {
-        throw new Error("no");
-      })
-    );
-    host._experienceLevel = ExperienceLevel.BEGINNER;
-    onSetExperienceLevel(
-      host as unknown as ESPHomeApp,
-      new CustomEvent("x", { detail: ExperienceLevel.EXPERT })
-    );
-    await flush();
-    expect(host._experienceLevel).toBe(ExperienceLevel.BEGINNER);
-    expect(toastError).toHaveBeenCalledOnce();
-    expect(warn).toHaveBeenCalled();
-    expect(host._prefsWritesInFlight).toBe(0);
-  });
-});
-
 describe("onSetExpertMode", () => {
+  beforeEach(() => toastError.mockClear());
   afterEach(() => vi.restoreAllMocks());
 
   it("maps the toggle to experience_level (EXPERT on, BEGINNER off)", async () => {
@@ -161,6 +113,25 @@ describe("onSetExpertMode", () => {
       new CustomEvent("x", { detail: false })
     );
     expect(host._experienceLevel).toBe(ExperienceLevel.BEGINNER);
+  });
+
+  it("reverts the level, logs, and toasts on backend rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = makePrefsHost(
+      vi.fn(async () => {
+        throw new Error("no");
+      })
+    );
+    host._experienceLevel = ExperienceLevel.BEGINNER;
+    onSetExpertMode(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    await flush();
+    expect(host._experienceLevel).toBe(ExperienceLevel.BEGINNER);
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
+    expect(host._prefsWritesInFlight).toBe(0);
   });
 });
 
@@ -219,9 +190,9 @@ describe("prefs-write in-flight counter", () => {
     const update = vi.fn(() => new Promise((r) => resolvers.push(r)));
     const host = makePrefsHost(update);
 
-    onSetExperienceLevel(
+    onSetExpertMode(
       host as unknown as ESPHomeApp,
-      new CustomEvent("x", { detail: ExperienceLevel.EXPERT })
+      new CustomEvent("x", { detail: true })
     );
     expect(host._prefsWritesInFlight).toBe(1);
     onSetRemoteComputeOnly(
