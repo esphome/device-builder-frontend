@@ -545,13 +545,16 @@ export class ESPHomePageDevice extends LitElement {
     }
   };
 
+  private _readStoredLayout(): DeviceLayoutMode | null {
+    const stored = localStorage.getItem("esphome-editor-layout");
+    return stored === "both" || stored === "left" || stored === "right" ? stored : null;
+  }
+
   private async _loadPreferences() {
     // localStorage is the instant per-browser seed; the backend pref below is
     // the durable cross-browser source when localStorage is empty.
-    const savedLayout = localStorage.getItem("esphome-editor-layout");
-    const hasSavedLayout =
-      savedLayout === "both" || savedLayout === "left" || savedLayout === "right";
-    if (hasSavedLayout) {
+    const savedLayout = this._readStoredLayout();
+    if (savedLayout) {
       this._layout = savedLayout;
     }
 
@@ -559,10 +562,10 @@ export class ESPHomePageDevice extends LitElement {
       const prefs = await this._api.getPreferences();
       this._navCollapsed = !prefs.navigator_visible;
       // No local layout yet (new browser): restore the backend choice, which
-      // defaults to the split view on a fresh install. Re-check localStorage
-      // after the await: a toggle during the in-flight fetch writes it, and
-      // that newer user choice must win over the seed.
-      if (!hasSavedLayout && localStorage.getItem("esphome-editor-layout") === null) {
+      // defaults to the split view on a fresh install. Re-check after the
+      // await: a toggle during the in-flight fetch writes a valid value that
+      // must win, but a stale invalid value still seeds from the backend.
+      if (!savedLayout && this._readStoredLayout() === null) {
         this._layout = prefToDeviceLayout(prefs.device_editor_layout);
       }
     } catch (err) {

@@ -39,6 +39,17 @@ describe("esphome-page-device layout persistence", () => {
     expect(page._layout).toBe("right");
   });
 
+  test("seeds from the backend when localStorage holds an invalid value", async () => {
+    localStorage.setItem("esphome-editor-layout", "garbage");
+    const getPreferences = vi.fn(() =>
+      Promise.resolve({ navigator_visible: true, device_editor_layout: "yaml" })
+    );
+    const page = makePage({ _layout: "both" });
+    page._api = { getPreferences } as unknown as ESPHomeAPI;
+    await page._loadPreferences();
+    expect(page._layout).toBe("right");
+  });
+
   test("defers to a layout the user toggled while the seed fetch was in flight", async () => {
     const getPreferences = vi.fn(() => {
       // The user toggled mid-fetch, so _persistLayout wrote localStorage.
