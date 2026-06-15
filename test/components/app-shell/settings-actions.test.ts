@@ -21,11 +21,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 type PrefsHost = Pick<
   ESPHomeApp,
-  | "_experienceLevel"
-  | "_yamlDiffButton"
-  | "_remoteComputeOnly"
-  | "_localize"
-  | "_prefsWritesInFlight"
+  "_experienceLevel" | "_remoteComputeOnly" | "_localize" | "_prefsWritesInFlight"
 > & { _api: { updatePreferences: (p: Record<string, unknown>) => Promise<unknown> } };
 
 function makePrefsHost(
@@ -33,7 +29,6 @@ function makePrefsHost(
 ): PrefsHost {
   return {
     _experienceLevel: null,
-    _yamlDiffButton: false,
     _remoteComputeOnly: false,
     _localize: ((key: string) => key) as ESPHomeApp["_localize"],
     _prefsWritesInFlight: 0,
@@ -109,23 +104,19 @@ describe("onSetExperienceLevel", () => {
       new CustomEvent("x", { detail: ExperienceLevel.YAML })
     );
     expect(host._experienceLevel).toBe(ExperienceLevel.YAML);
-    expect(host._yamlDiffButton).toBe(true);
     await flush();
     expect(update).toHaveBeenCalledWith({
       experience_level: ExperienceLevel.YAML,
-      yaml_diff_button: true,
     });
     expect(host._prefsWritesInFlight).toBe(0);
   });
 
   it("clears the yaml diff button for the beginner level", async () => {
     const host = makePrefsHost(vi.fn(async () => ({})));
-    host._yamlDiffButton = true;
     onSetExperienceLevel(
       host as unknown as ESPHomeApp,
       new CustomEvent("x", { detail: ExperienceLevel.BEGINNER })
     );
-    expect(host._yamlDiffButton).toBe(false);
     await flush();
   });
 
@@ -143,7 +134,6 @@ describe("onSetExperienceLevel", () => {
     );
     await flush();
     expect(host._experienceLevel).toBe(ExperienceLevel.BEGINNER);
-    expect(host._yamlDiffButton).toBe(false);
     expect(toastError).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalled();
     expect(host._prefsWritesInFlight).toBe(0);

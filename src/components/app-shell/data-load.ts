@@ -9,7 +9,6 @@ import type { ESPHomeApp } from "../app-shell.js";
 /** Apply a preferences snapshot to the app-shell's live contexts. */
 export function applyPreferences(host: ESPHomeApp, prefs: UserPreferences): void {
   host.applyTheme(prefs.theme);
-  host._yamlDiffButton = prefs.yaml_diff_button;
   host._experienceLevel = prefs.experience_level;
   host._remoteComputeOnly = prefs.remote_compute_only;
 }

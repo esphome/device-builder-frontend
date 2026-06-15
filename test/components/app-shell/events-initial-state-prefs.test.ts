@@ -12,7 +12,7 @@ function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
     dashboard_view: "cards" as UserPreferences["dashboard_view"],
     theme: "dark" as UserPreferences["theme"],
     navigator_visible: true,
-    yaml_diff_button: true,
+    expert_mode: true,
     table_page_size: 25,
     table_column_visibility: {},
     table_sort_column: null,
@@ -28,7 +28,6 @@ function makeHost() {
   return {
     _prefsLoaded: false,
     _prefsWritesInFlight: 0,
-    _yamlDiffButton: false,
     _experienceLevel: null as ExperienceLevel | null,
     _remoteComputeOnly: false,
     applyTheme: vi.fn(),
@@ -58,7 +57,6 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     expect(host._prefsLoaded).toBe(true);
     expect(host._experienceLevel).toBe(ExperienceLevel.YAML);
     expect(host._remoteComputeOnly).toBe(true);
-    expect(host._yamlDiffButton).toBe(true);
     expect(host.applyTheme).toHaveBeenCalledWith("dark");
   });
 

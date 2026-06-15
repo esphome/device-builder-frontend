@@ -90,7 +90,6 @@ describe("loadThemePreference (post-wizard context refresh)", () => {
     dashboard_view: "cards" as UserPreferences["dashboard_view"],
     theme: "dark" as UserPreferences["theme"],
     navigator_visible: true,
-    yaml_diff_button: true,
     table_page_size: 25,
     table_column_visibility: {},
     table_sort_column: null,
@@ -98,12 +97,12 @@ describe("loadThemePreference (post-wizard context refresh)", () => {
     experience_level: ExperienceLevel.YAML,
     remote_compute_only: true,
     onboarding_completed_version: 2,
+    expert_mode: true,
   };
 
   function makePrefsHost() {
     return {
       _prefsWritesInFlight: 0,
-      _yamlDiffButton: false,
       _experienceLevel: null as ExperienceLevel | null,
       _remoteComputeOnly: false,
       _prefsLoaded: false,
@@ -126,7 +125,6 @@ describe("loadThemePreference (post-wizard context refresh)", () => {
     await loadThemePreference(host as unknown as ESPHomeApp);
     expect(host._experienceLevel).toBe(ExperienceLevel.YAML);
     expect(host._remoteComputeOnly).toBe(true);
-    expect(host._yamlDiffButton).toBe(true);
     expect(host._prefsLoaded).toBe(true);
   });
 

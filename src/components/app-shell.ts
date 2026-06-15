@@ -72,7 +72,6 @@ import {
   onPairRequestSent,
   onRemoteBuildJobDismissed,
   onRemoteBuildJobSubmitted,
-  onSetExperienceLevel,
   onSetExpertMode,
   onSetLanguage,
   onSetOffloaderPairingEnabled,
@@ -80,7 +79,6 @@ import {
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
-  onSetRemoteComputeOnly,
   onSetTheme,
 } from "./app-shell/settings-actions.js";
 

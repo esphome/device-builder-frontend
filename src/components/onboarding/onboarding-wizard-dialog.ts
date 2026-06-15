@@ -18,7 +18,7 @@ import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js"
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
-import { EXPERIENCE_OPTIONS, yamlDiffForExperience } from "../../util/experience.js";
+import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
@@ -383,7 +383,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     try {
       await this._api.updatePreferences({
         experience_level: this._experience,
-        yaml_diff_button: yamlDiffForExperience(this._experience),
         remote_compute_only: this._remoteCompute,
       });
       return true;

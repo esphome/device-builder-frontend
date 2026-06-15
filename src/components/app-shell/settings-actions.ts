@@ -13,7 +13,6 @@ import {
   type SupportedLocale,
   writeStoredLocale,
 } from "../../common/localize.js";
-import { yamlDiffForExperience } from "../../util/experience.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { patchOffloadPairing } from "./events.js";
 
@@ -42,19 +41,15 @@ export function onSetExperienceLevel(
 ): void {
   const level = e.detail;
   const previousLevel = host._experienceLevel;
-  const previousDiff = host._yamlDiffButton;
-  const yamlDiff = yamlDiffForExperience(level);
   host._experienceLevel = level;
-  host._yamlDiffButton = yamlDiff;
   // Count the write so a reconnect's INITIAL_STATE snapshot can't reload the
   // pre-write values over the optimistic ones mid-flight.
   host._prefsWritesInFlight += 1;
   host._api
-    .updatePreferences({ experience_level: level, yaml_diff_button: yamlDiff })
+    .updatePreferences({ experience_level: level })
     .catch((err) => {
       console.warn("Failed to save experience level:", err);
       host._experienceLevel = previousLevel;
-      host._yamlDiffButton = previousDiff;
       toast.error(host._localize("settings.experience_save_failed"), {
         richColors: true,
       });
