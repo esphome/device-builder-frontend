@@ -255,6 +255,20 @@ export interface RenderCtx {
   setEditingMagnitude: (path: string[], text: string) => void;
   clearEditingMagnitude: (path: string[]) => void;
   /**
+   * Either/or constraint cluster (radio chooser) UI state, off-config like
+   * the unit/magnitude stashes above. ``ClusterChoice`` is the selected
+   * alternative id, needed because a freshly-picked-but-empty side has no
+   * present value to infer the selection from. ``ClusterStash`` preserves the
+   * deselected side's values so switching back restores them (only the
+   * selected side is ever serialized). Keyed by cluster id (its first member
+   * key) plus, for the stash, the member key.
+   */
+  getClusterChoice: (clusterId: string) => string | undefined;
+  setClusterChoice: (clusterId: string, altId: string) => void;
+  getClusterStash: (clusterId: string, key: string) => unknown;
+  setClusterStash: (clusterId: string, key: string, value: unknown) => void;
+  clearClusterStash: (clusterId: string, key: string) => void;
+  /**
    * Stable per-form object identity used by renderers that keep
    * cross-render scratch state via a WeakMap (e.g. templatable
    * literal/lambda stashing — see ``templatable.ts``). The form

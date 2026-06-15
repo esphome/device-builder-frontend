@@ -117,6 +117,11 @@ export function makeRenderCtx(
     getEditingMagnitude: () => undefined,
     setEditingMagnitude: vi.fn(),
     clearEditingMagnitude: vi.fn(),
+    getClusterChoice: () => undefined,
+    setClusterChoice: vi.fn(),
+    getClusterStash: () => undefined,
+    setClusterStash: vi.fn(),
+    clearClusterStash: vi.fn(),
     // Stable per-fixture stash owner — tests that exercise the
     // templatable stash WeakMap (literal/lambda recovery) need a
     // single object identity across calls into the renderer. A

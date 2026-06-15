@@ -656,6 +656,7 @@
     "value_from_secret": "Using stored secret:",
     "default_option_tag": "default",
     "constraint_exactly_one": "Set exactly one of: {keys}",
+    "constraint_exactly_one_radio": "Set exactly one of:",
     "constraint_at_least_one": "Set at least one of: {keys}",
     "constraint_at_most_one": "Set at most one of: {keys}",
     "constraint_none_or_all": "Set all of these together, or leave them all blank: {keys}",

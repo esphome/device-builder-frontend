@@ -80,6 +80,137 @@ export function formatConstraintKeys(
   return keys.map(option).join(", ");
 }
 
+/** An either/or choice within a cluster: a single scalar (`chipset`) or a
+ *  whole inclusive group (the four timings) the user picks between. */
+export interface ClusterAlternative {
+  /** Stable radio value — the alternative's first member key. */
+  id: string;
+  keys: string[];
+  members: ConfigEntry[];
+  label: string;
+}
+
+/** `exactly_one` clusters render as a radio chooser (only the picked side's
+ *  fields show); every other cluster stays a static box. */
+export function isRadioCluster(cluster: ConstraintCluster): boolean {
+  return cluster.cardinality?.kind === "exactly_one";
+}
+
+/** One alternative per cardinality key: a key heading an inclusive `group`
+ *  expands to that group's members (label = member labels joined); a bare key
+ *  is its own single-member alternative. */
+export function buildAlternatives(
+  cluster: ConstraintCluster,
+  ctx: RenderCtx
+): ClusterAlternative[] {
+  const byKey = new Map(cluster.members.map((m) => [m.key, m]));
+  return (cluster.cardinality?.keys ?? []).flatMap((key) => {
+    const entry = byKey.get(key);
+    if (!entry) return [];
+    const members = entry.group
+      ? cluster.members.filter((m) => m.group === entry.group)
+      : [entry];
+    return [
+      {
+        id: members[0].key,
+        keys: members.map((m) => m.key),
+        members,
+        label: members.map((m) => labelFor(m, ctx)).join(", "),
+      },
+    ];
+  });
+}
+
+/** Switch the cluster's active alternative: stash + drop every other side's
+ *  present values (so only the selected side reaches YAML), then restore any
+ *  values previously stashed for the chosen side. */
+export function selectClusterAlternative(
+  cluster: ConstraintCluster,
+  ctx: RenderCtx,
+  newAltId: string
+): void {
+  const clusterId = cluster.members[0].key;
+  const alternatives = buildAlternatives(cluster, ctx);
+  const chosen = alternatives.find((a) => a.id === newAltId);
+  if (!chosen) return;
+  for (const alt of alternatives) {
+    if (alt.id === newAltId) continue;
+    for (const key of alt.keys) {
+      const value = ctx.getAt([key]);
+      if (value !== undefined) {
+        ctx.setClusterStash(clusterId, key, value);
+        ctx.emitChange([key], undefined);
+      }
+    }
+  }
+  for (const key of chosen.keys) {
+    const stashed = ctx.getClusterStash(clusterId, key);
+    if (stashed !== undefined) {
+      ctx.emitChange([key], stashed);
+      ctx.clearClusterStash(clusterId, key);
+    }
+  }
+  ctx.setClusterChoice(clusterId, newAltId);
+}
+
+/** Render an `exactly_one` cluster as a radio chooser: a muted prompt, a radio
+ *  per alternative, and only the selected alternative's fields. The radio
+ *  enforces the choice and only the picked side is ever saved, so there is no
+ *  unsatisfied/warning state. */
+export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: RenderCtx) {
+  const clusterId = cluster.members[0].key;
+  const values = ctx.scopeValues([]);
+  const targetPlatform = ctx.board?.esphome.platform ?? null;
+  const alternatives = buildAlternatives(cluster, ctx);
+
+  // Stored choice wins; else infer from whichever side already holds a value
+  // (round-trips existing YAML); else nothing selected yet.
+  const selectedId =
+    ctx.getClusterChoice(clusterId) ??
+    alternatives.find((a) => a.keys.some((k) => ctx.getAt([k]) !== undefined))?.id;
+  const selected = alternatives.find((a) => a.id === selectedId);
+
+  // The radios below name each alternative, so the header drops the key list
+  // and reads as a bare prompt.
+  const message = ctx.localize("device.constraint_exactly_one_radio");
+  const headerId = `constraint-cluster-${clusterId}`;
+
+  const visibleMembers = (selected?.members ?? []).filter(
+    (m) =>
+      ctx.getAt([m.key]) !== undefined ||
+      isEntryVisible(m, values, ctx.presentComponents, targetPlatform)
+  );
+  return html`
+    <div
+      class="nested-group constraint-cluster"
+      data-field-key=${fieldKeyAttr([clusterId])}
+    >
+      <div id=${headerId} class="constraint-cluster-header">
+        <span>${message}</span>
+      </div>
+      <wa-radio-group
+        class="constraint-cluster-radios"
+        aria-labelledby=${headerId}
+        .value=${selectedId ?? ""}
+        ?disabled=${ctx.disabled}
+        @change=${(e: Event) =>
+          selectClusterAlternative(
+            cluster,
+            ctx,
+            (e.target as unknown as { value: string }).value
+          )}
+      >
+        ${alternatives.map((a) => html`<wa-radio value=${a.id}>${a.label}</wa-radio>`)}
+      </wa-radio-group>
+      ${visibleMembers.length
+        ? html`<div class="nested-fields">
+            ${visibleMembers.map((m) => ctx.renderEntry(m, [m.key]))}
+          </div>`
+        : nothing}
+    </div>
+  `;
+}
+
 /** Render one cluster as a bordered `.nested-group` box: a reactive
  *  constraint header (warning until satisfied) over its member fields. */
 export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: RenderCtx) {

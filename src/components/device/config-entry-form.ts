@@ -65,6 +65,8 @@ import { FieldScrollController } from "./field-scroll-controller.js";
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
+import "@home-assistant/webawesome/dist/components/radio-group/radio-group.js";
+import "@home-assistant/webawesome/dist/components/radio/radio.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
@@ -73,10 +75,12 @@ import {
   buildConstraintClusters,
   fieldRendererStyles,
   formatConstraintKeys,
+  isRadioCluster,
   labelFor,
   orderExclusiveGroups,
   renderBooleanField,
   renderConstraintClusterField,
+  renderConstraintRadioField,
   renderExclusiveGroupField,
   renderFloatWithUnitField,
   renderIconField,
@@ -268,6 +272,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _editingMagnitudes: Map<string, string> = new Map();
 
+  /**
+   * Either/or constraint-cluster (radio chooser) UI state, off-config like
+   * the stashes above. ``_clusterChoices`` maps a cluster id to the selected
+   * alternative; ``_clusterStash`` (keyed ``clusterId + " " + memberKey``)
+   * holds the deselected side's values so switching back restores them.
+   */
+  private _clusterChoices: Map<string, string> = new Map();
+
+  private _clusterStash: Map<string, unknown> = new Map();
+
   static styles = fieldRendererStyles;
 
   /**
@@ -314,7 +328,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
       if (Array.isArray(item)) return renderExclusiveGroupField(item, ctx);
       if (memberKeys.has(item.key)) {
         const cluster = clusterByFirstKey.get(item.key);
-        return cluster ? renderConstraintClusterField(cluster, ctx) : nothing;
+        if (!cluster) return nothing;
+        return isRadioCluster(cluster)
+          ? renderConstraintRadioField(cluster, ctx)
+          : renderConstraintClusterField(cluster, ctx);
       }
       return visible.has(item)
         ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
@@ -389,6 +406,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (changed.has("entries") && changed.get("entries") !== undefined) {
       this._pendingUnits.clear();
       this._editingMagnitudes.clear();
+      this._clusterChoices.clear();
+      this._clusterStash.clear();
       // Re-seed disclosures for the new component; a key like "pin:pin-advanced"
       // recurs across sections, and the form instance is reused.
       this._seededNestedOpen.clear();
@@ -403,7 +422,37 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
+    void this._syncRadioGroups();
     this._fieldScroll.maybeScroll(changed);
+  }
+
+  /**
+   * Force each constraint-cluster `<wa-radio-group>` to reflect the selected
+   * radio after render. `wa-radio-group`'s custom `value` setter never calls
+   * `requestUpdate`, so a Lit-set value never triggers the group's own
+   * `syncRadioElements` and the checked dot stays empty on a data-driven
+   * selection (a user click sets `checked` directly, so that path works). Same
+   * class of first-paint wiring gap that `_syncSelectValues` handles for
+   * `<wa-select>`.
+   */
+  private async _syncRadioGroups() {
+    if (!this.shadowRoot) return;
+    const groups = this.shadowRoot.querySelectorAll<
+      HTMLElement & {
+        syncRadioElements?: () => void | Promise<void>;
+        updateComplete?: Promise<unknown>;
+      }
+    >("wa-radio-group");
+    for (const group of groups) {
+      if (group.updateComplete) {
+        try {
+          await group.updateComplete;
+        } catch {
+          // ignore
+        }
+      }
+      group.syncRadioElements?.();
+    }
   }
 
   /**
@@ -750,6 +799,19 @@ export class ESPHomeConfigEntryForm extends LitElement {
       },
       clearEditingMagnitude: (path) => {
         this._editingMagnitudes.delete(path.join("."));
+      },
+      getClusterChoice: (clusterId) => this._clusterChoices.get(clusterId),
+      setClusterChoice: (clusterId, altId) => {
+        this._clusterChoices.set(clusterId, altId);
+        // Not a @state field, so re-render explicitly to reflect the pick.
+        this.requestUpdate();
+      },
+      getClusterStash: (clusterId, key) => this._clusterStash.get(`${clusterId} ${key}`),
+      setClusterStash: (clusterId, key, value) => {
+        this._clusterStash.set(`${clusterId} ${key}`, value);
+      },
+      clearClusterStash: (clusterId, key) => {
+        this._clusterStash.delete(`${clusterId} ${key}`);
       },
       // Stable object identity for renderer-local WeakMap stashes
       // (templatable literal/lambda recovery, currently). The host

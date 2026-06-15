@@ -13,7 +13,10 @@ import type { RenderCtx } from "../../../src/components/device/config-entry-rend
 import {
   buildConstraintClusters,
   formatConstraintKeys,
+  isRadioCluster,
   renderConstraintClusterField,
+  renderConstraintRadioField,
+  selectClusterAlternative,
 } from "../../../src/components/device/config-entry-renderers/constraint-cluster.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
@@ -116,5 +119,113 @@ describe("renderConstraintClusterField", () => {
       renderConstraintClusterField(cluster, ctxFor({ chipset: "SK6812" }))
     );
     expect(out).not.toContain("unsatisfied");
+  });
+});
+
+// Stateful ctx: emitChange mutates a backing values dict (delete on undefined)
+// and the cluster choice/stash live in real Maps, so a full radio switch can
+// be driven and the resulting values inspected.
+function statefulCtx(initial: Record<string, unknown>) {
+  const values: Record<string, unknown> = { ...initial };
+  const stash = new Map<string, unknown>();
+  const choice = new Map<string, string>();
+  const ctx = {
+    localize: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key}|${params.keys}` : key,
+    disabled: false,
+    scopeValues: () => values,
+    getAt: (path: string[]) => values[path[0]],
+    emitChange: (path: string[], value: unknown) => {
+      if (value === undefined) delete values[path[0]];
+      else values[path[0]] = value;
+    },
+    board: null,
+    presentComponents: new Set<string>(),
+    renderEntry: (entry: ConfigEntry) => `<entry:${entry.key}>`,
+    getClusterChoice: (id: string) => choice.get(id),
+    setClusterChoice: (id: string, alt: string) => choice.set(id, alt),
+    getClusterStash: (id: string, key: string) => stash.get(`${id} ${key}`),
+    setClusterStash: (id: string, key: string, v: unknown) =>
+      stash.set(`${id} ${key}`, v),
+    clearClusterStash: (id: string, key: string) => stash.delete(`${id} ${key}`),
+  } as unknown as RenderCtx;
+  return { ctx, values, stash, choice };
+}
+
+const TIMINGS = {
+  bit0_high: "400ns",
+  bit0_low: "850ns",
+  bit1_high: "800ns",
+  bit1_low: "450ns",
+};
+
+const MQTT_ENTRIES: ConfigEntry[] = [
+  makeConfigEntry({ key: "broker", type: ConfigEntryType.STRING, label: "Broker" }),
+  makeConfigEntry({
+    key: "client_certificate",
+    type: ConfigEntryType.STRING,
+    label: "Client Certificate",
+    group: "cert-key-pair",
+  }),
+  makeConfigEntry({
+    key: "client_certificate_key",
+    type: ConfigEntryType.STRING,
+    label: "Client Certificate Key",
+    group: "cert-key-pair",
+  }),
+];
+
+describe("isRadioCluster", () => {
+  it("is true for an exactly_one cluster and false for all-or-none", () => {
+    const [ledCluster] = buildConstraintClusters(ENTRIES, REQUIRED_GROUPS).clusters;
+    const [mqttCluster] = buildConstraintClusters(MQTT_ENTRIES, []).clusters;
+    expect(isRadioCluster(ledCluster)).toBe(true);
+    expect(isRadioCluster(mqttCluster)).toBe(false);
+  });
+});
+
+describe("renderConstraintRadioField", () => {
+  const [cluster] = buildConstraintClusters(ENTRIES, REQUIRED_GROUPS).clusters;
+
+  it("renders a radio per alternative with no fields and no warning when empty", () => {
+    const out = serialize(renderConstraintRadioField(cluster, statefulCtx({}).ctx));
+    expect(out).toContain("wa-radio-group");
+    expect(out).toContain("Bit0 High, Bit0 Low, Bit1 High, Bit1 Low");
+    expect(out).not.toContain("<entry:bit0_high>");
+    expect(out).not.toContain("<entry:chipset>");
+  });
+
+  it("infers the chipset side from its value and shows only that field", () => {
+    const out = serialize(
+      renderConstraintRadioField(cluster, statefulCtx({ chipset: "WS2812" }).ctx)
+    );
+    expect(out).toContain("<entry:chipset>");
+    expect(out).not.toContain("<entry:bit0_high>");
+  });
+
+  it("shows the timing fields and never a warning, even when partial", () => {
+    const out = serialize(
+      renderConstraintRadioField(cluster, statefulCtx({ bit0_high: "400ns" }).ctx)
+    );
+    expect(out).toContain("<entry:bit0_high>");
+    expect(out).not.toContain("<entry:chipset>");
+    // The radio enforces the choice, so the cluster never reads as unsatisfied.
+    expect(out).not.toContain("unsatisfied");
+  });
+});
+
+describe("selectClusterAlternative", () => {
+  const [cluster] = buildConstraintClusters(ENTRIES, REQUIRED_GROUPS).clusters;
+
+  it("preserves the deselected side's values and emits only the selected one", () => {
+    const state = statefulCtx({ ...TIMINGS });
+    // Switch timings -> chipset: the four bit values leave the config.
+    selectClusterAlternative(cluster, state.ctx, "chipset");
+    expect(state.values).toEqual({});
+    expect(state.choice.get("chipset")).toBe("chipset");
+    // Switch back: the stash restores every timing value verbatim.
+    selectClusterAlternative(cluster, state.ctx, "bit0_high");
+    expect(state.values).toEqual(TIMINGS);
+    expect(state.choice.get("chipset")).toBe("bit0_high");
   });
 });
