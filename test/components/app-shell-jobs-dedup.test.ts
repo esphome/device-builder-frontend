@@ -49,3 +49,74 @@ describe("live jobs dedup (config, type)", () => {
     expect(new Set(host._firmwareJobs.keys())).toEqual(new Set(["c2"]));
   });
 });
+
+// Stopping an install's compile cancels its dependent upload in the same
+// cascade. The compile's cancel arrives while the upload is still queued, which
+// the supersede branch mistook for a live successor and returned early without
+// releasing the card's active slot — leaving it stuck "Installing" (#1482).
+describe("stop during install releases the device's active slot", () => {
+  const CFG = "kitchen.yaml";
+  const queued = (o: Parameters<typeof makeJob>[0]) =>
+    makeJob({ configuration: CFG, status: JobStatus.QUEUED, ...o });
+
+  it("clears the active slot when a stopped compile cascades onto its upload", () => {
+    const host = makeHost();
+    // Install enqueues compile + dependent upload (upload queued first), then
+    // the compile starts and becomes the latched active job.
+    handleJobEvent(
+      host,
+      "job_queued",
+      queued({ job_id: "u", job_type: JobType.UPLOAD, depends_on: "c" })
+    );
+    handleJobEvent(
+      host,
+      "job_queued",
+      queued({ job_id: "c", job_type: JobType.COMPILE })
+    );
+    handleJobEvent(
+      host,
+      "job_started",
+      queued({ job_id: "c", job_type: JobType.COMPILE, status: JobStatus.RUNNING })
+    );
+    expect(host._activeJobs.get(CFG)?.job_id).toBe("c");
+
+    handleJobEvent(
+      host,
+      "job_cancelled",
+      queued({ job_id: "c", job_type: JobType.COMPILE, status: JobStatus.CANCELLED })
+    );
+    handleJobEvent(
+      host,
+      "job_cancelled",
+      queued({
+        job_id: "u",
+        job_type: JobType.UPLOAD,
+        depends_on: "c",
+        status: JobStatus.CANCELLED,
+      })
+    );
+    expect(host._activeJobs.has(CFG)).toBe(false);
+  });
+
+  it("keeps a live successor's slot when an older job is cancelled", () => {
+    const host = makeHost();
+    handleJobEvent(
+      host,
+      "job_started",
+      queued({ job_id: "old", job_type: JobType.COMPILE, status: JobStatus.RUNNING })
+    );
+    handleJobEvent(
+      host,
+      "job_queued",
+      queued({ job_id: "new", job_type: JobType.COMPILE })
+    );
+    expect(host._activeJobs.get(CFG)?.job_id).toBe("new");
+
+    handleJobEvent(
+      host,
+      "job_cancelled",
+      queued({ job_id: "old", job_type: JobType.COMPILE, status: JobStatus.CANCELLED })
+    );
+    expect(host._activeJobs.get(CFG)?.job_id).toBe("new");
+  });
+});

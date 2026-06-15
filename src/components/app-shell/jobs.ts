@@ -93,6 +93,24 @@ function upsertJob(host: ESPHomeApp, job: FirmwareJob): void {
 // this device (a re-compile replaces the prior compile, not its upload); clear
 // the active slot. A cancellation with a live successor is a supersede — drop it.
 function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
+  // Release the active slot whenever it points at *this* job, before the
+  // supersede branch can return early. Stopping an install's compile cascades
+  // a cancel onto its still-queued dependent upload; that non-terminal upload
+  // makes the compile's cancel look "superseded", but the card is latched on
+  // the compile and would otherwise stay "Installing" until reload (#1482). A
+  // freshly-queued follow-up keeps its slot since its job_id won't match.
+  let active: Map<string, FirmwareJob> | null = null;
+  if (host._activeJobs.get(job.configuration)?.job_id === job.job_id) {
+    active = new Map(host._activeJobs);
+    active.delete(job.configuration);
+  }
+  for (const key of renameKeys(job)) {
+    if (host._activeJobs.get(key)?.job_id !== job.job_id) continue;
+    active = active ?? new Map(host._activeJobs);
+    active.delete(key);
+  }
+  if (active !== null) host._activeJobs = active;
+
   if (job.status === JobStatus.CANCELLED && job.configuration) {
     const supersededByActive = [...host._firmwareJobs.values()].some(
       (j) =>
@@ -122,19 +140,6 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
     }
   }
   host._firmwareJobs = next;
-  // Only clear active slot when it points at *this* job — a freshly-queued
-  // follow-up for the same device must stay visible.
-  let active: Map<string, FirmwareJob> | null = null;
-  if (host._activeJobs.get(job.configuration)?.job_id === job.job_id) {
-    active = new Map(host._activeJobs);
-    active.delete(job.configuration);
-  }
-  for (const key of renameKeys(job)) {
-    if (host._activeJobs.get(key)?.job_id !== job.job_id) continue;
-    active = active ?? new Map(host._activeJobs);
-    active.delete(key);
-  }
-  if (active !== null) host._activeJobs = active;
   if (job.configuration) markJobRecent(host, job);
 }
 
