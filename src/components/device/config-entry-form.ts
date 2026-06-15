@@ -70,10 +70,13 @@ import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
 import "../options-combobox.js";
 import {
+  buildConstraintClusters,
   fieldRendererStyles,
+  formatConstraintKeys,
   labelFor,
   orderExclusiveGroups,
   renderBooleanField,
+  renderConstraintClusterField,
   renderExclusiveGroupField,
   renderFloatWithUnitField,
   renderIconField,
@@ -291,50 +294,46 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // first member's slot; other entries keep the advanced/visibility
     // filter (the Set preserves order while dropping filtered-out ones).
     const ordered = orderExclusiveGroups(entries);
-    const nonExclusive = entries.filter((entry) => !entry.exclusive_group);
+    // Either/or constraints (chipset OR the timing group) fold into one
+    // bordered box at the first member's slot, like exclusive_group; drop the
+    // members from the normal flow so they aren't also rendered loose.
+    const { clusters, memberKeys } = buildConstraintClusters(
+      entries,
+      this.requiredGroups
+    );
+    const clusterByFirstKey = new Map(clusters.map((c) => [c.members[0].key, c]));
+    const nonExclusive = entries.filter(
+      (entry) => !entry.exclusive_group && !memberKeys.has(entry.key)
+    );
     const visible = new Set(this._filterRenderable(nonExclusive, this.values));
     // An empty key means "this entry IS the whole values dict" —
     // used by top-level user-keyed sections (substitutions:) where
     // the component itself is the map. Pass ``[]`` so the entry's
     // renderer sees the values dict directly via ``ctx.getAt([])``.
-    return html`${this._renderConstraintBanners(ctx)}${ordered.map((item) =>
-      Array.isArray(item)
-        ? renderExclusiveGroupField(item, ctx)
-        : visible.has(item)
-          ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
-          : nothing
-    )}`;
+    return html`${this._renderConstraintBanners(ctx, memberKeys)}${ordered.map((item) => {
+      if (Array.isArray(item)) return renderExclusiveGroupField(item, ctx);
+      if (memberKeys.has(item.key)) {
+        const cluster = clusterByFirstKey.get(item.key);
+        return cluster ? renderConstraintClusterField(cluster, ctx) : nothing;
+      }
+      return visible.has(item)
+        ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
+        : nothing;
+    })}`;
   }
 
-  /** Reactive banner for each *unsatisfied* top-level constraint group
-   *  (cardinality `required_groups` + inclusive all-or-none `group`). A
-   *  satisfied group renders nothing, so an optional member whose group is
-   *  already met by a sibling (esp32_rmt_led_strip timings once `chipset` is
-   *  set) shows no prompt. A cardinality member that belongs to an all-or-none
-   *  group is shown as that whole set — e.g. "chipset, or (Bit0 High, Bit0 Low,
-   *  …)" — so the either/or alternatives read clearly. */
-  private _renderConstraintBanners(ctx: RenderCtx) {
-    const labelOf = (key: string): string => {
-      const entry = this.entries.find((e) => e.key === key);
-      return entry ? labelFor(entry, ctx) : key;
-    };
-    const membersOf = (key: string): string[] => {
-      const group = this.entries.find((e) => e.key === key)?.group;
-      return group
-        ? this.entries.filter((e) => e.group === group).map((e) => e.key)
-        : [key];
-    };
-    const option = (key: string): string => {
-      const labels = membersOf(key).map(labelOf);
-      return labels.length > 1 ? `(${labels.join(", ")})` : labels[0];
-    };
-
+  /** Fallback banner for *unsatisfied* constraint groups that aren't visually
+   *  clustered (pure cardinality groups with no inclusive `group`). Groups
+   *  whose members render inside a `constraint-cluster` box are skipped — the
+   *  box header carries their prompt. */
+  private _renderConstraintBanners(ctx: RenderCtx, clusteredKeys: Set<string>) {
     const messages: string[] = [];
     for (const group of this.requiredGroups) {
+      if (group.keys.some((k) => clusteredKeys.has(k))) continue;
       if (evaluateGroup(group.kind, group.keys, this.values)) continue;
       messages.push(
         ctx.localize(`device.constraint_${group.kind}`, {
-          keys: group.keys.map(option).join(", "),
+          keys: formatConstraintKeys(group.keys, this.entries, ctx),
         })
       );
     }
@@ -345,10 +344,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
       }
     }
     for (const keys of inclusive.values()) {
+      if (keys.some((k) => clusteredKeys.has(k))) continue;
       if (evaluateGroup("all_or_none", keys, this.values)) continue;
       messages.push(
         ctx.localize("device.constraint_all_or_none", {
-          keys: keys.map(labelOf).join(", "),
+          keys: formatConstraintKeys(keys, this.entries, ctx),
         })
       );
     }

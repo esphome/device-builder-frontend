@@ -344,4 +344,20 @@ export const configEntryFormExtraStyles = css`
   .constraint-banner wa-icon {
     flex-shrink: 0;
   }
+
+  /* Header of a folded either/or constraint cluster (the .nested-group box):
+     a muted caption of the rule, warm-toned while the rule is unmet. */
+  .constraint-cluster-header {
+    display: flex;
+    gap: var(--wa-space-s);
+    align-items: center;
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-quiet);
+  }
+  .constraint-cluster-header.unsatisfied {
+    color: var(--wa-color-warning-text-quiet, currentColor);
+  }
+  .constraint-cluster-header wa-icon {
+    flex-shrink: 0;
+  }
 `;

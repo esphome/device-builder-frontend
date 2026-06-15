@@ -1,9 +1,8 @@
 /**
  * @vitest-environment happy-dom
  *
- * The form shows a reactive banner for each *unsatisfied* constraint group and
- * nothing for a satisfied one — so esp32_rmt_led_strip's timing fields stop
- * prompting "Required" once `chipset` is set.
+ * The fallback banner prompts for unsatisfied cardinality groups that aren't
+ * visually clustered, and skips any group whose members render in a cluster box.
  */
 import { describe, expect, it } from "vitest";
 
@@ -25,47 +24,44 @@ const serialize = (tpl: unknown): string =>
   // `nothing` (a symbol) stringifies to undefined — treat it as "no banners".
   JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v)) ?? "";
 
+// Pure cardinality (no inclusive `group`) — these stay in the flow and surface
+// through the banner rather than a cluster box.
 const ENTRIES: ConfigEntry[] = [
-  makeConfigEntry({ key: "chipset", type: ConfigEntryType.STRING, label: "Chipset" }),
-  makeConfigEntry({ key: "bit0_high", type: ConfigEntryType.STRING, group: "custom" }),
-  makeConfigEntry({ key: "bit0_low", type: ConfigEntryType.STRING, group: "custom" }),
-  makeConfigEntry({ key: "bit1_high", type: ConfigEntryType.STRING, group: "custom" }),
-  makeConfigEntry({ key: "bit1_low", type: ConfigEntryType.STRING, group: "custom" }),
+  makeConfigEntry({ key: "ssid", type: ConfigEntryType.STRING, label: "SSID" }),
+  makeConfigEntry({ key: "networks", type: ConfigEntryType.STRING, label: "Networks" }),
 ];
 const REQUIRED_GROUPS: RequiredGroup[] = [
-  { kind: "exactly_one", keys: ["chipset", "bit0_high"] },
+  { kind: "at_least_one", keys: ["ssid", "networks"] },
 ];
 
-function banners(values: Record<string, unknown>): string {
+function banners(
+  values: Record<string, unknown>,
+  clustered: Set<string> = new Set()
+): string {
   const form = new ESPHomeConfigEntryForm();
   form.entries = ENTRIES;
   form.values = values;
   form.requiredGroups = REQUIRED_GROUPS;
   const out = (
-    form as unknown as { _renderConstraintBanners(c: RenderCtx): unknown }
-  )._renderConstraintBanners(ctx);
+    form as unknown as {
+      _renderConstraintBanners(c: RenderCtx, clustered: Set<string>): unknown;
+    }
+  )._renderConstraintBanners(ctx, clustered);
   return serialize(out);
 }
 
 describe("config-entry-form constraint banners", () => {
-  it("shows no banner once chipset satisfies the exactly_one group", () => {
-    const out = banners({ chipset: "SK6812" });
-    expect(out).not.toContain("constraint-banner");
-  });
-
-  it("prompts for the exactly_one group when nothing is set", () => {
+  it("prompts an unsatisfied, unclustered cardinality group", () => {
     const out = banners({});
     expect(out).toContain("constraint-banner");
-    expect(out).toContain("device.constraint_exactly_one");
-    // The all-or-none timing group is empty (0 set) so it stays satisfied.
-    expect(out).not.toContain("device.constraint_all_or_none");
+    expect(out).toContain("device.constraint_at_least_one");
   });
 
-  it("prompts the all-or-none group when only some timings are set", () => {
-    const out = banners({ bit0_high: "300ns" });
-    // exactly_one is now satisfied (one of chipset/bit0_high), but the
-    // inclusive timing group is partial.
-    expect(out).toContain("device.constraint_all_or_none");
-    expect(out).not.toContain("device.constraint_exactly_one");
+  it("shows no banner once the group is satisfied", () => {
+    expect(banners({ ssid: "home" })).not.toContain("constraint-banner");
+  });
+
+  it("skips a group whose members are clustered (the box owns the prompt)", () => {
+    expect(banners({}, new Set(["ssid"]))).not.toContain("constraint-banner");
   });
 });
