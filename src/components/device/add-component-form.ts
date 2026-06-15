@@ -356,6 +356,7 @@ export class ESPHomeAddComponentForm extends LitElement {
         ${missingDeps.length > 0 ? this._renderMissingDeps(missingDeps) : nothing}
         <esphome-config-entry-form
           .entries=${this._entries}
+          .requiredGroups=${this.component.required_groups ?? []}
           .values=${this._values}
           .errors=${this._errors}
           .board=${this.board}

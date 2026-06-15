@@ -52,7 +52,18 @@ export function buildConstraintClusters(
     }
     const members = entries.filter((e) => keys.has(e.key));
     members.forEach((m) => memberKeys.add(m.key));
-    clusters.push({ members, cardinality, inclusiveKeys });
+    // A cardinality (radio) needs >= 2 alternatives that resolve to a rendered
+    // member; when one is preset/hidden — a featured component locks chipset and
+    // drops it from the form — keep just the inclusive all-or-none box rather
+    // than a one-option radio.
+    const resolved = cardinality
+      ? cardinality.keys.filter((k) => members.some((m) => m.key === k)).length
+      : 0;
+    clusters.push({
+      members,
+      cardinality: resolved >= 2 ? cardinality : undefined,
+      inclusiveKeys,
+    });
   }
   return { clusters, memberKeys };
 }

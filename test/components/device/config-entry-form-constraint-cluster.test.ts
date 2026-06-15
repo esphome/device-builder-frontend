@@ -92,6 +92,15 @@ describe("buildConstraintClusters", () => {
     const flat = ENTRIES.map((e) => ({ ...e, group: undefined }));
     expect(buildConstraintClusters(flat, REQUIRED_GROUPS).clusters).toHaveLength(0);
   });
+
+  it("drops the cardinality when an alternative is not a rendered member", () => {
+    // Featured components preset/hide chipset, so only the timing group remains;
+    // fall back to the all-or-none box instead of a one-option radio.
+    const noChipset = ENTRIES.filter((e) => e.key !== "chipset");
+    const [cluster] = buildConstraintClusters(noChipset, REQUIRED_GROUPS).clusters;
+    expect(cluster.cardinality).toBeUndefined();
+    expect(isRadioCluster(cluster)).toBe(false);
+  });
 });
 
 describe("formatConstraintKeys", () => {
