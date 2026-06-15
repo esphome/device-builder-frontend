@@ -22,6 +22,10 @@ describe("device layout mapping", () => {
     expect(deviceLayoutToPref("right")).toBe(EditorLayout.YAML);
     expect(deviceLayoutToPref("both")).toBe(EditorLayout.BOTH);
   });
+
+  it("defaults an unexpected pref value to the split view", () => {
+    expect(prefToDeviceLayout("bogus" as EditorLayout)).toBe("both");
+  });
 });
 
 describe("secrets layout mapping", () => {

@@ -21,7 +21,9 @@ export function deviceLayoutToPref(mode: DeviceLayoutMode): EditorLayout {
 }
 
 export function prefToDeviceLayout(layout: EditorLayout): DeviceLayoutMode {
-  return PREF_TO_DEVICE[layout];
+  // Default to the split view if an unexpected value slips through (e.g. a
+  // hand-edited prefs file), mirroring prefToSecretsLayout's defaulting.
+  return PREF_TO_DEVICE[layout] ?? "both";
 }
 
 export function secretsLayoutToPref(layout: SecretsLayout): SecretsEditorLayout {

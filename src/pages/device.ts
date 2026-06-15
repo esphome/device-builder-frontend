@@ -807,7 +807,9 @@ export class ESPHomePageDevice extends LitElement {
       // to the split view so the user actually sees where they're
       // landing.
       if (this._layout === "left") {
-        this._persistLayout("both");
+        // Implicit expand to reveal the error: cache it locally but don't
+        // record it as the user's durable layout preference.
+        this._cacheLayout("both");
       }
       this._setHighlight({ fromLine: line, toLine: line }, true, true);
       const resolved = resolveSectionForUrlLine(this._yaml, line, null);
@@ -1115,11 +1117,17 @@ export class ESPHomePageDevice extends LitElement {
     this._persistLayout(e.detail);
   }
 
-  // Single writer for the editor layout: localStorage is the instant
-  // per-browser cache, the backend pref is the durable cross-browser store.
-  private _persistLayout(mode: DeviceLayoutMode) {
+  // Instant per-browser cache only; used for implicit layout changes (e.g.
+  // auto-expanding to show a validation error) that shouldn't become the
+  // user's durable cross-browser preference.
+  private _cacheLayout(mode: DeviceLayoutMode) {
     this._layout = mode;
     localStorage.setItem("esphome-editor-layout", mode);
+  }
+
+  // A deliberate toggle: cache locally and record the cross-browser pref.
+  private _persistLayout(mode: DeviceLayoutMode) {
+    this._cacheLayout(mode);
     this._api
       .updatePreferences({ device_editor_layout: deviceLayoutToPref(mode) })
       .catch((err) => console.warn("Failed to persist device layout preference:", err));
