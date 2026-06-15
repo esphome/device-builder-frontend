@@ -403,20 +403,47 @@ export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: Rend
   `;
 }
 
-// esp32's variant has no static default — it follows the chosen board. Derive
-// it from the live `board:` sibling (or the saved board) so the select shows
-// the board's variant greyed out as the default, like any other default. Only
-// returns a value that's actually one of the entry's options.
+// The device's ESP32 variant (lowercased, e.g. `esp32s3`), from the live
+// `board:` sibling first (so a just-picked board resolves before `ctx.board`
+// catches up) or the saved board. `""` when unknown or non-ESP32: per-variant
+// options only exist on ESP32 components, so a non-`esp32*` result never
+// filters.
+function resolveEsp32Variant(ctx: RenderCtx): string {
+  const board = String(ctx.getAt(["board"]) ?? "");
+  const variant = (
+    board ? chipNameToVariant(board) : (ctx.board?.esphome.variant ?? "")
+  ).toLowerCase();
+  return variant.startsWith("esp32") ? variant : "";
+}
+
+// Keep options whose `variants` is absent/empty or includes the device's
+// variant — plus the currently-stored value, so a board swap can't hide what
+// the YAML still holds. Falls back to all options when the variant is unknown or
+// the filter would empty the select (e.g. psram on a no-PSRAM variant).
+function filterOptionsByVariant<T extends { value: string; variants?: string[] }>(
+  options: T[],
+  variant: string,
+  current = ""
+): T[] {
+  if (!variant) return options;
+  const cur = current.toLowerCase();
+  const kept = options.filter(
+    (o) =>
+      !o.variants?.length || o.variants.includes(variant) || o.value.toLowerCase() === cur
+  );
+  return kept.length > 0 ? kept : options;
+}
+
+// esp32's variant has no static default — it follows the chosen board, so the
+// select shows the board's variant greyed out as the default. Only returns a
+// value that's actually one of the entry's options.
 function boardDerivedVariantDefault(
   entry: ConfigEntry,
-  ctx: RenderCtx
+  ctx: RenderCtx,
+  variant: string
 ): string | undefined {
-  if (entry.key !== "variant" || ctx.sectionKey !== "esp32") return undefined;
-  const board = String(ctx.getAt(["board"]) ?? "");
-  const variant = board ? chipNameToVariant(board) : (ctx.board?.esphome.variant ?? "");
-  if (!variant) return undefined;
-  const lower = variant.toLowerCase();
-  return entry.options?.some((o) => o.value.toLowerCase() === lower)
+  if (!variant || entry.key !== "variant" || ctx.sectionKey !== "esp32") return undefined;
+  return entry.options?.some((o) => o.value.toLowerCase() === variant)
     ? variant
     : undefined;
 }
@@ -453,6 +480,9 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
       </div>
     `;
   }
+  // The device's ESP32 variant, used to filter per-variant options (and derive
+  // the esp32 variant default below); resolved once per render.
+  const variant = resolveEsp32Variant(ctx);
   if (entry.allow_custom_value && entry.options && entry.options.length > 0) {
     // ``label`` only names the combobox's shadow-DOM input (renderLabel's
     // visible label isn't associated via for=); the combobox draws no label
@@ -461,7 +491,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
         <esphome-options-combobox
-          .options=${entry.options}
+          .options=${filterOptionsByVariant(entry.options, variant, value)}
           .value=${value}
           label=${entry.label}
           placeholder=${String(entry.default_value ?? "")}
@@ -481,7 +511,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   // still flags as selected.
   const valueLower = value.toLowerCase();
   const defaultStr =
-    boardDerivedVariantDefault(entry, ctx) ??
+    boardDerivedVariantDefault(entry, ctx, variant) ??
     (entry.default_value != null ? String(entry.default_value) : "");
   const defaultLower = defaultStr.toLowerCase();
   const defaultOption = entry.options?.find(
@@ -489,6 +519,8 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   );
   const placeholder = defaultOption?.label ?? defaultStr;
   const { clearable, visibleOptions } = selectOptions(entry);
+  // Filtered after the (entry-keyed) selectOptions memo since it depends on the board.
+  const shownOptions = filterOptionsByVariant(visibleOptions, variant, value);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
@@ -503,7 +535,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         ${clearable
           ? html`<wa-icon slot="clear-icon" library="mdi" name="close"></wa-icon>`
           : nothing}
-        ${visibleOptions.map((opt) => {
+        ${shownOptions.map((opt) => {
           const selected = opt.value.toLowerCase() === valueLower;
           const isDefault = defaultStr !== "" && opt.value.toLowerCase() === defaultLower;
           if (!isDefault) {

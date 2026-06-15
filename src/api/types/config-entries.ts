@@ -12,6 +12,11 @@ export type ConfigPrimitive = string | number | boolean;
 export interface ConfigValueOption {
   label: string;
   value: string;
+  /** ESP32 variants that accept this value (lowercased, e.g. `esp32s3`); absent
+   *  or empty means every variant. When the device resolves to an ESP32 variant
+   *  the select filters to it; otherwise (non-ESP32 or unknown) all options
+   *  show. */
+  variants?: string[];
 }
 
 /** Known GPIO pin features/capabilities (matches backend PinFeature enum). */
