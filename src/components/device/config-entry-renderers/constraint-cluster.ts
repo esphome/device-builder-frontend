@@ -69,15 +69,23 @@ export function formatConstraintKeys(
     const entry = byKey.get(key);
     return entry ? labelFor(entry, ctx) : key;
   };
-  const option = (key: string): string => {
+  // Collapse every key of one inclusive group to a single parenthesized set,
+  // emitted once: two keys sharing a group (mqtt's cert + key) must not name
+  // the pair twice.
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const key of keys) {
     const group = byKey.get(key)?.group;
-    const members = group
-      ? entries.filter((e) => e.group === group).map((e) => e.key)
-      : [key];
-    const labels = members.map(labelOf);
-    return labels.length > 1 ? `(${labels.join(", ")})` : labels[0];
-  };
-  return keys.map(option).join(", ");
+    if (!group) {
+      parts.push(labelOf(key));
+      continue;
+    }
+    if (seen.has(group)) continue;
+    seen.add(group);
+    const labels = entries.filter((e) => e.group === group).map((e) => labelOf(e.key));
+    parts.push(labels.length > 1 ? `(${labels.join(", ")})` : labels[0]);
+  }
+  return parts.join(", ");
 }
 
 /** An either/or choice within a cluster: a single scalar (`chipset`) or a

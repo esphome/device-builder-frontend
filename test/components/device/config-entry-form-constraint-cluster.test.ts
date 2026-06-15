@@ -184,6 +184,39 @@ describe("isRadioCluster", () => {
   });
 });
 
+// Pattern B: an inclusive all-or-none group with no cardinality renders the
+// static box (not a radio), with the all_or_none prompt toned by group state.
+describe("renderConstraintClusterField (all-or-none box)", () => {
+  const [cluster] = buildConstraintClusters(MQTT_ENTRIES, []).clusters;
+
+  it("boxes both members and warns when only one is set", () => {
+    const out = serialize(
+      renderConstraintClusterField(cluster, ctxFor({ client_certificate: "/d.crt" }))
+    );
+    expect(out).toContain("nested-group");
+    expect(out).toContain("unsatisfied");
+    // The two members share one group, so the prompt names the pair once.
+    expect(out).toContain(
+      "device.constraint_all_or_none|(Client Certificate, Client Certificate Key)"
+    );
+    expect(out).not.toContain(
+      "(Client Certificate, Client Certificate Key), (Client Certificate, Client Certificate Key)"
+    );
+    expect(out).toContain("<entry:client_certificate>");
+    expect(out).toContain("<entry:client_certificate_key>");
+  });
+
+  it("drops the warning tone when both are set", () => {
+    const out = serialize(
+      renderConstraintClusterField(
+        cluster,
+        ctxFor({ client_certificate: "/d.crt", client_certificate_key: "/d.key" })
+      )
+    );
+    expect(out).not.toContain("unsatisfied");
+  });
+});
+
 describe("renderConstraintRadioField", () => {
   const [cluster] = buildConstraintClusters(ENTRIES, REQUIRED_GROUPS).clusters;
 
