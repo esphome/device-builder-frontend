@@ -2,6 +2,7 @@
  * Either/or constraint members (chipset OR the four manual timings) fold into
  * one bordered box, adjacent, with a reactive header.
  */
+import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -214,6 +215,25 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
       )
     );
     expect(out).not.toContain("unsatisfied");
+  });
+
+  it("renders nothing when every member is gated off", () => {
+    const hidden: ConfigEntry[] = [
+      makeConfigEntry({
+        key: "a",
+        type: ConfigEntryType.STRING,
+        group: "g",
+        hidden: true,
+      }),
+      makeConfigEntry({
+        key: "b",
+        type: ConfigEntryType.STRING,
+        group: "g",
+        hidden: true,
+      }),
+    ];
+    const [gated] = buildConstraintClusters(hidden, []).clusters;
+    expect(renderConstraintClusterField(gated, ctxFor({}))).toBe(nothing);
   });
 });
 

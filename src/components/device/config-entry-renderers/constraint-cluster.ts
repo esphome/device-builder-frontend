@@ -32,6 +32,7 @@ export function buildConstraintClusters(
   entries: ConfigEntry[],
   requiredGroups: RequiredGroup[]
 ): { clusters: ConstraintCluster[]; memberKeys: Set<string> } {
+  const byKey = new Map(entries.map((e) => [e.key, e]));
   const inclusive = new Map<string, string[]>();
   for (const entry of entries) {
     // exclusive_group members own their pick-one dropdown; never re-cluster.
@@ -46,7 +47,7 @@ export function buildConstraintClusters(
     const cardinality = requiredGroups.find((g) => g.keys.some((k) => keys.has(k)));
     if (cardinality) {
       for (const key of cardinality.keys) {
-        if (!entries.find((e) => e.key === key)?.exclusive_group) keys.add(key);
+        if (!byKey.get(key)?.exclusive_group) keys.add(key);
       }
     }
     const members = entries.filter((e) => keys.has(e.key));
@@ -253,6 +254,9 @@ export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: Re
       ctx.getAt([m.key]) !== undefined ||
       isEntryVisible(m, values, ctx.presentComponents, targetPlatform)
   );
+  // All members gated off (depends_on / platform / hidden): skip the box rather
+  // than render an empty bordered card with just a header.
+  if (!visibleMembers.length) return nothing;
   return html`
     <div
       class="nested-group constraint-cluster"

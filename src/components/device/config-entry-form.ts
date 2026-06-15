@@ -442,22 +442,19 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private async _syncRadioGroups() {
     if (!this.shadowRoot) return;
-    const groups = this.shadowRoot.querySelectorAll<
-      HTMLElement & {
-        syncRadioElements?: () => void | Promise<void>;
-        updateComplete?: Promise<unknown>;
-      }
-    >("wa-radio-group");
-    for (const group of groups) {
-      if (group.updateComplete) {
-        try {
-          await group.updateComplete;
-        } catch {
-          // ignore
+    const groups = [
+      ...this.shadowRoot.querySelectorAll<
+        HTMLElement & {
+          syncRadioElements?: () => void | Promise<void>;
+          updateComplete?: Promise<unknown>;
         }
-      }
-      group.syncRadioElements?.();
-    }
+      >("wa-radio-group"),
+    ];
+    if (groups.length === 0) return;
+    // Let each group finish its own update before forcing the sync, awaiting
+    // them together rather than serially.
+    await Promise.all(groups.map((group) => group.updateComplete?.catch(() => {})));
+    for (const group of groups) group.syncRadioElements?.();
   }
 
   /**
