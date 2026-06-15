@@ -4,19 +4,19 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { APIError } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
+import { formatApiError } from "../util/format-api-error.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { type PasswordInputValueChange } from "./device/password-input-event.js";
+import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
+import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
-import "./device/password-input.js";
 
 registerMdiIcons({ wifi: mdiWifi });
 
@@ -68,13 +68,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @query("#onboarding-ssid")
   private _ssidInput?: HTMLInputElement;
 
-  // WPA/WPA2 passphrases are 8-63 characters; the maxlength=64 cap
-  // covers the 64-hex-digit PSK form. An empty password is a valid
-  // open network (the placeholder invites it), so only a non-empty
-  // value shorter than 8 is rejected. Whitespace is significant in
-  // a passphrase, so the length is taken from the raw value.
   private get _passwordTooShort(): boolean {
-    return this._password.length > 0 && this._password.length < 8;
+    return isWifiPasswordTooShort(this._password);
   }
 
   /** True after the user has explicitly saved or declined inside
@@ -106,6 +101,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     dialogActionButtonStyles,
+    wifiFieldsStyles,
     css`
       esphome-base-dialog {
         --width: 480px;
@@ -129,23 +125,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         vertical-align: -3px;
         margin-right: var(--wa-space-2xs);
         color: var(--esphome-primary);
-      }
-
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-      }
-
-      label {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
-      .error {
-        color: var(--esphome-error);
-        font-size: var(--wa-font-size-s);
       }
 
       /* Decline-permanent is rendered as a low-emphasis text link
@@ -202,45 +181,18 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             <wa-icon library="mdi" name="wifi"></wa-icon>
             ${this._localize("onboarding.wifi.intro")}
           </p>
-          <div class="field">
-            <label for="onboarding-ssid"
-              >${this._localize("onboarding.wifi.ssid_label")}</label
-            >
-            <input
-              id="onboarding-ssid"
-              type="text"
-              .value=${this._ssid}
-              maxlength="32"
-              placeholder=${this._localize("onboarding.wifi.ssid_placeholder")}
-              ?disabled=${this._saving}
-              @input=${(e: Event) => {
-                this._ssid = (e.target as HTMLInputElement).value;
-              }}
-            />
-          </div>
-          <div class="field">
-            <label for="onboarding-password"
-              >${this._localize("onboarding.wifi.password_label")}</label
-            >
-            <esphome-password-input
-              id="onboarding-password"
-              .value=${this._password}
-              .placeholder=${this._localize("onboarding.wifi.password_placeholder")}
-              .maxlength=${64}
-              .label=${this._localize("onboarding.wifi.password_label")}
-              .invalid=${this._passwordTooShort}
-              .describedby=${this._passwordTooShort ? "onboarding-password-error" : ""}
-              ?disabled=${this._saving}
-              @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) => {
-                this._password = e.detail.value;
-              }}
-            ></esphome-password-input>
-            ${this._passwordTooShort
-              ? html`<p id="onboarding-password-error" class="error" role="alert">
-                  ${this._localize("onboarding.wifi.password_too_short")}
-                </p>`
-              : nothing}
-          </div>
+          ${renderWifiFields({
+            localize: this._localize,
+            ssid: this._ssid,
+            password: this._password,
+            disabled: this._saving,
+            onSsidInput: (v) => {
+              this._ssid = v;
+            },
+            onPasswordInput: (v) => {
+              this._password = v;
+            },
+          })}
           ${this._error
             ? html`<p class="error" role="alert">${this._error}</p>`
             : nothing}
@@ -297,7 +249,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       // The wifi write itself failed — the user's credentials
       // never landed on disk. Surface the error inline so they
       // can correct and retry.
-      this._error = this._formatError(err, "onboarding.wifi.save_failed");
+      this._error = formatApiError(err, this._localize, "onboarding.wifi.save_failed");
       this._saving = false;
       return;
     }
@@ -344,7 +296,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       // happened. Use the decline-specific fallback so the user
       // doesn't see "Couldn't save Wi-Fi credentials" when
       // nothing of theirs was being saved in the first place.
-      this._error = this._formatError(err, "onboarding.wifi.decline_failed");
+      this._error = formatApiError(err, this._localize, "onboarding.wifi.decline_failed");
     } finally {
       this._saving = false;
     }
@@ -376,27 +328,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   private _onRequestClose = (): void => {
     this._open = false;
   };
-
-  /**
-   * Surface a backend error in user-facing prose. ``APIError``
-   * carries a structured ``errorCode`` + ``details`` pair; its
-   * ``Error.message`` is the wire form ``"INVALID_ARGS: …"`` —
-   * fine for logs, leaks an internal code into the dialog's
-   * inline error if rendered raw. Show ``details`` directly when
-   * we have an ``APIError``, fall back to ``message`` for native
-   * errors, and fall back to the *caller-supplied* localization
-   * key when we have neither — different code paths (save vs
-   * decline) want different fallback copy so the user isn't told
-   * "Couldn't save Wi-Fi credentials" when the failing call
-   * wasn't the wifi save.
-   */
-  private _formatError(err: unknown, fallbackKey: string): string {
-    if (err instanceof APIError) {
-      return err.details || this._localize(fallbackKey);
-    }
-    if (err instanceof Error) return err.message;
-    return this._localize(fallbackKey);
-  }
 
   private _dismissForSession = () => {
     // Idempotent — wa-after-hide also routes here, and an explicit

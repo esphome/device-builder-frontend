@@ -92,7 +92,9 @@ import {
   importableDevicesContext,
   labelsContext,
   localizeContext,
+  prefsLoadedContext,
   recentJobsContext,
+  remoteComputeOnlyContext,
   versionContext,
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
@@ -183,6 +185,25 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: labelsContext, subscribe: true }) @state() _labelsCatalog: Label[] =
     [];
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
+
+  // When true this install is a remote build node: every device-creation
+  // affordance (New device card, FAB, table Create, Adopt, serial wizard)
+  // is hidden. See _hideDeviceCreation for the actual gate.
+  @consume({ context: remoteComputeOnlyContext, subscribe: true })
+  @state()
+  _remoteComputeOnly = false;
+
+  // False until preferences load once. Creation fails closed while it's
+  // false so a remote-compute install can't flash creation UI when the
+  // initial prefs fetch fails (remote_compute_only would still be default).
+  @consume({ context: prefsLoadedContext, subscribe: true })
+  @state()
+  _prefsLoaded = false;
+
+  /** Whether every device-creation affordance should be hidden. */
+  get _hideDeviceCreation(): boolean {
+    return this._remoteComputeOnly || !this._prefsLoaded;
+  }
 
   // Used by the NO_COMPATIBLE_PEER toast classifier — see
   // classifyNoCompatiblePeerReason. Same context the settings
@@ -290,6 +311,9 @@ export class ESPHomePageDashboard extends LitElement {
   ];
 
   private _onSerialSetup = (event: Event) => {
+    // Remote-compute installs don't create devices; a plugged-in board
+    // shouldn't pop the creation wizard.
+    if (this._hideDeviceCreation) return;
     const port = (event as CustomEvent<{ port: SerialPort | null }>).detail?.port ?? null;
     void detectAndOpenWizard(this._api, this._createDialog, {
       port,

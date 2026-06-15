@@ -30,6 +30,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
+import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -544,18 +545,34 @@ export class ESPHomePageDevice extends LitElement {
     }
   };
 
+  private _readStoredLayout(): DeviceLayoutMode | null {
+    const stored = localStorage.getItem("esphome-editor-layout");
+    return stored === "both" || stored === "left" || stored === "right" ? stored : null;
+  }
+
   private async _loadPreferences() {
-    // Editor layout stored locally (not in backend preferences)
-    const savedLayout = localStorage.getItem("esphome-editor-layout");
-    if (savedLayout === "both" || savedLayout === "left" || savedLayout === "right") {
+    // localStorage is the instant per-browser seed; the backend pref below is
+    // the durable cross-browser source when localStorage is empty.
+    const savedLayout = this._readStoredLayout();
+    if (savedLayout) {
       this._layout = savedLayout;
     }
 
     try {
       const prefs = await this._api.getPreferences();
       this._navCollapsed = !prefs.navigator_visible;
-    } catch {
-      // Preferences not critical — use defaults
+      // No local layout yet (new browser): restore the backend choice, which
+      // defaults to the split view on a fresh install. Re-check after the
+      // await: a toggle during the in-flight fetch writes a valid value that
+      // must win, but a stale invalid value still seeds from the backend.
+      if (!savedLayout && this._readStoredLayout() === null) {
+        this._layout = prefToDeviceLayout(prefs.device_editor_layout);
+      }
+    } catch (err) {
+      // Preferences not critical; fall back to defaults. Logged so a YAML
+      // user silently dropped into the non-YAML first-open layout is
+      // diagnosable.
+      console.warn("Failed to load device preferences:", err);
     }
   }
 
@@ -793,8 +810,9 @@ export class ESPHomePageDevice extends LitElement {
       // to the split view so the user actually sees where they're
       // landing.
       if (this._layout === "left") {
-        this._layout = "both";
-        localStorage.setItem("esphome-editor-layout", "both");
+        // Implicit expand to reveal the error: cache it locally but don't
+        // record it as the user's durable layout preference.
+        this._cacheLayout("both");
       }
       this._setHighlight({ fromLine: line, toLine: line }, true, true);
       const resolved = resolveSectionForUrlLine(this._yaml, line, null);
@@ -1099,8 +1117,23 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onLayoutChange(e: CustomEvent<DeviceLayoutMode>) {
-    this._layout = e.detail;
-    localStorage.setItem("esphome-editor-layout", e.detail);
+    this._persistLayout(e.detail);
+  }
+
+  // Instant per-browser cache only; used for implicit layout changes (e.g.
+  // auto-expanding to show a validation error) that shouldn't become the
+  // user's durable cross-browser preference.
+  private _cacheLayout(mode: DeviceLayoutMode) {
+    this._layout = mode;
+    localStorage.setItem("esphome-editor-layout", mode);
+  }
+
+  // A deliberate toggle: cache locally and record the cross-browser pref.
+  private _persistLayout(mode: DeviceLayoutMode) {
+    this._cacheLayout(mode);
+    this._api
+      .updatePreferences({ device_editor_layout: deviceLayoutToPref(mode) })
+      .catch((err) => console.warn("Failed to persist device layout preference:", err));
   }
 
   /**

@@ -10,6 +10,11 @@ import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-
 import { apiContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
+import {
+  prefToSecretsLayout,
+  secretsLayoutToPref,
+  type SecretsLayout,
+} from "../util/editor-layout.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
@@ -30,8 +35,6 @@ registerMdiIcons({
 });
 
 const SECRETS_FILE = "secrets.yaml";
-
-type SecretsLayout = "form" | "yaml";
 
 const LAYOUT_STORAGE_KEY = "esphome-secrets-layout";
 const LAYOUTS: readonly SecretsLayout[] = ["form", "yaml"];
@@ -79,7 +82,13 @@ export class ESPHomePageSecrets extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    this._layout = this._readStoredLayout();
+    const stored = this._readStoredLayout();
+    if (stored) {
+      this._layout = stored;
+    } else {
+      // No local choice (new browser): restore from the backend pref.
+      void this._seedLayoutFromBackend();
+    }
     setLeaveGuard(this._confirmLeave);
     window.addEventListener("beforeunload", this._onBeforeUnload);
     window.addEventListener("popstate", this._onPopState, { capture: true });
@@ -90,14 +99,31 @@ export class ESPHomePageSecrets extends LitElement {
     await this._loadFromServer();
   }
 
-  private _readStoredLayout(): SecretsLayout {
+  private _readStoredLayout(): SecretsLayout | null {
     const stored = localStorage.getItem(LAYOUT_STORAGE_KEY);
-    return LAYOUTS.includes(stored as SecretsLayout) ? (stored as SecretsLayout) : "form";
+    return LAYOUTS.includes(stored as SecretsLayout) ? (stored as SecretsLayout) : null;
+  }
+
+  private async _seedLayoutFromBackend() {
+    try {
+      const prefs = await this._api.getPreferences();
+      // A toggle during the in-flight fetch writes localStorage; honor that
+      // newer user choice instead of clobbering it with the stored seed.
+      if (this._readStoredLayout() === null) {
+        this._layout = prefToSecretsLayout(prefs.secrets_editor_layout);
+      }
+    } catch (err) {
+      // Layout is not critical; keep the default form view on failure.
+      console.warn("Failed to load secrets layout preference:", err);
+    }
   }
 
   private _setLayout(layout: SecretsLayout) {
     this._layout = layout;
     localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
+    this._api
+      .updatePreferences({ secrets_editor_layout: secretsLayoutToPref(layout) })
+      .catch((err) => console.warn("Failed to persist secrets layout preference:", err));
   }
 
   disconnectedCallback() {

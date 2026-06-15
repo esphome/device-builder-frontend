@@ -3,12 +3,38 @@
  * header-actions, broken out so it can be unit-tested without
  * dragging in the WebSocket client + Lit lifecycle.
  */
-import { type OnboardingState, OnboardingStepStatus } from "../api/types/system.js";
+import {
+  type OnboardingState,
+  OnboardingStepId,
+  OnboardingStepStatus,
+} from "../api/types/system.js";
 
 /** True when any onboarding step is data-derived ``pending``.
- *  Drives the ``Set up Wi-Fi…`` kebab entry's visibility. */
+ *  Drives the auto-pop gate below. */
 export function isOnboardingPending(state: OnboardingState): boolean {
   return state.steps.some((s) => s.status === OnboardingStepStatus.PENDING);
+}
+
+/** True when the Wi-Fi step specifically is ``pending``. Drives the
+ *  ``Set up Wi-Fi…`` kebab entry's wording — independent of whether the
+ *  experience pick is still outstanding. */
+export function isWifiSetupPending(state: OnboardingState): boolean {
+  return state.steps.some(
+    (s) =>
+      s.id === OnboardingStepId.WIFI_CREDENTIALS &&
+      s.status === OnboardingStepStatus.PENDING
+  );
+}
+
+/** True when the experience step is already ``done`` (a stored experience
+ *  level). Distinguishes an existing / migrated install, which should only
+ *  ever be auto-prompted for Wi-Fi, from a fresh one that still needs the
+ *  full wizard. */
+export function isExperienceChosen(state: OnboardingState): boolean {
+  return state.steps.some(
+    (s) =>
+      s.id === OnboardingStepId.EXPERIENCE_LEVEL && s.status === OnboardingStepStatus.DONE
+  );
 }
 
 /**

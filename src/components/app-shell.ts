@@ -16,7 +16,7 @@ import type {
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
 import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
-import { Theme } from "../api/types/system.js";
+import { type ExperienceLevel, Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import {
@@ -32,6 +32,7 @@ import {
   darkModeContext,
   devicesContext,
   devicesLoadedContext,
+  experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,
   importableDevicesContext,
@@ -42,21 +43,24 @@ import {
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
+  prefsLoadedContext,
   recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
+  remoteComputeOnlyContext,
   serverVersionContext,
   versionContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { isExpert } from "../util/experience.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
   loadIntegrationDocs,
   loadLabels,
   loadOnboardingState,
+  loadPreferences,
   loadRemoteBuildSettings,
-  loadThemePreference,
 } from "./app-shell/data-load.js";
 import { handleEvent } from "./app-shell/events.js";
 import {
@@ -76,6 +80,7 @@ import {
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
+  onSetRemoteComputeOnly,
   onSetTheme,
 } from "./app-shell/settings-actions.js";
 
@@ -88,6 +93,7 @@ import type { ESPHomeFeedbackDialog } from "./feedback-dialog.js";
 import "./firmware-jobs-dialog.js";
 import type { ESPHomeFirmwareJobsDialog } from "./firmware-jobs-dialog.js";
 import "./onboarding-wifi-dialog.js";
+import "./onboarding/onboarding-wizard-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
 
@@ -119,6 +125,20 @@ export class ESPHomeApp extends LitElement {
   > = new Map();
   @provide({ context: localizeContext }) @state() _localize: LocalizeFunc =
     defaultLocalize;
+  @provide({ context: experienceLevelContext })
+  @state()
+  _experienceLevel: ExperienceLevel | null = null;
+  @provide({ context: remoteComputeOnlyContext })
+  @state()
+  _remoteComputeOnly = false;
+  // False until the subscribe snapshot delivers preferences; the dashboard
+  // fails device creation closed while it's false so a remote-compute install
+  // can't flash creation UI before its prefs are known.
+  @provide({ context: prefsLoadedContext })
+  @state()
+  _prefsLoaded = false;
+  // Derived from _experienceLevel in willUpdate (EXPERT ⇒ true); there is no
+  // separate expert_mode preference.
   @provide({ context: expertModeContext }) @state() _expertMode = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
@@ -160,8 +180,16 @@ export class ESPHomeApp extends LitElement {
     RemoteBuildJobState
   > = new Map();
 
+  // Fresh install: auto-pop the full experience wizard.
   @state() _onboardingShouldShow = false;
+  // Existing / migrated install missing Wi-Fi: auto-pop the standalone Wi-Fi
+  // dialog only (experience is already chosen), so they still get onboarded
+  // for Wi-Fi unless they decline.
+  @state() _onboardingShowWifi = false;
   @state() _onboardingSessionDismissed = false;
+  // Whether the first-run wizard should ask the remote-compute use-case
+  // question (non-HA only). Seeded from the onboarding state's step list.
+  @state() _onboardingHasUseCase = false;
   @state() _authState: AuthState = "connecting";
   @state() _authError: string | null = null;
   @state() _rateLimitedUntil = 0;
@@ -171,6 +199,11 @@ export class ESPHomeApp extends LitElement {
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
+  // Count of in-flight experience / remote-compute / yaml-diff preference
+  // writes so a reconnect's loadPreferences can't clobber an optimistic
+  // value. A counter, not a boolean: it guards more than one write path, so
+  // two overlapping writes must both settle before the gate reopens.
+  _prefsWritesInFlight = 0;
 
   private _router = createRouter(this);
 
@@ -180,6 +213,8 @@ export class ESPHomeApp extends LitElement {
   @query("esphome-feedback-dialog") private _feedbackDialog!: ESPHomeFeedbackDialog;
   @query("esphome-onboarding-wifi-dialog")
   private _onboardingDialog?: HTMLElement & { open(): void };
+  @query("esphome-onboarding-wizard-dialog")
+  private _onboardingWizard?: HTMLElement & { open(): void };
 
   static styles = [
     espHomeStyles,
@@ -230,6 +265,11 @@ export class ESPHomeApp extends LitElement {
   private static readonly PORT_TOAST_DEDUP_MS = 60_000;
 
   private _onSerialConnect = (event: Event) => {
+    // Device creation is hidden on remote-compute installs (and until prefs
+    // load once), so the dashboard's serial-setup handler no-ops; don't surface
+    // a USB-connect toast whose "Set up" action would be dead. Mirrors the
+    // dashboard's _hideDeviceCreation gate.
+    if (this._remoteComputeOnly || !this._prefsLoaded) return;
     // Suppress connect events that fire as a side-effect of our own
     // serial ops. esptool-js's chip reset toggles DTR/RTS, which on
     // native-USB chips (ESP32-C6 / S3 / C3) drops the USB device and
@@ -402,7 +442,6 @@ export class ESPHomeApp extends LitElement {
     subscribeToFollowJobs(this);
     void loadIntegrationDocs(this);
     void loadLabels(this);
-    void loadThemePreference(this);
     void loadRemoteBuildSettings(this);
     void loadOnboardingState(this);
   }
@@ -419,12 +458,21 @@ export class ESPHomeApp extends LitElement {
   // Refresh state so the badge reflects new data.
   _onOnboardingAcknowledged = () => {
     this._onboardingShouldShow = false;
+    this._onboardingShowWifi = false;
     void loadOnboardingState(this);
+    // The wizard persists experience / remote-compute before acknowledging;
+    // refresh prefs so the contexts (and the gated UI) reflect the picks.
+    void loadPreferences(this);
   };
 
   _onOnboardingDismissedSession = () => {
     this._onboardingSessionDismissed = true;
     this._onboardingShouldShow = false;
+    this._onboardingShowWifi = false;
+    // Skip-Wi-Fi persists the experience pick without acknowledging; refresh
+    // prefs so the contexts (yaml-diff button, experience-gated UI) reflect it
+    // this session rather than waiting for the next reconnect.
+    void loadPreferences(this);
   };
 
   // Kebab "Set up Wi-Fi" — explicit user intent, overrides both gates.
@@ -517,6 +565,8 @@ export class ESPHomeApp extends LitElement {
       <esphome-settings-dialog
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
+        @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
+          onSetRemoteComputeOnly(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>
           onSetRemoteBuildEnabled(this, e)}
         @set-remote-build-cleanup-ttl=${(e: CustomEvent<number>) =>
@@ -550,14 +600,32 @@ export class ESPHomeApp extends LitElement {
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
         @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
       ></esphome-onboarding-wifi-dialog>
+      <esphome-onboarding-wizard-dialog
+        .hasUseCase=${this._onboardingHasUseCase}
+        @onboarding-acknowledged=${this._onOnboardingAcknowledged}
+        @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
+      ></esphome-onboarding-wizard-dialog>
     `;
   }
 
-  // When _onboardingShouldShow flips true, programmatically open the dialog.
-  // The dialog is mounted unconditionally (so listeners are wired) but starts closed.
+  // Auto-pop the right onboarding surface: the full wizard for a fresh
+  // install, or the standalone Wi-Fi dialog for an existing install that's
+  // only missing Wi-Fi. Both dialogs are mounted unconditionally (so listeners
+  // are wired) but start closed.
+  protected willUpdate(changed: PropertyValues) {
+    // Expert Mode is experience_level === EXPERT; keep the provided context in
+    // sync so its consumers react when the level changes.
+    if (changed.has("_experienceLevel")) {
+      this._expertMode = isExpert(this._experienceLevel);
+    }
+  }
+
   protected updated(changed: PropertyValues) {
     super.updated?.(changed);
     if (changed.has("_onboardingShouldShow") && this._onboardingShouldShow) {
+      this._onboardingWizard?.open();
+    }
+    if (changed.has("_onboardingShowWifi") && this._onboardingShowWifi) {
       this._onboardingDialog?.open();
     }
   }

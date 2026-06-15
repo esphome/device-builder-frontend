@@ -825,7 +825,7 @@
     "automation_remove": "Remove",
     "adding": "Adding…",
     "saving": "Saving…",
-    "custom_component_title": "Custom component",
+    "external_component_title": "External component",
     "load_config_error": "Failed to load section config",
     "yaml_only_section": "This section doesn't have a structured editor — edit it directly in the YAML pane on the right.",
     "security_generate": "Generate",
@@ -908,6 +908,35 @@
       "decline_failed": "Couldn't update onboarding preferences",
       "dismiss_session": "Maybe later",
       "decline_permanent": "I don't use Wi-Fi — skip this step"
+    },
+    "wizard": {
+      "back": "Back",
+      "continue": "Continue",
+      "finish": "Finish",
+      "skip": "Skip",
+      "dismiss": "Maybe later",
+      "saving": "Saving…",
+      "ack_failed": "Saved your choices, but the wizard couldn't be marked as completed — it may reappear next time.",
+      "use_case": {
+        "title": "How will you use this?",
+        "intro": "This helps tailor the dashboard to what you need.",
+        "devices_title": "Build and manage devices",
+        "devices_desc": "Create, configure, and flash ESPHome devices from this dashboard.",
+        "remote_title": "Only for remote compute",
+        "remote_desc": "Use this install purely as a remote build server for other dashboards. Device creation stays hidden."
+      },
+      "experience": {
+        "title": "Pick your experience",
+        "intro": "You can change this any time in Settings.",
+        "beginner_title": "New to ESPHome",
+        "beginner_desc": "Keep it simple and guided, the lightest interface.",
+        "expert_title": "Expert",
+        "expert_desc": "Unlock the editor diff, navigator search, and YAML search."
+      },
+      "wifi": {
+        "title": "Set up Wi-Fi",
+        "intro": "Your devices use these to join your network. They're stored once in secrets.yaml and shared across every config you create."
+      }
     }
   },
   "layout": {
@@ -934,9 +963,8 @@
     "feedback_menu": "Found a bug? Have an idea?",
     "back": "Back",
     "close": "Close",
-    "editor": "Editor",
-    "yaml_diff_button": "YAML diff button",
     "more_options_with_count": "More options ({count, plural, one {# firmware task active} other {# firmware tasks active}})",
+    "editor": "Editor",
     "preview_badge": "Beta"
   },
   "feedback": {
@@ -1004,12 +1032,15 @@
   "settings": {
     "title": "Settings",
     "appearance": "Appearance",
+    "experience_save_failed": "Failed to save your preference",
+    "remote_compute_only": "Only use this for remote compute",
+    "remote_compute_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards.",
     "language": "Language",
     "language_desc": "Choose the language used across the interface.",
     "language_system": "System",
     "theme_desc": "Choose between light, dark, or follow your system preference.",
     "expert_mode": "Expert Mode",
-    "expert_mode_desc": "Enabling Export Mode will unlock some additional powerful options in the Device Builder for experienced power users of ESPHome.",
+    "expert_mode_desc": "Enabling Expert Mode will unlock some additional powerful options in the Device Builder for experienced power users of ESPHome.",
     "expert_mode_features_title": "What Expert Mode adds",
     "expert_mode_feature_diff": "Editor diff view",
     "expert_mode_feature_diff_desc": "Compare your unsaved YAML against the last saved version from the editor toolbar.",

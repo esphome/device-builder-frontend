@@ -51,15 +51,60 @@ export enum SortDirection {
   DESC = "desc",
 }
 
+/**
+ * Device editor pane layout: the form, the YAML pane, or both. Keep in
+ * lockstep with the backend's ``EditorLayout`` enum.
+ */
+export enum EditorLayout {
+  /** Form / guide only, YAML pane hidden. */
+  VISUAL = "visual",
+  /** YAML pane only. */
+  YAML = "yaml",
+  /** Split: form / guide alongside the YAML pane. */
+  BOTH = "both",
+}
+
+/**
+ * Secrets editor layout: the form or the YAML pane, never both. A
+ * dedicated enum keeps ``both`` off the wire. Keep in lockstep with the
+ * backend's ``SecretsEditorLayout`` enum.
+ */
+export enum SecretsEditorLayout {
+  VISUAL = "visual",
+  YAML = "yaml",
+}
+
+/**
+ * How much ESPHome the user knows — tailors UI weight. Chosen in
+ * onboarding, changeable in Settings. ``null`` (a fresh install that
+ * hasn't picked) is distinct from any level. Keep in lockstep with
+ * the backend's ``ExperienceLevel`` enum.
+ */
+export enum ExperienceLevel {
+  /** New to ESPHome — keep it light, expert surfaces hidden. */
+  BEGINNER = "beginner",
+  /** Power user — unlocks the editor diff, navigator search, YAML search. */
+  EXPERT = "expert",
+}
+
 export interface UserPreferences {
   dashboard_view: DashboardView;
   theme: Theme;
   navigator_visible: boolean;
-  expert_mode: boolean;
+  /** Which editor panes the user keeps open, persisted so the choice
+   *  survives a new browser. The secrets editor has no split view. */
+  device_editor_layout: EditorLayout;
+  secrets_editor_layout: SecretsEditorLayout;
   table_page_size: number;
   table_column_visibility: Record<string, boolean>;
   table_sort_column: string | null;
   table_sort_direction: SortDirection | null;
+  /** Experience level chosen in onboarding (``null`` until chosen).
+   *  ``EXPERT`` is the single source of truth for "expert mode". */
+  experience_level: ExperienceLevel | null;
+  /** This install is only a remote build node: onboarding skips the
+   *  Wi-Fi step and device-creation entry points are hidden. */
+  remote_compute_only: boolean;
   /** Highest onboarding-flow version the user has acknowledged.
    *  ``0`` ⇒ never gone through onboarding. The dashboard surfaces
    *  the wizard whenever this is below the server's
@@ -73,6 +118,8 @@ export interface UserPreferences {
  * through the wire as-is.
  */
 export enum OnboardingStepId {
+  USE_CASE = "use_case",
+  EXPERIENCE_LEVEL = "experience_level",
   WIFI_CREDENTIALS = "wifi_credentials",
 }
 

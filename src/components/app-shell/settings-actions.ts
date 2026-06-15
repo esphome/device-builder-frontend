@@ -6,7 +6,7 @@ import {
   CLEANUP_TTL_MIN_SECONDS,
   type PairingSummary,
 } from "../../api/types/remote-build.js";
-import type { Theme } from "../../api/types/system.js";
+import { ExperienceLevel, type Theme } from "../../api/types/system.js";
 import {
   clearStoredLocale,
   loadLocalize,
@@ -19,13 +19,65 @@ import { patchOffloadPairing } from "./events.js";
 export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   const theme = e.detail as Theme;
   host.applyTheme(theme);
-  host._api.updatePreferences({ theme }).catch(() => {});
+  // Count the write like the other prefs writes so a reconnect can't reload
+  // and revert the optimistic theme mid-flight. Theme has a localStorage
+  // fallback and self-corrects on the next successful load, so a failure is
+  // logged rather than reverted + toasted.
+  host._prefsWritesInFlight += 1;
+  host._api
+    .updatePreferences({ theme })
+    .catch((err) => console.warn("Failed to save theme:", err))
+    .finally(() => {
+      host._prefsWritesInFlight -= 1;
+    });
 }
 
-export function onSetExpertMode(host: ESPHomeApp, e: CustomEvent<boolean>): void {
+// experience_level is the single source of truth; EXPERT unlocks the power-user
+// surfaces and the editor's first-open layout. Revert + toast on failure so the
+// stored level can't silently diverge from the UI.
+function setExperienceLevel(host: ESPHomeApp, level: ExperienceLevel): void {
+  const previousLevel = host._experienceLevel;
+  host._experienceLevel = level;
+  // Count the write so a reconnect's INITIAL_STATE snapshot can't reload the
+  // pre-write values over the optimistic ones mid-flight.
+  host._prefsWritesInFlight += 1;
+  host._api
+    .updatePreferences({ experience_level: level })
+    .catch((err) => {
+      console.warn("Failed to save experience level:", err);
+      host._experienceLevel = previousLevel;
+      toast.error(host._localize("settings.experience_save_failed"), {
+        richColors: true,
+      });
+    })
+    .finally(() => {
+      host._prefsWritesInFlight -= 1;
+    });
+}
+
+export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>): void {
   const enabled = e.detail;
-  host._expertMode = enabled;
-  host._api.updatePreferences({ expert_mode: enabled }).catch(() => {});
+  const previous = host._remoteComputeOnly;
+  host._remoteComputeOnly = enabled;
+  host._prefsWritesInFlight += 1;
+  host._api
+    .updatePreferences({ remote_compute_only: enabled })
+    .catch((err) => {
+      console.warn("Failed to save remote-compute-only:", err);
+      host._remoteComputeOnly = previous;
+      toast.error(host._localize("settings.experience_save_failed"), {
+        richColors: true,
+      });
+    })
+    .finally(() => {
+      host._prefsWritesInFlight -= 1;
+    });
+}
+
+// Expert Mode is just experience_level === EXPERT; the Appearance/command-palette
+// toggle re-points the level (off → BEGINNER) through the same write path.
+export function onSetExpertMode(host: ESPHomeApp, e: CustomEvent<boolean>): void {
+  setExperienceLevel(host, e.detail ? ExperienceLevel.EXPERT : ExperienceLevel.BEGINNER);
 }
 
 // Optimistic flip with revert-on-failure for security-sensitive toggles.

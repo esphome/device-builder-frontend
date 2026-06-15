@@ -444,28 +444,21 @@ export class ESPHomeLabelForm extends LitElement {
   }
 
   private _cancel() {
-    if (this.editing) {
-      // Edit mode owns "exit" at the host level — fire an event
-      // and let the host clear the ``editing`` prop. Don't touch
-      // local state here; the willUpdate hook will reset on the
-      // next prop change.
-      this.dispatchEvent(
-        new CustomEvent("editing-cancel", { bubbles: true, composed: true })
-      );
+    // Device-drawer inline create form: collapse back to its toggle.
+    if (!this.editing && !this.defaultOpen) {
+      this.collapse();
       return;
     }
-    // The labels filter's empty popover relies on the form staying
-    // visible, so when ``defaultOpen`` is set we never collapse —
-    // we just blank the inputs. Hosts that want a real "close"
-    // behaviour leave ``defaultOpen`` false (the editor's dialog
-    // does this).
-    if (this.defaultOpen) {
+    // Create dialog: clear inputs so the next open starts clean (edit
+    // mode resets via willUpdate when ``editing`` clears).
+    if (!this.editing) {
       this._name = "";
       this._color = null;
       this._colorManual = false;
-      return;
     }
-    this.collapse();
+    // Edit mode and the standalone create dialog let the host own
+    // "close".
+    this.dispatchEvent(new CustomEvent("form-cancel", { bubbles: true, composed: true }));
   }
 
   private async _submit() {
