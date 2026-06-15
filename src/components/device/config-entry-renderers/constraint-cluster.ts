@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entries.js";
-import { isEntryVisible } from "../../../util/config-validation.js";
+import { isEntryVisible, isValuePresent } from "../../../util/config-validation.js";
 import { evaluateGroup } from "../../../util/constraint-groups.js";
 import {
   fieldKeyAttr,
@@ -173,7 +173,8 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   // (round-trips existing YAML); else nothing selected yet.
   const selectedId =
     ctx.getClusterChoice(clusterId) ??
-    alternatives.find((a) => a.members.some((m) => ctx.getAt([m.key]) !== undefined))?.id;
+    alternatives.find((a) => a.members.some((m) => isValuePresent(ctx.getAt([m.key]))))
+      ?.id;
   const selected = alternatives.find((a) => a.id === selectedId);
 
   // The radios below name each alternative, so the header drops the key list
