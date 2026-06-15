@@ -20,6 +20,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import { stripConstraintProse } from "../../util/constraint-groups.js";
 import { coerceIntFieldValue } from "../../util/int-input.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -331,10 +332,19 @@ export function renderLabel(
         : nothing}
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
-    ${entry.description
-      ? html`<p class="field-description">${renderMarkdown(entry.description)}</p>`
-      : nothing}
+    ${_fieldDescription(entry)}
   `;
+}
+
+/** The field's description with the backend's baked constraint-prose
+ *  paragraphs removed — the form renders those constraints reactively from the
+ *  structured groups, so the "Required — set exactly one of…" text would
+ *  otherwise mislabel an optional member as required. */
+function _fieldDescription(entry: ConfigEntry) {
+  const description = entry.description ? stripConstraintProse(entry.description) : "";
+  return description
+    ? html`<p class="field-description">${renderMarkdown(description)}</p>`
+    : nothing;
 }
 
 export function renderFieldError(path: string[], ctx: RenderCtx) {

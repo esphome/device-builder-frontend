@@ -3,7 +3,7 @@
  *
  * Part of the src/api/types.ts barrel split.
  */
-import type { ConfigEntry } from "./config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "./config-entries.js";
 import type { PagedResponse } from "./protocol.js";
 
 // ─── Components ──────────────────────────────────────────────
@@ -118,6 +118,10 @@ export interface ComponentCatalogEntry {
    *  parity, ...), range bounds (min/max_frequency in Hz) and required
    *  pins (require_tx / require_mosi / ...). Drives dep-add prefill. */
   bus_constraints?: Record<string, Record<string, unknown>>;
+  /** Cross-field cardinality constraints over the top-level `config_entries`
+   *  (from ESPHome's `cv.has_*_one_key` validators). Nested-scope constraints
+   *  live on the owning `nested` entry's `required_groups`. */
+  required_groups?: RequiredGroup[] | null;
   /** The component's configuration schema. May contain `nested` entries
    *  (`type === "nested"`) whose `config_entries` recurse. */
   config_entries: ConfigEntry[];

@@ -1,4 +1,4 @@
-import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entries.js";
 import { fetchComponent } from "../../../util/component-name-cache.js";
 import { normalizeHexValues } from "../../../util/hex-int.js";
 import { parseYamlSectionValues } from "../../../util/yaml-section-reader.js";
@@ -15,6 +15,7 @@ export interface SectionConfigResponse {
   icon: string;
   image_url: string;
   entries: ConfigEntry[];
+  required_groups: RequiredGroup[];
 }
 
 export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void> {
@@ -59,6 +60,7 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
         icon: "",
         image_url: "",
         entries: [],
+        required_groups: [],
       };
       host._isUnknown = true;
     } else {
@@ -71,6 +73,7 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
         icon: "",
         image_url: component.image_url,
         entries: component.config_entries,
+        required_groups: component.required_groups ?? [],
       };
     }
     // Asymmetric with save/delete paths: undefined here means "section

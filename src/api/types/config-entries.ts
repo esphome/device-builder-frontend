@@ -44,6 +44,23 @@ export enum PinMode {
   INPUT_OUTPUT = "input_output",
 }
 
+/** Cardinality of a cross-field `required_groups` constraint. */
+export type RequiredGroupKind =
+  | "exactly_one"
+  | "at_least_one"
+  | "at_most_one"
+  | "none_or_all";
+
+/**
+ * A cross-field constraint over sibling keys in one scope (from ESPHome's
+ * `cv.has_*_one_key` / `has_none_or_all_keys` validators). Satisfaction is a
+ * property of the whole group, not of any single member.
+ */
+export interface RequiredGroup {
+  kind: RequiredGroupKind;
+  keys: string[];
+}
+
 export interface ConfigEntry {
   // === core ===
   /** YAML key name. */
@@ -117,6 +134,19 @@ export interface ConfigEntry {
    * protocol). The form renders them as one pick-one dropdown.
    */
   exclusive_group?: string | null;
+  /**
+   * Inclusive all-or-none group id (from `cv.Inclusive`): every sibling
+   * sharing this id must be set together or all left blank. Distinct from
+   * `exclusive_group` (pick-one) and from the component-root
+   * `required_groups` cardinality constraints.
+   */
+  group?: string | null;
+  /**
+   * Cross-field cardinality constraints scoped to this entry's children
+   * (only on `type: "nested"` entries). The component-root constraints live
+   * on `ComponentCatalogEntry.required_groups`.
+   */
+  required_groups?: RequiredGroup[] | null;
 
   // === featured-component overlays ===
   /**

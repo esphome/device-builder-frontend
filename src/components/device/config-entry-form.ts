@@ -27,7 +27,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ConfigEntry } from "../../api/types/config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -37,6 +37,7 @@ import {
   type ComponentProvider,
 } from "../../util/config-entry-yaml-scan.js";
 import { type ValidationError } from "../../util/config-validation.js";
+import { evaluateGroup, type ConstraintKind } from "../../util/constraint-groups.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -149,6 +150,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  Owner-controlled — emits `value-change` to mutate. */
   @property({ attribute: false })
   values: Record<string, unknown> = {};
+
+  /** Cross-field cardinality constraints over the top-level `entries`
+   *  (the component's `required_groups`). Rendered as a reactive banner when
+   *  unsatisfied; nested-scope groups travel on their NESTED entry. */
+  @property({ attribute: false })
+  requiredGroups: RequiredGroup[] = [];
 
   /** Validation errors keyed by dotted path. */
   @property({ attribute: false })
@@ -290,13 +297,51 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // used by top-level user-keyed sections (substitutions:) where
     // the component itself is the map. Pass ``[]`` so the entry's
     // renderer sees the values dict directly via ``ctx.getAt([])``.
-    return html`${ordered.map((item) =>
+    return html`${this._renderConstraintBanners(ctx)}${ordered.map((item) =>
       Array.isArray(item)
         ? renderExclusiveGroupField(item, ctx)
         : visible.has(item)
           ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
           : nothing
     )}`;
+  }
+
+  /** Reactive banner for each *unsatisfied* top-level constraint group
+   *  (cardinality `required_groups` + inclusive all-or-none `group`). A
+   *  satisfied group renders nothing, so an optional member whose group is
+   *  already met by a sibling (esp32_rmt_led_strip timings once `chipset` is
+   *  set) shows no "Required" prompt. */
+  private _renderConstraintBanners(ctx: RenderCtx) {
+    const groups: Array<{ kind: ConstraintKind; keys: string[] }> = [
+      ...this.requiredGroups.map((g) => ({ kind: g.kind, keys: g.keys })),
+    ];
+    const inclusive = new Map<string, string[]>();
+    for (const entry of this.entries) {
+      if (entry.group) {
+        inclusive.set(entry.group, [...(inclusive.get(entry.group) ?? []), entry.key]);
+      }
+    }
+    for (const members of inclusive.values()) {
+      groups.push({ kind: "all_or_none", keys: members });
+    }
+    const unsatisfied = groups.filter((g) => !evaluateGroup(g.kind, g.keys, this.values));
+    if (unsatisfied.length === 0) return nothing;
+    const labelOf = (key: string): string => {
+      const entry = this.entries.find((e) => e.key === key);
+      return entry ? labelFor(entry, ctx) : key;
+    };
+    return unsatisfied.map(
+      (g) => html`
+        <div class="constraint-banner">
+          <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
+          <span
+            >${ctx.localize(`device.constraint_${g.kind}`, {
+              keys: g.keys.map(labelOf).join(", "),
+            })}</span
+          >
+        </div>
+      `
+    );
   }
 
   /** Stable-partition so required entries lead. An exclusive_group is
