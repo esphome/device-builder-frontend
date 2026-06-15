@@ -55,7 +55,7 @@ export interface UserPreferences {
   dashboard_view: DashboardView;
   theme: Theme;
   navigator_visible: boolean;
-  yaml_diff_button: boolean;
+  expert_mode: boolean;
   table_page_size: number;
   table_column_visibility: Record<string, boolean>;
   table_sort_column: string | null;

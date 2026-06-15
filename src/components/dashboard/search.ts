@@ -9,6 +9,7 @@ export function onSearchKeyDown(host: ESPHomePageDashboard, e: KeyboardEvent): v
     return;
   }
   if (e.key !== "/") return;
+  if (!host._expertMode) return;
   if (host._yamlMode) return;
   if (host._search !== "") return;
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
@@ -59,6 +60,7 @@ export function maybeFireEmptyStatePreview(
   changed: PropertyValues
 ): void {
   if (!changed.has("_search") && !changed.has("_yamlMode")) return;
+  if (!host._expertMode) return;
   if (!host._isDeviceSearchActive) return;
   const trimmed = host._search.trim();
   if (!trimmed) {

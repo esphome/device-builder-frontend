@@ -27,14 +27,14 @@ export interface CommandAction {
 export interface CommandActionContext {
   t: LocalizeFunc;
   devices: ConfiguredDevice[];
-  yamlDiffEnabled: boolean;
+  expertMode: boolean;
   setTheme: (theme: string) => void;
   setLanguage: (lang: LanguageChoice) => void;
-  toggleDiffButton: () => void;
+  toggleExpertMode: () => void;
 }
 
 /** The default (non-YAML-mode) command list: navigation, devices,
- *  themes, languages, editor toggles. */
+ *  themes, languages, the Expert Mode toggle. */
 export function buildCommands(ctx: CommandActionContext): CommandAction[] {
   const { t } = ctx;
 
@@ -95,16 +95,16 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
     },
   ];
 
-  const editor: CommandAction[] = [
+  const settings: CommandAction[] = [
     {
-      id: "editor.yaml_diff_button",
-      group: t("layout.editor"),
-      label: ctx.yamlDiffEnabled
-        ? t("command_palette.hide_yaml_diff_button")
-        : t("command_palette.show_yaml_diff_button"),
-      icon: "vector-difference",
-      keywords: ["diff", "yaml", "compare"],
-      run: () => ctx.toggleDiffButton(),
+      id: "settings.expert_mode",
+      group: t("settings.title"),
+      label: ctx.expertMode
+        ? t("command_palette.disable_expert_mode")
+        : t("command_palette.enable_expert_mode"),
+      icon: "tune",
+      keywords: ["expert", "advanced", "diff", "yaml", "search"],
+      run: () => ctx.toggleExpertMode(),
     },
   ];
 
@@ -118,7 +118,7 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
     run: () => ctx.setLanguage(l.value),
   }));
 
-  return [...nav, ...devices, ...themes, ...languages, ...editor];
+  return [...nav, ...devices, ...themes, ...languages, ...settings];
 }
 
 /**

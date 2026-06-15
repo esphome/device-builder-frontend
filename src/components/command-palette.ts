@@ -6,7 +6,7 @@ import {
   mdiKeyVariant,
   mdiMagnify,
   mdiThemeLightDark,
-  mdiVectorDifference,
+  mdiTune,
   mdiWeatherNight,
   mdiWeatherSunny,
 } from "@mdi/js";
@@ -18,8 +18,8 @@ import type { LanguageChoice, LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
   devicesContext,
+  expertModeContext,
   localizeContext,
-  yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -39,7 +39,7 @@ registerMdiIcons({
   "key-variant": mdiKeyVariant,
   magnify: mdiMagnify,
   "theme-light-dark": mdiThemeLightDark,
-  "vector-difference": mdiVectorDifference,
+  tune: mdiTune,
   "weather-night": mdiWeatherNight,
   "weather-sunny": mdiWeatherSunny,
 });
@@ -64,9 +64,9 @@ export class ESPHomeCommandPalette extends LitElement {
   @state()
   private _devices: ConfiguredDevice[] = [];
 
-  @consume({ context: yamlDiffButtonContext, subscribe: true })
+  @consume({ context: expertModeContext, subscribe: true })
   @state()
-  private _yamlDiffEnabled = false;
+  private _expertMode = false;
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
@@ -162,10 +162,10 @@ export class ESPHomeCommandPalette extends LitElement {
     return buildCommands({
       t: this._localize,
       devices: this._devices,
-      yamlDiffEnabled: this._yamlDiffEnabled,
+      expertMode: this._expertMode,
       setTheme: (theme) => this._setTheme(theme),
       setLanguage: (lang) => this._setLanguage(lang),
-      toggleDiffButton: () => this._toggleDiffButton(),
+      toggleExpertMode: () => this._toggleExpertMode(),
     });
   }
 
@@ -182,7 +182,10 @@ export class ESPHomeCommandPalette extends LitElement {
 
   /** True when the current query is in YAML-search mode. */
   private get _isYamlMode(): boolean {
-    return this._query.trimStart().startsWith(ESPHomeCommandPalette._YAML_PREFIX);
+    return (
+      this._expertMode &&
+      this._query.trimStart().startsWith(ESPHomeCommandPalette._YAML_PREFIX)
+    );
   }
 
   /** The YAML query body — i.e. the input minus the leading ``/``. */
@@ -265,6 +268,11 @@ export class ESPHomeCommandPalette extends LitElement {
        discoverable from the UI rather than only via docs. */
     const inYamlMode = this._isYamlMode;
     const searchIcon = inYamlMode ? "code-braces" : "magnify";
+    const placeholder = this._localize(
+      this._expertMode
+        ? "command_palette.placeholder"
+        : "command_palette.placeholder_basic"
+    );
     return html`
       <div class="search">
         <wa-icon library="mdi" name=${searchIcon}></wa-icon>
@@ -272,8 +280,8 @@ export class ESPHomeCommandPalette extends LitElement {
           class="search-input"
           type="text"
           .value=${this._query}
-          placeholder=${this._localize("command_palette.placeholder")}
-          aria-label=${this._localize("command_palette.placeholder")}
+          placeholder=${placeholder}
+          aria-label=${placeholder}
           @input=${this._onQueryInput}
           @keydown=${this._onInputKeyDown}
           autocomplete="off"
@@ -288,24 +296,29 @@ export class ESPHomeCommandPalette extends LitElement {
             mode so the affordance reads as an action rather than a
             status badge.
           -->
-        <button
-          class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
-          type="button"
-          title=${this._localize(
-            inYamlMode
-              ? "command_palette.switch_to_commands"
-              : "command_palette.switch_to_yaml"
-          )}
-          aria-label=${this._localize(
-            inYamlMode
-              ? "command_palette.switch_to_commands"
-              : "command_palette.switch_to_yaml"
-          )}
-          aria-pressed=${inYamlMode ? "true" : "false"}
-          @click=${this._onToggleMode}
-        >
-          <wa-icon library="mdi" name=${inYamlMode ? "magnify" : "code-braces"}></wa-icon>
-        </button>
+        ${this._expertMode
+          ? html`<button
+              class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
+              type="button"
+              title=${this._localize(
+                inYamlMode
+                  ? "command_palette.switch_to_commands"
+                  : "command_palette.switch_to_yaml"
+              )}
+              aria-label=${this._localize(
+                inYamlMode
+                  ? "command_palette.switch_to_commands"
+                  : "command_palette.switch_to_yaml"
+              )}
+              aria-pressed=${inYamlMode ? "true" : "false"}
+              @click=${this._onToggleMode}
+            >
+              <wa-icon
+                library="mdi"
+                name=${inYamlMode ? "magnify" : "code-braces"}
+              ></wa-icon>
+            </button>`
+          : nothing}
       </div>
       <div class="list" role="listbox">
         ${items.length === 0
@@ -327,9 +340,11 @@ export class ESPHomeCommandPalette extends LitElement {
         >
         <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
         <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
-        <span class="yaml-hint">
-          <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
-        </span>
+        ${this._expertMode
+          ? html`<span class="yaml-hint">
+              <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
+            </span>`
+          : nothing}
       </div>
     `;
   }
@@ -473,10 +488,10 @@ export class ESPHomeCommandPalette extends LitElement {
     );
   }
 
-  private _toggleDiffButton() {
+  private _toggleExpertMode() {
     this.dispatchEvent(
-      new CustomEvent("set-yaml-diff-button", {
-        detail: !this._yamlDiffEnabled,
+      new CustomEvent("set-expert-mode", {
+        detail: !this._expertMode,
         bubbles: true,
         composed: true,
       })

@@ -32,6 +32,7 @@ import {
   darkModeContext,
   devicesContext,
   devicesLoadedContext,
+  expertModeContext,
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
@@ -46,7 +47,6 @@ import {
   remoteBuildEnabledContext,
   serverVersionContext,
   versionContext,
-  yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
@@ -69,6 +69,7 @@ import {
   onPairRequestSent,
   onRemoteBuildJobDismissed,
   onRemoteBuildJobSubmitted,
+  onSetExpertMode,
   onSetLanguage,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
@@ -76,7 +77,6 @@ import {
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
   onSetTheme,
-  onSetYamlDiffButton,
 } from "./app-shell/settings-actions.js";
 
 import "../pages/dashboard.js";
@@ -119,7 +119,7 @@ export class ESPHomeApp extends LitElement {
   > = new Map();
   @provide({ context: localizeContext }) @state() _localize: LocalizeFunc =
     defaultLocalize;
-  @provide({ context: yamlDiffButtonContext }) @state() _yamlDiffButton = false;
+  @provide({ context: expertModeContext }) @state() _expertMode = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
     CLEANUP_TTL_DEFAULT_SECONDS;
@@ -497,7 +497,7 @@ export class ESPHomeApp extends LitElement {
     return html`
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @set-yaml-diff-button=${(e: CustomEvent<boolean>) => onSetYamlDiffButton(this, e)}
+        @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @open-settings=${() => this._settingsDialog?.open()}
@@ -510,13 +510,13 @@ export class ESPHomeApp extends LitElement {
       </esphome-layout>
       <esphome-command-palette
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @set-yaml-diff-button=${(e: CustomEvent<boolean>) => onSetYamlDiffButton(this, e)}
+        @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
       ></esphome-command-palette>
       <esphome-settings-dialog
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @set-yaml-diff-button=${(e: CustomEvent<boolean>) => onSetYamlDiffButton(this, e)}
+        @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>
           onSetRemoteBuildEnabled(this, e)}
         @set-remote-build-cleanup-ttl=${(e: CustomEvent<number>) =>

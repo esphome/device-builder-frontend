@@ -1,7 +1,6 @@
 export type Section =
   | "appearance"
   | "language"
-  | "editor"
   | "build_server"
   | "pairing_requests"
   | "build_offload";
@@ -29,7 +28,6 @@ export const SECTIONS: SectionDef[] = [
     labelKey: "settings.appearance",
   },
   { id: "language", icon: "translate", labelKey: "settings.language" },
-  { id: "editor", icon: "vector-difference", labelKey: "layout.editor" },
   {
     id: "build_server",
     icon: "server-network-outline",

@@ -11,6 +11,7 @@ export {
   darkModeContext,
   devicesContext,
   devicesLoadedContext,
+  expertModeContext,
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
@@ -26,6 +27,5 @@ export {
   serverVersionContext,
   stubRemoteBuildJobState,
   versionContext,
-  yamlDiffButtonContext,
 } from "./contexts.js";
 export type { RemoteBuildJobState } from "./contexts.js";

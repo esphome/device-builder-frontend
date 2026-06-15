@@ -11,7 +11,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-import { renderSearchInput } from "../../../src/components/dashboard/render-toolbar.js";
+import { DashboardView } from "../../../src/api/types/system.js";
+import {
+  renderSearchInput,
+  renderViewToggle,
+} from "../../../src/components/dashboard/render-toolbar.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 
 function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
@@ -57,5 +61,39 @@ describe("renderSearchInput", () => {
     const host = makeHost({ _search: "kitchen", _clearSearch: clearSearch });
     renderInto(host).querySelector<HTMLButtonElement>(".search-clear")?.click();
     expect(clearSearch).toHaveBeenCalledOnce();
+  });
+});
+
+describe("renderViewToggle Expert Mode gating", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function makeToggleHost(expertMode: boolean): ESPHomePageDashboard {
+    return makeHost({
+      _view: DashboardView.CARDS,
+      _expertMode: expertMode,
+      _enterDeviceView: vi.fn(),
+      _setSearchMode: vi.fn(),
+    });
+  }
+
+  function renderToggle(host: ESPHomePageDashboard): HTMLElement {
+    const container = document.createElement("div");
+    render(renderViewToggle(host), container);
+    return container;
+  }
+
+  it("hides the YAML-search view button when Expert Mode is off", () => {
+    const container = renderToggle(makeToggleHost(false));
+    // Cards + Table only; no YAML (code-braces) button.
+    expect(container.querySelectorAll(".view-toggle-btn").length).toBe(2);
+    expect(container.querySelector('wa-icon[name="code-braces"]')).toBeNull();
+  });
+
+  it("shows the YAML-search view button when Expert Mode is on", () => {
+    const container = renderToggle(makeToggleHost(true));
+    expect(container.querySelectorAll(".view-toggle-btn").length).toBe(3);
+    expect(container.querySelector('wa-icon[name="code-braces"]')).not.toBeNull();
   });
 });

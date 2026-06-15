@@ -54,7 +54,7 @@ export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
   try {
     const prefs = await host._api.getPreferences();
     host.applyTheme(prefs.theme);
-    host._yamlDiffButton = prefs.yaml_diff_button;
+    host._expertMode = prefs.expert_mode;
   } catch {
     // Preferences not critical — keep localStorage value.
   }

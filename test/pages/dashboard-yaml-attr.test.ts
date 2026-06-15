@@ -17,8 +17,15 @@ async function flushPending(times = 8): Promise<void> {
   for (let i = 0; i < times; i++) await Promise.resolve();
 }
 
-async function mountDashboard(yamlMode: boolean): Promise<ESPHomePageDashboard> {
+async function mountDashboard(
+  yamlMode: boolean,
+  expertMode = true
+): Promise<ESPHomePageDashboard> {
   const page = new ESPHomePageDashboard();
+  // YAML mode is gated behind Expert Mode (a Lit context app-shell
+  // provides); mounted bare, seed both consumed fields directly.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (page as any)._expertMode = expertMode;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (page as any)._yamlMode = yamlMode;
   document.body.appendChild(page);
@@ -49,6 +56,13 @@ describe("dashboard yaml host attribute", () => {
   it("omits the yaml attribute when not in YAML mode", async () => {
     const page = await mountDashboard(false);
     expect(page.hasAttribute("yaml")).toBe(false);
+  });
+
+  it("drops YAML mode (and the attribute) when Expert Mode is off", async () => {
+    const page = await mountDashboard(true, false);
+    expect(page.hasAttribute("yaml")).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((page as any)._yamlMode).toBe(false);
   });
 
   it("toggles the attribute as _yamlMode flips", async () => {

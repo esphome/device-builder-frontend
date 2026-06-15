@@ -22,10 +22,10 @@ export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   host._api.updatePreferences({ theme }).catch(() => {});
 }
 
-export function onSetYamlDiffButton(host: ESPHomeApp, e: CustomEvent<boolean>): void {
+export function onSetExpertMode(host: ESPHomeApp, e: CustomEvent<boolean>): void {
   const enabled = e.detail;
-  host._yamlDiffButton = enabled;
-  host._api.updatePreferences({ yaml_diff_button: enabled }).catch(() => {});
+  host._expertMode = enabled;
+  host._api.updatePreferences({ expert_mode: enabled }).catch(() => {});
 }
 
 // Optimistic flip with revert-on-failure for security-sensitive toggles.

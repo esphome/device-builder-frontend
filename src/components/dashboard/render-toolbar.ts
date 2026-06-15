@@ -10,9 +10,9 @@ export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
   const cardsLabel = host._localize("dashboard.view_cards");
   const tableLabel = host._localize("dashboard.view_table");
   const yamlLabel = host._localize("yaml_search.switch_to_yaml");
-  // Three mutually-exclusive view options: cards (default), table,
-  // and YAML search (a list of device titles that expands to show
-  // matching YAML snippets when the user types a query).
+  // Up to three mutually-exclusive view options: cards (default), table,
+  // and — only in Expert Mode — YAML search (a list of device titles that
+  // expands to show matching YAML snippets when the user types a query).
   return html`
     <div
       class="view-toggle"
@@ -39,16 +39,18 @@ export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
       >
         <wa-icon library="mdi" name="table"></wa-icon>
       </button>
-      <button
-        class="view-toggle-btn ${yaml ? "active" : ""}"
-        type="button"
-        title=${yamlLabel}
-        aria-label=${yamlLabel}
-        aria-pressed=${yaml ? "true" : "false"}
-        @click=${() => host._setSearchMode(true)}
-      >
-        <wa-icon library="mdi" name="code-braces"></wa-icon>
-      </button>
+      ${host._expertMode
+        ? html`<button
+            class="view-toggle-btn ${yaml ? "active" : ""}"
+            type="button"
+            title=${yamlLabel}
+            aria-label=${yamlLabel}
+            aria-pressed=${yaml ? "true" : "false"}
+            @click=${() => host._setSearchMode(true)}
+          >
+            <wa-icon library="mdi" name="code-braces"></wa-icon>
+          </button>`
+        : nothing}
     </div>
   `;
 }
@@ -180,8 +182,9 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
 
 export function renderNoResultsExtras(host: ESPHomePageDashboard): TemplateResult {
   const hasSearch = host._search.trim().length > 0;
+
   return html`
-    ${hasSearch
+    ${hasSearch && host._expertMode
       ? renderYamlPreviewPivot(host._localize, host._yamlPreviewCount, () =>
           host._setSearchMode(true)
         )

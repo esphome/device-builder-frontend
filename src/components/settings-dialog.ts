@@ -10,7 +10,6 @@ import {
   mdiServerNetwork,
   mdiServerNetworkOutline,
   mdiTranslate,
-  mdiVectorDifference,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -34,7 +33,6 @@ import "./base-dialog.js";
 import "./settings-dialog/appearance-section.js";
 import "./settings-dialog/build-offload-section.js";
 import "./settings-dialog/build-server-section.js";
-import "./settings-dialog/editor-section.js";
 import "./settings-dialog/language-section.js";
 import "./settings-dialog/pairing-requests-section.js";
 
@@ -49,7 +47,6 @@ registerMdiIcons({
   "server-network": mdiServerNetwork,
   "server-network-outline": mdiServerNetworkOutline,
   translate: mdiTranslate,
-  "vector-difference": mdiVectorDifference,
 });
 
 @customElement("esphome-settings-dialog")
@@ -178,8 +175,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         return html`<esphome-settings-appearance></esphome-settings-appearance>`;
       case "language":
         return html`<esphome-settings-language></esphome-settings-language>`;
-      case "editor":
-        return html`<esphome-settings-editor></esphome-settings-editor>`;
       case "build_server":
         return html`<esphome-settings-build-server></esphome-settings-build-server>`;
       case "pairing_requests":

@@ -15,7 +15,7 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext, yamlDiffButtonContext } from "../../context/index.js";
+import { expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -160,7 +160,7 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ type: Boolean })
   busy = false;
 
-  @consume({ context: yamlDiffButtonContext, subscribe: true })
+  @consume({ context: expertModeContext, subscribe: true })
   @state()
   private _showDiffButton = false;
 

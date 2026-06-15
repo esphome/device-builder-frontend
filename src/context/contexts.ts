@@ -83,10 +83,11 @@ export const firmwareJobsContext = createContext<Map<string, FirmwareJob>>(
   Symbol("esphome-firmware-jobs")
 );
 
-/** Context for whether the YAML diff button is enabled in the editor. */
-export const yamlDiffButtonContext = createContext<boolean>(
-  Symbol("esphome-yaml-diff-button")
-);
+/** Context for whether Expert Mode is enabled. A single master switch
+ *  that gates the editor diff view, the device-navigator search box,
+ *  and the command-palette YAML content search. Backed by the
+ *  ``expert_mode`` user preference. */
+export const expertModeContext = createContext<boolean>(Symbol("esphome-expert-mode"));
 
 /**
  * Context for the receiver-side remote-build master switch.
