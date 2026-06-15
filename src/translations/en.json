@@ -1009,7 +1009,7 @@
     "language_system": "System",
     "theme_desc": "Choose between light, dark, or follow your system preference.",
     "expert_mode": "Expert Mode",
-    "expert_mode_desc": "Enabling Export Mode will unlock some additional powerful options in the Device Builder for experienced power users of ESPHome.",
+    "expert_mode_desc": "Enabling Expert Mode will unlock some additional powerful options in the Device Builder for experienced power users of ESPHome.",
     "expert_mode_features_title": "What Expert Mode adds",
     "expert_mode_feature_diff": "Editor diff view",
     "expert_mode_feature_diff_desc": "Compare your unsaved YAML against the last saved version from the editor toolbar.",
