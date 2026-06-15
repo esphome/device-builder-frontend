@@ -354,6 +354,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
         })
       );
     }
+    // buildConstraintClusters folds every *non-exclusive* inclusive group into
+    // a cluster (whose members land in clusteredKeys), so this loop only fires
+    // for the residual case it skips: an inclusive group whose members are all
+    // also exclusive_group members. The collection here is deliberately broader
+    // (entry.group, no !exclusive_group guard) to still surface that banner.
     const inclusive = new Map<string, string[]>();
     for (const entry of this.entries) {
       if (entry.group) {

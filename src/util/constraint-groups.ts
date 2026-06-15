@@ -57,5 +57,11 @@ export function evaluateGroup(
     case "none_or_all":
     case "all_or_none":
       return present === 0 || present === keys.length;
+    default:
+      // Exhaustive over ConstraintKind at compile time; a kind off the wire we
+      // don't recognise degrades to "unsatisfied" rather than returning
+      // undefined behind the boolean annotation.
+      kind satisfies never;
+      return false;
   }
 }
