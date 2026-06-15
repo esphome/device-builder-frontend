@@ -58,4 +58,8 @@ export function evaluateGroup(
     case "all_or_none":
       return present === 0 || present === keys.length;
   }
+  // Compile-time exhaustiveness: a new ConstraintKind makes `kind` non-never
+  // here and fails the build. No runtime fallback — lockstep deployment means
+  // only known kinds ever reach this.
+  kind satisfies never;
 }

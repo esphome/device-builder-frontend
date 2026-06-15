@@ -64,4 +64,23 @@ describe("config-entry-form constraint banners", () => {
   it("skips a group whose members are clustered (the box owns the prompt)", () => {
     expect(banners({}, new Set(["ssid"]))).not.toContain("constraint-banner");
   });
+
+  it("skips a group whose members are not rendered entries", () => {
+    // e.g. sensor.pid references climate.pid's cool_output/heat_output, which
+    // aren't fields on the sensor form — no banner the user can act on.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = ENTRIES;
+    form.values = {};
+    form.requiredGroups = [
+      { kind: "at_least_one", keys: ["cool_output", "heat_output"] },
+    ];
+    const out = serialize(
+      (
+        form as unknown as {
+          _renderConstraintBanners(c: RenderCtx, clustered: Set<string>): unknown;
+        }
+      )._renderConstraintBanners(ctx, new Set())
+    );
+    expect(out).not.toContain("constraint-banner");
+  });
 });

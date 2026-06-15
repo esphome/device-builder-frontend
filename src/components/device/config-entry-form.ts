@@ -36,7 +36,7 @@ import {
   catalogEntryToProvider,
   type ComponentProvider,
 } from "../../util/config-entry-yaml-scan.js";
-import { type ValidationError } from "../../util/config-validation.js";
+import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
 import { evaluateGroup } from "../../util/constraint-groups.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -345,8 +345,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  box header carries their prompt. */
   private _renderConstraintBanners(ctx: RenderCtx, clusteredKeys: Set<string>) {
     const messages: string[] = [];
+    // Skip a banner when none of its members currently render (gated off by
+    // hidden / depends_on / platform, or simply not a rendered entry), matching
+    // the cluster box — otherwise the prompt nags about fields the user can't set.
+    const targetPlatform = ctx.board?.esphome.platform ?? null;
+    const byKey = new Map(this.entries.map((e) => [e.key, e]));
+    const anyVisible = (keys: string[]): boolean =>
+      keys.some((k) => {
+        const entry = byKey.get(k);
+        return (
+          entry !== undefined &&
+          (getIn(this.values, [k]) !== undefined ||
+            isEntryVisible(entry, this.values, this.presentComponents, targetPlatform))
+        );
+      });
     for (const group of this.requiredGroups) {
       if (group.keys.some((k) => clusteredKeys.has(k))) continue;
+      if (!anyVisible(group.keys)) continue;
       if (evaluateGroup(group.kind, group.keys, this.values)) continue;
       messages.push(
         ctx.localize(`device.constraint_${group.kind}`, {
@@ -367,6 +382,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     }
     for (const keys of inclusive.values()) {
       if (keys.some((k) => clusteredKeys.has(k))) continue;
+      if (!anyVisible(keys)) continue;
       if (evaluateGroup("all_or_none", keys, this.values)) continue;
       messages.push(
         ctx.localize("device.constraint_all_or_none", {
