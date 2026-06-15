@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  EditorLayout,
   ExperienceLevel,
   type OnboardingState,
   OnboardingStepId,
@@ -90,6 +91,8 @@ describe("loadPreferences (post-wizard context refresh)", () => {
     dashboard_view: "cards" as UserPreferences["dashboard_view"],
     theme: "dark" as UserPreferences["theme"],
     navigator_visible: true,
+    device_editor_layout: EditorLayout.BOTH,
+    secrets_editor_layout: EditorLayout.VISUAL,
     table_page_size: 25,
     table_column_visibility: {},
     table_sort_column: null,

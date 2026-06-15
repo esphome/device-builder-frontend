@@ -30,7 +30,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
-import { editorLayoutForExperience } from "../util/experience.js";
+import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -546,7 +546,8 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   private async _loadPreferences() {
-    // Editor layout stored locally (not in backend preferences)
+    // localStorage is the instant per-browser seed; the backend pref below is
+    // the durable cross-browser source when localStorage is empty.
     const savedLayout = localStorage.getItem("esphome-editor-layout");
     const hasSavedLayout =
       savedLayout === "both" || savedLayout === "left" || savedLayout === "right";
@@ -557,11 +558,10 @@ export class ESPHomePageDevice extends LitElement {
     try {
       const prefs = await this._api.getPreferences();
       this._navCollapsed = !prefs.navigator_visible;
-      // First editor open (no stored layout yet): seed the YAML pane from the
-      // experience level. Once the user touches the layout toggle it persists
-      // to localStorage and wins.
+      // No local layout yet (new browser): restore the backend choice, which
+      // defaults to the split view on a fresh install.
       if (!hasSavedLayout) {
-        this._layout = editorLayoutForExperience(prefs.experience_level);
+        this._layout = prefToDeviceLayout(prefs.device_editor_layout);
       }
     } catch (err) {
       // Preferences not critical; fall back to defaults. Logged so a YAML
@@ -805,8 +805,7 @@ export class ESPHomePageDevice extends LitElement {
       // to the split view so the user actually sees where they're
       // landing.
       if (this._layout === "left") {
-        this._layout = "both";
-        localStorage.setItem("esphome-editor-layout", "both");
+        this._persistLayout("both");
       }
       this._setHighlight({ fromLine: line, toLine: line }, true, true);
       const resolved = resolveSectionForUrlLine(this._yaml, line, null);
@@ -1111,8 +1110,17 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onLayoutChange(e: CustomEvent<DeviceLayoutMode>) {
-    this._layout = e.detail;
-    localStorage.setItem("esphome-editor-layout", e.detail);
+    this._persistLayout(e.detail);
+  }
+
+  // Single writer for the editor layout: localStorage is the instant
+  // per-browser cache, the backend pref is the durable cross-browser store.
+  private _persistLayout(mode: DeviceLayoutMode) {
+    this._layout = mode;
+    localStorage.setItem("esphome-editor-layout", mode);
+    this._api
+      .updatePreferences({ device_editor_layout: deviceLayoutToPref(mode) })
+      .catch(() => {});
   }
 
   /**

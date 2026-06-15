@@ -18,14 +18,3 @@ export const EXPERIENCE_OPTIONS: ReadonlyArray<readonly [ExperienceLevel, string
 export function isExpert(level: ExperienceLevel | null): boolean {
   return level === ExperienceLevel.EXPERT;
 }
-
-/**
- * Editor layout to seed on first open: experts land in the split view,
- * everyone else (including an unchosen level) starts on the navigator with
- * the YAML pane hidden.
- */
-export function editorLayoutForExperience(
-  level: ExperienceLevel | null
-): "both" | "left" {
-  return level === ExperienceLevel.EXPERT ? "both" : "left";
-}

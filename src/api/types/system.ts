@@ -52,6 +52,20 @@ export enum SortDirection {
 }
 
 /**
+ * Which editor panes are open, persisted per editor. The device editor
+ * uses all three; the secrets editor only ever stores VISUAL or YAML.
+ * Keep in lockstep with the backend's ``EditorLayout`` enum.
+ */
+export enum EditorLayout {
+  /** Form / guide only, YAML pane hidden. */
+  VISUAL = "visual",
+  /** YAML pane only. */
+  YAML = "yaml",
+  /** Split: form / guide alongside the YAML pane. */
+  BOTH = "both",
+}
+
+/**
  * How much ESPHome the user knows — tailors UI weight. Chosen in
  * onboarding, changeable in Settings. ``null`` (a fresh install that
  * hasn't picked) is distinct from any level. Keep in lockstep with
@@ -68,6 +82,10 @@ export interface UserPreferences {
   dashboard_view: DashboardView;
   theme: Theme;
   navigator_visible: boolean;
+  /** Which editor panes the user keeps open, persisted so the choice
+   *  survives a new browser. The secrets editor never uses ``BOTH``. */
+  device_editor_layout: EditorLayout;
+  secrets_editor_layout: EditorLayout;
   table_page_size: number;
   table_column_visibility: Record<string, boolean>;
   table_sort_column: string | null;
