@@ -43,6 +43,7 @@ import {
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
+import { constraintClusterStyles } from "./config-entry-renderers/constraint-cluster.styles.js";
 import { literalLambdaToggleStyles } from "./config-entry-renderers/literal-lambda-toggle.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
 import type { PasswordInputValueChange } from "./password-input.js";
@@ -63,6 +64,7 @@ export const fieldRendererStyles = [
   configEntryFormStyles,
   configEntryFormExtraStyles,
   literalLambdaToggleStyles,
+  constraintClusterStyles,
   fieldHighlightStyles,
 ];
 
