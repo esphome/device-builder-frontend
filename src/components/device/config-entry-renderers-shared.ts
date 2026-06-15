@@ -217,6 +217,11 @@ export interface RenderCtx {
    *  members). ``_fieldDescription`` strips the baked prose only for these, so
    *  nested-scope members keep theirs. */
   reactiveConstraintKeys: Set<string>;
+  /** The form's top-level config entries, for resolving a label of a key that
+   *  isn't in a given cluster's members (a cardinality key that's also an
+   *  ``exclusive_group`` member is dropped from the cluster). Absent in
+   *  lightweight contexts; callers fall back to a narrower lookup. */
+  entries?: ConfigEntry[];
   nestedOpenSections: Set<string>;
   getAt: (path: string[]) => unknown;
   errorAt: (path: string[]) => ValidationError | null;

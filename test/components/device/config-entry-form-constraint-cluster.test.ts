@@ -130,6 +130,22 @@ describe("renderConstraintClusterField", () => {
     );
     expect(out).not.toContain("unsatisfied");
   });
+
+  it("localizes a cardinality key that's absent from members via ctx.entries", () => {
+    // A key that's also an exclusive_group member is dropped from cluster
+    // members, but the full entry set still resolves its label (no raw key).
+    const timings = ENTRIES.filter((e) => e.group === "custom");
+    const absentChipset = {
+      members: timings,
+      cardinality: { kind: "at_least_one" as const, keys: ["chipset", "bit0_high"] },
+      inclusiveKeys: timings.map((m) => m.key),
+    };
+    const ctx = ctxFor({});
+    ctx.entries = ENTRIES;
+    const out = serialize(renderConstraintClusterField(absentChipset, ctx));
+    expect(out).toContain("device.constraint_at_least_one|Chipset, (Bit0 High");
+    expect(out).not.toContain("|chipset,");
+  });
 });
 
 // Stateful ctx: emitChange mutates a backing values dict (delete on undefined)

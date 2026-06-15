@@ -767,6 +767,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
       reactiveConstraintKeys,
+      entries: this.entries,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),
       errorAt: (path) => this.errors.get(path.join(".")) ?? null,
