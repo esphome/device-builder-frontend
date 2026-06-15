@@ -331,19 +331,15 @@ export const configEntryFormExtraStyles = css`
   }
 
   /* Reactive prompt for an unsatisfied cross-field constraint group
-     (e.g. "set exactly one of: chipset, manual timings"). Shown only
-     while the group is unmet, so a satisfied group adds no noise. */
+     (e.g. "set exactly one of: chipset, manual timings"). Layers the
+     icon+text row and spacing onto the shared .warning-banner shape;
+     shown only while the group is unmet, so a satisfied group adds no
+     noise. */
   .constraint-banner {
     display: flex;
     gap: var(--wa-space-s);
     align-items: center;
-    padding: var(--wa-space-s);
     margin-bottom: var(--wa-space-m);
-    border: 1px solid var(--wa-color-warning-fill-loud, currentColor);
-    border-radius: var(--wa-border-radius-m);
-    background: var(--wa-color-warning-fill-quiet, transparent);
-    color: var(--wa-color-warning-on-quiet, currentColor);
-    font-size: var(--wa-font-size-s);
   }
   .constraint-banner wa-icon {
     flex-shrink: 0;

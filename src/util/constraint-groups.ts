@@ -19,8 +19,16 @@ export type ConstraintKind = RequiredGroupKind | "all_or_none";
 // constraints reactively from the structured groups instead, so strip them.
 const _CONSTRAINT_PARAGRAPH = /^\*\*(Required —|Set at most one of:|Set together)/;
 
-/** Drop the backend's baked constraint-prose paragraphs from a description. */
+/**
+ * Drop the backend's baked constraint-prose paragraphs from a description.
+ *
+ * Transitional: the backend only bakes these as a stopgap; once it stops and
+ * component data is re-synced, this and `_CONSTRAINT_PARAGRAPH` can be deleted.
+ */
 export function stripConstraintProse(description: string): string {
+  // The baked paragraphs always lead with bold (`**`); skip the split for the
+  // overwhelming majority of descriptions that don't.
+  if (!description.startsWith("**")) return description;
   const paragraphs = description.split("\n\n");
   let start = 0;
   while (

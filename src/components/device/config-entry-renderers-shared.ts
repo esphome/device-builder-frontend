@@ -16,6 +16,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { warningBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
@@ -58,6 +59,7 @@ import type { SecretSelectedDetail } from "./secret-picker.js";
 export const fieldRendererStyles = [
   espHomeStyles,
   inputStyles,
+  warningBannerStyles,
   configEntryFormStyles,
   configEntryFormExtraStyles,
   literalLambdaToggleStyles,
@@ -341,7 +343,7 @@ export function renderLabel(
  *  structured groups, so the "Required — set exactly one of…" text would
  *  otherwise mislabel an optional member as required. */
 function _fieldDescription(entry: ConfigEntry) {
-  const description = entry.description ? stripConstraintProse(entry.description) : "";
+  const description = stripConstraintProse(entry.description ?? "");
   return description
     ? html`<p class="field-description">${renderMarkdown(description)}</p>`
     : nothing;

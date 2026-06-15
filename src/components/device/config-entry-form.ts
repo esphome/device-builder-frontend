@@ -37,7 +37,7 @@ import {
   type ComponentProvider,
 } from "../../util/config-entry-yaml-scan.js";
 import { type ValidationError } from "../../util/config-validation.js";
-import { evaluateGroup, type ConstraintKind } from "../../util/constraint-groups.js";
+import { evaluateGroup } from "../../util/constraint-groups.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -310,35 +310,54 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  (cardinality `required_groups` + inclusive all-or-none `group`). A
    *  satisfied group renders nothing, so an optional member whose group is
    *  already met by a sibling (esp32_rmt_led_strip timings once `chipset` is
-   *  set) shows no "Required" prompt. */
+   *  set) shows no prompt. A cardinality member that belongs to an all-or-none
+   *  group is shown as that whole set — e.g. "chipset, or (Bit0 High, Bit0 Low,
+   *  …)" — so the either/or alternatives read clearly. */
   private _renderConstraintBanners(ctx: RenderCtx) {
-    const groups: Array<{ kind: ConstraintKind; keys: string[] }> = [
-      ...this.requiredGroups.map((g) => ({ kind: g.kind, keys: g.keys })),
-    ];
+    const labelOf = (key: string): string => {
+      const entry = this.entries.find((e) => e.key === key);
+      return entry ? labelFor(entry, ctx) : key;
+    };
+    const membersOf = (key: string): string[] => {
+      const group = this.entries.find((e) => e.key === key)?.group;
+      return group
+        ? this.entries.filter((e) => e.group === group).map((e) => e.key)
+        : [key];
+    };
+    const option = (key: string): string => {
+      const labels = membersOf(key).map(labelOf);
+      return labels.length > 1 ? `(${labels.join(", ")})` : labels[0];
+    };
+
+    const messages: string[] = [];
+    for (const group of this.requiredGroups) {
+      if (evaluateGroup(group.kind, group.keys, this.values)) continue;
+      messages.push(
+        ctx.localize(`device.constraint_${group.kind}`, {
+          keys: group.keys.map(option).join(", "),
+        })
+      );
+    }
     const inclusive = new Map<string, string[]>();
     for (const entry of this.entries) {
       if (entry.group) {
         inclusive.set(entry.group, [...(inclusive.get(entry.group) ?? []), entry.key]);
       }
     }
-    for (const members of inclusive.values()) {
-      groups.push({ kind: "all_or_none", keys: members });
+    for (const keys of inclusive.values()) {
+      if (evaluateGroup("all_or_none", keys, this.values)) continue;
+      messages.push(
+        ctx.localize("device.constraint_all_or_none", {
+          keys: keys.map(labelOf).join(", "),
+        })
+      );
     }
-    const unsatisfied = groups.filter((g) => !evaluateGroup(g.kind, g.keys, this.values));
-    if (unsatisfied.length === 0) return nothing;
-    const labelOf = (key: string): string => {
-      const entry = this.entries.find((e) => e.key === key);
-      return entry ? labelFor(entry, ctx) : key;
-    };
-    return unsatisfied.map(
-      (g) => html`
-        <div class="constraint-banner">
+    if (messages.length === 0) return nothing;
+    return messages.map(
+      (text) => html`
+        <div class="warning-banner constraint-banner">
           <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
-          <span
-            >${ctx.localize(`device.constraint_${g.kind}`, {
-              keys: g.keys.map(labelOf).join(", "),
-            })}</span
-          >
+          <span>${text}</span>
         </div>
       `
     );
