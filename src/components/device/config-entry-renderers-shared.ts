@@ -212,6 +212,11 @@ export interface RenderCtx {
   /** Top-level component keys present in the YAML — for the
    *  ``depends_on_component`` visibility predicate when filtering directly. */
   presentComponents: Set<string>;
+  /** Top-level keys whose backend constraint prose the form replaces with a
+   *  reactive banner/cluster (``required_groups`` keys + inclusive-``group``
+   *  members). ``_fieldDescription`` strips the baked prose only for these, so
+   *  nested-scope members keep theirs. */
+  reactiveConstraintKeys: Set<string>;
   nestedOpenSections: Set<string>;
   getAt: (path: string[]) => unknown;
   errorAt: (path: string[]) => ValidationError | null;
@@ -350,16 +355,20 @@ export function renderLabel(
         : nothing}
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
-    ${_fieldDescription(entry)}
+    ${_fieldDescription(entry, ctx)}
   `;
 }
 
-/** The field's description with the backend's baked constraint-prose
- *  paragraphs removed — the form renders those constraints reactively from the
- *  structured groups, so the "Required — set exactly one of…" text would
- *  otherwise mislabel an optional member as required. */
-function _fieldDescription(entry: ConfigEntry) {
-  const description = stripConstraintProse(entry.description ?? "");
+/** The field's description, with the backend's baked constraint-prose paragraph
+ *  removed only for members the form replaces with a reactive banner/cluster
+ *  (top-level constraint keys). Nested-scope members keep their prose until
+ *  nested banners land, and a field whose docs merely start with bold "Set …"
+ *  isn't stripped by accident. */
+function _fieldDescription(entry: ConfigEntry, ctx: RenderCtx) {
+  const raw = entry.description ?? "";
+  const description = ctx.reactiveConstraintKeys?.has(entry.key)
+    ? stripConstraintProse(raw)
+    : raw;
   return description
     ? html`<p class="field-description">${renderMarkdown(description)}</p>`
     : nothing;

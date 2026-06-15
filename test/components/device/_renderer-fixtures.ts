@@ -117,6 +117,7 @@ export function makeRenderCtx(
     getEditingMagnitude: () => undefined,
     setEditingMagnitude: vi.fn(),
     clearEditingMagnitude: vi.fn(),
+    reactiveConstraintKeys: new Set<string>(),
     getClusterChoice: () => undefined,
     setClusterChoice: vi.fn(),
     getClusterStash: () => undefined,

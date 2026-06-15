@@ -759,6 +759,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
 
   private _buildCtx(): RenderCtx {
+    // Top-level keys whose baked constraint prose a banner/cluster replaces;
+    // _fieldDescription strips only these so nested members keep their prose.
+    const reactiveConstraintKeys = new Set<string>();
+    for (const group of this.requiredGroups) {
+      for (const key of group.keys) reactiveConstraintKeys.add(key);
+    }
+    for (const entry of this.entries) {
+      if (entry.group) reactiveConstraintKeys.add(entry.key);
+    }
     const ctx: RenderCtx = {
       localize: this._localize,
       disabled: this.disabled,
@@ -772,6 +781,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
+      reactiveConstraintKeys,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),
       errorAt: (path) => this.errors.get(path.join(".")) ?? null,
