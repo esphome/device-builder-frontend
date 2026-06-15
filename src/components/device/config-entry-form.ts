@@ -467,8 +467,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
       >("wa-radio-group"),
     ];
     if (groups.length === 0) return;
-    // Let each group finish its own update before forcing the sync, awaiting
-    // them together rather than serially.
+    // Await each group's update together (not serially) so the forced sync
+    // reflects the latest value. The `.catch(() => {})` swallows a rejection on
+    // purpose: a group that failed to settle just isn't ready, so we proceed to
+    // sync the ones that are and let the next render recover, rather than
+    // aborting the whole pass (don't "fix" this into a throw).
     await Promise.all(groups.map((group) => group.updateComplete?.catch(() => {})));
     for (const group of groups) group.syncRadioElements?.();
   }
