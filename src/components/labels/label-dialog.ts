@@ -83,7 +83,7 @@ export class ESPHomeLabelDialog extends LitElement {
           .editing=${this.editing}
           default-open
           compact
-          @editing-cancel=${this._requestClose}
+          @form-cancel=${this._requestClose}
         ></esphome-label-form>
       </esphome-base-dialog>
     `;
