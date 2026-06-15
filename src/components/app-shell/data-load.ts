@@ -53,7 +53,8 @@ export async function loadIntegrationDocs(host: ESPHomeApp): Promise<void> {
 export async function loadThemePreference(host: ESPHomeApp): Promise<void> {
   try {
     const prefs = await host._api.getPreferences();
-    host.applyTheme(prefs.theme);
+    // Theme rides the initial_state snapshot now; this refetch is for
+    // expert_mode, which the snapshot does not carry.
     host._expertMode = prefs.expert_mode;
   } catch {
     // Preferences not critical — keep localStorage value.

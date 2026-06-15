@@ -57,6 +57,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
   switch (event) {
     case DeviceEventType.INITIAL_STATE: {
       const {
+        preferences,
         devices,
         importable,
         peers,
@@ -67,6 +68,10 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         remote_builds_enabled,
         version_match_policy,
       } = data as InitialStateEventData;
+      // Seed UI prefs from the snapshot so first paint skips a separate
+      // get_preferences round trip.
+      host.applyTheme(preferences.theme);
+      host._prefsLoaded = true;
       host._devices = devices;
       host._importableDevices = importable;
       host._devicesLoaded = true;

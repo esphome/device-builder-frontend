@@ -89,6 +89,11 @@ export const firmwareJobsContext = createContext<Map<string, FirmwareJob>>(
  *  ``expert_mode`` user preference. */
 export const expertModeContext = createContext<boolean>(Symbol("esphome-expert-mode"));
 
+/** Context for whether the preferences snapshot has arrived. False until the
+ *  ``subscribe_events`` ``initial_state`` push seeds preferences; consumers can
+ *  hold preference-dependent UI until then. */
+export const prefsLoadedContext = createContext<boolean>(Symbol("esphome-prefs-loaded"));
+
 /**
  * Context for the receiver-side remote-build master switch.
  *

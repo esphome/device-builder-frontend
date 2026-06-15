@@ -42,6 +42,7 @@ import {
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
+  prefsLoadedContext,
   recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
@@ -120,6 +121,8 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: localizeContext }) @state() _localize: LocalizeFunc =
     defaultLocalize;
   @provide({ context: expertModeContext }) @state() _expertMode = false;
+  // False until the subscribe snapshot delivers preferences.
+  @provide({ context: prefsLoadedContext }) @state() _prefsLoaded = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
     CLEANUP_TTL_DEFAULT_SECONDS;
