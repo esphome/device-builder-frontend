@@ -197,10 +197,10 @@ describe("create-config-dialog stale error on navigation", () => {
 
   // Drive the dialog onto the setup step (where the Back button renders) by
   // dispatching the next-step a board pick would.
-  function goToSetup(el: ESPHomeCreateConfigDialog): void {
+  function goToSetup(el: ESPHomeCreateConfigDialog, boardId = "esp32dev"): void {
     el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
       new CustomEvent("next-step", {
-        detail: { step: "setup", board: { id: "esp32dev" } },
+        detail: { step: "setup", board: { id: boardId } },
         bubbles: true,
         composed: true,
       })
@@ -223,18 +223,19 @@ describe("create-config-dialog stale error on navigation", () => {
     expect(errorText(el)).toBeNull();
   });
 
-  it("clears the error when advancing into a new step", async () => {
+  it("clears the error on forward (next-step) navigation", async () => {
     const createDevice = vi.fn().mockRejectedValue(new Error("boom"));
     const el = await mount({ createDevice });
 
-    goToSetup(el);
+    goToSetup(el, "esp32dev");
     await el.updateComplete;
     emitFinish(el, "kitchen");
     await flush();
     await el.updateComplete;
     expect(errorText(el)).not.toBeNull();
 
-    goToSetup(el);
+    // Re-enter setup with a different board, as picking another board would.
+    goToSetup(el, "esp8266");
     await el.updateComplete;
     expect(errorText(el)).toBeNull();
   });
