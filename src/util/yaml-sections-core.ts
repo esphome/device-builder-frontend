@@ -18,6 +18,7 @@ import {
   _skipBlankAndCommentLines,
   endsBlockAtIndent,
   LIST_ITEM_START_RE,
+  TOP_LEVEL_KEY_RE,
 } from "./yaml-section-lexer.js";
 
 /** A field-path segment that addresses a list index (``["areas","0",…]``). */
@@ -123,7 +124,7 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
   const rawSections: Array<{ key: string; fromLine: number; toLine: number }> = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^([a-zA-Z_][a-zA-Z0-9_]*):/);
+    const match = lines[i].match(TOP_LEVEL_KEY_RE);
     if (match) {
       if (rawSections.length > 0) {
         // The previous section content ends one line before the new

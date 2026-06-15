@@ -39,6 +39,16 @@ export const KEY_PATTERN = "[a-zA-Z_][^\\s:#]*";
 export const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_]/;
 
 /**
+ * Capture a column-0 top-level key. Group 1 is the key; the prefix
+ * form (no end anchor) matches whether or not the key carries an
+ * inline value, so callers that only want the name can ignore the
+ * rest of the line. Companion to ``TOP_LEVEL_KEY_START_RE`` — shared
+ * so the several "what's the top-level key on this line" sites don't
+ * each re-spell the identifier class.
+ */
+export const TOP_LEVEL_KEY_RE = /^([a-zA-Z_][a-zA-Z0-9_]*):/;
+
+/**
  * Match the inline-key form on a YAML list-item line
  * (`  - platform: esphome`). Capture group 1 is the key.
  *
