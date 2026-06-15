@@ -1,11 +1,52 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ComponentCatalogEntry } from "../../src/api/types/components.js";
 import {
   _clearScanMemos,
+  catalogEntryToProvider,
   findComponentsByProviders,
   findReferenceCandidates,
   findUsedPins,
   yamlHasMergedSources,
 } from "../../src/util/config-entry-yaml-scan.js";
+
+function catalogEntry(over: Partial<ComponentCatalogEntry>): ComponentCatalogEntry {
+  return {
+    id: "usb_uart",
+    name: "",
+    description: "",
+    category: "misc" as ComponentCatalogEntry["category"],
+    docs_url: "",
+    image_url: "",
+    dependencies: [],
+    multi_conf: false,
+    supported_platforms: [],
+    config_entries: [],
+    ...over,
+  };
+}
+
+describe("catalogEntryToProvider", () => {
+  it("attaches the nested idPaths for the requested interface", () => {
+    const entry = catalogEntry({
+      id: "usb_uart",
+      provides: ["uart"],
+      provides_id_paths: { uart: [["channels", "id"]] },
+    });
+    expect(catalogEntryToProvider(entry, "uart")).toEqual({
+      domain: "usb_uart",
+      stem: "",
+      idPaths: [["channels", "id"]],
+    });
+  });
+
+  it("omits idPaths for an own-id provider (no path for that interface)", () => {
+    const entry = catalogEntry({ id: "ble_nus", provides: ["uart"] });
+    expect(catalogEntryToProvider(entry, "uart")).toEqual({
+      domain: "ble_nus",
+      stem: "",
+    });
+  });
+});
 
 // The scans use module-level single-entry memos. Within a single
 // test file vitest runs cases sequentially, so cache state from
@@ -320,6 +361,147 @@ describe("findComponentsByProviders", () => {
       { domain: "sensor", stem: "ads1115" },
     ]);
     expect(other).toEqual([{ id: "adc_b", name: "" }]);
+  });
+});
+
+describe("findComponentsByProviders (nested provider idPaths)", () => {
+  // The reported config (#1464): the configured uart is a usb_uart channel,
+  // not a top-level id, so the provider carries the path to descend.
+  const yaml = [
+    "usb_host:",
+    "  devices:",
+    "    - id: device_0",
+    "usb_uart:",
+    "  - type: CDC_ACM",
+    "    vid: 0x303A",
+    "    pid: 0x4001",
+    "    channels:",
+    "      - id: uch_1",
+    "        baud_rate: 115200",
+    "      - id: uch_2",
+    "        baud_rate: 9600",
+    "zwave_proxy:",
+    "  id: zw_proxy",
+    "",
+  ].join("\n");
+
+  it("collects nested channel ids the section's own id would miss", () => {
+    expect(
+      findComponentsByProviders(yaml, [
+        { domain: "usb_uart", stem: "", idPaths: [["channels", "id"]] },
+      ])
+    ).toEqual([
+      { id: "uch_1", name: "" },
+      { id: "uch_2", name: "" },
+    ]);
+  });
+
+  it("does not surface the usb_uart device-level id as a uart", () => {
+    const withDeviceId = yaml.replace(
+      "  - type: CDC_ACM",
+      "  - id: dev_bridge\n    type: CDC_ACM"
+    );
+    const ids = findComponentsByProviders(withDeviceId, [
+      { domain: "usb_uart", stem: "", idPaths: [["channels", "id"]] },
+    ]).map((c) => c.id);
+    expect(ids).toEqual(["uch_1", "uch_2"]);
+    expect(ids).not.toContain("dev_bridge");
+  });
+
+  it("reads a nested item's sibling name as the label", () => {
+    const named = yaml.replace(
+      "      - id: uch_1",
+      '      - id: uch_1\n        name: "Z-Wave UART"'
+    );
+    expect(
+      findComponentsByProviders(named, [
+        { domain: "usb_uart", stem: "", idPaths: [["channels", "id"]] },
+      ])[0]
+    ).toEqual({ id: "uch_1", name: "Z-Wave UART" });
+  });
+
+  it("surfaces the nested channel id through findReferenceCandidates (real call path)", () => {
+    // Mirrors the production call: the reference's own domain ("uart") is
+    // prepended as an implicit provider, and usb_uart arrives as an interface
+    // provider carrying the nested path.
+    expect(
+      findReferenceCandidates(yaml, "uart", [
+        { domain: "usb_uart", stem: "", idPaths: [["channels", "id"]] },
+      ])
+    ).toEqual([
+      { id: "uch_1", name: "" },
+      { id: "uch_2", name: "" },
+    ]);
+  });
+
+  it("collects a deeper key than id (tca9548a channels[].bus_id)", () => {
+    const mux = [
+      "tca9548a:",
+      "  - id: mux",
+      "    channels:",
+      "      - bus_id: mux_ch0",
+      "        channel: 0",
+      "      - bus_id: mux_ch1",
+      "        channel: 1",
+      "",
+    ].join("\n");
+    expect(
+      findComponentsByProviders(mux, [
+        { domain: "tca9548a", stem: "", idPaths: [["channels", "bus_id"]] },
+      ])
+    ).toEqual([
+      { id: "mux_ch0", name: "" },
+      { id: "mux_ch1", name: "" },
+    ]);
+  });
+
+  it("collects ids from every path when an interface is nested at several (sprinkler)", () => {
+    const sprinkler = [
+      "sprinkler:",
+      "  - id: lawn",
+      "    auto_advance_switch:",
+      "      id: lawn_auto",
+      "    valves:",
+      "      - valve_switch:",
+      "          id: zone1_sw",
+      "      - valve_switch:",
+      "          id: zone2_sw",
+      "",
+    ].join("\n");
+    expect(
+      findComponentsByProviders(sprinkler, [
+        {
+          domain: "sprinkler",
+          stem: "",
+          idPaths: [
+            ["auto_advance_switch", "id"],
+            ["valves", "valve_switch", "id"],
+          ],
+        },
+      ]).map((c) => c.id)
+    ).toEqual(["lawn_auto", "zone1_sw", "zone2_sw"]);
+  });
+
+  it("does not misread a mapping holding a compact block-sequence as a list", () => {
+    // ``channels`` uses YAML's compact block-sequence form (dashes at the same
+    // indent as the key), so the item's keys and the channel dashes share a
+    // column; the scan must still find the channel ids.
+    const compact = [
+      "usb_uart:",
+      "  - type: CDC_ACM",
+      "    channels:",
+      "    - id: uch_1",
+      "    - id: uch_2",
+      "",
+    ].join("\n");
+    expect(
+      findComponentsByProviders(compact, [
+        { domain: "usb_uart", stem: "", idPaths: [["channels", "id"]] },
+      ])
+    ).toEqual([
+      { id: "uch_1", name: "" },
+      { id: "uch_2", name: "" },
+    ]);
   });
 });
 

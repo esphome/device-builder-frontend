@@ -16,10 +16,12 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { warningBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import { stripConstraintProse } from "../../util/constraint-groups.js";
 import { coerceIntFieldValue } from "../../util/int-input.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -41,6 +43,7 @@ import {
 import { configEntryFormExtraStyles } from "./config-entry-form-extra.styles.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import { filterRenderable, renderFilterOptions } from "./config-entry-render-filter.js";
+import { constraintClusterStyles } from "./config-entry-renderers/constraint-cluster.styles.js";
 import { literalLambdaToggleStyles } from "./config-entry-renderers/literal-lambda-toggle.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
 import type { PasswordInputValueChange } from "./password-input.js";
@@ -57,9 +60,11 @@ import type { SecretSelectedDetail } from "./secret-picker.js";
 export const fieldRendererStyles = [
   espHomeStyles,
   inputStyles,
+  warningBannerStyles,
   configEntryFormStyles,
   configEntryFormExtraStyles,
   literalLambdaToggleStyles,
+  constraintClusterStyles,
   fieldHighlightStyles,
 ];
 
@@ -207,6 +212,16 @@ export interface RenderCtx {
   /** Top-level component keys present in the YAML — for the
    *  ``depends_on_component`` visibility predicate when filtering directly. */
   presentComponents: Set<string>;
+  /** Top-level keys whose backend constraint prose the form replaces with a
+   *  reactive banner/cluster (``required_groups`` keys + inclusive-``group``
+   *  members). ``_fieldDescription`` strips the baked prose only for these, so
+   *  nested-scope members keep theirs. */
+  reactiveConstraintKeys: Set<string>;
+  /** The form's top-level config entries, for resolving a label of a key that
+   *  isn't in a given cluster's members (a cardinality key that's also an
+   *  ``exclusive_group`` member is dropped from the cluster). Absent in
+   *  lightweight contexts; callers fall back to a narrower lookup. */
+  entries?: ConfigEntry[];
   nestedOpenSections: Set<string>;
   getAt: (path: string[]) => unknown;
   errorAt: (path: string[]) => ValidationError | null;
@@ -249,6 +264,20 @@ export interface RenderCtx {
   getEditingMagnitude: (path: string[]) => string | undefined;
   setEditingMagnitude: (path: string[], text: string) => void;
   clearEditingMagnitude: (path: string[]) => void;
+  /**
+   * Either/or constraint cluster (radio chooser) UI state, off-config like
+   * the unit/magnitude stashes above. ``ClusterChoice`` is the selected
+   * alternative id, needed because a freshly-picked-but-empty side has no
+   * present value to infer the selection from. ``ClusterStash`` preserves the
+   * deselected side's values so switching back restores them (only the
+   * selected side is ever serialized). Keyed by cluster id (its first member
+   * key) plus, for the stash, the member key.
+   */
+  getClusterChoice: (clusterId: string) => string | undefined;
+  setClusterChoice: (clusterId: string, altId: string) => void;
+  getClusterStash: (clusterId: string, key: string) => unknown;
+  setClusterStash: (clusterId: string, key: string, value: unknown) => void;
+  clearClusterStash: (clusterId: string, key: string) => void;
   /**
    * Stable per-form object identity used by renderers that keep
    * cross-render scratch state via a WeakMap (e.g. templatable
@@ -331,10 +360,23 @@ export function renderLabel(
         : nothing}
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
-    ${entry.description
-      ? html`<p class="field-description">${renderMarkdown(entry.description)}</p>`
-      : nothing}
+    ${_fieldDescription(entry, ctx)}
   `;
+}
+
+/** The field's description, with the backend's baked constraint-prose paragraph
+ *  removed only for members the form replaces with a reactive banner/cluster
+ *  (top-level constraint keys). Nested-scope members keep their prose until
+ *  nested banners land, and a field whose docs merely start with bold "Set …"
+ *  isn't stripped by accident. */
+function _fieldDescription(entry: ConfigEntry, ctx: RenderCtx) {
+  const raw = entry.description ?? "";
+  const description = ctx.reactiveConstraintKeys?.has(entry.key)
+    ? stripConstraintProse(raw)
+    : raw;
+  return description
+    ? html`<p class="field-description">${renderMarkdown(description)}</p>`
+    : nothing;
 }
 
 export function renderFieldError(path: string[], ctx: RenderCtx) {

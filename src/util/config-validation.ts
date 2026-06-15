@@ -122,17 +122,28 @@ export function getDeviceNameWarning(name: string): ValidationError | null {
   return null;
 }
 
+/**
+ * A value counts as "present" for required / constraint-group purposes
+ * unless it's nullish, a blank/whitespace string, or an empty array.
+ * Shared so `validateEntry` and the constraint-group evaluator agree on
+ * what "set" means.
+ */
+export function isValuePresent(raw: unknown): boolean {
+  return !(
+    raw === undefined ||
+    raw === null ||
+    (typeof raw === "string" && raw.trim() === "") ||
+    (Array.isArray(raw) && raw.length === 0)
+  );
+}
+
 export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError | null {
   // UNKNOWN renders as the YAML-only notice (a mapping-or-list union the
   // form can't edit), so there is nothing to validate; a required one must
   // not block the wizard with an error the user can't clear in the form.
   if (entry.hidden || entry.type === ConfigEntryType.UNKNOWN) return null;
 
-  const isEmpty =
-    raw === undefined ||
-    raw === null ||
-    (typeof raw === "string" && raw.trim() === "") ||
-    (Array.isArray(raw) && raw.length === 0);
+  const isEmpty = !isValuePresent(raw);
 
   if (entry.required && isEmpty) {
     return { key: entry.key, code: "validation.required" };

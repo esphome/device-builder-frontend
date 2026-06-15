@@ -12,6 +12,11 @@ export type ConfigPrimitive = string | number | boolean;
 export interface ConfigValueOption {
   label: string;
   value: string;
+  /** ESP32 variants that accept this value (lowercased, e.g. `esp32s3`); absent
+   *  or empty means every variant. When the device resolves to an ESP32 variant
+   *  the select filters to it; otherwise (non-ESP32 or unknown) all options
+   *  show. */
+  variants?: string[];
 }
 
 /** Known GPIO pin features/capabilities (matches backend PinFeature enum). */
@@ -42,6 +47,23 @@ export enum PinMode {
   INPUT = "input",
   OUTPUT = "output",
   INPUT_OUTPUT = "input_output",
+}
+
+/** Cardinality of a cross-field `required_groups` constraint. */
+export type RequiredGroupKind =
+  | "exactly_one"
+  | "at_least_one"
+  | "at_most_one"
+  | "none_or_all";
+
+/**
+ * A cross-field constraint over sibling keys in one scope (from ESPHome's
+ * `cv.has_*_one_key` / `has_none_or_all_keys` validators). Satisfaction is a
+ * property of the whole group, not of any single member.
+ */
+export interface RequiredGroup {
+  kind: RequiredGroupKind;
+  keys: string[];
 }
 
 export interface ConfigEntry {
@@ -117,6 +139,19 @@ export interface ConfigEntry {
    * protocol). The form renders them as one pick-one dropdown.
    */
   exclusive_group?: string | null;
+  /**
+   * Inclusive all-or-none group id (from `cv.Inclusive`): every sibling
+   * sharing this id must be set together or all left blank. Distinct from
+   * `exclusive_group` (pick-one) and from the component-root
+   * `required_groups` cardinality constraints.
+   */
+  group?: string | null;
+  /**
+   * Cross-field cardinality constraints scoped to this entry's children
+   * (only on `type: "nested"` entries). The component-root constraints live
+   * on `ComponentCatalogEntry.required_groups`.
+   */
+  required_groups?: RequiredGroup[] | null;
 
   // === featured-component overlays ===
   /**

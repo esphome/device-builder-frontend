@@ -73,6 +73,16 @@ describe("esphome-label-dialog", () => {
     expect(got).toEqual(["request-close", "after-hide"]);
   });
 
+  it("requests close when the form fires form-cancel", async () => {
+    const el = await mount({ open: true });
+    const onClose = vi.fn();
+    el.addEventListener("request-close", onClose);
+    el.shadowRoot!.querySelector("esphome-label-form")!.dispatchEvent(
+      new CustomEvent("form-cancel", { bubbles: true, composed: true })
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("requests close when a catalog push drops the label being edited", async () => {
     const el = await mount({ open: true, editing: LABEL });
     const onClose = vi.fn();

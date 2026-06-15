@@ -1,4 +1,5 @@
 import { parseYamlAutomations } from "./yaml-automations.js";
+import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 import {
   _clearYamlSectionsMemo,
   findFieldLine,
@@ -179,7 +180,9 @@ export function findAddedSection(
  * gap between sections (file header, blank-line interstitial,
  * comment block above a top-level key — the trim done by
  * `parseYamlTopLevelSections` deliberately keeps those gaps
- * unattributed).
+ * unattributed). A bare top-level sequence's header line
+ * (`usb_uart:` above its `- ` items) is the one exception: it has no
+ * covering item range, so it resolves to the section's first item.
  *
  * `find` over the section array — sections are file-ordered with
  * non-overlapping ranges, and at typical config sizes (~10-30
@@ -227,7 +230,36 @@ export function sectionAtLine(yaml: string, line: number): YamlSection | null {
   const autoHit = smallestContainingSection(autos, line);
   if (autoHit) return autoHit;
   const tops = parseYamlTopLevelSections(yaml);
-  return smallestContainingSection(tops, line);
+  const topHit = smallestContainingSection(tops, line);
+  if (topHit) return topHit;
+  // A bare top-level sequence (usb_uart:, sensor:, …) expands into per-item
+  // ranges that start at the first dash, so the header line itself is covered
+  // by nothing. When the click lands exactly on such a header, select the
+  // section's first instance instead of leaving the selection unchanged.
+  return _firstItemForListHeader(tops, yaml, line);
+}
+
+function _firstItemForListHeader(
+  tops: YamlSection[],
+  yaml: string,
+  line: number
+): YamlSection | null {
+  // Cap the split at the requested line so a click near a header doesn't
+  // materialize the whole document on the cursor path.
+  const header = yaml.split("\n", line)[line - 1];
+  const key = header?.match(TOP_LEVEL_KEY_RE)?.[1];
+  if (!key) return null;
+  let first: YamlSection | null = null;
+  for (const s of tops) {
+    if (
+      s.parentKey === key &&
+      s.fromLine > line &&
+      (!first || s.fromLine < first.fromLine)
+    ) {
+      first = s;
+    }
+  }
+  return first;
 }
 
 /**

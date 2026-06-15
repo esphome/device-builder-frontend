@@ -48,6 +48,32 @@ describe("resolveNavItemLabels core suffix", () => {
   });
 });
 
+describe("resolveNavItemLabels component action fields", () => {
+  const actionCtx: LabelContext = {
+    ...ctx,
+    localize: ((key: string, params?: { name: string }) =>
+      key === "device.action_field_label"
+        ? `${params?.name} action`
+        : key) as LabelContext["localize"],
+  };
+  const actionRow = (actionField: string): YamlSection =>
+    ({ key: "number", parentKey: "number", actionField }) as unknown as YamlSection;
+
+  it("labels a set_action row 'Set action', matching the editor heading", () => {
+    mockGetCached.mockReturnValue(undefined);
+    expect(
+      resolveNavItemLabels(actionRow("set_action"), "automation", actionCtx).primary
+    ).toBe("Set action");
+  });
+
+  it("keeps the action word for multi-word fields (turn_on_action)", () => {
+    mockGetCached.mockReturnValue(undefined);
+    expect(
+      resolveNavItemLabels(actionRow("turn_on_action"), "automation", actionCtx).primary
+    ).toBe("Turn on action");
+  });
+});
+
 describe("resolveNavItemLabels substitution resolution", () => {
   const subs = new Map([["upper_devicename", "Driveway Gate"]]);
   const row = (name: string): YamlSection =>

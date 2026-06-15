@@ -126,6 +126,12 @@ describe("device-navigator row icons", () => {
 
   it("leads action-field automations with the action so they stay distinct", async () => {
     const nav = new ESPHomeDeviceNavigator();
+    // The shared action-field label localizes through "{name} action"; wire a
+    // localize that applies it so the rows render the production strings.
+    (
+      nav as unknown as { _localize: (k: string, p?: { name: string }) => string }
+    )._localize = (key, params) =>
+      key === "device.action_field_label" ? `${params?.name} action` : key;
     nav.yaml = [
       "esphome:",
       "  name: t",
@@ -146,7 +152,7 @@ describe("device-navigator row icons", () => {
       ...(nav.shadowRoot?.querySelectorAll(".nav-item-content p") ?? []),
     ].map((el) => el.textContent?.trim());
     // The two switch.template actions lead with the action, not "mmWave Status → …".
-    expect(primaries).toContain("Turn On");
-    expect(primaries).toContain("Turn Off");
+    expect(primaries).toContain("Turn on action");
+    expect(primaries).toContain("Turn off action");
   });
 });

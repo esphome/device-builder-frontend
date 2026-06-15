@@ -3,7 +3,7 @@
  *
  * Part of the src/api/types.ts barrel split.
  */
-import type { ConfigEntry } from "./config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "./config-entries.js";
 import type { PagedResponse } from "./protocol.js";
 
 // ─── Components ──────────────────────────────────────────────
@@ -108,11 +108,20 @@ export interface ComponentCatalogEntry {
   /** Interfaces this component can be referenced *as* beyond its own domain
    *  (an `adc` sensor provides `voltage_sampler`). */
   provides?: string[];
+  /** For a provided interface whose id is nested rather than the component's
+   *  own top-level id (usb_uart exposes a uart via channels[].id), the YAML
+   *  key-paths to descend, keyed by interface (one per nested location).
+   *  Absent for own-id providers. */
+  provides_id_paths?: Record<string, string[][]>;
   /** Requirements this component imposes on the bus it attaches to, keyed
    *  by bus id ('i2c' / 'spi' / 'uart'): exact-match values (baud_rate,
    *  parity, ...), range bounds (min/max_frequency in Hz) and required
    *  pins (require_tx / require_mosi / ...). Drives dep-add prefill. */
   bus_constraints?: Record<string, Record<string, unknown>>;
+  /** Cross-field cardinality constraints over the top-level `config_entries`
+   *  (from ESPHome's `cv.has_*_one_key` validators). Nested-scope constraints
+   *  live on the owning `nested` entry's `required_groups`. */
+  required_groups?: RequiredGroup[] | null;
   /** The component's configuration schema. May contain `nested` entries
    *  (`type === "nested"`) whose `config_entries` recurse. */
   config_entries: ConfigEntry[];

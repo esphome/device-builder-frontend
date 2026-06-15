@@ -386,6 +386,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               : nothing}
             <esphome-config-entry-form
               .entries=${renderEntries}
+              .requiredGroups=${this._config.required_groups}
               .values=${this._values}
               .errors=${this._fieldErrors}
               .board=${this.board}

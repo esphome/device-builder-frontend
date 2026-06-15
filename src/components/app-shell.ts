@@ -33,6 +33,7 @@ import {
   devicesContext,
   devicesLoadedContext,
   experienceLevelContext,
+  expertModeContext,
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
@@ -49,7 +50,6 @@ import {
   remoteComputeOnlyContext,
   serverVersionContext,
   versionContext,
-  yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
@@ -73,6 +73,7 @@ import {
   onRemoteBuildJobDismissed,
   onRemoteBuildJobSubmitted,
   onSetExperienceLevel,
+  onSetExpertMode,
   onSetLanguage,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
@@ -124,7 +125,6 @@ export class ESPHomeApp extends LitElement {
   > = new Map();
   @provide({ context: localizeContext }) @state() _localize: LocalizeFunc =
     defaultLocalize;
-  @provide({ context: yamlDiffButtonContext }) @state() _yamlDiffButton = false;
   @provide({ context: experienceLevelContext })
   @state()
   _experienceLevel: ExperienceLevel | null = null;
@@ -137,6 +137,7 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: prefsLoadedContext })
   @state()
   _prefsLoaded = false;
+  @provide({ context: expertModeContext }) @state() _expertMode = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
   @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
     CLEANUP_TTL_DEFAULT_SECONDS;
@@ -542,6 +543,7 @@ export class ESPHomeApp extends LitElement {
     return html`
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
+        @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @open-settings=${() => this._settingsDialog?.open()}
@@ -554,15 +556,13 @@ export class ESPHomeApp extends LitElement {
       </esphome-layout>
       <esphome-command-palette
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
+        @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
       ></esphome-command-palette>
       <esphome-settings-dialog
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @set-experience-level=${(e: CustomEvent<ExperienceLevel>) =>
-          onSetExperienceLevel(this, e)}
-        @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
-          onSetRemoteComputeOnly(this, e)}
+        @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>
           onSetRemoteBuildEnabled(this, e)}
         @set-remote-build-cleanup-ttl=${(e: CustomEvent<number>) =>

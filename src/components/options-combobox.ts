@@ -52,6 +52,15 @@ export class ESPHomeOptionsCombobox extends LitElement {
   @property()
   label = "";
 
+  /** Option value that applies when the field is left empty, tagged in the
+   *  menu with ``defaultNote`` (mirrors the plain select). */
+  @property()
+  defaultValue = "";
+
+  /** Localized "default" note shown under the ``defaultValue`` option. */
+  @property()
+  defaultNote = "";
+
   /** Open state of the dropdown. */
   @state() private _open = false;
 
@@ -142,13 +151,26 @@ export class ESPHomeOptionsCombobox extends LitElement {
                     @click=${() => this._select(opt)}
                     @mouseenter=${() => (this._active = i)}
                   >
-                    <span class="option-label">${opt.label}</span>
+                    ${this._isDefault(opt)
+                      ? html`<span class="option-default-stack">
+                          <span class="option-label">${opt.label}</span>
+                          <small class="option-default-note">${this.defaultNote}</small>
+                        </span>`
+                      : html`<span class="option-label">${opt.label}</span>`}
                   </div>`
               )}
             </div>`
           : nothing}
       </wa-popup>
     `;
+  }
+
+  private _isDefault(opt: ComboboxOption): boolean {
+    return (
+      this.defaultNote !== "" &&
+      this.defaultValue !== "" &&
+      opt.value.toLowerCase() === this.defaultValue.toLowerCase()
+    );
   }
 
   private get _filtered(): ComboboxOption[] {

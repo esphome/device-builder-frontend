@@ -88,6 +88,7 @@ import {
   buildOffloadPairingsContext,
   devicesContext,
   devicesLoadedContext,
+  expertModeContext,
   importableDevicesContext,
   labelsContext,
   localizeContext,
@@ -214,6 +215,10 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: versionContext, subscribe: true })
   @state()
   _appVersion = "";
+
+  @consume({ context: expertModeContext, subscribe: true })
+  @state()
+  _expertMode = false;
 
   @state() _showDiscovered = false;
   @state() _search = "";
@@ -482,6 +487,11 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues) {
+    if (!this._expertMode && this._yamlMode) {
+      this._yamlMode = false;
+      this._search = "";
+      this._yamlSearch.clear();
+    }
     if (changed.has("_view")) this.setAttribute("view", this._view);
     if (changed.has("_yamlMode")) this.toggleAttribute("yaml", this._yamlMode);
     // ``has-discovered`` is the hook that adds top padding for the

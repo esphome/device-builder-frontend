@@ -8,6 +8,9 @@ import {
   yamlHitLabel,
 } from "../util/yaml-search-helpers.js";
 
+/** Window event that opens the palette from outside (kebab Search item). */
+export const OPEN_COMMAND_PALETTE_EVENT = "esphome-open-command-palette";
+
 export interface CommandAction {
   id: string;
   group: string;
@@ -27,12 +30,14 @@ export interface CommandAction {
 export interface CommandActionContext {
   t: LocalizeFunc;
   devices: ConfiguredDevice[];
+  expertMode: boolean;
   setTheme: (theme: string) => void;
   setLanguage: (lang: LanguageChoice) => void;
+  toggleExpertMode: () => void;
 }
 
 /** The default (non-YAML-mode) command list: navigation, devices,
- *  themes, languages. */
+ *  themes, languages, the Expert Mode toggle. */
 export function buildCommands(ctx: CommandActionContext): CommandAction[] {
   const { t } = ctx;
 
@@ -93,6 +98,19 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
     },
   ];
 
+  const settings: CommandAction[] = [
+    {
+      id: "settings.expert_mode",
+      group: t("settings.title"),
+      label: ctx.expertMode
+        ? t("command_palette.disable_expert_mode")
+        : t("command_palette.enable_expert_mode"),
+      icon: "tune",
+      keywords: ["expert", "advanced", "diff", "yaml", "search"],
+      run: () => ctx.toggleExpertMode(),
+    },
+  ];
+
   const languageGroup = t("command_palette.group_language");
   const languages: CommandAction[] = LANGUAGES.map((l) => ({
     id: `language.${l.value}`,
@@ -103,7 +121,7 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
     run: () => ctx.setLanguage(l.value),
   }));
 
-  return [...nav, ...devices, ...themes, ...languages];
+  return [...nav, ...devices, ...themes, ...languages, ...settings];
 }
 
 /**

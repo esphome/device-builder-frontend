@@ -6,6 +6,7 @@ import {
   mdiKeyVariant,
   mdiMagnify,
   mdiThemeLightDark,
+  mdiTune,
   mdiWeatherNight,
   mdiWeatherSunny,
 } from "@mdi/js";
@@ -14,12 +15,21 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LanguageChoice, LocalizeFunc } from "../common/localize.js";
-import { apiContext, devicesContext, localizeContext } from "../context/index.js";
+import {
+  apiContext,
+  devicesContext,
+  expertModeContext,
+  localizeContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { yamlEmptyMessageKey } from "../util/yaml-search-helpers.js";
 import type { CommandAction } from "./command-palette-actions.js";
-import { buildCommands, buildYamlHitActions } from "./command-palette-actions.js";
+import {
+  OPEN_COMMAND_PALETTE_EVENT,
+  buildCommands,
+  buildYamlHitActions,
+} from "./command-palette-actions.js";
 import { commandPaletteStyles } from "./command-palette.styles.js";
 import { YamlSearchController } from "./yaml-search-controller.js";
 
@@ -33,6 +43,7 @@ registerMdiIcons({
   "key-variant": mdiKeyVariant,
   magnify: mdiMagnify,
   "theme-light-dark": mdiThemeLightDark,
+  tune: mdiTune,
   "weather-night": mdiWeatherNight,
   "weather-sunny": mdiWeatherSunny,
 });
@@ -56,6 +67,10 @@ export class ESPHomeCommandPalette extends LitElement {
   @consume({ context: devicesContext, subscribe: true })
   @state()
   private _devices: ConfiguredDevice[] = [];
+
+  @consume({ context: expertModeContext, subscribe: true })
+  @state()
+  private _expertMode = false;
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
@@ -96,14 +111,20 @@ export class ESPHomeCommandPalette extends LitElement {
     }
   };
 
+  /* The kebab menu's Search item fires this so a visible affordance opens
+     the same palette as Cmd+K. */
+  private _onOpenEvent = () => this.open();
+
   connectedCallback() {
     super.connectedCallback();
     window.addEventListener("keydown", this._onGlobalKeyDown);
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, this._onOpenEvent);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener("keydown", this._onGlobalKeyDown);
+    window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, this._onOpenEvent);
   }
 
   open() {
@@ -151,8 +172,10 @@ export class ESPHomeCommandPalette extends LitElement {
     return buildCommands({
       t: this._localize,
       devices: this._devices,
+      expertMode: this._expertMode,
       setTheme: (theme) => this._setTheme(theme),
       setLanguage: (lang) => this._setLanguage(lang),
+      toggleExpertMode: () => this._toggleExpertMode(),
     });
   }
 
@@ -169,7 +192,10 @@ export class ESPHomeCommandPalette extends LitElement {
 
   /** True when the current query is in YAML-search mode. */
   private get _isYamlMode(): boolean {
-    return this._query.trimStart().startsWith(ESPHomeCommandPalette._YAML_PREFIX);
+    return (
+      this._expertMode &&
+      this._query.trimStart().startsWith(ESPHomeCommandPalette._YAML_PREFIX)
+    );
   }
 
   /** The YAML query body — i.e. the input minus the leading ``/``. */
@@ -252,6 +278,11 @@ export class ESPHomeCommandPalette extends LitElement {
        discoverable from the UI rather than only via docs. */
     const inYamlMode = this._isYamlMode;
     const searchIcon = inYamlMode ? "code-braces" : "magnify";
+    const placeholder = this._localize(
+      this._expertMode
+        ? "command_palette.placeholder"
+        : "command_palette.placeholder_basic"
+    );
     return html`
       <div class="search">
         <wa-icon library="mdi" name=${searchIcon}></wa-icon>
@@ -259,8 +290,8 @@ export class ESPHomeCommandPalette extends LitElement {
           class="search-input"
           type="text"
           .value=${this._query}
-          placeholder=${this._localize("command_palette.placeholder")}
-          aria-label=${this._localize("command_palette.placeholder")}
+          placeholder=${placeholder}
+          aria-label=${placeholder}
           @input=${this._onQueryInput}
           @keydown=${this._onInputKeyDown}
           autocomplete="off"
@@ -275,24 +306,29 @@ export class ESPHomeCommandPalette extends LitElement {
             mode so the affordance reads as an action rather than a
             status badge.
           -->
-        <button
-          class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
-          type="button"
-          title=${this._localize(
-            inYamlMode
-              ? "command_palette.switch_to_commands"
-              : "command_palette.switch_to_yaml"
-          )}
-          aria-label=${this._localize(
-            inYamlMode
-              ? "command_palette.switch_to_commands"
-              : "command_palette.switch_to_yaml"
-          )}
-          aria-pressed=${inYamlMode ? "true" : "false"}
-          @click=${this._onToggleMode}
-        >
-          <wa-icon library="mdi" name=${inYamlMode ? "magnify" : "code-braces"}></wa-icon>
-        </button>
+        ${this._expertMode
+          ? html`<button
+              class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
+              type="button"
+              title=${this._localize(
+                inYamlMode
+                  ? "command_palette.switch_to_commands"
+                  : "command_palette.switch_to_yaml"
+              )}
+              aria-label=${this._localize(
+                inYamlMode
+                  ? "command_palette.switch_to_commands"
+                  : "command_palette.switch_to_yaml"
+              )}
+              aria-pressed=${inYamlMode ? "true" : "false"}
+              @click=${this._onToggleMode}
+            >
+              <wa-icon
+                library="mdi"
+                name=${inYamlMode ? "magnify" : "code-braces"}
+              ></wa-icon>
+            </button>`
+          : nothing}
       </div>
       <div class="list" role="listbox">
         ${items.length === 0
@@ -314,9 +350,11 @@ export class ESPHomeCommandPalette extends LitElement {
         >
         <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
         <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
-        <span class="yaml-hint">
-          <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
-        </span>
+        ${this._expertMode
+          ? html`<span class="yaml-hint">
+              <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
+            </span>`
+          : nothing}
       </div>
     `;
   }
@@ -454,6 +492,16 @@ export class ESPHomeCommandPalette extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-language", {
         detail: lang,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _toggleExpertMode() {
+    this.dispatchEvent(
+      new CustomEvent("set-expert-mode", {
+        detail: !this._expertMode,
         bubbles: true,
         composed: true,
       })

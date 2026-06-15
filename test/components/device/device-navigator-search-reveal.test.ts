@@ -3,8 +3,10 @@
  *
  * Pins the navigator search reveal: nothing on a short config, and a header
  * magnifier that reveals the box once the item count passes the toggle
- * threshold (the box never auto-expands). Dialog children are no-oped so the
- * element constructs in happy-dom; see ``device-navigator-coalesce.test.ts``.
+ * threshold (the box never auto-expands). The search box is gated behind
+ * Expert Mode, so the reveal tests mount with it on; a final case pins that
+ * it disappears entirely with Expert Mode off. Dialog children are no-oped so
+ * the element constructs in happy-dom; see ``device-navigator-coalesce.test.ts``.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -32,10 +34,17 @@ const MID_YAML = ["esphome:", "  name: t", "wifi:", "sensor:", ...sensors(16), "
 // 30 items: still just a magnifier, no auto-expand.
 const LARGE_YAML = ["esphome:", "  name: t", "sensor:", ...sensors(30), ""].join("\n");
 
-async function mountNavigator(yaml: string): Promise<ESPHomeDeviceNavigator> {
+async function mountNavigator(
+  yaml: string,
+  expertMode = true
+): Promise<ESPHomeDeviceNavigator> {
   const nav = new ESPHomeDeviceNavigator();
   nav.yaml = yaml;
   nav.openSections = new Set([0, 1, 2]);
+  // The navigator reads Expert Mode from a Lit context normally provided
+  // by app-shell; mounted bare, seed the consumed field directly.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (nav as any)._expertMode = expertMode;
   document.body.appendChild(nav);
   await nav.updateComplete;
   return nav;
@@ -91,6 +100,12 @@ describe("navigator search reveal", () => {
   it("still only offers the magnifier on a large config (no auto-expand)", async () => {
     const nav = await mountNavigator(LARGE_YAML);
     expect(searchBtn(nav)).not.toBeNull();
+    expect(searchBox(nav).hasAttribute("hidden")).toBe(true);
+  });
+
+  it("offers no search affordance at all with Expert Mode off", async () => {
+    const nav = await mountNavigator(LARGE_YAML, false);
+    expect(searchBtn(nav)).toBeNull();
     expect(searchBox(nav).hasAttribute("hidden")).toBe(true);
   });
 });

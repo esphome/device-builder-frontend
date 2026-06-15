@@ -15,7 +15,7 @@ import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, localizeContext } from "../../context/index.js";
+import { apiContext, expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { subscribeAutomationCatalogCache } from "../../util/automation-catalog-cache.js";
 import {
@@ -202,6 +202,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _hoveredLine: number | null = null;
 
+  @consume({ context: expertModeContext, subscribe: true })
+  @state()
+  private _expertMode = false;
+
   /** Active navigator search query; empty string means "not filtering". */
   @state()
   private _query = "";
@@ -360,8 +364,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // the header magnifier until the user (or a query) reveals it.
     // Offer the toggle only once the list is long enough to be worth
     // filtering; keep it while open so an expanded box can still be closed.
-    const showSearchToggle = totalItems >= SEARCH_TOGGLE_THRESHOLD || this._searchOpen;
-    const showSearch = this._searchOpen || filtering;
+    const showSearchToggle =
+      this._expertMode && (totalItems >= SEARCH_TOGGLE_THRESHOLD || this._searchOpen);
+    const showSearch = this._expertMode && (this._searchOpen || filtering);
     const matchCount = matches ? matches.reduce((n, m) => n + m.length, 0) : 0;
     // Stay silent on zero matches; the "No matches" empty state speaks.
     const resultLabel =

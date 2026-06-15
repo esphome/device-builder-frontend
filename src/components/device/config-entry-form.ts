@@ -27,16 +27,17 @@ import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
-import type { ConfigEntry } from "../../api/types/config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import {
-  parseCatalogId,
+  catalogEntryToProvider,
   type ComponentProvider,
 } from "../../util/config-entry-yaml-scan.js";
-import { type ValidationError } from "../../util/config-validation.js";
+import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
+import { evaluateGroup } from "../../util/constraint-groups.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -58,21 +59,29 @@ import {
   parseFieldKey,
   renderYamlOnlyField,
 } from "./config-entry-renderers-shared.js";
+import { ConstraintClusterController } from "./constraint-cluster-controller.js";
 import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
+import "@home-assistant/webawesome/dist/components/radio-group/radio-group.js";
+import "@home-assistant/webawesome/dist/components/radio/radio.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
 import "../options-combobox.js";
 import {
+  buildConstraintClusters,
   fieldRendererStyles,
+  formatConstraintKeys,
+  isRadioCluster,
   labelFor,
   orderExclusiveGroups,
   renderBooleanField,
+  renderConstraintClusterField,
+  renderConstraintRadioField,
   renderExclusiveGroupField,
   renderFloatWithUnitField,
   renderIconField,
@@ -149,6 +158,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  Owner-controlled — emits `value-change` to mutate. */
   @property({ attribute: false })
   values: Record<string, unknown> = {};
+
+  /** Cross-field cardinality constraints over the top-level `entries`
+   *  (the component's `required_groups`). Rendered as a reactive banner when
+   *  unsatisfied; nested-scope groups travel on their NESTED entry. */
+  @property({ attribute: false })
+  requiredGroups: RequiredGroup[] = [];
 
   /** Validation errors keyed by dotted path. */
   @property({ attribute: false })
@@ -258,6 +273,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _editingMagnitudes: Map<string, string> = new Map();
 
+  /** Either/or constraint-cluster (radio chooser) choice + stash state and the
+   *  post-render radio-group sync; kept in a controller so this file doesn't
+   *  grow. */
+  private _constraintClusters = new ConstraintClusterController(this);
+
   static styles = fieldRendererStyles;
 
   /**
@@ -284,19 +304,97 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // first member's slot; other entries keep the advanced/visibility
     // filter (the Set preserves order while dropping filtered-out ones).
     const ordered = orderExclusiveGroups(entries);
-    const nonExclusive = entries.filter((entry) => !entry.exclusive_group);
+    // Either/or constraints (chipset OR the timing group) fold into one
+    // bordered box at the first member's slot, like exclusive_group; drop the
+    // members from the normal flow so they aren't also rendered loose.
+    const { clusters, memberKeys } = buildConstraintClusters(
+      entries,
+      this.requiredGroups
+    );
+    const clusterByFirstKey = new Map(clusters.map((c) => [c.members[0].key, c]));
+    const nonExclusive = entries.filter(
+      (entry) => !entry.exclusive_group && !memberKeys.has(entry.key)
+    );
     const visible = new Set(this._filterRenderable(nonExclusive, this.values));
     // An empty key means "this entry IS the whole values dict" —
     // used by top-level user-keyed sections (substitutions:) where
     // the component itself is the map. Pass ``[]`` so the entry's
     // renderer sees the values dict directly via ``ctx.getAt([])``.
-    return html`${ordered.map((item) =>
-      Array.isArray(item)
-        ? renderExclusiveGroupField(item, ctx)
-        : visible.has(item)
-          ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
-          : nothing
-    )}`;
+    return html`${this._renderConstraintBanners(ctx, memberKeys)}${ordered.map((item) => {
+      if (Array.isArray(item)) return renderExclusiveGroupField(item, ctx);
+      if (memberKeys.has(item.key)) {
+        const cluster = clusterByFirstKey.get(item.key);
+        if (!cluster) return nothing;
+        return isRadioCluster(cluster)
+          ? renderConstraintRadioField(cluster, ctx)
+          : renderConstraintClusterField(cluster, ctx);
+      }
+      return visible.has(item)
+        ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
+        : nothing;
+    })}`;
+  }
+
+  /** Fallback banner for *unsatisfied* constraint groups that aren't visually
+   *  clustered (pure cardinality groups with no inclusive `group`). Groups
+   *  whose members render inside a `constraint-cluster` box are skipped — the
+   *  box header carries their prompt. */
+  private _renderConstraintBanners(ctx: RenderCtx, clusteredKeys: Set<string>) {
+    const messages: string[] = [];
+    // Skip a banner when none of its members currently render (gated off by
+    // hidden / depends_on / platform, or simply not a rendered entry), matching
+    // the cluster box — otherwise the prompt nags about fields the user can't set.
+    const targetPlatform = ctx.board?.esphome.platform ?? null;
+    const byKey = new Map(this.entries.map((e) => [e.key, e]));
+    const anyVisible = (keys: string[]): boolean =>
+      keys.some((k) => {
+        const entry = byKey.get(k);
+        return (
+          entry !== undefined &&
+          (getIn(this.values, [k]) !== undefined ||
+            isEntryVisible(entry, this.values, this.presentComponents, targetPlatform))
+        );
+      });
+    for (const group of this.requiredGroups) {
+      if (group.keys.some((k) => clusteredKeys.has(k))) continue;
+      if (!anyVisible(group.keys)) continue;
+      if (evaluateGroup(group.kind, group.keys, this.values)) continue;
+      messages.push(
+        ctx.localize(`device.constraint_${group.kind}`, {
+          keys: formatConstraintKeys(group.keys, this.entries, ctx),
+        })
+      );
+    }
+    // buildConstraintClusters folds every *non-exclusive* inclusive group into
+    // a cluster (whose members land in clusteredKeys), so this loop only fires
+    // for the residual case it skips: an inclusive group whose members are all
+    // also exclusive_group members. The collection here is deliberately broader
+    // (entry.group, no !exclusive_group guard) to still surface that banner.
+    const inclusive = new Map<string, string[]>();
+    for (const entry of this.entries) {
+      if (entry.group) {
+        inclusive.set(entry.group, [...(inclusive.get(entry.group) ?? []), entry.key]);
+      }
+    }
+    for (const keys of inclusive.values()) {
+      if (keys.some((k) => clusteredKeys.has(k))) continue;
+      if (!anyVisible(keys)) continue;
+      if (evaluateGroup("all_or_none", keys, this.values)) continue;
+      messages.push(
+        ctx.localize("device.constraint_all_or_none", {
+          keys: formatConstraintKeys(keys, this.entries, ctx),
+        })
+      );
+    }
+    if (messages.length === 0) return nothing;
+    return messages.map(
+      (text) => html`
+        <div class="warning-banner constraint-banner">
+          <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
+          <span>${text}</span>
+        </div>
+      `
+    );
   }
 
   /** Stable-partition so required entries lead. An exclusive_group is
@@ -325,6 +423,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (changed.has("entries") && changed.get("entries") !== undefined) {
       this._pendingUnits.clear();
       this._editingMagnitudes.clear();
+      this._constraintClusters.reset();
       // Re-seed disclosures for the new component; a key like "pin:pin-advanced"
       // recurs across sections, and the form instance is reused.
       this._seededNestedOpen.clear();
@@ -339,6 +438,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
+    // The radio-group sync runs from ConstraintClusterController.hostUpdated().
     this._fieldScroll.maybeScroll(changed);
   }
 
@@ -644,6 +744,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
 
   private _buildCtx(): RenderCtx {
+    // Top-level keys whose baked constraint prose a banner/cluster replaces;
+    // _fieldDescription strips only these so nested members keep their prose.
+    const reactiveConstraintKeys = new Set<string>();
+    for (const group of this.requiredGroups) {
+      for (const key of group.keys) reactiveConstraintKeys.add(key);
+    }
+    for (const entry of this.entries) {
+      if (entry.group) reactiveConstraintKeys.add(entry.key);
+    }
     const ctx: RenderCtx = {
       localize: this._localize,
       disabled: this.disabled,
@@ -657,6 +766,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
+      reactiveConstraintKeys,
+      entries: this.entries,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),
       errorAt: (path) => this.errors.get(path.join(".")) ?? null,
@@ -687,6 +798,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
       clearEditingMagnitude: (path) => {
         this._editingMagnitudes.delete(path.join("."));
       },
+      getClusterChoice: (clusterId) => this._constraintClusters.getChoice(clusterId),
+      setClusterChoice: (clusterId, altId) =>
+        this._constraintClusters.setChoice(clusterId, altId),
+      getClusterStash: (clusterId, key) =>
+        this._constraintClusters.getStash(clusterId, key),
+      setClusterStash: (clusterId, key, value) =>
+        this._constraintClusters.setStash(clusterId, key, value),
+      clearClusterStash: (clusterId, key) =>
+        this._constraintClusters.clearStash(clusterId, key),
       // Stable object identity for renderer-local WeakMap stashes
       // (templatable literal/lambda recovery, currently). The host
       // element survives the per-render ctx rebuild so it's the
@@ -803,7 +923,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         .then((resp) => {
           this._interfaceProviders.set(
             interfaceName,
-            resp.components.map((c) => parseCatalogId(c.id))
+            resp.components.map((c) => catalogEntryToProvider(c, interfaceName))
           );
           this.requestUpdate();
         })

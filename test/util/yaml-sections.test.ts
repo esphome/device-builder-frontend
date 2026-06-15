@@ -335,7 +335,7 @@ sensor:
   //   6: logger:                — logger [6..7]
   //   7:   level: INFO
   //   8: (blank)                — gap
-  //   9: sensor:                — covered by list-item ranges (no parent)
+  //   9: sensor:                — header line, selects the first item (dht)
   //  10:   - platform: dht      — sensor.dht [10..12]
   //  11:     name: kitchen
   //  12:     pin: D1
@@ -365,6 +365,22 @@ sensor:
   it("crosses to the next list item", () => {
     const m = sectionAtLine(yaml, 13);
     expect(m?.platform).toBe("bme280");
+  });
+
+  it("selects the first item when the bare-sequence header line is clicked", () => {
+    // `sensor:` header isn't covered by any item range; the click should
+    // still land on the first instance instead of leaving the selection put.
+    const m = sectionAtLine(yaml, 9);
+    expect(m?.key).toBe("sensor");
+    expect(m?.platform).toBe("dht");
+    expect(m?.fromLine).toBe(10); // the dash line, so the loader parses it
+  });
+
+  it("selects the first item for a bare-sequence header with a trailing comment", () => {
+    const commented = `sensor:  # my sensors\n  - platform: dht\n    name: x\n`;
+    const m = sectionAtLine(commented, 1);
+    expect(m?.key).toBe("sensor");
+    expect(m?.platform).toBe("dht");
   });
 
   it("returns null for the file header above the first section", () => {

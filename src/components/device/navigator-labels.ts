@@ -1,4 +1,5 @@
 import type { LocalizeFunc } from "../../common/localize.js";
+import { actionFieldLabel } from "../../util/action-field-label.js";
 import { getCachedComponent } from "../../util/component-name-cache.js";
 import { stripRedundantComponentSuffix } from "../../util/component-title.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
@@ -158,9 +159,10 @@ function automationLabels(
   }
   // Component action-list field (``turn_on_action`` / ``set_action``) — lead
   // with the action so the two switch.template actions (turn on vs turn off)
-  // are distinct; entity on line 2, mirroring the trigger rows.
+  // are distinct; entity on line 2, mirroring the trigger rows. Shared
+  // ``actionFieldLabel`` so the row matches the editor heading ("Set action").
   if (item.parentKey && item.actionField) {
-    const primary = humanizeEvent(item.actionField.replace(/_action$/, ""));
+    const primary = actionFieldLabel(item.actionField, ctx.localize);
     return { primary, secondary: componentTarget(item, ctx, primary) };
   }
   // Unscoped / unrecognised — fall back to displayLabel.

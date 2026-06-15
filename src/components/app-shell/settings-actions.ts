@@ -83,6 +83,12 @@ export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>
     });
 }
 
+export function onSetExpertMode(host: ESPHomeApp, e: CustomEvent<boolean>): void {
+  const enabled = e.detail;
+  host._expertMode = enabled;
+  host._api.updatePreferences({ expert_mode: enabled }).catch(() => {});
+}
+
 // Optimistic flip with revert-on-failure for security-sensitive toggles.
 // _remoteBuildSetInFlight gates loadRemoteBuildSettings so a reconnect
 // racing the write can't clobber the optimistic value.

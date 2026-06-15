@@ -186,6 +186,38 @@ describe("esphome-options-combobox", () => {
     expect(opts[0].classList.contains("option--active")).toBe(true);
   });
 
+  test("tags the default option with the muted note when opened", async () => {
+    const el = await mount("");
+    el.defaultValue = "bw15"; // index 2
+    el.defaultNote = "default";
+    await el.updateComplete;
+    await open(el);
+    const opts = options(el);
+    const noteOf = (o: HTMLElement) =>
+      o.querySelector(".option-default-note")?.textContent?.trim() ?? null;
+    expect(noteOf(opts[2])).toBe("default");
+    expect(opts.filter((o) => noteOf(o) !== null)).toHaveLength(1);
+  });
+
+  test("matches the default case-insensitively", async () => {
+    const el = await mount("");
+    el.defaultValue = "BW15";
+    el.defaultNote = "default";
+    await el.updateComplete;
+    await open(el);
+    expect(
+      options(el)[2].querySelector(".option-default-note")?.textContent?.trim()
+    ).toBe("default");
+  });
+
+  test("tags nothing without a default value or note", async () => {
+    const el = await mount("");
+    el.defaultNote = "default"; // value missing → no tag
+    await el.updateComplete;
+    await open(el);
+    expect(el.shadowRoot!.querySelector(".option-default-note")).toBeNull();
+  });
+
   test("the change event is namespaced (no generic value-changed)", () => {
     expect(OPTIONS_COMBOBOX_CHANGE_EVENT).toBe("options-combobox-change");
   });

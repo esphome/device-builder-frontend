@@ -143,6 +143,7 @@ export const settingsRowStyles = css`
     justify-content: space-between;
     gap: var(--wa-space-m);
     padding: var(--wa-space-m) 0;
+    padding-bottom: var(--wa-space-l);
     border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
   }
 
