@@ -184,6 +184,62 @@ describe("create-config-dialog create de-dupe + retry", () => {
   });
 });
 
+// A failed create shows a dialog-level error bar that outlives step changes.
+// Navigating (Back, or forward into a new step with another board) must clear
+// it so a stale message doesn't follow the user onto the next attempt (#1487).
+describe("create-config-dialog stale error on navigation", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const errorText = (el: ESPHomeCreateConfigDialog): string | null =>
+    el.shadowRoot!.querySelector("p.error")?.textContent ?? null;
+
+  // Drive the dialog onto the setup step (where the Back button renders) by
+  // dispatching the next-step a board pick would.
+  function goToSetup(el: ESPHomeCreateConfigDialog): void {
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("next-step", {
+        detail: { step: "setup", board: { id: "esp32dev" } },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  it("clears the error when pressing Back after a failed create", async () => {
+    const createDevice = vi.fn().mockRejectedValue(new Error("boom"));
+    const el = await mount({ createDevice });
+
+    goToSetup(el);
+    await el.updateComplete;
+    emitFinish(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+    expect(errorText(el)).not.toBeNull();
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button")!.click();
+    await el.updateComplete;
+    expect(errorText(el)).toBeNull();
+  });
+
+  it("clears the error when advancing into a new step", async () => {
+    const createDevice = vi.fn().mockRejectedValue(new Error("boom"));
+    const el = await mount({ createDevice });
+
+    goToSetup(el);
+    await el.updateComplete;
+    emitFinish(el, "kitchen");
+    await flush();
+    await el.updateComplete;
+    expect(errorText(el)).not.toBeNull();
+
+    goToSetup(el);
+    await el.updateComplete;
+    expect(errorText(el)).toBeNull();
+  });
+});
+
 // The migration onto esphome-base-dialog swapped the imperative
 // `_dialog.open = …` for a reactive `_open` flag. _onRequestClose flipping
 // _open back to false is the load-bearing part — without it a user-driven

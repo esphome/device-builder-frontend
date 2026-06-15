@@ -323,6 +323,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   private _onNextStep(e: CustomEvent<WizardStepDetail>) {
+    // A new step starts clean: a failed create's error bar must not follow the
+    // user forward (e.g. Back to the board picker, then a different board).
+    this._resetCreateErrors();
     const detail = e.detail;
     if (typeof detail === "string") {
       this._step = detail;
@@ -361,6 +364,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   private _onBack() {
+    this._resetCreateErrors();
     switch (this._step) {
       case "board":
         this._step = "method";
