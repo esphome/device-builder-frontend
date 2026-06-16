@@ -70,6 +70,7 @@ describe("renderSelectField — esp32 variant default from board", () => {
           board: "esp32-c6-devkitm-1",
           variant: "esp32c6",
           framework: null,
+          mcu: null,
         },
       },
     });

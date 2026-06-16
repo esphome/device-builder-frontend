@@ -21,7 +21,9 @@ const MODE: ConfigValueOption[] = [
 
 function boardWithVariant(variant: string): BoardCatalogEntry {
   return makeTestBoard({
-    overrides: { esphome: { platform: "esp32", board: "b", variant, framework: null } },
+    overrides: {
+      esphome: { platform: "esp32", board: "b", variant, framework: null, mcu: null },
+    },
   });
 }
 

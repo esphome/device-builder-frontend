@@ -164,7 +164,14 @@ export class ESPHomeWizardStepBoard extends LitElement {
       );
       const platform = filter?.platform || undefined;
       const variant = filter?.variant || undefined;
-      const response = await this._api.getBoards({ query, platform, variant, limit: 50 });
+      const mcu = filter?.mcu || undefined;
+      const response = await this._api.getBoards({
+        query,
+        platform,
+        variant,
+        mcu,
+        limit: 50,
+      });
       this._boards = response.boards;
     } catch (e) {
       console.error("Failed to load board catalog:", e);
@@ -298,7 +305,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
           <div class="tags">
             <wa-badge variant="neutral" pill style="font-size: var(--wa-font-size-s);"
               >${this._localizeTag(
-                board.esphome.variant || board.esphome.platform
+                board.esphome.mcu || board.esphome.variant || board.esphome.platform
               )}</wa-badge
             >
             ${board.tags.map(
@@ -356,7 +363,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
         <div class="tags">
           <wa-badge style="font-size: var(--wa-font-size-xs);" variant="neutral" pill
             >${this._localizeTag(
-              board.esphome.variant || board.esphome.platform
+              board.esphome.mcu || board.esphome.variant || board.esphome.platform
             )}</wa-badge
           >
           ${board.tags.map(

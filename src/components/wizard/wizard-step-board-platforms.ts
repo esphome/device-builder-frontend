@@ -11,14 +11,14 @@
  *   this value verbatim.
  * - ``variant`` narrows ESP32 chips into their families (S2 / S3 /
  *   C3 / C6 / H2). Empty for non-ESP32 platforms.
- * - ``label`` is the user-facing chip text. The RP2040 chip's
- *   label is ``RP2040 / RP2350`` because ESPHome's ``rp2040``
- *   platform covers both chip generations; users searching for
- *   either chip name need to recognise the filter as theirs.
+ * - ``mcu`` narrows ESPHome's single ``rp2040`` platform into its
+ *   two chip series (RP2040 / RP2350). Absent for other platforms.
+ * - ``label`` is the user-facing chip text.
  */
 export interface WizardBoardPlatform {
   readonly platform: string;
   readonly variant: string;
+  readonly mcu?: string;
   readonly label: string;
 }
 
@@ -30,11 +30,12 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
   { platform: "esp32", variant: "esp32c6", label: "ESP32-C6" },
   { platform: "esp32", variant: "esp32h2", label: "ESP32-H2" },
   { platform: "esp8266", variant: "", label: "ESP8266" },
-  // ESPHome's ``rp2040`` platform covers both the original
-  // RP2040 and the newer RP2350; the label calls out both
-  // chip names so a user searching for either one sees the
-  // filter chip that owns them.
-  { platform: "rp2040", variant: "", label: "RP2040 / RP2350" },
+  // ESPHome's 'rp2040' platform covers both the original RP2040 and
+  // the newer RP2350; split into two chips (mirroring the per-variant
+  // ESP32 chips) so users pick their actual silicon. The backend
+  // filters the shared platform by 'mcu'.
+  { platform: "rp2040", variant: "", mcu: "rp2040", label: "RP2040" },
+  { platform: "rp2040", variant: "", mcu: "rp2350", label: "RP2350" },
   { platform: "bk72xx", variant: "", label: "BK72xx" },
   { platform: "rtl87xx", variant: "", label: "RTL87xx" },
   { platform: "ln882x", variant: "", label: "LN882x" },
@@ -55,6 +56,9 @@ export function chipNameToFilterLabel(chipName: string): string | null {
   const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
   const byVariant = WIZARD_BOARD_PLATFORMS.find((p) => p.variant === family);
   if (byVariant) return byVariant.label;
+  // rp2040 / rp2350 share one platform; match on the chip series.
+  const byMcu = WIZARD_BOARD_PLATFORMS.find((p) => p.mcu === family);
+  if (byMcu) return byMcu.label;
   const byPlatform = WIZARD_BOARD_PLATFORMS.find(
     (p) => p.platform === family && !p.variant
   );

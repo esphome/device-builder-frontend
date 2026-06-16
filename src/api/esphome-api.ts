@@ -1320,6 +1320,7 @@ export class ESPHomeAPI {
     query?: string;
     platform?: string;
     variant?: string;
+    mcu?: string;
     tag?: string;
     offset?: number;
     limit?: number;

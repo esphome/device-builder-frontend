@@ -13,6 +13,8 @@ export interface BoardEsphomeConfig {
   board: string;
   variant: string | null;
   framework: string | null;
+  // rp2040-only chip series ('rp2040' / 'rp2350'); null on other platforms.
+  mcu: string | null;
 }
 
 export interface BoardHardware {

@@ -63,6 +63,7 @@ function _hydrateEsphome(esphome: BoardEsphomeConfig): BoardEsphomeConfig {
     ...esphome,
     variant: esphome.variant ?? null,
     framework: esphome.framework ?? null,
+    mcu: esphome.mcu ?? null,
   };
 }
 

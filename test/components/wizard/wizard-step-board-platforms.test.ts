@@ -30,17 +30,18 @@ describe("wizard step-board platform chips", () => {
     expect(nrf52?.variant).toBe("");
   });
 
-  it("labels the rp2040 platform 'RP2040 / RP2350' so users searching for either chip name see it", () => {
-    // ESPHome's `rp2040` platform key covers both the original
-    // RP2040 and the newer RP2350 (Raspberry Pi Pico 2). A plain
-    // "RP2040" label hides the filter from anyone searching for
-    // their RP2350 board. The platform key stays `rp2040` —
-    // this is a label-only contract.
-    const labels = WIZARD_BOARD_PLATFORMS.map((p) => p.label);
-    expect(labels).toContain("RP2040 / RP2350");
-    expect(labels).not.toContain("RP2040");
-    const rp = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "RP2040 / RP2350");
-    expect(rp?.platform).toBe("rp2040");
+  it("splits the rp2040 platform into separate RP2040 and RP2350 chips", () => {
+    // ESPHome's `rp2040` platform key covers both the original RP2040
+    // and the newer RP2350 (Raspberry Pi Pico 2). Each gets its own
+    // filter chip (mirroring the per-variant ESP32 chips); both keep
+    // platform `rp2040` and are told apart by `mcu`, which the backend
+    // filters on.
+    const rp2040 = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "RP2040");
+    const rp2350 = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "RP2350");
+    expect(rp2040?.platform).toBe("rp2040");
+    expect(rp2040?.mcu).toBe("rp2040");
+    expect(rp2350?.platform).toBe("rp2040");
+    expect(rp2350?.mcu).toBe("rp2350");
   });
 
   it("groups the libretiny-family chips (BK72xx / RTL87xx / LN882x) adjacent", () => {
@@ -78,11 +79,17 @@ describe("wizard step-board platform chips", () => {
     });
 
     it("maps a platform-only chip (variant === '') via the platform fallback", () => {
-      // ESP8266 / RP2040 / BK72xx / RTL87xx / LN882x / nRF52 don't have
-      // variants in WIZARD_BOARD_PLATFORMS — the function must fall back
-      // to a platform match when the variant lookup misses.
+      // ESP8266 / BK72xx / RTL87xx / LN882x / nRF52 don't have variants
+      // in WIZARD_BOARD_PLATFORMS — the function must fall back to a
+      // platform match when the variant lookup misses.
       expect(chipNameToFilterLabel("ESP8266")).toBe("ESP8266");
-      expect(chipNameToFilterLabel("RP2040")).toBe("RP2040 / RP2350");
+    });
+
+    it("maps the rp2040 / rp2350 chip series to their split filter labels", () => {
+      // The two rp2040-platform chips are distinguished by `mcu`, so the
+      // chip-series name must resolve to its own label.
+      expect(chipNameToFilterLabel("RP2040")).toBe("RP2040");
+      expect(chipNameToFilterLabel("RP2350")).toBe("RP2350");
     });
 
     it("returns null for a chip name with no matching platform or variant", () => {

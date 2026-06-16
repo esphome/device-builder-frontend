@@ -522,6 +522,7 @@
       "esp32p4": "ESP32-P4",
       "esp8266": "ESP8266",
       "rp2040": "RP2040",
+      "rp2350": "RP2350",
       "bk72xx": "BK72xx",
       "rtl87xx": "RTL87xx",
       "compact": "Compact",

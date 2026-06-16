@@ -172,6 +172,7 @@ describe("hydrateBoard", () => {
         board: "esp32dev",
         variant: "esp32",
         framework: "arduino",
+        mcu: null,
       },
       hardware: {
         flash_size: "4 MB",
