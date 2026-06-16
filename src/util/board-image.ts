@@ -8,9 +8,13 @@ export function defaultBoardImageUrl(): string {
   return withBase(DEFAULT_BOARD_IMAGE);
 }
 
-/** First catalog image for a board, or the bundled placeholder. */
+/** First catalog image for a board, or the bundled placeholder.
+ *  Local board images (generic SVGs) are root-relative `/boards/images/...`
+ *  paths the backend serves; `withBase` adds the deployment prefix so they
+ *  resolve under HA ingress / a reverse-proxy subpath. External `https://`
+ *  URLs (curated boards) pass through unchanged. */
 export function boardImageUrl(board: BoardCatalogEntry): string {
-  if (board.images.length > 0) return board.images[0];
+  if (board.images.length > 0) return withBase(board.images[0]);
   return defaultBoardImageUrl();
 }
 
