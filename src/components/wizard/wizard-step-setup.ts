@@ -365,7 +365,8 @@ export class ESPHomeWizardStepSetup extends LitElement {
   private _onNext() {
     if (this._stage === "name") {
       if (this._hasSecretWifi) {
-        this._finish("!secret wifi_ssid", "!secret wifi_password");
+        // Empty ssid/psk tells the backend to emit unquoted !secret tags.
+        this._finish("", "");
         return;
       }
       if (this._secretWifiSsid && !this._wifiSsid) {
@@ -378,15 +379,15 @@ export class ESPHomeWizardStepSetup extends LitElement {
       return;
     }
 
-    // If the user kept the value from secrets, emit !secret references
-    // so the generated YAML uses secrets instead of hardcoded values.
+    // If the user kept the value from secrets, send empty so the backend
+    // emits the !secret reference instead of a hardcoded value.
     const ssid =
       this._wifiSsid === this._secretWifiSsid && this._secretWifiSsid
-        ? "!secret wifi_ssid"
+        ? ""
         : this._wifiSsid;
     const password =
       this._wifiPassword === this._secretWifiPassword && this._secretWifiPassword
-        ? "!secret wifi_password"
+        ? ""
         : this._wifiPassword;
 
     this._finish(ssid, password);

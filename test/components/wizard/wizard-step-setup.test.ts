@@ -43,7 +43,51 @@ describe("wizard-step-setup ENTER", () => {
     el.addEventListener("finish-setup", onFinish as EventListener);
     pressEnter();
     expect(onFinish).toHaveBeenCalledTimes(1);
-    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.name).toBe("kitchen");
+    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.name).toBe("kitchen");
+    // Empty so the backend emits unquoted !secret tags, not a literal string.
+    expect(detail.wifiSsid).toBe("");
+    expect(detail.wifiPassword).toBe("");
+  });
+
+  it("sends empty ssid when the prefilled secret value is kept on the wifi stage", async () => {
+    const el = await mount();
+    // SSID-only secret prefills the ssid field and lands on the wifi stage
+    // (both secrets would skip it via _hasSecretWifi).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._secretWifiSsid = "homessid";
+    await setName(el, "kitchen");
+    pressEnter(); // advance to wifi; ssid prefilled from the secret
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._stage).toBe("wifi");
+
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter(); // keep the prefilled ssid
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.wifiSsid).toBe("");
+  });
+
+  it("passes a typed wifi value through unchanged (not a secret reference)", async () => {
+    const el = await mount();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._secretWifiSsid = "homessid";
+    await setName(el, "kitchen");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#wifi-ssid")!;
+    input.value = "typed-network";
+    input.dispatchEvent(new Event("input"));
+    await el.updateComplete;
+
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe(
+      "typed-network"
+    );
   });
 
   it("advances to the wifi stage on Enter when there is no secret wifi", async () => {
