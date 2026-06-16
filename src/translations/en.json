@@ -538,6 +538,7 @@
       "microphone": "Microphone",
       "speaker": "Speaker",
       "imu": "IMU",
+      "wifi": "WiFi",
       "lipo": "LiPo",
       "poe": "PoE",
       "usb-c": "USB-C",
