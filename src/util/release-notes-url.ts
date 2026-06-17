@@ -2,7 +2,8 @@ import { deviceBuilderChannel } from "./device-builder-channel.js";
 
 /**
  * Release-notes URL for a Device Builder version, or null for a dev build
- * (which has no published tag). The release tag is the version verbatim.
+ * (which has no published tag). The release tag is the trimmed version with
+ * any leading v removed.
  */
 export function deviceBuilderReleaseUrl(version: string): string | null {
   if (deviceBuilderChannel(version) === "dev") return null;
