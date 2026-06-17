@@ -154,6 +154,9 @@ export function postInstallShowLogsHandler(
 
 // Same USB device by vendor/product id. Requires both ids present so two
 // non-USB ports (``undefined === undefined``) aren't treated as a match.
+// VID:PID isn't a unique device id — two identical boards both match and
+// getPorts() order picks one; Web Serial exposes no per-device serial to
+// disambiguate, and the post-install flow is single-device anyway.
 const matchesDevice = (a: SerialPortInfo, b: SerialPortInfo): boolean =>
   a.usbVendorId !== undefined &&
   a.usbProductId !== undefined &&
@@ -180,6 +183,7 @@ async function openLiveSerialPort(
 ): Promise<SerialPort | null> {
   const want = cachedPort.getInfo();
   const deadline = Date.now() + timeoutMs;
+  let lastErr: unknown = null;
   while (true) {
     let granted: SerialPort[] = [];
     try {
@@ -201,12 +205,14 @@ async function openLiveSerialPort(
       try {
         await p.open({ baudRate });
         return p;
-      } catch {
-        // Device still gone (NetworkError) or a stale handle — try the next
-        // candidate / next round.
+      } catch (err) {
+        // Device still gone (NetworkError) or a stale handle — keep the last
+        // error for the timeout breadcrumb and try the next candidate / round.
+        lastErr = err;
       }
     }
     if (Date.now() >= deadline) {
+      console.error("[Web Serial] Failed to reopen port for logs:", lastErr);
       return null;
     }
     await new Promise((resolve) => setTimeout(resolve, 200));

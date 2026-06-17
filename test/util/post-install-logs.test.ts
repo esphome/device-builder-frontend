@@ -168,8 +168,9 @@ describe("attachSerialLogStream reopen", () => {
     }
   });
 
-  it("names the port in the failure message when nothing opens in the window", async () => {
+  it("names the port in the failure message and logs a breadcrumb when nothing opens", async () => {
     vi.useFakeTimers();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const restore = withGetPorts(async () => []); // device never reappears
     const dialog = stubDialog();
     try {
@@ -180,7 +181,9 @@ describe("attachSerialLogStream reopen", () => {
       const message = dialog.setSerialOpenFailed.mock.calls[0][0] as string;
       expect(message).toContain("USB 303a:1001");
       expect(toastError).toHaveBeenCalledTimes(1);
+      expect(errSpy).toHaveBeenCalled(); // last open error logged for field debugging
     } finally {
+      errSpy.mockRestore();
       restore();
       vi.useRealTimers();
     }
