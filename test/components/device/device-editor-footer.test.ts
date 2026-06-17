@@ -53,22 +53,25 @@ describe("device-editor footer install action", () => {
     expect(install).toHaveBeenCalledTimes(1);
   });
 
-  it("renders a plain Install (-> picker) when there are pending changes", async () => {
+  it("renders a highlighted plain Install (-> picker) when there are pending changes", async () => {
     const el = await mount({ hasPendingChanges: true });
     const install = vi.fn();
     el.addEventListener("install-device", install);
     expect(q(el, ".install-split")).toBeNull();
-    q(el, ".install-fab")!.click();
+    const btn = q(el, ".install-fab")!;
+    expect(btn.classList.contains("install-fab--muted")).toBe(false); // there's something to apply
+    btn.click();
     expect(install).toHaveBeenCalledTimes(1);
   });
 
-  it("still shows an Install button when the config is in sync", async () => {
+  it("shows a muted-but-usable Install when the config is in sync", async () => {
     const el = await mount({ hasUpdateAvailable: false, hasPendingChanges: false });
     const install = vi.fn();
     el.addEventListener("install-device", install);
     const btn = q(el, ".install-fab");
     expect(btn).not.toBeNull();
-    btn!.click();
+    expect(btn!.classList.contains("install-fab--muted")).toBe(true); // de-emphasized, nothing to apply
+    btn!.click(); // still usable (re-flash)
     expect(install).toHaveBeenCalledTimes(1);
   });
 });

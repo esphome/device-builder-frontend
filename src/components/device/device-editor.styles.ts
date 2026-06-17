@@ -220,6 +220,19 @@ export const deviceEditorStyles = css`
     cursor: not-allowed;
   }
 
+  /* In sync: nothing to apply, so drop the primary tint to a neutral, still
+     usable button (you can re-flash, but the config matches the firmware). */
+  .install-fab--muted {
+    background: var(--wa-color-surface-default);
+    color: var(--wa-color-text-normal);
+    border-color: var(--wa-color-surface-border);
+  }
+
+  .install-fab--muted:hover:not(:disabled) {
+    background: var(--wa-color-surface-raised);
+    border-color: color-mix(in srgb, var(--wa-color-text-normal), transparent 70%);
+  }
+
   .save-button wa-icon,
   .validate-button wa-icon,
   .install-fab wa-icon {

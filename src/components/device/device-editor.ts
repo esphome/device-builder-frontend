@@ -489,9 +489,11 @@ export class ESPHomeDeviceEditor extends LitElement {
         </button>
       </div>`;
     }
+    // Highlighted when there's something to apply (pending changes); muted but
+    // still usable when the config already matches the deployed firmware.
     return html`<button
       type="button"
-      class="install-fab"
+      class="install-fab ${this.hasPendingChanges ? "" : "install-fab--muted"}"
       ?disabled=${this.busy}
       @click=${this._onInstall}
       title=${this._localize("dashboard.install")}
