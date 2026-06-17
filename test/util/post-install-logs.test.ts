@@ -20,7 +20,9 @@ import { defaultLocalize } from "../../src/common/localize.js";
 import {
   attachSerialLogStream,
   formatSerialPortLabel,
+  handlePostInstallShowLogs,
   reconnectWebSerialLogs,
+  type PostInstallShowLogsDetail,
 } from "../../src/util/post-install-logs.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -254,5 +256,40 @@ describe("attachSerialLogStream reopen", () => {
       restore();
       vi.useRealTimers();
     }
+  });
+});
+
+describe("handlePostInstallShowLogs serial baud", () => {
+  function detail(loggerBaudRate: number | null): PostInstallShowLogsDetail {
+    return {
+      configuration: "x.yaml",
+      name: "X",
+      webSerialPort: openPort(),
+      loggerBaudRate,
+      reopenInstall: vi.fn(),
+    };
+  }
+
+  function logsDialog() {
+    return {
+      configuration: "",
+      name: "",
+      openPassive: vi.fn(),
+      setSerialStream: vi.fn(),
+      setSerialOpenFailed: vi.fn(),
+      abortSerialReconnect: vi.fn(),
+    };
+  }
+
+  it("notifies and never opens a serial session when logging is disabled (baud 0)", async () => {
+    const dialog = logsDialog();
+    const event = new CustomEvent("request-show-logs-after-install", {
+      cancelable: true,
+      detail: detail(0),
+    });
+    await handlePostInstallShowLogs(event, dialog as never, defaultLocalize);
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(dialog.openPassive).not.toHaveBeenCalled();
+    expect(dialog.setSerialStream).not.toHaveBeenCalled();
   });
 });

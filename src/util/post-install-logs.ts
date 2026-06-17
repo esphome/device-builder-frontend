@@ -3,6 +3,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
+import { resolveLogBaudRate } from "./log-baud-rate.js";
 import { isPortPickerCancel, SERIAL_ACTIVITY_WINDOW_MS } from "./web-serial.js";
 
 // Reopen budget for a port closed by the post-install reset: covers the
@@ -94,10 +95,10 @@ export interface PostInstallShowLogsDetail {
   name: string;
   port?: string;
   webSerialPort?: SerialPort;
-  // Baud for the Web Serial log port, resolved from the device's logger
-  // config. Set on the webSerialPort path; absent on OTA / server-serial,
-  // where the log port baud is irrelevant.
-  loggerBaudRate?: number;
+  // Raw device logger baud_rate, only meaningful on the webSerialPort path.
+  // The handler resolves it: null / absent ⇒ 115200 default, 0 ⇒ serial
+  // logging disabled (skip with a notice).
+  loggerBaudRate?: number | null;
   reopenInstall: () => void;
 }
 
@@ -286,7 +287,12 @@ export async function handlePostInstallShowLogs(
   logsDialog.configuration = configuration;
   logsDialog.name = name;
   if (webSerialPort) {
-    const baudRate = loggerBaudRate ?? 115200;
+    const baudRate = resolveLogBaudRate(loggerBaudRate);
+    if (baudRate === null) {
+      // logger: baud_rate: 0 — UART logging disabled; the port would be silent.
+      toast.error(localize("dashboard.logs_serial_disabled"), { richColors: true });
+      return;
+    }
     logsDialog.openPassive({
       onBackToInstall: reopenInstall,
       // "click Start to reconnect" after a reopen failure (#636). Re-acquire a

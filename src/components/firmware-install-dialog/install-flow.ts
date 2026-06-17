@@ -1,4 +1,3 @@
-import toast from "sonner-js";
 import {
   JobSource,
   JobStatus,
@@ -7,7 +6,6 @@ import {
 import { chipNameToVariant } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { resolveLogBaudRate } from "../../util/log-baud-rate.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import {
   connectToPort,
@@ -229,18 +227,12 @@ export function flipToLogs(
 ): void {
   const device = host._device;
   if (!device) return;
-  const loggerBaudRate = resolveLogBaudRate(device.logger_baud_rate);
-  if (loggerBaudRate === null) {
-    // logger: baud_rate: 0 — UART logging is disabled, so a serial log view
-    // would be silent; tell the user instead of opening a dead port.
-    toast.info(host._localize("dashboard.logs_serial_disabled"), { richColors: true });
-    return;
-  }
   const handled = dispatchShowLogsAfterInstall(host, {
     configuration: device.configuration,
     name: device.friendly_name || device.name,
     webSerialPort,
-    loggerBaudRate,
+    // Raw baud; the logs handler resolves it (0 ⇒ disabled, skip with a notice).
+    loggerBaudRate: device.logger_baud_rate,
     reopenInstall: () => host.reopen(),
   });
   if (handled) host._open = false;
