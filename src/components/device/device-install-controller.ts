@@ -2,6 +2,7 @@ import { type ReactiveController, type ReactiveControllerHost } from "lit";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
+import { applyInstallMethod } from "../install-method-select.js";
 
 export interface DeviceInstallControllerHost extends ReactiveControllerHost {
   /** Currently displayed device, or null when not yet loaded. */
@@ -62,21 +63,11 @@ export class DeviceInstallController implements ReactiveController {
     this._host.requestUpdate();
     if (!device) return;
     const { method, port } = e.detail;
-    if (method === "ota") {
-      // ``port`` is set when the user typed an explicit address
-      // into the OTA option's chevron-expanded form — pass it
-      // through so the CLI flashes against that override. The
-      // literal "OTA" sentinel is the default-address path.
-      this._openCommand(device, "install", port ?? "OTA");
-    } else if (method === "server-serial") {
-      this._openCommand(device, "install", port!);
-    } else if (method === "web-serial") {
-      this._host.firmwareDialog?.installWebSerial(device);
-    } else if (method === "web-download") {
-      this._host.firmwareDialog?.installWebDownload(device);
-    } else if (method === "binary-download") {
-      this._host.firmwareDialog?.installBinaryDownload(device);
-    }
+    applyInstallMethod(method, port, {
+      device,
+      firmwareDialog: this._host.firmwareDialog,
+      openInstall: (p) => this._openCommand(device, "install", p),
+    });
   };
 
   private _openCommand(device: ConfiguredDevice, type: CommandType, port?: string) {

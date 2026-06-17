@@ -1,0 +1,40 @@
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
+
+export interface InstallMethodHandlers {
+  device: ConfiguredDevice;
+  /** Run the backend/OTA install with an optional address override
+   *  ("OTA" sentinel for the default address, a server serial port, etc.). */
+  openInstall: (port?: string) => void;
+  firmwareDialog: ESPHomeFirmwareInstallDialog | null;
+}
+
+/**
+ * Route an install-method-picker selection to its action. Shared by the
+ * dashboard and the device editor so the method switch lives in one place.
+ */
+export function applyInstallMethod(
+  method: string,
+  port: string | undefined,
+  h: InstallMethodHandlers
+): void {
+  switch (method) {
+    case "ota":
+      // ``port`` is the user-typed address override from the OTA option's
+      // expanded form; the "OTA" sentinel is the default-address path.
+      h.openInstall(port ?? "OTA");
+      break;
+    case "server-serial":
+      h.openInstall(port!);
+      break;
+    case "web-serial":
+      h.firmwareDialog?.installWebSerial(h.device);
+      break;
+    case "web-download":
+      h.firmwareDialog?.installWebDownload(h.device);
+      break;
+    case "binary-download":
+      h.firmwareDialog?.installBinaryDownload(h.device);
+      break;
+  }
+}

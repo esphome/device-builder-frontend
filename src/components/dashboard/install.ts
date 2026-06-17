@@ -2,6 +2,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import type { CommandType } from "../command-dialog.js";
+import { applyInstallMethod } from "../install-method-select.js";
 import { openLogsWithMethod } from "./actions-ui.js";
 
 export function openInstallMethod(
@@ -25,17 +26,11 @@ export function onInstallMethodSelect(
     void openLogsWithMethod(host, device, method, port);
     return;
   }
-  if (method === "ota") {
-    openCommand(host, device, "install", port ?? "OTA");
-  } else if (method === "server-serial") {
-    openCommand(host, device, "install", port!);
-  } else if (method === "web-serial") {
-    host._firmwareDialog.installWebSerial(device);
-  } else if (method === "web-download") {
-    host._firmwareDialog.installWebDownload(device);
-  } else if (method === "binary-download") {
-    host._firmwareDialog.installBinaryDownload(device);
-  }
+  applyInstallMethod(method, port, {
+    device,
+    firmwareDialog: host._firmwareDialog,
+    openInstall: (p) => openCommand(host, device, "install", p),
+  });
 }
 
 export function openCommand(

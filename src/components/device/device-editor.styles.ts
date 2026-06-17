@@ -123,6 +123,27 @@ export const deviceEditorStyles = css`
       transform 0.12s;
   }
 
+  .install-split {
+    display: inline-flex;
+    align-items: stretch;
+  }
+
+  /* Join the two halves into one split control: square the inner corners
+     and share the middle border so they read as a single button. */
+  .install-split__main {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .install-split__caret {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: none;
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 0;
+  }
+
   .save-button {
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);

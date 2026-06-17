@@ -705,6 +705,7 @@
     "pin_group_other": "Other pins",
     "pin_group_reserved": "Reserved",
     "pin_advanced": "Advanced",
+    "install_choose_method": "Choose install method",
     "save": "Save",
     "save_yaml": "Save YAML",
     "validate": "Validate",

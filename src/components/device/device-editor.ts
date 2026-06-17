@@ -314,29 +314,7 @@ export class ESPHomeDeviceEditor extends LitElement {
         </header>
         <div class="card-body">
           <div class="editor-floating-actions">
-            ${this.hasUpdateAvailable
-              ? html`<button
-                  type="button"
-                  class="install-fab"
-                  ?disabled=${this.busy}
-                  @click=${this._onUpdate}
-                  title=${this._localize("dashboard.update")}
-                >
-                  <wa-icon library="mdi" name="upload"></wa-icon>
-                  ${this._localize("dashboard.update")}
-                </button>`
-              : this.hasPendingChanges
-                ? html`<button
-                    type="button"
-                    class="install-fab"
-                    ?disabled=${this.busy}
-                    @click=${this._onInstall}
-                    title=${this._localize("dashboard.install")}
-                  >
-                    <wa-icon library="mdi" name="upload"></wa-icon>
-                    ${this._localize("dashboard.install")}
-                  </button>`
-                : nothing}
+            ${this._renderPrimaryAction()}
             <!-- Span wrapper carries the title because a disabled
                  button isn't focusable and most browsers won't
                  surface its tooltip on hover. The disabled state
@@ -477,6 +455,48 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   private _toggleRevealSensitive() {
     this._revealSensitive = !this._revealSensitive;
+  }
+
+  // Always-available install affordance. With an update available the main
+  // button keeps the one-click OTA; the caret opens the install-method picker
+  // (Web Serial / OTA / manual) so a re-flash or replacement chip still has a
+  // path. Otherwise (pending changes or fully in sync) a plain Install opens
+  // the picker — including the in-sync case, which previously showed no button.
+  private _renderPrimaryAction() {
+    if (this.hasUpdateAvailable) {
+      return html`<div class="install-split">
+        <button
+          type="button"
+          class="install-fab install-split__main"
+          ?disabled=${this.busy}
+          @click=${this._onUpdate}
+          title=${this._localize("dashboard.update")}
+        >
+          <wa-icon library="mdi" name="upload"></wa-icon>
+          ${this._localize("dashboard.update")}
+        </button>
+        <button
+          type="button"
+          class="install-fab install-split__caret"
+          ?disabled=${this.busy}
+          @click=${this._onInstall}
+          aria-label=${this._localize("device.install_choose_method")}
+          title=${this._localize("device.install_choose_method")}
+        >
+          <wa-icon library="mdi" name="menu-down"></wa-icon>
+        </button>
+      </div>`;
+    }
+    return html`<button
+      type="button"
+      class="install-fab"
+      ?disabled=${this.busy}
+      @click=${this._onInstall}
+      title=${this._localize("dashboard.install")}
+    >
+      <wa-icon library="mdi" name="upload"></wa-icon>
+      ${this._localize("dashboard.install")}
+    </button>`;
   }
 
   private _onInstall() {
