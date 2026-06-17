@@ -10,7 +10,6 @@ import type { ESPLoader, Transport } from "esptool-js";
 import { describe, expect, it, vi } from "vitest";
 import { resetAndDisconnect } from "../../src/util/web-serial.js";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 function fakeTransport() {
   return {
     setDTR: vi.fn().mockResolvedValue(undefined),
@@ -22,7 +21,6 @@ function fakeTransport() {
 // An ESP8266 (no RTC watchdog) behind a CP210x bridge — the classic path.
 const esp8266Loader = { chip: { CHIP_NAME: "ESP8266" } } as unknown as ESPLoader;
 const cp210xPort = { getInfo: () => ({ usbVendorId: 0x10c4 }) } as unknown as SerialPort;
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe("resetAndDisconnect — classic ESP32 / ESP8266 over a UART bridge", () => {
   it("pulses EN and leaves GPIO0 released, then disconnects", async () => {
@@ -35,8 +33,9 @@ describe("resetAndDisconnect — classic ESP32 / ESP8266 over a UART bridge", ()
 
     // EN pulse: RTS true (reset) then false (boot).
     expect(transport.setRTS.mock.calls.map((c) => c[0])).toEqual([true, false]);
-    // GPIO0/DTR is only ever released — never driven low (which would re-enter
+    // GPIO0/DTR is actively released and never driven low (which would re-enter
     // the download bootloader, the #1529 regression).
+    expect(transport.setDTR).toHaveBeenCalledWith(false);
     expect(transport.setDTR.mock.calls.every((c) => c[0] === false)).toBe(true);
     expect(transport.disconnect).toHaveBeenCalledTimes(1);
   });
