@@ -5,7 +5,7 @@
  * the reused dialog is reopened: a prior user uncheck must not leave the box
  * visually unchecked while `_encryption` is back to true (issue #1535).
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/components/base-dialog.js", () => ({}));
 
@@ -30,6 +30,10 @@ const checkbox = (el: ESPHomeAdoptDialog) =>
   el.shadowRoot!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
 
 describe("adopt-dialog encryption checkbox reset", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
   it("re-checks the box on reopen after a prior uncheck", async () => {
     const el = await mount();
 
