@@ -120,6 +120,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * ln882x) uses ltchiptool's own serial protocol — only the backend
    * (`esphome run` / server-serial) flashes those. So the Web Serial and
    * web-download rows are hidden for them.
+   *
+   * Fail-closed: an empty / unknown platform returns false, so we never offer a
+   * browser flasher that won't work (server-serial / OTA stay). target_platform
+   * is reliably populated for configured devices, so this only ever hides Web
+   * Serial transiently before metadata loads.
    */
   private get _isEsptoolPlatform(): boolean {
     const p = this.deviceTargetPlatform.toLowerCase();
