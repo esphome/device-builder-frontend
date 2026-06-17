@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { mdiChevronDown, mdiChevronRight, mdiCog } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
@@ -27,8 +27,10 @@ export class ESPHomeWizardStepMethod extends LitElement {
   @query("#file-input")
   private _fileInput!: HTMLInputElement;
 
-  @state()
-  private _advancedOpen = false;
+  // Owned by the parent dialog so it survives step changes (the dialog
+  // unmounts this element when navigating away and back).
+  @property({ type: Boolean })
+  advancedOpen = false;
 
   private _drop = new FileDropController(this, (file) => this._sendImportFile(file));
 
@@ -192,14 +194,14 @@ export class ESPHomeWizardStepMethod extends LitElement {
 
           <button
             class="advanced-toggle"
-            aria-expanded=${this._advancedOpen}
+            aria-expanded=${this.advancedOpen}
             @click=${this._toggleAdvanced}
           >
             ${this._localize("wizard.advanced_options")}
             <wa-icon library="mdi" name="chevron-down"></wa-icon>
           </button>
 
-          ${this._advancedOpen
+          ${this.advancedOpen
             ? html`<div class="option-cards">${this._renderAdvancedOptions()}</div>`
             : nothing}
         </div>
@@ -238,7 +240,11 @@ export class ESPHomeWizardStepMethod extends LitElement {
   }
 
   private _toggleAdvanced() {
-    this._advancedOpen = !this._advancedOpen;
+    // Just signal intent; the dialog owns the flag (it outlives this element)
+    // and flips it.
+    this.dispatchEvent(
+      new CustomEvent("toggle-advanced", { bubbles: true, composed: true })
+    );
   }
 
   private _goToBoard() {

@@ -62,6 +62,12 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   @state()
   private _step: WizardStep = "method";
 
+  // Owned here, not in the method step, so the "Advanced" disclosure stays
+  // open when the user navigates into an advanced option (empty-config /
+  // import) and back — the step element is unmounted across that transition.
+  @state()
+  private _advancedOpen = false;
+
   // Drives the step components' Enter listeners: the steps stay mounted in
   // the wa-dialog while it's merely hidden (light-dismiss / Escape / close),
   // so they must deactivate on hide, not just on unmount.
@@ -168,6 +174,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    * here. */
   private _resetTransientState(): void {
     this._creationMethod = "basic";
+    this._advancedOpen = false;
     this._import.reset();
     this._submitting = false;
     this._resetCreateErrors();
@@ -254,6 +261,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         @request-close=${this._onRequestClose}
         @after-hide=${this._onHide}
         @next-step=${this._onNextStep}
+        @toggle-advanced=${this._onToggleAdvanced}
         @finish-setup=${this._onFinishSetup}
         @create-empty-config=${this._onCreateEmptyConfig}
         @import-file=${this._onImportFile}
@@ -291,7 +299,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
 
     switch (this._step) {
       case "method":
-        return html`<esphome-wizard-step-method></esphome-wizard-step-method>`;
+        return html`<esphome-wizard-step-method
+          .advancedOpen=${this._advancedOpen}
+        ></esphome-wizard-step-method>`;
       case "board":
         return html`<esphome-wizard-step-board
           .presetFilterLabel=${this._initialBoardFilter}
@@ -342,6 +352,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     }
 
     this._step = detail.step;
+  }
+
+  private _onToggleAdvanced() {
+    this._advancedOpen = !this._advancedOpen;
   }
 
   private _onImportFile(e: CustomEvent<{ file: File }>) {

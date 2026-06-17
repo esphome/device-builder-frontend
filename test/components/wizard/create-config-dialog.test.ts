@@ -496,3 +496,57 @@ describe("create-config-dialog upload overwrite", () => {
     expect(createDevice).toHaveBeenCalledTimes(1);
   });
 });
+
+// The "Advanced" disclosure flag lives on the dialog (not the method step) so
+// it survives the method element being unmounted and re-created when the user
+// navigates into an advanced option (empty-config / import) and back.
+describe("create-config-dialog advanced disclosure persistence", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const methodEl = (el: ESPHomeCreateConfigDialog): HTMLElement | null =>
+    el.shadowRoot!.querySelector("esphome-wizard-step-method");
+
+  const advancedOpen = (el: ESPHomeCreateConfigDialog): boolean | undefined =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (methodEl(el) as any)?.advancedOpen;
+
+  function toggleAdvanced(el: ESPHomeCreateConfigDialog): void {
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("toggle-advanced", { bubbles: true, composed: true })
+    );
+  }
+
+  it("keeps Advanced open when navigating into empty-config and back", async () => {
+    const el = await mount({});
+    expect(advancedOpen(el)).toBe(false);
+
+    toggleAdvanced(el);
+    await el.updateComplete;
+    expect(advancedOpen(el)).toBe(true);
+
+    // Into the advanced option — the method element unmounts.
+    emitNextStep(el, "empty-config");
+    await el.updateComplete;
+    expect(methodEl(el)).toBeNull();
+
+    // Back to the chooser — the re-mounted method step still gets it open.
+    emitNextStep(el, "method");
+    await el.updateComplete;
+    expect(advancedOpen(el)).toBe(true);
+  });
+
+  it("starts collapsed again after the dialog is reopened", async () => {
+    const el = await mount({});
+    toggleAdvanced(el);
+    await el.updateComplete;
+    expect(advancedOpen(el)).toBe(true);
+
+    el.close();
+    await el.updateComplete;
+    el.open();
+    await el.updateComplete;
+    expect(advancedOpen(el)).toBe(false);
+  });
+});
