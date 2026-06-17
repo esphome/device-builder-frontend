@@ -520,6 +520,12 @@ export class ESPHomeLogsDialog extends LitElement {
   // reader (streamSerialToDialog) and the OTA stream both feed through here.
   _enqueueLine(line: string): void {
     this._pendingLines.push(line);
+    // rAF doesn't fire while the tab is hidden, so a flood can pile up here
+    // unflushed. Trim with headroom (so we slice once per MAX_LOG_LINES pushes,
+    // not every push) to keep the pending buffer bounded too.
+    if (this._pendingLines.length > 2 * MAX_LOG_LINES) {
+      this._pendingLines = this._pendingLines.slice(-MAX_LOG_LINES);
+    }
     if (this._flushScheduled) return;
     this._flushScheduled = requestAnimationFrame(() => {
       this._flushScheduled = 0;

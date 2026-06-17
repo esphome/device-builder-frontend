@@ -52,6 +52,20 @@ describe("logs-dialog line batching + cap", () => {
     expect(d._lines[d._lines.length - 1]).toBe(String(total - 1));
   });
 
+  it("bounds the pending buffer when frames never fire (hidden tab)", () => {
+    // rAF is captured but never invoked, simulating a backgrounded tab; the
+    // pending buffer must not grow without bound during a flood.
+    const d = new ESPHomeLogsDialog();
+    for (let i = 0; i < 12000; i++) d._enqueueLine(String(i));
+    const pending = (d as unknown as { _pendingLines: string[] })._pendingLines;
+    expect(d._lines).toHaveLength(0); // nothing flushed without a frame
+    expect(pending.length).toBeLessThanOrEqual(10000); // 2 * MAX_LOG_LINES
+    expect(pending[pending.length - 1]).toBe("11999"); // newest retained
+    fireFrame();
+    expect(d._lines).toHaveLength(5000);
+    expect(d._lines[d._lines.length - 1]).toBe("11999");
+  });
+
   it("caps the buffer on the recovery-path append (setSerialOpenFailed)", () => {
     const d = new ESPHomeLogsDialog();
     for (let i = 0; i < 5000; i++) d._enqueueLine(String(i));
