@@ -23,8 +23,11 @@ describe("cardStatusDetail flashing warning", () => {
   });
 
   it("adds no warning on non-flashing steps", () => {
+    // The restart phase keeps _step === "flashing" (only the status message
+    // changes), so the warning correctly persists there; test genuine
+    // non-flashing steps instead.
+    expect(cardStatusDetail(host("connecting"))).toBe("");
     expect(cardStatusDetail(host("queued"))).toBe("");
     expect(cardStatusDetail(host("downloading"))).toBe("");
-    expect(cardStatusDetail(host("resetting"))).toBe("");
   });
 });
