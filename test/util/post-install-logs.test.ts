@@ -1,10 +1,11 @@
 /**
  * @vitest-environment happy-dom
  *
- * The post-install Web Serial logs handoff: reconnect must re-acquire a FRESH
- * port via the picker (the cached esptool handle is dead after a native-USB
- * chip's post-flash re-enumeration), and the reopen-failure message names the
- * port being tried.
+ * The post-install Web Serial logs handoff. After a native-USB chip's
+ * post-flash re-enumeration the cached esptool handle is dead, so the auto
+ * reopen prefers a fresh navigator.serial.getPorts() handle (no picker); only
+ * the user-gesture "Start" reconnect re-prompts via requestPort(). The
+ * reopen-failure message names the port being tried.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -56,24 +57,35 @@ function stubDialog() {
   };
 }
 
+// Restore the original `navigator.serial`, deleting the injected property when
+// it didn't exist before (happy-dom has none) so a leaked `"serial" in
+// navigator` can't make later tests order-dependent.
+function restoreSerial(had: boolean, prev: unknown): () => void {
+  return () => {
+    if (had) {
+      Object.defineProperty(navigator, "serial", { configurable: true, value: prev });
+    } else {
+      delete (navigator as any).serial;
+    }
+  };
+}
+
 function withRequestPort(impl: () => Promise<SerialPort>): () => void {
-  const prev = (navigator as any).serial;
+  const restore = restoreSerial("serial" in navigator, (navigator as any).serial);
   Object.defineProperty(navigator, "serial", {
     configurable: true,
     value: { requestPort: vi.fn(impl) },
   });
-  return () =>
-    Object.defineProperty(navigator, "serial", { configurable: true, value: prev });
+  return restore;
 }
 
 function withGetPorts(impl: () => Promise<SerialPort[]>): () => void {
-  const prev = (navigator as any).serial;
+  const restore = restoreSerial("serial" in navigator, (navigator as any).serial);
   Object.defineProperty(navigator, "serial", {
     configurable: true,
     value: { getPorts: vi.fn(impl) },
   });
-  return () =>
-    Object.defineProperty(navigator, "serial", { configurable: true, value: prev });
+  return restore;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
