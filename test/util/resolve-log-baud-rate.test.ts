@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveLogBaudRate } from "../../src/util/web-serial.js";
+import { resolveLogBaudRate } from "../../src/util/log-baud-rate.js";
 
 describe("resolveLogBaudRate", () => {
   it("uses the device's configured baud", () => {

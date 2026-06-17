@@ -1,3 +1,4 @@
+import toast from "sonner-js";
 import {
   JobSource,
   JobStatus,
@@ -6,6 +7,7 @@ import {
 import { chipNameToVariant } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { resolveLogBaudRate } from "../../util/log-baud-rate.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import {
   connectToPort,
@@ -14,7 +16,6 @@ import {
   flashFirmware,
   isPortPickerCancel,
   resetAndDisconnect,
-  resolveLogBaudRate,
   type DetectedChip,
 } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -228,13 +229,18 @@ export function flipToLogs(
 ): void {
   const device = host._device;
   if (!device) return;
+  const loggerBaudRate = resolveLogBaudRate(device.logger_baud_rate);
+  if (loggerBaudRate === null) {
+    // logger: baud_rate: 0 — UART logging is disabled, so a serial log view
+    // would be silent; tell the user instead of opening a dead port.
+    toast.info(host._localize("dashboard.logs_serial_disabled"), { richColors: true });
+    return;
+  }
   const handled = dispatchShowLogsAfterInstall(host, {
     configuration: device.configuration,
     name: device.friendly_name || device.name,
     webSerialPort,
-    // Disabled (0) is moot here — the user just flashed over serial; open at
-    // the default so any boot output still streams.
-    loggerBaudRate: resolveLogBaudRate(device.logger_baud_rate) ?? 115200,
+    loggerBaudRate,
     reopenInstall: () => host.reopen(),
   });
   if (handled) host._open = false;

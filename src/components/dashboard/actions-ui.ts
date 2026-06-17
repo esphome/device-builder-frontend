@@ -10,12 +10,12 @@ import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
+import { resolveLogBaudRate } from "../../util/log-baud-rate.js";
 import {
   attachSerialLogStream,
   reconnectWebSerialLogs,
   requestAndOpenSerialPort,
 } from "../../util/post-install-logs.js";
-import { resolveLogBaudRate } from "../../util/web-serial.js";
 
 export async function executeFriendlyName(
   host: ESPHomePageDashboard,
