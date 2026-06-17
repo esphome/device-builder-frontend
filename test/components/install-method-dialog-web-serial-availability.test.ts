@@ -43,6 +43,9 @@ async function mount(): Promise<ESPHomeInstallMethodDialog> {
   (dialog as any)._localize = defaultLocalize;
   (dialog as any)._api = {}; // detectEnvironment only needs serverInfo?.ha_addon
   dialog.deviceState = DeviceState.ONLINE;
+  // Web Serial availability messaging only applies to ESP (esptool) platforms;
+  // the row is hidden for non-ESP targets.
+  dialog.deviceTargetPlatform = "esp32";
   document.body.appendChild(dialog);
   await dialog.updateComplete;
   return dialog;

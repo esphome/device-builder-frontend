@@ -112,14 +112,19 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   }
 
   /**
-   * web.esphome.io / esp-web-tools only supports ESP32 (all variants)
-   * and ESP8266. UF2 platforms (RP2040, nrf52, libretiny) ship a
-   * different binary format that the browser flasher can't handle, so
-   * we hide the option entirely for those.
+   * ESP32 (all variants) and ESP8266 / ESP8285 — the only chips the browser
+   * flashers can handle. Both Web Serial (esptool-js) and web.esphome.io /
+   * esp-web-tools speak the esptool ROM protocol. Non-ESP targets can't be
+   * flashed from the browser: RP2040 / RP2350 and nrf52 use a BOOTSEL /
+   * 1200-baud touch + UF2 mass-storage copy, and libretiny (bk72xx / rtl87xx /
+   * ln882x) uses ltchiptool's own serial protocol — only the backend
+   * (`esphome run` / server-serial) flashes those. So the Web Serial and
+   * web-download rows are hidden for them.
    */
-  private get _supportsWebDownload(): boolean {
+  private get _isEsptoolPlatform(): boolean {
     const p = this.deviceTargetPlatform.toLowerCase();
-    return p.startsWith("esp32") || p === "esp8266";
+    // esp82… covers esp8266 and esp8285.
+    return p.startsWith("esp32") || p.startsWith("esp82");
   }
 
   protected willUpdate(changed: Map<string, unknown>) {
@@ -174,8 +179,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // Replaces the disabled WebSerial row with web-download when
     // not online (offline or unknown) and no Web Serial. OTA is
     // offered above but may fail; web-download always works.
+    // Browser flashers (Web Serial esptool-js, web.esphome.io) are ESP-only.
+    // Non-ESP targets (RP2040 / RP2350, nrf52, libretiny) flash over serial
+    // only via the backend (`esphome run` / server-serial), never the browser.
+    const isEsptool = this._isEsptoolPlatform;
     const swapInWebDownload =
-      this.mode === "install" && !hasWebSerial && !isOnline && this._supportsWebDownload;
+      this.mode === "install" && !hasWebSerial && !isOnline && isEsptool;
     // On localhost the WebSerial option and the server-serial option
     // target the same physical USB stack. There are two collapse cases:
     //
@@ -191,7 +200,10 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // KEEP the disabled row — it carries an actionable "open at 127.0.0.1 /
     // https" fix, so it isn't dead weight. On HA / remote both rows point at
     // different machines, so both always stay.
-    const showServerSerialRow = !(env === "localhost" && hasWebSerial);
+    // Only collapse the server-serial row in favour of Web Serial when Web
+    // Serial is actually shown (esptool platform) — otherwise a non-ESP device
+    // on localhost would lose its only working serial path.
+    const showServerSerialRow = !(env === "localhost" && hasWebSerial && isEsptool);
     const dropDisabledWebSerial =
       env === "localhost" && availability === "unsupported" && !swapInWebDownload;
     const serverSerialKeys = this._serverSerialCopyKeys(env);
@@ -201,9 +213,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         ${this._renderOtaOption(isOnline)}
         ${swapInWebDownload
           ? this._renderWebDownloadOption()
-          : dropDisabledWebSerial
-            ? nothing
-            : this._renderWebSerialOption(availability)}
+          : isEsptool && !dropDisabledWebSerial
+            ? this._renderWebSerialOption(availability)
+            : nothing}
         ${showServerSerialRow
           ? html`<div class="option" @click=${this._onServerSerial}>
               <wa-icon library="mdi" name="serial-port"></wa-icon>
