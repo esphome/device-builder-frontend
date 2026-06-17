@@ -68,4 +68,18 @@ describe("dashboard pending serial setup", () => {
     await mountDashboard(true);
     expect(detectAndOpenWizard).not.toHaveBeenCalled();
   });
+
+  it("does not open the wizard if the dashboard is torn down before first render", async () => {
+    markPendingSerialSetup(fakePort);
+    const page = new ESPHomePageDashboard();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (page as any)._prefsLoaded = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (page as any)._remoteComputeOnly = false;
+    document.body.appendChild(page); // connectedCallback consumes + schedules
+    page.remove(); // disconnect before updateComplete resolves
+    await page.updateComplete;
+    await flushPending();
+    expect(detectAndOpenWizard).not.toHaveBeenCalled();
+  });
 });

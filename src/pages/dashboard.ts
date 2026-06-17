@@ -389,7 +389,12 @@ export class ESPHomePageDashboard extends LitElement {
     // the prefs contexts driving _hideDeviceCreation land during it.
     const pendingSerial = consumePendingSerialSetup();
     if (pendingSerial !== null) {
-      void this.updateComplete.then(() => this._startSerialSetup(pendingSerial.port));
+      void this.updateComplete.then(() => {
+        // Bailed back off `/` before first render resolved; don't open the
+        // wizard against a torn-down host (the stash is already consumed).
+        if (!this.isConnected) return;
+        this._startSerialSetup(pendingSerial.port);
+      });
     }
   }
 
