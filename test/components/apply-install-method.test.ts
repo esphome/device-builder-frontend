@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import { applyInstallMethod } from "../../src/components/apply-install-method.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { applyInstallMethod } from "../../src/components/install-method-select.js";
 
 const device = { configuration: "x.yaml", name: "x" } as ConfiguredDevice;
 

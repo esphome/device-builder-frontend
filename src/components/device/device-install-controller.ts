@@ -1,8 +1,8 @@
 import { type ReactiveController, type ReactiveControllerHost } from "lit";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
+import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { applyInstallMethod } from "../install-method-select.js";
 
 export interface DeviceInstallControllerHost extends ReactiveControllerHost {
   /** Currently displayed device, or null when not yet loaded. */
