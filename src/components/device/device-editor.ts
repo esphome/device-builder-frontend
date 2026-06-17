@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import {
   mdiAlertCircleOutline,
   mdiCheckCircleOutline,
+  mdiChevronDown,
   mdiContentSave,
   mdiDockLeft,
   mdiDockRight,
@@ -38,6 +39,7 @@ import "./device-board-info.js";
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
   "check-circle-outline": mdiCheckCircleOutline,
+  "chevron-down": mdiChevronDown,
   "content-save": mdiContentSave,
   eye: mdiEye,
   "eye-off": mdiEyeOff,
@@ -483,7 +485,7 @@ export class ESPHomeDeviceEditor extends LitElement {
           aria-label=${this._localize("device.install_choose_method")}
           title=${this._localize("device.install_choose_method")}
         >
-          <wa-icon library="mdi" name="menu-down"></wa-icon>
+          <wa-icon library="mdi" name="chevron-down"></wa-icon>
         </button>
       </div>`;
     }
