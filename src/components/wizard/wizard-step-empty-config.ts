@@ -129,7 +129,7 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
 
   private _cancel() {
     this.dispatchEvent(
-      new CustomEvent("next-step", { detail: "board", bubbles: true, composed: true })
+      new CustomEvent("next-step", { detail: "method", bubbles: true, composed: true })
     );
   }
 

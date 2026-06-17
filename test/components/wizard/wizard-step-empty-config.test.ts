@@ -67,4 +67,16 @@ describe("wizard-step-empty-config ENTER", () => {
     pressEnter();
     expect(onCreate).not.toHaveBeenCalled();
   });
+
+  it("Cancel returns to the method chooser, not the board picker", async () => {
+    // This step is reached directly from the method chooser (no board is
+    // picked), so Cancel must go back there, matching the dialog's header
+    // back arrow.
+    const el = await mount();
+    const onNext = vi.fn();
+    el.addEventListener("next-step", onNext as EventListener);
+    (el.shadowRoot!.querySelector(".btn-cancel") as HTMLButtonElement).click();
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect((onNext.mock.calls[0][0] as CustomEvent).detail).toBe("method");
+  });
 });
