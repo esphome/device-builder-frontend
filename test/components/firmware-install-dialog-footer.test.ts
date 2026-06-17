@@ -18,6 +18,11 @@ function footerHost(step: string) {
     _localize: (key: string) => key,
     _close: vi.fn(),
     _cancel: vi.fn(),
+    _retry: vi.fn(),
+    _showLogsAgain: vi.fn(),
+    _detected: null,
+    _failedDuringCompile: false,
+    _failedDuringValidate: false,
     _showLogsAfterInstall: false,
     _toggleShowLogsAfterInstall: vi.fn(),
   };
@@ -44,5 +49,29 @@ describe("firmware-install-dialog footer", () => {
     const host = footerHost("compiling");
     const values = footerValues(host);
     expect(values).toContain(host._cancel);
+  });
+
+  it("offers Retry and Close on a Web Serial flash failure", () => {
+    const host = footerHost("error");
+    host._installer = "web-serial";
+    const values = footerValues(host);
+    expect(values).toContain(host._retry);
+    expect(values).toContain(host._close);
+  });
+
+  it("does not offer Retry when the Web Serial failure was during compile", () => {
+    // Compile/validate failures show the reset-build hint instead; re-flashing
+    // wouldn't address them, so it falls through to the plain Close footer.
+    const host = footerHost("error");
+    host._installer = "web-serial";
+    host._failedDuringCompile = true;
+    const values = footerValues(host);
+    expect(values).not.toContain(host._retry);
+  });
+
+  it("does not offer Retry on a non-Web-Serial error", () => {
+    const host = footerHost("error"); // binary-download
+    const values = footerValues(host);
+    expect(values).not.toContain(host._retry);
   });
 });

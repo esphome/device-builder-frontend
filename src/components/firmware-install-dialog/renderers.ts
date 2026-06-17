@@ -313,6 +313,26 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
+  // A failed Web Serial flash can be retried in place — re-run the install.
+  // Excludes compile / validate failures, which surface the reset-build hint
+  // (renderResetSuggestion) instead; re-flashing wouldn't address those.
+  const canRetry =
+    host._step === "error" &&
+    host._installer === "web-serial" &&
+    !host._failedDuringCompile &&
+    !host._failedDuringValidate;
+  if (canRetry) {
+    return html`
+      <div class="footer">
+        <button class="btn btn--ghost" @click=${host._close}>
+          ${host._localize("command.close")}
+        </button>
+        <button class="btn btn--primary" @click=${host._retry}>
+          ${host._localize("command.retry")}
+        </button>
+      </div>
+    `;
+  }
   // Web Serial install success — surface "Logs" so users can flip back after
   // they've clicked logs-dialog's "Back to install". _detected survives
   // _onClose but not _close, so the button only renders while the SerialPort
