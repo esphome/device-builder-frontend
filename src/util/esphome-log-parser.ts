@@ -36,6 +36,30 @@ const LEADING_COLOR_RE = /^(?:\u001b|\\033)\[[0-9;]*m/;
 // trailing reset is needed so color can't bleed past the line.
 const HAS_ANSI_RE = /(?:\u001b|\\033)\[/;
 
+// Strip CSI escape sequences (both ESC-byte and literal \033 forms) so the
+// garbage heuristic counts content bytes, not color codes.
+const ANSI_STRIP_RE = /(?:\u001b|\\033)\[[0-9;?]*[ -\/]*[@-~]/g;
+
+/**
+ * True when a decoded UART line looks like baud-mismatch garbage rather than a
+ * real log line. An ESP8266 prints its boot/reset banner at 74880 baud; read at
+ * the app's (lower) configured baud it mis-samples into mojibake: U+FFFD
+ * replacement chars and non-printable control bytes. Clean ESPHome logs are
+ * printable ASCII plus ANSI escapes, so they never trip this. Short lines are
+ * never flagged (too little signal; the line cap bounds any that slip by).
+ */
+export function isLikelyGarbageLine(line: string): boolean {
+  const stripped = line.replace(ANSI_STRIP_RE, "").replace(/\u001b/g, "");
+  if (stripped.length < 2) return false;
+  let bad = 0;
+  for (const ch of stripped) {
+    const code = ch.codePointAt(0) ?? 0;
+    // Tab is fine; U+FFFD, DEL, and other C0 controls signal corruption.
+    if (ch === "\ufffd" || code === 0x7f || (code < 0x20 && code !== 0x09)) bad++;
+  }
+  return bad / stripped.length > 0.3;
+}
+
 /** Already ends in a reset (either escape form)? */
 function endsWithReset(line: string): boolean {
   return line.endsWith("\u001b[0m") || line.endsWith("\\033[0m");

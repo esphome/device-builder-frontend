@@ -14,6 +14,19 @@ import { streamSerialToDialog } from "../../../src/components/dashboard/actions.
 
 interface MockDialog {
   _lines: string[];
+  _enqueueLine(line: string): void;
+}
+
+// The real dialog batches via requestAnimationFrame; for these decode-focused
+// tests a synchronous push keeps the existing _lines assertions intact.
+function mockDialog(): MockDialog {
+  const d: MockDialog = {
+    _lines: [],
+    _enqueueLine(line: string) {
+      d._lines.push(line);
+    },
+  };
+  return d;
 }
 
 function encode(str: string): Uint8Array {
@@ -75,7 +88,7 @@ describe("streamSerialToDialog", () => {
     const port = createMockPort([
       encode("[I][app:100]: Booting\n[W][gpio:5]: strapping\n"),
     ]);
-    const dialog: MockDialog = { _lines: [] };
+    const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
     cancel();
@@ -87,7 +100,7 @@ describe("streamSerialToDialog", () => {
 
   it("strips trailing CR before prepending the timestamp", async () => {
     const port = createMockPort([encode("[I][app:100]: Hello\r\n")]);
-    const dialog: MockDialog = { _lines: [] };
+    const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
     cancel();
@@ -102,7 +115,7 @@ describe("streamSerialToDialog", () => {
        line still carries a [HH:MM:SS] anchor so the two web serial
        paths render identically when viewed side by side. */
     const port = createMockPort([encode("[I][a:1]: hi\n\n[I][a:2]: bye\n")]);
-    const dialog: MockDialog = { _lines: [] };
+    const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
     cancel();
@@ -112,9 +125,22 @@ describe("streamSerialToDialog", () => {
     expect(dialog._lines[2]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]\[I\]\[a:2\]: bye$/);
   });
 
+  it("drops a mis-sampled garbage line but keeps the clean lines around it", async () => {
+    // Invalid UTF-8 bytes decode to U+FFFD replacement chars — the shape of an
+    // ESP8266 boot banner read at the wrong baud. A clean line follows.
+    const garbage = new Uint8Array([0x80, 0x81, 0xfe, 0xff, 0x80, 0x81, 0x0a]);
+    const port = createMockPort([garbage, encode("[I][app:1]: ok\n")]);
+    const dialog = mockDialog();
+    const cancel = streamSerialToDialog(port, dialog);
+    await flush();
+    cancel();
+    expect(dialog._lines).toHaveLength(1);
+    expect(dialog._lines[0]).toMatch(/\[I\]\[app:1\]: ok$/);
+  });
+
   it("buffers a partial line across chunks and stamps it once on completion", async () => {
     const port = createMockPort([encode("[I][app:100]: par"), encode("tial\n")]);
-    const dialog: MockDialog = { _lines: [] };
+    const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
     cancel();
@@ -127,7 +153,7 @@ describe("streamSerialToDialog", () => {
     // later open() throws "already open" and the logs dialog never reopens.
     // The lock must be released before close().
     const port = createMockPort([encode("[I][a:1]: hi\n")]);
-    const dialog: MockDialog = { _lines: [] };
+    const dialog = mockDialog();
     const cancel = streamSerialToDialog(port, dialog);
     await flush();
     cancel();

@@ -56,6 +56,11 @@ registerMdiIcons({
   restart: mdiRestart,
 });
 
+// Hard cap on retained log lines. A verbose (or garbage-flooding) device can
+// emit faster than the view renders; without a bound the line array and its
+// DOM grow until the tab locks up. Trimmed to the newest on every flush.
+const MAX_LOG_LINES = 5000;
+
 @customElement("esphome-logs-dialog")
 export class ESPHomeLogsDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -106,6 +111,13 @@ export class ESPHomeLogsDialog extends LitElement {
 
   @state()
   _lines: string[] = [];
+
+  // rAF batch buffer: coalesce per-line appends into one render per frame
+  // instead of one per line (mirrors command-dialog, #348). A fast serial
+  // stream would otherwise schedule a full re-render of the whole list per
+  // line and freeze the tab.
+  private _pendingLines: string[] = [];
+  private _flushScheduled = 0;
 
   @state()
   private _open = false;
@@ -172,6 +184,7 @@ export class ESPHomeLogsDialog extends LitElement {
    *  behaves the same way every time unless the user flips it this session. */
   private _beginSession(onBackToInstall?: () => void) {
     void this._teardownSession();
+    this._resetPendingLines();
     this._lines = [];
     this._expanded = false;
     this._showStates = true;
@@ -221,6 +234,7 @@ export class ESPHomeLogsDialog extends LitElement {
     // an OTA session — don't tear that unrelated session down or flip it dead.
     if (!this._open || !isPassive(this._session)) return;
     void this._teardownSession();
+    this._resetPendingLines();
     this._lines = [...this._lines, message];
     this._session = { kind: "dead" };
   }
@@ -243,6 +257,9 @@ export class ESPHomeLogsDialog extends LitElement {
    *  so the next open() isn't blocked by a still-open port. A Stop *pause*
    *  doesn't call this — it keeps the reader + port alive (#526). */
   private _teardownSession(): Promise<void> {
+    // Drain any batched lines into the visible buffer before the session ends
+    // so a stop/close doesn't drop what was buffered for the next frame.
+    this._flushPendingLines();
     const s = this._session;
     this._session = { kind: "idle" };
     if (s.kind === "serial") {
@@ -436,7 +453,7 @@ export class ESPHomeLogsDialog extends LitElement {
       s.port,
       {
         onOutput: (line: string) => {
-          this._lines = [...this._lines, line];
+          this._enqueueLine(line);
         },
         onResult: () => this._markOtaStopped(streamId),
         onError: () => this._markOtaStopped(streamId),
@@ -470,6 +487,7 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _downloadLogs() {
+    this._flushPendingLines();
     const stem = configurationStem(this.configuration, "logs");
     downloadAnsiText(this._lines, `${stem}-logs.txt`);
   }
@@ -494,7 +512,39 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _clearLogs() {
+    this._resetPendingLines();
     this._lines = [];
+  }
+
+  // Buffer a streamed line; flushed on the next animation frame. The serial
+  // reader (streamSerialToDialog) and the OTA stream both feed through here.
+  _enqueueLine(line: string): void {
+    this._pendingLines.push(line);
+    if (this._flushScheduled) return;
+    this._flushScheduled = requestAnimationFrame(() => {
+      this._flushScheduled = 0;
+      this._flushPendingLines();
+    });
+  }
+
+  // Drain pending lines into ``_lines`` now, trimmed to the newest
+  // MAX_LOG_LINES. Called from teardown / clear / download so consumers
+  // don't race the rAF.
+  _flushPendingLines(): void {
+    if (this._pendingLines.length === 0) return;
+    const merged = [...this._lines, ...this._pendingLines];
+    this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+    this._pendingLines = [];
+  }
+
+  // Drop the pending batch and cancel any scheduled flush. Paired with every
+  // ``_lines = []`` reset.
+  _resetPendingLines(): void {
+    this._pendingLines = [];
+    if (this._flushScheduled) {
+      cancelAnimationFrame(this._flushScheduled);
+      this._flushScheduled = 0;
+    }
   }
 
   // Reset Device button (Web Serial only). Pulses RTS (wired to EN on the

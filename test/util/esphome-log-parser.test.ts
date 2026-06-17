@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { ESPHomeLogParser } from "../../src/util/esphome-log-parser.js";
+import {
+  ESPHomeLogParser,
+  isLikelyGarbageLine,
+} from "../../src/util/esphome-log-parser.js";
 
 // Build the ESC byte at runtime so the test source stays free of raw
 // control characters (the device sends real ESC; the renderer accepts it).
 const ESC = String.fromCharCode(0x1b);
 const RESET = `${ESC}[0m`;
 const MAGENTA = `${ESC}[0;35m`; // [C] config color
+const FFFD = "\ufffd"; // U+FFFD, what TextDecoder emits for invalid UTF-8
 
 describe("ESPHomeLogParser", () => {
   it("appends a reset to an entry line that opened color but never closed it", () => {
@@ -89,5 +93,30 @@ describe("ESPHomeLogParser", () => {
     expect(p.parseLine("  Hostname: 'ol'")).toBe(
       `${MAGENTA}[C][wifi:1248]:   Hostname: 'ol'${RESET}`
     );
+  });
+});
+
+describe("isLikelyGarbageLine", () => {
+  it("flags a line that is mostly replacement chars", () => {
+    expect(isLikelyGarbageLine(FFFD.repeat(8))).toBe(true);
+  });
+
+  it("flags a line dominated by control bytes", () => {
+    const ctrl = String.fromCharCode(0x01, 0x02, 0x00, 0x1f, 0x7f);
+    expect(isLikelyGarbageLine(`${ctrl}ab`)).toBe(true);
+  });
+
+  it("passes a clean ESPHome log line, color codes and all", () => {
+    expect(isLikelyGarbageLine(`${MAGENTA}[C][wifi:1248]: WiFi:${RESET}`)).toBe(false);
+    expect(isLikelyGarbageLine("[I][app:100]: Booting")).toBe(false);
+  });
+
+  it("keeps tab-indented continuation lines", () => {
+    expect(isLikelyGarbageLine("\t  Hostname: slowlogs")).toBe(false);
+  });
+
+  it("never flags a short line — too little signal, the cap bounds it", () => {
+    expect(isLikelyGarbageLine("m")).toBe(false);
+    expect(isLikelyGarbageLine(FFFD)).toBe(false);
   });
 });
