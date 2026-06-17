@@ -99,7 +99,7 @@ let _lastSerialActivityMs = 0;
 // plus our internal disconnect → port.close → optional hard_reset
 // chain. Bursts of re-enum events extend the window further (see
 // the handler in ``app-shell``), so this is just the floor.
-const SERIAL_ACTIVITY_WINDOW_MS = 6000;
+export const SERIAL_ACTIVITY_WINDOW_MS = 6000;
 
 export function markSerialActivity(): void {
   _lastSerialActivityMs = Date.now();

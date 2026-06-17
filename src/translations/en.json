@@ -62,7 +62,7 @@
     "logs_show_states": "Show states",
     "logs_back_to_install": "Back to install",
     "logs_back_to_install_tooltip": "Return to the install output",
-    "logs_port_reopen_failed": "Failed to reopen the serial port for logs. The device may still be restarting — click Start to reconnect.",
+    "logs_port_reopen_failed": "Failed to reopen the serial port for logs ({port}). The device may still be restarting — click Start to reconnect.",
     "select_all": "Select all",
     "deselect_all": "Deselect all",
     "selected_count": "{count} selected",

@@ -3,6 +3,73 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
+import { SERIAL_ACTIVITY_WINDOW_MS } from "./web-serial.js";
+
+// Reopen budget for a port closed by the post-install reset: covers the
+// native-USB re-enumeration window (``SERIAL_ACTIVITY_WINDOW_MS``) with margin
+// for a slower first enumeration on a brand-new board.
+const SERIAL_REOPEN_TIMEOUT_MS = SERIAL_ACTIVITY_WINDOW_MS + 2000;
+
+/**
+ * Human label for a Web Serial port, for error messages. Web Serial exposes
+ * no device path/name, only the USB vendor/product ids; fall back to a generic
+ * label when those are absent (non-USB ports).
+ */
+export function formatSerialPortLabel(port: SerialPort): string {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  if (usbVendorId === undefined || usbProductId === undefined) {
+    return "USB serial device";
+  }
+  const hex = (n: number) => n.toString(16).padStart(4, "0");
+  return `USB ${hex(usbVendorId)}:${hex(usbProductId)}`;
+}
+
+/**
+ * Prompt for a Web Serial port and open it at log baud. Returns the open port,
+ * or ``null`` if the user dismissed the picker. Throws if a picked port can't
+ * be opened (claimed by another tab, driver error) — the caller surfaces that.
+ */
+export async function requestAndOpenSerialPort(): Promise<SerialPort | null> {
+  let port: SerialPort;
+  try {
+    port = await navigator.serial.requestPort();
+  } catch {
+    return null; // User dismissed the port picker.
+  }
+  await port.open({ baudRate: 115200 });
+  return port;
+}
+
+/**
+ * Reconnect a dead Web Serial logs session by acquiring a FRESH port via the
+ * picker, not reopening the cached handle.
+ *
+ * The post-install handoff caches the ``SerialPort`` esptool used for flashing;
+ * on a native-USB chip (C3 / S3 / C6) the post-flash reset re-enumerates the
+ * USB device and that download-mode handle never reopens. Re-running the picker
+ * (the dialog's "Start" runs inside the click's user activation, so
+ * ``requestPort()`` is allowed) grabs the running firmware's live CDC — the
+ * same thing a manual "Logs → Web Serial" does, which is why that works.
+ */
+export async function reconnectWebSerialLogs(
+  logsDialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc
+): Promise<void> {
+  let port: SerialPort | null;
+  try {
+    port = await requestAndOpenSerialPort();
+  } catch {
+    const message = localize("dashboard.logs_web_serial_open_failed");
+    logsDialog.setSerialOpenFailed(message);
+    toast.error(message, { richColors: true });
+    return;
+  }
+  if (!port) {
+    logsDialog.abortSerialReconnect(); // Picker dismissed — back to "Start", quietly.
+    return;
+  }
+  await attachSerialLogStream(port, logsDialog, localize);
+}
 
 /**
  * Detail shape of the cancelable ``request-show-logs-after-install``
@@ -140,9 +207,11 @@ export async function attachSerialLogStream(
   localize: LocalizeFunc
 ): Promise<void> {
   if (!port.readable) {
-    const opened = await openSerialWithRetry(port, 115200, 5000);
+    const opened = await openSerialWithRetry(port, 115200, SERIAL_REOPEN_TIMEOUT_MS);
     if (!opened) {
-      const message = localize("dashboard.logs_port_reopen_failed");
+      const message = localize("dashboard.logs_port_reopen_failed", {
+        port: formatSerialPortLabel(port),
+      });
       logsDialog.setSerialOpenFailed(message);
       toast.error(message, { richColors: true });
       return;
@@ -170,8 +239,10 @@ export async function handlePostInstallShowLogs(
   if (webSerialPort) {
     logsDialog.openPassive({
       onBackToInstall: reopenInstall,
-      // "click Start to reconnect" after a reopen failure (#636).
-      onReconnect: () => attachSerialLogStream(webSerialPort, logsDialog, localize),
+      // "click Start to reconnect" after a reopen failure (#636). Re-acquire a
+      // fresh port via the picker rather than reopening the cached esptool
+      // handle, which a native-USB chip's post-flash re-enumeration leaves dead.
+      onReconnect: () => reconnectWebSerialLogs(logsDialog, localize),
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly

@@ -10,7 +10,11 @@ import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
-import { attachSerialLogStream } from "../../util/post-install-logs.js";
+import {
+  attachSerialLogStream,
+  reconnectWebSerialLogs,
+  requestAndOpenSerialPort,
+} from "../../util/post-install-logs.js";
 
 export async function executeFriendlyName(
   host: ESPHomePageDashboard,
@@ -195,18 +199,9 @@ export async function openLogsWithMethod(
       });
       return;
     }
-    let serialPort: SerialPort;
+    let serialPort: SerialPort | null;
     try {
-      serialPort = await (
-        navigator as unknown as {
-          serial: { requestPort: () => Promise<SerialPort> };
-        }
-      ).serial.requestPort();
-    } catch {
-      return; // User dismissed the port picker.
-    }
-    try {
-      await serialPort.open({ baudRate: 115200 });
+      serialPort = await requestAndOpenSerialPort();
     } catch {
       // The user picked a port but it couldn't open (claimed by another tab,
       // driver error); unlike a picker dismissal this needs feedback.
@@ -215,16 +210,19 @@ export async function openLogsWithMethod(
       });
       return;
     }
+    if (!serialPort) return; // User dismissed the port picker.
+    const port = serialPort;
     host._logsDialog.configuration = device.configuration;
     host._logsDialog.name = device.friendly_name || device.name;
-    // Reconnect hook drives the dialog's "click Start to reconnect" path.
-    const reconnect = () =>
-      attachSerialLogStream(serialPort, host._logsDialog, host._localize);
-    host._logsDialog.openPassive({ onReconnect: reconnect });
+    // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
+    // port via the picker — the cached handle can be dead after a device reset.
+    host._logsDialog.openPassive({
+      onReconnect: () => reconnectWebSerialLogs(host._logsDialog, host._localize),
+    });
     // attach toasts the reopen-retry failure itself; cover any other rejection
     // so it can't escape this fire-and-forget call as an unhandled rejection.
     try {
-      await reconnect();
+      await attachSerialLogStream(port, host._logsDialog, host._localize);
     } catch {
       toast.error(host._localize("dashboard.logs_web_serial_open_failed"), {
         richColors: true,

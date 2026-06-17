@@ -377,5 +377,20 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     el.setSerialOpenFailed("gone");
     expect(hasSerialPort(session(el))).toBe(false);
   });
+
+  it("abortSerialReconnect drops to dead with no error line or toast", () => {
+    el.openPassive({ onReconnect: () => Promise.resolve() });
+    expect(session(el).kind).toBe("reconnecting");
+    el.abortSerialReconnect();
+    expect(session(el).kind).toBe("dead");
+    expect((el as any)._lines).toEqual([]); // a cancel isn't a failure
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("abortSerialReconnect is a no-op for a non-passive (OTA) session", () => {
+    el.open("OTA");
+    el.abortSerialReconnect();
+    expect(session(el).kind).toBe("ota");
+  });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

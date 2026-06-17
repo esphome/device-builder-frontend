@@ -225,6 +225,16 @@ export class ESPHomeLogsDialog extends LitElement {
     this._session = { kind: "dead" };
   }
 
+  /**
+   * Return a reconnect attempt to ``dead`` without surfacing an error — for
+   * when the user dismisses the Web Serial port picker. The ``Start`` button
+   * stays available; no log line or toast (a cancel isn't a failure).
+   */
+  public abortSerialReconnect() {
+    if (!this._open || !isPassive(this._session)) return;
+    this._session = { kind: "dead" };
+  }
+
   /** Stop whatever the session is running (Web Serial reader -> closes the
    *  port; backend WS -> kills the subprocess) and return to ``idle``. The
    *  cancel from `streamSerialToDialog` releases the reader lock before closing

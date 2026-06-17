@@ -19,6 +19,7 @@ vi.mock("../../src/util/web-serial.js", () => ({
   disconnect: vi.fn(),
   flashFirmware: vi.fn(),
   resetAndDisconnect: vi.fn(),
+  SERIAL_ACTIVITY_WINDOW_MS: 6000,
 }));
 
 import {
