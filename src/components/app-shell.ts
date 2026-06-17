@@ -52,7 +52,13 @@ import {
   versionContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { stripBase } from "../util/base-path.js";
 import { isExpert } from "../util/experience.js";
+import { navigate } from "../util/navigation.js";
+import {
+  consumePendingSerialSetup,
+  markPendingSerialSetup,
+} from "../util/pending-serial-setup.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
@@ -336,15 +342,29 @@ export class ESPHomeApp extends LitElement {
       duration: 8000,
       action: {
         label: this._localize("layout.usb_device_setup"),
-        onClick: () => {
+        onClick: async () => {
           // Bridge the gap between the click and the first internal
           // markSerialActivity inside connectToPort — the chip
           // reset can fire a new connect event before that runs.
           markSerialActivity();
           toast.dismiss("esphome-usb-device-connected");
-          window.dispatchEvent(
-            new CustomEvent("esphome-serial-setup", { detail: { port } })
-          );
+          // The serial-setup handler and the wizard dialog live only on
+          // the dashboard; off-route the window event has no listener.
+          // On the dashboard, dispatch as before; elsewhere stash the
+          // port and navigate home so the dashboard resumes on mount.
+          if (stripBase(window.location.pathname) === "/") {
+            window.dispatchEvent(
+              new CustomEvent("esphome-serial-setup", { detail: { port } })
+            );
+            return;
+          }
+          markPendingSerialSetup(port);
+          await navigate("/");
+          // The editor / secrets leave guard can veto the navigation;
+          // clear the stash so a stale port can't fire on a later mount.
+          if (stripBase(window.location.pathname) !== "/") {
+            consumePendingSerialSetup();
+          }
         },
       },
     });

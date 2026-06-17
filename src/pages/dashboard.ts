@@ -106,6 +106,7 @@ import { UPDATE_FACET_BUCKETS, UPDATE_FACET_PREDICATES } from "../util/facets.js
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
+import { consumePendingSerialSetup } from "../util/pending-serial-setup.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { classifyNoCompatiblePeerReason } from "../util/version-mismatch.js";
@@ -311,10 +312,14 @@ export class ESPHomePageDashboard extends LitElement {
   ];
 
   private _onSerialSetup = (event: Event) => {
+    const port = (event as CustomEvent<{ port: SerialPort | null }>).detail?.port ?? null;
+    this._startSerialSetup(port);
+  };
+
+  private _startSerialSetup(port: SerialPort | null): void {
     // Remote-compute installs don't create devices; a plugged-in board
     // shouldn't pop the creation wizard.
     if (this._hideDeviceCreation) return;
-    const port = (event as CustomEvent<{ port: SerialPort | null }>).detail?.port ?? null;
     void detectAndOpenWizard(this._api, this._createDialog, {
       port,
       devices: this._devices,
@@ -327,7 +332,7 @@ export class ESPHomePageDashboard extends LitElement {
       },
       localize: this._localize,
     });
-  };
+  }
   private _onShowIgnoredChanged = (e: Event) => {
     this._showIgnored = (e as CustomEvent<{ value: boolean }>).detail.value;
   };
@@ -378,6 +383,13 @@ export class ESPHomePageDashboard extends LitElement {
     if (pending !== null) {
       this._highlightFreshDevice(pending);
       this._tryConsumePendingScroll();
+    }
+    // USB "Set it up" actioned from another route stashes the port and
+    // navigates here. Defer to first render: _createDialog (@query) and
+    // the prefs contexts driving _hideDeviceCreation land during it.
+    const pendingSerial = consumePendingSerialSetup();
+    if (pendingSerial !== null) {
+      void this.updateComplete.then(() => this._startSerialSetup(pendingSerial.port));
     }
   }
 
