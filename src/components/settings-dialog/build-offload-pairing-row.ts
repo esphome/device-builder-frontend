@@ -147,7 +147,7 @@ export function renderPairingRow(
           : nothing}
         <button
           type="button"
-          class="peer-remove btn-unpair"
+          class="peer-remove"
           aria-label=${localize("settings.unpair_aria", { label: pairing.label })}
           title=${localize("settings.unpair_action")}
           @click=${() => onUnpair(pairing)}

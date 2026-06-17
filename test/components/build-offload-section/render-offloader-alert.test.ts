@@ -1,6 +1,6 @@
 /**
  * The alert's Unpair action is a text button and must use the padded
- * text style, never the pairing row's 32×32 icon-only ``btn-unpair``
+ * text style, never the pairing row's 32×32 icon-only ``peer-remove``
  * (text overflowed the square and read as an unstyled button, #766).
  */
 import { describe, expect, it, vi } from "vitest";
@@ -45,12 +45,12 @@ describe("renderOffloaderAlert", () => {
     const tokens = classTokens(renderOffloaderAlert(pinMismatch, ctx()).strings.join(""));
     expect(tokens).toContain("btn-pair-build-server");
     expect(tokens).toContain("offloader-alert-unpair");
-    expect(tokens).not.toContain("btn-unpair");
+    expect(tokens).not.toContain("peer-remove");
   });
 
   it("styles the peer-revoked Unpair as a text button", () => {
     const tokens = classTokens(renderOffloaderAlert(peerRevoked, ctx()).strings.join(""));
     expect(tokens).toContain("offloader-alert-unpair");
-    expect(tokens).not.toContain("btn-unpair");
+    expect(tokens).not.toContain("peer-remove");
   });
 });

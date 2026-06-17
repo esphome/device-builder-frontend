@@ -252,7 +252,9 @@ export const peerRowStyles = css`
   }
 
   /* Destructive remove/unpair icon button: neutral bordered square at
-     rest, error tint on hover/focus. */
+     rest, error tint on hover/focus. Single source for both the
+     approved-senders Remove (build-server-section) and the offloader
+     unpair trash (build-offload-pairing-row). */
   .peer-remove {
     display: inline-flex;
     align-items: center;

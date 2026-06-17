@@ -108,11 +108,11 @@ export const pairingRowStyles = css`
   }
 
   /* Shared chrome for the section's secondary action buttons: the
-     pairing row's icon-only squares, its Build-remote / View-build
+     pairing row's icon Edit square, its Build-remote / View-build
      text actions, and the alert's text Unpair (.offloader-alert-unpair
      markup lives in build-offload-alert.ts; its chrome stays here with
-     its siblings). */
-  .btn-unpair,
+     its siblings). The pairing row's trash button is the shared
+     .peer-remove in shared-styles.ts. */
   .btn-edit-endpoint,
   .btn-build-remote,
   .btn-view-remote-build,
@@ -128,19 +128,16 @@ export const pairingRowStyles = css`
     flex-shrink: 0;
   }
 
-  .btn-unpair,
   .btn-edit-endpoint {
     width: 32px;
     border-radius: var(--wa-border-radius-s);
   }
 
-  .btn-unpair wa-icon,
   .btn-edit-endpoint wa-icon {
     font-size: 16px;
   }
 
   /* Destructive actions tint error on hover; edit tints primary. */
-  .btn-unpair:hover,
   .offloader-alert-unpair:hover {
     background: color-mix(in srgb, var(--esphome-error), white 90%);
     color: var(--esphome-error);
@@ -168,7 +165,6 @@ export const pairingRowStyles = css`
     font-weight: var(--wa-font-weight-semibold);
   }
 
-  .btn-unpair:focus-visible,
   .btn-edit-endpoint:focus-visible,
   .btn-build-remote:focus-visible,
   .btn-view-remote-build:focus-visible,
