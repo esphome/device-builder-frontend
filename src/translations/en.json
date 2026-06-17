@@ -405,6 +405,7 @@
     "status_installing": "Compiling and installing firmware…",
     "status_downloading": "Downloading firmware…",
     "status_flashing": "Flashing firmware to device…",
+    "flashing_keep_visible": "Keep this window visible — switching to another tab or window can interrupt the flash.",
     "status_resetting": "Restarting device…",
     "status_done": "Installation complete!",
     "status_failed": "Installation failed",

@@ -134,6 +134,9 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
   }
   if (host._step === "download-ready") return downloadReadyDetail(host);
   if (host._step === "error") return host._errorMessage;
+  // Hidden tabs throttle timers, which can stall the Web Serial write and fail
+  // the flash; there's no API to opt out, so warn the user to stay on the page.
+  if (host._step === "flashing") return host._localize("firmware.flashing_keep_visible");
   return "";
 }
 
