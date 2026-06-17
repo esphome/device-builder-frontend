@@ -248,9 +248,10 @@ export class ESPHomeSettingsBuildServer extends LitElement {
           aria-label=${this._localize("settings.build_server_peer_remove_aria", {
             label: peer.label,
           })}
+          title=${this._localize("settings.build_server_peer_remove")}
           @click=${() => this._onRemovePeerRequest(peer.dashboard_id)}
         >
-          ${this._localize("settings.build_server_peer_remove")}
+          <wa-icon library="mdi" name="delete"></wa-icon>
         </button>
       </div>
     `;

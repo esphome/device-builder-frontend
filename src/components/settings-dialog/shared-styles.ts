@@ -251,24 +251,36 @@ export const peerRowStyles = css`
     gap: var(--wa-space-xs);
   }
 
+  /* Destructive remove/unpair icon button: neutral bordered square at
+     rest, error tint on hover/focus. */
   .peer-remove {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 32px;
     height: 32px;
-    border: none;
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-s);
-    background: transparent;
+    background: var(--wa-color-surface-default);
     color: var(--wa-color-text-quiet);
     cursor: pointer;
     flex-shrink: 0;
   }
 
+  .peer-remove wa-icon {
+    font-size: 16px;
+  }
+
   .peer-remove:hover,
   .peer-remove:focus-visible {
-    background: var(--wa-color-surface-border);
-    color: var(--wa-color-text);
+    background: color-mix(in srgb, var(--esphome-error), white 90%);
+    color: var(--esphome-error);
+    border-color: var(--esphome-error);
+  }
+
+  .peer-remove:focus-visible {
+    outline: none;
+    box-shadow: var(--esphome-focus-ring);
   }
 
   .peer-connection-pill {
