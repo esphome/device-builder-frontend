@@ -149,57 +149,75 @@ export function postInstallShowLogsHandler(
   return (e) => handlePostInstallShowLogs(e, getLogsDialog(), getLocalize());
 }
 
+const matchesDevice = (a: SerialPortInfo, b: SerialPortInfo): boolean =>
+  a.usbVendorId === b.usbVendorId && a.usbProductId === b.usbProductId;
+
 /**
- * Reopen a SerialPort that the post-install hard-reset just closed,
- * retrying through the brief native-USB re-enumeration window.
+ * Open the live SerialPort for a device the post-install hard-reset just
+ * closed, retrying through the native-USB re-enumeration window. Returns the
+ * open port, or ``null`` if none opened inside ``timeoutMs``.
  *
- * ESP32-S3 / C3 / C6 (USB-Serial/JTAG) drop their USB device for a
- * few hundred ms after the EN-pulse reset, so a synchronous
- * ``port.open()`` immediately after ``transport.disconnect()`` races
- * the re-enumeration and throws ``NetworkError``. UART-bridge chips
- * (CP2102 / CH340) don't re-enumerate and the first attempt succeeds.
- *
- * Returns ``true`` on success (or "already open" — a race that left
- * the port usable). Returns ``false`` if no attempt succeeded inside
- * ``timeoutMs``.
+ * ESP32-S3 / C3 / C6 (USB-Serial/JTAG) drop their USB device after the reset
+ * and re-enumerate. On Chrome the *cached* handle esptool used stays dead
+ * (``open()`` throws ``NetworkError`` forever) while ``navigator.serial.
+ * getPorts()`` returns a fresh, openable handle for the same authorized
+ * device — so each attempt prefers a live granted port, falling back to the
+ * cached handle (which Firefox and non-re-enumerating UART bridges reopen
+ * directly). No re-prompt: every candidate is already permitted.
  */
-async function openSerialWithRetry(
-  port: SerialPort,
+async function openLiveSerialPort(
+  cachedPort: SerialPort,
   baudRate: number,
   timeoutMs: number
-): Promise<boolean> {
+): Promise<SerialPort | null> {
+  const want = cachedPort.getInfo();
   const deadline = Date.now() + timeoutMs;
-  let lastErr: unknown = null;
   while (true) {
+    let granted: SerialPort[] = [];
     try {
-      await port.open({ baudRate });
-      return true;
-    } catch (err) {
-      lastErr = err;
-      const name = err instanceof DOMException ? err.name : "";
-      const message = err instanceof Error ? err.message : "";
-      // Chrome's message for "InvalidStateError: The port is already
-      // open." has no specific DOMException code; string-match is
-      // unavoidable. Web Serial is Chromium-only today so the surface
-      // is one-browser — acceptable.
-      if (name === "InvalidStateError" && /already open/i.test(message)) {
-        return true;
-      }
-      if (name !== "NetworkError" || Date.now() >= deadline) {
-        console.error("[Web Serial] Failed to reopen port for logs:", lastErr);
-        return false;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      granted = await navigator.serial.getPorts();
+    } catch {
+      /* getPorts can transiently reject mid-re-enumeration; treat as empty
+         and retry (the cached handle is still tried below). */
     }
+    // Prefer a freshly-granted handle for the same device (Chrome's live
+    // re-enumerated port), then any other granted port, then the cached handle
+    // (Firefox / UART bridges reopen it in place). Dedup so the dead cached
+    // handle isn't retried twice per round.
+    const candidates = [
+      ...granted.filter((p) => p !== cachedPort && matchesDevice(p.getInfo(), want)),
+      ...granted.filter((p) => p !== cachedPort && !matchesDevice(p.getInfo(), want)),
+      cachedPort,
+    ];
+    for (const p of candidates) {
+      if (p.readable) return p; // already open (a reset race left it usable)
+      try {
+        await p.open({ baudRate });
+        return p;
+      } catch (err) {
+        const name = err instanceof DOMException ? err.name : "";
+        const message = err instanceof Error ? err.message : "";
+        if (name === "InvalidStateError" && /already open/i.test(message)) {
+          return p;
+        }
+        // Anything else (NetworkError while the device is still gone, a stale
+        // handle) — try the next candidate / next round.
+      }
+    }
+    if (Date.now() >= deadline) {
+      return null;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 }
 
 /**
  * Start a Web Serial read loop and hand the dialog its port + loop-cancel.
  * Begins a passive session (user-initiated logs, post-install hand-off, or
- * the dialog's reconnect-after-failure). A closed port is reopened through
- * the re-enumeration window (the ``requestPort()`` grant persists, so no
- * re-prompt) with DTR/RTS cleared; an already-open port skips the reopen.
+ * the dialog's reconnect-after-failure). A closed port is reopened through the
+ * re-enumeration window — resolving the live granted handle, since a native-USB
+ * chip's cached handle can be dead after the reset — with DTR/RTS cleared; an
+ * already-open port streams as-is.
  */
 export async function attachSerialLogStream(
   port: SerialPort,
@@ -207,8 +225,8 @@ export async function attachSerialLogStream(
   localize: LocalizeFunc
 ): Promise<void> {
   if (!port.readable) {
-    const opened = await openSerialWithRetry(port, 115200, SERIAL_REOPEN_TIMEOUT_MS);
-    if (!opened) {
+    const live = await openLiveSerialPort(port, 115200, SERIAL_REOPEN_TIMEOUT_MS);
+    if (!live) {
       const message = localize("dashboard.logs_port_reopen_failed", {
         port: formatSerialPortLabel(port),
       });
@@ -216,6 +234,7 @@ export async function attachSerialLogStream(
       toast.error(message, { richColors: true });
       return;
     }
+    port = live;
     try {
       await port.setSignals({ dataTerminalReady: false, requestToSend: false });
     } catch {

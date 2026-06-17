@@ -63,6 +63,16 @@ function withRequestPort(impl: () => Promise<SerialPort>): () => void {
   return () =>
     Object.defineProperty(navigator, "serial", { configurable: true, value: prev });
 }
+
+function withGetPorts(impl: () => Promise<SerialPort[]>): () => void {
+  const prev = (navigator as any).serial;
+  Object.defineProperty(navigator, "serial", {
+    configurable: true,
+    value: { getPorts: vi.fn(impl) },
+  });
+  return () =>
+    Object.defineProperty(navigator, "serial", { configurable: true, value: prev });
+}
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 afterEach(() => {
@@ -125,13 +135,38 @@ describe("reconnectWebSerialLogs", () => {
   });
 });
 
-describe("attachSerialLogStream reopen failure", () => {
-  it("names the port being tried in the failure message", async () => {
+describe("attachSerialLogStream reopen", () => {
+  it("opens a fresh getPorts() handle when the cached one is dead (Chrome re-enum)", async () => {
+    // The cached esptool handle won't reopen, but getPorts() yields a live one
+    // for the same device — the auto path must recover with no picker.
+    const live = openPort();
+    const restore = withGetPorts(async () => [live]);
     const dialog = stubDialog();
-    await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize);
-    expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
-    const message = dialog.setSerialOpenFailed.mock.calls[0][0] as string;
-    expect(message).toContain("USB 303a:1001");
-    expect(toastError).toHaveBeenCalledTimes(1);
+    try {
+      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize);
+      expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
+      expect(dialog.setSerialStream.mock.calls[0][0]).toBe(live); // streamed the live handle
+      expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("names the port in the failure message when nothing opens in the window", async () => {
+    vi.useFakeTimers();
+    const restore = withGetPorts(async () => []); // device never reappears
+    const dialog = stubDialog();
+    try {
+      const done = attachSerialLogStream(deadPort(), dialog as never, defaultLocalize);
+      await vi.advanceTimersByTimeAsync(8100);
+      await done;
+      expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
+      const message = dialog.setSerialOpenFailed.mock.calls[0][0] as string;
+      expect(message).toContain("USB 303a:1001");
+      expect(toastError).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+      vi.useRealTimers();
+    }
   });
 });

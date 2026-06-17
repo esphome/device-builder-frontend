@@ -216,9 +216,9 @@ export class ESPHomeLogsDialog extends LitElement {
    * with a ``toast.error``.
    */
   public setSerialOpenFailed(message: string) {
-    // Same guard as setSerialStream: the reopen retries for ~5s, so a late
-    // failure can land after the dialog closed or switched to an OTA session —
-    // don't tear that unrelated session down or flip it into a passive `dead`.
+    // Same guard as setSerialStream: the reopen retries across the re-enum
+    // window, so a late failure can land after the dialog closed or switched to
+    // an OTA session — don't tear that unrelated session down or flip it dead.
     if (!this._open || !isPassive(this._session)) return;
     void this._teardownSession();
     this._lines = [...this._lines, message];
