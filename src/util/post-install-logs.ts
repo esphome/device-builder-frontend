@@ -18,7 +18,7 @@ const SERIAL_REOPEN_TIMEOUT_MS = SERIAL_ACTIVITY_WINDOW_MS + 2000;
 export function formatSerialPortLabel(port: SerialPort): string {
   const { usbVendorId, usbProductId } = port.getInfo();
   if (usbVendorId === undefined || usbProductId === undefined) {
-    return "the serial port";
+    return "unknown device";
   }
   const hex = (n: number) => n.toString(16).padStart(4, "0");
   return `USB ${hex(usbVendorId)}:${hex(usbProductId)}`;
@@ -206,9 +206,22 @@ async function openLiveSerialPort(
         await p.open({ baudRate });
         return p;
       } catch (err) {
-        // Device still gone (NetworkError) or a stale handle — keep the last
-        // error for the timeout breadcrumb and try the next candidate / round.
         lastErr = err;
+        const name = err instanceof DOMException ? err.name : "";
+        const message = err instanceof Error ? err.message : "";
+        // Already open (a reset race / another candidate) — usable as-is.
+        if (name === "InvalidStateError" && /already open/i.test(message)) {
+          return p;
+        }
+        // NetworkError means the device is still gone mid-re-enumeration: keep
+        // retrying the next candidate / round. Anything else (claimed by
+        // another app, driver / security error) won't fix itself by waiting —
+        // fail fast rather than stall the whole window behind a misleading
+        // "still restarting" message.
+        if (name !== "NetworkError") {
+          console.error("[Web Serial] Failed to reopen port for logs:", err);
+          return null;
+        }
       }
     }
     if (Date.now() >= deadline) {

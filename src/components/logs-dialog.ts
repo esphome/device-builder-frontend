@@ -226,12 +226,14 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   /**
-   * Return a reconnect attempt to ``dead`` without surfacing an error — for
+   * Return an in-flight reconnect to ``dead`` without surfacing an error — for
    * when the user dismisses the Web Serial port picker. The ``Start`` button
-   * stays available; no log line or toast (a cancel isn't a failure).
+   * stays available; no log line or toast (a cancel isn't a failure). Only acts
+   * while ``reconnecting`` — never on a live ``serial`` session, which holds an
+   * open reader/port that flipping to ``dead`` would leak.
    */
   public abortSerialReconnect() {
-    if (!this._open || !isPassive(this._session)) return;
+    if (this._session.kind !== "reconnecting") return;
     this._session = { kind: "dead" };
   }
 

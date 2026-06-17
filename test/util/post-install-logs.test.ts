@@ -35,13 +35,15 @@ function openPort(
   } as unknown as SerialPort;
 }
 
-// A closed port whose open() rejects with a non-NetworkError, so the reopen
-// retry bails immediately (no fake timers needed).
-function deadPort(): SerialPort {
+// A closed port whose open() always rejects. Defaults to a non-NetworkError
+// (the reopen bails fast); pass a NetworkError to exercise the retry window.
+function deadPort(
+  error: unknown = new DOMException("blocked", "SecurityError")
+): SerialPort {
   return {
     readable: null,
     getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }),
-    open: vi.fn().mockRejectedValue(new Error("nope")),
+    open: vi.fn().mockRejectedValue(error),
     setSignals: vi.fn(),
   } as unknown as SerialPort;
 }
@@ -85,7 +87,7 @@ describe("formatSerialPortLabel", () => {
   });
 
   it("falls back to a neutral label when USB ids are absent", () => {
-    expect(formatSerialPortLabel(openPort({}))).toBe("the serial port");
+    expect(formatSerialPortLabel(openPort({}))).toBe("unknown device");
   });
 });
 
@@ -168,18 +170,39 @@ describe("attachSerialLogStream reopen", () => {
     }
   });
 
-  it("names the port in the failure message and logs a breadcrumb when nothing opens", async () => {
+  it("fails fast on a non-recoverable open error (no waiting out the window)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const restore = withGetPorts(async () => []);
+    const dialog = stubDialog();
+    try {
+      // SecurityError won't fix itself by waiting — bail without fake timers.
+      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize);
+      expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
+      expect(dialog.setSerialOpenFailed.mock.calls[0][0] as string).toContain(
+        "USB 303a:1001"
+      );
+      expect(toastError).toHaveBeenCalledTimes(1);
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      errSpy.mockRestore();
+      restore();
+    }
+  });
+
+  it("retries NetworkError across the window, then names the port and logs a breadcrumb", async () => {
     vi.useFakeTimers();
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const restore = withGetPorts(async () => []); // device never reappears
     const dialog = stubDialog();
     try {
-      const done = attachSerialLogStream(deadPort(), dialog as never, defaultLocalize);
+      const port = deadPort(new DOMException("gone", "NetworkError"));
+      const done = attachSerialLogStream(port, dialog as never, defaultLocalize);
       await vi.advanceTimersByTimeAsync(8100);
       await done;
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
-      const message = dialog.setSerialOpenFailed.mock.calls[0][0] as string;
-      expect(message).toContain("USB 303a:1001");
+      expect(dialog.setSerialOpenFailed.mock.calls[0][0] as string).toContain(
+        "USB 303a:1001"
+      );
       expect(toastError).toHaveBeenCalledTimes(1);
       expect(errSpy).toHaveBeenCalled(); // last open error logged for field debugging
     } finally {
