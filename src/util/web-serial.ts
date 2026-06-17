@@ -5,7 +5,7 @@
  * Web Serial API. No backend involvement — talks directly to the
  * USB-connected ESP device.
  */
-import { ClassicReset, ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
+import { ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
 const ESPRESSIF_USB_VID = 0x303a;
@@ -284,7 +284,7 @@ export async function flashFirmware(
  * trick precisely because DTR/RTS-based resets are unreliable on
  * native-USB / USB-Serial-JTAG chips and on boards whose auto-reset
  * circuit doesn't have the cross-coupled "cancellation" behaviour the
- * standard ClassicReset sequence assumes (M5Stamp C3 with CH9102F is
+ * standard DTR/RTS reset sequence assumes (M5Stamp C3 with CH9102F is
  * one such combination — the user-reported repro of this fix).
  *
  * Disabled on ESP32-C6 (causes full system freeze per Espressif docs)
@@ -373,6 +373,19 @@ async function watchdogReset(loader: ESPLoader, transport: Transport): Promise<b
 }
 
 /**
+ * Boot the just-flashed firmware on a classic ESP32 / ESP8266 behind a UART
+ * bridge: pulse EN (RTS) low→high while leaving GPIO0 (DTR) released, so the
+ * chip resets out of the bootloader and runs the app. Mirrors esptool's
+ * ``--after hard-reset`` and the legacy dashboard's ``resetSerialDevice``.
+ */
+async function classicHardReset(transport: Transport): Promise<void> {
+  await transport.setDTR(false); // GPIO0 high → boot from flash, not download mode
+  await transport.setRTS(true); // EN low (hold in reset)
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await transport.setRTS(false); // EN high → boot the app
+}
+
+/**
  * Pick a reset strategy based on the chip and how it's connected.
  *
  * esptool-js's ``loader.after("hard_reset")`` resolves to its
@@ -391,8 +404,11 @@ async function watchdogReset(loader: ESPLoader, transport: Transport): Promise<b
  *   list (mostly fall-through; safety net): esptool-js's
  *   ``UsbJtagSerialReset``.
  * - Everything else (classic ESP32 / ESP8266 via CP210x / CH340 /
- *   FTDI / etc. bridges): the standard DTR/RTS pulse esptool's
- *   ``--after hard-reset`` uses (``ClassicReset``).
+ *   FTDI / etc. bridges): an EN pulse with GPIO0 released
+ *   (``classicHardReset``), matching esptool's ``--after hard-reset``.
+ *   esptool-js's ``ClassicReset`` is NOT this — it's the
+ *   *enter-bootloader* sequence (drives GPIO0 low as EN releases), which
+ *   left the just-flashed chip stuck in the serial bootloader (#1529).
  */
 async function hardResetChip(
   loader: ESPLoader,
@@ -404,7 +420,7 @@ async function hardResetChip(
   if (vendorId === ESPRESSIF_USB_VID) {
     await new UsbJtagSerialReset(transport).reset();
   } else {
-    await new ClassicReset(transport, 50).reset();
+    await classicHardReset(transport);
   }
 }
 
