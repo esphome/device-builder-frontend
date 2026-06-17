@@ -49,11 +49,13 @@ describe("esphome-layout footer version links", () => {
     }
   });
 
-  test("renders dev versions as plain text without a link", async () => {
-    el = await renderFooter("0.0.0", "2026.5.0-dev");
-    expect(footerLinks(el)).toHaveLength(0);
+  test("dev Device Builder stays plain text; dev ESPHome links to the next docs root", async () => {
+    el = await renderFooter("0.0.0", "2026.7.0-dev");
+    const links = footerLinks(el);
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe("https://next.esphome.io/");
+    expect(links[0].textContent?.trim()).toBe("ESPHome 2026.7.0-dev");
     const footer = el.shadowRoot!.querySelector(".app-footer")?.textContent;
     expect(footer).toContain("ESPHome Device Builder v0.0.0");
-    expect(footer).toContain("ESPHome 2026.5.0-dev");
   });
 });

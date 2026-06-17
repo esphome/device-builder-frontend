@@ -40,17 +40,20 @@ describe("esphomeChangelogUrl", () => {
     );
   });
 
-  it("normalizes a pre-release version to the minor page", () => {
-    expect(esphomeChangelogUrl("2026.5.0b1")).toBe(
-      "https://esphome.io/changelog/2026.5.0/"
+  it("routes a beta version to the beta docs site", () => {
+    expect(esphomeChangelogUrl("2026.6.0b3")).toBe(
+      "https://beta.esphome.io/changelog/2026.6.0/"
     );
     expect(esphomeChangelogUrl("2026.12.0b2")).toBe(
-      "https://esphome.io/changelog/2026.12.0/"
+      "https://beta.esphome.io/changelog/2026.12.0/"
     );
   });
 
-  it("returns null for a dev build or an unparseable version", () => {
-    expect(esphomeChangelogUrl("2026.5.0-dev")).toBeNull();
+  it("links a dev build to the next docs root", () => {
+    expect(esphomeChangelogUrl("2026.7.0-dev")).toBe("https://next.esphome.io/");
+  });
+
+  it("returns null for an unparseable version", () => {
     expect(esphomeChangelogUrl("")).toBeNull();
     expect(esphomeChangelogUrl("not-a-version")).toBeNull();
   });
