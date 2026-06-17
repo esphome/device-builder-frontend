@@ -84,8 +84,8 @@ describe("formatSerialPortLabel", () => {
     expect(formatSerialPortLabel(openPort())).toBe("USB 303a:1001");
   });
 
-  it("falls back to a generic label when USB ids are absent", () => {
-    expect(formatSerialPortLabel(openPort({}))).toBe("USB serial device");
+  it("falls back to a neutral label when USB ids are absent", () => {
+    expect(formatSerialPortLabel(openPort({}))).toBe("the serial port");
   });
 });
 
@@ -105,8 +105,9 @@ describe("reconnectWebSerialLogs", () => {
   });
 
   it("returns to dead without an error when the picker is dismissed", async () => {
+    // A dismissed picker rejects with DOMException NotFoundError.
     const restore = withRequestPort(async () => {
-      throw new Error("dismissed");
+      throw new DOMException("dismissed", "NotFoundError");
     });
     const dialog = stubDialog();
     try {
@@ -114,6 +115,21 @@ describe("reconnectWebSerialLogs", () => {
       expect(dialog.abortSerialReconnect).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("surfaces a non-cancel requestPort failure instead of swallowing it", async () => {
+    const restore = withRequestPort(async () => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    const dialog = stubDialog();
+    try {
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize);
+      expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
+      expect(toastError).toHaveBeenCalledTimes(1);
+      expect(dialog.abortSerialReconnect).not.toHaveBeenCalled();
     } finally {
       restore();
     }

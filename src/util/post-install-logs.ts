@@ -3,7 +3,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
-import { SERIAL_ACTIVITY_WINDOW_MS } from "./web-serial.js";
+import { isPortPickerCancel, SERIAL_ACTIVITY_WINDOW_MS } from "./web-serial.js";
 
 // Reopen budget for a port closed by the post-install reset: covers the
 // native-USB re-enumeration window (``SERIAL_ACTIVITY_WINDOW_MS``) with margin
@@ -18,7 +18,7 @@ const SERIAL_REOPEN_TIMEOUT_MS = SERIAL_ACTIVITY_WINDOW_MS + 2000;
 export function formatSerialPortLabel(port: SerialPort): string {
   const { usbVendorId, usbProductId } = port.getInfo();
   if (usbVendorId === undefined || usbProductId === undefined) {
-    return "USB serial device";
+    return "the serial port";
   }
   const hex = (n: number) => n.toString(16).padStart(4, "0");
   return `USB ${hex(usbVendorId)}:${hex(usbProductId)}`;
@@ -33,8 +33,11 @@ export async function requestAndOpenSerialPort(): Promise<SerialPort | null> {
   let port: SerialPort;
   try {
     port = await navigator.serial.requestPort();
-  } catch {
-    return null; // User dismissed the port picker.
+  } catch (err) {
+    if (isPortPickerCancel(err)) {
+      return null; // User dismissed the port picker.
+    }
+    throw err; // A real requestPort failure — let the caller surface it.
   }
   await port.open({ baudRate: 115200 });
   return port;
@@ -149,8 +152,13 @@ export function postInstallShowLogsHandler(
   return (e) => handlePostInstallShowLogs(e, getLogsDialog(), getLocalize());
 }
 
+// Same USB device by vendor/product id. Requires both ids present so two
+// non-USB ports (``undefined === undefined``) aren't treated as a match.
 const matchesDevice = (a: SerialPortInfo, b: SerialPortInfo): boolean =>
-  a.usbVendorId === b.usbVendorId && a.usbProductId === b.usbProductId;
+  a.usbVendorId !== undefined &&
+  a.usbProductId !== undefined &&
+  a.usbVendorId === b.usbVendorId &&
+  a.usbProductId === b.usbProductId;
 
 /**
  * Open the live SerialPort for a device the post-install hard-reset just
