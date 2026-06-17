@@ -328,7 +328,7 @@ export class ESPHomeAdoptDialog extends LitElement {
               <label class="checkbox-row">
                 <input
                   type="checkbox"
-                  ?checked=${this._encryption}
+                  .checked=${this._encryption}
                   ?disabled=${this._busy}
                   @change=${(e: Event) => {
                     this._encryption = (e.target as HTMLInputElement).checked;

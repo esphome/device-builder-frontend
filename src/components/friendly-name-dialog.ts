@@ -222,7 +222,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
         </div>
         <div class="install-row">
           <wa-checkbox
-            ?checked=${this._install}
+            .checked=${this._install}
             @change=${(e: Event) => {
               this._install = (e.target as HTMLInputElement).checked;
             }}
