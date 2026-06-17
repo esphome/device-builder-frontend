@@ -34,6 +34,33 @@ export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
 }
 
+/**
+ * Choose which binary to flash over Web Serial and its flash offset.
+ *
+ * ESP8266 / ESP8285 flash a single complete ``firmware.bin`` at 0x0; ESP32 uses
+ * a merged ``*.factory.bin`` (bootloader + partitions + app) at 0x0, falling
+ * back to the app image at 0x10000. Flashing an ESP8266 image at 0x10000 leaves
+ * the boot address empty so the chip never boots (#1529). Returns ``null`` when
+ * there's no binary to flash.
+ *
+ * ``chipName`` is esptool-js's chip *description* (``loader.main()`` returns
+ * ``getChipDescription()`` — e.g. ``ESP8266EX`` / ``ESP8285``, not ``ESP8266``),
+ * so normalize it via ``chipNameToVariant`` and match the ``esp82`` family.
+ */
+export function pickFlashTarget(
+  chipName: string,
+  binaries: FirmwareBinary[]
+): { binary: FirmwareBinary; address: number } | null {
+  const factory = binaries.find((b) => b.file.includes("factory"));
+  const binary = factory ?? binaries[0];
+  if (!binary) return null;
+  // ESP8266 / ESP8285 are the only "esp82…" family — both flash a single
+  // complete image at 0x0, unlike ESP32's app-at-0x10000 layout.
+  const isEsp8266 = chipNameToVariant(chipName).startsWith("esp82");
+  const atZero = factory !== undefined || isEsp8266;
+  return { binary, address: atZero ? 0x0 : 0x10000 };
+}
+
 export async function startWebSerialInstall(
   host: ESPHomeFirmwareInstallDialog
 ): Promise<void> {
@@ -122,19 +149,17 @@ export async function startWebSerialInstall(
   // 4. Download binary
   host._statusMessage = host._localize("firmware.status_downloading");
   let firmwareBytes: Uint8Array;
-  let flashAddress = 0x10000;
+  let flashAddress: number;
   try {
     const binaries = await host._api.firmwareGetBinaries(device.configuration);
-    // Prefer factory binary (flashes at 0x0, includes bootloader).
-    const factory = binaries.find((b) => b.file.includes("factory"));
-    const binary = factory || binaries[0];
-    if (!binary) {
+    const target = pickFlashTarget(detected.chipName, binaries);
+    if (!target) {
       host._fail(host._localize("serial.no_firmware"));
       return;
     }
-    if (factory) flashAddress = 0x0;
+    flashAddress = target.address;
     firmwareBytes = new Uint8Array(
-      await host._api.firmwareDownloadBytes(device.configuration, binary.file)
+      await host._api.firmwareDownloadBytes(device.configuration, target.binary.file)
     );
   } catch {
     host._fail(host._localize("firmware.download_failed"));
