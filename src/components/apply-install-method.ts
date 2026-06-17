@@ -25,7 +25,9 @@ export function applyInstallMethod(
       h.openInstall(port ?? "OTA");
       break;
     case "server-serial":
-      h.openInstall(port!);
+      // server-serial always carries the chosen port; guard rather than assert
+      // so a malformed event can't open the install command without one.
+      if (port) h.openInstall(port);
       break;
     case "web-serial":
       h.firmwareDialog?.installWebSerial(h.device);

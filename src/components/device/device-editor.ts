@@ -29,6 +29,7 @@ import {
 } from "../../util/split-ratio.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
+import { renderInstallAction } from "./install-action.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -459,48 +460,15 @@ export class ESPHomeDeviceEditor extends LitElement {
     this._revealSensitive = !this._revealSensitive;
   }
 
-  // Always-available install affordance. With an update available the main
-  // button keeps the one-click OTA; the caret opens the install-method picker
-  // (Web Serial / OTA / manual) so a re-flash or replacement chip still has a
-  // path. Otherwise (pending changes or fully in sync) a plain Install opens
-  // the picker — including the in-sync case, which previously showed no button.
   private _renderPrimaryAction() {
-    if (this.hasUpdateAvailable) {
-      return html`<div class="install-split">
-        <button
-          type="button"
-          class="install-fab install-split__main"
-          ?disabled=${this.busy}
-          @click=${this._onUpdate}
-          title=${this._localize("dashboard.update")}
-        >
-          <wa-icon library="mdi" name="upload"></wa-icon>
-          ${this._localize("dashboard.update")}
-        </button>
-        <button
-          type="button"
-          class="install-fab install-split__caret"
-          ?disabled=${this.busy}
-          @click=${this._onInstall}
-          aria-label=${this._localize("device.install_choose_method")}
-          title=${this._localize("device.install_choose_method")}
-        >
-          <wa-icon library="mdi" name="chevron-down"></wa-icon>
-        </button>
-      </div>`;
-    }
-    // Highlighted when there's something to apply (pending changes); muted but
-    // still usable when the config already matches the deployed firmware.
-    return html`<button
-      type="button"
-      class="install-fab ${this.hasPendingChanges ? "" : "install-fab--muted"}"
-      ?disabled=${this.busy}
-      @click=${this._onInstall}
-      title=${this._localize("dashboard.install")}
-    >
-      <wa-icon library="mdi" name="upload"></wa-icon>
-      ${this._localize("dashboard.install")}
-    </button>`;
+    return renderInstallAction({
+      localize: this._localize,
+      hasUpdateAvailable: this.hasUpdateAvailable,
+      hasPendingChanges: this.hasPendingChanges,
+      busy: this.busy,
+      onUpdate: () => this._onUpdate(),
+      onInstall: () => this._onInstall(),
+    });
   }
 
   private _onInstall() {

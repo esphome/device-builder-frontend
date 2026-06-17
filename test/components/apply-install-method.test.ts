@@ -33,6 +33,12 @@ describe("applyInstallMethod", () => {
     expect(d.openInstall).toHaveBeenCalledWith("/dev/ttyUSB0");
   });
 
+  it("server-serial without a port does nothing (no portless install)", () => {
+    const d = deps();
+    applyInstallMethod("server-serial", undefined, d);
+    expect(d.openInstall).not.toHaveBeenCalled();
+  });
+
   it("web-serial routes to the firmware dialog, not the install command", () => {
     const d = deps();
     applyInstallMethod("web-serial", undefined, d);
