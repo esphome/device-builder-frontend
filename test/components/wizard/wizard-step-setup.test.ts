@@ -149,4 +149,18 @@ describe("wizard-step-setup ENTER", () => {
     expect(onFinish).toHaveBeenCalledTimes(1);
     expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("home");
   });
+
+  it("disables browser autofill on the name and wifi inputs", async () => {
+    const el = await mount();
+    const deviceName = el.shadowRoot!.querySelector<HTMLInputElement>("#device-name");
+    expect(deviceName?.getAttribute("autocomplete")).toBe("off");
+
+    await setName(el, "kitchen");
+    pressEnter(); // advance to the wifi stage so its inputs render
+    await el.updateComplete;
+    for (const id of ["wifi-ssid", "wifi-password"]) {
+      const input = el.shadowRoot!.querySelector<HTMLInputElement>(`#${id}`);
+      expect(input?.getAttribute("autocomplete")).toBe("off");
+    }
+  });
 });

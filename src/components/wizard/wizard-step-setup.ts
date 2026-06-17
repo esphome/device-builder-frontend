@@ -300,6 +300,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           <input
             id="device-name"
             type="text"
+            autocomplete="off"
             .value=${this._deviceName}
             placeholder=${this._localize("wizard.device_name_placeholder")}
             @input=${(e: InputEvent) => {
@@ -326,6 +327,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           <input
             id="wifi-ssid"
             type="text"
+            autocomplete="off"
             .value=${this._wifiSsid}
             @input=${(e: InputEvent) => {
               this._wifiSsid = (e.target as HTMLInputElement).value;
@@ -338,6 +340,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           <input
             id="wifi-password"
             type="password"
+            autocomplete="off"
             .value=${this._wifiPassword}
             @input=${(e: InputEvent) => {
               this._wifiPassword = (e.target as HTMLInputElement).value;
