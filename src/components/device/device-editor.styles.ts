@@ -128,8 +128,15 @@ export const deviceEditorStyles = css`
     align-items: stretch;
   }
 
-  /* Join the two halves into one split control: square the inner corners
-     and share the middle border so they read as a single button. */
+  /* Join the two halves into one split control: square the inner corners and
+     overlap the seam by one border width so both buttons keep a full border.
+     The hovered / focused half is raised so it owns a single, consistent seam
+     colour (without the overlap, the seam keeps the un-hovered border). */
+  .install-split__main,
+  .install-split__caret {
+    position: relative;
+  }
+
   .install-split__main {
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
@@ -138,10 +145,17 @@ export const deviceEditorStyles = css`
   .install-split__caret {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    border-left: none;
+    margin-left: calc(-1 * var(--wa-border-width-s));
     padding-left: 8px;
     padding-right: 8px;
     gap: 0;
+  }
+
+  .install-split__main:hover:not(:disabled),
+  .install-split__caret:hover:not(:disabled),
+  .install-split__main:focus-visible,
+  .install-split__caret:focus-visible {
+    z-index: 1;
   }
 
   .save-button {
