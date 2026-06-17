@@ -3,7 +3,10 @@ import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
-import { executeRename } from "../../../src/components/dashboard/actions-ui.js";
+import {
+  executeRename,
+  openLogsWithMethod,
+} from "../../../src/components/dashboard/actions-ui.js";
 import {
   confirmDialogCopy,
   executeConfirm,
@@ -17,6 +20,15 @@ vi.mock("sonner-js", () => ({
     success: vi.fn(),
     error: (...args: unknown[]) => toastError(...args),
   },
+}));
+
+const { requestAndOpenSerialPort } = vi.hoisted(() => ({
+  requestAndOpenSerialPort: vi.fn(),
+}));
+vi.mock("../../../src/util/post-install-logs.js", () => ({
+  requestAndOpenSerialPort,
+  attachSerialLogStream: vi.fn(),
+  reconnectWebSerialLogs: vi.fn(),
 }));
 
 // Append the interpolation params so the assertion sees the surfaced
@@ -48,6 +60,36 @@ function makeHost(
 function renameEvent(newName: string): CustomEvent<string> {
   return new CustomEvent("rename-confirm", { detail: newName });
 }
+
+describe("openLogsWithMethod web-serial", () => {
+  beforeEach(() => {
+    toastError.mockClear();
+    requestAndOpenSerialPort.mockClear();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("blocks serial logs and notifies when logging is disabled (baud_rate 0)", async () => {
+    vi.stubGlobal("navigator", { serial: {} });
+    const host = { _localize: localize } as unknown as ESPHomePageDashboard;
+    const device = {
+      configuration: "x.yaml",
+      name: "x",
+      friendly_name: "X",
+      logger_baud_rate: 0,
+    } as ConfiguredDevice;
+
+    await openLogsWithMethod(host, device, "web-serial");
+
+    expect(toastError).toHaveBeenCalledWith(
+      "dashboard.logs_serial_disabled",
+      expect.anything()
+    );
+    expect(requestAndOpenSerialPort).not.toHaveBeenCalled();
+  });
+});
 
 describe("executeRename", () => {
   beforeEach(() => toastError.mockClear());

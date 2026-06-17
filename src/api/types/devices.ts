@@ -37,6 +37,10 @@ export interface ConfiguredDevice {
    *  populated. */
   ip_addresses: string[];
   web_port: number | null;
+  /** Resolved `logger: baud_rate` for the Web Serial log port. `null` means
+   *  unset (open at the 115200 default); `0` means UART logging is disabled;
+   *  a positive value is the baud to open at. */
+  logger_baud_rate: number | null;
   current_version: string;
   deployed_version: string;
   loaded_integrations: string[];

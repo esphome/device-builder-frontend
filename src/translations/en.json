@@ -140,6 +140,7 @@
     "logs_method_wireless_desc": "Requires the device to be online",
     "logs_method_network_address_submit": "View logs over network",
     "logs_web_serial_unsupported": "Web Serial is not supported in this browser",
+    "logs_serial_disabled": "Serial logging is disabled for this device (logger baud_rate is 0).",
     "install_method_title": "How do you want to install the firmware?",
     "install_method_network": "On the network",
     "install_method_network_desc": "Compile and upload over the network",

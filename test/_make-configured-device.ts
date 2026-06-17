@@ -34,6 +34,7 @@ const _BASE = {
   build_size_bytes: 0,
   labels: [],
   web_port: null,
+  logger_baud_rate: null,
   current_version: "",
   deployed_version: "",
   loaded_integrations: [],

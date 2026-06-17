@@ -108,11 +108,23 @@ describe("reconnectWebSerialLogs", () => {
     const restore = withRequestPort(async () => openPort());
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((navigator as any).serial.requestPort).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("opens the picked port at the resolved baud", async () => {
+    const port = openPort();
+    const restore = withRequestPort(async () => port);
+    const dialog = stubDialog();
+    try {
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 19200);
+      expect(port.open).toHaveBeenCalledWith({ baudRate: 19200 });
     } finally {
       restore();
     }
@@ -125,7 +137,7 @@ describe("reconnectWebSerialLogs", () => {
     });
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
       expect(dialog.abortSerialReconnect).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
@@ -140,7 +152,7 @@ describe("reconnectWebSerialLogs", () => {
     });
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
       expect(toastError).toHaveBeenCalledTimes(1);
       expect(dialog.abortSerialReconnect).not.toHaveBeenCalled();
@@ -155,7 +167,7 @@ describe("reconnectWebSerialLogs", () => {
     const restore = withRequestPort(async () => port);
     const dialog = stubDialog();
     try {
-      await reconnectWebSerialLogs(dialog as never, defaultLocalize);
+      await reconnectWebSerialLogs(dialog as never, defaultLocalize, 115200);
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
       expect(toastError).toHaveBeenCalledTimes(1);
       expect(dialog.abortSerialReconnect).not.toHaveBeenCalled();
@@ -173,10 +185,30 @@ describe("attachSerialLogStream reopen", () => {
     const restore = withGetPorts(async () => [live]);
     const dialog = stubDialog();
     try {
-      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize);
+      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize, 115200);
       expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialStream.mock.calls[0][0]).toBe(live); // streamed the live handle
       expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("reopens the live handle at the resolved baud", async () => {
+    // A closed live handle from getPorts() must be reopened at the device's
+    // configured log baud, not the flash baud.
+    const live = {
+      readable: null,
+      getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }),
+      open: vi.fn().mockResolvedValue(undefined),
+      setSignals: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SerialPort;
+    const restore = withGetPorts(async () => [live]);
+    const dialog = stubDialog();
+    try {
+      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize, 19200);
+      expect(live.open).toHaveBeenCalledWith({ baudRate: 19200 });
+      expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
     } finally {
       restore();
     }
@@ -188,7 +220,7 @@ describe("attachSerialLogStream reopen", () => {
     const dialog = stubDialog();
     try {
       // SecurityError won't fix itself by waiting — bail without fake timers.
-      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize);
+      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize, 115200);
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
       expect(dialog.setSerialOpenFailed.mock.calls[0][0] as string).toContain(
         "USB 303a:1001"
@@ -208,7 +240,7 @@ describe("attachSerialLogStream reopen", () => {
     const dialog = stubDialog();
     try {
       const port = deadPort(new DOMException("gone", "NetworkError"));
-      const done = attachSerialLogStream(port, dialog as never, defaultLocalize);
+      const done = attachSerialLogStream(port, dialog as never, defaultLocalize, 115200);
       await vi.advanceTimersByTimeAsync(8100);
       await done;
       expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);

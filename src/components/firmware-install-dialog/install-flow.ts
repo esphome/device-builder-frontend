@@ -14,6 +14,7 @@ import {
   flashFirmware,
   isPortPickerCancel,
   resetAndDisconnect,
+  resolveLogBaudRate,
   type DetectedChip,
 } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -231,6 +232,9 @@ export function flipToLogs(
     configuration: device.configuration,
     name: device.friendly_name || device.name,
     webSerialPort,
+    // Disabled (0) is moot here — the user just flashed over serial; open at
+    // the default so any boot output still streams.
+    loggerBaudRate: resolveLogBaudRate(device.logger_baud_rate) ?? 115200,
     reopenInstall: () => host.reopen(),
   });
   if (handled) host._open = false;
