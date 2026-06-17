@@ -235,7 +235,7 @@ export class ESPHomeLogsDialog extends LitElement {
     if (!this._open || !isPassive(this._session)) return;
     void this._teardownSession();
     this._resetPendingLines();
-    this._lines = [...this._lines, message];
+    this._appendCapped([message]);
     this._session = { kind: "dead" };
   }
 
@@ -527,13 +527,20 @@ export class ESPHomeLogsDialog extends LitElement {
     });
   }
 
+  // Append to the visible buffer, trimmed to the newest MAX_LOG_LINES. The
+  // single place the cap is enforced, shared by the batched flush and the
+  // direct recovery-path append (setSerialOpenFailed).
+  private _appendCapped(lines: string[]): void {
+    const merged = [...this._lines, ...lines];
+    this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+  }
+
   // Drain pending lines into ``_lines`` now, trimmed to the newest
   // MAX_LOG_LINES. Called from teardown / clear / download so consumers
   // don't race the rAF.
   _flushPendingLines(): void {
     if (this._pendingLines.length === 0) return;
-    const merged = [...this._lines, ...this._pendingLines];
-    this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+    this._appendCapped(this._pendingLines);
     this._pendingLines = [];
   }
 

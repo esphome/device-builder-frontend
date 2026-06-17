@@ -52,6 +52,24 @@ describe("logs-dialog line batching + cap", () => {
     expect(d._lines[d._lines.length - 1]).toBe(String(total - 1));
   });
 
+  it("caps the buffer on the recovery-path append (setSerialOpenFailed)", () => {
+    const d = new ESPHomeLogsDialog();
+    for (let i = 0; i < 5000; i++) d._enqueueLine(String(i));
+    fireFrame();
+    expect(d._lines).toHaveLength(5000);
+    // Drive the reconnect-failure append with the dialog open + a passive
+    // session so the guard passes; it must stay capped, not grow to 5001.
+    const internal = d as unknown as {
+      _open: boolean;
+      _session: { kind: string; paused: boolean };
+    };
+    internal._open = true;
+    internal._session = { kind: "reconnecting", paused: false };
+    d.setSerialOpenFailed("reopen failed");
+    expect(d._lines).toHaveLength(5000);
+    expect(d._lines[d._lines.length - 1]).toBe("reopen failed");
+  });
+
   it("resetPendingLines drops the batch and a late frame can't resurrect it", () => {
     const d = new ESPHomeLogsDialog();
     d._enqueueLine("x");
