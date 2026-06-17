@@ -942,6 +942,7 @@
     }
   },
   "layout": {
+    "release_notes": "View release notes",
     "secrets": "Secrets",
     "update_all_started": "{count, plural, one {# device update started} other {# device updates started}}",
     "update_all_none": "No online devices to update",

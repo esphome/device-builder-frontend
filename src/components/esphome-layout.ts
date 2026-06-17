@@ -15,6 +15,10 @@ import { stripBase, withBase } from "../util/base-path.js";
 import { deviceBuilderChannel } from "../util/device-builder-channel.js";
 import { navigate, runLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import {
+  deviceBuilderReleaseUrl,
+  esphomeChangelogUrl,
+} from "../util/release-notes-url.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -78,6 +82,20 @@ export class ESPHomeLayout extends LitElement {
     // Reflect the consumed context to a host attribute so the slim-header
     // CSS (`:host([ingress])`) can key off it.
     this.toggleAttribute("ingress", this._isHaIngress);
+  }
+
+  // Footer version, linked to its release notes when a URL exists, else plain
+  // text. The anchor inherits the footer style so it reads as ordinary text.
+  private _footerVersion(text: string, href: string | null) {
+    return href
+      ? html`<a
+          href=${href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title=${this._localize("layout.release_notes")}
+          >${text}</a
+        >`
+      : html`${text}`;
   }
 
   static styles = [
@@ -302,6 +320,14 @@ export class ESPHomeLayout extends LitElement {
         color: color-mix(in srgb, var(--wa-color-text-quiet), transparent 30%);
         user-select: text;
       }
+
+      /* Version links read as plain footer text; only the cursor and the
+         title tooltip hint that they are clickable. */
+      .app-footer a {
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+      }
     `,
   ];
 
@@ -363,10 +389,20 @@ export class ESPHomeLayout extends LitElement {
       <slot></slot>
       <div class="app-footer">
         ${this._serverVersion
-          ? html`<span>ESPHome Device Builder v${this._serverVersion}</span>`
+          ? html`<span
+              >${this._footerVersion(
+                `ESPHome Device Builder v${this._serverVersion}`,
+                deviceBuilderReleaseUrl(this._serverVersion)
+              )}</span
+            >`
           : nothing}
         ${this._esphomeVersion
-          ? html`<span>ESPHome ${this._esphomeVersion}</span>`
+          ? html`<span
+              >${this._footerVersion(
+                `ESPHome ${this._esphomeVersion}`,
+                esphomeChangelogUrl(this._esphomeVersion)
+              )}</span
+            >`
           : nothing}
       </div>
     `;
