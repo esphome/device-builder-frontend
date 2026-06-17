@@ -211,7 +211,6 @@ export async function openLogsWithMethod(
       return;
     }
     if (!serialPort) return; // User dismissed the port picker.
-    const port = serialPort;
     host._logsDialog.configuration = device.configuration;
     host._logsDialog.name = device.friendly_name || device.name;
     // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
@@ -222,7 +221,7 @@ export async function openLogsWithMethod(
     // attach toasts the reopen-retry failure itself; cover any other rejection
     // so it can't escape this fire-and-forget call as an unhandled rejection.
     try {
-      await attachSerialLogStream(port, host._logsDialog, host._localize);
+      await attachSerialLogStream(serialPort, host._logsDialog, host._localize);
     } catch {
       toast.error(host._localize("dashboard.logs_web_serial_open_failed"), {
         richColors: true,

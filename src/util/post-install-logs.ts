@@ -181,12 +181,11 @@ async function openLiveSerialPort(
          and retry (the cached handle is still tried below). */
     }
     // Prefer a freshly-granted handle for the same device (Chrome's live
-    // re-enumerated port), then any other granted port, then the cached handle
-    // (Firefox / UART bridges reopen it in place). Dedup so the dead cached
-    // handle isn't retried twice per round.
+    // re-enumerated port), then the cached handle (Firefox / UART bridges
+    // reopen it in place). The cached handle is dropped from the granted list
+    // so it isn't tried twice per round.
     const candidates = [
       ...granted.filter((p) => p !== cachedPort && matchesDevice(p.getInfo(), want)),
-      ...granted.filter((p) => p !== cachedPort && !matchesDevice(p.getInfo(), want)),
       cachedPort,
     ];
     for (const p of candidates) {
@@ -194,14 +193,9 @@ async function openLiveSerialPort(
       try {
         await p.open({ baudRate });
         return p;
-      } catch (err) {
-        const name = err instanceof DOMException ? err.name : "";
-        const message = err instanceof Error ? err.message : "";
-        if (name === "InvalidStateError" && /already open/i.test(message)) {
-          return p;
-        }
-        // Anything else (NetworkError while the device is still gone, a stale
-        // handle) — try the next candidate / next round.
+      } catch {
+        // Device still gone (NetworkError) or a stale handle — try the next
+        // candidate / next round.
       }
     }
     if (Date.now() >= deadline) {
