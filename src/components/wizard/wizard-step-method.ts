@@ -49,6 +49,12 @@ export class ESPHomeWizardStepMethod extends LitElement {
         padding: var(--wa-space-s);
       }
 
+      /* The old advanced block sat flush under the toggle; drop the shared
+         panel's default top margin to keep that spacing. */
+      .disclosure-panel {
+        margin-top: 0;
+      }
+
       .step-heading {
         display: flex;
         align-items: center;
