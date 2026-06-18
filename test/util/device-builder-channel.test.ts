@@ -24,8 +24,8 @@ describe("deviceBuilderChannel", () => {
     expect(deviceBuilderChannel("2026.5.0-dev")).toBe("dev");
   });
 
-  it("tolerates null/undefined without throwing", () => {
-    expect(deviceBuilderChannel(null)).toBe("dev");
-    expect(deviceBuilderChannel(undefined)).toBe("dev");
+  it("returns null for an unknown (null/undefined) version", () => {
+    expect(deviceBuilderChannel(null)).toBeNull();
+    expect(deviceBuilderChannel(undefined)).toBeNull();
   });
 });
