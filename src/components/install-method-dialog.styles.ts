@@ -71,50 +71,18 @@ export const installMethodDialogStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  /* "Advanced options" disclosure rendered below the method
-     list. Holds the OTA address-override form and the manual
-     binary-download option — paths that aren't part of the
-     everyday install flow. Styled as an underlined inline
-     link rather than a button card so it doesn't compete
-     visually with the main method options above. */
-  .advanced-toggle {
-    display: inline-flex;
-    align-items: center;
+  /* "Advanced options" disclosure (shared renderDisclosure helper) rendered
+     below the method list. Separate it from the method cards above; the panel
+     content stacks the OTA address form and the manual-download option with the
+     same gap as the main list so the visual rhythm stays uniform when expanded. */
+  .disclosure-toggle {
     margin-top: var(--wa-space-m);
-    padding: 0;
-    background: none;
-    border: none;
-    font-family: inherit;
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--esphome-primary);
-    cursor: pointer;
-    /* Underline targets the text only (via text-underline-offset);
-       the chevron is excluded from text-decoration below so it
-       doesn't sit on the underline rail. */
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
 
-  .advanced-toggle__chevron {
-    font-size: 16px;
-    text-decoration: none;
-  }
-
-  .advanced-toggle:focus-visible {
-    outline: 2px solid var(--esphome-primary);
-    outline-offset: 2px;
-  }
-
-  /* Container for the disclosed advanced controls. Stacks
-     the OTA address form and the manual-download option with
-     the same gap as the main list so the visual rhythm
-     stays uniform when expanded. */
-  .advanced-panel {
+  .advanced-panel-content {
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-s);
-    margin-top: var(--wa-space-s);
   }
 
   /* Trailing chevron on option cards. chevron-right on

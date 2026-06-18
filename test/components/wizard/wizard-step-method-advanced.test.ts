@@ -36,14 +36,16 @@ describe("wizard-step-method advanced disclosure", () => {
     const closed = await mount(false);
     expect(closed.shadowRoot!.querySelectorAll(".option-cards")).toHaveLength(1);
     expect(
-      closed.shadowRoot!.querySelector(".advanced-toggle")!.getAttribute("aria-expanded")
+      closed
+        .shadowRoot!.querySelector(".disclosure-toggle")!
+        .getAttribute("aria-expanded")
     ).toBe("false");
 
     // Open: the advanced block is rendered (import + empty-config cards).
     const open = await mount(true);
     expect(open.shadowRoot!.querySelectorAll(".option-cards")).toHaveLength(2);
     expect(
-      open.shadowRoot!.querySelector(".advanced-toggle")!.getAttribute("aria-expanded")
+      open.shadowRoot!.querySelector(".disclosure-toggle")!.getAttribute("aria-expanded")
     ).toBe("true");
   });
 
@@ -51,7 +53,7 @@ describe("wizard-step-method advanced disclosure", () => {
     const el = await mount(false);
     const onToggle = vi.fn();
     el.addEventListener("toggle-advanced", onToggle as EventListener);
-    (el.shadowRoot!.querySelector(".advanced-toggle") as HTMLButtonElement).click();
+    (el.shadowRoot!.querySelector(".disclosure-toggle") as HTMLButtonElement).click();
     expect(onToggle).toHaveBeenCalledTimes(1);
     // The step doesn't own the state — it just signals and stays put until the
     // parent feeds advancedOpen back down.

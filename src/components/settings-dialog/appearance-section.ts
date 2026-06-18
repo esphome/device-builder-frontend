@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
-import { mdiChevronDown, mdiCodeBraces, mdiMagnify, mdiVectorDifference } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { mdiCodeBraces, mdiMagnify, mdiVectorDifference } from "@mdi/js";
+import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -9,9 +9,11 @@ import {
   localizeContext,
   remoteComputeOnlyContext,
 } from "../../context/index.js";
+import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderDisclosure } from "../shared/disclosure.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -19,7 +21,6 @@ import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 
 registerMdiIcons({
-  "chevron-down": mdiChevronDown,
   "code-braces": mdiCodeBraces,
   magnify: mdiMagnify,
   "vector-difference": mdiVectorDifference,
@@ -69,6 +70,7 @@ export class ESPHomeSettingsAppearance extends LitElement {
     inputStyles,
     settingsSharedStyles,
     settingsRowStyles,
+    disclosureStyles,
     css`
       .expert-row {
         border-bottom: none;
@@ -82,40 +84,9 @@ export class ESPHomeSettingsAppearance extends LitElement {
         border-radius: var(--wa-border-radius-m);
       }
 
-      .expert-features-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        padding: 0;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: inherit;
-      }
-
-      .expert-features-heading {
-        font-size: var(--wa-font-size-2xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-quiet);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-
-      .expert-features-chevron {
-        font-size: 18px;
-        color: var(--wa-color-text-quiet);
-        flex-shrink: 0;
-        transition: transform 0.15s;
-      }
-
-      .expert-features-toggle[aria-expanded="true"] .expert-features-chevron {
-        transform: rotate(180deg);
-      }
-
       .expert-feature-list {
         list-style: none;
-        margin: var(--wa-space-s) 0 0;
+        margin: 0;
         padding: 0;
         display: flex;
         flex-direction: column;
@@ -212,43 +183,32 @@ export class ESPHomeSettingsAppearance extends LitElement {
         ></button>
       </div>
       <div class="expert-features">
-        <button
-          class="expert-features-toggle"
-          type="button"
-          aria-expanded=${this._featuresOpen ? "true" : "false"}
-          @click=${this._onToggleFeatures}
-        >
-          <span class="expert-features-heading">
-            ${this._localize("settings.expert_mode_features_title")}
-          </span>
-          <wa-icon
-            class="expert-features-chevron"
-            library="mdi"
-            name="chevron-down"
-            aria-hidden="true"
-          ></wa-icon>
-        </button>
-        ${this._featuresOpen
-          ? html`
-              <ul class="expert-feature-list">
-                ${EXPERT_FEATURES.map(
-                  (f) => html`
-                    <li class="expert-feature">
-                      <wa-icon library="mdi" name=${f.icon}></wa-icon>
-                      <div class="expert-feature-text">
-                        <span class="expert-feature-title">
-                          ${this._localize(f.titleKey)}
-                        </span>
-                        <span class="expert-feature-desc">
-                          ${this._localize(f.descKey)}
-                        </span>
-                      </div>
-                    </li>
-                  `
-                )}
-              </ul>
-            `
-          : nothing}
+        ${renderDisclosure({
+          open: this._featuresOpen,
+          onToggle: () => this._onToggleFeatures(),
+          localize: this._localize,
+          labelKey: "settings.expert_mode_features_title",
+          variant: "heading",
+          body: () => html`
+            <ul class="expert-feature-list">
+              ${EXPERT_FEATURES.map(
+                (f) => html`
+                  <li class="expert-feature">
+                    <wa-icon library="mdi" name=${f.icon}></wa-icon>
+                    <div class="expert-feature-text">
+                      <span class="expert-feature-title">
+                        ${this._localize(f.titleKey)}
+                      </span>
+                      <span class="expert-feature-desc">
+                        ${this._localize(f.descKey)}
+                      </span>
+                    </div>
+                  </li>
+                `
+              )}
+            </ul>
+          `,
+        })}
       </div>
     `;
   }

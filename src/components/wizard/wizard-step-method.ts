@@ -1,21 +1,22 @@
 import { consume } from "@lit/context";
-import { mdiChevronDown, mdiChevronRight, mdiCog } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { mdiChevronRight, mdiCog } from "@mdi/js";
+import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { disclosureStyles } from "../../styles/disclosure.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { FileDropController } from "../../util/file-drop-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { ACCEPTED_UPLOAD_EXTENSIONS } from "../../util/upload-file-types.js";
+import { renderDisclosure } from "../shared/disclosure.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   cog: mdiCog,
   "chevron-right": mdiChevronRight,
-  "chevron-down": mdiChevronDown,
 });
 
 @customElement("esphome-wizard-step-method")
@@ -36,6 +37,7 @@ export class ESPHomeWizardStepMethod extends LitElement {
 
   static styles = [
     espHomeStyles,
+    disclosureStyles,
     css`
       :host {
         display: block;
@@ -115,34 +117,6 @@ export class ESPHomeWizardStepMethod extends LitElement {
         flex-shrink: 0;
       }
 
-      .advanced-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--wa-space-2xs);
-        color: var(--esphome-primary);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        cursor: pointer;
-        text-decoration: underline;
-        background: none;
-        border: none;
-        padding: var(--wa-space-s);
-      }
-
-      .advanced-toggle:hover {
-        text-decoration: none;
-      }
-
-      .advanced-toggle wa-icon {
-        font-size: var(--wa-font-size-s);
-        color: var(--esphome-primary);
-        transition: transform var(--wa-transition-normal) var(--wa-transition-easing);
-      }
-
-      .advanced-toggle[aria-expanded="true"] wa-icon {
-        transform: rotate(180deg);
-      }
-
       .drop-hint {
         margin-top: var(--wa-space-xl);
         text-align: center;
@@ -192,18 +166,15 @@ export class ESPHomeWizardStepMethod extends LitElement {
             </button>
           </div>
 
-          <button
-            class="advanced-toggle"
-            aria-expanded=${this.advancedOpen}
-            @click=${this._toggleAdvanced}
-          >
-            ${this._localize("wizard.advanced_options")}
-            <wa-icon library="mdi" name="chevron-down"></wa-icon>
-          </button>
-
-          ${this.advancedOpen
-            ? html`<div class="option-cards">${this._renderAdvancedOptions()}</div>`
-            : nothing}
+          ${renderDisclosure({
+            open: this.advancedOpen,
+            onToggle: () => this._toggleAdvanced(),
+            localize: this._localize,
+            labelKey: "wizard.advanced_options",
+            variant: "link",
+            body: () =>
+              html`<div class="option-cards">${this._renderAdvancedOptions()}</div>`,
+          })}
         </div>
 
         <p class="drop-hint">${this._localize("wizard.drop_yaml")}</p>

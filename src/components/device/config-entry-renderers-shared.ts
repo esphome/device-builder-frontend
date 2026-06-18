@@ -16,6 +16,7 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { warningBannerStyles } from "../../styles/banners.js";
+import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { stripConstraintProse } from "../../util/constraint-groups.js";
@@ -61,6 +62,7 @@ export const fieldRendererStyles = [
   warningBannerStyles,
   configEntryFormStyles,
   configEntryFormExtraStyles,
+  disclosureStyles,
   literalLambdaToggleStyles,
   constraintClusterStyles,
   fieldHighlightStyles,

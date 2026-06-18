@@ -36,9 +36,8 @@ describe("appearance Expert Mode toggle", () => {
 
   it("hides the feature list until the chevron is opened", async () => {
     const el = await mount(false);
-    const disclosure = el.shadowRoot!.querySelector<HTMLButtonElement>(
-      ".expert-features-toggle"
-    )!;
+    const disclosure =
+      el.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!;
     expect(disclosure.getAttribute("aria-expanded")).toBe("false");
     expect(el.shadowRoot!.querySelectorAll(".expert-feature").length).toBe(0);
 

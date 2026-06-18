@@ -19,6 +19,7 @@ import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
+import { disclosureStyles } from "../styles/disclosure.js";
 import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -31,6 +32,7 @@ import {
   type WebSerialAvailability,
 } from "../util/web-serial.js";
 import { installMethodDialogStyles } from "./install-method-dialog.styles.js";
+import { renderDisclosure } from "./shared/disclosure.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -149,6 +151,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    disclosureStyles,
     primaryDialogHeaderStyles,
     inputStyles,
     newItemHighlightStyles,
@@ -486,31 +489,20 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * option (compile here, flash with an external tool).
    */
   private _renderAdvancedSection() {
-    const expanded = this._advancedExpanded;
-    return html`
-      <button
-        type="button"
-        class="advanced-toggle"
-        aria-expanded=${expanded ? "true" : "false"}
-        aria-controls=${expanded ? "advanced-panel" : nothing}
-        @click=${this._onToggleAdvanced}
-      >
-        ${this._localize("dashboard.install_method_advanced_toggle")}
-        <wa-icon
-          class="advanced-toggle__chevron"
-          library="mdi"
-          name=${expanded ? "chevron-up" : "chevron-down"}
-        ></wa-icon>
-      </button>
-      ${expanded
-        ? html`
-            <div id="advanced-panel" class="advanced-panel">
-              ${this._renderOtaAddressCard()}
-              ${this.mode === "install" ? this._renderManualDownloadOption() : nothing}
-            </div>
-          `
-        : nothing}
-    `;
+    return renderDisclosure({
+      open: this._advancedExpanded,
+      onToggle: () => this._onToggleAdvanced(),
+      localize: this._localize,
+      labelKey: "dashboard.install_method_advanced_toggle",
+      variant: "link",
+      panelId: "advanced-panel",
+      body: () => html`
+        <div class="advanced-panel-content">
+          ${this._renderOtaAddressCard()}
+          ${this.mode === "install" ? this._renderManualDownloadOption() : nothing}
+        </div>
+      `,
+    });
   }
 
   /**

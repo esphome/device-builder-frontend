@@ -13,6 +13,7 @@ import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { formatPinValue, parsePinGpio } from "../../util/pin-gpio.js";
 import { expandPinModeShorthand } from "../../util/pin-mode.js";
+import { renderDisclosure } from "../shared/disclosure.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -401,21 +402,17 @@ function renderPinAdvanced(
       data-field-key="${advancedKey}"
       data-reveal-for="${fieldKeyAttr(path)}"
     >
-      <button
-        type="button"
-        class="pin-advanced-toggle"
-        aria-expanded=${isOpen}
-        ?disabled=${fieldDisabled}
-        @click=${onAdvancedToggle}
-      >
-        <wa-icon library="mdi" name=${isOpen ? "chevron-up" : "chevron-down"}></wa-icon>
-        <span>${ctx.localize("device.pin_advanced")}</span>
-      </button>
-      ${isOpen
-        ? html`<div class="pin-advanced-fields">
-            ${longFormFields.map((child) => renderLongFormChild(child, path, ctx))}
-          </div>`
-        : nothing}
+      ${renderDisclosure({
+        open: isOpen,
+        onToggle: onAdvancedToggle,
+        localize: ctx.localize,
+        labelKey: "device.pin_advanced",
+        variant: "quiet",
+        iconBefore: true,
+        disabled: fieldDisabled,
+        body: () =>
+          html`${longFormFields.map((child) => renderLongFormChild(child, path, ctx))}`,
+      })}
     </div>
   `;
 }

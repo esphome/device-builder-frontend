@@ -128,23 +128,10 @@ export const configEntryFormExtraStyles = css`
     margin-top: var(--wa-space-2xs);
   }
 
-  .pin-advanced-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: none;
-    border: none;
-    padding: 2px 0;
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-2xs);
-    cursor: pointer;
-  }
-
-  .pin-advanced-toggle:hover {
-    color: var(--wa-color-text-normal);
-  }
-
-  .pin-advanced-fields {
+  /* The shared disclosure renders the quiet toggle + panel; the bordered indent
+     rail for the long-form fields is pin-specific, scoped to this disclosure's
+     panel so it overrides the shared margin-only default. */
+  .pin-advanced .disclosure-panel {
     margin-top: var(--wa-space-xs);
     padding-left: var(--wa-space-s);
     border-left: 2px solid var(--wa-color-surface-border);
