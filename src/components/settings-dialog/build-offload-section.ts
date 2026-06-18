@@ -146,9 +146,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
 
   protected render() {
     return html`
-      ${this._renderAlerts()} ${this._renderRemoteBuildsToggle()}
-      ${this._renderVersionMatchPolicyPicker()}
-      <esphome-settings-build-offload-advanced></esphome-settings-build-offload-advanced>
+      ${this._renderAlerts()}
 
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
@@ -156,7 +154,9 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       <div class="section-intro">
         ${this._localize("settings.paired_build_servers_desc")}
       </div>
-      ${this._renderPairings()}
+      ${this._renderPairings()} ${this._renderRemoteBuildsToggle()}
+      ${this._renderVersionMatchPolicyPicker()}
+      <esphome-settings-build-offload-advanced></esphome-settings-build-offload-advanced>
 
       <div class="section-heading">
         ${this._localize("settings.remote_build_known_dashboards")}
