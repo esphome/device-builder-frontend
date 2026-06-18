@@ -4,10 +4,7 @@ import type { PairingSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { trimTrailingDot } from "../../util/hostname.js";
-import {
-  classifyVersionMismatch,
-  type VersionMismatchKind,
-} from "../../util/version-mismatch.js";
+import { classifyVersionMismatch } from "../../util/version-mismatch.js";
 
 interface PillResult {
   pillClass: string;
@@ -65,10 +62,6 @@ export function renderPairingRow(
     onUnpair,
   } = ctx;
   const { pillClass, pillLabel } = pillFor(pairing, localize);
-  // Computed once and threaded into both version helpers: the plain
-  // line shows only when versions match, the mismatch note only when
-  // they don't, so they never double up.
-  const versionMismatch = classifyVersionMismatch(appVersion, pairing.esphome_version);
   return html`
     <div class="row peer-row row--stacked">
       <div class="row-label">
@@ -92,7 +85,6 @@ export function renderPairingRow(
         </span>
         <span class="row-desc">
           ${trimTrailingDot(pairing.receiver_hostname)}:${pairing.receiver_port}
-          ${renderPeerVersionLine(pairing, localize, versionMismatch)}
         </span>
         ${pairing.status === "approved" &&
         !pairing.connected &&
@@ -105,7 +97,7 @@ export function renderPairingRow(
               </span>
             `
           : nothing}
-        ${renderVersionMismatch(pairing, localize, appVersion, versionMismatch)}
+        ${renderPeerVersion(pairing, localize, appVersion)}
       </div>
       <div class="pairing-actions">
         ${pairing.status === "approved" && pairing.connected
@@ -167,33 +159,25 @@ export function renderPairingRow(
   `;
 }
 
-function renderPeerVersionLine(
+function renderPeerVersion(
   pairing: PairingSummary,
   localize: LocalizeFunc,
-  versionMismatch: VersionMismatchKind
-): string | typeof nothing {
-  // Mirror of renderVersionMismatch: scoped to approved rows, the
-  // plain version line is the match case, so it yields when there's
-  // a mismatch note to show (or no version yet).
-  if (
-    pairing.status !== "approved" ||
-    !pairing.esphome_version ||
-    versionMismatch !== null
-  ) {
-    return nothing;
-  }
-  return localize("settings.remote_build_peer_version_line", {
-    esphome: pairing.esphome_version,
-  });
-}
-
-function renderVersionMismatch(
-  pairing: PairingSummary,
-  localize: LocalizeFunc,
-  appVersion: string,
-  kind: VersionMismatchKind
+  appVersion: string
 ): TemplateResult | typeof nothing {
-  if (pairing.status !== "approved" || kind === null) return nothing;
+  // One sub-line for an approved row's version: a plain "ESPHome X"
+  // when it matches the local version, or the cautionary note when it
+  // doesn't. Hidden until the first handshake fills in esphome_version.
+  if (pairing.status !== "approved" || !pairing.esphome_version) return nothing;
+  const kind = classifyVersionMismatch(appVersion, pairing.esphome_version);
+  if (kind === null) {
+    return html`
+      <span class="row-desc">
+        ${localize("settings.remote_build_peer_version_line", {
+          esphome: pairing.esphome_version,
+        })}
+      </span>
+    `;
+  }
   const key =
     kind === "release"
       ? "settings.build_offload_pairing_version_mismatch_release"
