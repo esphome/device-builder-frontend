@@ -68,8 +68,8 @@ export enum DeviceEventType {
   // to the receiver enters / leaves the post-handshake parked
   // state. Drives the PairingSummary.connected indicator on
   // the offloader-side Paired-build-servers list. Both events
-  // share the same OffloaderPeerLinkSessionEventData shape;
-  // the discriminator is the event type itself.
+  // share the OffloaderPeerLinkSessionEventData identity base;
+  // OPENED adds esphome_version, CLOSED adds reason/error_detail.
   OFFLOADER_PEER_LINK_OPENED = "offloader_peer_link_opened",
   OFFLOADER_PEER_LINK_CLOSED = "offloader_peer_link_closed",
   // Offloader-side remote-build job lifecycle. Fired by the

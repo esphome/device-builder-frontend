@@ -1,0 +1,70 @@
+import type { TemplateResult } from "lit";
+import { describe, expect, it, vi } from "vitest";
+import type { PairingSummary } from "../../../src/api/types/remote-build.js";
+import type { LocalizeFunc } from "../../../src/common/localize.js";
+import { renderPairingRow } from "../../../src/components/settings-dialog/build-offload-pairing-row.js";
+import { visitTemplates } from "../../_lit-template-walker.js";
+
+const localize: LocalizeFunc = ((key: string, values?: Record<string, unknown>) =>
+  values ? `${key} ${JSON.stringify(values)}` : key) as LocalizeFunc;
+
+function makeSummary(esphome_version: string): PairingSummary {
+  return {
+    receiver_hostname: "mac.local",
+    receiver_port: 6055,
+    pin_sha256: "a".repeat(64),
+    label: "macbook",
+    paired_at: 1,
+    status: "approved",
+    connected: true,
+    connecting: false,
+    last_connect_error: "",
+    esphome_version,
+    enabled: true,
+  };
+}
+
+function ctx() {
+  return {
+    localize,
+    // Equal to the peer version so renderVersionMismatch stays silent
+    // and the plain version line is the only version text.
+    appVersion: "2026.6.0",
+    latestJob: undefined,
+    onToggleEnabled: vi.fn(),
+    onBuildRemote: vi.fn(),
+    onViewBuild: vi.fn(),
+    onEditEndpoint: vi.fn(),
+    onUnpair: vi.fn(),
+  };
+}
+
+/** Flatten the static strings + string values across the template tree. */
+function renderedText(root: TemplateResult): string {
+  const parts: string[] = [];
+  visitTemplates(root, (t) => {
+    parts.push(...t.strings);
+    for (const v of t.values) if (typeof v === "string") parts.push(v);
+  });
+  return parts.join(" ");
+}
+
+describe("renderPairingRow version line", () => {
+  it("renders the ESPHome version when the peer has reported one", () => {
+    const text = renderedText(renderPairingRow(makeSummary("2026.6.0"), ctx()));
+    expect(text).toContain("settings.remote_build_peer_version_line");
+    expect(text).toContain("2026.6.0");
+  });
+
+  it("omits the version line before the first handshake (empty version)", () => {
+    const text = renderedText(renderPairingRow(makeSummary(""), ctx()));
+    expect(text).not.toContain("settings.remote_build_peer_version_line");
+  });
+
+  it("omits the version line on a mismatch (the mismatch note already states it)", () => {
+    // appVersion 2026.6.0 vs peer 2026.5.0 -> release mismatch.
+    const text = renderedText(renderPairingRow(makeSummary("2026.5.0"), ctx()));
+    expect(text).not.toContain("settings.remote_build_peer_version_line");
+    expect(text).toContain("settings.build_offload_pairing_version_mismatch_release");
+  });
+});

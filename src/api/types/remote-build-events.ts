@@ -149,22 +149,30 @@ export interface ReceiverPeerLinkSessionEventData {
 }
 
 /**
- * Data payload for offloader_peer_link_opened.
+ * Shared identity base for the peer-link session events
+ * (OPENED / CLOSED).
  *
- * Fires on the offloader-side bus when the long-lived
- * PeerLinkClient enters its post-handshake parked state.
- * Drives the PairingSummary.connected indicator: app-shell
- * flips the matching row's connected flag in the local
- * _buildOffloadPairings map keyed by pin_sha256. Receiver
- * coords are carried as display fields the renderer can use
- * without a follow-up lookup, but they're ignored when keying
- * the map (4a-o part 6; pin_sha256 is the canonical row
- * identity).
+ * pin_sha256 is the canonical row key in the local
+ * _buildOffloadPairings map; receiver coords are display fields
+ * the renderer can use without a follow-up lookup (4a-o part 6).
  */
 export interface OffloaderPeerLinkSessionEventData {
   receiver_hostname: string;
   receiver_port: number;
   pin_sha256: string;
+}
+
+/**
+ * Data payload for offloader_peer_link_opened.
+ *
+ * The OPENED counterpart of the shared identity base, plus the
+ * receiver's freshly-handshaked esphome_version. App-shell merges
+ * it into the matching row keyed by pin_sha256 so a receiver
+ * upgrade surfaces on the next reconnect without a page reload.
+ * Empty until the first handshake fills it in.
+ */
+export interface OffloaderPeerLinkOpenedEventData extends OffloaderPeerLinkSessionEventData {
+  esphome_version: string;
 }
 
 /**

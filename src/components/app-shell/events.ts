@@ -19,7 +19,7 @@ import type {
   OffloaderPairPinMismatchEventData,
   OffloaderPairStatusChangedEventData,
   OffloaderPeerLinkClosedEventData,
-  OffloaderPeerLinkSessionEventData,
+  OffloaderPeerLinkOpenedEventData,
   OffloaderRemoteBuildsToggledEventData,
   OffloaderVersionMatchPolicyChangedEventData,
   ReceiverPeerLinkSessionEventData,
@@ -281,11 +281,12 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.OFFLOADER_PEER_LINK_OPENED: {
       // OPENED clears the failure record: a successful session-open
       // invalidates whatever caused the previous close.
-      const evt = data as OffloaderPeerLinkSessionEventData;
+      const evt = data as OffloaderPeerLinkOpenedEventData;
       patchOffloadPairing(host, evt.pin_sha256, {
         connected: true,
         connecting: false,
         last_connect_error: "",
+        esphome_version: evt.esphome_version,
       });
       break;
     }

@@ -85,6 +85,12 @@ export function renderPairingRow(
         </span>
         <span class="row-desc">
           ${trimTrailingDot(pairing.receiver_hostname)}:${pairing.receiver_port}
+          ${pairing.esphome_version &&
+          classifyVersionMismatch(appVersion, pairing.esphome_version) === null
+            ? localize("settings.remote_build_peer_version_line", {
+                esphome: pairing.esphome_version,
+              })
+            : nothing}
         </span>
         ${pairing.status === "approved" &&
         !pairing.connected &&
