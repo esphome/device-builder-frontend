@@ -81,6 +81,12 @@ export const disclosureStyles = css`
     letter-spacing: 0.04em;
   }
 
+  /* Heading rows carry a slightly larger chevron than the inline link/quiet
+     variants (matches the pre-refactor expert-features disclosure). */
+  .disclosure-toggle--heading .disclosure-toggle__chevron {
+    font-size: 18px;
+  }
+
   /* quiet — small quiet text that brightens on hover. */
   .disclosure-toggle--quiet {
     font-size: var(--wa-font-size-2xs);
