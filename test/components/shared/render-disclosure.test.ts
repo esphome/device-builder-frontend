@@ -1,6 +1,13 @@
 import { html } from "lit";
 import { describe, expect, it, vi } from "vitest";
 
+// renderDisclosure's module-level registerMdiIcons() reaches webawesome's
+// icon-library registry; stub it so this node-environment test stays hermetic
+// and doesn't pull the DOM-dependent real implementation.
+vi.mock("@home-assistant/webawesome/dist/components/icon/library.js", () => ({
+  registerIconLibrary: () => {},
+}));
+
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { renderDisclosure } from "../../../src/components/shared/disclosure.js";
 import {
