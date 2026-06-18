@@ -3,17 +3,28 @@ import { classMap } from "lit/directives/class-map.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 
-export interface ToggleRowOptions {
+interface ToggleRowBase {
   titleId: string;
   titleKey: string;
   descKey: string;
-  checked: boolean | null;
   onToggle: () => void;
-  /** Loading-row description key; required when `checked` can be `null`. */
-  loadingDescKey?: string;
   /** Extra class on the live `.row` (e.g. ``expert-row``). */
   rowClass?: string;
 }
+
+/** Always-live toggle: `checked` is a settled boolean, no loading row. */
+interface LiveToggleRowOptions extends ToggleRowBase {
+  checked: boolean;
+  loadingDescKey?: never;
+}
+
+/** Toggle whose state can be unresolved; `null` renders the loading row. */
+interface LoadableToggleRowOptions extends ToggleRowBase {
+  checked: boolean | null;
+  loadingDescKey: string;
+}
+
+export type ToggleRowOptions = LiveToggleRowOptions | LoadableToggleRowOptions;
 
 /**
  * Settings toggle row: title + description and a `role=switch` button.
@@ -30,7 +41,7 @@ export function renderToggleRow(
       <div class="row" role="status">
         <div class="row-label">
           <span class="row-title">${localize(opts.titleKey)}</span>
-          <span class="row-desc"> ${localize(opts.loadingDescKey ?? opts.descKey)} </span>
+          <span class="row-desc">${localize(opts.loadingDescKey)}</span>
         </div>
       </div>
     `;
