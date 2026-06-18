@@ -43,6 +43,12 @@ export class ESPHomeWizardStepMethod extends LitElement {
         display: block;
       }
 
+      /* Restore the pre-shared-helper padding so the advanced toggle keeps its
+         comfortable touch target (the shared base is flush, padding: 0). */
+      .disclosure-toggle {
+        padding: var(--wa-space-s);
+      }
+
       .step-heading {
         display: flex;
         align-items: center;

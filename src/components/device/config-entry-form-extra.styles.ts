@@ -128,6 +128,11 @@ export const configEntryFormExtraStyles = css`
     margin-top: var(--wa-space-2xs);
   }
 
+  /* Keep the toggle's original vertical hit area (the shared base is flush). */
+  .pin-advanced .disclosure-toggle {
+    padding: 2px 0;
+  }
+
   /* The shared disclosure renders the quiet toggle + panel; the bordered indent
      rail for the long-form fields is pin-specific, scoped to this disclosure's
      panel so it overrides the shared margin-only default. */
