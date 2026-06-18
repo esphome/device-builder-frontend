@@ -1044,6 +1044,8 @@
     "language": "Language",
     "language_desc": "Choose the language used across the interface.",
     "language_system": "System",
+    "language_help": "Is your language missing or incomplete?",
+    "language_help_link": "Help translate ESPHome",
     "theme_desc": "Choose between light, dark, or follow your system preference.",
     "expert_mode": "Expert Mode",
     "expert_mode_desc": "Enabling Expert Mode will unlock some additional powerful options in the Device Builder for experienced power users of ESPHome.",

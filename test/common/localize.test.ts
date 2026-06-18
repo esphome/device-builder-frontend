@@ -10,6 +10,13 @@ describe("defaultLocalize", () => {
     expect(defaultLocalize("wizard.tag.esp32")).toBe("ESP32");
   });
 
+  it("resolves the language translation-help keys", () => {
+    expect(defaultLocalize("settings.language_help")).toBe(
+      "Is your language missing or incomplete?"
+    );
+    expect(defaultLocalize("settings.language_help_link")).toBe("Help translate ESPHome");
+  });
+
   it("returns the key unchanged when missing", () => {
     expect(defaultLocalize("does.not.exist")).toBe("does.not.exist");
   });
