@@ -32,6 +32,7 @@ import type { ESPHomeRemoteBuildJobDialog } from "../remote-build-job-dialog.js"
 import { renderOffloaderAlert } from "./build-offload-alert.js";
 import { latestJobForPin, renderPairingRow } from "./build-offload-pairing-row.js";
 import { offloaderAlertStyles, pairingRowStyles } from "./offload-styles.js";
+import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
 import {
   peerRowStyles,
   settingsRowStyles,
@@ -204,39 +205,14 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   }
 
   private _renderRemoteBuildsToggle() {
-    if (this._remoteBuildsEnabled === null) {
-      return html`
-        <div class="row" role="status">
-          <div class="row-label">
-            <span class="row-title">
-              ${this._localize("settings.offloader_remote_builds_enabled")}
-            </span>
-            <span class="row-desc">
-              ${this._localize("settings.offloader_remote_builds_enabled_loading")}
-            </span>
-          </div>
-        </div>
-      `;
-    }
-    return html`
-      <div class="row">
-        <div class="row-label">
-          <span id="offloader-remote-builds-enabled-title" class="row-title">
-            ${this._localize("settings.offloader_remote_builds_enabled")}
-          </span>
-          <span class="row-desc">
-            ${this._localize("settings.offloader_remote_builds_enabled_desc")}
-          </span>
-        </div>
-        <button
-          class="toggle"
-          role="switch"
-          aria-labelledby="offloader-remote-builds-enabled-title"
-          aria-checked=${this._remoteBuildsEnabled}
-          @click=${this._onToggleRemoteBuilds}
-        ></button>
-      </div>
-    `;
+    return renderToggleRow(this._localize, {
+      titleId: "offloader-remote-builds-enabled-title",
+      titleKey: "settings.offloader_remote_builds_enabled",
+      descKey: "settings.offloader_remote_builds_enabled_desc",
+      loadingDescKey: "settings.offloader_remote_builds_enabled_loading",
+      checked: this._remoteBuildsEnabled,
+      onToggle: this._onToggleRemoteBuilds,
+    });
   }
 
   private _renderVersionMatchPolicyPicker() {
@@ -282,10 +258,10 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
 
   private _renderPairings() {
     if (this._pairings === null) {
-      return this._statusRow("settings.paired_build_servers_loading");
+      return renderStatusRow(this._localize, "settings.paired_build_servers_loading");
     }
     if (this._pairings.size === 0) {
-      return this._statusRow("settings.paired_build_servers_empty");
+      return renderStatusRow(this._localize, "settings.paired_build_servers_empty");
     }
     return Array.from(this._pairings.values()).map((p) =>
       renderPairingRow(p, {
@@ -301,19 +277,9 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     );
   }
 
-  private _statusRow(key: string) {
-    return html`
-      <div class="row" role="status">
-        <div class="row-label">
-          <span class="row-desc">${this._localize(key)}</span>
-        </div>
-      </div>
-    `;
-  }
-
   private _renderDiscoveredHosts() {
     if (this._discoveredHosts === null) {
-      return this._statusRow("settings.remote_build_peers_loading");
+      return renderStatusRow(this._localize, "settings.remote_build_peers_loading");
     }
     // remote_build_port === 0 means no peer-link receiver, so the dashboard
     // can't accept builds (e.g. an HA addon); hide it from this list.
@@ -321,7 +287,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       (peer) => peer.remote_build_port > 0 && !this._hasPairingFor(peer.hostname)
     );
     if (peers.length === 0) {
-      return this._statusRow("settings.remote_build_peers_empty");
+      return renderStatusRow(this._localize, "settings.remote_build_peers_empty");
     }
     return peers.map((peer) => this._renderDiscoveredRow(peer));
   }

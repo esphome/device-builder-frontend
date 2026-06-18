@@ -31,6 +31,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { formatSecondsAgo } from "../../util/relative-time.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import { buildServerCardStyles, cleanupTtlStyles } from "./build-server-styles.js";
+import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
 import {
   peerRowStyles,
   settingsRowStyles,
@@ -118,24 +119,13 @@ export class ESPHomeSettingsBuildServer extends LitElement {
 
   protected render() {
     return html`
-      <div class="row">
-        <div class="row-label">
-          <span id="remote-build-enable-title" class="row-title">
-            ${this._localize("settings.remote_build_enable")}
-          </span>
-          <span class="row-desc">
-            ${this._localize("settings.remote_build_enable_desc")}
-          </span>
-        </div>
-        <button
-          class="toggle"
-          role="switch"
-          aria-labelledby="remote-build-enable-title"
-          aria-checked=${this._remoteBuildEnabled}
-          @click=${this._onToggleEnabled}
-        ></button>
-      </div>
-
+      ${renderToggleRow(this._localize, {
+        titleId: "remote-build-enable-title",
+        titleKey: "settings.remote_build_enable",
+        descKey: "settings.remote_build_enable_desc",
+        checked: this._remoteBuildEnabled,
+        onToggle: this._onToggleEnabled,
+      })}
       ${this._renderApprovedPeers()} ${this._renderPeerRemoveConfirmDialog()}
 
       <div class="section-heading">
@@ -159,20 +149,10 @@ export class ESPHomeSettingsBuildServer extends LitElement {
         ${this._localize("settings.build_server_paired_senders_desc")}
       </div>
       ${peers === null
-        ? this._loadingRow("settings.build_server_paired_senders_loading")
+        ? renderStatusRow(this._localize, "settings.build_server_paired_senders_loading")
         : approved.length === 0
-          ? this._loadingRow("settings.build_server_paired_senders_empty")
+          ? renderStatusRow(this._localize, "settings.build_server_paired_senders_empty")
           : approved.map((p) => this._renderApprovedPeerRow(p))}
-    `;
-  }
-
-  private _loadingRow(key: string) {
-    return html`
-      <div class="row" role="status">
-        <div class="row-label">
-          <span class="row-desc">${this._localize(key)}</span>
-        </div>
-      </div>
     `;
   }
 
@@ -273,18 +253,14 @@ export class ESPHomeSettingsBuildServer extends LitElement {
 
   private _renderCard() {
     if (this._identityLoadFailed) {
-      return html`
-        <div class="row" role="alert">
-          <div class="row-label">
-            <span class="row-desc">
-              ${this._localize("settings.remote_build_identity_load_failed")}
-            </span>
-          </div>
-        </div>
-      `;
+      return renderStatusRow(
+        this._localize,
+        "settings.remote_build_identity_load_failed",
+        "alert"
+      );
     }
     if (this._identity === null) {
-      return this._loadingRow("settings.remote_build_identity_loading");
+      return renderStatusRow(this._localize, "settings.remote_build_identity_loading");
     }
     const identity = this._identity;
     const formattedPin = formatPinSha256(identity.pin_sha256);

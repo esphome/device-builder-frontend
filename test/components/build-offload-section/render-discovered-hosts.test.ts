@@ -3,9 +3,10 @@
  *
  * Pins that ``_renderDiscoveredHosts`` hides un-buildable dashboards
  * (``remote_build_port === 0``) and keeps real build servers. ``happy-dom`` is
- * only for the component import (WebAwesome touches ``CSSStyleSheet`` at load);
- * the render call uses stubbed sentinels, no DOM.
+ * needed both for the component import (WebAwesome touches ``CSSStyleSheet`` at
+ * load) and to render the empty/loading status-row template back to its key.
  */
+import { render, type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
 import type { RemoteBuildPeer } from "../../../src/api/types/remote-build.js";
 import { ESPHomeSettingsBuildOffload } from "../../../src/components/settings-dialog/build-offload-section.js";
@@ -28,9 +29,9 @@ type Row = { row: string };
 
 function makeHost(peers: RemoteBuildPeer[]) {
   return {
+    _localize: (key: string) => key,
     _discoveredHosts: new Map(peers.map((p) => [p.name, p])),
     _hasPairingFor: () => false,
-    _statusRow: (key: string) => ({ status: key }),
     _renderDiscoveredRow: (p: RemoteBuildPeer): Row => ({ row: p.name }),
   };
 }
@@ -43,13 +44,22 @@ function renderDiscoveredHosts(host: ReturnType<typeof makeHost>): unknown {
   return fn.call(host);
 }
 
+// The empty / loading branch returns a single status-row TemplateResult; render
+// it and read back the localize key the row shows.
+function statusRowKey(result: unknown): string | null {
+  if (Array.isArray(result)) return null;
+  const el = document.createElement("div");
+  render(result as TemplateResult, el);
+  return el.querySelector(".row-desc")?.textContent?.trim() ?? null;
+}
+
 describe("_renderDiscoveredHosts", () => {
   it("hides dashboards with no peer-link receiver (remote_build_port === 0)", () => {
     const host = makeHost([peer("addon", 0)]);
     // Every discovered host filtered out → the empty status row, not rows.
-    expect(renderDiscoveredHosts(host)).toEqual({
-      status: "settings.remote_build_peers_empty",
-    });
+    expect(statusRowKey(renderDiscoveredHosts(host))).toBe(
+      "settings.remote_build_peers_empty"
+    );
   });
 
   it("keeps build servers that bound a peer-link receiver", () => {
