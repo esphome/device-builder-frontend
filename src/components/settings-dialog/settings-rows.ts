@@ -18,7 +18,8 @@ export interface ToggleRowOptions {
 /**
  * Settings toggle row: title + description and a `role=switch` button.
 
- * A `null` `checked` renders the desc-only loading variant instead.
+ * A `null` `checked` renders the button-less loading variant (title +
+ * `loadingDescKey`) instead.
  */
 export function renderToggleRow(
   localize: LocalizeFunc,

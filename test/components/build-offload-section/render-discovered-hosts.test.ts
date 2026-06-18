@@ -3,8 +3,8 @@
  *
  * Pins that ``_renderDiscoveredHosts`` hides un-buildable dashboards
  * (``remote_build_port === 0``) and keeps real build servers. ``happy-dom`` is
- * only for the component import (WebAwesome touches ``CSSStyleSheet`` at load);
- * the render call uses stubbed sentinels, no DOM.
+ * needed both for the component import (WebAwesome touches ``CSSStyleSheet`` at
+ * load) and to render the empty/loading status-row template back to its key.
  */
 import { render, type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
