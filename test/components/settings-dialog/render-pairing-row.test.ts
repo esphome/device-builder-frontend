@@ -27,8 +27,8 @@ function makeSummary(esphome_version: string): PairingSummary {
 function ctx() {
   return {
     localize,
-    // Equal to the peer version so renderVersionMismatch stays silent
-    // and the plain version line is the only version text.
+    // Equal to the peer version so renderPeerVersion emits the plain
+    // line, not the mismatch note.
     appVersion: "2026.6.0",
     latestJob: undefined,
     onToggleEnabled: vi.fn(),
