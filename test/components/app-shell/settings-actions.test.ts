@@ -42,6 +42,7 @@ type StubHost = Pick<
   | "_offloaderVersionMatchPolicy"
   | "_offloaderRemoteBuildsEnabled"
   | "_offloaderIncludeLocalInPool"
+  | "_offloaderWritesInFlight"
   | "_localize"
 > & {
   _api: {
@@ -54,6 +55,7 @@ function makeHost(api: StubHost["_api"]): StubHost {
     _offloaderVersionMatchPolicy: "any" as VersionMatchPolicy,
     _offloaderRemoteBuildsEnabled: true,
     _offloaderIncludeLocalInPool: false,
+    _offloaderWritesInFlight: 0,
     _localize: ((key: string) => key) as ESPHomeApp["_localize"],
     _api: api,
   };
@@ -132,6 +134,36 @@ describe("onSetOffloaderIncludeLocal", () => {
 
     expect(host._offloaderIncludeLocalInPool).toBe(false);
     expect(toastError).toHaveBeenCalledOnce();
+  });
+});
+
+describe("offloader-write in-flight counter", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("stays > 0 until every overlapping offloader write settles", async () => {
+    const resolvers: Array<(v?: unknown) => void> = [];
+    const setApi = vi.fn(() => new Promise((r) => resolvers.push(r)));
+    const host = makeHost({ setOffloaderRemoteBuildSettings: setApi });
+
+    void onSetOffloaderIncludeLocal(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    expect(host._offloaderWritesInFlight).toBe(1);
+    void onSetOffloaderVersionMatchPolicy(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: "exact" as VersionMatchPolicy })
+    );
+    expect(host._offloaderWritesInFlight).toBe(2);
+
+    resolvers[0]();
+    await flush();
+    // first write settled, but the gate stays closed for the second
+    expect(host._offloaderWritesInFlight).toBe(1);
+
+    resolvers[1]();
+    await flush();
+    expect(host._offloaderWritesInFlight).toBe(0);
   });
 });
 

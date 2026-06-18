@@ -45,11 +45,24 @@ function makeHost() {
     _buildOffloadDiscoveredHosts: null,
     _buildOffloadPairings: null,
     _buildOffloadAlerts: null,
+    // Offloader settings, gated by _offloaderWritesInFlight.
+    _offloaderWritesInFlight: 0,
+    _offloaderRemoteBuildsEnabled: null as boolean | null,
+    _offloaderVersionMatchPolicy: null,
+    _offloaderIncludeLocalInPool: null as boolean | null,
   };
 }
 
-function snapshot(preferences: UserPreferences): InitialStateEventData {
-  return { preferences, devices: [], importable: [] };
+function snapshot(
+  preferences: UserPreferences,
+  offloader: Partial<
+    Pick<
+      InitialStateEventData,
+      "remote_builds_enabled" | "version_match_policy" | "include_local_in_pool"
+    >
+  > = {}
+): InitialStateEventData {
+  return { preferences, devices: [], importable: [], ...offloader };
 }
 
 function dispatch(host: ReturnType<typeof makeHost>, data: InitialStateEventData): void {
@@ -77,5 +90,31 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     expect(host._remoteComputeOnly).toBe(false);
     expect(host._experienceLevel).toBe(ExperienceLevel.BEGINNER);
     expect(host.applyTheme).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleEvent INITIAL_STATE offloader settings", () => {
+  it("applies offloader settings from the snapshot when no write is in flight", () => {
+    const host = makeHost();
+    dispatch(
+      host,
+      snapshot(prefs(), { remote_builds_enabled: false, include_local_in_pool: true })
+    );
+    expect(host._offloaderRemoteBuildsEnabled).toBe(false);
+    expect(host._offloaderIncludeLocalInPool).toBe(true);
+  });
+
+  it("keeps optimistic offloader values while a write is in flight", () => {
+    const host = makeHost();
+    host._offloaderWritesInFlight = 1;
+    host._offloaderRemoteBuildsEnabled = true; // optimistic local value
+    host._offloaderIncludeLocalInPool = true;
+    dispatch(
+      host,
+      snapshot(prefs(), { remote_builds_enabled: false, include_local_in_pool: false })
+    );
+    // A reconnect snapshot must not revert the in-flight write.
+    expect(host._offloaderRemoteBuildsEnabled).toBe(true);
+    expect(host._offloaderIncludeLocalInPool).toBe(true);
   });
 });

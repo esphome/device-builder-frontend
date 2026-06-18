@@ -104,14 +104,18 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         }
         host._buildOffloadJobs = seeded;
       }
-      if (remote_builds_enabled !== undefined) {
-        host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
-      }
-      if (version_match_policy !== undefined) {
-        host._offloaderVersionMatchPolicy = version_match_policy;
-      }
-      if (include_local_in_pool !== undefined) {
-        host._offloaderIncludeLocalInPool = include_local_in_pool;
+      // Skip re-applying offloader settings while a toggle write is in flight,
+      // so a reconnect's snapshot can't revert the optimistic value mid-write.
+      if (host._offloaderWritesInFlight === 0) {
+        if (remote_builds_enabled !== undefined) {
+          host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
+        }
+        if (version_match_policy !== undefined) {
+          host._offloaderVersionMatchPolicy = version_match_policy;
+        }
+        if (include_local_in_pool !== undefined) {
+          host._offloaderIncludeLocalInPool = include_local_in_pool;
+        }
       }
       break;
     }

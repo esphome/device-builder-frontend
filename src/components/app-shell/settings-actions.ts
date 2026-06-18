@@ -148,6 +148,7 @@ export async function onSetOffloaderRemoteBuildsEnabled(
   const enabled = e.detail;
   const previous = host._offloaderRemoteBuildsEnabled;
   host._offloaderRemoteBuildsEnabled = enabled;
+  host._offloaderWritesInFlight += 1;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       remote_builds_enabled: enabled,
@@ -157,6 +158,8 @@ export async function onSetOffloaderRemoteBuildsEnabled(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
+  } finally {
+    host._offloaderWritesInFlight -= 1;
   }
 }
 
@@ -167,6 +170,7 @@ export async function onSetOffloaderIncludeLocal(
   const enabled = e.detail;
   const previous = host._offloaderIncludeLocalInPool;
   host._offloaderIncludeLocalInPool = enabled;
+  host._offloaderWritesInFlight += 1;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       include_local_in_pool: enabled,
@@ -176,6 +180,8 @@ export async function onSetOffloaderIncludeLocal(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
+  } finally {
+    host._offloaderWritesInFlight -= 1;
   }
 }
 
@@ -205,6 +211,7 @@ export async function onSetOffloaderVersionMatchPolicy(
   const policy = e.detail;
   const previous = host._offloaderVersionMatchPolicy;
   host._offloaderVersionMatchPolicy = policy;
+  host._offloaderWritesInFlight += 1;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       version_match_policy: policy,
@@ -214,6 +221,8 @@ export async function onSetOffloaderVersionMatchPolicy(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
+  } finally {
+    host._offloaderWritesInFlight -= 1;
   }
 }
 

@@ -210,6 +210,11 @@ export class ESPHomeApp extends LitElement {
   // value. A counter, not a boolean: it guards more than one write path, so
   // two overlapping writes must both settle before the gate reopens.
   _prefsWritesInFlight = 0;
+  // Same gate for the offloader-settings writes (remote-builds master,
+  // version-match policy, include-local-in-pool): while one is outstanding,
+  // the INITIAL_STATE reseed skips re-applying these three so a reconnect
+  // mid-write can't revert the optimistic value. Counter for overlapping flips.
+  _offloaderWritesInFlight = 0;
 
   private _router = createRouter(this);
 
