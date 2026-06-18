@@ -162,7 +162,7 @@
     "install_method_usb_server_ha_desc": "For devices connected via USB to your Home Assistant server",
     "install_method_web_download": "Flash on this computer via {link}",
     "install_method_web_download_link": "web.esphome.io",
-    "install_method_web_download_desc": "Requires a browser with Web Serial support (e.g. Chrome)",
+    "install_method_web_download_desc": "Requires a browser with Web Serial support (e.g. Chrome, Edge, or Firefox 151+)",
     "install_method_manual_download": "Download firmware binary",
     "install_method_manual_download_desc": "Compile here and download the binary, then flash it manually with your preferred tool",
     "install": "Install",
