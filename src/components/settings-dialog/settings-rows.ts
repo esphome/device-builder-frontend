@@ -17,7 +17,7 @@ export interface ToggleRowOptions {
 
 /**
  * Settings toggle row: title + description and a `role=switch` button.
-
+ *
  * A `null` `checked` renders the button-less loading variant (title +
  * `loadingDescKey`) instead.
  */
