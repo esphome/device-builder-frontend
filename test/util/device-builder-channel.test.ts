@@ -23,4 +23,9 @@ describe("deviceBuilderChannel", () => {
     expect(deviceBuilderChannel("0.1.0.dev5+g1234")).toBe("dev");
     expect(deviceBuilderChannel("2026.5.0-dev")).toBe("dev");
   });
+
+  it("tolerates null/undefined without throwing", () => {
+    expect(deviceBuilderChannel(null)).toBe("dev");
+    expect(deviceBuilderChannel(undefined)).toBe("dev");
+  });
 });

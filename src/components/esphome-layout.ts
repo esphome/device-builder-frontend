@@ -73,6 +73,7 @@ export class ESPHomeLayout extends LitElement {
 
   /** Hardcoded (untranslated) badge label for a non-stable backend, else null. */
   private get _versionBadge(): string | null {
+    if (!this._serverVersion) return null;
     const channel = deviceBuilderChannel(this._serverVersion);
     if (!channel) return null;
     return channel === "dev" ? "Dev" : "Beta";
