@@ -160,6 +160,25 @@ export async function onSetOffloaderRemoteBuildsEnabled(
   }
 }
 
+export async function onSetOffloaderIncludeLocal(
+  host: ESPHomeApp,
+  e: CustomEvent<boolean>
+): Promise<void> {
+  const enabled = e.detail;
+  const previous = host._offloaderIncludeLocalInPool;
+  host._offloaderIncludeLocalInPool = enabled;
+  try {
+    await host._api.setOffloaderRemoteBuildSettings({
+      include_local_in_pool: enabled,
+    });
+  } catch {
+    host._offloaderIncludeLocalInPool = previous;
+    toast.error(host._localize("settings.remote_build_save_failed"), {
+      richColors: true,
+    });
+  }
+}
+
 export async function onSetOffloaderPairingEnabled(
   host: ESPHomeApp,
   e: CustomEvent<{ pin_sha256: string; enabled: boolean }>

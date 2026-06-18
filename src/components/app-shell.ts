@@ -40,6 +40,7 @@ import {
   isHaIngressContext,
   labelsContext,
   localizeContext,
+  offloaderIncludeLocalInPoolContext,
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
@@ -76,6 +77,7 @@ import {
   onRemoteBuildJobSubmitted,
   onSetExpertMode,
   onSetLanguage,
+  onSetOffloaderIncludeLocal,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
   onSetOffloaderVersionMatchPolicy,
@@ -172,6 +174,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: offloaderVersionMatchPolicyContext })
   @state()
   _offloaderVersionMatchPolicy: VersionMatchPolicy | null = null;
+  @provide({ context: offloaderIncludeLocalInPoolContext })
+  @state()
+  _offloaderIncludeLocalInPool: boolean | null = null;
   @provide({ context: buildOffloadAlertsContext }) @state() _buildOffloadAlerts: Map<
     string,
     OffloaderAlertSnapshotEntry
@@ -577,6 +582,8 @@ export class ESPHomeApp extends LitElement {
         ) => onSetOffloaderPairingEnabled(this, e)}
         @set-offloader-version-match-policy=${(e: CustomEvent<VersionMatchPolicy>) =>
           onSetOffloaderVersionMatchPolicy(this, e)}
+        @set-offloader-include-local=${(e: CustomEvent<boolean>) =>
+          onSetOffloaderIncludeLocal(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @pair-request-sent=${(e: CustomEvent<{ summary: PairingSummary }>) =>

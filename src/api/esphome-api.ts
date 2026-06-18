@@ -1814,8 +1814,21 @@ export class ESPHomeAPI {
    */
   async setOffloaderRemoteBuildSettings(
     args:
-      | { remote_builds_enabled: boolean; version_match_policy?: VersionMatchPolicy }
-      | { remote_builds_enabled?: boolean; version_match_policy: VersionMatchPolicy }
+      | {
+          remote_builds_enabled: boolean;
+          version_match_policy?: VersionMatchPolicy;
+          include_local_in_pool?: boolean;
+        }
+      | {
+          remote_builds_enabled?: boolean;
+          version_match_policy: VersionMatchPolicy;
+          include_local_in_pool?: boolean;
+        }
+      | {
+          remote_builds_enabled?: boolean;
+          version_match_policy?: VersionMatchPolicy;
+          include_local_in_pool: boolean;
+        }
   ): Promise<OffloaderRemoteBuildSettings> {
     return this.sendCommand<OffloaderRemoteBuildSettings>(
       "remote_build/set_offloader_settings",

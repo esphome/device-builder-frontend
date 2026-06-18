@@ -217,6 +217,12 @@ export interface OffloaderRemoteBuildSettings {
    * for the per-value semantics.
    */
   version_match_policy: VersionMatchPolicy;
+  /**
+   * Advanced: include the local machine in the build pool so it
+   * compiles overflow when every paired build server is busy.
+   * Off by default.
+   */
+  include_local_in_pool: boolean;
   pairings: PairingSummary[];
 }
 

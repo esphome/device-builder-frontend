@@ -354,6 +354,17 @@ export const offloaderVersionMatchPolicyContext =
   );
 
 /**
+ * Offloader-side "include local in build pool" advanced toggle.
+ *
+ * `null` until ``subscribe_events.initial_state`` lands; the
+ * Settings toggle renders a loading row while the seed is in
+ * flight. Defaults to `false` on the backend.
+ */
+export const offloaderIncludeLocalInPoolContext = createContext<boolean | null>(
+  Symbol("esphome-offloader-include-local-in-pool")
+);
+
+/**
  * Offloader-side pair alerts (pin_mismatch / peer_revoked).
  * Keyed on ``${hostname}:${port}`` to match the backend's
  * ``_offloader_alerts`` dict. Seeded from

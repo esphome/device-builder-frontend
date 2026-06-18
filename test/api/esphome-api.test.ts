@@ -920,6 +920,32 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
+  it("setOffloaderRemoteBuildSettings forwards include_local_in_pool on its own", async () => {
+    // The advanced "include this machine in the build pool" toggle
+    // flips this field alone; the helper must accept it without
+    // requiring the other two settings.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setOffloaderRemoteBuildSettings({
+      include_local_in_pool: true,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_offloader_settings");
+    expect(sent.args).toEqual({ include_local_in_pool: true });
+    const result = {
+      remote_builds_enabled: true,
+      version_match_policy: "any",
+      include_local_in_pool: true,
+      pairings: [],
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
   // No ``listRemoteBuildHosts`` / ``addRemoteBuildManualHost`` /
   // ``removeRemoteBuildManualHost`` tests — the wrappers were
   // deleted in lockstep with the backend rip-out. Discovered

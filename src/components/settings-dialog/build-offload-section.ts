@@ -46,6 +46,7 @@ import "../edit-pairing-endpoint-dialog.js";
 import "../pair-build-server-dialog.js";
 import "../reauth-wizard-dialog.js";
 import "../remote-build-job-dialog.js";
+import "./build-offload-advanced.js";
 
 registerMdiIcons({
   delete: mdiDelete,
@@ -178,6 +179,8 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
           ${this._localize("settings.pair_build_server_open_action")}
         </button>
       </div>
+
+      <esphome-settings-build-offload-advanced></esphome-settings-build-offload-advanced>
 
       <esphome-pair-build-server-dialog
         @pair-request-sent=${this._onPairRequestSent}

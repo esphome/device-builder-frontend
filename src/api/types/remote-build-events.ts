@@ -133,6 +133,18 @@ export interface OffloaderVersionMatchPolicyChangedEventData {
 }
 
 /**
+ * Data payload for ``offloader_include_local_changed``.
+ *
+ * Fires when the "include local in build pool" advanced toggle
+ * flips through ``remote_build/set_offloader_settings``. Carries
+ * the new value so subscribing tabs update their switch render
+ * without re-fetching settings.
+ */
+export interface OffloaderIncludeLocalChangedEventData {
+  include_local_in_pool: boolean;
+}
+
+/**
  * Data payload for ``receiver_peer_link_session_opened`` and
  * ``receiver_peer_link_session_closed``.
  *

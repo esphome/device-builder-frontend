@@ -10,6 +10,7 @@ import type {
 } from "../../api/types/event-subscription.js";
 import { DeviceEventType } from "../../api/types/event-subscription.js";
 import type {
+  OffloaderIncludeLocalChangedEventData,
   OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
@@ -68,6 +69,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         remote_jobs,
         remote_builds_enabled,
         version_match_policy,
+        include_local_in_pool,
       } = data as InitialStateEventData;
       // Mark prefs known so creation gates on the subscription, not a separate
       // get_preferences (preferences is always present). Skip the apply while a
@@ -107,6 +109,9 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       }
       if (version_match_policy !== undefined) {
         host._offloaderVersionMatchPolicy = version_match_policy;
+      }
+      if (include_local_in_pool !== undefined) {
+        host._offloaderIncludeLocalInPool = include_local_in_pool;
       }
       break;
     }
@@ -354,6 +359,11 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.OFFLOADER_VERSION_MATCH_POLICY_CHANGED: {
       const evt = data as OffloaderVersionMatchPolicyChangedEventData;
       host._offloaderVersionMatchPolicy = evt.version_match_policy;
+      break;
+    }
+    case DeviceEventType.OFFLOADER_INCLUDE_LOCAL_CHANGED: {
+      const evt = data as OffloaderIncludeLocalChangedEventData;
+      host._offloaderIncludeLocalInPool = evt.include_local_in_pool;
       break;
     }
     case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {

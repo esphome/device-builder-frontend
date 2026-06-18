@@ -19,6 +19,7 @@ export {
   isHaIngressContext,
   labelsContext,
   localizeContext,
+  offloaderIncludeLocalInPoolContext,
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,

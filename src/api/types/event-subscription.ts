@@ -123,6 +123,8 @@ export enum DeviceEventType {
   OFFLOADER_PAIRING_ENABLED_CHANGED = "offloader_pairing_enabled_changed",
   // Master version-match policy change.
   OFFLOADER_VERSION_MATCH_POLICY_CHANGED = "offloader_version_match_policy_changed",
+  // "Include local in build pool" advanced toggle change.
+  OFFLOADER_INCLUDE_LOCAL_CHANGED = "offloader_include_local_changed",
 }
 
 /**
@@ -234,6 +236,12 @@ export interface InitialStateEventData {
   /** Offloader-side master version-match policy. See
    *  :type:`VersionMatchPolicy` for the per-value semantics. */
   version_match_policy?: VersionMatchPolicy;
+  /** Advanced: when set, the local machine joins the build pool
+   *  and compiles overflow once every paired server is busy.
+   *  Optional for the same reason as the fields above; defaults
+   *  to `false`. Live updates flow through
+   *  ``OFFLOADER_INCLUDE_LOCAL_CHANGED``. */
+  include_local_in_pool?: boolean;
 }
 
 /**
