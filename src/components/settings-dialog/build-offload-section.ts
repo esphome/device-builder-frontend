@@ -154,9 +154,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       <div class="section-intro">
         ${this._localize("settings.paired_build_servers_desc")}
       </div>
-      ${this._renderPairings()} ${this._renderRemoteBuildsToggle()}
-      ${this._renderVersionMatchPolicyPicker()}
-      <esphome-settings-build-offload-advanced></esphome-settings-build-offload-advanced>
+      ${this._renderPairings()}
 
       <div class="section-heading">
         ${this._localize("settings.remote_build_known_dashboards")}
@@ -180,6 +178,9 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
           ${this._localize("settings.pair_build_server_open_action")}
         </button>
       </div>
+
+      ${this._renderRemoteBuildsToggle()} ${this._renderVersionMatchPolicyPicker()}
+      <esphome-settings-build-offload-advanced></esphome-settings-build-offload-advanced>
 
       <esphome-pair-build-server-dialog
         @pair-request-sent=${this._onPairRequestSent}
