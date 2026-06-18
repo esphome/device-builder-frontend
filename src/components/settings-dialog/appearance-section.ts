@@ -12,6 +12,7 @@ import {
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderToggleRow } from "./settings-rows.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -173,44 +174,25 @@ export class ESPHomeSettingsAppearance extends LitElement {
   }
 
   private _renderRemoteCompute() {
-    return html`
-      <div class="row">
-        <div class="row-label">
-          <span id="remote-compute-title" class="row-title">
-            ${this._localize("settings.remote_compute_only")}
-          </span>
-          <span class="row-desc">
-            ${this._localize("settings.remote_compute_only_desc")}
-          </span>
-        </div>
-        <button
-          class="toggle"
-          role="switch"
-          aria-labelledby="remote-compute-title"
-          aria-checked=${this._remoteComputeOnly}
-          @click=${this._onToggleRemoteCompute}
-        ></button>
-      </div>
-    `;
+    return renderToggleRow(this._localize, {
+      titleId: "remote-compute-title",
+      titleKey: "settings.remote_compute_only",
+      descKey: "settings.remote_compute_only_desc",
+      checked: this._remoteComputeOnly,
+      onToggle: this._onToggleRemoteCompute,
+    });
   }
 
   private _renderExpertMode() {
     return html`
-      <div class="row expert-row">
-        <div class="row-label">
-          <span id="expert-mode-title" class="row-title">
-            ${this._localize("settings.expert_mode")}
-          </span>
-          <span class="row-desc">${this._localize("settings.expert_mode_desc")}</span>
-        </div>
-        <button
-          class="toggle"
-          role="switch"
-          aria-labelledby="expert-mode-title"
-          aria-checked=${this._expertMode}
-          @click=${this._onToggleExpertMode}
-        ></button>
-      </div>
+      ${renderToggleRow(this._localize, {
+        titleId: "expert-mode-title",
+        titleKey: "settings.expert_mode",
+        descKey: "settings.expert_mode_desc",
+        checked: this._expertMode,
+        onToggle: this._onToggleExpertMode,
+        rowClass: "expert-row",
+      })}
       <div class="expert-features">
         <button
           class="expert-features-toggle"

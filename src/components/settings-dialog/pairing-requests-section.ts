@@ -18,6 +18,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { remainingOf } from "../../util/relative-time.js";
 import type { ESPHomeAcceptPeerDialog } from "../accept-peer-dialog.js";
 import { pairingWindowStyles } from "./pairing-styles.js";
+import { renderStatusRow } from "./settings-rows.js";
 import {
   peerRowStyles,
   settingsRowStyles,
@@ -113,24 +114,20 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
         ${this._localize("settings.build_server_pairing_requests_desc")}
       </div>
       ${peers === null
-        ? this._statusRow("settings.build_server_pairing_requests_loading")
+        ? renderStatusRow(
+            this._localize,
+            "settings.build_server_pairing_requests_loading"
+          )
         : pending.length === 0
-          ? this._statusRow("settings.build_server_pairing_requests_empty")
+          ? renderStatusRow(
+              this._localize,
+              "settings.build_server_pairing_requests_empty"
+            )
           : pending.map((p) => this._renderPendingRow(p))}
       <esphome-accept-peer-dialog
         @confirm=${this._onAcceptConfirm}
         @reject=${this._onRejectFromDialog}
       ></esphome-accept-peer-dialog>
-    `;
-  }
-
-  private _statusRow(key: string) {
-    return html`
-      <div class="row" role="status">
-        <div class="row-label">
-          <span class="row-desc">${this._localize(key)}</span>
-        </div>
-      </div>
     `;
   }
 

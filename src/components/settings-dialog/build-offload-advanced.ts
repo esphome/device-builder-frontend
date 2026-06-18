@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, html } from "lit";
+import { LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -8,6 +8,7 @@ import {
   offloaderIncludeLocalInPoolContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { renderToggleRow } from "./settings-rows.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 /**
@@ -31,39 +32,14 @@ export class ESPHomeSettingsBuildOffloadAdvanced extends LitElement {
   static styles = [espHomeStyles, settingsSharedStyles, settingsRowStyles];
 
   protected render() {
-    if (this._includeLocalInPool === null) {
-      return html`
-        <div class="row" role="status">
-          <div class="row-label">
-            <span class="row-title">
-              ${this._localize("settings.offloader_include_local")}
-            </span>
-            <span class="row-desc">
-              ${this._localize("settings.offloader_include_local_loading")}
-            </span>
-          </div>
-        </div>
-      `;
-    }
-    return html`
-      <div class="row">
-        <div class="row-label">
-          <span id="offloader-include-local-title" class="row-title">
-            ${this._localize("settings.offloader_include_local")}
-          </span>
-          <span class="row-desc">
-            ${this._localize("settings.offloader_include_local_desc")}
-          </span>
-        </div>
-        <button
-          class="toggle"
-          role="switch"
-          aria-labelledby="offloader-include-local-title"
-          aria-checked=${this._includeLocalInPool}
-          @click=${this._onToggleIncludeLocal}
-        ></button>
-      </div>
-    `;
+    return renderToggleRow(this._localize, {
+      titleId: "offloader-include-local-title",
+      titleKey: "settings.offloader_include_local",
+      descKey: "settings.offloader_include_local_desc",
+      loadingDescKey: "settings.offloader_include_local_loading",
+      checked: this._includeLocalInPool,
+      onToggle: this._onToggleIncludeLocal,
+    });
   }
 
   private _onToggleIncludeLocal = () => {
