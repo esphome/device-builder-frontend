@@ -1,10 +1,9 @@
 import { consume } from "@lit/context";
-import { LitElement, html, nothing } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
-  expertModeContext,
   localizeContext,
   offloaderIncludeLocalInPoolContext,
 } from "../../context/index.js";
@@ -12,23 +11,18 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 /**
- * Expert-only "include local in build pool" toggle for the Build offload section.
+ * "Include local in build pool" toggle for the Build offload section.
  *
- * Gated on ``expertModeContext`` (the onboarding-collected experience
- * level) rather than a manual disclosure: advanced users see it inline,
- * everyone else doesn't render it at all. Owns its own contexts so the
- * parent section stays under the file-size cap; dispatches a
- * bubbling+composed ``set-offloader-include-local`` event app-shell handles.
+ * Shown inline to every user (the setting is buried enough in the section
+ * that gating it would hide it from everyone who'd use it). Its own
+ * component so the parent section stays under the file-size cap; dispatches
+ * a bubbling+composed ``set-offloader-include-local`` event app-shell handles.
  */
 @customElement("esphome-settings-build-offload-advanced")
 export class ESPHomeSettingsBuildOffloadAdvanced extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
-
-  @consume({ context: expertModeContext, subscribe: true })
-  @state()
-  private _expertMode = false;
 
   @consume({ context: offloaderIncludeLocalInPoolContext, subscribe: true })
   @state()
@@ -37,7 +31,6 @@ export class ESPHomeSettingsBuildOffloadAdvanced extends LitElement {
   static styles = [espHomeStyles, settingsSharedStyles, settingsRowStyles];
 
   protected render() {
-    if (!this._expertMode) return nothing;
     if (this._includeLocalInPool === null) {
       return html`
         <div class="row" role="status">
