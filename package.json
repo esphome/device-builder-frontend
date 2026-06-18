@@ -51,7 +51,7 @@
     "prettier": "3.8.4",
     "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   },
   "browserslist": {
     "modern": [
