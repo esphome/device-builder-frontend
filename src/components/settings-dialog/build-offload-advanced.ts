@@ -89,6 +89,7 @@ export class ESPHomeSettingsBuildOffloadAdvanced extends LitElement {
           class="advanced-toggle__chevron"
           library="mdi"
           name=${this._expanded ? "chevron-up" : "chevron-down"}
+          aria-hidden="true"
         ></wa-icon>
       </button>
       ${this._expanded

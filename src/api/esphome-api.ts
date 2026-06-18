@@ -1801,7 +1801,7 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Flip one or both offloader-side master settings.
+   * Flip one or more offloader-side master settings.
    *
    * ``remote_builds_enabled=false`` short-circuits every install
    * to LOCAL; paired peer-link sessions stay open and the
@@ -1809,7 +1809,9 @@ export class ESPHomeAPI {
    * ``version_match_policy`` selects how strictly the scheduler
    * filters paired peers by ESPHome version — see
    * :type:`VersionMatchPolicy` for the per-value contract.
-   * The arg type requires at least one of the two; an
+   * ``include_local_in_pool`` (advanced) lets the local machine
+   * compile overflow when every paired server is busy.
+   * The arg type requires at least one of the three; an
    * all-undefined call is rejected as INVALID_ARGS.
    */
   async setOffloaderRemoteBuildSettings(
