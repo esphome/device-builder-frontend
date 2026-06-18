@@ -46,12 +46,12 @@
     "@types/node": "25.9.3",
     "@types/w3c-web-serial": "^1.0.8",
     "fflate": "^0.8.3",
-    "happy-dom": "^20.10.2",
+    "happy-dom": "^20.10.6",
     "husky": "^9.1.7",
     "prettier": "3.8.4",
     "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   },
   "browserslist": {
     "modern": [
