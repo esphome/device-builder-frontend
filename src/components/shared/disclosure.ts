@@ -12,8 +12,10 @@ registerMdiIcons({ "chevron-down": mdiChevronDown });
 export interface DisclosureOptions {
   /** Whether the panel is shown. The caller owns this state. */
   open: boolean;
-  /** Fired on toggle-button click; the caller flips its own `open`. */
-  onToggle: () => void;
+  /** Fired on toggle-button click; the caller flips its own `open`. Receives
+   *  the click event so an existing event handler can be passed directly; a
+   *  zero-arg arrow is also fine (extra params are ignored). */
+  onToggle: (event: Event) => void;
   localize: LocalizeFunc;
   /** Translation key for the toggle label. */
   labelKey: string;

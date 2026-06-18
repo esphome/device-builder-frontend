@@ -63,7 +63,7 @@ export const disclosureStyles = css`
     text-underline-offset: 2px;
   }
 
-  .disclosure-toggle--link:hover .disclosure-toggle__label {
+  .disclosure-toggle--link:not([disabled]):hover .disclosure-toggle__label {
     text-decoration: none;
   }
 
@@ -93,7 +93,7 @@ export const disclosureStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  .disclosure-toggle--quiet:hover {
+  .disclosure-toggle--quiet:not([disabled]):hover {
     color: var(--wa-color-text-normal);
   }
 
