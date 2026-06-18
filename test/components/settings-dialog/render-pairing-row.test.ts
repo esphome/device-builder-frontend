@@ -67,4 +67,10 @@ describe("renderPairingRow version line", () => {
     expect(text).not.toContain("settings.remote_build_peer_version_line");
     expect(text).toContain("settings.build_offload_pairing_version_mismatch_release");
   });
+
+  it("omits the version line on a non-approved row even with a retained version", () => {
+    const pending = { ...makeSummary("2026.6.0"), status: "pending" as const };
+    const text = renderedText(renderPairingRow(pending, ctx()));
+    expect(text).not.toContain("settings.remote_build_peer_version_line");
+  });
 });

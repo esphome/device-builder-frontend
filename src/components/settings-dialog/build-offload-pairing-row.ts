@@ -172,10 +172,16 @@ function renderPeerVersionLine(
   localize: LocalizeFunc,
   versionMismatch: VersionMismatchKind
 ): string | typeof nothing {
-  // Mirror of renderVersionMismatch: the plain version line is the
-  // match case, so it yields when there's a mismatch note to show
-  // (or no version yet).
-  if (!pairing.esphome_version || versionMismatch !== null) return nothing;
+  // Mirror of renderVersionMismatch: scoped to approved rows, the
+  // plain version line is the match case, so it yields when there's
+  // a mismatch note to show (or no version yet).
+  if (
+    pairing.status !== "approved" ||
+    !pairing.esphome_version ||
+    versionMismatch !== null
+  ) {
+    return nothing;
+  }
   return localize("settings.remote_build_peer_version_line", {
     esphome: pairing.esphome_version,
   });
