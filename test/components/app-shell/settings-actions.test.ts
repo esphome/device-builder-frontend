@@ -6,6 +6,7 @@ import {
   onSetExpertMode,
   onSetOffloaderIncludeLocal,
   onSetOffloaderVersionMatchPolicy,
+  onSetRemoteBuildEnabled,
   onSetRemoteComputeOnly,
   onSetTheme,
 } from "../../../src/components/app-shell/settings-actions.js";
@@ -254,6 +255,70 @@ describe("onSetTheme", () => {
     expect(host._prefsWritesInFlight).toBe(0);
     expect(warn).toHaveBeenCalled();
     expect(toastError).not.toHaveBeenCalled();
+  });
+});
+
+type RemoteBuildHost = Pick<
+  ESPHomeApp,
+  | "_remoteBuildEnabled"
+  | "_remoteBuildSetInFlight"
+  | "_buildServerIdentityRotationCounter"
+  | "_localize"
+> & {
+  _api: { setRemoteBuildSettings: (args: Record<string, unknown>) => Promise<unknown> };
+};
+
+function makeRemoteBuildHost(
+  setRemoteBuildSettings: RemoteBuildHost["_api"]["setRemoteBuildSettings"]
+): RemoteBuildHost {
+  return {
+    _remoteBuildEnabled: false,
+    _remoteBuildSetInFlight: false,
+    _buildServerIdentityRotationCounter: 0,
+    _localize: ((key: string) => key) as ESPHomeApp["_localize"],
+    _api: { setRemoteBuildSettings },
+  };
+}
+
+describe("onSetRemoteBuildEnabled", () => {
+  beforeEach(() => toastError.mockClear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("flips optimistically, gates the write, and rotates identity on success", async () => {
+    const setApi = vi.fn(async () => ({}));
+    const host = makeRemoteBuildHost(setApi);
+
+    const pending = onSetRemoteBuildEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    // Optimistic value + in-flight gate apply synchronously, before the await.
+    expect(host._remoteBuildEnabled).toBe(true);
+    expect(host._remoteBuildSetInFlight).toBe(true);
+
+    await pending;
+    expect(setApi).toHaveBeenCalledWith({ enabled: true });
+    expect(host._buildServerIdentityRotationCounter).toBe(1);
+    expect(host._remoteBuildSetInFlight).toBe(false);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("reverts and toasts on rejection without rotating identity", async () => {
+    const host = makeRemoteBuildHost(
+      vi.fn(async () => {
+        throw new Error("no");
+      })
+    );
+
+    await onSetRemoteBuildEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+
+    expect(host._remoteBuildEnabled).toBe(false);
+    expect(host._buildServerIdentityRotationCounter).toBe(0);
+    expect(host._remoteBuildSetInFlight).toBe(false);
+    expect(toastError).toHaveBeenCalledOnce();
   });
 });
 
