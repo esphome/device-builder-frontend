@@ -18,6 +18,7 @@ import {
 } from "../util/editor-layout.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { secretsStyles } from "./secrets.styles.js";
@@ -82,6 +83,14 @@ export class ESPHomePageSecrets extends LitElement {
   private _wipeDialog?: ESPHomeConfirmDialog;
 
   private _unsavedGuard = new UnsavedGuard();
+
+  // Cmd/Ctrl+S → save when there's something to save. Covers both the
+  // structured and YAML views, which share the single _yaml buffer.
+  private _saveShortcut = new SaveShortcutController(this, () => {
+    if (this._isDirty && !this._saving && this._yaml.trim() !== "") {
+      void this._save();
+    }
+  });
 
   // Set true once the leave guard has cleared a navigation, so the
   // synthetic popstate it triggers isn't re-intercepted.
