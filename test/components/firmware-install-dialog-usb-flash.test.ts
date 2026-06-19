@@ -76,7 +76,8 @@ describe("startUsbFlash", () => {
     const host = makeHost({ compileOk: false });
     await startUsbFlash(asHost(host));
     expect(host._step).toBe("error");
-    expect(host._step).not.toBe("download-ready");
+    // Bailed before the download step — never fetched bytes, never held firmware.
+    expect(host._api.firmwareDownloadBytes).not.toHaveBeenCalled();
     expect(host._usbFirmware).toBeNull();
   });
 

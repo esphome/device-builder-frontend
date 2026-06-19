@@ -123,6 +123,43 @@ describe("openFlasher", () => {
     ]);
   });
 
+  it("ignores progress/state frames that arrive before ready", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    // A stray "done" before the firmware hand-off must not flip to success.
+    emit(fakeWin, { type: "esphome-web-flash:state", state: "done" });
+    emit(fakeWin, { type: "esphome-web-flash:progress", pct: 99 });
+    expect(cb.states).toEqual([]);
+    expect(cb.progress).toEqual([]);
+    expect(fakeWin.postMessage).not.toHaveBeenCalled();
+  });
+
+  it("fires onLost if the flasher never reports ready", () => {
+    vi.useFakeTimers();
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    vi.advanceTimersByTime(60 * 1000);
+    expect(cb.lost).toBe(1);
+    vi.useRealTimers();
+  });
+
+  it("fires onLost when the flasher window closes", () => {
+    vi.useFakeTimers();
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    emit(fakeWin, { type: "esphome-web-flash:ready" });
+    fakeWin.closed = true;
+    vi.advanceTimersByTime(1000);
+    expect(cb.lost).toBe(1);
+    vi.useRealTimers();
+  });
+
   it("teardown stops listening without firing onLost", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);

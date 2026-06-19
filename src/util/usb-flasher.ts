@@ -113,7 +113,16 @@ export function openFlasher(
       );
       bytes = null; // transferred (detached)
       watchdog = setTimeout(lost, FLASH_WATCHDOG_MS);
-    } else if (data.type === MSG_PROGRESS) {
+      return;
+    }
+    // Ignore data frames until we've handed off: a stray/early "done" must not
+    // flip the dashboard to success before any firmware was sent.
+    if (!handedOff) return;
+    // Any frame means the flasher is alive (including an in-tab retry after an
+    // error); refresh the watchdog so a slow-but-progressing flash isn't lost.
+    if (watchdog !== undefined) clearTimeout(watchdog);
+    watchdog = setTimeout(lost, FLASH_WATCHDOG_MS);
+    if (data.type === MSG_PROGRESS) {
       cb.onProgress(data.pct ?? 0);
     } else if (data.type === MSG_STATE) {
       if (data.state === "done") {
