@@ -221,15 +221,10 @@ async function openLiveSerialPort(
         if (name === "InvalidStateError" && /already open/i.test(message)) {
           return p;
         }
-        // NetworkError means the device is still gone mid-re-enumeration: keep
-        // retrying the next candidate / round. Anything else (claimed by
-        // another app, driver / security error) won't fix itself by waiting —
-        // fail fast rather than stall the whole window behind a misleading
-        // "still restarting" message.
-        if (name !== "NetworkError") {
-          console.error("[Web Serial] Failed to reopen port for logs:", err);
-          return null;
-        }
+        // Unusable this round — still re-enumerating (NetworkError), claimed by
+        // another app, or a transient driver / security error. Fall through to
+        // the next candidate (including the cached handle this function exists
+        // to fall back to) and only give up at the deadline below.
       }
     }
     if (Date.now() >= deadline) {
