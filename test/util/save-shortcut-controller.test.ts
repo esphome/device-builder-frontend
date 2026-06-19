@@ -70,6 +70,18 @@ describe("SaveShortcutController", () => {
     expect(cb).not.toHaveBeenCalled();
   });
 
+  it("skips when the event was already defaultPrevented", () => {
+    const target = new EventTarget();
+    const cb = vi.fn();
+    const ctrl = new SaveShortcutController(new FakeHost(), cb, { target });
+    ctrl.hostConnected();
+
+    const e = makeKey("s", { meta: true });
+    e.preventDefault();
+    target.dispatchEvent(e);
+    expect(cb).not.toHaveBeenCalled();
+  });
+
   it("attaches only one listener for repeated hostConnected calls", () => {
     const target = new EventTarget();
     const cb = vi.fn();

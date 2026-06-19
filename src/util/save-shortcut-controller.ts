@@ -10,7 +10,7 @@ export interface SaveShortcutControllerOptions {
 /**
  * Reactive controller that runs ``onSave`` on Cmd/Ctrl+S, swallowing the
  * browser's "save page" default while the host is connected.
-
+ *
  * ``preventDefault`` fires on every match (so the browser dialog never
  * appears on an editor page); ``onSave`` decides whether anything is dirty.
  */
@@ -46,6 +46,9 @@ export class SaveShortcutController implements ReactiveController {
     if (!(ke.metaKey || ke.ctrlKey) || ke.shiftKey || ke.key.toLowerCase() !== "s") {
       return;
     }
+    // Bail if a deeper handler already claimed this Cmd+S, so two co-active
+    // controllers on the same target don't both fire (mirrors EnterController).
+    if (ke.defaultPrevented) return;
     ke.preventDefault();
     this.onSave();
   };
