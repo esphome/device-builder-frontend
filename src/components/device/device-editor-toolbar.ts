@@ -65,7 +65,11 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
           </button>`;
         })()
       : nothing}
-    <div class="layout-toggle" aria-label=${p.localize("device.editor_layout_label")}>
+    <div
+      class="layout-toggle"
+      role="group"
+      aria-label=${p.localize("device.editor_layout_label")}
+    >
       <button
         type="button"
         class="ghost-icon-btn"
