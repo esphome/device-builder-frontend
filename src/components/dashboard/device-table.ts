@@ -20,7 +20,6 @@ import {
 } from "@mdi/js";
 import {
   TableController,
-  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
@@ -31,10 +30,8 @@ import {
   type VisibilityState,
 } from "@tanstack/lit-table";
 import type { PropertyValues } from "lit";
-import { LitElement, html, nothing } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import { classMap } from "lit/directives/class-map.js";
-import { repeat } from "lit/directives/repeat.js";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -43,6 +40,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { matchesMacAddress } from "../../util/device-search.js";
 import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderDeviceTableBody, renderDeviceTableHead } from "./device-table-grid.js";
 import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
 import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
@@ -350,7 +348,25 @@ export class ESPHomeDeviceTable extends LitElement {
       <div class="table-wrap">
         <div class="table-scroll">
           <table role="grid">
-            ${this._renderThead(table)} ${this._renderTbody(table, rows)}
+            ${renderDeviceTableHead({
+              table,
+              selectMode: this.selectMode,
+              allSelected: this._allSelected,
+              onToggleAll: () => this._onToggleAll(),
+            })}
+            ${renderDeviceTableBody({
+              table,
+              rows,
+              selectMode: this.selectMode,
+              selectedDevices: this.selectedDevices,
+              highlightConfiguration: this.highlightConfiguration,
+              localize: this._localize,
+              onToggleSelect: (config) => this._onToggleSelect(config),
+              onRowClick: (device) => this._onRowClick(device),
+              onRowContextMenu: (e, device) => this._onRowContextMenu(e, device),
+              onRowKeydown: (e, device) => this._onRowKeydown(e, device),
+              openActionsMenu: (e, device) => this._openActionsMenu(e, device),
+            })}
           </table>
         </div>
         <esphome-table-pagination
@@ -466,165 +482,6 @@ export class ESPHomeDeviceTable extends LitElement {
           <slot name="actions"></slot>
         </div>
       </div>
-    `;
-  }
-
-  private _renderThead(table: any) {
-    return html`
-      <thead>
-        ${table.getHeaderGroups().map(
-          (hg: any) => html`
-            <tr role="row">
-              ${this.selectMode
-                ? html`<th class="select-col" style="width:40px">
-                    <span class="row-checkbox" @click=${this._onToggleAll}>
-                      <wa-icon
-                        library="mdi"
-                        name=${this._allSelected
-                          ? "checkbox-marked"
-                          : "checkbox-blank-outline"}
-                      ></wa-icon>
-                    </span>
-                  </th>`
-                : nothing}
-              ${hg.headers.map((header: any) => {
-                const sorted = header.column.getIsSorted();
-                const canSort = header.column.getCanSort();
-                return html`
-                  <th
-                    role="columnheader"
-                    aria-sort=${sorted === "asc"
-                      ? "ascending"
-                      : sorted === "desc"
-                        ? "descending"
-                        : "none"}
-                    class="${canSort ? "sortable" : ""} ${sorted
-                      ? "sorted"
-                      : ""} col-${header.column.id}"
-                    style="width:${header.getSize()}px"
-                    @click=${canSort ? () => header.column.toggleSorting() : nothing}
-                  >
-                    <span class="th-content">
-                      ${header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                      ${canSort
-                        ? html`<wa-icon
-                            class="sort-icon"
-                            library="mdi"
-                            name=${sorted === "asc"
-                              ? "chevron-up"
-                              : sorted === "desc"
-                                ? "chevron-down"
-                                : "unfold-more-horizontal"}
-                          ></wa-icon>`
-                        : nothing}
-                    </span>
-                  </th>
-                `;
-              })}
-              <th class="actions-col"></th>
-            </tr>
-          `
-        )}
-      </thead>
-    `;
-  }
-
-  private _renderTbody(table: any, rows: any[]) {
-    return html`
-      <tbody>
-        ${rows.length > 0
-          ? repeat(
-              rows,
-              // Key on the device config so Lit reuses each row's DOM
-              // across re-renders (job-progress ticks, selection) instead
-              // of re-diffing every row — matters most with "All" selected.
-              (row) => row.original.config,
-              (row) => html`
-                <tr
-                  role="row"
-                  tabindex="0"
-                  data-configuration=${row.original.config}
-                  class=${classMap({
-                    selected:
-                      this.selectMode && this.selectedDevices.has(row.original.config),
-                    highlight: this.highlightConfiguration === row.original.config,
-                  })}
-                  @click=${() =>
-                    this.selectMode
-                      ? this._onToggleSelect(row.original.config)
-                      : this._onRowClick(row.original._device)}
-                  @contextmenu=${(e: MouseEvent) =>
-                    this._onRowContextMenu(e, row.original._device)}
-                  @keydown=${(e: KeyboardEvent) =>
-                    this._onRowKeydown(e, row.original._device)}
-                >
-                  ${this.selectMode
-                    ? html`<td role="gridcell" class="select-col">
-                        <span class="row-checkbox">
-                          <wa-icon
-                            library="mdi"
-                            name=${this.selectedDevices.has(row.original.config)
-                              ? "checkbox-marked"
-                              : "checkbox-blank-outline"}
-                          ></wa-icon>
-                        </span>
-                      </td>`
-                    : nothing}
-                  ${row.getVisibleCells().map((cell: any) => {
-                    // The stacked mobile layout (table-styles.ts) shows each
-                    // cell's column header as a field label. It's a real
-                    // span (not a CSS ::before) so screen readers announce
-                    // it on mobile, where the <thead> is hidden; the span is
-                    // display:none on desktop, so it stays out of the a11y
-                    // tree there (the column header already provides context).
-                    // Name is the card title and actions is a button row, so
-                    // neither gets a label. Only string headers can be used as
-                    // a label; a future flexRender (template/function) header
-                    // would stringify to "[object Object]", so skip it.
-                    const id = cell.column.id;
-                    const header = cell.column.columnDef.header;
-                    const label =
-                      id !== "name" && id !== "actions" && typeof header === "string"
-                        ? header
-                        : null;
-                    return html`<td role="gridcell" class="col-${id}">
-                      ${label !== null
-                        ? html`<span class="cell-stack-label">${label}</span>`
-                        : nothing}
-                      ${flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>`;
-                  })}
-                  <td role="gridcell" class="actions-col">
-                    <button
-                      class="actions-btn"
-                      aria-label=${this._localize("dashboard.more_options")}
-                      @click=${(e: MouseEvent) => {
-                        e.stopPropagation();
-                        this._openActionsMenu(e, row.original._device);
-                      }}
-                    >
-                      <wa-icon library="mdi" name="dots-vertical"></wa-icon>
-                    </button>
-                  </td>
-                </tr>
-              `
-            )
-          : html`
-              <tr>
-                <td
-                  colspan=${table.getVisibleLeafColumns().length +
-                  (this.selectMode ? 1 : 0) +
-                  1}
-                  class="no-results"
-                >
-                  ${this._localize("dashboard.table_no_results")}
-                  <slot name="no-results-extra"></slot>
-                </td>
-              </tr>
-            `}
-      </tbody>
     `;
   }
 
