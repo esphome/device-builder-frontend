@@ -9,6 +9,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl } from "../../util/board-image.js";
 import { EnterController } from "../../util/enter-controller.js";
+import { fetchSecretKeys } from "../../util/secrets-cache.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
 
@@ -64,8 +65,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _canAdvance(): boolean {
     if (this._stage === "name") return !!this._deviceName.trim();
-    // Wi-Fi is optional: an empty SSID finishes with no credentials. Only block
-    // on a too-short WPA passphrase (an empty password is a valid open network).
+    // Wi-Fi is optional: a blank SSID + blank password finishes with no
+    // credentials (no-network / open). But a password with no SSID isn't a
+    // usable pair, and a too-short WPA passphrase is invalid — block both.
+    if (this._wifiPassword && !this._wifiSsid.trim()) return false;
     return !isWifiPasswordTooShort(this._wifiPassword);
   }
 
@@ -75,14 +78,12 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    try {
-      const yaml = await this._api.getConfig("secrets.yaml");
-      const hasSsid = /^wifi_ssid\s*:\s*["']?\S/m.test(yaml);
-      const hasPasswordKey = /^wifi_password\s*:/m.test(yaml);
-      this._wifiConfigured = hasSsid && hasPasswordKey;
-    } catch {
-      // No secrets file — leave _wifiConfigured false so the stage shows.
-    }
+    // "Configured" matches the backend's wifi_secrets_defined and the kebab
+    // "Set up / Change Wi-Fi" wording: both a wifi_ssid and a wifi_password key
+    // in secrets.yaml. Read via the shared, secrets-saved-refreshed key cache
+    // (fetchSecretKeys caches [] on failure) rather than parsing raw YAML.
+    const keys = await fetchSecretKeys(this._api);
+    this._wifiConfigured = keys.includes("wifi_ssid") && keys.includes("wifi_password");
   }
 
   static styles = [

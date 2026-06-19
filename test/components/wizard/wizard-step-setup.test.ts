@@ -5,23 +5,31 @@
  * (no shared secret yet, board has no own network), passes typed credentials
  * straight through for the backend to persist, and offers an explicit skip.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
+import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
 import { pressEnter } from "../../_press-enter.js";
 
-async function mount(secretsYaml?: string): Promise<ESPHomeWizardStepSetup> {
+// connectedCallback reads the shared (session-cached) secret-keys list to
+// decide whether Wi-Fi is already configured; mock it per-test (no cache bleed).
+vi.mock("../../../src/util/secrets-cache.js", () => ({
+  fetchSecretKeys: vi.fn(async () => [] as string[]),
+}));
+
+beforeEach(() => {
+  vi.mocked(fetchSecretKeys).mockResolvedValue([]);
+});
+
+async function mount(secretKeys: string[] = []): Promise<ESPHomeWizardStepSetup> {
+  vi.mocked(fetchSecretKeys).mockResolvedValue(secretKeys);
   const el = new ESPHomeWizardStepSetup();
-  const getConfig =
-    secretsYaml === undefined
-      ? vi.fn().mockRejectedValue(new Error("no secrets file"))
-      : vi.fn().mockResolvedValue(secretsYaml);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._api = { getConfig };
+  (el as any)._api = {};
   el.active = true; // the parent dialog is open
   document.body.appendChild(el);
   await el.updateComplete;
-  // connectedCallback parses secrets.yaml asynchronously; let it settle.
+  // connectedCallback reads secret keys asynchronously; let it settle.
   await Promise.resolve();
   await Promise.resolve();
   await el.updateComplete;
@@ -86,7 +94,7 @@ describe("wizard-step-setup", () => {
   });
 
   it("skips the wifi stage when secrets already define Wi-Fi", async () => {
-    const el = await mount('wifi_ssid: "home"\nwifi_password: "pw"\n');
+    const el = await mount(["wifi_ssid", "wifi_password"]);
     await setName(el, "kitchen");
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
@@ -125,6 +133,29 @@ describe("wizard-step-setup", () => {
     const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
     expect(detail.wifiSsid).toBe("");
     expect(detail.skipWifi).toBe(false);
+  });
+
+  it("does not finish the wifi stage with a password but blank SSID", async () => {
+    const el = await mount();
+    await setName(el, "kitchen");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    // password set, ssid blank → not a usable pair
+    const pw = el.shadowRoot!.querySelector("esphome-password-input")!;
+    pw.dispatchEvent(
+      new CustomEvent("password-input-change", {
+        detail: { value: "hunter2" },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await el.updateComplete;
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect(onFinish).not.toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._stage).toBe("wifi");
   });
 
   it("the skip-wifi button finishes with skipWifi true and no credentials", async () => {

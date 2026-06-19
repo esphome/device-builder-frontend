@@ -82,7 +82,14 @@ describe("loadOnboardingState routing", () => {
     expect(host._onboardingPending).toBe(true);
   });
 
-  it("clears the Wi-Fi pending flag once a wifi_ssid secret exists", async () => {
+  it("stays pending when only wifi_ssid exists (needs the password key too)", async () => {
+    vi.mocked(fetchSecretKeys).mockResolvedValue(["wifi_ssid"]);
+    const host = makeHost(state([]));
+    await loadOnboardingState(host as unknown as ESPHomeApp);
+    expect(host._onboardingPending).toBe(true);
+  });
+
+  it("clears the Wi-Fi pending flag once both wifi_ssid and wifi_password exist", async () => {
     vi.mocked(fetchSecretKeys).mockResolvedValue(["wifi_ssid", "wifi_password"]);
     const host = makeHost(state([]));
     await loadOnboardingState(host as unknown as ESPHomeApp);

@@ -30,11 +30,14 @@ export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
     console.warn("Failed to load onboarding state:", err);
   }
   // The kebab "Set up Wi-Fi" / "Change Wi-Fi" entry is always present; its
-  // wording tracks whether a shared Wi-Fi secret exists yet. Use the shared
-  // secret-keys cache so this rides the same `secrets-saved` refresh the
-  // pickers do and doesn't add a round-trip (it caches [] on failure).
+  // wording tracks whether a shared Wi-Fi secret exists yet — both a wifi_ssid
+  // and a wifi_password key, matching the wizard's skip rule and the backend's
+  // wifi_secrets_defined. Use the shared secret-keys cache so this rides the
+  // same `secrets-saved` refresh the pickers do (it caches [] on failure).
   const keys = await fetchSecretKeys(host._api);
-  host._onboardingPending = !keys.includes("wifi_ssid");
+  host._onboardingPending = !(
+    keys.includes("wifi_ssid") && keys.includes("wifi_password")
+  );
 }
 
 export async function loadRemoteBuildSettings(host: ESPHomeApp): Promise<void> {
