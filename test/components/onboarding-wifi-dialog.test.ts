@@ -26,10 +26,8 @@ interface DialogPrivateView extends EventTarget {
   _open: boolean;
   _saving: boolean;
   _error: string | null;
-  _exitedExplicitly: boolean;
   _api: {
     setWifiCredentials: (ssid: string, password: string) => Promise<unknown>;
-    markOnboardingAcknowledged?: () => Promise<unknown>;
   };
   readonly _passwordTooShort: boolean;
   _save(): Promise<void>;
@@ -108,8 +106,8 @@ describe("onboarding-wifi-dialog password-length gate", () => {
  * reactive ``_open`` flag, so the close / error paths are the part most
  * likely to silently regress. These pin the contract the host still
  * owns: a failed save keeps the dialog open with an inline error, a
- * successful save closes it and suppresses the session-dismiss, and the
- * reactive close path flips ``_open``.
+ * successful save closes it and fires ``secrets-saved``, and the reactive
+ * close path flips ``_open``.
  */
 describe("onboarding-wifi-dialog close / error gating", () => {
   test("a failed save shows the inline error and leaves the dialog open", async () => {
@@ -127,23 +125,25 @@ describe("onboarding-wifi-dialog close / error gating", () => {
     expect(dialog._saving).toBe(false); // re-enabled for another attempt
   });
 
-  test("a successful save closes the dialog and marks it exited explicitly", async () => {
+  test("a successful save closes the dialog and fires secrets-saved", async () => {
     const dialog = makeDialog();
     const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
-    const markOnboardingAcknowledged = vi.fn().mockResolvedValue(undefined);
-    dialog._api = { setWifiCredentials, markOnboardingAcknowledged };
+    dialog._api = { setWifiCredentials };
     dialog._open = true;
     dialog._ssid = "MyNetwork";
     dialog._password = "12345678";
 
-    const acked = vi.fn();
-    dialog.addEventListener("onboarding-acknowledged", acked);
+    const saved = vi.fn();
+    window.addEventListener("secrets-saved", saved);
+    try {
+      await dialog._save();
+    } finally {
+      window.removeEventListener("secrets-saved", saved);
+    }
 
-    await dialog._save();
-
+    expect(setWifiCredentials).toHaveBeenCalledWith("MyNetwork", "12345678");
     expect(dialog._open).toBe(false); // closed via the reactive flag
-    expect(dialog._exitedExplicitly).toBe(true); // suppresses the session-dismiss
-    expect(acked).toHaveBeenCalledTimes(1);
+    expect(saved).toHaveBeenCalledTimes(1); // pickers + kebab wording refresh
   });
 
   test("_onRequestClose flips the reactive open flag", () => {

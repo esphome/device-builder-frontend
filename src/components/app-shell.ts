@@ -480,9 +480,8 @@ export class ESPHomeApp extends LitElement {
     void loadPreferences(this);
   };
 
-  // Kebab "Set up Wi-Fi" — explicit user intent, overrides both gates.
+  // Kebab "Set up / Change Wi-Fi credentials" — open the manual Wi-Fi dialog.
   private _onOpenOnboarding = () => {
-    this._onboardingSessionDismissed = false;
     this._onboardingDialog?.open();
   };
 
@@ -603,10 +602,7 @@ export class ESPHomeApp extends LitElement {
         @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}
       ></esphome-firmware-jobs-dialog>
       <esphome-feedback-dialog></esphome-feedback-dialog>
-      <esphome-onboarding-wifi-dialog
-        @onboarding-acknowledged=${this._onOnboardingAcknowledged}
-        @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
-      ></esphome-onboarding-wifi-dialog>
+      <esphome-onboarding-wifi-dialog></esphome-onboarding-wifi-dialog>
       <esphome-onboarding-wizard-dialog
         .hasUseCase=${this._onboardingHasUseCase}
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
