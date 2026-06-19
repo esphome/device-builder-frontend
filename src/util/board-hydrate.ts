@@ -39,7 +39,6 @@ export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
     is_generic: entry.is_generic ?? false,
     featured_components: (entry.featured_components ?? []).map(_hydrateFeaturedComponent),
     featured_bundles: (entry.featured_bundles ?? []).map(_hydrateFeaturedBundle),
-    provides_network: entry.provides_network ?? false,
     requires_wifi: entry.requires_wifi ?? false,
   };
 }

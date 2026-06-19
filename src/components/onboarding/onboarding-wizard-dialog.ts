@@ -14,7 +14,6 @@ import { ExperienceLevel } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
-import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
@@ -92,7 +91,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
-    inputStyles,
     dialogActionButtonStyles,
     choiceCardStyles,
     onboardingWizardStyles,

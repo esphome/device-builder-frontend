@@ -9,7 +9,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl } from "../../util/board-image.js";
 import { EnterController } from "../../util/enter-controller.js";
-import { fetchSecretKeys } from "../../util/secrets-cache.js";
+import { fetchSecretKeys, hasSharedWifiSecret } from "../../util/secrets-cache.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
 
@@ -78,12 +78,9 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    // "Configured" matches the backend's wifi_secrets_defined and the kebab
-    // "Set up / Change Wi-Fi" wording: both a wifi_ssid and a wifi_password key
-    // in secrets.yaml. Read via the shared, secrets-saved-refreshed key cache
-    // (fetchSecretKeys caches [] on failure) rather than parsing raw YAML.
-    const keys = await fetchSecretKeys(this._api);
-    this._wifiConfigured = keys.includes("wifi_ssid") && keys.includes("wifi_password");
+    // Already configured ⇒ skip the Wi-Fi stage and reuse !secret. Read via the
+    // shared, secrets-saved-refreshed key cache (caches [] on failure).
+    this._wifiConfigured = hasSharedWifiSecret(await fetchSecretKeys(this._api));
   }
 
   static styles = [

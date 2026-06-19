@@ -17,7 +17,8 @@ import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
 
 // loadOnboardingState reads the shared (session-cached) secret-keys list; mock
 // it so the kebab-wording flag is driven per-test without cache bleed.
-vi.mock("../../../src/util/secrets-cache.js", () => ({
+vi.mock("../../../src/util/secrets-cache.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/util/secrets-cache.js")>()),
   fetchSecretKeys: vi.fn(async () => [] as string[]),
 }));
 

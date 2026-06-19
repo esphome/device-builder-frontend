@@ -53,6 +53,16 @@ export function fetchSecretKeys(api: ESPHomeAPI): Promise<string[]> {
   return _cache.fetch(api);
 }
 
+/**
+ * Whether *keys* hold a usable shared Wi-Fi secret — both a ``wifi_ssid`` and a
+ * ``wifi_password`` key. Mirrors the backend's ``wifi_secrets_defined`` and is
+ * the single source for the wizard's "Wi-Fi already configured" skip and the
+ * kebab "Set up / Change Wi-Fi" wording.
+ */
+export function hasSharedWifiSecret(keys: string[]): boolean {
+  return keys.includes("wifi_ssid") && keys.includes("wifi_password");
+}
+
 /** Re-read the keys and overwrite the cache. Concurrent callers (one per
  *  mounted picker reacting to the same event) share a single in-flight
  *  request. Swallows errors so a WS blip keeps the cached list. */

@@ -77,6 +77,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
 
+  /** Board id whose full body has already been fetched into `_selectedBoard`,
+   *  so re-entering the setup step doesn't refetch (getBoard is uncached). */
+  private _upgradedBoardId: string | null = null;
+
   /** Initial platform-filter label for the board step. Set by
    *  ``openAtBoardStep`` when the caller knows the chip family
    *  (e.g. from serial chip detection) so the picker opens with
@@ -178,6 +182,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._advancedOpen = false;
     this._import.reset();
     this._submitting = false;
+    this._upgradedBoardId = null;
     this._resetCreateErrors();
     this._open = true;
   }
@@ -359,15 +364,19 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   /** Replace the slim board entry from the picker list with the full body so
-   *  ``wizard-step-setup`` can read ``provides_network`` — ``boards/get_boards``
-   *  ships slim entries that omit it (and ``hydrateBoard`` defaults it to
-   *  ``false``, so there's no reliable "already full" flag to gate on). The
-   *  setup step renders immediately with the slim board; the upgrade lands a
-   *  beat later and only refines the Wi-Fi skip decision. */
+   *  ``wizard-step-setup`` can read ``requires_wifi`` — ``boards/get_boards``
+   *  ships slim entries that omit it. The setup step renders immediately with
+   *  the slim board; the upgrade lands a beat later and only refines the Wi-Fi
+   *  skip decision. Skips the (uncached) fetch when this id is already upgraded
+   *  so Back/forward between board↔setup doesn't refetch. */
   private async _upgradeSelectedBoard(board: BoardCatalogEntry): Promise<void> {
+    if (this._upgradedBoardId === board.id) return;
     try {
       const full = await this._api.getBoard(board.id);
-      if (full && this._selectedBoard?.id === board.id) this._selectedBoard = full;
+      if (full && this._selectedBoard?.id === board.id) {
+        this._selectedBoard = full;
+        this._upgradedBoardId = board.id;
+      }
     } catch (err) {
       console.warn("Failed to load full board body:", err);
     }

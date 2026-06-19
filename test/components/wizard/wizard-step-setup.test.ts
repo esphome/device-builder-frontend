@@ -14,7 +14,8 @@ import { pressEnter } from "../../_press-enter.js";
 
 // connectedCallback reads the shared (session-cached) secret-keys list to
 // decide whether Wi-Fi is already configured; mock it per-test (no cache bleed).
-vi.mock("../../../src/util/secrets-cache.js", () => ({
+vi.mock("../../../src/util/secrets-cache.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/util/secrets-cache.js")>()),
   fetchSecretKeys: vi.fn(async () => [] as string[]),
 }));
 
@@ -34,8 +35,9 @@ function board(flags: Partial<BoardCatalogEntry>): BoardCatalogEntry {
 
 // A Wi-Fi-only board (native Wi-Fi, no onboard network) → wizard collects Wi-Fi.
 const wifiBoard = () => board({ requires_wifi: true });
-// A board that brings its own network (Ethernet/Thread) → Wi-Fi step skipped.
-const networkedBoard = () => board({ provides_network: true });
+// Any board that doesn't require Wi-Fi (Ethernet/Thread, or no network
+// hardware) → the Wi-Fi step is skipped.
+const noWifiBoard = () => board({ requires_wifi: false });
 
 async function mount(
   boardEntry: BoardCatalogEntry,
@@ -133,8 +135,11 @@ describe("wizard-step-setup", () => {
     expect(stage(el)).toBe("wifi");
   });
 
-  it("skips the Wi-Fi stage and finishes for a board that brings its own network", async () => {
-    const el = await mount(networkedBoard());
+  it("skips the Wi-Fi stage and finishes for a board that doesn't require Wi-Fi", async () => {
+    // Ethernet/Thread or no-network-hardware boards alike: nothing to ask, so
+    // finish straight from the name stage (backend uses the board's network or
+    // a no-network stub).
+    const el = await mount(noWifiBoard());
     await setName(el, "kitchen");
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
@@ -155,18 +160,6 @@ describe("wizard-step-setup", () => {
     const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
     expect(detail.wifiSsid).toBe("");
     expect(detail.wifiPassword).toBe("");
-  });
-
-  it("skips the Wi-Fi stage for a board with no native Wi-Fi and no onboard network", async () => {
-    // Neither flag set (e.g. a Thread/P4 board): nothing to ask — finish to a
-    // no-network stub straight from the name stage.
-    const el = await mount(board({}));
-    await setName(el, "kitchen");
-    const onFinish = vi.fn();
-    el.addEventListener("finish-setup", onFinish as EventListener);
-    pressEnter();
-    expect(onFinish).toHaveBeenCalledTimes(1);
-    expect(stage(el)).toBe("name");
   });
 
   it("passes a typed SSID through unchanged for the backend to persist", async () => {

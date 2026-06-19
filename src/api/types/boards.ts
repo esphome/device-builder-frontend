@@ -109,12 +109,6 @@ export interface BoardCatalogEntry {
   /** Logical groups of featured components added together. */
   featured_bundles: FeaturedBundle[];
   /**
-   * Derived (only on the full `boards/get_board` body): the board supplies
-   * its own non-Wi-Fi network by default (onboard Ethernet today, Thread
-   * later), so the create wizard skips the Wi-Fi step.
-   */
-  provides_network?: boolean;
-  /**
    * Derived (full body only): Wi-Fi is the board's only built-in network, so a
    * generated config needs it — the wizard makes Wi-Fi mandatory (no skip).
    */
