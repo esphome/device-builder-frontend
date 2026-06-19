@@ -145,6 +145,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Compile on the server, download the resulting binary, show instructions
   // to flash it via web.esphome.io. Fallback when neither OTA nor Web Serial
   // is available (HTTP dashboard, offline first-flash).
+  // DEAD since #904 (the picker routes USB to web-flash); prune tracked in #907.
   installWebDownload(device: ConfiguredDevice) {
     this._init(device);
     this._installer = "web-download";
