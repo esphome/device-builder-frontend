@@ -7,6 +7,7 @@ import { chipNameToVariant } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
+import { openFlasher } from "../../util/usb-flasher.js";
 import {
   connectToPort,
   detectChip,
@@ -429,6 +430,47 @@ export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise
   }
   host._step = "download-ready";
   host._statusMessage = "";
+}
+
+// Open the external flasher and hand off the already-built firmware, mirroring
+// its progress/result into the dialog. Called from the download-ready "Open USB
+// flasher" button (a user gesture, so the pop-up isn't blocked).
+export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
+  const firmware = host._usbFirmware;
+  if (!firmware) return;
+  host._step = "flashing";
+  host._flashPercent = 0;
+  host._statusMessage = host._localize("firmware.usb_flashing");
+  const teardown = openFlasher(firmware, host._usbFirmwareName, {
+    onProgress: (pct) => {
+      host._flashPercent = pct;
+    },
+    onStatus: (detail) => {
+      host._statusMessage = detail;
+    },
+    onState: (state, detail) => {
+      host._usbFlashTeardown = null;
+      if (state === "done") {
+        host._step = "done";
+        host._statusMessage = host._localize("firmware.usb_done");
+      } else {
+        host._fail(host._localize("firmware.usb_failed"), detail);
+      }
+    },
+    onLost: () => {
+      host._usbFlashTeardown = null;
+      host._fail(
+        host._localize("firmware.usb_failed"),
+        host._localize("firmware.usb_window_closed")
+      );
+    },
+  });
+  if (!teardown) {
+    host._fail(host._localize("firmware.usb_popup_blocked"));
+    return;
+  }
+  host._usbFirmware = null; // ownership transferred to the flasher session
+  host._usbFlashTeardown = teardown;
 }
 
 export function compileAndWait(

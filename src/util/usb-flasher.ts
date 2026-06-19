@@ -1,5 +1,4 @@
 import { FLASHER_ORIGIN, FLASHER_URL } from "../common/docs.js";
-import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 
 // Message types, mirroring flasher/src/protocol.ts in the device-builder repo.
 // The nonce travels one way only (dashboard -> flasher).
@@ -13,20 +12,30 @@ const READY_TIMEOUT_MS = 60 * 1000;
 // Bound the flash itself (armed at hand-off).
 const FLASH_WATCHDOG_MS = 10 * 60 * 1000;
 
-/**
- * Open the external secure-context flasher and hand off the already-built
- * firmware (host._usbFirmware) over postMessage, mirroring the flasher's
- * progress/state back into the install dialog.
- *
- * Must be called from a user gesture (the "Open USB flasher" button) so the
- * popup isn't blocked, and only after the firmware compiled + downloaded — we
- * never open the external site until a working image exists.
- */
-export function openFlasherAndHandOff(host: ESPHomeFirmwareInstallDialog): void {
-  let bytes: ArrayBuffer | null = host._usbFirmware;
-  if (!bytes) return;
-  const name = host._usbFirmwareName;
+export interface FlasherCallbacks {
+  /** Flash write progress, 0-100. */
+  onProgress: (pct: number) => void;
+  /** A non-terminal status line from the flasher (e.g. "connecting"). */
+  onStatus: (detail: string) => void;
+  /** Terminal result. */
+  onState: (state: "done" | "error", detail: string) => void;
+  /** The flasher tab closed / crashed / went silent before a result. */
+  onLost: () => void;
+}
 
+/**
+ * Open the external secure-context flasher and hand off the firmware over
+ * postMessage. Pure and dialog-agnostic: results come back through callbacks.
+ *
+ * Returns a teardown (stop listening + clear timers), or null if the pop-up was
+ * blocked. Must be called from a user gesture so the pop-up isn't blocked, and
+ * only after a working firmware exists (the caller owns that ordering).
+ */
+export function openFlasher(
+  firmware: ArrayBuffer,
+  name: string,
+  cb: FlasherCallbacks
+): (() => void) | null {
   const nonce = crypto.randomUUID();
   const win = window.open(
     `${FLASHER_URL}#nonce=${encodeURIComponent(nonce)}&origin=${encodeURIComponent(
@@ -34,15 +43,9 @@ export function openFlasherAndHandOff(host: ESPHomeFirmwareInstallDialog): void 
     )}`,
     "_blank"
   );
-  if (!win) {
-    host._fail(host._localize("firmware.usb_popup_blocked"));
-    return;
-  }
+  if (!win) return null;
 
-  host._step = "flashing";
-  host._flashPercent = 0;
-  host._statusMessage = host._localize("firmware.usb_flashing");
-
+  let bytes: ArrayBuffer | null = firmware;
   const controller = new AbortController();
   let readyTimer: ReturnType<typeof setTimeout> | undefined;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
@@ -50,6 +53,8 @@ export function openFlasherAndHandOff(host: ESPHomeFirmwareInstallDialog): void 
   let finished = false;
   let handedOff = false;
 
+  // Pure teardown (also the returned handle): no callback, so a caller closing
+  // the session doesn't trigger onLost.
   const finish = () => {
     if (finished) return;
     finished = true;
@@ -57,18 +62,11 @@ export function openFlasherAndHandOff(host: ESPHomeFirmwareInstallDialog): void 
     if (readyTimer !== undefined) clearTimeout(readyTimer);
     if (watchdog !== undefined) clearTimeout(watchdog);
     if (closePoll !== undefined) clearInterval(closePoll);
-    host._usbFlashTeardown = null;
   };
-  // Let the dialog tear this down on close / reuse (see _detachStream).
-  host._usbFlashTeardown = finish;
-  // The flasher tab closed / crashed / went silent before reporting a result.
-  const abandon = () => {
+  const lost = () => {
     if (finished) return;
-    host._fail(
-      host._localize("firmware.usb_failed"),
-      host._localize("dashboard.flash_usb_window_closed")
-    );
     finish();
+    cb.onLost();
   };
 
   const onMessage = (ev: MessageEvent) => {
@@ -96,27 +94,26 @@ export function openFlasherAndHandOff(host: ESPHomeFirmwareInstallDialog): void 
         [bytes]
       );
       bytes = null; // transferred (detached)
-      host._usbFirmware = null;
-      watchdog = setTimeout(abandon, FLASH_WATCHDOG_MS);
+      watchdog = setTimeout(lost, FLASH_WATCHDOG_MS);
     } else if (data.type === MSG_PROGRESS) {
-      host._flashPercent = data.pct ?? 0;
+      cb.onProgress(data.pct ?? 0);
     } else if (data.type === MSG_STATE) {
       if (data.state === "done") {
-        host._step = "done";
-        host._statusMessage = host._localize("firmware.usb_done");
         finish();
+        cb.onState("done", "");
       } else if (data.state === "error") {
-        host._fail(host._localize("firmware.usb_failed"), data.detail || "");
         finish();
+        cb.onState("error", data.detail || "");
       } else if (data.detail) {
-        host._statusMessage = data.detail;
+        cb.onStatus(data.detail);
       }
     }
   };
 
   window.addEventListener("message", onMessage, { signal: controller.signal });
   closePoll = setInterval(() => {
-    if (win.closed) abandon();
+    if (win.closed) lost();
   }, 1000);
-  readyTimer = setTimeout(abandon, READY_TIMEOUT_MS);
+  readyTimer = setTimeout(lost, READY_TIMEOUT_MS);
+  return finish;
 }

@@ -1,39 +1,35 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { openFlasherAndHandOff } from "../../src/util/usb-flasher.js";
+import { openFlasher, type FlasherCallbacks } from "../../src/util/usb-flasher.js";
 
 const FLASHER_ORIGIN = "https://esphome.github.io";
 
-interface FakeHost {
-  _usbFirmware: ArrayBuffer | null;
-  _usbFirmwareName: string;
-  _localize: (k: string) => string;
-  _step: string;
-  _flashPercent: number;
-  _statusMessage: string;
-  _fail: (title: string, detail?: string) => void;
-  _usbFlashTeardown: (() => void) | null;
-  failDetail?: string;
-}
-
-function makeHost(firmware: ArrayBuffer | null = new ArrayBuffer(32)): FakeHost {
-  return {
-    _usbFirmware: firmware,
-    _usbFirmwareName: "firmware.factory.bin",
-    _localize: (k) => k,
-    _step: "download-ready",
-    _flashPercent: 0,
-    _statusMessage: "",
-    _fail(title, detail) {
-      this._step = "error";
-      this.failDetail = detail;
+function makeCallbacks(): FlasherCallbacks & {
+  progress: number[];
+  states: Array<{ state: string; detail: string }>;
+  lost: number;
+  statuses: string[];
+} {
+  const rec = {
+    progress: [] as number[],
+    states: [] as Array<{ state: string; detail: string }>,
+    statuses: [] as string[],
+    lost: 0,
+    onProgress(pct: number) {
+      this.progress.push(pct);
     },
-    _usbFlashTeardown: null,
+    onStatus(detail: string) {
+      this.statuses.push(detail);
+    },
+    onState(state: "done" | "error", detail: string) {
+      this.states.push({ state, detail });
+    },
+    onLost() {
+      this.lost += 1;
+    },
   };
+  return rec;
 }
-
-const asHost = (h: FakeHost) => h as unknown as ESPHomeFirmwareInstallDialog;
 
 function emit(win: unknown, data: unknown) {
   window.dispatchEvent(
@@ -56,73 +52,62 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("openFlasherAndHandOff", () => {
-  it("does nothing without firmware in hand", () => {
-    const open = vi.spyOn(window, "open");
-    openFlasherAndHandOff(asHost(makeHost(null)));
-    expect(open).not.toHaveBeenCalled();
-  });
-
-  it("fails the dialog when the pop-up is blocked", () => {
+describe("openFlasher", () => {
+  it("returns null when the pop-up is blocked", () => {
     vi.spyOn(window, "open").mockReturnValue(null);
-    const host = makeHost();
-    openFlasherAndHandOff(asHost(host));
-    expect(host._step).toBe("error");
+    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", makeCallbacks());
+    expect(teardown).toBeNull();
   });
 
-  it("opens with nonce+origin and hands off on ready, mirroring state", () => {
+  it("opens with nonce+origin, hands off on ready, and reports progress + done", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     const open = vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
-    const host = makeHost();
-    openFlasherAndHandOff(asHost(host));
+    const cb = makeCallbacks();
+    const teardown = openFlasher(new ArrayBuffer(32), "firmware.factory.bin", cb);
+    expect(teardown).toBeTypeOf("function");
 
     const url = open.mock.calls[0][0] as string;
     expect(url).toContain("#nonce=");
     expect(url).toContain("origin=");
-    expect(host._step).toBe("flashing");
 
     emit(fakeWin, { type: "esphome-web-flash:ready" });
     expect(fakeWin.postMessage).toHaveBeenCalledTimes(1);
     const [msg, targetOrigin, transfer] = fakeWin.postMessage.mock.calls[0];
     expect(msg.type).toBe("esphome-web-flash:firmware");
+    expect(msg.name).toBe("firmware.factory.bin");
     expect(msg.parts[0].address).toBe(0);
     expect(targetOrigin).toBe(FLASHER_ORIGIN);
     expect(transfer).toHaveLength(1);
-    expect(host._usbFirmware).toBeNull(); // detached after transfer
 
     emit(fakeWin, { type: "esphome-web-flash:progress", pct: 42 });
-    expect(host._flashPercent).toBe(42);
+    expect(cb.progress).toContain(42);
 
     emit(fakeWin, { type: "esphome-web-flash:state", state: "done" });
-    expect(host._step).toBe("done");
+    expect(cb.states).toEqual([{ state: "done", detail: "" }]);
   });
 
-  it("exposes a teardown that stops listening (dialog close / reuse)", () => {
+  it("surfaces a flasher error with its detail", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
-    const host = makeHost();
-    openFlasherAndHandOff(asHost(host));
-    expect(host._usbFlashTeardown).toBeTypeOf("function");
-    // Simulate _detachStream on dialog close/reuse.
-    host._usbFlashTeardown!();
-    expect(host._usbFlashTeardown).toBeNull();
-    // A late flasher message must no longer be acted on.
-    emit(fakeWin, { type: "esphome-web-flash:ready" });
-    expect(fakeWin.postMessage).not.toHaveBeenCalled();
-  });
-
-  it("surfaces a flasher error state", () => {
-    const fakeWin = { postMessage: vi.fn(), closed: false };
-    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
-    const host = makeHost();
-    openFlasherAndHandOff(asHost(host));
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", cb);
     emit(fakeWin, { type: "esphome-web-flash:ready" });
     emit(fakeWin, {
       type: "esphome-web-flash:state",
       state: "error",
       detail: "boom",
     });
-    expect(host._step).toBe("error");
-    expect(host.failDetail).toBe("boom");
+    expect(cb.states).toEqual([{ state: "error", detail: "boom" }]);
+  });
+
+  it("teardown stops listening without firing onLost", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", cb)!;
+    teardown();
+    emit(fakeWin, { type: "esphome-web-flash:ready" });
+    expect(fakeWin.postMessage).not.toHaveBeenCalled();
+    expect(cb.lost).toBe(0);
   });
 });

@@ -18,11 +18,11 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { openFlasherAndHandOff } from "../util/usb-flasher.js";
 import type { DetectedChip } from "../util/web-serial.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
+  handOffToFlasher,
   startArtifactDownload,
   startDownload,
   startUsbFlash,
@@ -132,7 +132,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _usbFirmwareName = "";
 
   // Teardown for an in-flight external-flasher hand-off (set by
-  // openFlasherAndHandOff). Called from _detachStream so closing / reusing the
+  // handOffToFlasher). Called from _detachStream so closing / reusing the
   // dialog removes the message listener + timers. Null when none is active.
   _usbFlashTeardown: (() => void) | null = null;
 
@@ -186,7 +186,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Hand the compiled firmware to the external flasher. Called from the
   // download-ready "Open USB flasher" button (a user gesture, so the popup
   // isn't blocked).
-  _openUsbFlasher = () => openFlasherAndHandOff(this);
+  _openUsbFlasher = () => handOffToFlasher(this);
 
   // Compile + download with no opinion on how to flash. Always available so
   // users can plug into esptool.py / picotool / a UF2 mass-storage flow.
