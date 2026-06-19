@@ -456,7 +456,8 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   host._step = "flashing";
   host._flashPercent = 0;
   host._statusMessage = host._localize("firmware.usb_flashing");
-  const teardown = openFlasher(firmware, host._usbFirmwareName, {
+  const deviceName = host._device ? host._device.friendly_name || host._device.name : "";
+  const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, {
     onProgress: (pct) => {
       host._flashPercent = pct;
       // An in-tab retry after a failure resumes flashing; leave the error view.

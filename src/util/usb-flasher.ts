@@ -7,6 +7,12 @@ const MSG_FIRMWARE = "esphome-web-flash:firmware";
 const MSG_STATE = "esphome-web-flash:state";
 const MSG_PROGRESS = "esphome-web-flash:progress";
 
+// The wire protocol version this dashboard speaks. Bumped only for a breaking
+// change; additive fields/messages don't need it (see protocol.ts). We send it
+// in the firmware frame and read the flasher's from "ready" so a future version
+// gate has both sides' versions to branch on.
+const PROTOCOL_VERSION = 1;
+
 // Give up if the flasher tab never reports "ready" (failed to load / crashed).
 const READY_TIMEOUT_MS = 60 * 1000;
 // Bound the flash itself (armed at hand-off).
@@ -34,6 +40,7 @@ export interface FlasherCallbacks {
 export function openFlasher(
   firmware: ArrayBuffer,
   name: string,
+  deviceName: string,
   cb: FlasherCallbacks
 ): (() => void) | null {
   const nonce = crypto.randomUUID();
@@ -76,17 +83,28 @@ export function openFlasher(
       state?: string;
       detail?: string;
       pct?: number;
+      version?: number;
     };
     if (!data?.type) return;
     if (data.type === MSG_READY) {
       if (readyTimer !== undefined) clearTimeout(readyTimer);
       if (handedOff || !bytes) return;
+      // Forward-compat: a flasher advertising a newer protocol still gets our
+      // v1 frame (additive fields are ignored); just note the mismatch. When a
+      // breaking change lands, branch on data.version here.
+      if (typeof data.version === "number" && data.version > PROTOCOL_VERSION) {
+        console.warn(
+          `Flasher protocol v${data.version} is newer than this dashboard's v${PROTOCOL_VERSION}; proceeding with v${PROTOCOL_VERSION}.`
+        );
+      }
       handedOff = true;
       win.postMessage(
         {
           type: MSG_FIRMWARE,
+          version: PROTOCOL_VERSION,
           nonce,
           name,
+          deviceName,
           erase: true,
           parts: [{ address: 0, data: bytes }],
         },

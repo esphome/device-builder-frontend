@@ -54,7 +54,7 @@ afterEach(() => {
 describe("openFlasher", () => {
   it("returns null when the pop-up is blocked", () => {
     vi.spyOn(window, "open").mockReturnValue(null);
-    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", makeCallbacks());
+    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", "dev", makeCallbacks());
     expect(teardown).toBeNull();
   });
 
@@ -62,7 +62,12 @@ describe("openFlasher", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     const open = vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
     const cb = makeCallbacks();
-    const teardown = openFlasher(new ArrayBuffer(32), "firmware.factory.bin", cb);
+    const teardown = openFlasher(
+      new ArrayBuffer(32),
+      "firmware.factory.bin",
+      "mys3t",
+      cb
+    );
     expect(teardown).toBeTypeOf("function");
 
     const url = open.mock.calls[0][0] as string;
@@ -73,7 +78,9 @@ describe("openFlasher", () => {
     expect(fakeWin.postMessage).toHaveBeenCalledTimes(1);
     const [msg, targetOrigin, transfer] = fakeWin.postMessage.mock.calls[0];
     expect(msg.type).toBe("esphome-web-flash:firmware");
+    expect(msg.version).toBe(1);
     expect(msg.name).toBe("firmware.factory.bin");
+    expect(msg.deviceName).toBe("mys3t");
     expect(msg.parts[0].address).toBe(0);
     expect(targetOrigin).toBe(FLASHER_ORIGIN);
     expect(transfer).toHaveLength(1);
@@ -89,7 +96,7 @@ describe("openFlasher", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
     const cb = makeCallbacks();
-    openFlasher(new ArrayBuffer(8), "f.bin", cb);
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
     emit(fakeWin, { type: "esphome-web-flash:ready" });
     emit(fakeWin, {
       type: "esphome-web-flash:state",
@@ -103,7 +110,7 @@ describe("openFlasher", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
     const cb = makeCallbacks();
-    openFlasher(new ArrayBuffer(8), "f.bin", cb);
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
     emit(fakeWin, { type: "esphome-web-flash:ready" });
     emit(fakeWin, { type: "esphome-web-flash:state", state: "error", detail: "boom" });
     // User holds BOOT and retries in the same tab; the flasher streams again.
@@ -120,7 +127,7 @@ describe("openFlasher", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
     const cb = makeCallbacks();
-    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", cb)!;
+    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb)!;
     teardown();
     emit(fakeWin, { type: "esphome-web-flash:ready" });
     expect(fakeWin.postMessage).not.toHaveBeenCalled();
