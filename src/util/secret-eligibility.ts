@@ -169,6 +169,9 @@ export function recommendedSecretKeys(
     }
   }
 
+  // A nested concealed wifi leaf not in DEVICE_BASE (e.g. `wifi.eap.password`)
+  // intentionally falls through here and resolves to the shared `wifi_password`;
+  // only the fallback-AP fields get their own scoped key.
   const shared = SHARED[sectionKey]?.[key];
   if (shared) return [shared];
 
