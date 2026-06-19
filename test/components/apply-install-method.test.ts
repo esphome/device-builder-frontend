@@ -11,7 +11,12 @@ function deps() {
     installWebDownload: vi.fn(),
     installBinaryDownload: vi.fn(),
   } as unknown as ESPHomeFirmwareInstallDialog;
-  return { device, openInstall: vi.fn(), firmwareDialog };
+  return {
+    device,
+    openInstall: vi.fn(),
+    firmwareDialog,
+    openRemoteFlash: vi.fn(),
+  };
 }
 
 describe("applyInstallMethod", () => {
@@ -46,10 +51,16 @@ describe("applyInstallMethod", () => {
     expect(d.openInstall).not.toHaveBeenCalled();
   });
 
-  it("web-download and binary-download route to the firmware dialog", () => {
+  it("web-flash opens the external flasher, not the install command", () => {
     const d = deps();
-    applyInstallMethod("web-download", undefined, d);
-    expect(d.firmwareDialog.installWebDownload).toHaveBeenCalledWith(device);
+    applyInstallMethod("web-flash", undefined, d);
+    expect(d.openRemoteFlash).toHaveBeenCalledWith(device);
+    expect(d.openInstall).not.toHaveBeenCalled();
+    expect(d.firmwareDialog.installWebSerial).not.toHaveBeenCalled();
+  });
+
+  it("binary-download routes to the firmware dialog", () => {
+    const d = deps();
     applyInstallMethod("binary-download", undefined, d);
     expect(d.firmwareDialog.installBinaryDownload).toHaveBeenCalledWith(device);
   });

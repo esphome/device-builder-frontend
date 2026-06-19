@@ -283,6 +283,12 @@ export class ESPHomePageDevice extends LitElement {
       get firmwareDialog() {
         return page._firmwareDialog ?? null;
       },
+      get api() {
+        return page._api;
+      },
+      get localize() {
+        return page._localize;
+      },
     });
   }
 

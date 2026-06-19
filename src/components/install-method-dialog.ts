@@ -4,7 +4,6 @@ import {
   mdiChevronDown,
   mdiChevronRight,
   mdiChevronUp,
-  mdiCloudDownload,
   mdiDownload,
   mdiIpNetworkOutline,
   mdiSerialPort,
@@ -24,6 +23,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
+import { isEsptoolPlatform } from "../util/esptool-platform.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SerialPortsPollController } from "../util/serial-ports-poll-controller.js";
 import {
@@ -46,7 +46,6 @@ registerMdiIcons({
   wifi: mdiWifi,
   usb: mdiUsb,
   "serial-port": mdiSerialPort,
-  "cloud-download": mdiCloudDownload,
   download: mdiDownload,
   "ip-network-outline": mdiIpNetworkOutline,
 });
@@ -113,25 +112,10 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     return detectEnvironment(this._api);
   }
 
-  /**
-   * ESP32 (all variants) and ESP8266 / ESP8285 — the only chips the browser
-   * flashers can handle. Both Web Serial (esptool-js) and web.esphome.io /
-   * esp-web-tools speak the esptool ROM protocol. Non-ESP targets can't be
-   * flashed from the browser: RP2040 / RP2350 and nrf52 use a BOOTSEL /
-   * 1200-baud touch + UF2 mass-storage copy, and libretiny (bk72xx / rtl87xx /
-   * ln882x) uses ltchiptool's own serial protocol — only the backend
-   * (`esphome run` / server-serial) flashes those. So the Web Serial and
-   * web-download rows are hidden for them.
-   *
-   * Fail-closed: an empty / unknown platform returns false, so we never offer a
-   * browser flasher that won't work (server-serial / OTA stay). target_platform
-   * is reliably populated for configured devices, so this only ever hides Web
-   * Serial transiently before metadata loads.
-   */
+  // Gates the browser-flasher USB row to ESP families; see isEsptoolPlatform
+  // for why non-ESP targets are excluded.
   private get _isEsptoolPlatform(): boolean {
-    const p = this.deviceTargetPlatform.toLowerCase();
-    // esp82… covers esp8266 and esp8285.
-    return p.startsWith("esp32") || p.startsWith("esp82");
+    return isEsptoolPlatform(this.deviceTargetPlatform);
   }
 
   protected willUpdate(changed: Map<string, unknown>) {
@@ -184,46 +168,19 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const availability = this._webSerialAvailability;
     const hasWebSerial = availability === "available";
     const env = this._environment;
-    // Replaces the disabled WebSerial row with web-download when
-    // not online (offline or unknown) and no Web Serial. OTA is
-    // offered above but may fail; web-download always works.
-    // Browser flashers (Web Serial esptool-js, web.esphome.io) are ESP-only.
-    // Non-ESP targets (RP2040 / RP2350, nrf52, libretiny) flash over serial
-    // only via the backend (`esphome run` / server-serial), never the browser.
+    // Browser flashers (in-app Web Serial esptool-js, the external flasher) are
+    // ESP-only. Non-ESP targets (RP2040 / RP2350, nrf52, libretiny) flash over
+    // serial only via the backend (`esphome run` / server-serial).
     const isEsptool = this._isEsptoolPlatform;
-    const swapInWebDownload =
-      this.mode === "install" && !hasWebSerial && !isOnline && isEsptool;
-    // On localhost the WebSerial option and the server-serial option
-    // target the same physical USB stack. There are two collapse cases:
-    //
-    // - With WebSerial: drop the server-serial row (WebSerial is the
-    //   better path, no backend round-trip).
-    // - Browser genuinely can't do WebSerial (Safari / Firefox): drop the
-    //   *disabled* WebSerial row — the active server-serial row directly
-    //   below carries the same "Plug into this computer" label, so the
-    //   disabled row only added a duplicate title and a hint with no
-    //   actionable fix (the user has a working path right here).
-    //
-    // When WebSerial is merely blocked by an insecure origin (e.g. 0.0.0.0),
-    // KEEP the disabled row — it carries an actionable "open at 127.0.0.1 /
-    // https" fix, so it isn't dead weight. On HA / remote both rows point at
-    // different machines, so both always stay.
-    // Only collapse the server-serial row in favour of Web Serial when Web
-    // Serial is actually shown (esptool platform) — otherwise a non-ESP device
-    // on localhost would lose its only working serial path.
+    // On localhost in-app Web Serial and server-serial hit the same USB stack,
+    // so drop the redundant server-serial row when Web Serial is in-app there.
     const showServerSerialRow = !(env === "localhost" && hasWebSerial && isEsptool);
-    const dropDisabledWebSerial =
-      env === "localhost" && availability === "unsupported" && !swapInWebDownload;
     const serverSerialKeys = this._serverSerialCopyKeys(env);
 
     return html`
       <div class="list">
         ${this._renderOtaOption(isOnline)}
-        ${swapInWebDownload
-          ? this._renderWebDownloadOption()
-          : isEsptool && !dropDisabledWebSerial
-            ? this._renderWebSerialOption(availability)
-            : nothing}
+        ${isEsptool ? this._renderUsbOption(availability) : nothing}
         ${showServerSerialRow
           ? html`<div class="option" @click=${this._onServerSerial}>
               <wa-icon library="mdi" name="serial-port"></wa-icon>
@@ -269,56 +226,70 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     }
   }
 
-  private _renderWebSerialOption(availability: WebSerialAvailability) {
-    const enabled = availability === "available";
+  /**
+   * Single "Plug in via USB" row for ESP devices.
+   *
+   * - ``available``: in-app Web Serial (secure context, capable browser).
+   * - ``insecure-context``: the browser has Web Serial but this origin isn't
+   *   secure — open the external secure-context flasher (handing the firmware
+   *   off over postMessage). When a same-machine secure loopback exists
+   *   (``0.0.0.0`` -> ``127.0.0.1``), the desc also offers an inline link to
+   *   switch origins and flash in-app locally instead.
+   * - ``unsupported``: the browser lacks Web Serial entirely; the external
+   *   flasher runs in the same browser, so it can't help — disable with a hint.
+   */
+  private _renderUsbOption(availability: WebSerialAvailability) {
+    if (availability === "unsupported") {
+      return html`
+        <div class="option option--disabled">
+          <wa-icon library="mdi" name="usb"></wa-icon>
+          <div class="info">
+            <span class="title"
+              >${this._localize("dashboard.install_method_usb_local")}</span
+            >
+            <span class="desc"
+              >${this._localize("dashboard.install_method_usb_local_unsupported")}</span
+            >
+          </div>
+        </div>
+      `;
+    }
+    const inApp = availability === "available";
+    const desc = inApp
+      ? this._localize("dashboard.install_method_usb_local_desc")
+      : this._renderUsbRemoteDesc();
     return html`
       <div
-        class="option ${!enabled ? "option--disabled" : ""}"
-        @click=${enabled ? () => this._selectMethod("web-serial") : undefined}
+        class="option"
+        @click=${() => this._selectMethod(inApp ? "web-serial" : "web-flash")}
       >
         <wa-icon library="mdi" name="usb"></wa-icon>
         <div class="info">
           <span class="title"
             >${this._localize("dashboard.install_method_usb_local")}</span
           >
-          <span class="desc">${this._renderWebSerialDesc(availability)}</span>
+          <span class="desc">${desc}</span>
         </div>
       </div>
     `;
   }
 
   /**
-   * Disabled-row hint that names the real blocker. ``insecure-context`` is the
-   * common Chrome-on-``0.0.0.0`` case: the browser is capable, the origin
-   * isn't a secure context. When the loopback equivalent is known to work
-   * (``0.0.0.0`` only) render it as an inline link the user can click to switch
-   * origins; otherwise point them at localhost / https generically. Only a
-   * genuinely unsupported browser gets the use-a-supported-browser copy. The
-   * ``{link}`` split mirrors ``_renderWebDownloadOption`` so locales can place
-   * the URL anywhere (falling back to the plain key if a translation omits the
-   * marker).
-   *
-   * Known limitation: on an insecure origin ``navigator.serial`` is absent for
-   * EVERY browser, so we can't tell a capable-but-blocked browser from one with
-   * no Web Serial support at all. A browser that lacks it (older Firefox, etc.)
-   * is therefore shown the loopback link and, on the secure origin, still has no
-   * Web Serial. We accept that: the link helps the majority (Chrome, Edge,
-   * Firefox 151+) and the copy is phrased as a prerequisite, not a guarantee.
+   * Desc for the insecure-context USB row. On ``0.0.0.0`` a same-machine
+   * secure loopback exists, so offer a ``127.0.0.1`` link (stop-propagation so
+   * it doesn't also trigger the row's external-flasher action) to flash in-app
+   * locally; otherwise (HA-http / LAN IP) just describe the external flasher.
    */
-  private _renderWebSerialDesc(availability: WebSerialAvailability) {
-    if (availability === "available") {
-      return this._localize("dashboard.install_method_usb_local_desc");
-    }
-    if (availability === "unsupported") {
-      return this._localize("dashboard.install_method_usb_local_unsupported");
-    }
+  private _renderUsbRemoteDesc() {
     const loopback = secureLoopbackUrl();
     if (!loopback) {
-      return this._localize("dashboard.install_method_usb_local_insecure");
+      return this._localize("dashboard.install_method_usb_remote_desc");
+    }
+    const template = this._localize("dashboard.install_method_usb_remote_loopback");
+    if (!template.includes("{link}")) {
+      return this._localize("dashboard.install_method_usb_remote_desc");
     }
     const linkText = new URL(loopback).host; // e.g. 127.0.0.1:6052
-    const template = this._localize("dashboard.install_method_usb_local_insecure_link");
-    if (!template.includes("{link}")) return template;
     const [before, after = ""] = template.split("{link}");
     return html`${before}<a
         class="inline-link"
@@ -329,55 +300,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   }
 
   /**
-   * web.esphome.io fallback row. Renders the host name as an inline
-   * link inside the title so users can preview / right-click open the
-   * destination before committing to the compile + download. The link
-   * stops click propagation so opening it doesn't double-fire as a
-   * "start install" on the parent row.
-   *
-   * Translation splits on the ``{link}`` marker so other locales can
-   * place the URL anywhere within the sentence. Locales that don't
-   * include the marker (e.g. an older translation that already inlines
-   * the host name) fall back to rendering the title verbatim — without
-   * this guard the link would be appended after the existing inlined
-   * URL, producing duplicates like "... web.esphome.io web.esphome.io".
-   */
-  private _renderWebDownloadOption() {
-    const titleTemplate = this._localize("dashboard.install_method_web_download");
-    const linkText = this._localize("dashboard.install_method_web_download_link");
-    const hasMarker = titleTemplate.includes("{link}");
-    const [before, after = ""] = titleTemplate.split("{link}");
-    return html`
-      <div class="option" @click=${() => this._selectMethod("web-download")}>
-        <wa-icon library="mdi" name="cloud-download"></wa-icon>
-        <div class="info">
-          <span class="title"
-            >${hasMarker
-              ? html`${before}<a
-                    class="inline-link"
-                    href="https://web.esphome.io"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    @click=${(e: MouseEvent) => e.stopPropagation()}
-                    >${linkText}</a
-                  >${after}`
-              : titleTemplate}</span
-          >
-          <span class="desc"
-            >${this._localize("dashboard.install_method_web_download_desc")}</span
-          >
-        </div>
-      </div>
-    `;
-  }
-
-  /**
    * Manual binary download — always offered in install mode. Compiles
    * here, hands the user the resulting binary, and leaves flashing to
    * whatever tool they prefer (esptool.py, picotool, copy-to-MSC for
-   * UF2 platforms, etc). Distinct from the web-download row, which
-   * specifically routes the user through web.esphome.io and is gated
-   * to ESP32 / ESP8266.
+   * UF2 platforms, etc). Distinct from the USB row, which flashes for the
+   * user (in-app or via the external flasher) and is gated to ESP32 / ESP8266.
    */
   private _renderManualDownloadOption() {
     return html`

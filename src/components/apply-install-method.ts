@@ -7,6 +7,10 @@ export interface InstallMethodHandlers {
    *  ("OTA" sentinel for the default address, a server serial port, etc.). */
   openInstall: (port?: string) => void;
   firmwareDialog: ESPHomeFirmwareInstallDialog | null;
+  /** Open the external secure-context flasher and hand off the firmware over
+   *  postMessage. Used for "web-flash" when the dashboard's own browser can't
+   *  run Web Serial (the HA add-on is plain http). */
+  openRemoteFlash: (device: ConfiguredDevice) => void;
 }
 
 /**
@@ -32,8 +36,10 @@ export function applyInstallMethod(
     case "web-serial":
       h.firmwareDialog?.installWebSerial(h.device);
       break;
-    case "web-download":
-      h.firmwareDialog?.installWebDownload(h.device);
+    case "web-flash":
+      // In-app Web Serial isn't available here; flash through the external
+      // secure-context flasher instead.
+      h.openRemoteFlash(h.device);
       break;
     case "binary-download":
       h.firmwareDialog?.installBinaryDownload(h.device);

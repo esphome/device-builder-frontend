@@ -1,6 +1,7 @@
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
+import { flashViaUsb } from "../../util/usb-flasher.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType } from "../command-dialog.js";
 import { openLogsWithMethod } from "./actions-ui.js";
@@ -30,6 +31,7 @@ export function onInstallMethodSelect(
     device,
     firmwareDialog: host._firmwareDialog,
     openInstall: (p) => openCommand(host, device, "install", p),
+    openRemoteFlash: (d) => flashViaUsb(host._api, host._localize, d),
   });
 }
 

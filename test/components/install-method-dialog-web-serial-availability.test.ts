@@ -1,10 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * On an insecure origin (e.g. http://0.0.0.0:6052) Chrome hides
- * navigator.serial, so the Web Serial row must explain the real blocker and
- * offer the 127.0.0.1 loopback (a secure context that hits the same backend)
- * rather than the misleading "needs Chrome" copy.
+ * The single "Plug into this computer" USB row adapts to Web Serial
+ * availability: an insecure origin (e.g. http://0.0.0.0:6052 or the HA add-on)
+ * still flashes, by routing to the external secure-context flasher; only a
+ * browser that lacks Web Serial entirely (secure origin, no API) is disabled.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -43,16 +43,30 @@ async function mount(): Promise<ESPHomeInstallMethodDialog> {
   (dialog as any)._localize = defaultLocalize;
   (dialog as any)._api = {}; // detectEnvironment only needs serverInfo?.ha_addon
   dialog.deviceState = DeviceState.ONLINE;
-  // Web Serial availability messaging only applies to ESP (esptool) platforms;
-  // the row is hidden for non-ESP targets.
+  // The USB row only applies to ESP (esptool) platforms.
   dialog.deviceTargetPlatform = "esp32";
   document.body.appendChild(dialog);
   await dialog.updateComplete;
   return dialog;
 }
 
-const webSerialRow = (d: ESPHomeInstallMethodDialog): Element | null =>
-  d.shadowRoot?.querySelector(".option--disabled") ?? null;
+const usbRow = (d: ESPHomeInstallMethodDialog): Element | null =>
+  Array.from(d.shadowRoot?.querySelectorAll(".option") ?? []).find((o) =>
+    o.querySelector(".title")?.textContent?.includes("Plug into this computer")
+  ) ?? null;
+
+function methodOnClick(d: ESPHomeInstallMethodDialog, el: Element): string | null {
+  let method: string | null = null;
+  d.addEventListener(
+    "select-method",
+    (e) => {
+      method = (e as CustomEvent).detail.method;
+    },
+    { once: true }
+  );
+  (el as HTMLElement).click();
+  return method;
+}
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 afterEach(() => {
@@ -64,27 +78,50 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("install-method-dialog Web Serial availability", () => {
-  it("on 0.0.0.0 keeps the disabled row with a 127.0.0.1 loopback link", async () => {
+describe("install-method-dialog USB row availability", () => {
+  it("on 0.0.0.0 routes to the external flasher but keeps the 127.0.0.1 jump", async () => {
     setEnv({ serial: false, secure: false, href: "http://0.0.0.0:6052/" });
     const dialog = await mount();
-    const row = webSerialRow(dialog);
+    const row = usbRow(dialog);
     expect(row).not.toBeNull();
+    // Enabled (actionable), not the disabled hint state.
+    expect(row!.classList.contains("option--disabled")).toBe(false);
+    // Keep the local-flash escape hatch: a 127.0.0.1 link to switch origins.
     const link = row!.querySelector("a.inline-link") as HTMLAnchorElement | null;
     expect(link).not.toBeNull();
     expect(link!.getAttribute("href")).toBe("http://127.0.0.1:6052/");
     expect(link!.textContent).toContain("127.0.0.1:6052");
-    // Framed as a requirement (secure origin), not a guaranteed fix.
-    expect(row!.textContent).toContain("secure origin");
+    // The row body still routes to the external flasher.
+    expect(methodOnClick(dialog, row!)).toBe("web-flash");
   });
 
-  it("on a secure origin without the API shows the unsupported-browser copy", async () => {
+  it("on an insecure origin with no loopback (HA-http) just uses the external flasher", async () => {
+    setEnv({ serial: false, secure: false, href: "http://homeassistant.local:8123/" });
+    const dialog = await mount();
+    const row = usbRow(dialog);
+    expect(row).not.toBeNull();
+    expect(row!.classList.contains("option--disabled")).toBe(false);
+    expect(row!.querySelector("a.inline-link")).toBeNull();
+    expect(methodOnClick(dialog, row!)).toBe("web-flash");
+  });
+
+  it("in a secure context with Web Serial uses in-app flashing", async () => {
+    setEnv({ serial: true, secure: true, href: "https://example.com/" });
+    const dialog = await mount();
+    const row = usbRow(dialog);
+    expect(row).not.toBeNull();
+    expect(row!.classList.contains("option--disabled")).toBe(false);
+    expect(methodOnClick(dialog, row!)).toBe("web-serial");
+  });
+
+  it("disables the USB row when the browser lacks Web Serial entirely", async () => {
     setEnv({ serial: false, secure: true, href: "https://example.com/" });
     const dialog = await mount();
-    const row = webSerialRow(dialog);
+    const row = usbRow(dialog);
     expect(row).not.toBeNull();
-    expect(row!.querySelector("a.inline-link")).toBeNull();
-    // Browser-agnostic wording (Chrome / Edge / Firefox 151+), no loopback link.
+    expect(row!.classList.contains("option--disabled")).toBe(true);
+    // Disabled rows don't dispatch a method.
+    expect(methodOnClick(dialog, row!)).toBeNull();
     expect(row!.textContent).toContain("Web Serial support");
   });
 });
