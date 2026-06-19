@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
+import { FLASHER_URL } from "../../common/docs.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import type { ProcessTerminalState } from "../process-terminal/process-terminal.js";
@@ -113,7 +114,9 @@ function downloadReadyTitle(host: ESPHomeFirmwareInstallDialog): string {
 
 function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
   if (host._installer === "web-flash") {
-    return host._localize("firmware.usb_built_body");
+    return host._localize("firmware.usb_built_body", {
+      host: new URL(FLASHER_URL).host,
+    });
   }
   const filename = host._downloadedFilename;
   if (host._installer === "binary-download") {
@@ -319,6 +322,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
           </button>
           <button class="btn btn--primary" @click=${host._openUsbFlasher}>
             ${host._localize("firmware.usb_open_button")}
+            <wa-icon library="mdi" name="open-in-new"></wa-icon>
           </button>
         </div>
       `;
@@ -339,12 +343,13 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
-  // A failed Web Serial flash can be retried in place — re-run the install.
-  // Excludes compile / validate failures, which surface the reset-build hint
-  // (renderResetSuggestion) instead; re-flashing wouldn't address those.
+  // A failed Web Serial or USB (web-flash) flash can be retried in place: re-run
+  // the install (web-flash re-opens the external flasher). Excludes compile /
+  // validate failures, which surface the reset-build hint (renderResetSuggestion)
+  // instead; re-flashing wouldn't address those.
   const canRetry =
     host._step === "error" &&
-    host._installer === "web-serial" &&
+    (host._installer === "web-serial" || host._installer === "web-flash") &&
     !host._failedDuringCompile &&
     !host._failedDuringValidate;
   if (canRetry) {

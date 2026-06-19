@@ -102,7 +102,9 @@ export function openFlasher(
         finish();
         cb.onState("done", "");
       } else if (data.state === "error") {
-        finish();
+        // Not terminal: the flasher tab stays open and the user can retry in
+        // place (hold BOOT + Connect & install). Keep listening so a later
+        // success or a tab close still reaches the dashboard.
         cb.onState("error", data.detail || "");
       } else if (data.detail) {
         cb.onStatus(data.detail);

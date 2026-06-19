@@ -425,7 +425,7 @@
     "web_download_done_title": "Firmware ready to flash",
     "web_download_done_body": "Saved as {filename}. Open web.esphome.io on a computer that can connect to your device via USB and flash the file.",
     "usb_built_title": "Firmware built",
-    "usb_built_body": "Ready to flash over USB. Open the flasher to connect your device and install.",
+    "usb_built_body": "This page can't flash over USB because it isn't on a secure (HTTPS) connection or localhost. The button below opens {host} in a new tab to connect to your device and install over USB.",
     "usb_open_button": "Open USB flasher",
     "usb_flashing": "Installing over USB…",
     "usb_flashing_detail": "Flashing in the flasher tab; keep it open until it finishes.",

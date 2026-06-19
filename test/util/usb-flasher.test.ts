@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FLASHER_ORIGIN } from "../../src/common/docs.js";
 import { openFlasher, type FlasherCallbacks } from "../../src/util/usb-flasher.js";
-
-const FLASHER_ORIGIN = "https://esphome.github.io";
 
 function makeCallbacks(): FlasherCallbacks & {
   progress: number[];
@@ -98,6 +97,23 @@ describe("openFlasher", () => {
       detail: "boom",
     });
     expect(cb.states).toEqual([{ state: "error", detail: "boom" }]);
+  });
+
+  it("keeps listening after an error so an in-tab retry still reports done", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", cb);
+    emit(fakeWin, { type: "esphome-web-flash:ready" });
+    emit(fakeWin, { type: "esphome-web-flash:state", state: "error", detail: "boom" });
+    // User holds BOOT and retries in the same tab; the flasher streams again.
+    emit(fakeWin, { type: "esphome-web-flash:progress", pct: 50 });
+    emit(fakeWin, { type: "esphome-web-flash:state", state: "done" });
+    expect(cb.progress).toContain(50);
+    expect(cb.states).toEqual([
+      { state: "error", detail: "boom" },
+      { state: "done", detail: "" },
+    ]);
   });
 
   it("teardown stops listening without firing onLost", () => {

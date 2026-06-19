@@ -459,16 +459,21 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   const teardown = openFlasher(firmware, host._usbFirmwareName, {
     onProgress: (pct) => {
       host._flashPercent = pct;
+      // An in-tab retry after a failure resumes flashing; leave the error view.
+      if (host._step === "error") host._step = "flashing";
     },
     onStatus: (detail) => {
       host._statusMessage = detail;
+      if (host._step === "error") host._step = "flashing";
     },
     onState: (state, detail) => {
-      host._usbFlashTeardown = null;
       if (state === "done") {
+        host._usbFlashTeardown = null;
         host._step = "done";
         host._statusMessage = host._localize("firmware.usb_done");
       } else {
+        // Non-terminal: the flasher tab can retry in place, so keep the
+        // teardown live for a later success or close.
         host._fail(host._localize("firmware.usb_failed"), detail);
       }
     },

@@ -346,11 +346,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // rebooted device's logs over OTA/native-API rather than a local port.
   _showUsbLogs = () => showOtaLogs(this);
 
-  // Re-run the Web Serial install after a flash failure: a full reset (_init) +
-  // fresh connect/flash, so a transient serial error (noise, dropped port) can
-  // be retried without closing and reopening the dialog.
+  // Re-run the install after a flash failure: a full reset (_init) + fresh
+  // build/flash, so a transient error (serial noise, the external flasher's
+  // chip-init failing, a closed flasher tab) can be retried in place. Routes by
+  // installer since web-flash hands off to the external tab again.
   _retry = () => {
-    if (this._device) this.installWebSerial(this._device);
+    if (!this._device) return;
+    if (this._installer === "web-flash") this.installUsbFlash(this._device);
+    else this.installWebSerial(this._device);
   };
 
   _cancel = async () => {
