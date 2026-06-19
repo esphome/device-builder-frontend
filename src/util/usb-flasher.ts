@@ -14,10 +14,13 @@ const MSG_FIRMWARE = "esphome-web-flash:firmware";
 const MSG_STATE = "esphome-web-flash:state";
 const MSG_PROGRESS = "esphome-web-flash:progress";
 
-// Stop listening to the flasher tab after this much silence, so a tab that's
-// closed / crashed / navigated away mid-flash (no terminal state) can't leave
-// the message listener and its captured firmware buffer alive for the page.
-const FLASH_WATCHDOG_MS = 15 * 60 * 1000;
+// Give up if the flasher tab never reports "ready" (failed to load / crashed),
+// so the listener + loading toast don't linger. Compile time is intentionally
+// NOT inside this window — "ready" arrives while compiling, clearing it.
+const READY_TIMEOUT_MS = 60 * 1000;
+// Bound the actual flash (armed at hand-off, not at attach, so a slow compile
+// can't trip a misleading "lost contact").
+const FLASH_WATCHDOG_MS = 10 * 60 * 1000;
 
 // Compile and resolve when the job completes; reject with the backend error text.
 // The follow-job stream auto-detaches on the terminal result (see ESPHomeAPI).
@@ -69,10 +72,11 @@ export async function flashViaUsb(
   const toastId = `flash-usb-${nonce}`;
   toast.loading(localize("dashboard.flash_usb_preparing"), { id: toastId });
 
-  // Single teardown path: aborting the controller removes the message listener,
-  // and the close-poll + watchdog bound its lifetime if no terminal state ever
-  // arrives (tab closed / crashed / went silent).
+  // Single teardown path: aborting the controller removes the message listener.
+  // The close-poll, ready-timeout, and flash watchdog bound its lifetime if the
+  // tab is closed / crashed / went silent before a terminal state.
   const controller = new AbortController();
+  let readyTimer: ReturnType<typeof setTimeout> | undefined;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
   let closePoll: ReturnType<typeof setInterval> | undefined;
   let finished = false;
@@ -80,6 +84,7 @@ export async function flashViaUsb(
     if (finished) return;
     finished = true;
     controller.abort();
+    if (readyTimer !== undefined) clearTimeout(readyTimer);
     if (watchdog !== undefined) clearTimeout(watchdog);
     if (closePoll !== undefined) clearInterval(closePoll);
   };
@@ -99,8 +104,7 @@ export async function flashViaUsb(
   let handedOff = false;
 
   const handOff = () => {
-    // Don't post to a tab we've already stopped watching (abandon/timeout): the
-    // watchdog spans compile+flash, so a slow compile could resolve after it.
+    // Don't post to a tab we've already stopped watching (closed / timed out).
     if (finished || handedOff || !ready || !firmware) return;
     handedOff = true;
     win.postMessage(
@@ -118,6 +122,8 @@ export async function flashViaUsb(
     // closure that lives on for state/progress doesn't pin the wrapper.
     firmware = null;
     toast.loading(localize("dashboard.flash_usb_handoff"), { id: toastId });
+    // Bound only the flash phase, now that the hand-off has happened.
+    watchdog = setTimeout(abandon, FLASH_WATCHDOG_MS);
   };
 
   const onMessage = (ev: MessageEvent) => {
@@ -131,6 +137,7 @@ export async function flashViaUsb(
     if (!data?.type) return;
     if (data.type === MSG_READY) {
       ready = true;
+      if (readyTimer !== undefined) clearTimeout(readyTimer);
       handOff();
     } else if (data.type === MSG_PROGRESS) {
       toast.loading(localize("dashboard.flash_usb_flashing", { pct: data.pct ?? 0 }), {
@@ -159,7 +166,9 @@ export async function flashViaUsb(
   closePoll = setInterval(() => {
     if (win.closed) abandon();
   }, 1000);
-  watchdog = setTimeout(abandon, FLASH_WATCHDOG_MS);
+  // Until "ready" arrives the compile is the only long step; bound only the
+  // handshake here. The flash watchdog is armed later, at hand-off.
+  readyTimer = setTimeout(abandon, READY_TIMEOUT_MS);
 
   try {
     let binaries = await api.firmwareGetBinaries(device.configuration);
