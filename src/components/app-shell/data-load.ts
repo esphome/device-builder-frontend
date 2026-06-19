@@ -1,7 +1,6 @@
 import { OnboardingStepId, type UserPreferences } from "../../api/types/system.js";
 import {
   isExperienceChosen,
-  isWifiSetupPending,
   shouldAutoShowOnboarding,
 } from "../../util/onboarding-gate.js";
 import type { ESPHomeApp } from "../app-shell.js";
@@ -16,23 +15,26 @@ export function applyPreferences(host: ESPHomeApp, prefs: UserPreferences): void
 export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
   try {
     const state = await host._api.getOnboardingState();
-    const wifiPending = isWifiSetupPending(state);
-    host._onboardingPending = wifiPending;
     host._onboardingHasUseCase = state.steps.some(
       (s) => s.id === OnboardingStepId.USE_CASE
     );
-    const show = shouldAutoShowOnboarding(state, host._onboardingSessionDismissed);
-    // Fresh install (experience not chosen) gets the full wizard; an existing
-    // install that already has an experience but is missing Wi-Fi gets only the
-    // standalone Wi-Fi dialog, so it still onboards Wi-Fi unless they decline.
-    const experienceChosen = isExperienceChosen(state);
-    host._onboardingShouldShow = show && !experienceChosen;
-    host._onboardingShowWifi = show && experienceChosen && wifiPending;
+    // Only the full first-run wizard (use-case + experience) auto-pops now;
+    // Wi-Fi is collected per-device in the create wizard, never auto-popped.
+    host._onboardingShouldShow =
+      shouldAutoShowOnboarding(state, host._onboardingSessionDismissed) &&
+      !isExperienceChosen(state);
   } catch (err) {
-    // Non-critical — clear the badge (latest data unknown, "no nudge" is safer
-    // than a stale red dot) but leave _onboardingShouldShow alone so a
-    // transient reload on a session-dismissed state can't re-open the wizard.
+    // Non-critical — leave _onboardingShouldShow alone so a transient reload on
+    // a session-dismissed state can't re-open the wizard.
     console.warn("Failed to load onboarding state:", err);
+  }
+  // The kebab "Set up Wi-Fi" / "Change Wi-Fi" entry is always present; its
+  // wording tracks whether a shared Wi-Fi secret exists yet.
+  try {
+    const keys = await host._api.getSecretKeys();
+    host._onboardingPending = !keys.includes("wifi_ssid");
+  } catch (err) {
+    console.warn("Failed to load secret keys for Wi-Fi menu wording:", err);
     host._onboardingPending = false;
   }
 }

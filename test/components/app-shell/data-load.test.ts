@@ -25,65 +25,58 @@ function state(
   return { current_version, completed_version, steps };
 }
 
-function makeHost(state: OnboardingState) {
+function makeHost(state: OnboardingState, secretKeys: string[] = []) {
   return {
     _onboardingPending: false,
     _onboardingHasUseCase: false,
     _onboardingShouldShow: false,
-    _onboardingShowWifi: false,
     _onboardingSessionDismissed: false,
-    _api: { getOnboardingState: vi.fn(async () => state) },
+    _api: {
+      getOnboardingState: vi.fn(async () => state),
+      getSecretKeys: vi.fn(async () => secretKeys),
+    },
   };
 }
 
 describe("loadOnboardingState routing", () => {
-  it("a fresh install (experience pending) routes to the wizard, not the wifi dialog", async () => {
+  it("a fresh install (experience pending) auto-pops the first-run wizard", async () => {
     const host = makeHost(
       state([
         { id: OnboardingStepId.USE_CASE, status: PENDING },
         { id: OnboardingStepId.EXPERIENCE_LEVEL, status: PENDING },
-        { id: OnboardingStepId.WIFI_CREDENTIALS, status: PENDING },
       ])
     );
     await loadOnboardingState(host as unknown as ESPHomeApp);
     expect(host._onboardingShouldShow).toBe(true);
-    expect(host._onboardingShowWifi).toBe(false);
   });
 
-  it("an existing install missing wifi routes to the wifi dialog, not the wizard", async () => {
+  it("an existing install (experience done) does not auto-pop the wizard", async () => {
     const host = makeHost(
-      state([
-        { id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE },
-        { id: OnboardingStepId.WIFI_CREDENTIALS, status: PENDING },
-      ])
+      state([{ id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE }])
     );
     await loadOnboardingState(host as unknown as ESPHomeApp);
     expect(host._onboardingShouldShow).toBe(false);
-    expect(host._onboardingShowWifi).toBe(true);
   });
 
-  it("an existing install with wifi configured pops neither", async () => {
+  it("respects a session dismissal", async () => {
     const host = makeHost(
-      state([
-        { id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE },
-        { id: OnboardingStepId.WIFI_CREDENTIALS, status: DONE },
-      ])
-    );
-    await loadOnboardingState(host as unknown as ESPHomeApp);
-    expect(host._onboardingShouldShow).toBe(false);
-    expect(host._onboardingShowWifi).toBe(false);
-  });
-
-  it("respects a session dismissal even when wifi is pending", async () => {
-    const host = makeHost(
-      state([
-        { id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE },
-        { id: OnboardingStepId.WIFI_CREDENTIALS, status: PENDING },
-      ])
+      state([{ id: OnboardingStepId.EXPERIENCE_LEVEL, status: PENDING }])
     );
     host._onboardingSessionDismissed = true;
     await loadOnboardingState(host as unknown as ESPHomeApp);
-    expect(host._onboardingShowWifi).toBe(false);
+    expect(host._onboardingShouldShow).toBe(false);
+  });
+
+  it("flags Wi-Fi as pending (kebab wording) when no wifi_ssid secret exists", async () => {
+    const host = makeHost(state([]), ["api_key"]);
+    await loadOnboardingState(host as unknown as ESPHomeApp);
+    expect(host._onboardingPending).toBe(true);
+  });
+
+  it("clears the Wi-Fi pending flag once a wifi_ssid secret exists", async () => {
+    const host = makeHost(state([]), ["wifi_ssid", "wifi_password"]);
+    await loadOnboardingState(host as unknown as ESPHomeApp);
+    expect(host._onboardingPending).toBe(false);
   });
 });
 

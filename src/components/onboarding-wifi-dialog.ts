@@ -244,7 +244,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._saving = true;
     this._error = null;
     try {
-      await this._api.setOnboardingWifi(this._ssid, this._password);
+      await this._api.setWifiCredentials(this._ssid, this._password);
     } catch (err) {
       // The wifi write itself failed — the user's credentials
       // never landed on disk. Surface the error inline so they

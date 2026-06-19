@@ -28,7 +28,7 @@ interface DialogPrivateView extends EventTarget {
   _error: string | null;
   _exitedExplicitly: boolean;
   _api: {
-    setOnboardingWifi: (ssid: string, password: string) => Promise<unknown>;
+    setWifiCredentials: (ssid: string, password: string) => Promise<unknown>;
     markOnboardingAcknowledged?: () => Promise<unknown>;
   };
   readonly _passwordTooShort: boolean;
@@ -73,14 +73,14 @@ describe("onboarding-wifi-dialog password-length gate", () => {
 
   test("_save bails out before hitting the API on a too-short password", async () => {
     const dialog = makeDialog();
-    const setOnboardingWifi = vi.fn().mockResolvedValue(undefined);
-    dialog._api = { setOnboardingWifi };
+    const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
+    dialog._api = { setWifiCredentials };
     dialog._ssid = "MyNetwork";
     dialog._password = "1234567"; // 7 chars
 
     await dialog._save();
 
-    expect(setOnboardingWifi).not.toHaveBeenCalled();
+    expect(setWifiCredentials).not.toHaveBeenCalled();
   });
 
   test("a second _save while one is in flight does not double-submit", async () => {
@@ -88,15 +88,15 @@ describe("onboarding-wifi-dialog password-length gate", () => {
     // Never resolves, so the first call stays in flight (``_saving`` true)
     // while the second runs — exactly the held-Enter window the EnterController
     // path opens by bypassing the disabled Save button.
-    const setOnboardingWifi = vi.fn(() => new Promise<void>(() => {}));
-    dialog._api = { setOnboardingWifi };
+    const setWifiCredentials = vi.fn(() => new Promise<void>(() => {}));
+    dialog._api = { setWifiCredentials };
     dialog._ssid = "MyNetwork";
     dialog._password = "12345678";
 
     void dialog._save();
     await dialog._save();
 
-    expect(setOnboardingWifi).toHaveBeenCalledTimes(1);
+    expect(setWifiCredentials).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -114,8 +114,8 @@ describe("onboarding-wifi-dialog password-length gate", () => {
 describe("onboarding-wifi-dialog close / error gating", () => {
   test("a failed save shows the inline error and leaves the dialog open", async () => {
     const dialog = makeDialog();
-    const setOnboardingWifi = vi.fn().mockRejectedValue(new Error("write failed"));
-    dialog._api = { setOnboardingWifi };
+    const setWifiCredentials = vi.fn().mockRejectedValue(new Error("write failed"));
+    dialog._api = { setWifiCredentials };
     dialog._open = true;
     dialog._ssid = "MyNetwork";
     dialog._password = "12345678";
@@ -129,9 +129,9 @@ describe("onboarding-wifi-dialog close / error gating", () => {
 
   test("a successful save closes the dialog and marks it exited explicitly", async () => {
     const dialog = makeDialog();
-    const setOnboardingWifi = vi.fn().mockResolvedValue(undefined);
+    const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
     const markOnboardingAcknowledged = vi.fn().mockResolvedValue(undefined);
-    dialog._api = { setOnboardingWifi, markOnboardingAcknowledged };
+    dialog._api = { setWifiCredentials, markOnboardingAcknowledged };
     dialog._open = true;
     dialog._ssid = "MyNetwork";
     dialog._password = "12345678";

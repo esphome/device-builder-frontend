@@ -198,6 +198,7 @@ describe("hydrateBoard", () => {
       is_generic: false,
       featured_components: [],
       featured_bundles: [],
+      provides_network: false,
     };
     expect(hydrateBoard(entry)).toEqual(entry);
   });

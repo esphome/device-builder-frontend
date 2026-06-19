@@ -153,6 +153,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._selectedBoard = board;
     this._initialBoardFilter = null;
     this._resetTransientState();
+    void this._upgradeSelectedBoard(board);
   }
 
   /** Open directly at the board-picker step with an optional
@@ -352,6 +353,24 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     }
 
     this._step = detail.step;
+    if (detail.step === "setup" && this._selectedBoard) {
+      void this._upgradeSelectedBoard(this._selectedBoard);
+    }
+  }
+
+  /** Replace the slim board entry from the picker list with the full body so
+   *  ``wizard-step-setup`` can read ``provides_network`` — ``boards/get_boards``
+   *  ships slim entries that omit it (and ``hydrateBoard`` defaults it to
+   *  ``false``, so there's no reliable "already full" flag to gate on). The
+   *  setup step renders immediately with the slim board; the upgrade lands a
+   *  beat later and only refines the Wi-Fi skip decision. */
+  private async _upgradeSelectedBoard(board: BoardCatalogEntry): Promise<void> {
+    try {
+      const full = await this._api.getBoard(board.id);
+      if (full && this._selectedBoard?.id === board.id) this._selectedBoard = full;
+    } catch (err) {
+      console.warn("Failed to load full board body:", err);
+    }
   }
 
   private _onToggleAdvanced() {
@@ -448,9 +467,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       name: string;
       wifiSsid: string;
       wifiPassword: string;
+      skipWifi: boolean;
     }>
   ) {
-    const { board, name, wifiSsid, wifiPassword } = e.detail;
+    const { board, name, wifiSsid, wifiPassword, skipWifi } = e.detail;
     if (!board) return;
     await this._runCreate(
       {
@@ -460,8 +480,11 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         name,
         board_id: board.id,
         config_type: "basic",
+        // Typed credentials are persisted to secrets.yaml by the backend and
+        // referenced via !secret; skip_wifi forces a no-network config.
         ssid: wifiSsid,
         psk: wifiPassword,
+        skip_wifi: skipWifi,
       },
       { board }
     );
@@ -488,6 +511,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       ssid?: string;
       psk?: string;
       file_content?: string;
+      skip_wifi?: boolean;
     },
     options: { board?: BoardCatalogEntry | null } = {}
   ): Promise<void> {
