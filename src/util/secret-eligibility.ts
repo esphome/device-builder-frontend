@@ -48,7 +48,11 @@ export function isSecretEligible(sectionKey: string, key: string): boolean {
  */
 export function isSharedSecret(key: string, hostname: string): boolean {
   const host = secretHostSlug(hostname);
-  return !host || !key.startsWith(`${host}__`);
+  if (!host) return true;
+  const sep = key.indexOf("__");
+  // Slug the stored prefix too, so a legacy hyphenated key (`temp-sensor__…`)
+  // still reads as this device's own rather than triggering the shared warning.
+  return sep <= 0 || secretHostSlug(key.slice(0, sep)) !== host;
 }
 
 /** Lowercase + collapse anything outside ``[a-z0-9_]`` so a hostname or
@@ -84,7 +88,9 @@ export function withoutForeignDeviceSecrets(
   if (others.size === 0) return [...keys];
   return keys.filter((k) => {
     const i = k.indexOf("__");
-    return i <= 0 || !others.has(k.slice(0, i));
+    // Slug the stored prefix so a legacy hyphenated key matches the slugged
+    // device set and is correctly recognized as another device's secret.
+    return i <= 0 || !others.has(secretHostSlug(k.slice(0, i)));
   });
 }
 
