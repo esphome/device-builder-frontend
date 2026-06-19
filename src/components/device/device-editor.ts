@@ -28,6 +28,7 @@ import {
   saveSplitRatio,
 } from "../../util/split-ratio.js";
 import type { HighlightRange } from "../yaml-editor.js";
+import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
 import { renderInstallAction } from "./install-action.js";
 
@@ -237,83 +238,18 @@ export class ESPHomeDeviceEditor extends LitElement {
                 : nothing}
             </div>
           </div>
-          <div class="header-actions">
-            ${effectiveLayout !== "left"
-              ? (() => {
-                  const sensitiveLabel = this._localize(
-                    this._revealSensitive
-                      ? "device.yaml_mask_sensitive"
-                      : "device.yaml_reveal_sensitive"
-                  );
-                  return html`<button
-                    type="button"
-                    class="ghost-icon-btn diff-toggle"
-                    aria-pressed=${this._revealSensitive}
-                    aria-label=${sensitiveLabel}
-                    @click=${this._toggleRevealSensitive}
-                    title=${sensitiveLabel}
-                  >
-                    <wa-icon
-                      library="mdi"
-                      name=${this._revealSensitive ? "eye-off" : "eye"}
-                    ></wa-icon>
-                  </button>`;
-                })()
-              : nothing}
-            ${this._showDiffButton
-              ? (() => {
-                  const diffLabel = this._showDiff
-                    ? this._localize("device.diff_view_editor")
-                    : this._localize("device.diff_view_diff");
-                  return html`<button
-                    type="button"
-                    class="ghost-icon-btn diff-toggle"
-                    aria-pressed=${this._showDiff}
-                    ?disabled=${this.yaml === this.savedYaml && !this._showDiff}
-                    aria-label=${diffLabel}
-                    @click=${this._toggleDiff}
-                    title=${diffLabel}
-                  >
-                    <wa-icon library="mdi" name="vector-difference"></wa-icon>
-                  </button>`;
-                })()
-              : nothing}
-            <div
-              class="layout-toggle"
-              aria-label=${this._localize("device.editor_layout_label")}
-            >
-              <button
-                type="button"
-                class="ghost-icon-btn"
-                aria-pressed=${effectiveLayout === "left"}
-                @click=${() => this._setLayout("left")}
-                aria-label=${this._localize("device.layout_components_only")}
-                title=${this._localize("device.layout_components_only")}
-              >
-                <wa-icon library="mdi" name="layout-left"></wa-icon>
-              </button>
-              <button
-                class="ghost-icon-btn split-btn"
-                type="button"
-                aria-pressed=${effectiveLayout === "both"}
-                @click=${() => this._setLayout("both")}
-                aria-label=${this._localize("device.layout_split")}
-                title=${this._localize("device.layout_split")}
-              >
-                <wa-icon library="mdi" name="layout-split"></wa-icon>
-              </button>
-              <button
-                type="button"
-                class="ghost-icon-btn"
-                aria-pressed=${effectiveLayout === "right"}
-                @click=${() => this._setLayout("right")}
-                aria-label=${this._localize("device.layout_yaml_only")}
-                title=${this._localize("device.layout_yaml_only")}
-              >
-                <wa-icon library="mdi" name="layout-right"></wa-icon>
-              </button>
-            </div>
-          </div>
+          ${renderEditorToolbar({
+            localize: this._localize,
+            effectiveLayout,
+            revealSensitive: this._revealSensitive,
+            showDiffButton: this._showDiffButton,
+            showDiff: this._showDiff,
+            yaml: this.yaml,
+            savedYaml: this.savedYaml,
+            onToggleRevealSensitive: () => this._toggleRevealSensitive(),
+            onToggleDiff: () => this._toggleDiff(),
+            onSetLayout: (layout) => this._setLayout(layout),
+          })}
         </header>
         <div class="card-body">
           <div class="editor-floating-actions">
