@@ -551,7 +551,8 @@
       "shelly": "Shelly"
     },
     "create_general_error": "Failed to create the device. Please try again.",
-    "create_with_board_error": "Failed to create device for {board}: {message}"
+    "create_with_board_error": "Failed to create device for {board}: {message}",
+    "board_load_failed": "Couldn't load the board details. Please try again."
   },
   "device": {
     "navigator_title": "Device navigator",

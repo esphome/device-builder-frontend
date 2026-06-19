@@ -369,19 +369,24 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   /** Upgrade the slim picker entry to the full board body, then show the setup
    *  step — so ``wizard-step-setup`` reads a known ``requires_wifi`` on first
    *  render and can't under-collect Wi-Fi on a Wi-Fi-only board. The picker
-   *  stays up during the (uncached) fetch; a cached id skips it. */
+   *  stays up during the (uncached) fetch; a cached id skips it. On a failed /
+   *  empty fetch we stay on the picker with an error rather than advance on the
+   *  slim entry (whose ``requires_wifi`` hydrates to ``false``). */
   private async _enterSetupStep(board: BoardCatalogEntry): Promise<void> {
     if (this._upgradedBoardId !== board.id) {
+      let full: BoardCatalogEntry | null = null;
       try {
-        const full = await this._api.getBoard(board.id);
-        if (this._selectedBoard?.id !== board.id) return; // selection moved on
-        if (full) {
-          this._selectedBoard = full;
-          this._upgradedBoardId = board.id;
-        }
+        full = await this._api.getBoard(board.id);
       } catch (err) {
         console.warn("Failed to load full board body:", err);
       }
+      if (this._selectedBoard?.id !== board.id) return; // selection moved on
+      if (!full) {
+        this._createError = this._localize("wizard.board_load_failed");
+        return; // keep the user on the picker to retry
+      }
+      this._selectedBoard = full;
+      this._upgradedBoardId = board.id;
     }
     this._step = "setup";
   }

@@ -263,6 +263,26 @@ describe("create-config-dialog stale error on navigation", () => {
     await goToSetup(el, "esp8266");
     expect(errorText(el)).toBeNull();
   });
+
+  it("does not advance to setup with an error when the board body fails to load", async () => {
+    // A failed getBoard must not advance to setup on the slim entry (whose
+    // requires_wifi hydrates to false → could under-collect Wi-Fi).
+    const getBoard = vi.fn().mockRejectedValue(new Error("offline"));
+    const el = await mount({ getBoard });
+    await goToSetup(el, "esp32dev");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._step).not.toBe("setup");
+    expect(errorText(el)).not.toBeNull();
+  });
+
+  it("does not advance to setup with an error when getBoard returns null", async () => {
+    const getBoard = vi.fn().mockResolvedValue(null);
+    const el = await mount({ getBoard });
+    await goToSetup(el, "esp32dev");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._step).not.toBe("setup");
+    expect(errorText(el)).not.toBeNull();
+  });
 });
 
 // The migration onto esphome-base-dialog swapped the imperative
