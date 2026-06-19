@@ -182,6 +182,22 @@ describe("create-config-dialog create de-dupe + retry", () => {
       })
     );
   });
+
+  it("fires secrets-saved after a Wi-Fi create so secret pickers refresh", async () => {
+    // The backend persists the SSID to secrets.yaml; without this event the
+    // editor's secret pickers show the new !secret refs as missing until reload.
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "living-room.yaml" });
+    const el = await mount({ createDevice });
+    const onSaved = vi.fn();
+    window.addEventListener("secrets-saved", onSaved);
+    try {
+      emitFinish(el, "Living Room"); // emitFinish sends wifiSsid: "net"
+      await flush();
+      expect(onSaved).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("secrets-saved", onSaved);
+    }
+  });
 });
 
 // A failed create shows a dialog-level error bar that outlives step changes.

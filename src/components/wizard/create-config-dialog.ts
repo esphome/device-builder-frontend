@@ -520,6 +520,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice(args);
+      // A supplied SSID is persisted to secrets.yaml by the backend; refresh
+      // the shared secret-keys cache so the new device's editor doesn't show
+      // the just-written `!secret wifi_*` refs as missing until a reload.
+      if (args.ssid) window.dispatchEvent(new CustomEvent("secrets-saved"));
       this.navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
