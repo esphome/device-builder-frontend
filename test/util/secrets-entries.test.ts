@@ -200,6 +200,17 @@ describe("groupSecretsByDevice", () => {
     );
     expect(groups.map((g) => g.device)).toEqual([null, "bw15"]);
   });
+
+  test("collapses hyphen and underscore spellings of the same device into one group", () => {
+    const groups = groupSecretsByDevice(
+      parseSecretsEntries("temp_sensor__api: a\ntemp-sensor__ota: b\n")
+    );
+    expect(groups.map((g) => g.device)).toEqual(["temp_sensor"]);
+    expect(groups[0].entries.map((e) => e.key)).toEqual([
+      "temp_sensor__api",
+      "temp-sensor__ota",
+    ]);
+  });
 });
 
 describe("isValidSecretKey", () => {

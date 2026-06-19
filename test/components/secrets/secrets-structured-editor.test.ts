@@ -222,6 +222,25 @@ describe("esphome-secrets-structured-editor", () => {
     expect(captured.value).toBe("wifi_ssid: home\nbw15__api: xyz\n");
   });
 
+  test("a hyphenated device target is slugged so the prefix matches the field picker", async () => {
+    const el = await mount("wifi_ssid: home\n", false, [
+      {
+        name: "temp-sensor",
+        configuration: "temp-sensor.yaml",
+        friendly_name: "Temp Sensor",
+      },
+    ]);
+    const captured = onChange(el);
+    const view = el as unknown as AddView;
+    view._openAdd();
+    view._addTarget = "temp-sensor";
+    view._addName = "ap_password";
+    view._addValue = "xyz";
+    view._confirmAdd();
+    expect(view._addOpen).toBe(false);
+    expect(captured.value).toBe("wifi_ssid: home\ntemp_sensor__ap_password: xyz\n");
+  });
+
   test("the add dialog rejects an invalid name and stays open", async () => {
     const el = await mount("wifi_ssid: home\n");
     const captured = onChange(el);

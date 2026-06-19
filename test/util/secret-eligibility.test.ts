@@ -70,6 +70,32 @@ describe("recommendedSecretKeys", () => {
   it("recommends nothing for a non-concealed unknown field", () => {
     expect(recommendedSecretKeys("sensor", "name", "kitchen", false)).toEqual([]);
   });
+
+  it("scopes the nested AP password by its path, not the shared wifi_password", () => {
+    // `wifi.ap.password` and the STA `wifi.password` share the leaf `password`;
+    // the dotted path disambiguates so the AP field gets its own scoped key.
+    expect(
+      recommendedSecretKeys("wifi", "password", "kitchen", true, ["ap", "password"])
+    ).toEqual(["kitchen__ap_password", "kitchen_ap_password"]);
+  });
+
+  it("still resolves the STA wifi password to the shared key when path is passed", () => {
+    expect(
+      recommendedSecretKeys("wifi", "password", "kitchen", true, ["password"])
+    ).toEqual(["wifi_password"]);
+  });
+
+  it("leaves api / web_server keys unchanged when their nested paths are passed", () => {
+    expect(
+      recommendedSecretKeys("api", "key", "kitchen", true, ["encryption", "key"])
+    ).toEqual(["kitchen__encryption_key", "kitchen_encryption_key"]);
+    expect(
+      recommendedSecretKeys("web_server", "password", "kitchen", true, [
+        "auth",
+        "password",
+      ])
+    ).toEqual(["kitchen__web_password", "kitchen_web_password"]);
+  });
 });
 
 describe("withoutForeignDeviceSecrets", () => {

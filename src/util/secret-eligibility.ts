@@ -19,13 +19,18 @@ const FIELD_BOUND_SHARED = new Set(
 );
 
 /** Per-device base names for the well-known credential fields, joined to the
- *  hostname as ``<hostname>__<base>``. Keyed by ``sectionKey`` then key. */
+ *  hostname as ``<hostname>__<base>``. Keyed by ``sectionKey`` then the field's
+ *  *lookup key*: the leaf ``entry.key`` by default, or the dotted field path
+ *  (``ap.password``) when a leaf alone is ambiguous within the section. */
 const DEVICE_BASE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   // Keyed by the editor sectionKey (the OTA esphome platform is `ota.esphome`),
   // so the field picker and the security notice agree on the secret name.
   "ota.esphome": { password: "ota_password" },
   api: { key: "encryption_key" },
   web_server: { password: "web_password" },
+  // The fallback-hotspot password is `wifi.ap.password`; key it by its dotted
+  // path so it doesn't collide with the STA `wifi.password` (`wifi_password`).
+  wifi: { "ap.password": "ap_password" },
 };
 
 /** True when a non-concealed *key* under *sectionKey* still wants the picker. */
@@ -41,13 +46,15 @@ export function isSecretEligible(sectionKey: string, key: string): boolean {
  * value warns. An unknown hostname can't prove scoping → shared.
  */
 export function isSharedSecret(key: string, hostname: string): boolean {
-  const host = slug(hostname);
+  const host = secretHostSlug(hostname);
   return !host || !key.startsWith(`${host}__`);
 }
 
 /** Lowercase + collapse anything outside ``[a-z0-9_]`` so a hostname or
- *  field name is safe to embed in a secret key. */
-function slug(s: string): string {
+ *  field name is safe to embed in a secret key. The single normalization both
+ *  write paths (field picker and Secrets-menu add) share so a device's secret
+ *  prefix is identical however the secret was created. */
+export function secretHostSlug(s: string): string {
   return s
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, "_")
@@ -65,13 +72,13 @@ export function withoutForeignDeviceSecrets(
   currentHostname: string,
   allDeviceNames: readonly string[]
 ): string[] {
-  const current = slug(currentHostname);
+  const current = secretHostSlug(currentHostname);
   // Without the current host we can't tell ours from theirs — don't filter, or
   // we'd hide the current device's own keys (and the migrate target) during the
   // brief window before the device name resolves.
   if (!current) return [...keys];
   const others = new Set(
-    allDeviceNames.map((n) => slug(n)).filter((h) => h && h !== current)
+    allDeviceNames.map((n) => secretHostSlug(n)).filter((h) => h && h !== current)
   );
   if (others.size === 0) return [...keys];
   return keys.filter((k) => {
@@ -130,18 +137,35 @@ function scoped(host: string, base: string): string[] {
  * - Any other concealed field → ``<hostname>__<section>_<key>``.
  *
  * *hostname* is the backend-resolved ESPHome node name (substitutions already
- * expanded), threaded through the render context.
+ * expanded), threaded through the render context. *path* is the field's full
+ * path within the section; a nested leaf (``wifi.ap.password``) is looked up by
+ * its dotted path first so it doesn't collapse onto a sibling leaf of the same
+ * name (the STA ``wifi.password``), then falls back to the leaf-key logic.
  */
 export function recommendedSecretKeys(
   sectionKey: string,
   key: string,
   hostname: string,
-  concealed: boolean
+  concealed: boolean,
+  path?: readonly string[]
 ): string[] {
+  // Dotted-path lookup wins for nested leaves so `ap.password` resolves before
+  // the leaf `password` short-circuits onto the shared `wifi_password`.
+  const qualified = path && path.length > 1 ? path.join(".") : undefined;
+  if (qualified) {
+    const sharedQ = SHARED[sectionKey]?.[qualified];
+    if (sharedQ) return [sharedQ];
+    const baseQ = DEVICE_BASE[sectionKey]?.[qualified];
+    if (baseQ) {
+      const hostQ = secretHostSlug(hostname);
+      return hostQ ? scoped(hostQ, baseQ) : [];
+    }
+  }
+
   const shared = SHARED[sectionKey]?.[key];
   if (shared) return [shared];
 
-  const host = slug(hostname);
+  const host = secretHostSlug(hostname);
   if (!host) return [];
 
   const base = DEVICE_BASE[sectionKey]?.[key];
@@ -149,7 +173,7 @@ export function recommendedSecretKeys(
 
   // Generic per-device fallback for any other concealed credential field.
   if (concealed) {
-    const tail = slug(`${sectionKey}_${key}`);
+    const tail = secretHostSlug(`${sectionKey}_${key}`);
     return tail ? scoped(host, tail) : [];
   }
   return [];

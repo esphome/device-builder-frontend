@@ -6,6 +6,7 @@
  * keys, block / flow collections and nested mappings are read-only.
  */
 
+import { secretHostSlug } from "./secret-eligibility.js";
 import { escapeYamlDoubleQuoted } from "./yaml-escape.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
 import { formatYamlScalar } from "./yaml-serialize.js";
@@ -53,13 +54,17 @@ export function isValidSecretKey(key: string): boolean {
   return VALID_KEY.test(key);
 }
 
-/** Group entries into shared-then-per-device runs by the ``<device>__`` key prefix. */
+/** Group entries into shared-then-per-device runs by the ``<device>__`` key prefix.
+ *  The prefix is slugged so a device's hyphenated and underscored secrets
+ *  (created by different flows before the names converged) collapse into one
+ *  group instead of two. */
 export function groupSecretsByDevice(entries: SecretEntry[]): SecretGroup[] {
   const order: (string | null)[] = [];
   const byDevice = new Map<string | null, SecretEntry[]>();
   for (const entry of entries) {
     const sep = entry.key.indexOf("__");
-    const device = sep > 0 ? entry.key.slice(0, sep) : null;
+    const raw = sep > 0 ? entry.key.slice(0, sep) : null;
+    const device = raw ? secretHostSlug(raw) || raw : null;
     if (!byDevice.has(device)) {
       byDevice.set(device, []);
       order.push(device);

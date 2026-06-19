@@ -372,7 +372,8 @@ export function renderStringField(
         ctx.sectionKey,
         entry.key,
         ctx.deviceName ?? "",
-        inputType === "password"
+        inputType === "password",
+        path
       )
     : [];
   const secretPicker = secretEligible
