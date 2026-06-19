@@ -30,8 +30,6 @@ export function onInstallMethodSelect(
     device,
     firmwareDialog: host._firmwareDialog,
     openInstall: (p) => openCommand(host, device, "install", p),
-    api: host._api,
-    localize: host._localize,
   });
 }
 

@@ -1,7 +1,4 @@
-import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
-import type { LocalizeFunc } from "../common/localize.js";
-import { flashViaUsb } from "../util/usb-flasher.js";
 import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
 
 export interface InstallMethodHandlers {
@@ -10,10 +7,6 @@ export interface InstallMethodHandlers {
    *  ("OTA" sentinel for the default address, a server serial port, etc.). */
   openInstall: (port?: string) => void;
   firmwareDialog: ESPHomeFirmwareInstallDialog | null;
-  /** Used for "web-flash" (the external secure-context flasher hand-off) when
-   *  the dashboard's own browser can't run Web Serial (HA add-on over http). */
-  api: ESPHomeAPI;
-  localize: LocalizeFunc;
 }
 
 /**
@@ -40,9 +33,9 @@ export function applyInstallMethod(
       h.firmwareDialog?.installWebSerial(h.device);
       break;
     case "web-flash":
-      // In-app Web Serial isn't available here; flash through the external
-      // secure-context flasher instead.
-      void flashViaUsb(h.api, h.localize, h.device);
+      // In-app Web Serial isn't available here; compile + download in the
+      // dialog, then hand off to the external secure-context flasher.
+      h.firmwareDialog?.installUsbFlash(h.device);
       break;
     case "binary-download":
       h.firmwareDialog?.installBinaryDownload(h.device);

@@ -1,7 +1,5 @@
 import { type ReactiveController, type ReactiveControllerHost } from "lit";
-import type { ESPHomeAPI } from "../../api/index.js";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
-import type { LocalizeFunc } from "../../common/localize.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -13,9 +11,6 @@ export interface DeviceInstallControllerHost extends ReactiveControllerHost {
   readonly commandDialog: ESPHomeCommandDialog | null;
   /** Resolve the mounted firmware-install-dialog instance. */
   readonly firmwareDialog: ESPHomeFirmwareInstallDialog | null;
-  /** API + localize for the external-flasher hand-off ("web-flash"). */
-  readonly api: ESPHomeAPI;
-  readonly localize: LocalizeFunc;
 }
 
 export class DeviceInstallController implements ReactiveController {
@@ -72,8 +67,6 @@ export class DeviceInstallController implements ReactiveController {
       device,
       firmwareDialog: this._host.firmwareDialog,
       openInstall: (p) => this._openCommand(device, "install", p),
-      api: this._host.api,
-      localize: this._host.localize,
     });
   };
 

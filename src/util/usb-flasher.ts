@@ -1,85 +1,55 @@
-import toast from "sonner-js";
-import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice } from "../api/types/devices.js";
-import { JobStatus } from "../api/types/firmware-jobs.js";
 import { FLASHER_ORIGIN, FLASHER_URL } from "../common/docs.js";
-import type { LocalizeFunc } from "../common/localize.js";
-import { getErrorMessage } from "./error-message.js";
-import { isEsptoolPlatform } from "./esptool-platform.js";
+import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 
-// Outbound message types, mirroring flasher/src/protocol.ts in the
-// device-builder repo. The nonce travels one way only (dashboard -> flasher).
+// Message types, mirroring flasher/src/protocol.ts in the device-builder repo.
+// The nonce travels one way only (dashboard -> flasher).
 const MSG_READY = "esphome-web-flash:ready";
 const MSG_FIRMWARE = "esphome-web-flash:firmware";
 const MSG_STATE = "esphome-web-flash:state";
 const MSG_PROGRESS = "esphome-web-flash:progress";
 
-// Give up if the flasher tab never reports "ready" (failed to load / crashed),
-// so the listener + loading toast don't linger. Compile time is intentionally
-// NOT inside this window — "ready" arrives while compiling, clearing it.
+// Give up if the flasher tab never reports "ready" (failed to load / crashed).
 const READY_TIMEOUT_MS = 60 * 1000;
-// Bound the actual flash (armed at hand-off, not at attach, so a slow compile
-// can't trip a misleading "lost contact").
+// Bound the flash itself (armed at hand-off).
 const FLASH_WATCHDOG_MS = 10 * 60 * 1000;
 
-// Compile and resolve when the job completes; reject with the backend error text.
-// The follow-job stream auto-detaches on the terminal result (see ESPHomeAPI).
-async function compileAndWait(api: ESPHomeAPI, configuration: string): Promise<void> {
-  const job = await api.firmwareCompile(configuration);
-  return new Promise((resolve, reject) => {
-    api.firmwareFollowJob(job.job_id, {
-      onResult: (data) => {
-        const result = data as unknown as { status: string; error?: string | null };
-        if (result.status === JobStatus.COMPLETED) resolve();
-        // Keep the real failure mode visible when the backend sends no text.
-        else reject(new Error(result.error || `compile ${result.status}`));
-      },
-      onError: (error) => reject(new Error(error)),
-    });
-  });
-}
-
 /**
- * Flash a device over USB by handing its factory image to the external
- * secure-context flasher (FLASHER_URL) via postMessage.
+ * Open the external secure-context flasher and hand off the already-built
+ * firmware (host._usbFirmware) over postMessage, mirroring the flasher's
+ * progress/state back into the install dialog.
  *
- * Used where the dashboard itself can't run Web Serial (the HA add-on is plain
- * http). The flasher tab does the actual flash; the bytes go tab-to-tab and
- * never touch a server.
+ * Must be called from a user gesture (the "Open USB flasher" button) so the
+ * popup isn't blocked, and only after the firmware compiled + downloaded — we
+ * never open the external site until a working image exists.
  */
-export async function flashViaUsb(
-  api: ESPHomeAPI,
-  localize: LocalizeFunc,
-  device: ConfiguredDevice
-): Promise<void> {
-  if (!isEsptoolPlatform(device.target_platform)) {
-    toast.error(localize("dashboard.flash_usb_unsupported"), { richColors: true });
-    return;
-  }
+export function openFlasherAndHandOff(host: ESPHomeFirmwareInstallDialog): void {
+  let bytes: ArrayBuffer | null = host._usbFirmware;
+  if (!bytes) return;
+  const name = host._usbFirmwareName;
 
-  // Open the flasher synchronously so the user gesture isn't lost to the popup
-  // blocker; firmware is compiled/fetched afterwards and handed off on "ready".
   const nonce = crypto.randomUUID();
-  const url = `${FLASHER_URL}#nonce=${encodeURIComponent(
-    nonce
-  )}&origin=${encodeURIComponent(location.origin)}`;
-  const win = window.open(url, "_blank");
+  const win = window.open(
+    `${FLASHER_URL}#nonce=${encodeURIComponent(nonce)}&origin=${encodeURIComponent(
+      location.origin
+    )}`,
+    "_blank"
+  );
   if (!win) {
-    toast.error(localize("dashboard.flash_usb_popup_blocked"), { richColors: true });
+    host._fail(host._localize("firmware.usb_popup_blocked"));
     return;
   }
 
-  const toastId = `flash-usb-${nonce}`;
-  toast.loading(localize("dashboard.flash_usb_preparing"), { id: toastId });
+  host._step = "flashing";
+  host._flashPercent = 0;
+  host._statusMessage = host._localize("firmware.usb_flashing");
 
-  // Single teardown path: aborting the controller removes the message listener.
-  // The close-poll, ready-timeout, and flash watchdog bound its lifetime if the
-  // tab is closed / crashed / went silent before a terminal state.
   const controller = new AbortController();
   let readyTimer: ReturnType<typeof setTimeout> | undefined;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
   let closePoll: ReturnType<typeof setInterval> | undefined;
   let finished = false;
+  let handedOff = false;
+
   const finish = () => {
     if (finished) return;
     finished = true;
@@ -88,42 +58,14 @@ export async function flashViaUsb(
     if (watchdog !== undefined) clearTimeout(watchdog);
     if (closePoll !== undefined) clearInterval(closePoll);
   };
-  // Surface a failure (instead of a forever-spinning loading toast) when the
-  // flasher tab closes or goes silent before reporting a terminal state.
+  // The flasher tab closed / crashed / went silent before reporting a result.
   const abandon = () => {
     if (finished) return;
-    toast.error(localize("dashboard.flash_usb_window_closed"), {
-      id: toastId,
-      richColors: true,
-    });
-    finish();
-  };
-
-  let ready = false;
-  let firmware: { name: string; data: ArrayBuffer } | null = null;
-  let handedOff = false;
-
-  const handOff = () => {
-    // Don't post to a tab we've already stopped watching (closed / timed out).
-    if (finished || handedOff || !ready || !firmware) return;
-    handedOff = true;
-    win.postMessage(
-      {
-        type: MSG_FIRMWARE,
-        nonce,
-        name: firmware.name,
-        erase: true,
-        parts: [{ address: 0, data: firmware.data }],
-      },
-      FLASHER_ORIGIN,
-      [firmware.data]
+    host._fail(
+      host._localize("firmware.usb_failed"),
+      host._localize("dashboard.flash_usb_window_closed")
     );
-    // Bytes are transferred (detached); drop the reference so the listener
-    // closure that lives on for state/progress doesn't pin the wrapper.
-    firmware = null;
-    toast.loading(localize("dashboard.flash_usb_handoff"), { id: toastId });
-    // Bound only the flash phase, now that the hand-off has happened.
-    watchdog = setTimeout(abandon, FLASH_WATCHDOG_MS);
+    finish();
   };
 
   const onMessage = (ev: MessageEvent) => {
@@ -136,28 +78,35 @@ export async function flashViaUsb(
     };
     if (!data?.type) return;
     if (data.type === MSG_READY) {
-      ready = true;
       if (readyTimer !== undefined) clearTimeout(readyTimer);
-      handOff();
+      if (handedOff || !bytes) return;
+      handedOff = true;
+      win.postMessage(
+        {
+          type: MSG_FIRMWARE,
+          nonce,
+          name,
+          erase: true,
+          parts: [{ address: 0, data: bytes }],
+        },
+        FLASHER_ORIGIN,
+        [bytes]
+      );
+      bytes = null; // transferred (detached)
+      host._usbFirmware = null;
+      watchdog = setTimeout(abandon, FLASH_WATCHDOG_MS);
     } else if (data.type === MSG_PROGRESS) {
-      toast.loading(localize("dashboard.flash_usb_flashing", { pct: data.pct ?? 0 }), {
-        id: toastId,
-      });
+      host._flashPercent = data.pct ?? 0;
     } else if (data.type === MSG_STATE) {
       if (data.state === "done") {
-        toast.success(localize("dashboard.flash_usb_done"), {
-          id: toastId,
-          richColors: true,
-        });
+        host._step = "done";
+        host._statusMessage = host._localize("firmware.usb_done");
         finish();
       } else if (data.state === "error") {
-        toast.error(data.detail || localize("dashboard.flash_usb_failed"), {
-          id: toastId,
-          richColors: true,
-        });
+        host._fail(host._localize("firmware.usb_failed"), data.detail || "");
         finish();
       } else if (data.detail) {
-        toast.loading(data.detail, { id: toastId });
+        host._statusMessage = data.detail;
       }
     }
   };
@@ -166,46 +115,5 @@ export async function flashViaUsb(
   closePoll = setInterval(() => {
     if (win.closed) abandon();
   }, 1000);
-  // Until "ready" arrives the compile is the only long step; bound only the
-  // handshake here. The flash watchdog is armed later, at hand-off.
   readyTimer = setTimeout(abandon, READY_TIMEOUT_MS);
-
-  try {
-    let binaries = await api.firmwareGetBinaries(device.configuration);
-    if (finished) return; // abandoned (tab closed / watchdog) while awaiting
-    if (binaries.length === 0) {
-      toast.loading(localize("dashboard.flash_usb_compiling"), { id: toastId });
-      await compileAndWait(api, device.configuration);
-      if (finished) return;
-      binaries = await api.firmwareGetBinaries(device.configuration);
-      if (finished) return;
-    }
-    // Pick the self-contained image flashed from scratch at 0x0. ESP8266/8285
-    // is the single firmware.bin; ESP32 is the merged factory image (its plain
-    // firmware.bin is the app-only image at 0x10000, not flashable from 0x0).
-    const factory = device.target_platform.toLowerCase().startsWith("esp82")
-      ? binaries.find((b) => b.file === "firmware.bin")
-      : (binaries.find((b) => b.file === "firmware.factory.bin") ??
-        binaries.find((b) => b.file.endsWith(".factory.bin")));
-    if (!factory) {
-      toast.error(localize("dashboard.flash_usb_no_binary"), {
-        id: toastId,
-        richColors: true,
-      });
-      finish();
-      return;
-    }
-    toast.loading(localize("dashboard.flash_usb_downloading"), { id: toastId });
-    const data = await api.firmwareDownloadBytes(device.configuration, factory.file);
-    if (finished) return; // abandoned while downloading; don't re-spin the toast
-    firmware = { name: factory.file, data };
-    handOff();
-  } catch (err) {
-    if (finished) return; // don't overwrite the abandon/terminal error toast
-    toast.error(getErrorMessage(err) || localize("dashboard.flash_usb_failed"), {
-      id: toastId,
-      richColors: true,
-    });
-    finish();
-  }
 }

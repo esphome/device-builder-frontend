@@ -381,6 +381,56 @@ export async function downloadSelectedBinary(
   host._statusMessage = "";
 }
 
+/**
+ * The self-contained image flashed from scratch at 0x0. ESP8266 / ESP8285 is
+ * the single ``firmware.bin``; ESP32 is the merged ``*.factory.bin`` (its plain
+ * ``firmware.bin`` is the app-only image at 0x10000, not flashable from 0x0).
+ * Returns undefined when no from-scratch image was produced.
+ */
+export function pickFactoryBinary(
+  targetPlatform: string,
+  binaries: FirmwareBinary[]
+): FirmwareBinary | undefined {
+  if (targetPlatform.toLowerCase().startsWith("esp82")) {
+    return binaries.find((b) => b.file === "firmware.bin");
+  }
+  return (
+    binaries.find((b) => b.file === "firmware.factory.bin") ??
+    binaries.find((b) => b.file.endsWith(".factory.bin"))
+  );
+}
+
+// "Flash via USB" through the external flasher: compile + download the factory
+// image HERE (logs/errors visible, like the download flow), then land on the
+// download-ready step. The flasher tab is opened only afterwards, on the user's
+// click, so we never hand off until a working firmware exists.
+export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
+  const device = host._device;
+  if (!device) return;
+  if (!(await compileOrFail(host, device.configuration))) return;
+  host._statusMessage = host._localize("firmware.status_downloading");
+  host._step = "downloading";
+  const binaries = await fetchBinaries(host, device.configuration);
+  if (!binaries) return;
+  const factory = pickFactoryBinary(device.target_platform, binaries);
+  if (!factory) {
+    failNoBinaries(host, { isWebFlasher: true, isEmpty: binaries.length === 0 });
+    return;
+  }
+  try {
+    host._usbFirmware = await host._api.firmwareDownloadBytes(
+      device.configuration,
+      factory.file
+    );
+    host._usbFirmwareName = factory.file;
+  } catch {
+    host._fail(host._localize("firmware.download_failed"));
+    return;
+  }
+  host._step = "download-ready";
+  host._statusMessage = "";
+}
+
 export function compileAndWait(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
