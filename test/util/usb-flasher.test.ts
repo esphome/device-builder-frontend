@@ -101,6 +101,29 @@ describe("flashViaUsb", () => {
     emitDone(fakeWin); // terminal state tears down the listener + timers
   });
 
+  it("surfaces a flasher 'error' state and tears down", async () => {
+    const fakeWin = { postMessage: vi.fn() };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+
+    const done = flashViaUsb(makeApi(), localize, device());
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { type: "esphome-web-flash:ready" },
+        origin: FLASHER_ORIGIN,
+        source: fakeWin as unknown as Window,
+      })
+    );
+    await done;
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { type: "esphome-web-flash:state", state: "error", detail: "boom" },
+        origin: FLASHER_ORIGIN,
+        source: fakeWin as unknown as Window,
+      })
+    );
+    expect(toast.error).toHaveBeenCalledWith("boom", expect.anything());
+  });
+
   it("compiles first when no binary is built yet", async () => {
     const followJob = vi.fn((_jobId: string, cbs: { onResult: (d: unknown) => void }) => {
       cbs.onResult({ status: "completed" });

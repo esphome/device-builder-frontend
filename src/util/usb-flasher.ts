@@ -168,10 +168,13 @@ export async function flashViaUsb(
       await compileAndWait(api, device.configuration);
       binaries = await api.firmwareGetBinaries(device.configuration);
     }
-    const factory =
-      binaries.find((b) => b.file === "firmware.factory.bin") ??
-      binaries.find((b) => b.file === "firmware.bin") ??
-      binaries.find((b) => b.file.includes("factory"));
+    // Pick the self-contained image flashed from scratch at 0x0. ESP8266/8285
+    // is the single firmware.bin; ESP32 is the merged factory image (its plain
+    // firmware.bin is the app-only image at 0x10000, not flashable from 0x0).
+    const factory = device.target_platform.toLowerCase().startsWith("esp82")
+      ? binaries.find((b) => b.file === "firmware.bin")
+      : (binaries.find((b) => b.file === "firmware.factory.bin") ??
+        binaries.find((b) => b.file.endsWith(".factory.bin")));
     if (!factory) {
       toast.error(localize("dashboard.flash_usb_no_binary"), {
         id: toastId,

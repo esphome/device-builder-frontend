@@ -95,6 +95,12 @@ describe("install-method-dialog USB row availability", () => {
     expect(link!.textContent).toContain("127.0.0.1:6052");
     // The row body still routes to the external flasher.
     expect(methodOnClick(dialog, row!)).toBe("web-flash");
+    // No duplicate "Plug into this computer": the localhost server-serial row
+    // is dropped once the USB row is actionable.
+    const serialRow = Array.from(
+      dialog.shadowRoot?.querySelectorAll(".option") ?? []
+    ).find((o) => o.querySelector('wa-icon[name="serial-port"]'));
+    expect(serialRow).toBeUndefined();
   });
 
   it("on an insecure origin with no loopback (HA-http) just uses the external flasher", async () => {

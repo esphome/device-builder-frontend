@@ -15,7 +15,6 @@ const localize: LocalizeFunc = ((key: string) => key) as LocalizeFunc;
 function deps() {
   const firmwareDialog = {
     installWebSerial: vi.fn(),
-    installWebDownload: vi.fn(),
     installBinaryDownload: vi.fn(),
   } as unknown as ESPHomeFirmwareInstallDialog;
   return { device, openInstall: vi.fn(), firmwareDialog, api, localize };
