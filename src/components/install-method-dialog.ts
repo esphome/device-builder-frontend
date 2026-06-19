@@ -172,26 +172,26 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // ESP-only. Non-ESP targets (RP2040 / RP2350, nrf52, libretiny) flash over
     // serial only via the backend (`esphome run` / server-serial).
     const isEsptool = this._isEsptoolPlatform;
-    // On localhost the USB row and server-serial both target the same machine's
-    // USB stack and share the "Plug into this computer" title, so show only one:
-    // whenever the USB row is actionable (in-app Web Serial or the external
-    // flasher), drop the redundant server-serial row. They only coexist on
-    // localhost when the USB row is the disabled/unsupported hint.
-    const showServerSerialRow = !(
-      env === "localhost" &&
-      isEsptool &&
-      availability !== "unsupported"
-    );
-    // On localhost a Web-Serial-incapable browser (e.g. Safari) gets the same
-    // "Plug into this computer" path from the server-serial row below, so drop
-    // the disabled USB row there to avoid a duplicate, non-actionable title.
+    const isLogs = this.mode === "logs";
+    // Drop the redundant server-serial row only when in-app Web Serial is
+    // actually available on localhost (same USB stack). Keep it on insecure
+    // origins as a fallback: there a Web-Serial-incapable browser (Safari) still
+    // needs a working serial path, and we can't detect that case client-side.
+    const showServerSerialRow = !(env === "localhost" && hasWebSerial && isEsptool);
+    // On localhost a Web-Serial-incapable browser gets the same "Plug into this
+    // computer" path from the server-serial row, so drop the disabled USB hint
+    // there to avoid a duplicate, non-actionable title.
     const dropDisabledUsb = env === "localhost" && availability === "unsupported";
+    // The external flasher only flashes (install). In logs mode the USB row is
+    // actionable solely via in-app Web Serial, so show it only when that's
+    // available; otherwise logs go through server-serial / OTA.
+    const showUsbRow = isEsptool && (isLogs ? hasWebSerial : !dropDisabledUsb);
     const serverSerialKeys = this._serverSerialCopyKeys(env);
 
     return html`
       <div class="list">
         ${this._renderOtaOption(isOnline)}
-        ${isEsptool && !dropDisabledUsb ? this._renderUsbOption(availability) : nothing}
+        ${showUsbRow ? this._renderUsbOption(availability) : nothing}
         ${showServerSerialRow
           ? html`<div class="option" @click=${this._onServerSerial}>
               <wa-icon library="mdi" name="serial-port"></wa-icon>

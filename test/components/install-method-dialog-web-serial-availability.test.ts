@@ -38,17 +38,25 @@ function setEnv(opts: { serial: boolean; secure: boolean; href: string }) {
   });
 }
 
-async function mount(): Promise<ESPHomeInstallMethodDialog> {
+async function mount(
+  mode: "install" | "logs" = "install"
+): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
   (dialog as any)._localize = defaultLocalize;
   (dialog as any)._api = {}; // detectEnvironment only needs serverInfo?.ha_addon
   dialog.deviceState = DeviceState.ONLINE;
+  dialog.mode = mode;
   // The USB row only applies to ESP (esptool) platforms.
   dialog.deviceTargetPlatform = "esp32";
   document.body.appendChild(dialog);
   await dialog.updateComplete;
   return dialog;
 }
+
+const serialRow = (d: ESPHomeInstallMethodDialog): Element | undefined =>
+  Array.from(d.shadowRoot?.querySelectorAll(".option") ?? []).find((o) =>
+    o.querySelector('wa-icon[name="serial-port"]')
+  );
 
 // Select by the usb icon, not the title: on localhost the server-serial row
 // shares the "Plug into this computer" title.
@@ -95,12 +103,10 @@ describe("install-method-dialog USB row availability", () => {
     expect(link!.textContent).toContain("127.0.0.1:6052");
     // The row body still routes to the external flasher.
     expect(methodOnClick(dialog, row!)).toBe("web-flash");
-    // No duplicate "Plug into this computer": the localhost server-serial row
-    // is dropped once the USB row is actionable.
-    const serialRow = Array.from(
-      dialog.shadowRoot?.querySelectorAll(".option") ?? []
-    ).find((o) => o.querySelector('wa-icon[name="serial-port"]'));
-    expect(serialRow).toBeUndefined();
+    // Keep the server-serial row as a fallback: on an insecure origin we can't
+    // tell a capable-but-blocked browser from one without Web Serial, so the
+    // backend serial path must stay available.
+    expect(serialRow(dialog)).not.toBeUndefined();
   });
 
   it("on an insecure origin with no loopback (HA-http) just uses the external flasher", async () => {
@@ -133,15 +139,30 @@ describe("install-method-dialog USB row availability", () => {
     expect(row!.textContent).toContain("Web Serial support");
   });
 
+  it("in logs mode hides the USB row on an insecure origin (no web-flash logs)", async () => {
+    // web-flash is install-only; logs over USB need in-app Web Serial, which an
+    // insecure origin can't do. The row must not render a no-op web-flash here.
+    setEnv({ serial: false, secure: false, href: "http://0.0.0.0:6052/" });
+    const dialog = await mount("logs");
+    expect(usbRow(dialog)).toBeNull();
+    // Logs still have a serial path via server-serial.
+    expect(serialRow(dialog)).not.toBeUndefined();
+  });
+
+  it("in logs mode with Web Serial shows the USB row routing to web-serial", async () => {
+    setEnv({ serial: true, secure: true, href: "https://example.com/" });
+    const dialog = await mount("logs");
+    const row = usbRow(dialog);
+    expect(row).not.toBeNull();
+    expect(methodOnClick(dialog, row!)).toBe("web-serial");
+  });
+
   it("drops the disabled USB row on localhost (server-serial covers it)", async () => {
     // 127.0.0.1 is a secure context; no navigator.serial => unsupported browser.
     setEnv({ serial: false, secure: true, href: "http://127.0.0.1:6052/" });
     const dialog = await mount();
     // No USB row: the server-serial row below carries the same actionable path.
     expect(usbRow(dialog)).toBeNull();
-    const serialRow = Array.from(
-      dialog.shadowRoot?.querySelectorAll(".option") ?? []
-    ).find((o) => o.querySelector('wa-icon[name="serial-port"]'));
-    expect(serialRow).not.toBeUndefined();
+    expect(serialRow(dialog)).not.toBeUndefined();
   });
 });

@@ -163,10 +163,13 @@ export async function flashViaUsb(
 
   try {
     let binaries = await api.firmwareGetBinaries(device.configuration);
+    if (finished) return; // abandoned (tab closed / watchdog) while awaiting
     if (binaries.length === 0) {
       toast.loading(localize("dashboard.flash_usb_compiling"), { id: toastId });
       await compileAndWait(api, device.configuration);
+      if (finished) return;
       binaries = await api.firmwareGetBinaries(device.configuration);
+      if (finished) return;
     }
     // Pick the self-contained image flashed from scratch at 0x0. ESP8266/8285
     // is the single firmware.bin; ESP32 is the merged factory image (its plain
@@ -185,9 +188,11 @@ export async function flashViaUsb(
     }
     toast.loading(localize("dashboard.flash_usb_downloading"), { id: toastId });
     const data = await api.firmwareDownloadBytes(device.configuration, factory.file);
+    if (finished) return; // abandoned while downloading; don't re-spin the toast
     firmware = { name: factory.file, data };
     handOff();
   } catch (err) {
+    if (finished) return; // don't overwrite the abandon/terminal error toast
     toast.error(getErrorMessage(err) || localize("dashboard.flash_usb_failed"), {
       id: toastId,
       richColors: true,
