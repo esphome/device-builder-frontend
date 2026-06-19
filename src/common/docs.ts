@@ -18,3 +18,5 @@ export const FLASHER_URL = "https://web.esphome.io/";
 // Derived so the postMessage targetOrigin / inbound-frame check can't drift
 // from FLASHER_URL when the target moves to web.esphome.io.
 export const FLASHER_ORIGIN = new URL(FLASHER_URL).origin;
+// The bare host (no scheme), for user-facing copy; same single source as above.
+export const FLASHER_HOST = new URL(FLASHER_URL).host;

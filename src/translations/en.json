@@ -152,7 +152,7 @@
     "install_method_usb_local": "Plug into this computer",
     "install_method_usb_local_desc": "For devices connected via USB to this computer",
     "install_method_usb_remote_desc": "Opens the USB flasher in a new tab to flash over USB",
-    "install_method_usb_remote_loopback": "Opens a flasher tab, or open at {link} to flash on this computer",
+    "install_method_usb_remote_loopback": "Opens a flasher tab. Or open the dashboard at {link} to flash directly from this computer.",
     "install_method_usb_local_unsupported": "Requires a browser with Web Serial support (e.g. Chrome, Edge, or Firefox 151+)",
     "install_method_usb_server": "Plug into computer running ESPHome Device Builder",
     "install_method_usb_server_desc": "For devices connected via USB to the server",

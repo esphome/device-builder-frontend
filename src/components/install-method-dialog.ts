@@ -305,7 +305,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     }
     const template = this._localize("dashboard.install_method_usb_remote_loopback");
     if (!template.includes("{link}")) {
-      return this._localize("dashboard.install_method_usb_remote_desc");
+      // A locale that hasn't added the {link} marker still shows its own copy.
+      return template;
     }
     const linkText = new URL(loopback).host; // e.g. 127.0.0.1:6052
     const [before, after = ""] = template.split("{link}");

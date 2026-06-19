@@ -98,19 +98,27 @@ export function openFlasher(
         );
       }
       handedOff = true;
-      win.postMessage(
-        {
-          type: MSG_FIRMWARE,
-          version: PROTOCOL_VERSION,
-          nonce,
-          name,
-          deviceName,
-          erase: true,
-          parts: [{ address: 0, data: bytes }],
-        },
-        FLASHER_ORIGIN,
-        [bytes]
-      );
+      try {
+        win.postMessage(
+          {
+            type: MSG_FIRMWARE,
+            version: PROTOCOL_VERSION,
+            nonce,
+            name,
+            deviceName,
+            erase: true,
+            parts: [{ address: 0, data: bytes }],
+          },
+          FLASHER_ORIGIN,
+          [bytes]
+        );
+      } catch (err) {
+        // postMessage can throw (e.g. DataCloneError); converge to a terminal
+        // state rather than leaving the dialog stuck flashing with timers armed.
+        console.error("Firmware hand-off failed:", err);
+        lost();
+        return;
+      }
       bytes = null; // transferred (detached)
       watchdog = setTimeout(lost, FLASH_WATCHDOG_MS);
       return;

@@ -58,8 +58,8 @@ const serialRow = (d: ESPHomeInstallMethodDialog): Element | undefined =>
     o.querySelector('wa-icon[name="serial-port"]')
   );
 
-// Select by the usb icon, not the title: on localhost the server-serial row
-// shares the "Plug into this computer" title.
+// Select by the usb icon, not the title or row order, so the selector isn't
+// coupled to localized copy.
 const usbRow = (d: ESPHomeInstallMethodDialog): Element | null =>
   Array.from(d.shadowRoot?.querySelectorAll(".option") ?? []).find((o) =>
     o.querySelector('wa-icon[name="usb"]')

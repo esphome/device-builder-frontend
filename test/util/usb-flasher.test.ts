@@ -96,7 +96,9 @@ describe("openFlasher", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
     const cb = makeCallbacks();
-    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    // Error is non-terminal (timers stay armed); tear down so the test doesn't
+    // leak the ready interval / watchdog into the worker.
+    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb)!;
     emit(fakeWin, { type: "esphome-web-flash:ready" });
     emit(fakeWin, {
       type: "esphome-web-flash:state",
@@ -104,6 +106,7 @@ describe("openFlasher", () => {
       detail: "boom",
     });
     expect(cb.states).toEqual([{ state: "error", detail: "boom" }]);
+    teardown();
   });
 
   it("keeps listening after an error so an in-tab retry still reports done", () => {
@@ -127,13 +130,14 @@ describe("openFlasher", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
     const cb = makeCallbacks();
-    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb)!;
     // A stray "done" before the firmware hand-off must not flip to success.
     emit(fakeWin, { type: "esphome-web-flash:state", state: "done" });
     emit(fakeWin, { type: "esphome-web-flash:progress", pct: 99 });
     expect(cb.states).toEqual([]);
     expect(cb.progress).toEqual([]);
     expect(fakeWin.postMessage).not.toHaveBeenCalled();
+    teardown(); // no terminal state reached; clear armed timers
   });
 
   it("fires onLost if the flasher never reports ready", () => {

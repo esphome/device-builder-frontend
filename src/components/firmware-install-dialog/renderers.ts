@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
-import { FLASHER_URL } from "../../common/docs.js";
+import { FLASHER_HOST } from "../../common/docs.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import type { ProcessTerminalState } from "../process-terminal/process-terminal.js";
@@ -114,9 +114,7 @@ function downloadReadyTitle(host: ESPHomeFirmwareInstallDialog): string {
 
 function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
   if (host._installer === "web-flash") {
-    return host._localize("firmware.usb_built_body", {
-      host: new URL(FLASHER_URL).host,
-    });
+    return host._localize("firmware.usb_built_body", { host: FLASHER_HOST });
   }
   const filename = host._downloadedFilename;
   if (host._installer === "binary-download") {

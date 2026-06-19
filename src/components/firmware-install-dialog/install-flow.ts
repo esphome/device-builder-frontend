@@ -490,7 +490,10 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     host._fail(host._localize("firmware.usb_popup_blocked"));
     return;
   }
-  host._usbFirmware = null; // ownership transferred to the flasher session
+  // The openFlasher session now holds the bytes (in its closure) and transfers
+  // them to the tab on the ready hand-off; drop the dialog's reference. A retry
+  // after a lost/never-ready tab recompiles, which is incremental and cheap.
+  host._usbFirmware = null;
   host._usbFlashTeardown = teardown;
 }
 
