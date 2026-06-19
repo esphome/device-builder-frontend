@@ -38,8 +38,9 @@ function openPort(
   } as unknown as SerialPort;
 }
 
-// A closed port whose open() always rejects. Defaults to a non-NetworkError
-// (the reopen bails fast); pass a NetworkError to exercise the retry window.
+// A closed port whose open() always rejects. Defaults to a non-NetworkError;
+// the reopen falls through to the next candidate either way, so pass a
+// NetworkError only when a test cares about the error kind.
 function deadPort(
   error: unknown = new DOMException("blocked", "SecurityError")
 ): SerialPort {
@@ -216,21 +217,28 @@ describe("attachSerialLogStream reopen", () => {
     }
   });
 
-  it("fails fast on a non-recoverable open error (no waiting out the window)", async () => {
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const restore = withGetPorts(async () => []);
+  it("falls through a non-NetworkError fresh handle to the cached port", async () => {
+    // A re-enumerated handle that fails non-NetworkError (e.g. SecurityError on
+    // a phantom UART bridge) must not abandon the cached fallback the loop
+    // exists to provide. Resolves on the first round, so no fake timers.
+    const cached = {
+      readable: null,
+      getInfo: () => ({ usbVendorId: 0x303a, usbProductId: 0x1001 }),
+      open: vi.fn().mockResolvedValue(undefined),
+      setSignals: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SerialPort;
+    const restore = withGetPorts(async () => [
+      deadPort(new DOMException("blocked", "SecurityError")),
+    ]);
     const dialog = stubDialog();
     try {
-      // SecurityError won't fix itself by waiting — bail without fake timers.
-      await attachSerialLogStream(deadPort(), dialog as never, defaultLocalize, 115200);
-      expect(dialog.setSerialOpenFailed).toHaveBeenCalledTimes(1);
-      expect(dialog.setSerialOpenFailed.mock.calls[0][0] as string).toContain(
-        "USB 303a:1001"
-      );
-      expect(toastError).toHaveBeenCalledTimes(1);
-      expect(errSpy).toHaveBeenCalled();
+      await attachSerialLogStream(cached, dialog as never, defaultLocalize, 115200);
+      expect(cached.open).toHaveBeenCalledWith({ baudRate: 115200 });
+      expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
+      expect(dialog.setSerialStream.mock.calls[0][0]).toBe(cached);
+      expect(dialog.setSerialOpenFailed).not.toHaveBeenCalled();
+      expect(toastError).not.toHaveBeenCalled();
     } finally {
-      errSpy.mockRestore();
       restore();
     }
   });
