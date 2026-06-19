@@ -7,18 +7,19 @@ import { FakeHost } from "../_fake-host.js";
    the handler reads. */
 function makeKey(
   key: string,
-  mods: { meta?: boolean; ctrl?: boolean; shift?: boolean } = {}
+  mods: { meta?: boolean; ctrl?: boolean; shift?: boolean; alt?: boolean } = {}
 ): Event {
   const e = new Event("keydown", { cancelable: true });
   Object.defineProperty(e, "key", { value: key });
   Object.defineProperty(e, "metaKey", { value: !!mods.meta });
   Object.defineProperty(e, "ctrlKey", { value: !!mods.ctrl });
   Object.defineProperty(e, "shiftKey", { value: !!mods.shift });
+  Object.defineProperty(e, "altKey", { value: !!mods.alt });
   return e;
 }
 
 describe("SaveShortcutController", () => {
-  it("invokes the callback on Cmd+S and Ctrl+S once connected, and preventDefaults", () => {
+  it("invokes the callback on Cmd+S and Ctrl+S once connected, and calls preventDefault", () => {
     const target = new EventTarget();
     const host = new FakeHost();
     const cb = vi.fn();
@@ -47,13 +48,15 @@ describe("SaveShortcutController", () => {
     expect(cb).not.toHaveBeenCalled();
   });
 
-  it("ignores Shift+Cmd+S, plain s, and other modified keys", () => {
+  it("ignores Shift/Alt-modified Cmd+S, plain s, and other modified keys", () => {
     const target = new EventTarget();
     const cb = vi.fn();
     const ctrl = new SaveShortcutController(new FakeHost(), cb, { target });
     ctrl.hostConnected();
 
     target.dispatchEvent(makeKey("s", { meta: true, shift: true }));
+    target.dispatchEvent(makeKey("s", { meta: true, alt: true }));
+    target.dispatchEvent(makeKey("s", { ctrl: true, alt: true }));
     target.dispatchEvent(makeKey("s"));
     target.dispatchEvent(makeKey("k", { meta: true }));
     expect(cb).not.toHaveBeenCalled();

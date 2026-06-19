@@ -43,7 +43,12 @@ export class SaveShortcutController implements ReactiveController {
      registration; the cast is local and callers get a real KeyboardEvent. */
   private _handler: EventListener = (e) => {
     const ke = e as KeyboardEvent;
-    if (!(ke.metaKey || ke.ctrlKey) || ke.shiftKey || ke.key.toLowerCase() !== "s") {
+    if (
+      !(ke.metaKey || ke.ctrlKey) ||
+      ke.altKey ||
+      ke.shiftKey ||
+      ke.key.toLowerCase() !== "s"
+    ) {
       return;
     }
     // Bail if a deeper handler already claimed this Cmd+S, so two co-active
