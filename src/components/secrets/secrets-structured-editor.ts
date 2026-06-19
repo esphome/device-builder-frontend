@@ -18,6 +18,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { navigate } from "../../util/navigation.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { secretHostSlug } from "../../util/secret-eligibility.js";
 import {
   addSecret,
   groupSecretsByDevice,
@@ -334,7 +335,12 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
   };
 
   private _addKey(): string {
-    return (this._addTarget ? `${this._addTarget}__` : "") + this._addName.trim();
+    // Slug the device prefix so a hyphenated name (`temp-sensor`) lands under
+    // the same `temp_sensor__` namespace the field picker uses, instead of a
+    // second hyphenated group.
+    const host = this._addTarget ? secretHostSlug(this._addTarget) : "";
+    const name = this._addName.trim();
+    return host ? `${host}__${name}` : name;
   }
 
   // Validate the dialog's name against the chosen target; null when valid.

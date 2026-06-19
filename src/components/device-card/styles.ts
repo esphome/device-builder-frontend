@@ -17,7 +17,12 @@ export const deviceCardStyles = [
     :host {
       display: block;
       outline: none;
-      height: 100%;
+      /* Intentionally no height: 100%. The .devices-grid already equalizes
+         card heights via align-items: stretch (its default) and the inner
+         .device-card fills this host, so a height here is redundant. It is
+         also fragile: a percentage height on a grid item resolves against the
+         track, which WebKit can compute as the viewport-tall grid box instead
+         of the auto content track, stretching the card to full-window height. */
     }
 
     .device-card {

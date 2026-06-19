@@ -38,6 +38,8 @@ describe("wizard-step-setup ENTER", () => {
     (el as any)._secretWifiSsid = "ssid";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._secretWifiPassword = "pw";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._secretHasWifiPasswordKey = true;
     await setName(el, "kitchen");
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
@@ -101,6 +103,36 @@ describe("wizard-step-setup ENTER", () => {
     expect((el as any)._stage).toBe("wifi");
   });
 
+  it("auto-skips the wifi stage for an open-network secret (ssid set, empty password)", async () => {
+    // The backend treats a wifi_password key (even empty) + non-empty ssid as
+    // defined and emits !secret. The wizard must agree: auto-skip the wifi
+    // stage so the skip button can't later produce a !secret config the user
+    // declined. Drive the real secrets parse via getConfig.
+    const el = new ESPHomeWizardStepSetup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._api = {
+      getConfig: vi.fn().mockResolvedValue('wifi_ssid: "home"\nwifi_password: ""\n'),
+    };
+    el.active = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await Promise.resolve();
+
+    await setName(el, "kitchen");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+
+    // Finished straight from the name stage — the wifi stage was skipped — and
+    // sends empty creds so the backend emits the !secret block.
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.wifiSsid).toBe("");
+    expect(detail.wifiPassword).toBe("");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._stage).toBe("name");
+  });
+
   it("does nothing on Enter with a blank name", async () => {
     const el = await mount();
     const onFinish = vi.fn();
@@ -148,6 +180,40 @@ describe("wizard-step-setup ENTER", () => {
     pressEnter(); // a distinct press (repeat=false) finishes
     expect(onFinish).toHaveBeenCalledTimes(1);
     expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("home");
+  });
+
+  it("finishes with empty credentials when the wifi stage is left blank", async () => {
+    const el = await mount();
+    await setName(el, "kitchen");
+    pressEnter(); // advance to wifi (no secret prefill)
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._stage).toBe("wifi");
+
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter(); // blank ssid is allowed now — finish with no credentials
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.wifiSsid).toBe("");
+    expect(detail.wifiPassword).toBe("");
+  });
+
+  it("the skip-wifi button finishes with empty credentials", async () => {
+    const el = await mount();
+    await setName(el, "kitchen");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".skip-wifi")!.click();
+
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.name).toBe("kitchen");
+    expect(detail.wifiSsid).toBe("");
+    expect(detail.wifiPassword).toBe("");
   });
 
   it("disables browser autofill on the name and wifi inputs", async () => {

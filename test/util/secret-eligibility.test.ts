@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isSecretEligible,
+  isSharedSecret,
   recommendedSecretKeys,
   secretValueFromYaml,
   visibleSecretKeys,
@@ -70,6 +71,39 @@ describe("recommendedSecretKeys", () => {
   it("recommends nothing for a non-concealed unknown field", () => {
     expect(recommendedSecretKeys("sensor", "name", "kitchen", false)).toEqual([]);
   });
+
+  it("scopes the nested AP credentials by path, not the shared wifi_* keys", () => {
+    // `wifi.ap.{ssid,password}` share their leaf with the STA `wifi.{ssid,password}`;
+    // the dotted path disambiguates so each AP field gets its own scoped key
+    // instead of pointing at the home-network secret.
+    expect(
+      recommendedSecretKeys("wifi", "password", "kitchen", true, ["ap", "password"])
+    ).toEqual(["kitchen__ap_password", "kitchen_ap_password"]);
+    expect(
+      recommendedSecretKeys("wifi", "ssid", "kitchen", false, ["ap", "ssid"])
+    ).toEqual(["kitchen__ap_ssid", "kitchen_ap_ssid"]);
+  });
+
+  it("still resolves the STA wifi ssid/password to the shared keys when path is passed", () => {
+    expect(
+      recommendedSecretKeys("wifi", "password", "kitchen", true, ["password"])
+    ).toEqual(["wifi_password"]);
+    expect(recommendedSecretKeys("wifi", "ssid", "kitchen", false, ["ssid"])).toEqual([
+      "wifi_ssid",
+    ]);
+  });
+
+  it("leaves api / web_server keys unchanged when their nested paths are passed", () => {
+    expect(
+      recommendedSecretKeys("api", "key", "kitchen", true, ["encryption", "key"])
+    ).toEqual(["kitchen__encryption_key", "kitchen_encryption_key"]);
+    expect(
+      recommendedSecretKeys("web_server", "password", "kitchen", true, [
+        "auth",
+        "password",
+      ])
+    ).toEqual(["kitchen__web_password", "kitchen_web_password"]);
+  });
 });
 
 describe("withoutForeignDeviceSecrets", () => {
@@ -102,6 +136,18 @@ describe("withoutForeignDeviceSecrets", () => {
     ).toEqual(["apollo_r_pro_1_eth_5938e0__encryption_key"]);
   });
 
+  it("filters a legacy hyphenated foreign key by slugging the stored prefix", () => {
+    // The key was stored before names converged (`porch-light__…`); it must
+    // still be recognized as another device's and dropped.
+    expect(
+      withoutForeignDeviceSecrets(
+        ["porch-light__encryption_key", "kitchen__ota_password"],
+        "kitchen",
+        ["kitchen", "porch-light"]
+      )
+    ).toEqual(["kitchen__ota_password"]);
+  });
+
   it("keeps everything when there are no other devices", () => {
     expect(withoutForeignDeviceSecrets(keys, "kitchen", ["kitchen"])).toEqual(keys);
   });
@@ -116,6 +162,29 @@ describe("withoutForeignDeviceSecrets", () => {
     expect(withoutForeignDeviceSecrets(["myapp__token"], "kitchen", devices)).toEqual([
       "myapp__token",
     ]);
+  });
+});
+
+describe("isSharedSecret", () => {
+  it("treats wifi_* and unscoped names as shared", () => {
+    expect(isSharedSecret("wifi_password", "kitchen")).toBe(true);
+    expect(isSharedSecret("some_token", "kitchen")).toBe(true);
+  });
+
+  it("treats this device's own scoped key as not shared", () => {
+    expect(isSharedSecret("kitchen__ota_password", "kitchen")).toBe(false);
+  });
+
+  it("recognizes a legacy hyphenated own-device key as not shared", () => {
+    expect(isSharedSecret("temp-sensor__ota_password", "temp-sensor")).toBe(false);
+  });
+
+  it("treats another device's scoped key as shared", () => {
+    expect(isSharedSecret("porch__encryption_key", "kitchen")).toBe(true);
+  });
+
+  it("is shared when the hostname is unresolved", () => {
+    expect(isSharedSecret("kitchen__ota_password", "")).toBe(true);
   });
 });
 
