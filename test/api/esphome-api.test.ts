@@ -449,6 +449,74 @@ describe("ESPHomeAPI — editFriendlyName", () => {
   });
 });
 
+describe("ESPHomeAPI — updateConfig", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``allow_wipe: true`` when allowWipe is set", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.updateConfig("secrets.yaml", "", { allowWipe: true });
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/update_config");
+    expect(sent.args).toEqual({
+      configuration: "secrets.yaml",
+      content: "",
+      allow_wipe: true,
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: null,
+    });
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("omits ``allow_wipe`` when opts is unset", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.updateConfig("kitchen.yaml", "esphome:\n  name: kitchen\n");
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      content: "esphome:\n  name: kitchen\n",
+    });
+    expect(sent.args).not.toHaveProperty("allow_wipe");
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: null,
+    });
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("omits ``allow_wipe`` when allowWipe is false", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.updateConfig("secrets.yaml", "wifi_ssid: home\n", {
+      allowWipe: false,
+    });
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+
+    expect(sent.args).not.toHaveProperty("allow_wipe");
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: null,
+    });
+    await expect(pending).resolves.toBeUndefined();
+  });
+});
+
 describe("ESPHomeAPI — streaming commands", () => {
   beforeEach(() => {
     installMockWebSocket();

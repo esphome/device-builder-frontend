@@ -942,9 +942,17 @@ export class ESPHomeAPI {
     return this.sendCommand<string>("devices/get_config", { configuration });
   }
 
-  /** Save device YAML config. */
-  async updateConfig(configuration: string, content: string): Promise<void> {
-    await this.sendCommand("devices/update_config", { configuration, content });
+  /** Save device YAML config. `allowWipe` confirms clearing secrets.yaml. */
+  async updateConfig(
+    configuration: string,
+    content: string,
+    opts?: { allowWipe?: boolean }
+  ): Promise<void> {
+    await this.sendCommand("devices/update_config", {
+      configuration,
+      content,
+      ...(opts?.allowWipe ? { allow_wipe: true } : {}),
+    });
   }
 
   /**

@@ -6,6 +6,7 @@ import toast from "sonner-js";
 import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -17,12 +18,14 @@ import {
 } from "../util/editor-layout.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { parseSecretsEntries } from "../util/secrets-entries.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { secretsStyles } from "./secrets.styles.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../components/confirm-dialog.js";
 import "../components/secrets/secrets-structured-editor.js";
 import "../components/unsaved-changes-dialog.js";
 import "../components/yaml-editor.js";
@@ -75,11 +78,19 @@ export class ESPHomePageSecrets extends LitElement {
   @query("esphome-unsaved-changes-dialog")
   private _unsavedDialog?: ESPHomeUnsavedChangesDialog;
 
+  @query("esphome-confirm-dialog")
+  private _wipeDialog?: ESPHomeConfirmDialog;
+
   private _unsavedGuard = new UnsavedGuard();
 
   // Set true once the leave guard has cleared a navigation, so the
   // synthetic popstate it triggers isn't re-intercepted.
   private _allowingLeave = false;
+
+  // Resolver for an in-flight wipe confirm, settled (as cancelled) on
+  // disconnect so the awaiting _save() can't hang if the page unmounts
+  // while the dialog is open.
+  private _settlePendingWipe: ((confirmed: boolean) => void) | null = null;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -132,6 +143,8 @@ export class ESPHomePageSecrets extends LitElement {
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
     this._unsavedGuard.cancelPending();
+    // A wipe confirm open at unmount resolves as cancelled, never dangling.
+    this._settlePendingWipe?.(false);
     window.removeEventListener(
       "secrets-saved",
       this._onExternalSecretsSaved as EventListener
@@ -276,9 +289,7 @@ export class ESPHomePageSecrets extends LitElement {
                 <button
                   type="button"
                   class="save-button"
-                  ?disabled=${this._saving ||
-                  this._yaml === this._savedYaml ||
-                  this._yaml.trim() === ""}
+                  ?disabled=${this._saving || this._yaml === this._savedYaml}
                   @click=${this._save}
                 >
                   <wa-icon library="mdi" name="content-save"></wa-icon>
@@ -314,6 +325,12 @@ export class ESPHomePageSecrets extends LitElement {
         @save=${this._onUnsavedSave}
         @cancel=${this._onUnsavedCancel}
       ></esphome-unsaved-changes-dialog>
+      <esphome-confirm-dialog
+        ?destructive=${true}
+        heading=${this._localize("secrets.wipe_title")}
+        message=${this._localize("secrets.wipe_message")}
+        confirm-label=${this._localize("secrets.wipe_confirm")}
+      ></esphome-confirm-dialog>
     `;
   }
 
@@ -327,9 +344,45 @@ export class ESPHomePageSecrets extends LitElement {
     this._yaml = e.detail.value;
   };
 
+  // Opens the destructive confirm dialog and resolves true only on the user's
+  // explicit click. A stray Enter can't confirm — the dialog skips Enter when
+  // destructive (see confirm-dialog's EnterController).
+  private _confirmWipe(): Promise<boolean> {
+    const dialog = this._wipeDialog;
+    if (!dialog) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      const settle = (confirmed: boolean) => {
+        dialog.removeEventListener("confirm", onConfirm);
+        dialog.removeEventListener("cancel", onCancel);
+        this._settlePendingWipe = null;
+        resolve(confirmed);
+      };
+      const onConfirm = () => settle(true);
+      const onCancel = () => settle(false);
+      this._settlePendingWipe = settle;
+      dialog.addEventListener("confirm", onConfirm);
+      dialog.addEventListener("cancel", onCancel);
+      dialog.open();
+    });
+  }
+
   // Returns whether the save succeeded (timeout counts as success), so the
   // leave guard can decide whether navigation may proceed.
   private async _save(): Promise<boolean> {
+    // Removing the last secret is destructive (device configs referencing
+    // those !secret values stop building), so confirm it. Only a real
+    // transition — had secrets, now none — is worth confirming; editing a
+    // secrets.yaml that was already entry-less (comments only) is not. Covers
+    // both the Save button and the navigate-away path, which share this method.
+    const clearingSecrets =
+      parseSecretsEntries(this._yaml).length === 0 &&
+      parseSecretsEntries(this._savedYaml).length > 0;
+    if (clearingSecrets && !(await this._confirmWipe())) {
+      return false;
+    }
+    // The backend refuses a truly blank secrets.yaml unless allow_wipe is set;
+    // a comment-only file saves without it. Match that exact gate.
+    const allowWipe = this._yaml.trim() === "";
     // Optimistic update: dirty-state UI flips back to "saved"
     // immediately so the Save button disables. Snapshot the
     // previous saved buffer first so a real (non-timeout)
@@ -351,7 +404,11 @@ export class ESPHomePageSecrets extends LitElement {
     // with the internal error_code.
     let errorDetail = "";
     try {
-      await this._api.updateConfig(SECRETS_FILE, this._yaml);
+      if (allowWipe) {
+        await this._api.updateConfig(SECRETS_FILE, this._yaml, { allowWipe: true });
+      } else {
+        await this._api.updateConfig(SECRETS_FILE, this._yaml);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       // A timeout likely still wrote the file, so keep the
