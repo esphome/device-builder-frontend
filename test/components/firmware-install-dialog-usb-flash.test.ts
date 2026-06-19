@@ -6,6 +6,7 @@ import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import {
   pickFactoryBinary,
+  showOtaLogs,
   startUsbFlash,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
 
@@ -84,6 +85,30 @@ describe("startUsbFlash", () => {
     await startUsbFlash(asHost(host));
     expect(host._step).toBe("error");
     expect(host._usbFirmware).toBeNull();
+  });
+});
+
+describe("showOtaLogs", () => {
+  it("requests post-install logs over OTA, not a serial port, and closes when claimed", () => {
+    const host = makeHost({ compileOk: true });
+    let captured: CustomEvent<{ port?: string; webSerialPort?: unknown }> | null = null;
+    const ext = host as unknown as {
+      _open: boolean;
+      reopen: () => void;
+      dispatchEvent: (ev: Event) => boolean;
+    };
+    ext._open = true;
+    ext.reopen = vi.fn();
+    ext.dispatchEvent = (ev: Event) => {
+      captured = ev as CustomEvent<{ port?: string; webSerialPort?: unknown }>;
+      ev.preventDefault(); // a logs-dialog host claimed the hand-off
+      return false;
+    };
+    showOtaLogs(asHost(host));
+    expect(captured!.type).toBe("request-show-logs-after-install");
+    expect(captured!.detail.port).toBe("OTA");
+    expect(captured!.detail.webSerialPort).toBeUndefined();
+    expect(ext._open).toBe(false);
   });
 });
 

@@ -359,6 +359,21 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
+  // Web-flash success: the device flashed in the external tab and is rebooting;
+  // offer its logs over OTA/native-API (the dashboard has no serial port).
+  if (host._installer === "web-flash" && host._step === "done") {
+    return html`
+      <div class="footer">
+        <button class="btn btn--ghost" @click=${host._close}>
+          ${host._localize("command.close")}
+        </button>
+        <button class="btn btn--primary" @click=${host._showUsbLogs}>
+          <wa-icon library="mdi" name="text-box-outline"></wa-icon>
+          ${host._localize("command.show_logs")}
+        </button>
+      </div>
+    `;
+  }
   // Web Serial install success — surface "Logs" so users can flip back after
   // they've clicked logs-dialog's "Back to install". _detected survives
   // _onClose but not _close, so the button only renders while the SerialPort

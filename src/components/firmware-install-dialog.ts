@@ -23,6 +23,7 @@ import {
   downloadSelectedBinary,
   flipToLogs,
   handOffToFlasher,
+  showOtaLogs,
   startArtifactDownload,
   startDownload,
   startUsbFlash,
@@ -340,6 +341,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _showLogsAgain = () => {
     if (this._detected) flipToLogs(this, this._detected.port);
   };
+
+  // Web-flash success: the flash happened in the external tab, so view the
+  // rebooted device's logs over OTA/native-API rather than a local port.
+  _showUsbLogs = () => showOtaLogs(this);
 
   // Re-run the Web Serial install after a flash failure: a full reset (_init) +
   // fresh connect/flash, so a transient serial error (noise, dropped port) can

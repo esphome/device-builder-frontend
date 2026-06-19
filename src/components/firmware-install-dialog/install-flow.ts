@@ -18,6 +18,7 @@ import {
   type DetectedChip,
 } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
+import { OTA_PORT } from "../logs-session.js";
 
 // Dashboard mode pins escaped form (\033[…m); raw branch is defensive.
 const ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
@@ -234,6 +235,20 @@ export function flipToLogs(
     webSerialPort,
     // Raw baud; the logs handler resolves it (0 ⇒ disabled, skip with a notice).
     loggerBaudRate: device.logger_baud_rate,
+    reopenInstall: () => host.reopen(),
+  });
+  if (handled) host._open = false;
+}
+
+// Web-flash logs go over OTA/native-API: the serial port lived in the external
+// flasher tab, so there's nothing local to read.
+export function showOtaLogs(host: ESPHomeFirmwareInstallDialog): void {
+  const device = host._device;
+  if (!device) return;
+  const handled = dispatchShowLogsAfterInstall(host, {
+    configuration: device.configuration,
+    name: device.friendly_name || device.name,
+    port: OTA_PORT,
     reopenInstall: () => host.reopen(),
   });
   if (handled) host._open = false;
