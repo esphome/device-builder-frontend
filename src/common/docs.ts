@@ -9,4 +9,6 @@ export const ESPHOME_DOCS_BASE = "https://esphome.io";
  * postMessage targetOrigin and for validating inbound frames.
  */
 export const FLASHER_URL = "https://esphome.github.io/device-builder/";
-export const FLASHER_ORIGIN = "https://esphome.github.io";
+// Derived so the postMessage targetOrigin / inbound-frame check can't drift
+// from FLASHER_URL when the target moves to web.esphome.io.
+export const FLASHER_ORIGIN = new URL(FLASHER_URL).origin;
