@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, type PropertyValues } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
@@ -65,8 +65,13 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _canAdvance(): boolean {
     if (this._stage === "name") return !!this._deviceName.trim();
-    // Wi-Fi is optional: a blank SSID + blank password finishes with no
-    // credentials (no-network / open). But a password with no SSID isn't a
+    // Wi-Fi-only board: Wi-Fi is the only network a generated config can use,
+    // so an SSID is mandatory (a no-network config wouldn't validate).
+    if (this.board?.requires_wifi) {
+      return !!this._wifiSsid.trim() && !isWifiPasswordTooShort(this._wifiPassword);
+    }
+    // Otherwise Wi-Fi is optional: a blank SSID + blank password finishes with
+    // no credentials (no-network / open). But a password with no SSID isn't a
     // usable pair, and a too-short WPA passphrase is invalid — block both.
     if (this._wifiPassword && !this._wifiSsid.trim()) return false;
     return !isWifiPasswordTooShort(this._wifiPassword);
@@ -330,12 +335,15 @@ export class ESPHomeWizardStepSetup extends LitElement {
   }
 
   private _renderWifiSection() {
+    const required = Boolean(this.board?.requires_wifi);
     return html`
       <section class="section">
         <div>
           <h3 class="section-title">${this._localize("wizard.wifi_configuration")}</h3>
           <p class="section-subtitle">
-            ${this._localize("wizard.wifi_configuration_desc")}
+            ${this._localize(
+              required ? "wizard.wifi_required_desc" : "wizard.wifi_configuration_desc"
+            )}
           </p>
         </div>
 
@@ -351,10 +359,11 @@ export class ESPHomeWizardStepSetup extends LitElement {
             this._wifiPassword = v;
           },
         })}
-
-        <button class="skip-wifi" type="button" @click=${this._onSkipWifi}>
-          ${this._localize("wizard.wifi_skip")}
-        </button>
+        ${required
+          ? nothing
+          : html`<button class="skip-wifi" type="button" @click=${this._onSkipWifi}>
+              ${this._localize("wizard.wifi_skip")}
+            </button>`}
       </section>
     `;
   }

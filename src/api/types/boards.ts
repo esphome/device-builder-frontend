@@ -114,6 +114,11 @@ export interface BoardCatalogEntry {
    * later), so the create wizard skips the Wi-Fi step.
    */
   provides_network?: boolean;
+  /**
+   * Derived (full body only): Wi-Fi is the board's only built-in network, so a
+   * generated config needs it — the wizard makes Wi-Fi mandatory (no skip).
+   */
+  requires_wifi?: boolean;
 }
 
 export interface PagedBoardsResponse extends PagedResponse {

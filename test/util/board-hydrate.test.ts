@@ -199,6 +199,7 @@ describe("hydrateBoard", () => {
       featured_components: [],
       featured_bundles: [],
       provides_network: false,
+      requires_wifi: false,
     };
     expect(hydrateBoard(entry)).toEqual(entry);
   });

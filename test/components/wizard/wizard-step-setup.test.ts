@@ -191,6 +191,33 @@ describe("wizard-step-setup", () => {
     expect((onFinish.mock.calls[0][0] as CustomEvent).detail.skipWifi).toBe(false);
   });
 
+  it("requires an SSID and hides skip for a Wi-Fi-only board", async () => {
+    const el = await mount();
+    el.board = {
+      id: "apollo-esk-1",
+      name: "Apollo",
+      tags: [],
+      images: [],
+      requires_wifi: true,
+    } as unknown as BoardCatalogEntry;
+    await el.updateComplete;
+    await setName(el, "kitchen");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._stage).toBe("wifi");
+    // The "I don't use Wi-Fi" skip is not offered.
+    expect(el.shadowRoot!.querySelector(".skip-wifi")).toBeNull();
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter(); // blank SSID → can't finish
+    expect(onFinish).not.toHaveBeenCalled();
+    await setSsid(el, "myssid");
+    pressEnter(); // SSID entered → finishes
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("myssid");
+  });
+
   it("does nothing on Enter with a blank name", async () => {
     const el = await mount();
     const onFinish = vi.fn();

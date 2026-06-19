@@ -40,6 +40,7 @@ export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
     featured_components: (entry.featured_components ?? []).map(_hydrateFeaturedComponent),
     featured_bundles: (entry.featured_bundles ?? []).map(_hydrateFeaturedBundle),
     provides_network: entry.provides_network ?? false,
+    requires_wifi: entry.requires_wifi ?? false,
   };
 }
 
