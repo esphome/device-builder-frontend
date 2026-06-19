@@ -1,9 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the create wizard's setup step: it collects Wi-Fi only when it's needed
- * (no shared secret yet, board has no own network), passes typed credentials
- * straight through for the backend to persist, and offers an explicit skip.
+ * Pins the create wizard's setup step: it collects Wi-Fi only for a board that
+ * needs it (native Wi-Fi, no onboard network, no shared secret yet) and makes
+ * the SSID mandatory there; every other board finishes straight from the name
+ * stage. Typed credentials pass through for the backend to persist.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
@@ -21,11 +22,30 @@ beforeEach(() => {
   vi.mocked(fetchSecretKeys).mockResolvedValue([]);
 });
 
-async function mount(secretKeys: string[] = []): Promise<ESPHomeWizardStepSetup> {
+function board(flags: Partial<BoardCatalogEntry>): BoardCatalogEntry {
+  return {
+    id: "b",
+    name: "Board",
+    tags: [],
+    images: [],
+    ...flags,
+  } as unknown as BoardCatalogEntry;
+}
+
+// A Wi-Fi-only board (native Wi-Fi, no onboard network) → wizard collects Wi-Fi.
+const wifiBoard = () => board({ requires_wifi: true });
+// A board that brings its own network (Ethernet/Thread) → Wi-Fi step skipped.
+const networkedBoard = () => board({ provides_network: true });
+
+async function mount(
+  boardEntry: BoardCatalogEntry,
+  secretKeys: string[] = []
+): Promise<ESPHomeWizardStepSetup> {
   vi.mocked(fetchSecretKeys).mockResolvedValue(secretKeys);
   const el = new ESPHomeWizardStepSetup();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (el as any)._api = {};
+  el.board = boardEntry;
   el.active = true; // the parent dialog is open
   document.body.appendChild(el);
   await el.updateComplete;
@@ -50,97 +70,53 @@ function setSsid(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
   return el.updateComplete;
 }
 
-function networkedBoard(): BoardCatalogEntry {
-  // Minimal board the render path touches, flagged as bringing its own network.
-  return {
-    id: "wt32-eth01",
-    name: "WT32-ETH01",
-    tags: [],
-    images: [],
-    provides_network: true,
-  } as unknown as BoardCatalogEntry;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const stage = (el: ESPHomeWizardStepSetup) => (el as any)._stage;
 
 describe("wizard-step-setup", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
 
-  it("advances to the wifi stage on Enter when there's no shared secret", async () => {
-    const el = await mount();
+  it("advances to the Wi-Fi stage for a Wi-Fi-only board with no secret", async () => {
+    const el = await mount(wifiBoard());
     await setName(el, "kitchen");
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
     pressEnter();
     expect(onFinish).not.toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._stage).toBe("wifi");
+    expect(stage(el)).toBe("wifi");
   });
 
-  it("skips the wifi stage and finishes when the board brings its own network", async () => {
-    const el = await mount();
-    el.board = networkedBoard();
+  it("never shows a skip link on the Wi-Fi stage", async () => {
+    const el = await mount(wifiBoard());
+    await setName(el, "kitchen");
+    pressEnter();
     await el.updateComplete;
-    await setName(el, "kitchen");
-    const onFinish = vi.fn();
-    el.addEventListener("finish-setup", onFinish as EventListener);
-    pressEnter();
-    expect(onFinish).toHaveBeenCalledTimes(1);
-    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._stage).toBe("name");
-    expect(detail.wifiSsid).toBe("");
-    expect(detail.skipWifi).toBe(false);
+    expect(stage(el)).toBe("wifi");
+    expect(el.shadowRoot!.querySelector(".skip-wifi")).toBeNull();
   });
 
-  it("skips the wifi stage when secrets already define Wi-Fi", async () => {
-    const el = await mount(["wifi_ssid", "wifi_password"]);
-    await setName(el, "kitchen");
-    const onFinish = vi.fn();
-    el.addEventListener("finish-setup", onFinish as EventListener);
-    pressEnter();
-    expect(onFinish).toHaveBeenCalledTimes(1);
-    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
-    // Empty creds → backend reuses the existing !secret block; not a decline.
-    expect(detail.wifiSsid).toBe("");
-    expect(detail.wifiPassword).toBe("");
-    expect(detail.skipWifi).toBe(false);
-  });
-
-  it("passes a typed SSID through unchanged for the backend to persist", async () => {
-    const el = await mount();
-    await setName(el, "kitchen");
-    pressEnter(); // advance to wifi
-    await el.updateComplete;
-    await setSsid(el, "typed-network");
-    const onFinish = vi.fn();
-    el.addEventListener("finish-setup", onFinish as EventListener);
-    pressEnter();
-    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
-    expect(detail.wifiSsid).toBe("typed-network");
-    expect(detail.skipWifi).toBe(false);
-  });
-
-  it("finishes with empty credentials when the wifi stage is left blank", async () => {
-    const el = await mount();
+  it("requires an SSID to finish a Wi-Fi-only board", async () => {
+    const el = await mount(wifiBoard());
     await setName(el, "kitchen");
     pressEnter(); // advance to wifi
     await el.updateComplete;
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
-    pressEnter();
+    pressEnter(); // blank SSID → blocked
+    expect(onFinish).not.toHaveBeenCalled();
+    await setSsid(el, "myssid");
+    pressEnter(); // SSID entered → finishes
     expect(onFinish).toHaveBeenCalledTimes(1);
-    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
-    expect(detail.wifiSsid).toBe("");
-    expect(detail.skipWifi).toBe(false);
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("myssid");
   });
 
-  it("does not finish the wifi stage with a password but blank SSID", async () => {
-    const el = await mount();
+  it("does not finish with a password but a blank SSID", async () => {
+    const el = await mount(wifiBoard());
     await setName(el, "kitchen");
-    pressEnter(); // advance to wifi
+    pressEnter();
     await el.updateComplete;
-    // password set, ssid blank → not a usable pair
     const pw = el.shadowRoot!.querySelector("esphome-password-input")!;
     pw.dispatchEvent(
       new CustomEvent("password-input-change", {
@@ -154,109 +130,95 @@ describe("wizard-step-setup", () => {
     el.addEventListener("finish-setup", onFinish as EventListener);
     pressEnter();
     expect(onFinish).not.toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._stage).toBe("wifi");
+    expect(stage(el)).toBe("wifi");
   });
 
-  it("the skip-wifi button finishes with skipWifi true and no credentials", async () => {
-    const el = await mount();
+  it("skips the Wi-Fi stage and finishes for a board that brings its own network", async () => {
+    const el = await mount(networkedBoard());
     await setName(el, "kitchen");
-    pressEnter(); // advance to wifi
-    await el.updateComplete;
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".skip-wifi")!.click();
+    pressEnter();
     expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(stage(el)).toBe("name");
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("");
+  });
+
+  it("skips the Wi-Fi stage when secrets already define Wi-Fi", async () => {
+    const el = await mount(wifiBoard(), ["wifi_ssid", "wifi_password"]);
+    await setName(el, "kitchen");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    // Empty creds → backend reuses the existing !secret block.
     const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
-    expect(detail.name).toBe("kitchen");
     expect(detail.wifiSsid).toBe("");
     expect(detail.wifiPassword).toBe("");
-    expect(detail.skipWifi).toBe(true);
   });
 
-  it("skip on a board that turned out to bring its own network sends skipWifi false", async () => {
-    // Race: the slim board (provides_network undefined) lands on the Wi-Fi
-    // stage, then the full body resolves provides_network=true. Skip must mean
-    // "use the board's network", not force a no-network config.
-    const el = await mount();
+  it("skips the Wi-Fi stage for a board with no native Wi-Fi and no onboard network", async () => {
+    // Neither flag set (e.g. a Thread/P4 board): nothing to ask — finish to a
+    // no-network stub straight from the name stage.
+    const el = await mount(board({}));
     await setName(el, "kitchen");
-    pressEnter(); // advance to wifi while still slim
-    await el.updateComplete;
-    el.board = networkedBoard(); // full body resolves
-    await el.updateComplete;
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
-    el.shadowRoot!.querySelector<HTMLButtonElement>(".skip-wifi")!.click();
+    pressEnter();
     expect(onFinish).toHaveBeenCalledTimes(1);
-    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.skipWifi).toBe(false);
+    expect(stage(el)).toBe("name");
   });
 
-  it("requires an SSID and hides skip for a Wi-Fi-only board", async () => {
-    const el = await mount();
-    el.board = {
-      id: "apollo-esk-1",
-      name: "Apollo",
-      tags: [],
-      images: [],
-      requires_wifi: true,
-    } as unknown as BoardCatalogEntry;
-    await el.updateComplete;
+  it("passes a typed SSID through unchanged for the backend to persist", async () => {
+    const el = await mount(wifiBoard());
     await setName(el, "kitchen");
-    pressEnter(); // advance to wifi
+    pressEnter();
     await el.updateComplete;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._stage).toBe("wifi");
-    // The "I don't use Wi-Fi" skip is not offered.
-    expect(el.shadowRoot!.querySelector(".skip-wifi")).toBeNull();
+    await setSsid(el, "typed-network");
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
-    pressEnter(); // blank SSID → can't finish
-    expect(onFinish).not.toHaveBeenCalled();
-    await setSsid(el, "myssid");
-    pressEnter(); // SSID entered → finishes
-    expect(onFinish).toHaveBeenCalledTimes(1);
-    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("myssid");
+    pressEnter();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe(
+      "typed-network"
+    );
   });
 
   it("does nothing on Enter with a blank name", async () => {
-    const el = await mount();
+    const el = await mount(wifiBoard());
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
     pressEnter();
     expect(onFinish).not.toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._stage).toBe("name");
+    expect(stage(el)).toBe("name");
   });
 
-  it("a held Enter does not skip past the wifi stage (no auto-finish on key-repeat)", async () => {
-    const el = await mount();
+  it("a held Enter does not skip past the Wi-Fi stage (no auto-finish on key-repeat)", async () => {
+    const el = await mount(wifiBoard());
     await setName(el, "kitchen");
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
     pressEnter(); // first keydown advances to wifi
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._stage).toBe("wifi");
+    expect(stage(el)).toBe("wifi");
     pressEnter({ repeat: true }); // same held key auto-repeats; ignored
     expect(onFinish).not.toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._stage).toBe("wifi");
+    expect(stage(el)).toBe("wifi");
   });
 
-  it("a fresh Enter on the wifi stage finishes", async () => {
-    const el = await mount();
+  it("a fresh Enter on the Wi-Fi stage finishes once an SSID is set", async () => {
+    const el = await mount(wifiBoard());
     await setName(el, "kitchen");
     pressEnter(); // advance to wifi
     await el.updateComplete;
     await setSsid(el, "home");
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
-    pressEnter(); // a distinct press (repeat=false) finishes
+    pressEnter();
     expect(onFinish).toHaveBeenCalledTimes(1);
     expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("home");
   });
 
   it("disables browser autofill on the name input", async () => {
-    const el = await mount();
+    const el = await mount(wifiBoard());
     const deviceName = el.shadowRoot!.querySelector<HTMLInputElement>("#device-name");
     expect(deviceName?.getAttribute("autocomplete")).toBe("off");
   });

@@ -467,10 +467,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       name: string;
       wifiSsid: string;
       wifiPassword: string;
-      skipWifi: boolean;
     }>
   ) {
-    const { board, name, wifiSsid, wifiPassword, skipWifi } = e.detail;
+    const { board, name, wifiSsid, wifiPassword } = e.detail;
     if (!board) return;
     await this._runCreate(
       {
@@ -481,10 +480,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         board_id: board.id,
         config_type: "basic",
         // Typed credentials are persisted to secrets.yaml by the backend and
-        // referenced via !secret; skip_wifi forces a no-network config.
+        // referenced via !secret — never inlined.
         ssid: wifiSsid,
         psk: wifiPassword,
-        skip_wifi: skipWifi,
       },
       { board }
     );
@@ -511,7 +509,6 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       ssid?: string;
       psk?: string;
       file_content?: string;
-      skip_wifi?: boolean;
     },
     options: { board?: BoardCatalogEntry | null } = {}
   ): Promise<void> {

@@ -768,7 +768,6 @@ export class ESPHomeAPI {
     psk?: string;
     file_content?: string;
     overwrite?: boolean;
-    skip_wifi?: boolean;
   }): Promise<WizardResponse> {
     return this.sendCommand<WizardResponse>("devices/create", args);
   }
