@@ -175,12 +175,16 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // On localhost in-app Web Serial and server-serial hit the same USB stack,
     // so drop the redundant server-serial row when Web Serial is in-app there.
     const showServerSerialRow = !(env === "localhost" && hasWebSerial && isEsptool);
+    // On localhost a Web-Serial-incapable browser (e.g. Safari) gets the same
+    // "Plug into this computer" path from the server-serial row below, so drop
+    // the disabled USB row there to avoid a duplicate, non-actionable title.
+    const dropDisabledUsb = env === "localhost" && availability === "unsupported";
     const serverSerialKeys = this._serverSerialCopyKeys(env);
 
     return html`
       <div class="list">
         ${this._renderOtaOption(isOnline)}
-        ${isEsptool ? this._renderUsbOption(availability) : nothing}
+        ${isEsptool && !dropDisabledUsb ? this._renderUsbOption(availability) : nothing}
         ${showServerSerialRow
           ? html`<div class="option" @click=${this._onServerSerial}>
               <wa-icon library="mdi" name="serial-port"></wa-icon>

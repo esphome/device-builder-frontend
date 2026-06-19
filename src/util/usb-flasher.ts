@@ -99,7 +99,9 @@ export async function flashViaUsb(
   let handedOff = false;
 
   const handOff = () => {
-    if (handedOff || !ready || !firmware) return;
+    // Don't post to a tab we've already stopped watching (abandon/timeout): the
+    // watchdog spans compile+flash, so a slow compile could resolve after it.
+    if (finished || handedOff || !ready || !firmware) return;
     handedOff = true;
     win.postMessage(
       {

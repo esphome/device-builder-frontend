@@ -50,9 +50,11 @@ async function mount(): Promise<ESPHomeInstallMethodDialog> {
   return dialog;
 }
 
+// Select by the usb icon, not the title: on localhost the server-serial row
+// shares the "Plug into this computer" title.
 const usbRow = (d: ESPHomeInstallMethodDialog): Element | null =>
   Array.from(d.shadowRoot?.querySelectorAll(".option") ?? []).find((o) =>
-    o.querySelector(".title")?.textContent?.includes("Plug into this computer")
+    o.querySelector('wa-icon[name="usb"]')
   ) ?? null;
 
 function methodOnClick(d: ESPHomeInstallMethodDialog, el: Element): string | null {
@@ -123,5 +125,17 @@ describe("install-method-dialog USB row availability", () => {
     // Disabled rows don't dispatch a method.
     expect(methodOnClick(dialog, row!)).toBeNull();
     expect(row!.textContent).toContain("Web Serial support");
+  });
+
+  it("drops the disabled USB row on localhost (server-serial covers it)", async () => {
+    // 127.0.0.1 is a secure context; no navigator.serial => unsupported browser.
+    setEnv({ serial: false, secure: true, href: "http://127.0.0.1:6052/" });
+    const dialog = await mount();
+    // No USB row: the server-serial row below carries the same actionable path.
+    expect(usbRow(dialog)).toBeNull();
+    const serialRow = Array.from(
+      dialog.shadowRoot?.querySelectorAll(".option") ?? []
+    ).find((o) => o.querySelector('wa-icon[name="serial-port"]'));
+    expect(serialRow).not.toBeUndefined();
   });
 });
