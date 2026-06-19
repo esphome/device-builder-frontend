@@ -2,7 +2,6 @@ import { type ReactiveController, type ReactiveControllerHost } from "lit";
 import type { ESPHomeAPI } from "../../api/index.js";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { flashViaUsb } from "../../util/usb-flasher.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -73,7 +72,8 @@ export class DeviceInstallController implements ReactiveController {
       device,
       firmwareDialog: this._host.firmwareDialog,
       openInstall: (p) => this._openCommand(device, "install", p),
-      openRemoteFlash: (d) => flashViaUsb(this._host.api, this._host.localize, d),
+      api: this._host.api,
+      localize: this._host.localize,
     });
   };
 

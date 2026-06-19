@@ -164,8 +164,6 @@
     "flash_usb_failed": "Could not prepare the firmware for USB flashing",
     "flash_usb_done": "Device flashed over USB",
     "install_method_usb_local_unsupported": "Requires a browser with Web Serial support (e.g. Chrome, Edge, or Firefox 151+)",
-    "install_method_usb_local_insecure": "Web Serial needs a secure origin (https or localhost)",
-    "install_method_usb_local_insecure_link": "Web Serial needs a secure origin; open the dashboard at {link}",
     "install_method_usb_server": "Plug into computer running ESPHome Device Builder",
     "install_method_usb_server_desc": "For devices connected via USB to the server",
     "install_method_usb_server_localhost": "Plug into this computer",

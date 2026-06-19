@@ -14,23 +14,24 @@ const MSG_FIRMWARE = "esphome-web-flash:firmware";
 const MSG_STATE = "esphome-web-flash:state";
 const MSG_PROGRESS = "esphome-web-flash:progress";
 
+// Stop listening to the flasher tab after this much silence, so a tab that's
+// closed / crashed / navigated away mid-flash (no terminal state) can't leave
+// the message listener and its captured firmware buffer alive for the page.
+const FLASH_WATCHDOG_MS = 15 * 60 * 1000;
+
 // Compile and resolve when the job completes; reject with the backend error text.
-function compileAndWait(api: ESPHomeAPI, configuration: string): Promise<void> {
+// The follow-job stream auto-detaches on the terminal result (see ESPHomeAPI).
+async function compileAndWait(api: ESPHomeAPI, configuration: string): Promise<void> {
+  const job = await api.firmwareCompile(configuration);
   return new Promise((resolve, reject) => {
-    api
-      .firmwareCompile(configuration)
-      .then((job) => {
-        api.firmwareFollowJob(job.job_id, {
-          onOutput: () => {},
-          onResult: (data) => {
-            const result = data as unknown as { status: string; error?: string | null };
-            if (result.status === JobStatus.COMPLETED) resolve();
-            else reject(new Error(result.error || ""));
-          },
-          onError: (error) => reject(new Error(error)),
-        });
-      })
-      .catch(reject);
+    api.firmwareFollowJob(job.job_id, {
+      onResult: (data) => {
+        const result = data as unknown as { status: string; error?: string | null };
+        if (result.status === JobStatus.COMPLETED) resolve();
+        else reject(new Error(result.error || ""));
+      },
+      onError: (error) => reject(new Error(error)),
+    });
   });
 }
 
@@ -47,10 +48,8 @@ export async function flashViaUsb(
   localize: LocalizeFunc,
   device: ConfiguredDevice
 ): Promise<void> {
-  const t = (key: string, args?: Record<string, string | number>) => localize(key, args);
-
   if (!isEsptoolPlatform(device.target_platform)) {
-    toast.error(t("dashboard.flash_usb_unsupported"), { richColors: true });
+    toast.error(localize("dashboard.flash_usb_unsupported"), { richColors: true });
     return;
   }
 
@@ -62,18 +61,28 @@ export async function flashViaUsb(
   )}&origin=${encodeURIComponent(location.origin)}`;
   const win = window.open(url, "_blank");
   if (!win) {
-    toast.error(t("dashboard.flash_usb_popup_blocked"), { richColors: true });
+    toast.error(localize("dashboard.flash_usb_popup_blocked"), { richColors: true });
     return;
   }
 
   const toastId = `flash-usb-${nonce}`;
-  toast.loading(t("dashboard.flash_usb_preparing"), { id: toastId });
+  toast.loading(localize("dashboard.flash_usb_preparing"), { id: toastId });
+
+  // Single teardown path: aborting the controller removes the message listener,
+  // and the watchdog bounds its lifetime if no terminal state ever arrives.
+  const controller = new AbortController();
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    controller.abort();
+    if (watchdog !== undefined) clearTimeout(watchdog);
+  };
 
   let ready = false;
   let firmware: { name: string; data: ArrayBuffer } | null = null;
   let handedOff = false;
-
-  const cleanup = () => window.removeEventListener("message", onMessage);
 
   const handOff = () => {
     if (handedOff || !ready || !firmware) return;
@@ -89,11 +98,13 @@ export async function flashViaUsb(
       FLASHER_ORIGIN,
       [firmware.data]
     );
-    toast.loading(t("dashboard.flash_usb_handoff"), { id: toastId });
+    // Bytes are transferred (detached); drop the reference so the listener
+    // closure that lives on for state/progress doesn't pin the wrapper.
+    firmware = null;
+    toast.loading(localize("dashboard.flash_usb_handoff"), { id: toastId });
   };
 
-  // Function declaration (hoisted) so cleanup() can reference it above.
-  function onMessage(ev: MessageEvent) {
+  const onMessage = (ev: MessageEvent) => {
     if (ev.origin !== FLASHER_ORIGIN || ev.source !== win) return;
     const data = ev.data as {
       type?: string;
@@ -106,31 +117,35 @@ export async function flashViaUsb(
       ready = true;
       handOff();
     } else if (data.type === MSG_PROGRESS) {
-      toast.loading(t("dashboard.flash_usb_flashing", { pct: data.pct ?? 0 }), {
+      toast.loading(localize("dashboard.flash_usb_flashing", { pct: data.pct ?? 0 }), {
         id: toastId,
       });
     } else if (data.type === MSG_STATE) {
       if (data.state === "done") {
-        toast.success(t("dashboard.flash_usb_done"), { id: toastId, richColors: true });
-        cleanup();
-      } else if (data.state === "error") {
-        toast.error(data.detail || t("dashboard.flash_usb_failed"), {
+        toast.success(localize("dashboard.flash_usb_done"), {
           id: toastId,
           richColors: true,
         });
-        cleanup();
+        finish();
+      } else if (data.state === "error") {
+        toast.error(data.detail || localize("dashboard.flash_usb_failed"), {
+          id: toastId,
+          richColors: true,
+        });
+        finish();
       } else if (data.detail) {
         toast.loading(data.detail, { id: toastId });
       }
     }
-  }
+  };
 
-  window.addEventListener("message", onMessage);
+  window.addEventListener("message", onMessage, { signal: controller.signal });
+  watchdog = setTimeout(finish, FLASH_WATCHDOG_MS);
 
   try {
     let binaries = await api.firmwareGetBinaries(device.configuration);
     if (binaries.length === 0) {
-      toast.loading(t("dashboard.flash_usb_compiling"), { id: toastId });
+      toast.loading(localize("dashboard.flash_usb_compiling"), { id: toastId });
       await compileAndWait(api, device.configuration);
       binaries = await api.firmwareGetBinaries(device.configuration);
     }
@@ -139,22 +154,22 @@ export async function flashViaUsb(
       binaries.find((b) => b.file === "firmware.bin") ??
       binaries.find((b) => b.file.includes("factory"));
     if (!factory) {
-      toast.error(t("dashboard.flash_usb_no_binary"), {
+      toast.error(localize("dashboard.flash_usb_no_binary"), {
         id: toastId,
         richColors: true,
       });
-      cleanup();
+      finish();
       return;
     }
-    toast.loading(t("dashboard.flash_usb_downloading"), { id: toastId });
+    toast.loading(localize("dashboard.flash_usb_downloading"), { id: toastId });
     const data = await api.firmwareDownloadBytes(device.configuration, factory.file);
     firmware = { name: factory.file, data };
     handOff();
   } catch (err) {
-    toast.error(getErrorMessage(err) || t("dashboard.flash_usb_failed"), {
+    toast.error(getErrorMessage(err) || localize("dashboard.flash_usb_failed"), {
       id: toastId,
       richColors: true,
     });
-    cleanup();
+    finish();
   }
 }

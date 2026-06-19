@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import type { LocalizeFunc } from "../../src/common/localize.js";
 import { applyInstallMethod } from "../../src/components/apply-install-method.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import { flashViaUsb } from "../../src/util/usb-flasher.js";
+
+vi.mock("../../src/util/usb-flasher.js", () => ({ flashViaUsb: vi.fn() }));
 
 const device = { configuration: "x.yaml", name: "x" } as ConfiguredDevice;
+const api = {} as ESPHomeAPI;
+const localize: LocalizeFunc = ((key: string) => key) as LocalizeFunc;
 
 function deps() {
   const firmwareDialog = {
@@ -11,12 +18,7 @@ function deps() {
     installWebDownload: vi.fn(),
     installBinaryDownload: vi.fn(),
   } as unknown as ESPHomeFirmwareInstallDialog;
-  return {
-    device,
-    openInstall: vi.fn(),
-    firmwareDialog,
-    openRemoteFlash: vi.fn(),
-  };
+  return { device, openInstall: vi.fn(), firmwareDialog, api, localize };
 }
 
 describe("applyInstallMethod", () => {
@@ -54,7 +56,7 @@ describe("applyInstallMethod", () => {
   it("web-flash opens the external flasher, not the install command", () => {
     const d = deps();
     applyInstallMethod("web-flash", undefined, d);
-    expect(d.openRemoteFlash).toHaveBeenCalledWith(device);
+    expect(flashViaUsb).toHaveBeenCalledWith(api, localize, device);
     expect(d.openInstall).not.toHaveBeenCalled();
     expect(d.firmwareDialog.installWebSerial).not.toHaveBeenCalled();
   });
