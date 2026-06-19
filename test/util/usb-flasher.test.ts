@@ -13,6 +13,7 @@ interface FakeHost {
   _flashPercent: number;
   _statusMessage: string;
   _fail: (title: string, detail?: string) => void;
+  _usbFlashTeardown: (() => void) | null;
   failDetail?: string;
 }
 
@@ -28,6 +29,7 @@ function makeHost(firmware: ArrayBuffer | null = new ArrayBuffer(32)): FakeHost 
       this._step = "error";
       this.failDetail = detail;
     },
+    _usbFlashTeardown: null,
   };
 }
 
@@ -93,6 +95,20 @@ describe("openFlasherAndHandOff", () => {
 
     emit(fakeWin, { type: "esphome-web-flash:state", state: "done" });
     expect(host._step).toBe("done");
+  });
+
+  it("exposes a teardown that stops listening (dialog close / reuse)", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const host = makeHost();
+    openFlasherAndHandOff(asHost(host));
+    expect(host._usbFlashTeardown).toBeTypeOf("function");
+    // Simulate _detachStream on dialog close/reuse.
+    host._usbFlashTeardown!();
+    expect(host._usbFlashTeardown).toBeNull();
+    // A late flasher message must no longer be acted on.
+    emit(fakeWin, { type: "esphome-web-flash:ready" });
+    expect(fakeWin.postMessage).not.toHaveBeenCalled();
   });
 
   it("surfaces a flasher error state", () => {

@@ -57,7 +57,10 @@ export function openFlasherAndHandOff(host: ESPHomeFirmwareInstallDialog): void 
     if (readyTimer !== undefined) clearTimeout(readyTimer);
     if (watchdog !== undefined) clearTimeout(watchdog);
     if (closePoll !== undefined) clearInterval(closePoll);
+    host._usbFlashTeardown = null;
   };
+  // Let the dialog tear this down on close / reuse (see _detachStream).
+  host._usbFlashTeardown = finish;
   // The flasher tab closed / crashed / went silent before reporting a result.
   const abandon = () => {
     if (finished) return;

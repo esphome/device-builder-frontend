@@ -131,6 +131,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _usbFirmware: ArrayBuffer | null = null;
   _usbFirmwareName = "";
 
+  // Teardown for an in-flight external-flasher hand-off (set by
+  // openFlasherAndHandOff). Called from _detachStream so closing / reusing the
+  // dialog removes the message listener + timers. Null when none is active.
+  _usbFlashTeardown: (() => void) | null = null;
+
   // Reject hook for the in-flight _compileAndWait promise. _detachStream
   // removes the local handler so onResult/onError can never fire after a
   // teardown — without this the awaiter would hang and leak install tasks
@@ -252,6 +257,13 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // the parent flow doesn't hang. Cancels the underlying job so the backend
   // stops working for a dismissed dialog.
   _detachStream() {
+    // Tear down an in-flight USB-flasher hand-off (message listener + timers)
+    // too, so closing or reusing the dialog can't leak it or let a stale
+    // flasher tab mutate the next install's state. Pure teardown, no _fail.
+    if (this._usbFlashTeardown) {
+      this._usbFlashTeardown();
+      this._usbFlashTeardown = null;
+    }
     if (this._streamId) {
       this._api.stopStream(this._streamId).catch(() => {});
       this._streamId = "";
