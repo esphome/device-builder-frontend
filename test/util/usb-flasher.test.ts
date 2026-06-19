@@ -31,6 +31,17 @@ function makeApi(over: Partial<ESPHomeAPI> = {}): ESPHomeAPI {
 const device = (platform = "esp32") =>
   ({ configuration: "x.yaml", name: "x", target_platform: platform }) as ConfiguredDevice;
 
+// Deliver a terminal state so flashViaUsb tears down its listener + timers.
+function emitDone(fakeWin: { postMessage: unknown }) {
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      data: { type: "esphome-web-flash:state", state: "done" },
+      origin: FLASHER_ORIGIN,
+      source: fakeWin as unknown as Window,
+    })
+  );
+}
+
 beforeEach(() => {
   if (!crypto.randomUUID) {
     (crypto as unknown as { randomUUID: () => string }).randomUUID = () => "test-nonce";
@@ -87,6 +98,7 @@ describe("flashViaUsb", () => {
     expect(msg.parts[0].address).toBe(0);
     expect(targetOrigin).toBe(FLASHER_ORIGIN);
     expect(transfer).toHaveLength(1);
+    emitDone(fakeWin); // terminal state tears down the listener + timers
   });
 
   it("compiles first when no binary is built yet", async () => {
@@ -119,5 +131,6 @@ describe("flashViaUsb", () => {
 
     expect(api.firmwareCompile).toHaveBeenCalledWith("x.yaml");
     expect(fakeWin.postMessage).toHaveBeenCalledTimes(1);
+    emitDone(fakeWin); // terminal state tears down the listener + timers
   });
 });

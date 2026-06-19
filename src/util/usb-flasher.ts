@@ -28,7 +28,8 @@ async function compileAndWait(api: ESPHomeAPI, configuration: string): Promise<v
       onResult: (data) => {
         const result = data as unknown as { status: string; error?: string | null };
         if (result.status === JobStatus.COMPLETED) resolve();
-        else reject(new Error(result.error || ""));
+        // Keep the real failure mode visible when the backend sends no text.
+        else reject(new Error(result.error || `compile ${result.status}`));
       },
       onError: (error) => reject(new Error(error)),
     });
@@ -69,15 +70,28 @@ export async function flashViaUsb(
   toast.loading(localize("dashboard.flash_usb_preparing"), { id: toastId });
 
   // Single teardown path: aborting the controller removes the message listener,
-  // and the watchdog bounds its lifetime if no terminal state ever arrives.
+  // and the close-poll + watchdog bound its lifetime if no terminal state ever
+  // arrives (tab closed / crashed / went silent).
   const controller = new AbortController();
   let watchdog: ReturnType<typeof setTimeout> | undefined;
+  let closePoll: ReturnType<typeof setInterval> | undefined;
   let finished = false;
   const finish = () => {
     if (finished) return;
     finished = true;
     controller.abort();
     if (watchdog !== undefined) clearTimeout(watchdog);
+    if (closePoll !== undefined) clearInterval(closePoll);
+  };
+  // Surface a failure (instead of a forever-spinning loading toast) when the
+  // flasher tab closes or goes silent before reporting a terminal state.
+  const abandon = () => {
+    if (finished) return;
+    toast.error(localize("dashboard.flash_usb_window_closed"), {
+      id: toastId,
+      richColors: true,
+    });
+    finish();
   };
 
   let ready = false;
@@ -140,7 +154,10 @@ export async function flashViaUsb(
   };
 
   window.addEventListener("message", onMessage, { signal: controller.signal });
-  watchdog = setTimeout(finish, FLASH_WATCHDOG_MS);
+  closePoll = setInterval(() => {
+    if (win.closed) abandon();
+  }, 1000);
+  watchdog = setTimeout(abandon, FLASH_WATCHDOG_MS);
 
   try {
     let binaries = await api.firmwareGetBinaries(device.configuration);

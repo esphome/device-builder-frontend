@@ -237,6 +237,13 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    *   switch origins and flash in-app locally instead.
    * - ``unsupported``: the browser lacks Web Serial entirely; the external
    *   flasher runs in the same browser, so it can't help — disable with a hint.
+   *
+   * Detection caveat: ``unsupported`` is only distinguishable in a SECURE
+   * context (e.g. Safari over https). On an insecure origin (the HA add-on over
+   * http) ``webSerialAvailability()`` returns ``insecure-context`` for every
+   * browser, since ``navigator.serial`` is hidden regardless of support — so a
+   * Web-Serial-incapable browser there still gets the enabled external-flasher
+   * row, and the flasher tab itself surfaces the "no Web Serial" error.
    */
   private _renderUsbOption(availability: WebSerialAvailability) {
     if (availability === "unsupported") {
