@@ -21,25 +21,21 @@ import "./base-dialog.js";
 registerMdiIcons({ wifi: mdiWifi });
 
 /**
- * First-run Wi-Fi setup dialog.
+ * On-demand Wi-Fi setup dialog.
  *
- * Surfaced by the app shell when ``OnboardingState.completed_version
- * < current_version``. The dialog gives the user three exits:
+ * Opened from the kebab "Set up Wi-Fi" action (no longer auto-popped —
+ * the create wizard collects Wi-Fi per device). The dialog gives the user
+ * three exits:
  *
- * - **Save** — POSTs the new credentials to
- *   ``onboarding/set_wifi_credentials`` and acknowledges the
- *   current version. Closes.
- * - **Maybe later** (close button) — frontend-only session
- *   dismiss. The dialog reopens on the next dashboard load.
- * - **I only use Ethernet** — explicit decline. POSTs
- *   ``onboarding/mark_acknowledged`` so the dialog stops
- *   re-opening for this user, but the secrets-menu badge stays
- *   (the underlying data is still un-configured) so a user who
- *   later switches to Wi-Fi has a visible reminder.
+ * - **Save** — writes the credentials to ``secrets.yaml`` via
+ *   ``config/set_wifi_credentials`` and acknowledges onboarding. Closes.
+ * - **Maybe later** (close button) — frontend-only session dismiss.
+ * - **I only use Ethernet** — explicit decline; acknowledges onboarding
+ *   so it stops nudging, while the secrets-menu wording still reflects the
+ *   unconfigured state.
  *
- * The dialog is dispatched a ``onboarding-acknowledged`` event on
- * a successful save / decline so the app shell can refresh its
- * cached state without re-querying.
+ * Dispatches ``onboarding-acknowledged`` on a successful save / decline so
+ * the app shell refreshes its cached state without re-querying.
  */
 @customElement("esphome-onboarding-wifi-dialog")
 export class ESPHomeOnboardingWifiDialog extends LitElement {
