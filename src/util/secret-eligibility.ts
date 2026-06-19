@@ -28,9 +28,10 @@ const DEVICE_BASE: Readonly<Record<string, Readonly<Record<string, string>>>> = 
   "ota.esphome": { password: "ota_password" },
   api: { key: "encryption_key" },
   web_server: { password: "web_password" },
-  // The fallback-hotspot password is `wifi.ap.password`; key it by its dotted
-  // path so it doesn't collide with the STA `wifi.password` (`wifi_password`).
-  wifi: { "ap.password": "ap_password" },
+  // The fallback-hotspot credentials are nested under `wifi.ap`; key them by
+  // their dotted path so they don't collapse onto the STA `wifi.ssid` /
+  // `wifi.password` shared secrets (the AP is a different network).
+  wifi: { "ap.ssid": "ap_ssid", "ap.password": "ap_password" },
 };
 
 /** True when a non-concealed *key* under *sectionKey* still wants the picker. */

@@ -71,18 +71,25 @@ describe("recommendedSecretKeys", () => {
     expect(recommendedSecretKeys("sensor", "name", "kitchen", false)).toEqual([]);
   });
 
-  it("scopes the nested AP password by its path, not the shared wifi_password", () => {
-    // `wifi.ap.password` and the STA `wifi.password` share the leaf `password`;
-    // the dotted path disambiguates so the AP field gets its own scoped key.
+  it("scopes the nested AP credentials by path, not the shared wifi_* keys", () => {
+    // `wifi.ap.{ssid,password}` share their leaf with the STA `wifi.{ssid,password}`;
+    // the dotted path disambiguates so each AP field gets its own scoped key
+    // instead of pointing at the home-network secret.
     expect(
       recommendedSecretKeys("wifi", "password", "kitchen", true, ["ap", "password"])
     ).toEqual(["kitchen__ap_password", "kitchen_ap_password"]);
+    expect(
+      recommendedSecretKeys("wifi", "ssid", "kitchen", false, ["ap", "ssid"])
+    ).toEqual(["kitchen__ap_ssid", "kitchen_ap_ssid"]);
   });
 
-  it("still resolves the STA wifi password to the shared key when path is passed", () => {
+  it("still resolves the STA wifi ssid/password to the shared keys when path is passed", () => {
     expect(
       recommendedSecretKeys("wifi", "password", "kitchen", true, ["password"])
     ).toEqual(["wifi_password"]);
+    expect(recommendedSecretKeys("wifi", "ssid", "kitchen", false, ["ssid"])).toEqual([
+      "wifi_ssid",
+    ]);
   });
 
   it("leaves api / web_server keys unchanged when their nested paths are passed", () => {
