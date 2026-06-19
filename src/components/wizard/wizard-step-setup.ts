@@ -35,8 +35,18 @@ export class ESPHomeWizardStepSetup extends LitElement {
   @state()
   private _secretWifiPassword = "";
 
+  // Whether secrets.yaml has a wifi_password key at all (any value). Tracked
+  // separately from _secretWifiPassword because an open network stores an empty
+  // password, which the value regex below can't match.
+  @state()
+  private _secretHasWifiPasswordKey = false;
+
   private get _hasSecretWifi(): boolean {
-    return Boolean(this._secretWifiSsid && this._secretWifiPassword);
+    // Mirror the backend's wifi_secrets_defined (a non-empty wifi_ssid plus a
+    // wifi_password key, value irrelevant) so the wizard auto-skips the Wi-Fi
+    // stage exactly when the backend would emit a !secret block. That keeps the
+    // skip button from ever producing a Wi-Fi config the user declined.
+    return Boolean(this._secretWifiSsid.trim()) && this._secretHasWifiPasswordKey;
   }
 
   @state()
@@ -58,7 +68,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
   });
 
   private _canAdvance(): boolean {
-    return this._stage === "name" ? !!this._deviceName.trim() : !!this._wifiSsid.trim();
+    // Wi-Fi is optional: an empty SSID finishes with no credentials, so the
+    // backend emits a no-network stub for Ethernet / no-Wi-Fi setups. Only the
+    // name stage gates on input.
+    return this._stage === "name" ? !!this._deviceName.trim() : true;
   }
 
   protected willUpdate(changed: PropertyValues): void {
@@ -73,6 +86,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
       const pass = yaml.match(/^wifi_password\s*:\s*["']?(.+?)["']?\s*$/m);
       if (ssid) this._secretWifiSsid = ssid[1];
       if (pass) this._secretWifiPassword = pass[1];
+      this._secretHasWifiPasswordKey = /^wifi_password\s*:/m.test(yaml);
     } catch {
       // No secrets file — leave defaults
     }
@@ -101,16 +115,24 @@ export class ESPHomeWizardStepSetup extends LitElement {
         gap: var(--wa-space-m);
       }
 
-      .back-btn {
+      .back-btn,
+      .skip-wifi {
         border: none;
         background: none;
         cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
         color: var(--esphome-primary);
         font-size: var(--wa-font-size-s);
         padding: 0;
+      }
+
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .skip-wifi {
+        align-self: flex-start;
       }
 
       .board-info-title {
@@ -347,6 +369,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
             }}
           />
         </div>
+
+        <button class="skip-wifi" type="button" @click=${() => this._finish("", "")}>
+          ${this._localize("wizard.wifi_skip")}
+        </button>
       </section>
     `;
   }
