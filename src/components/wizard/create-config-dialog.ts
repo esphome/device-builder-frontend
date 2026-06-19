@@ -151,13 +151,15 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._resetTransientState();
   }
 
-  /** Open directly at the setup step with a pre-selected board. */
+  /** Open directly at the setup step with a pre-selected **full** board body
+   *  (callers resolve it via ``getBoard``), so ``requires_wifi`` is already
+   *  known and the Wi-Fi decision is correct on first render. */
   public openWithBoard(board: BoardCatalogEntry) {
     this._step = "setup";
     this._selectedBoard = board;
     this._initialBoardFilter = null;
     this._resetTransientState();
-    void this._upgradeSelectedBoard(board);
+    this._upgradedBoardId = board.id; // already a full body; no upgrade fetch
   }
 
   /** Open directly at the board-picker step with an optional
@@ -357,29 +359,31 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       this._selectedBoard = detail.board;
     }
 
-    this._step = detail.step;
     if (detail.step === "setup" && this._selectedBoard) {
-      void this._upgradeSelectedBoard(this._selectedBoard);
+      void this._enterSetupStep(this._selectedBoard);
+      return;
     }
+    this._step = detail.step;
   }
 
-  /** Replace the slim board entry from the picker list with the full body so
-   *  ``wizard-step-setup`` can read ``requires_wifi`` — ``boards/get_boards``
-   *  ships slim entries that omit it. The setup step renders immediately with
-   *  the slim board; the upgrade lands a beat later and only refines the Wi-Fi
-   *  skip decision. Skips the (uncached) fetch when this id is already upgraded
-   *  so Back/forward between board↔setup doesn't refetch. */
-  private async _upgradeSelectedBoard(board: BoardCatalogEntry): Promise<void> {
-    if (this._upgradedBoardId === board.id) return;
-    try {
-      const full = await this._api.getBoard(board.id);
-      if (full && this._selectedBoard?.id === board.id) {
-        this._selectedBoard = full;
-        this._upgradedBoardId = board.id;
+  /** Upgrade the slim picker entry to the full board body, then show the setup
+   *  step — so ``wizard-step-setup`` reads a known ``requires_wifi`` on first
+   *  render and can't under-collect Wi-Fi on a Wi-Fi-only board. The picker
+   *  stays up during the (uncached) fetch; a cached id skips it. */
+  private async _enterSetupStep(board: BoardCatalogEntry): Promise<void> {
+    if (this._upgradedBoardId !== board.id) {
+      try {
+        const full = await this._api.getBoard(board.id);
+        if (this._selectedBoard?.id !== board.id) return; // selection moved on
+        if (full) {
+          this._selectedBoard = full;
+          this._upgradedBoardId = board.id;
+        }
+      } catch (err) {
+        console.warn("Failed to load full board body:", err);
       }
-    } catch (err) {
-      console.warn("Failed to load full board body:", err);
     }
+    this._step = "setup";
   }
 
   private _onToggleAdvanced() {

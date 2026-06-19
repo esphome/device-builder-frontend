@@ -32,17 +32,13 @@ export class ESPHomeWizardStepSetup extends LitElement {
   @state()
   private _stage: "name" | "wifi" = "name";
 
-  // Whether secrets.yaml already holds usable Wi-Fi (a non-empty wifi_ssid plus
-  // a wifi_password key). Mirrors the backend's wifi_secrets_defined so the
-  // wizard skips the Wi-Fi stage exactly when the backend would reuse !secret.
+  // secrets.yaml has both wifi_ssid and wifi_password keys (see
+  // hasSharedWifiSecret) — the wizard skips Wi-Fi and reuses !secret.
   @state()
   private _wifiConfigured = false;
 
-  /** Whether the wizard must collect Wi-Fi: the board needs it (Wi-Fi is its
-   *  only network) and no shared Wi-Fi secret exists yet. Every other board —
-   *  one with its own network (Ethernet/Thread), no Wi-Fi hardware, or secrets
-   *  already set — skips the step, so we never ask for Wi-Fi we won't use or
-   *  already have. */
+  /** Collect Wi-Fi only when the board needs it and no shared secret exists
+   *  yet; every other board skips the step. */
   private get _collectWifi(): boolean {
     return Boolean(this.board?.requires_wifi) && !this._wifiConfigured;
   }
