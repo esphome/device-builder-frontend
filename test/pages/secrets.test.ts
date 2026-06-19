@@ -15,6 +15,21 @@ vi.mock("sonner-js", () => ({
   default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
+// Capture the save-shortcut callback the page wires so the gating closure
+// can be exercised without mounting (and binding a real window listener).
+const { capturedRef } = vi.hoisted(() => ({
+  capturedRef: { onSave: undefined as (() => void) | undefined },
+}));
+vi.mock("../../src/util/save-shortcut-controller.js", () => ({
+  SaveShortcutController: class {
+    constructor(_host: unknown, onSave: () => void) {
+      capturedRef.onSave = onSave;
+    }
+    hostConnected() {}
+    hostDisconnected() {}
+  },
+}));
+
 /**
  * Pin the secrets-page data-loss guards: don't render an editor
  * with empty content while loading, and keep Save disabled when
@@ -400,6 +415,64 @@ describe("esphome-page-secrets save toast ordering", () => {
     window.removeEventListener("secrets-saved", onSaved);
 
     expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe("esphome-page-secrets Cmd/Ctrl+S save shortcut wiring", () => {
+  function pageWith(overrides: Partial<PageView>): {
+    updateConfig: ReturnType<typeof vi.fn>;
+    save: () => void;
+  } {
+    // Reset first so the assertion proves THIS construction wired the
+    // shortcut, not a stale callback captured by an earlier test.
+    capturedRef.onSave = undefined;
+    const page = makePage({ _loaded: true, ...overrides });
+    const updateConfig = vi.fn().mockResolvedValue(undefined);
+    page._api = { updateConfig } as unknown as ESPHomeAPI;
+    // The page's field initializer constructed the (mocked) controller and
+    // handed us its callback — that is the gating closure the shortcut runs.
+    expect(capturedRef.onSave).toBeTypeOf("function");
+    return { updateConfig, save: capturedRef.onSave! };
+  }
+
+  test("saves a dirty, non-empty buffer", async () => {
+    const { updateConfig, save } = pageWith({
+      _yaml: "wifi_password: new\n",
+      _savedYaml: "wifi_password: old\n",
+    });
+    save();
+    await Promise.resolve();
+    expect(updateConfig).toHaveBeenCalledWith("secrets.yaml", "wifi_password: new\n");
+  });
+
+  test("no-ops on a clean buffer", () => {
+    const { updateConfig, save } = pageWith({
+      _yaml: "wifi_password: same\n",
+      _savedYaml: "wifi_password: same\n",
+    });
+    save();
+    expect(updateConfig).not.toHaveBeenCalled();
+  });
+
+  test("no-ops while a save is already in flight", () => {
+    const { updateConfig, save } = pageWith({
+      _yaml: "wifi_password: new\n",
+      _savedYaml: "wifi_password: old\n",
+      _saving: true,
+    });
+    save();
+    expect(updateConfig).not.toHaveBeenCalled();
+  });
+
+  test("does not trigger the destructive wipe path on an empty buffer", () => {
+    // The Save button stays enabled at zero secrets to allow a confirmed wipe,
+    // but the keyboard shortcut must not fire that destructive path.
+    const { updateConfig, save } = pageWith({
+      _yaml: "",
+      _savedYaml: "wifi_password: old\n",
+    });
+    save();
+    expect(updateConfig).not.toHaveBeenCalled();
   });
 });
 

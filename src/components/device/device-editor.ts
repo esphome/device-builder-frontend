@@ -19,6 +19,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
 import {
   clampSplitRatio,
   loadSplitRatio,
@@ -96,29 +97,22 @@ export class ESPHomeDeviceEditor extends LitElement {
     this._isMobile = e.matches;
   };
 
-  /** Cmd/Ctrl+S → save the YAML if there are unsaved changes.
-   *  Listens at the window level so the shortcut works regardless of
-   *  which child (CodeMirror, navigator, etc.) currently has focus. */
-  private _onGlobalKeyDown = (e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
-      e.preventDefault();
-      if (this.hasUnsavedEdits) {
-        this._onSave();
-      }
+  // Cmd/Ctrl+S → save the YAML if there are unsaved changes.
+  private _saveShortcut = new SaveShortcutController(this, () => {
+    if (this.hasUnsavedEdits) {
+      this._onSave();
     }
-  };
+  });
 
   connectedCallback() {
     super.connectedCallback();
     this._isMobile = this._mql.matches;
     this._mql.addEventListener("change", this._onMqlChange);
-    window.addEventListener("keydown", this._onGlobalKeyDown);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this._mql.removeEventListener("change", this._onMqlChange);
-    window.removeEventListener("keydown", this._onGlobalKeyDown);
   }
 
   @property({ attribute: false })
