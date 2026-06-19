@@ -174,6 +174,23 @@ describe("wizard-step-setup", () => {
     expect(detail.skipWifi).toBe(true);
   });
 
+  it("skip on a board that turned out to bring its own network sends skipWifi false", async () => {
+    // Race: the slim board (provides_network undefined) lands on the Wi-Fi
+    // stage, then the full body resolves provides_network=true. Skip must mean
+    // "use the board's network", not force a no-network config.
+    const el = await mount();
+    await setName(el, "kitchen");
+    pressEnter(); // advance to wifi while still slim
+    await el.updateComplete;
+    el.board = networkedBoard(); // full body resolves
+    await el.updateComplete;
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".skip-wifi")!.click();
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.skipWifi).toBe(false);
+  });
+
   it("does nothing on Enter with a blank name", async () => {
     const el = await mount();
     const onFinish = vi.fn();

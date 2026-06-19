@@ -352,15 +352,20 @@ export class ESPHomeWizardStepSetup extends LitElement {
           },
         })}
 
-        <button
-          class="skip-wifi"
-          type="button"
-          @click=${() => this._finish("", "", true)}
-        >
+        <button class="skip-wifi" type="button" @click=${this._onSkipWifi}>
           ${this._localize("wizard.wifi_skip")}
         </button>
       </section>
     `;
+  }
+
+  private _onSkipWifi() {
+    // "Skip" forces a no-network config only when the board has no network of
+    // its own; on a provides_network board it means "use that network", so
+    // leave skipWifi false and let the backend default to Ethernet/Thread.
+    // (The Wi-Fi stage isn't shown for such boards normally — this guards the
+    // brief window before the full board body resolves provides_network.)
+    this._finish("", "", !this.board?.provides_network);
   }
 
   private _onBack() {
