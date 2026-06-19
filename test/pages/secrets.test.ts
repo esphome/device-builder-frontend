@@ -423,6 +423,9 @@ describe("esphome-page-secrets Cmd/Ctrl+S save shortcut wiring", () => {
     updateConfig: ReturnType<typeof vi.fn>;
     save: () => void;
   } {
+    // Reset first so the assertion proves THIS construction wired the
+    // shortcut, not a stale callback captured by an earlier test.
+    capturedRef.onSave = undefined;
     const page = makePage({ _loaded: true, ...overrides });
     const updateConfig = vi.fn().mockResolvedValue(undefined);
     page._api = { updateConfig } as unknown as ESPHomeAPI;
