@@ -15,6 +15,8 @@
  *   two chip series (RP2040 / RP2350). Absent for other platforms.
  * - ``label`` is the user-facing chip text.
  */
+import { chipNameToVariant } from "../../util/chip-variant.js";
+
 export interface WizardBoardPlatform {
   readonly platform: string;
   readonly variant: string;
@@ -46,22 +48,21 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
 /**
  * Map an esptool-js chip name (e.g. ``"ESP32-C6 (QFN32) (revision
  * v0.2)"``) to the platform-filter label the board picker uses
- * (e.g. ``"ESP32-C6"``). Strips the parenthesised chip-package /
- * revision suffix, normalises to lowercase, drops dashes, then
- * looks the family up in ``WIZARD_BOARD_PLATFORMS`` — that's the
- * same shape the picker's filter chips use, so callers can hand
- * the result straight to ``_selectedFilter`` /
- * ``openAtBoardStep``.
+ * (e.g. ``"ESP32-C6"``). Normalises through ``chipNameToVariant``
+ * (handles package-specific descriptions like ``ESP32-D0WD`` →
+ * ``esp32`` and ``ESP8266EX`` → ``esp8266``), then matches an
+ * existing filter chip. Returns ``null`` when no chip represents the
+ * variant (e.g. ESP32-S31/C31/H21) so the caller shows the full
+ * picker rather than narrowing to the wrong family.
  */
 export function chipNameToFilterLabel(chipName: string): string | null {
-  const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
-  const byVariant = WIZARD_BOARD_PLATFORMS.find((p) => p.variant === family);
-  if (byVariant) return byVariant.label;
-  // rp2040 / rp2350 share one platform; match on the chip series.
-  const byMcu = WIZARD_BOARD_PLATFORMS.find((p) => p.mcu === family);
-  if (byMcu) return byMcu.label;
-  const byPlatform = WIZARD_BOARD_PLATFORMS.find(
-    (p) => p.platform === family && !p.variant
+  let family = chipNameToVariant(chipName);
+  if (family.startsWith("esp82")) family = "esp8266"; // esp8266 / esp8285
+  const match = WIZARD_BOARD_PLATFORMS.find(
+    (p) =>
+      (p.variant && p.variant === family) ||
+      p.mcu === family ||
+      (!p.variant && !p.mcu && p.platform === family)
   );
-  return byPlatform?.label ?? null;
+  return match?.label ?? null;
 }

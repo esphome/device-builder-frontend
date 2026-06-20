@@ -528,8 +528,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
         }
       }
 
-      if (result.chip_family) {
-        this._selectedFilter = result.chip_family;
+      // Resolve to an existing filter chip (same as the WebSerial path);
+      // a recognised-but-unfiltered variant (e.g. ESP32-S31) yields null,
+      // so we leave the picker unfiltered instead of setting a dead filter.
+      const label = result.chip_family && chipNameToFilterLabel(result.chip_family);
+      if (label) {
+        this._selectedFilter = label;
         this._filterFromDetection = true;
         this._search = "";
       }
