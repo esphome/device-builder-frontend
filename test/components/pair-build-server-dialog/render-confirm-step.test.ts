@@ -12,16 +12,19 @@ import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-
 import { renderConfirmStep } from "../../../src/components/pair-build-server-dialog/renderers.js";
 import { findTemplatesByAnchor, visitTemplates } from "../../_lit-template-walker.js";
 
-function makeHost(pin: string): ESPHomePairBuildServerDialog {
+function makeHost(
+  opts: { pin?: string; skippedInput?: boolean; error?: string | null } = {}
+): ESPHomePairBuildServerDialog {
   return {
     _localize: (key: string) => key,
     _busy: false,
-    _previewedPin: pin,
+    _previewedPin: opts.pin ?? "",
     _hostname: "buildbox.local",
     _port: "6055",
     _receiverLabel: "buildbox",
     _offloaderLabel: "ha-green",
-    _error: null,
+    _error: opts.error ?? null,
+    _skippedInput: opts.skippedInput ?? false,
     _onConfirmBack: () => {},
     _onConfirmSubmit: () => {},
     close: () => {},
@@ -37,7 +40,7 @@ function allValues(root: unknown): unknown[] {
 
 describe("renderConfirmStep", () => {
   it("shows a connecting spinner (no fingerprint) while the pin is empty", () => {
-    const tree = renderConfirmStep(makeHost(""));
+    const tree = renderConfirmStep(makeHost({ pin: "" }));
 
     expect(findTemplatesByAnchor(tree, "<wa-spinner")).toHaveLength(1);
     expect(findTemplatesByAnchor(tree, "<esphome-pin-emoji-grid")).toHaveLength(0);
@@ -45,10 +48,27 @@ describe("renderConfirmStep", () => {
   });
 
   it("shows the fingerprint and target once the pin has landed", () => {
-    const tree = renderConfirmStep(makeHost("9f86d081884c7d659a2feaa0c55ad015"));
+    const tree = renderConfirmStep(makeHost({ pin: "9f86d081884c7d659a2feaa0c55ad015" }));
 
     expect(findTemplatesByAnchor(tree, "<wa-spinner")).toHaveLength(0);
     expect(findTemplatesByAnchor(tree, "<esphome-pin-emoji-grid")).toHaveLength(1);
     expect(allValues(tree)).toContain("settings.pair_build_server_target");
+  });
+
+  it("labels the secondary button Back in the manual flow", () => {
+    const tree = renderConfirmStep(makeHost({ pin: "abc", skippedInput: false }));
+    expect(allValues(tree)).toContain("layout.back");
+    expect(allValues(tree)).not.toContain("layout.cancel");
+  });
+
+  it("labels the secondary button Cancel when the input step was skipped", () => {
+    const tree = renderConfirmStep(makeHost({ pin: "abc", skippedInput: true }));
+    expect(allValues(tree)).toContain("layout.cancel");
+    expect(allValues(tree)).not.toContain("layout.back");
+  });
+
+  it("renders the error banner when an error is set", () => {
+    const tree = renderConfirmStep(makeHost({ pin: "abc", error: "boom" }));
+    expect(allValues(tree)).toContain("boom");
   });
 });

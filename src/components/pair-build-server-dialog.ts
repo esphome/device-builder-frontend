@@ -72,6 +72,11 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   // Resets on open() so the next pair attempt re-derives from hostname.
   @state() _receiverLabelTouched = false;
 
+  // True when the confirm step was reached by auto-preview (mDNS-discovered
+  // host), so the input step was never shown. Drives the confirm step's
+  // secondary button: Cancel (close) rather than Back (to the skipped form).
+  @state() _skippedInput = false;
+
   // ${hostname}:${port} of the submitted request — null outside the sent step.
   @state() _sentKey: string | null = null;
 
@@ -115,6 +120,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     this._error = null;
     this._sentKey = null;
     this._offloaderIdentity = null;
+    this._skippedInput = false;
     void this._loadOffloaderIdentity();
     this._open = true;
     if (
@@ -124,6 +130,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
       parsePortInput(this._port) !== null
     ) {
       this._step = "confirm";
+      this._skippedInput = true;
       void onPreviewSubmit(this);
     }
   }
@@ -162,8 +169,15 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     // Drop captured pin — user is going back, possibly to a different host.
     // Re-previewing refills it on the next forward step.
     this._previewedPin = "";
-    this._step = "input";
     this._error = null;
+    // Reached confirm straight from the discovered list — there's no input
+    // step to return to, so dismiss back to that list instead of revealing the
+    // skipped hostname form.
+    if (this._skippedInput) {
+      this.close();
+      return;
+    }
+    this._step = "input";
   };
 
   protected render() {

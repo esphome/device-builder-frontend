@@ -68,8 +68,10 @@ export async function onPreviewSubmit(host: ESPHomePairBuildServerDialog): Promi
     host._error = previewErrorMessage(host, err);
     // Drop back to the input form so the user can fix the host/port. No-op in
     // the manual flow (already on input); matters for an auto-preview that
-    // jumped straight to confirm.
+    // jumped straight to confirm. Once the form is shown, a later Back from
+    // confirm should behave normally (go to input, not close).
     host._step = "input";
+    host._skippedInput = false;
   } finally {
     host._busy = false;
   }

@@ -20,6 +20,7 @@ function makeHost(
     _previewedPin: "",
     _error: null,
     _step: "confirm",
+    _skippedInput: true,
   } as unknown as ESPHomePairBuildServerDialog;
 }
 
@@ -40,6 +41,8 @@ describe("onPreviewSubmit", () => {
     expect(host._step).toBe("input");
     expect(host._previewedPin).toBe("");
     expect(host._error).not.toBeNull();
+    // Form is now shown, so a later Back from confirm goes to input, not close.
+    expect(host._skippedInput).toBe(false);
   });
 
   it("ignores invalid input without calling the API", async () => {

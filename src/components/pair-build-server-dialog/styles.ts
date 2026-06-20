@@ -89,7 +89,13 @@ export const pairBuildServerDialogStyles = css`
   }
 
   /* Rendered into wa-dialog's footer slot (pinned outside the scrolling
-     body), which supplies its own padding — so the row carries none. */
+     body) so the error + actions stay visible regardless of body scroll. */
+  .dialog-footer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
+
   .actions {
     display: flex;
     align-items: center;
@@ -114,7 +120,6 @@ export const pairBuildServerDialogStyles = css`
   .step-error {
     color: var(--esphome-error);
     font-size: var(--wa-font-size-s);
-    padding: var(--wa-space-s) 0;
   }
 
   .trust-warning {

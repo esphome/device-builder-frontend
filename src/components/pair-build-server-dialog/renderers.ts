@@ -75,22 +75,24 @@ export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateRes
       </div>
     </div>
     <div class="helper">${host._localize("settings.pair_build_server_port_helper")}</div>
-    ${host._error
-      ? html`<div class="step-error" role="alert">${host._error}</div>`
-      : nothing}
-    <div slot="footer" class="actions">
-      <button class="btn btn--cancel" ?disabled=${host._busy} @click=${host.close}>
-        ${host._localize("layout.cancel")}
-      </button>
-      <button
-        class="btn btn--primary"
-        ?disabled=${!canSubmit}
-        @click=${host._onPreviewSubmit}
-      >
-        ${host._busy
-          ? host._localize("settings.pair_build_server_previewing")
-          : host._localize("settings.pair_build_server_preview_action")}
-      </button>
+    <div slot="footer" class="dialog-footer">
+      ${host._error
+        ? html`<div class="step-error" role="alert">${host._error}</div>`
+        : nothing}
+      <div class="actions">
+        <button class="btn btn--cancel" ?disabled=${host._busy} @click=${host.close}>
+          ${host._localize("layout.cancel")}
+        </button>
+        <button
+          class="btn btn--primary"
+          ?disabled=${!canSubmit}
+          @click=${host._onPreviewSubmit}
+        >
+          ${host._busy
+            ? host._localize("settings.pair_build_server_previewing")
+            : host._localize("settings.pair_build_server_preview_action")}
+        </button>
+      </div>
     </div>
   `;
 }
@@ -182,26 +184,30 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
         ${host._localize("settings.pair_build_server_offloader_label_helper")}
       </span>
     </div>
-    ${host._error
-      ? html`<div class="step-error" role="alert">${host._error}</div>`
-      : nothing}
-    <div slot="footer" class="actions">
-      <button
-        class="btn btn--cancel"
-        ?disabled=${host._busy}
-        @click=${host._onConfirmBack}
-      >
-        ${host._localize("layout.back")}
-      </button>
-      <button
-        class="btn btn--primary"
-        ?disabled=${!canSubmit}
-        @click=${host._onConfirmSubmit}
-      >
-        ${host._busy
-          ? host._localize("settings.pair_build_server_sending")
-          : host._localize("settings.pair_build_server_request_action")}
-      </button>
+    <div slot="footer" class="dialog-footer">
+      ${host._error
+        ? html`<div class="step-error" role="alert">${host._error}</div>`
+        : nothing}
+      <div class="actions">
+        <button
+          class="btn btn--cancel"
+          ?disabled=${host._busy}
+          @click=${host._onConfirmBack}
+        >
+          ${host._skippedInput
+            ? host._localize("layout.cancel")
+            : host._localize("layout.back")}
+        </button>
+        <button
+          class="btn btn--primary"
+          ?disabled=${!canSubmit}
+          @click=${host._onConfirmSubmit}
+        >
+          ${host._busy
+            ? host._localize("settings.pair_build_server_sending")
+            : host._localize("settings.pair_build_server_request_action")}
+        </button>
+      </div>
     </div>
   `;
 }
