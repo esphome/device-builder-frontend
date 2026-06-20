@@ -59,6 +59,12 @@ export function openFlasher(
   let closePoll: ReturnType<typeof setInterval> | undefined;
   let finished = false;
   let handedOff = false;
+  // True while the user is sitting on a delivered error (the tab stays open for
+  // an in-tab retry). Closing the tab then is "I give up", not "lost contact",
+  // so the close poll finishes quietly instead of overwriting the real error.
+  // Cleared once the flasher resumes activity, so an interrupted active retry
+  // still reports lost.
+  let errored = false;
 
   // Pure teardown (also the returned handle): no callback, so a caller closing
   // the session doesn't trigger onLost.
@@ -137,22 +143,25 @@ export function openFlasher(
     };
     if (data.type === MSG_PROGRESS) {
       armWatchdog();
+      errored = false;
       cb.onProgress(data.pct ?? 0);
     } else if (data.type === MSG_STATE) {
       if (data.state === "done") {
         finish();
         cb.onState("done", "");
       } else if (data.state === "error") {
+        errored = true;
         // Not terminal: the flasher tab stays open and the user can retry in
         // place (hold BOOT + Connect & install). Keep listening so a later
-        // success or a tab close still reaches the dashboard, but leave the
-        // watchdog disarmed: idle-on-error would otherwise fire lost() and
-        // overwrite the real error with a misleading "lost contact" (the tab
-        // is alive) while severing the retry. The win.closed poll still catches
-        // an actually-closed tab; an in-tab retry's progress re-arms above.
+        // success still reaches the dashboard, but leave the watchdog disarmed:
+        // idle-on-error would otherwise fire lost() and overwrite the real error
+        // with a misleading "lost contact" (the tab is alive) while severing the
+        // retry. Closing the tab now is handled by the errored guard on the
+        // close poll; an in-tab retry's progress re-arms above and clears it.
         cb.onState("error", data.detail || "");
       } else if (data.detail) {
         armWatchdog();
+        errored = false;
         cb.onStatus(data.detail);
       }
     }
@@ -160,7 +169,11 @@ export function openFlasher(
 
   window.addEventListener("message", onMessage, { signal: controller.signal });
   closePoll = setInterval(() => {
-    if (win.closed) lost();
+    if (!win.closed) return;
+    // The dialog already shows the real error; a quiet finish keeps it instead
+    // of overwriting with "lost contact".
+    if (errored) finish();
+    else lost();
   }, 1000);
   readyTimer = setTimeout(lost, READY_TIMEOUT_MS);
   return finish;

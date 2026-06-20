@@ -174,6 +174,39 @@ describe("openFlasher", () => {
     vi.useRealTimers();
   });
 
+  it("does not fire onLost when the tab closes after an error", () => {
+    vi.useFakeTimers();
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    emit(fakeWin, { type: "esphome-web-flash:ready" });
+    emit(fakeWin, { type: "esphome-web-flash:state", state: "error", detail: "boom" });
+    // User gives up on the failed flash and closes the tab.
+    fakeWin.closed = true;
+    vi.advanceTimersByTime(1000);
+    expect(cb.lost).toBe(0);
+    expect(cb.states).toEqual([{ state: "error", detail: "boom" }]);
+    vi.useRealTimers();
+  });
+
+  it("fires onLost when the tab closes mid-retry after an error", () => {
+    vi.useFakeTimers();
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    emit(fakeWin, { type: "esphome-web-flash:ready" });
+    emit(fakeWin, { type: "esphome-web-flash:state", state: "error", detail: "boom" });
+    // In-tab retry restarts (progress clears the errored guard), then the tab is
+    // closed mid-flash: that's a genuine lost contact.
+    emit(fakeWin, { type: "esphome-web-flash:progress", pct: 30 });
+    fakeWin.closed = true;
+    vi.advanceTimersByTime(1000);
+    expect(cb.lost).toBe(1);
+    vi.useRealTimers();
+  });
+
   it("teardown stops listening without firing onLost", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
