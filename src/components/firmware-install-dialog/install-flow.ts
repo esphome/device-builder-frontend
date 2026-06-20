@@ -459,16 +459,25 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   host._step = "flashing";
   host._flashPercent = 0;
   host._statusMessage = host._localize("firmware.usb_flashing");
+  host._errorMessage = "";
   const deviceName = host._device ? host._device.friendly_name || host._device.name : "";
+  // An in-tab retry after a failure resumes via progress/status frames; leave
+  // the error view and clear the failure banner so it doesn't headline a flash
+  // that's already running (a progress frame often lands before a status one).
+  const resumeFromError = () => {
+    if (host._step !== "error") return;
+    host._step = "flashing";
+    host._errorMessage = "";
+    host._statusMessage = host._localize("firmware.usb_flashing");
+  };
   const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, {
     onProgress: (pct) => {
+      resumeFromError();
       host._flashPercent = pct;
-      // An in-tab retry after a failure resumes flashing; leave the error view.
-      if (host._step === "error") host._step = "flashing";
     },
     onStatus: (detail) => {
+      resumeFromError();
       host._statusMessage = detail;
-      if (host._step === "error") host._step = "flashing";
     },
     onState: (state, detail) => {
       if (state === "done") {
@@ -490,7 +499,12 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     },
   });
   if (!teardown) {
-    host._fail(host._localize("firmware.usb_popup_blocked"));
+    // Pop-up blocked: stay on download-ready with the firmware still in hand so
+    // the user can allow pop-ups and click Open again, rather than being forced
+    // through a full recompile. The message surfaces in the ready-screen detail.
+    host._step = "download-ready";
+    host._statusMessage = "";
+    host._errorMessage = host._localize("firmware.usb_popup_blocked");
     return;
   }
   // The openFlasher session now holds the bytes (in its closure) and transfers

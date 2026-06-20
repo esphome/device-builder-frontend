@@ -112,6 +112,9 @@ function downloadReadyTitle(host: ESPHomeFirmwareInstallDialog): string {
 
 function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
   if (host._installer === "web-flash") {
+    // A blocked pop-up parks here with the firmware still built; show why so the
+    // user can allow pop-ups and click Open again (handOffToFlasher clears it).
+    if (host._errorMessage) return host._errorMessage;
     return host._localize("firmware.usb_built_body", { host: FLASHER_HOST });
   }
   // binary-download
