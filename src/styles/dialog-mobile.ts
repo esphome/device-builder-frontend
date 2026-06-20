@@ -20,14 +20,14 @@ const HOST_SELECTOR: Record<DialogHost, CSSResult> = {
   "esphome-base-dialog": css`esphome-base-dialog`,
 };
 
-/** Consistent, tighter horizontal body gutter on the mobile sheet. Each dialog
- *  hardcodes its own desktop body padding (--wa-space-l … --wa-space-xl) with no
- *  mobile reduction, so the phone sheet looked inconsistent — some roomy, some
- *  not. ``!important`` is needed because consumers set ``::part(body)`` padding
- *  after this fragment in their styles array; only the inline (horizontal)
- *  padding is overridden so each dialog keeps its own vertical rhythm. */
+/** Custom property each dialog reads for its body's horizontal padding, e.g.
+ *  ``padding-inline: var(--esphome-dialog-body-gutter, var(--wa-space-l))``. On
+ *  the mobile sheet the fragments below set it to a tighter, consistent value;
+ *  on desktop it's unset so each dialog's own fallback applies. Driving it
+ *  through an inherited custom property (set on the host, read in the shadow
+ *  ``::part(body)``) avoids any ``::part`` specificity fight — no !important. */
 const MOBILE_DIALOG_BODY_GUTTER = css`
-  padding-inline: var(--wa-space-m) !important;
+  --esphome-dialog-body-gutter: var(--wa-space-m);
 `;
 
 /** Full-screen sheet on mobile. Pass a custom `breakpoint` for dialogs whose
@@ -52,7 +52,7 @@ export function fullscreenMobileDialog(
         margin: 0;
         border-radius: 0;
       }
-      ${sel}::part(body) {
+      ${sel} {
         ${MOBILE_DIALOG_BODY_GUTTER}
       }
     }
@@ -71,7 +71,7 @@ export function centeredMobileDialog(host: DialogHost): CSSResult {
         max-height: calc(100vh - var(--wa-space-l));
         max-height: calc(100dvh - var(--wa-space-l));
       }
-      ${sel}::part(body) {
+      ${sel} {
         ${MOBILE_DIALOG_BODY_GUTTER}
       }
     }
