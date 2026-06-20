@@ -23,6 +23,22 @@ function renderFingerprint(
   `;
 }
 
+// Footer slot shared by the input + confirm steps: the step error (when set)
+// stacked above the actions row, pinned outside the scrolling body.
+function renderFooter(
+  host: ESPHomePairBuildServerDialog,
+  actions: TemplateResult
+): TemplateResult {
+  return html`
+    <div slot="footer" class="dialog-footer">
+      ${host._error
+        ? html`<div class="step-error" role="alert">${host._error}</div>`
+        : nothing}
+      <div class="actions">${actions}</div>
+    </div>
+  `;
+}
+
 export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateResult {
   const portValid = parsePortInput(host._port) !== null;
   const canSubmit = !host._busy && host._hostname.trim().length > 0 && portValid;
@@ -75,11 +91,9 @@ export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateRes
       </div>
     </div>
     <div class="helper">${host._localize("settings.pair_build_server_port_helper")}</div>
-    <div slot="footer" class="dialog-footer">
-      ${host._error
-        ? html`<div class="step-error" role="alert">${host._error}</div>`
-        : nothing}
-      <div class="actions">
+    ${renderFooter(
+      host,
+      html`
         <button class="btn btn--cancel" ?disabled=${host._busy} @click=${host.close}>
           ${host._localize("layout.cancel")}
         </button>
@@ -92,8 +106,8 @@ export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateRes
             ? host._localize("settings.pair_build_server_previewing")
             : host._localize("settings.pair_build_server_preview_action")}
         </button>
-      </div>
-    </div>
+      `
+    )}
   `;
 }
 
@@ -184,11 +198,9 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
         ${host._localize("settings.pair_build_server_offloader_label_helper")}
       </span>
     </div>
-    <div slot="footer" class="dialog-footer">
-      ${host._error
-        ? html`<div class="step-error" role="alert">${host._error}</div>`
-        : nothing}
-      <div class="actions">
+    ${renderFooter(
+      host,
+      html`
         <button
           class="btn btn--cancel"
           ?disabled=${host._busy}
@@ -207,8 +219,8 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
             ? host._localize("settings.pair_build_server_sending")
             : host._localize("settings.pair_build_server_request_action")}
         </button>
-      </div>
-    </div>
+      `
+    )}
   `;
 }
 
