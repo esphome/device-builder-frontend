@@ -1082,6 +1082,7 @@
     "pair_build_server_pin_label": "Receiver fingerprint (SHA-256)",
     "pair_build_server_pin_hex_summary": "Show hex bytes",
     "pair_build_server_target": "Connected to {hostname}:{port}",
+    "pair_build_server_connecting": "Connecting to {hostname}:{port}…",
     "pair_build_server_receiver_label_label": "Name for this receiver",
     "pair_build_server_receiver_label_placeholder": "e.g. desktop, lab-pc",
     "pair_build_server_receiver_label_helper": "Shown to you in the paired-receivers list. Local to this dashboard.",

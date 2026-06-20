@@ -80,11 +80,21 @@ export const pairBuildServerDialogStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
+  /* Rendered into wa-dialog's footer slot (pinned outside the scrolling
+     body), which supplies its own padding — so the row carries none. */
   .actions {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-m) 0 var(--wa-space-l);
+  }
+
+  .pin-connecting {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-quiet);
   }
 
   .field-error {

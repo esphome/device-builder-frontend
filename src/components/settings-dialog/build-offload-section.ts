@@ -394,10 +394,15 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     // peer.port is the SRV dashboard HTTP port and would land an
     // UNAVAILABLE on preview_pair. 0 means the receiver didn't
     // publish the key — let the wizard fall back to its default.
-    this._pairDialog?.open({
-      hostname: peer.hostname,
-      port: peer.remote_build_port > 0 ? peer.remote_build_port : undefined,
-    });
+    this._pairDialog?.open(
+      {
+        hostname: peer.hostname,
+        port: peer.remote_build_port > 0 ? peer.remote_build_port : undefined,
+      },
+      // Host + peer-link port are known from mDNS — skip the manual entry step
+      // and preview the fingerprint straight away.
+      { autoPreview: true }
+    );
   };
 
   private _onAlertRepair = (alert: OffloaderAlertSnapshotEntry): void => {

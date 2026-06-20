@@ -1,3 +1,5 @@
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+
 import { consume } from "@lit/context";
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -15,7 +17,7 @@ import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { friendlyHostname } from "../util/hostname.js";
+import { friendlyHostname, parsePortInput } from "../util/hostname.js";
 import "./base-dialog.js";
 import {
   onConfirmSubmit,
@@ -90,7 +92,14 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     pairBuildServerDialogStyles,
   ];
 
-  open(prefill?: { hostname?: string; port?: number }): void {
+  // autoPreview skips the hostname/port input step: when the host+port are
+  // already known (mDNS-discovered dashboard), preview the fingerprint
+  // immediately and land on the confirm step. A failed preview drops back to
+  // the pre-filled input form (onPreviewSubmit's error branch).
+  open(
+    prefill?: { hostname?: string; port?: number },
+    opts?: { autoPreview?: boolean }
+  ): void {
     this._step = "input";
     this._busy = false;
     this._hostname = prefill?.hostname ?? "";
@@ -108,6 +117,15 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     this._offloaderIdentity = null;
     void this._loadOffloaderIdentity();
     this._open = true;
+    if (
+      opts?.autoPreview &&
+      this._api !== undefined &&
+      this._hostname &&
+      parsePortInput(this._port) !== null
+    ) {
+      this._step = "confirm";
+      void onPreviewSubmit(this);
+    }
   }
 
   // Read this dashboard's own identity for the sent-step fingerprint. The
