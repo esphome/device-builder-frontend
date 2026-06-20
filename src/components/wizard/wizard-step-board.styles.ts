@@ -294,7 +294,7 @@ export const wizardStepBoardStyles = css`
   .platform-chip {
     display: inline-flex;
     align-items: center;
-    padding: 4px 8px;
+    padding: 4px 12px;
     border-radius: 999px;
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-bold);
