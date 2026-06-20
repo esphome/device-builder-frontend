@@ -13,11 +13,16 @@ import { renderConfirmStep } from "../../../src/components/pair-build-server-dia
 import { findTemplatesByAnchor, visitTemplates } from "../../_lit-template-walker.js";
 
 function makeHost(
-  opts: { pin?: string; skippedInput?: boolean; error?: string | null } = {}
+  opts: {
+    pin?: string;
+    skippedInput?: boolean;
+    error?: string | null;
+    busy?: boolean;
+  } = {}
 ): ESPHomePairBuildServerDialog {
   return {
     _localize: (key: string) => key,
-    _busy: false,
+    _busy: opts.busy ?? false,
     _previewedPin: opts.pin ?? "",
     _hostname: "buildbox.local",
     _port: "6055",
@@ -39,12 +44,19 @@ function allValues(root: unknown): unknown[] {
 }
 
 describe("renderConfirmStep", () => {
-  it("shows a connecting spinner (no fingerprint) while the pin is empty", () => {
-    const tree = renderConfirmStep(makeHost({ pin: "" }));
+  it("shows a connecting spinner (no fingerprint) while busy with no pin", () => {
+    const tree = renderConfirmStep(makeHost({ pin: "", busy: true }));
 
     expect(findTemplatesByAnchor(tree, "<wa-spinner")).toHaveLength(1);
     expect(findTemplatesByAnchor(tree, "<esphome-pin-emoji-grid")).toHaveLength(0);
     expect(allValues(tree)).toContain("settings.pair_build_server_connecting");
+  });
+
+  it("renders the landed branch (no spinner) for an empty pin when not busy", () => {
+    // Degenerate backend pin: don't strand an unresolving spinner.
+    const tree = renderConfirmStep(makeHost({ pin: "", busy: false }));
+
+    expect(findTemplatesByAnchor(tree, "<wa-spinner")).toHaveLength(0);
   });
 
   it("shows the fingerprint and target once the pin has landed", () => {

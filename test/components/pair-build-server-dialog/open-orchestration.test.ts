@@ -1,0 +1,78 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * Pins open()'s auto-preview orchestration: with the guard satisfied it jumps
+ * to the confirm step, marks the input step skipped, and dispatches the
+ * fingerprint preview; otherwise (no api, no/blank hostname, or no autoPreview)
+ * it stays on the input step.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+
+import { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
+
+function makeApi() {
+  return {
+    getRemoteBuildIdentity: vi.fn(async () => ({
+      dashboard_id: "x",
+      pin_sha256: "p",
+      server_version: "1",
+      esphome_version: "1",
+      listener_bound: true,
+    })),
+    previewRemoteBuildPair: vi.fn(async () => ({ pin_sha256: "abc" })),
+  };
+}
+
+function makeDialog(api: unknown): ESPHomePairBuildServerDialog {
+  const d = new ESPHomePairBuildServerDialog();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (d as any)._localize = (k: string) => k;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (d as any)._api = api;
+  return d;
+}
+
+describe("pair dialog open() auto-preview orchestration", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.clearAllMocks();
+  });
+
+  it("jumps to confirm, skips input, and previews when the guard passes", () => {
+    const api = makeApi();
+    const d = makeDialog(api);
+    d.open({ hostname: "buildbox.local", port: 6055 }, { autoPreview: true });
+    expect(d._step).toBe("confirm");
+    expect(d._skippedInput).toBe(true);
+    expect(api.previewRemoteBuildPair).toHaveBeenCalledOnce();
+  });
+
+  it("stays on input when the api is undefined", () => {
+    const d = makeDialog(undefined);
+    d.open({ hostname: "buildbox.local", port: 6055 }, { autoPreview: true });
+    expect(d._step).toBe("input");
+    expect(d._skippedInput).toBe(false);
+  });
+
+  it("stays on input for a blank/whitespace hostname", () => {
+    const api = makeApi();
+    const d = makeDialog(api);
+    d.open({ hostname: "   ", port: 6055 }, { autoPreview: true });
+    expect(d._step).toBe("input");
+    expect(d._skippedInput).toBe(false);
+    expect(api.previewRemoteBuildPair).not.toHaveBeenCalled();
+  });
+
+  it("stays on input without autoPreview even with a valid prefill", () => {
+    const api = makeApi();
+    const d = makeDialog(api);
+    d.open({ hostname: "buildbox.local", port: 6055 });
+    expect(d._step).toBe("input");
+    expect(d._skippedInput).toBe(false);
+    expect(api.previewRemoteBuildPair).not.toHaveBeenCalled();
+  });
+});

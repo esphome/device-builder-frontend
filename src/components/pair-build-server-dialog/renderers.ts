@@ -112,12 +112,14 @@ export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateRes
 }
 
 export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateResult {
-  // Empty pin = auto-preview still in flight (mDNS-discovered host jumped
-  // straight here); show a connecting state until the fingerprint lands.
-  const connecting = host._previewedPin === "";
+  // Busy with no pin yet = auto-preview still in flight (mDNS-discovered host
+  // jumped straight here); show a connecting state until the fingerprint lands.
+  // Gating on _busy means a degenerate empty pin from the backend renders the
+  // landed branch rather than an unresolving spinner.
+  const connecting = host._busy && host._previewedPin === "";
   const canSubmit =
     !host._busy &&
-    !connecting &&
+    host._previewedPin !== "" &&
     host._receiverLabel.trim().length > 0 &&
     host._offloaderLabel.trim().length > 0;
   return html`
@@ -215,7 +217,7 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
           ?disabled=${!canSubmit}
           @click=${host._onConfirmSubmit}
         >
-          ${host._busy
+          ${host._busy && !connecting
             ? host._localize("settings.pair_build_server_sending")
             : host._localize("settings.pair_build_server_request_action")}
         </button>
