@@ -49,7 +49,7 @@ export type DelayUnit = TimePeriodUnit;
 /** Maps each picker unit to the catalog field key the backend's
  *  YAML writer expects. ESPHome's time_period coercer accepts any
  *  of these; we always write through exactly one. */
-export const DELAY_UNIT_TO_KEY: Record<DelayUnit, string> = {
+const DELAY_UNIT_TO_KEY: Record<DelayUnit, string> = {
   us: "microseconds",
   ms: "milliseconds",
   s: "seconds",
