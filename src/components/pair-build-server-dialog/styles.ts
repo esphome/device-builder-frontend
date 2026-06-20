@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
+
 export const pairBuildServerDialogStyles = css`
   esphome-base-dialog {
     --width: 500px;
@@ -143,5 +145,13 @@ export const pairBuildServerDialogStyles = css`
   .sent-body code {
     font-family: var(--wa-font-family-mono, monospace);
     font-size: var(--wa-font-size-xs);
+  }
+
+  /* On the mobile full-screen sheet the desktop header breathing room wastes
+     vertical space; tighten the top padding there only. */
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    esphome-base-dialog::part(header) {
+      padding-top: var(--wa-space-s);
+    }
   }
 `;
