@@ -21,11 +21,13 @@ const HOST_SELECTOR: Record<DialogHost, CSSResult> = {
 };
 
 /** Custom property each dialog reads for its body's horizontal padding, e.g.
- *  ``padding-inline: var(--esphome-dialog-body-gutter, var(--wa-space-l))``. On
- *  the mobile sheet the fragments below set it to a tighter, consistent value;
- *  on desktop it's unset so each dialog's own fallback applies. Driving it
- *  through an inherited custom property (set on the host, read in the shadow
- *  ``::part(body)``) avoids any ``::part`` specificity fight — no !important. */
+ *  ``padding-inline: var(--esphome-dialog-body-gutter, <desktop fallback>)``
+ *  where the fallback is that dialog's own desktop value (create-config uses
+ *  ``var(--wa-space-xl)``). On the mobile sheet the fragments below set it to a
+ *  tighter, consistent value; on desktop it's unset so each dialog's own
+ *  fallback applies. Driving it through an inherited custom property (set on the
+ *  host, read in the shadow ``::part(body)``) avoids any ``::part`` specificity
+ *  fight — no !important. */
 const MOBILE_DIALOG_BODY_GUTTER = css`
   --esphome-dialog-body-gutter: var(--wa-space-m);
 `;
