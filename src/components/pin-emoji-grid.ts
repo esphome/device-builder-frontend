@@ -35,13 +35,14 @@ export class ESPHomePinEmojiGrid extends LitElement {
     }
 
     /* Emoji-only row, evenly distributed across the card width. Wraps rather
-       than overflowing in a narrow host (e.g. the build-server identity card's
-       label/value row on mobile); with no name labels the seven glyphs fit one
-       line wherever there's room (the pair-confirm card). */
+       than overflowing in a narrow host; space-evenly (not space-between) keeps
+       inter-glyph spacing consistent if it wraps, so the fingerprint reads as
+       one cohesive strip instead of a ragged last row. With no name labels the
+       seven glyphs fit one line wherever there's room (the pair-confirm card). */
     .grid {
       display: flex;
       flex-wrap: wrap;
-      justify-content: space-between;
+      justify-content: space-evenly;
       align-items: center;
       gap: var(--wa-space-xs);
     }
