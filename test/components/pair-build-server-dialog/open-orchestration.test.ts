@@ -61,6 +61,25 @@ describe("pair dialog open() auto-preview orchestration", () => {
     expect(d._sending).toBe(false);
   });
 
+  it("drops a stale preview result after the dialog is reopened", async () => {
+    const api = makeApi();
+    let resolvePreview: (v: { pin_sha256: string }) => void = () => {};
+    api.previewRemoteBuildPair = vi.fn(() => new Promise((r) => (resolvePreview = r)));
+    const d = makeDialog(api);
+    // Pair host A: auto-preview starts and hangs (offline host).
+    d.open({ hostname: "hostA.local", port: 6055 }, { autoPreview: true });
+    // User dismisses and reopens the singleton for a fresh session.
+    d.open();
+    expect(d._step).toBe("input");
+    // Host A's preview finally resolves, late.
+    resolvePreview({ pin_sha256: "stale-a-pin" });
+    await Promise.resolve();
+    await Promise.resolve();
+    // The stale result must not yank the fresh session to confirm.
+    expect(d._step).toBe("input");
+    expect(d._previewedPin).toBe("");
+  });
+
   it("stays on input when the api is undefined", () => {
     const d = makeDialog(undefined);
     d.open({ hostname: "buildbox.local", port: 6055 }, { autoPreview: true });

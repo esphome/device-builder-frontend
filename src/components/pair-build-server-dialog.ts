@@ -83,6 +83,13 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   // secondary button: Cancel (close) rather than Back (to the skipped form).
   @state() _skippedInput = false;
 
+  // Bumped on every open(). The dialog is a reused singleton and a dismissable
+  // preview can still be in flight (offline host), so onPreviewSubmit captures
+  // this and drops its result if a later open() superseded the session — else a
+  // late preview would clobber the fresh session with a stale host/fingerprint.
+  // Not reactive: it gates a write, it doesn't drive render.
+  _previewGeneration = 0;
+
   // ${hostname}:${port} of the submitted request — null outside the sent step.
   @state() _sentKey: string | null = null;
 
@@ -112,6 +119,8 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     prefill?: { hostname?: string; port?: number },
     opts?: { autoPreview?: boolean }
   ): void {
+    // Supersede any preview still in flight from a previous open().
+    this._previewGeneration += 1;
     this._step = "input";
     this._busy = false;
     this._sending = false;

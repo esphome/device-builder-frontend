@@ -62,13 +62,19 @@ export async function onPreviewSubmit(host: ESPHomePairBuildServerDialog): Promi
     host._skippedInput = false;
     return;
   }
+  // The dialog is a reused singleton and this preview is dismissable, so a
+  // later open() can supersede us mid-flight; drop a stale result rather than
+  // clobber the fresh session with the wrong host/fingerprint.
+  const generation = host._previewGeneration;
   host._busy = true;
   host._error = null;
   try {
     const response = await host._api.previewRemoteBuildPair({ hostname, port });
+    if (host._previewGeneration !== generation) return;
     host._previewedPin = response.pin_sha256;
     host._step = "confirm";
   } catch (err) {
+    if (host._previewGeneration !== generation) return;
     host._error = previewErrorMessage(host, err);
     // Drop back to the input form so the user can fix the host/port. No-op in
     // the manual flow (already on input); matters for an auto-preview that
@@ -77,7 +83,8 @@ export async function onPreviewSubmit(host: ESPHomePairBuildServerDialog): Promi
     host._step = "input";
     host._skippedInput = false;
   } finally {
-    host._busy = false;
+    // Only clear busy for the live session; a superseded open() owns it now.
+    if (host._previewGeneration === generation) host._busy = false;
   }
 }
 
