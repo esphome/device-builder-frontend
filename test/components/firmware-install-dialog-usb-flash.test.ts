@@ -85,6 +85,7 @@ describe("startUsbFlash", () => {
     const host = makeHost({ compileOk: true, binaries: [bin("firmware.ota.bin")] });
     await startUsbFlash(asHost(host));
     expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.no_flashable_binary");
     expect(host._usbFirmware).toBeNull();
   });
 });

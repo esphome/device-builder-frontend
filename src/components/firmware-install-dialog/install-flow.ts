@@ -318,31 +318,27 @@ function failNoBinaries(
   );
 }
 
-// web.esphome.io needs a self-contained image (factory.bin / firmware.bin);
-// manual download takes whatever the build produced (incl. .uf2).
+// The manual binary download: compile, then hand over whatever the build
+// produced (incl. .uf2). More than one format routes to the choose-binary
+// picker so every image stays reachable.
 export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const isWebFlasher = host._installer === "web-download";
 
   if (!(await compileOrFail(host, device.configuration))) return;
   host._statusMessage = host._localize("firmware.status_downloading");
   const binaries = await fetchBinaries(host, device.configuration);
   if (!binaries) return;
 
-  if (!isWebFlasher && binaries.length > 1) {
+  if (binaries.length > 1) {
     showBinaryPicker(host, binaries);
     return;
   }
-  const flashable =
-    binaries.find((b) => b.file === "firmware.factory.bin") ??
-    binaries.find((b) => b.file === "firmware.bin") ??
-    (isWebFlasher ? undefined : binaries[0]);
-  if (!flashable) {
-    failNoBinaries(host, { isWebFlasher, isEmpty: binaries.length === 0 });
+  if (binaries.length === 0) {
+    failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
     return;
   }
-  await downloadSelectedBinary(host, flashable.file);
+  await downloadSelectedBinary(host, binaries[0].file);
 }
 
 // Three-dot "Download". Compiles only when nothing is built, so an existing

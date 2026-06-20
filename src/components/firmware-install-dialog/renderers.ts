@@ -103,28 +103,24 @@ function downloadReadyTitle(host: ESPHomeFirmwareInstallDialog): string {
   if (host._installer === "web-flash") {
     return host._localize("firmware.usb_built_title");
   }
-  if (host._installer === "binary-download") {
-    const isElf = host._downloadedFilename.endsWith(".elf");
-    return host._localize(
-      isElf ? "firmware.elf_download_done_title" : "firmware.binary_download_done_title"
-    );
-  }
-  return host._localize("firmware.web_download_done_title");
+  // binary-download
+  const isElf = host._downloadedFilename.endsWith(".elf");
+  return host._localize(
+    isElf ? "firmware.elf_download_done_title" : "firmware.binary_download_done_title"
+  );
 }
 
 function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
   if (host._installer === "web-flash") {
     return host._localize("firmware.usb_built_body", { host: FLASHER_HOST });
   }
+  // binary-download
   const filename = host._downloadedFilename;
-  if (host._installer === "binary-download") {
-    const isElf = filename.endsWith(".elf");
-    return host._localize(
-      isElf ? "firmware.elf_download_done_body" : "firmware.binary_download_done_body",
-      { filename }
-    );
-  }
-  return host._localize("firmware.web_download_done_body", { filename });
+  const isElf = filename.endsWith(".elf");
+  return host._localize(
+    isElf ? "firmware.elf_download_done_body" : "firmware.binary_download_done_body",
+    { filename }
+  );
 }
 
 export function cardStatusMessage(host: ESPHomeFirmwareInstallDialog): string {
@@ -155,8 +151,8 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
 
 // ── status-extra slot ────────────────────────────────────────────────
 // Bespoke bodies that don't fit the standard status block: the binary-format
-// picker (choose-binary), the web-flasher instructions / "choose another
-// format" link (download-ready), and the collapsible compile / esptool log.
+// picker (choose-binary), the "choose another format" link (download-ready),
+// and the collapsible compile / esptool log.
 
 function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   return html`
@@ -184,30 +180,16 @@ function renderDownloadReadyExtra(
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
   // Manual binary download: offer to pick a different format when more than
-  // one was produced. The ELF is debug symbols, not a flashable image, so no
-  // web.esphome.io checklist here.
-  if (host._installer === "binary-download") {
-    return host._binaries.length > 1
-      ? html`<button
-          type="button"
-          class="reset-suggestion-link"
-          @click=${() => (host._step = "choose-binary")}
-        >
-          ${host._localize("firmware.choose_binary_again")}
-        </button>`
-      : nothing;
-  }
-  const filename = host._downloadedFilename;
-  return html`
-    <ol class="instructions">
-      <li>${host._localize("firmware.web_download_step_open")}</li>
-      <li>${host._localize("firmware.web_download_step_connect")}</li>
-      <li>${host._localize("firmware.web_download_step_install", { filename })}</li>
-    </ol>
-    <p class="instructions-note">
-      ${host._localize("dashboard.install_method_web_download_desc")}
-    </p>
-  `;
+  // one was produced.
+  return host._binaries.length > 1
+    ? html`<button
+        type="button"
+        class="reset-suggestion-link"
+        @click=${() => (host._step = "choose-binary")}
+      >
+        ${host._localize("firmware.choose_binary_again")}
+      </button>`
+    : nothing;
 }
 
 export function renderStatusExtra(
@@ -281,7 +263,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   const isRunning =
     host._step !== "done" && host._step !== "error" && host._step !== "download-ready";
   if (isRunning) {
-    // Web Serial only — installWebDownload doesn't connect to a device.
+    // Web Serial only — the download / web-flash installers don't connect.
     const showToggle = host._installer === "web-serial";
     return html`
       <div class="footer">
@@ -303,15 +285,6 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
     `;
   }
   if (host._step === "download-ready") {
-    if (host._installer === "binary-download") {
-      return html`
-        <div class="footer">
-          <button class="btn btn--primary" @click=${host._close}>
-            ${host._localize("command.close")}
-          </button>
-        </div>
-      `;
-    }
     if (host._installer === "web-flash") {
       return html`
         <div class="footer">
@@ -325,19 +298,12 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
         </div>
       `;
     }
+    // binary-download
     return html`
       <div class="footer">
-        <button class="btn btn--ghost" @click=${host._close}>
+        <button class="btn btn--primary" @click=${host._close}>
           ${host._localize("command.close")}
         </button>
-        <a
-          class="btn btn--primary"
-          href="https://web.esphome.io"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          ${host._localize("firmware.web_download_open_button")}
-        </a>
       </div>
     `;
   }

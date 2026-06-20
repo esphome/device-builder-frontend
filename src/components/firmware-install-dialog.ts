@@ -69,12 +69,7 @@ export type InstallStep =
   | "download-ready"
   | "error";
 
-export type Installer =
-  | "web-serial"
-  | "web-download"
-  | "binary-download"
-  | "web-flash"
-  | null;
+export type Installer = "web-serial" | "binary-download" | "web-flash" | null;
 
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {
@@ -116,8 +111,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // device produces more than one (e.g. ESP32 factory + OTA).
   @state() _binaries: FirmwareBinary[] = [];
 
-  // Reset per _init so an opt-out on one run doesn't persist. installWebDownload
-  // doesn't connect to a device, so the toggle is install-only.
+  // Reset per _init so an opt-out on one run doesn't persist. Only the
+  // web-serial install connects to a device, so the toggle is install-only.
   @state() _showLogsAfterInstall = true;
 
   // Which entry opened the dialog — controls success-screen wording, footer
@@ -161,18 +156,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._step = "connecting";
     this._statusMessage = this._localize("firmware.status_connecting");
     void startWebSerialInstall(this);
-  }
-
-  // Compile on the server, download the resulting binary, show instructions
-  // to flash it via web.esphome.io. Fallback when neither OTA nor Web Serial
-  // is available (HTTP dashboard, offline first-flash).
-  // DEAD since #904 (the picker routes USB to web-flash); prune tracked in #907.
-  installWebDownload(device: ConfiguredDevice) {
-    this._init(device);
-    this._installer = "web-download";
-    this._step = "queued";
-    this._statusMessage = this._localize("firmware.status_queued");
-    void startDownload(this);
   }
 
   // "Flash via USB": compile + download the factory image here (logs/errors

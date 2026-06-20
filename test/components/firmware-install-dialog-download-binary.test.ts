@@ -2,8 +2,7 @@
  * Tests for the manual firmware-binary download flow. Pins the #1033 fix:
  * when a device produces more than one format the manual download must
  * route to the choose-binary picker (so the OTA image is reachable)
- * instead of silently auto-downloading the factory image; web-flasher
- * paths still auto-select the self-contained factory image.
+ * instead of silently auto-downloading the factory image.
  *
  * Downloads go over HTTP: api.firmwareDownloadUrl mints a tokenized URL and
  * triggerDownload navigates to it (native, streamed, mobile-friendly) so a
@@ -40,7 +39,7 @@ const OTA: FirmwareBinary = {
   description: "For OTA updating a device.",
 };
 
-type Installer = "web-serial" | "web-download" | "binary-download";
+type Installer = "web-serial" | "binary-download";
 
 function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
   const api = {
@@ -106,16 +105,6 @@ describe("manual firmware-binary download flow", () => {
     expect(host._step).toBe("download-ready");
   });
 
-  it("web flasher auto-selects the factory image even with multiple formats", async () => {
-    const { host, api } = makeHost("web-download", [FACTORY, OTA]);
-    await run(host);
-    expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
-      "device.yaml",
-      "firmware.factory.bin"
-    );
-    expect(host._step).toBe("download-ready");
-  });
-
   it("picking the OTA format downloads that file and hands it to the browser", async () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     await run(host); // lands on choose-binary
@@ -145,15 +134,8 @@ describe("manual firmware-binary download flow", () => {
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 
-  it("web flasher with no flashable binary points at the web-flasher limits", async () => {
-    const { host, api } = makeHost("web-download", []);
-    await run(host);
-    expect(host._fail).toHaveBeenCalledWith("firmware.no_flashable_binary");
-    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
-  });
-
   it("names the build server when a remote compile returns no binaries", async () => {
-    const { host, api } = makeHost("web-download", []);
+    const { host, api } = makeHost("binary-download", []);
     api.firmwareCompile.mockResolvedValueOnce({
       job_id: "j1",
       source: JobSource.REMOTE,
@@ -164,20 +146,6 @@ describe("manual firmware-binary download flow", () => {
       "firmware.no_binaries_remote",
       "firmware.no_binaries_remote_detail"
     );
-    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
-  });
-
-  it("keeps the web-flasher message when a remote build returns only non-flashable formats", async () => {
-    // Binaries DID come back (OTA), so the build transferred fine — the web
-    // flasher just can't use them. Not a remote-transfer failure.
-    const { host, api } = makeHost("web-download", [OTA]);
-    api.firmwareCompile.mockResolvedValueOnce({
-      job_id: "j1",
-      source: JobSource.REMOTE,
-      source_label: "build-server-1",
-    });
-    await run(host);
-    expect(host._fail).toHaveBeenCalledWith("firmware.no_flashable_binary");
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 
