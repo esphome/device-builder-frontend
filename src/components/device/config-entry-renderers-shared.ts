@@ -14,12 +14,12 @@ import {
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
-import type { LocalizeFunc } from "../../common/localize.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { stripConstraintProse } from "../../util/constraint-groups.js";
+import { resolveEntryLabel } from "../../util/entry-label.js";
 import { coerceIntFieldValue } from "../../util/int-input.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -186,35 +186,11 @@ export function renderSubstitutionHint(value: string, ctx: RenderCtx) {
 // renderer keeps importing it from the one shared entry point.
 export type { RenderCtx };
 
-/**
- * Resolve the user-visible label for *entry* given a `localize`
- * function. Three-layer fallback:
- *
- * 1. `translation_key` resolved via `localize` (ignored when
- *    `localize` echoes the key back unchanged — the convention
- *    for "no translation registered").
- * 2. The catalog's English `entry.label`.
- * 3. The entry's `key`, prettified — `"update_interval"` →
- *    `"Update Interval"`.
- *
- * Pulled out of `labelFor()` so callers without a full
- * `RenderCtx` (e.g. the add-component dialog's hidden-validation
- * summary) can share the same chain.
- */
-export function resolveEntryLabel(entry: ConfigEntry, localize: LocalizeFunc): string {
-  if (entry.translation_key) {
-    const params = (entry.translation_params || undefined) as
-      | Record<string, string | number>
-      | undefined;
-    const translated = localize(entry.translation_key, params);
-    if (translated && translated !== entry.translation_key) return translated;
-  }
-  if (entry.label) return entry.label;
-  return entry.key
-    .split("_")
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
-}
+// `resolveEntryLabel` lives in a side-effect-free util so the
+// value-seeding pipeline can share the chain without importing
+// this renderer module (Lit deps + module-level icon registration).
+// Re-exported here so renderers keep importing it from one place.
+export { resolveEntryLabel };
 
 export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {
   return resolveEntryLabel(entry, ctx.localize);

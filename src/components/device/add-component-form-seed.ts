@@ -12,8 +12,8 @@ import {
   collectExistingIds,
   generateDefaultComponentId,
 } from "../../util/default-component-id.js";
+import { resolveEntryLabel } from "../../util/entry-label.js";
 import { setIn } from "../../util/nested-values.js";
-import { resolveEntryLabel } from "./config-entry-renderers-shared.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
 export interface SeedContext {
