@@ -48,6 +48,9 @@ export function compileFailureDetail(err: unknown): string {
  * ``chipName`` is esptool-js's chip *description* (``loader.main()`` returns
  * ``getChipDescription()`` — e.g. ``ESP8266EX`` / ``ESP8285``, not ``ESP8266``),
  * so normalize it via ``chipNameToVariant`` and match the ``esp82`` family.
+ *
+ * Distinct from ``pickFactoryBinary`` on purpose: Web Serial knows the detected
+ * chip and returns a flash offset, with a ``binaries[0]`` fallback. Don't unify.
  */
 export function pickFlashTarget(
   chipName: string,
@@ -402,6 +405,10 @@ export async function downloadSelectedBinary(
  * the single ``firmware.bin``; ESP32 is the merged ``*.factory.bin`` (its plain
  * ``firmware.bin`` is the app-only image at 0x10000, not flashable from 0x0).
  * Returns undefined when no from-scratch image was produced.
+ *
+ * Distinct from ``pickFlashTarget`` on purpose: web-flash only has the coarse
+ * ``target_platform`` (no chip yet), so it matches strictly and has no
+ * ``binaries[0]`` fallback. Don't unify the two.
  */
 export function pickFactoryBinary(
   targetPlatform: string,
