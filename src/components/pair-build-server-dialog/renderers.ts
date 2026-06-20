@@ -127,7 +127,7 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
     <div class="pin-card">
       ${connecting
         ? html`
-            <div class="pin-connecting">
+            <div class="pin-connecting" role="status">
               <wa-spinner></wa-spinner>
               <span>
                 ${host._localize("settings.pair_build_server_connecting", {

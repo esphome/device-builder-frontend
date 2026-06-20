@@ -127,7 +127,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     if (
       opts?.autoPreview &&
       this._api !== undefined &&
-      this._hostname &&
+      this._hostname.trim() &&
       parsePortInput(this._port) !== null
     ) {
       this._step = "confirm";
