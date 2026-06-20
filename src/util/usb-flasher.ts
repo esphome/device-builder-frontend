@@ -126,11 +126,17 @@ export function openFlasher(
     // Ignore data frames until we've handed off: a stray/early "done" must not
     // flip the dashboard to success before any firmware was sent.
     if (!handedOff) return;
-    // Any frame means the flasher is alive (including an in-tab retry after an
-    // error); refresh the watchdog so a slow-but-progressing flash isn't lost.
-    if (watchdog !== undefined) clearTimeout(watchdog);
-    watchdog = setTimeout(lost, FLASH_WATCHDOG_MS);
+    // Any frame proves the flasher is alive right now, so clear the pending
+    // watchdog; re-arm it below only while the flash is still progressing.
+    if (watchdog !== undefined) {
+      clearTimeout(watchdog);
+      watchdog = undefined;
+    }
+    const armWatchdog = () => {
+      watchdog = setTimeout(lost, FLASH_WATCHDOG_MS);
+    };
     if (data.type === MSG_PROGRESS) {
+      armWatchdog();
       cb.onProgress(data.pct ?? 0);
     } else if (data.type === MSG_STATE) {
       if (data.state === "done") {
@@ -139,9 +145,14 @@ export function openFlasher(
       } else if (data.state === "error") {
         // Not terminal: the flasher tab stays open and the user can retry in
         // place (hold BOOT + Connect & install). Keep listening so a later
-        // success or a tab close still reaches the dashboard.
+        // success or a tab close still reaches the dashboard, but leave the
+        // watchdog disarmed: idle-on-error would otherwise fire lost() and
+        // overwrite the real error with a misleading "lost contact" (the tab
+        // is alive) while severing the retry. The win.closed poll still catches
+        // an actually-closed tab; an in-tab retry's progress re-arms above.
         cb.onState("error", data.detail || "");
       } else if (data.detail) {
+        armWatchdog();
         cb.onStatus(data.detail);
       }
     }

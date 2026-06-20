@@ -96,8 +96,8 @@ describe("openFlasher", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
     const cb = makeCallbacks();
-    // Error is non-terminal (timers stay armed); tear down so the test doesn't
-    // leak the ready interval / watchdog into the worker.
+    // Error is non-terminal (the close poll stays armed); tear down so the test
+    // doesn't leak the interval into the worker.
     const teardown = openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb)!;
     emit(fakeWin, { type: "esphome-web-flash:ready" });
     emit(fakeWin, {
@@ -107,6 +107,22 @@ describe("openFlasher", () => {
     });
     expect(cb.states).toEqual([{ state: "error", detail: "boom" }]);
     teardown();
+  });
+
+  it("disarms the watchdog on an error so idle-on-error doesn't fire onLost", () => {
+    vi.useFakeTimers();
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    const teardown = openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb)!;
+    emit(fakeWin, { type: "esphome-web-flash:ready" });
+    emit(fakeWin, { type: "esphome-web-flash:state", state: "error", detail: "boom" });
+    // Sit on the error, tab still open, well past the 10-min flash watchdog.
+    vi.advanceTimersByTime(10 * 60 * 1000 + 1000);
+    expect(cb.lost).toBe(0);
+    expect(cb.states).toEqual([{ state: "error", detail: "boom" }]);
+    teardown();
+    vi.useRealTimers();
   });
 
   it("keeps listening after an error so an in-tab retry still reports done", () => {
