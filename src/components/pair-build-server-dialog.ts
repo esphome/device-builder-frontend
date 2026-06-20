@@ -14,6 +14,7 @@ import {
 } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
+import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { inputStyles } from "../styles/inputs.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -95,6 +96,9 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     // Neutral header + title + footer (shared) — dialog-chrome.ts.
     dialogChromeStyles,
     pairBuildServerDialogStyles,
+    // Full-screen sheet on mobile (overrides base-dialog's centered default;
+    // the outer-tree ::part rule wins the cascade).
+    fullscreenMobileDialog("esphome-base-dialog"),
   ];
 
   // autoPreview skips the hostname/port input step: when the host+port are
