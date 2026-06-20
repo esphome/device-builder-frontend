@@ -45,14 +45,15 @@ describe("onPreviewSubmit", () => {
     expect(host._skippedInput).toBe(false);
   });
 
-  it("ignores invalid input without calling the API", async () => {
+  it("recovers to the input step on invalid input without calling the API", async () => {
     const preview = vi.fn(async () => ({ pin_sha256: "x" }));
     const host = makeHost(preview);
     host._hostname = "";
     await onPreviewSubmit(host);
 
     expect(preview).not.toHaveBeenCalled();
-    expect(host._step).toBe("confirm");
+    expect(host._step).toBe("input");
+    expect(host._skippedInput).toBe(false);
     expect(host._error).toBe("settings.pair_build_server_input_invalid");
   });
 });

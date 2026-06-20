@@ -56,6 +56,10 @@ export async function onPreviewSubmit(host: ESPHomePairBuildServerDialog): Promi
   const port = parsePortInput(host._port);
   if (!hostname || port === null) {
     host._error = host._localize("settings.pair_build_server_input_invalid");
+    // Recover to a usable form, mirroring the catch below — keeps both failure
+    // exits consistent if the open() guard ever loosens.
+    host._step = "input";
+    host._skippedInput = false;
     return;
   }
   host._busy = true;
@@ -89,6 +93,8 @@ export async function onConfirmSubmit(host: ESPHomePairBuildServerDialog): Promi
     return;
   }
   host._busy = true;
+  // The mutating send: veto dismissal until it resolves (don't orphan it).
+  host._sending = true;
   host._error = null;
   try {
     const summary = await host._api.requestRemoteBuildPair({
@@ -119,6 +125,7 @@ export async function onConfirmSubmit(host: ESPHomePairBuildServerDialog): Promi
     host._error = requestErrorMessage(host, err);
   } finally {
     host._busy = false;
+    host._sending = false;
   }
 }
 

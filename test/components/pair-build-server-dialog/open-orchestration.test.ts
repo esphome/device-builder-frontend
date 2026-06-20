@@ -51,6 +51,16 @@ describe("pair dialog open() auto-preview orchestration", () => {
     expect(api.previewRemoteBuildPair).toHaveBeenCalledOnce();
   });
 
+  it("connecting state is busy but not sending, so the dialog stays dismissable", () => {
+    const api = makeApi();
+    const d = makeDialog(api);
+    d.open({ hostname: "buildbox.local", port: 6055 }, { autoPreview: true });
+    // The read-only preview marks _busy (spinner/submit-gate) but not _sending,
+    // so base-dialog's busy gate doesn't veto Escape/outside-click/Cancel.
+    expect(d._busy).toBe(true);
+    expect(d._sending).toBe(false);
+  });
+
   it("stays on input when the api is undefined", () => {
     const d = makeDialog(undefined);
     d.open({ hostname: "buildbox.local", port: 6055 }, { autoPreview: true });

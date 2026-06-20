@@ -18,11 +18,13 @@ function makeHost(
     skippedInput?: boolean;
     error?: string | null;
     busy?: boolean;
+    sending?: boolean;
   } = {}
 ): ESPHomePairBuildServerDialog {
   return {
     _localize: (key: string) => key,
     _busy: opts.busy ?? false,
+    _sending: opts.sending ?? false,
     _previewedPin: opts.pin ?? "",
     _hostname: "buildbox.local",
     _port: "6055",

@@ -94,7 +94,7 @@ export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateRes
     ${renderFooter(
       host,
       html`
-        <button class="btn btn--cancel" ?disabled=${host._busy} @click=${host.close}>
+        <button class="btn btn--cancel" ?disabled=${host._sending} @click=${host.close}>
           ${host._localize("layout.cancel")}
         </button>
         <button
@@ -205,7 +205,7 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
       html`
         <button
           class="btn btn--cancel"
-          ?disabled=${host._busy}
+          ?disabled=${host._sending}
           @click=${host._onConfirmBack}
         >
           ${host._skippedInput
