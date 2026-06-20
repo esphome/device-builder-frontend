@@ -3,9 +3,11 @@ import { customElement, property } from "lit/decorators.js";
 import { pinSha256ToEmojis } from "../util/pin-emoji.js";
 
 /**
- * Render a SHA-256 pin as a row of large emojis with their
- * names underneath; the visualisation each side of an OOB
- * verification compares.
+ * Render a SHA-256 pin as a row of evenly-spaced emojis; the
+ * visualisation each side of an OOB verification compares. The
+ * emoji glyph is the canonical signal, so the names show only as
+ * per-emoji ``title`` tooltips and the grid's combined
+ * ``aria-label`` (screen readers), not as visible labels.
  *
  * The mapping itself lives in `util/pin-emoji.ts`; this
  * component is just the visual frame, kept as a Lit element
@@ -32,25 +34,13 @@ export class ESPHomePinEmojiGrid extends LitElement {
       display: block;
     }
 
+    /* Emoji-only row, evenly distributed across the card width. With no
+       name labels the seven glyphs fit one line in every host context. */
     .grid {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    /* Cells are sized to fit a 4+3 layout inside a ~280px host
-       (the typical width once the surrounding dialog padding +
-       icon column eats into 420px); cell background is
-       intentionally transparent so the row reads as a single
-       fingerprint rather than a strip of buttons that invite
-       clicking. */
-    .cell {
-      display: flex;
-      flex-direction: column;
+      justify-content: space-between;
       align-items: center;
-      gap: 1px;
-      min-width: 48px;
-      padding: 2px 4px;
+      gap: var(--wa-space-xs);
     }
 
     /* Lean on the platform emoji font; overriding font-family
@@ -61,33 +51,21 @@ export class ESPHomePinEmojiGrid extends LitElement {
       font-size: 1.5rem;
       line-height: 1;
     }
-
-    .name {
-      font-size: var(--wa-font-size-xs, 11px);
-      color: var(--wa-color-text-quiet);
-      text-transform: lowercase;
-      letter-spacing: 0.02em;
-    }
   `;
 
   protected render() {
     const slots = pinSha256ToEmojis(this.pin);
     if (slots.length === 0) return null;
-    // ``lang="en"`` because the emoji names are English; screen
-    // readers in non-English locales use it to pick the right
-    // pronunciation while the visible text serves sighted users
-    // identically across locales. Per-cell name spans are
-    // ``aria-hidden`` so screen readers announce the
-    // fingerprint once via the grid's aria-label rather than
-    // repeating each name twice (container label + cell text).
+    // ``lang="en"`` because the emoji names are English; screen readers in
+    // non-English locales use it to pick the right pronunciation for the
+    // combined aria-label. Each emoji is ``aria-hidden`` so the fingerprint
+    // is announced once via the grid's aria-label, not per-glyph; the
+    // ``title`` gives sighted users the name on hover.
     return html`
       <div class="grid" role="img" lang="en" aria-label=${this._ariaLabel(slots)}>
         ${slots.map(
           (slot) => html`
-            <div class="cell">
-              <span class="emoji" aria-hidden="true">${slot.emoji}</span>
-              <span class="name" aria-hidden="true">${slot.name}</span>
-            </div>
+            <span class="emoji" title=${slot.name} aria-hidden="true">${slot.emoji}</span>
           `
         )}
       </div>
@@ -96,10 +74,7 @@ export class ESPHomePinEmojiGrid extends LitElement {
 
   private _ariaLabel(slots: ReadonlyArray<{ name: string }>): string {
     // Single combined label so screen readers announce the
-    // sequence as one fingerprint instead of N separate
-    // images; the per-cell .name text remains the visual
-    // identifier for sighted users (with aria-hidden so it
-    // doesn't get double-announced via the container label).
+    // sequence as one fingerprint instead of N separate images.
     return slots.map((s) => s.name).join(", ");
   }
 }
