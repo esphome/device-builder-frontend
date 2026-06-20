@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FLASHER_ORIGIN } from "../../src/common/docs.js";
 import { openFlasher, type FlasherCallbacks } from "../../src/util/usb-flasher.js";
 
@@ -39,12 +39,6 @@ function emit(win: unknown, data: unknown) {
     })
   );
 }
-
-beforeEach(() => {
-  if (!crypto.randomUUID) {
-    (crypto as unknown as { randomUUID: () => string }).randomUUID = () => "nonce";
-  }
-});
 
 afterEach(() => {
   vi.restoreAllMocks();
