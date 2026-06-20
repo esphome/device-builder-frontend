@@ -299,7 +299,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         })
       : nothing;
     // Prefer the friendly_name label; fall back to the instance name.
-    const displayName = trimTrailingDot(peer.friendly_name || peer.name);
+    const displayName = trimTrailingDot(peer.friendly_name.trim() || peer.name);
     return html`
       <div class="row peer-row">
         <div class="row-label">

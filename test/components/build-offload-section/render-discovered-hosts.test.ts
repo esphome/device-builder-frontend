@@ -103,4 +103,10 @@ describe("_renderDiscoveredRow display name", () => {
       "esphome-builder-jwywnve"
     );
   });
+
+  it("falls back to the instance name for a whitespace-only friendly_name", () => {
+    expect(rowTitle(peer("esphome-builder-jwywnve", 6055, "   "))).toBe(
+      "esphome-builder-jwywnve"
+    );
+  });
 });
