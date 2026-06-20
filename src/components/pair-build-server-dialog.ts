@@ -13,7 +13,6 @@ import {
   localizeContext,
 } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
-import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { inputStyles } from "../styles/inputs.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
@@ -93,8 +92,6 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     inputStyles,
     pinHexStyles,
     dialogActionButtonStyles,
-    // Neutral header + title + footer (shared) — dialog-chrome.ts.
-    dialogChromeStyles,
     pairBuildServerDialogStyles,
     // Full-screen sheet on mobile (overrides base-dialog's centered default;
     // the outer-tree ::part rule wins the cascade).

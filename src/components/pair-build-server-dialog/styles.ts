@@ -5,18 +5,22 @@ export const pairBuildServerDialogStyles = css`
     --width: 500px;
   }
 
-  /* Neutral header + title + footer come from dialogChromeStyles
-     (added in pair-build-server-dialog.ts's static styles). */
-  esphome-base-dialog::part(body) {
-    padding: 0 var(--wa-space-l);
+  /* Neutral header + title chrome, inlined rather than composed from
+     dialogChromeStyles: that shared block also hides the footer part, and this
+     wizard renders its actions in the footer so they stay pinned while a tall
+     confirm step scrolls. */
+  esphome-base-dialog::part(header) {
+    padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
   }
 
-  /* dialogChromeStyles hides the footer part (this dialog historically kept
-     its actions inside the scrolling body). We render the wizard actions in
-     the footer so they stay pinned while a tall confirm step scrolls, so
-     re-enable it — this rule comes after dialogChromeStyles in the cascade. */
-  esphome-base-dialog::part(footer) {
-    display: block;
+  esphome-base-dialog::part(title) {
+    font-size: var(--wa-font-size-m);
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-normal);
+  }
+
+  esphome-base-dialog::part(body) {
+    padding: 0 var(--wa-space-l);
   }
 
   .description {
