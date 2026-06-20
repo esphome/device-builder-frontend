@@ -11,6 +11,14 @@ export const pairBuildServerDialogStyles = css`
     padding: 0 var(--wa-space-l);
   }
 
+  /* dialogChromeStyles hides the footer part (this dialog historically kept
+     its actions inside the scrolling body). We render the wizard actions in
+     the footer so they stay pinned while a tall confirm step scrolls, so
+     re-enable it — this rule comes after dialogChromeStyles in the cascade. */
+  esphome-base-dialog::part(footer) {
+    display: block;
+  }
+
   .description {
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-quiet);
