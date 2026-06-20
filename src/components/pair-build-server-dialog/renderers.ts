@@ -126,10 +126,13 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
     <div class="description">
       ${host._localize("settings.pair_build_server_confirm_desc")}
     </div>
-    <div class="pin-card">
+    <!-- role="status" on the card (not the inner connecting div) makes one
+         polite live region cover both states, so a screen reader hears
+         "connecting…" and then the fingerprint when the auto-preview lands. -->
+    <div class="pin-card" role="status">
       ${connecting
         ? html`
-            <div class="pin-connecting" role="status">
+            <div class="pin-connecting">
               <wa-spinner></wa-spinner>
               <span>
                 ${host._localize("settings.pair_build_server_connecting", {
