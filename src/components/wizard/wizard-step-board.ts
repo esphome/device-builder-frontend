@@ -479,13 +479,8 @@ export class ESPHomeWizardStepBoard extends LitElement {
       // filtered picker is the better UX: they can still pick the
       // generic board explicitly, or one of several boards for
       // their chip.
-      const label = chipNameToFilterLabel(chipName);
-      if (label) {
-        this._selectedFilter = label;
-        this._filterFromDetection = true;
-        this._search = "";
-        void this._fetchBoards();
-      }
+      this._applyDetectedFilter(chipNameToFilterLabel(chipName));
+      void this._fetchBoards();
     } catch (err) {
       if (isPortPickerCancel(err)) return;
       this._detectError = this._extractErrorDetail(
@@ -528,11 +523,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
         }
       }
 
-      if (result.chip_family) {
-        this._selectedFilter = result.chip_family;
-        this._filterFromDetection = true;
-        this._search = "";
-      }
+      // Resolve to an existing filter chip (same as the WebSerial path);
+      // a recognised-but-unfiltered variant (e.g. ESP32-S31) yields null,
+      // so the picker is left unfiltered instead of keeping a dead filter.
+      this._applyDetectedFilter(
+        result.chip_family ? chipNameToFilterLabel(result.chip_family) : null
+      );
       this._view = "boards";
       void this._fetchBoards();
     } catch (err) {
@@ -574,6 +570,15 @@ export class ESPHomeWizardStepBoard extends LitElement {
     this._view = "boards";
     this._detectError = "";
   };
+
+  // Apply a detected chip's filter, clearing any prior filter when the
+  // chip maps to no picker chip (null) so the picker is genuinely
+  // unfiltered rather than keeping a stale manual/preset selection.
+  private _applyDetectedFilter(label: string | null) {
+    this._selectedFilter = label ?? "";
+    this._filterFromDetection = label !== null;
+    this._search = "";
+  }
 
   private _exitDetectionMode() {
     this._selectedFilter = "";

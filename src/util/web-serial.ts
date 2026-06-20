@@ -352,11 +352,12 @@ async function watchdogReset(loader: ESPLoader, transport: Transport): Promise<b
      Order: unlock → set timeout → enable+arm → re-lock. The
      ``(1<<31) | (5<<28) | (1<<8) | 2`` config0 bit pattern is what
      esptool ships — exact bit semantics aren't documented per-chip;
-     trust the authoritative source. */
+     trust the authoritative source. ``>>> 0`` keeps it an unsigned
+     u32 (``1 << 31`` alone is negative in JS). */
   try {
     await loader.writeReg(regs.wdtWProtect, RTC_CNTL_WDT_WKEY);
     await loader.writeReg(regs.wdtConfig1, 2000);
-    await loader.writeReg(regs.wdtConfig0, (1 << 31) | (5 << 28) | (1 << 8) | 2);
+    await loader.writeReg(regs.wdtConfig0, ((1 << 31) | (5 << 28) | (1 << 8) | 2) >>> 0);
     await loader.writeReg(regs.wdtWProtect, 0);
   } catch {
     /* A writeReg may race the actual reset firing — the chip is

@@ -133,7 +133,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
          styles so the board picker isn't boxed into a 520px column. #41 */
 
       esphome-base-dialog::part(body) {
-        padding: var(--wa-space-l) var(--wa-space-xl);
+        /* Horizontal gutter drops to a tighter value on the mobile sheet via
+           --esphome-dialog-body-gutter (set by fullscreenMobileDialog). */
+        padding: var(--wa-space-l) var(--esphome-dialog-body-gutter, var(--wa-space-xl));
       }
 
       .error {

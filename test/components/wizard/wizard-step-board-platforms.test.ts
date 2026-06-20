@@ -85,6 +85,34 @@ describe("wizard step-board platform chips", () => {
       expect(chipNameToFilterLabel("ESP8266")).toBe("ESP8266");
     });
 
+    it("identifies classic ESP32 from its package-specific description", () => {
+      // esptool reports classic ESP32 as ESP32-D0WD / ESP32-PICO-D4 etc.,
+      // never the bare "ESP32" — the exact-match version returned null.
+      expect(chipNameToFilterLabel("ESP32-D0WD (revision 1)")).toBe("ESP32");
+      expect(chipNameToFilterLabel("ESP32-PICO-D4")).toBe("ESP32");
+      expect(chipNameToFilterLabel("ESP32-U4WDH")).toBe("ESP32");
+    });
+
+    it("identifies ESP8266 / ESP8285 from their package descriptions", () => {
+      expect(chipNameToFilterLabel("ESP8266EX")).toBe("ESP8266");
+      expect(chipNameToFilterLabel("ESP8285")).toBe("ESP8266");
+    });
+
+    it("keeps ESP32-S3 packages on the S3 filter (not classic ESP32)", () => {
+      expect(chipNameToFilterLabel("ESP32-S3 (QFN56)")).toBe("ESP32-S3");
+      expect(chipNameToFilterLabel("ESP32-S3-PICO-1")).toBe("ESP32-S3");
+    });
+
+    it("returns null for variants with no filter chip (no mis-narrowing)", () => {
+      // S31/C31/H21/H4 have no catalog filter — narrowing to the shorter
+      // sibling (S3/C3/H2) or to classic ESP32 would show the wrong boards,
+      // so the caller falls back to the full picker.
+      expect(chipNameToFilterLabel("ESP32-S31")).toBeNull();
+      expect(chipNameToFilterLabel("ESP32-C31")).toBeNull();
+      expect(chipNameToFilterLabel("ESP32-H21")).toBeNull();
+      expect(chipNameToFilterLabel("ESP32-H4")).toBeNull();
+    });
+
     it("maps the rp2040 / rp2350 chip series to their split filter labels", () => {
       // The two rp2040-platform chips are distinguished by `mcu`, so the
       // chip-series name must resolve to its own label.

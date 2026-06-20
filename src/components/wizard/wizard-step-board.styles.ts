@@ -271,7 +271,7 @@ export const wizardStepBoardStyles = css`
   .platform-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
   }
 
   .detection-banner {
@@ -292,7 +292,7 @@ export const wizardStepBoardStyles = css`
   .platform-chip {
     display: inline-flex;
     align-items: center;
-    padding: 4px 12px;
+    padding: 4px 8px;
     border-radius: 999px;
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-bold);
