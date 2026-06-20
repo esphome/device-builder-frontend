@@ -31,9 +31,7 @@ import type {
   AvailableComponentInstance,
   AvailableScript,
   ConditionNode,
-  LambdaValue,
 } from "../../../api/types/automations.js";
-import { isLambdaValue } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
@@ -42,22 +40,21 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { actionAdvancedState } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import {
-  looksLikeTimePeriodScalar,
-  parseTimePeriodScalar,
-  TIME_PERIOD_UNITS,
-  type TimePeriodUnit,
-} from "../../../util/time-period.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import "../config-entry-renderers/lambda-editor.js";
 import { lambdaBodyOf } from "../config-entry-renderers/lambda.js";
-import {
-  literalLambdaToggleStyles,
-  renderLiteralLambdaToggle,
-} from "../config-entry-renderers/literal-lambda-toggle.js";
+import { literalLambdaToggleStyles } from "../config-entry-renderers/literal-lambda-toggle.js";
 import "./automation-condition-tree.js";
+import {
+  delayLambdaOf,
+  type DelayUnit,
+  readDelay,
+  renderDelayParams,
+  writeDelayLambdaParams,
+  writeDelayParams,
+} from "./automation-delay-params.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./catalog-picker-dialog.js";
 import type {
@@ -79,23 +76,6 @@ registerMdiIcons({
   delete: mdiDelete,
   "pencil-outline": mdiPencilOutline,
 });
-
-/** Time units the Delay action picker offers (the shared canonical
- *  set, least → most coarse). */
-const DELAY_UNITS = TIME_PERIOD_UNITS;
-type DelayUnit = TimePeriodUnit;
-
-/** Maps each picker unit to the catalog field key the backend's
- *  YAML writer expects. ESPHome's time_period coercer accepts any
- *  of these; we always write through exactly one. */
-const DELAY_UNIT_TO_KEY: Record<DelayUnit, string> = {
-  us: "microseconds",
-  ms: "milliseconds",
-  s: "seconds",
-  min: "minutes",
-  h: "hours",
-  d: "days",
-};
 
 @customElement("esphome-automation-action-node")
 export class ESPHomeAutomationActionNode extends LitElement {
@@ -427,162 +407,44 @@ export class ESPHomeAutomationActionNode extends LitElement {
         : nothing}`;
   }
 
-  /**
-   * Bespoke renderer for the ``delay`` action.
-   *
-   * The catalog exposes Delay as six separate string fields
-   * (``days``, ``hours``, ``minutes``, ``seconds``, ``milliseconds``,
-   * ``microseconds``) all tagged advanced + optional, but
-   * semantically only one knob is being set — the user picks a
-   * unit and types a number. Surfacing six empty inputs invites
-   * filling several of them by accident and looks nothing like
-   * the single ``interval: 5s`` widget the interval automation
-   * already uses.
-   *
-   * Replace it with a number + unit pair. On write we put the
-   * value into the matching catalog field and clear the others;
-   * on read we pick whichever field carries a value and split it
-   * back into number + unit. ``delay: 2s`` written by the
-   * backend's shortcut writer lands as ``params.id = "2s"`` —
-   * fall back to that key as a last resort so we don't lose
-   * historic shortcut values when the user opens the editor.
-   *
-   * Delay is also templatable: ``delay: !lambda "..."`` lands as a
-   * lambda sentinel under ``params.id``. A literal/lambda toggle
-   * (matching the templatable field UX) swaps the number + unit pair
-   * for the C++ editor so the lambda is visible and round-trips.
-   */
+  /** The bespoke value+unit / lambda Delay widget. The renderer and
+   *  its params read/write helpers live in ``automation-delay-params``;
+   *  the host owns only the toggle stashes and the emit plumbing. */
   private _renderDelayParams() {
-    const lambda = this._delayLambda();
-    return html`<div class="ae-delay">
-      ${renderLiteralLambdaToggle({
-        isLambda: lambda !== null,
-        disabled: this.disabled,
-        localize: this._localize,
-        onSwitch: (toLambda) => this._toggleDelayLambda(toLambda),
-      })}
-      ${lambda ? this._renderDelayLambda(lambda) : this._renderDelayLiteral()}
-    </div>`;
-  }
-
-  private _renderDelayLiteral() {
-    const { value: numericValue, unit } = this._readDelay();
-    return html`<div class="ae-delay-row">
-      <div class="ae-delay-value">
-        <label class="field-label" for="ae-delay-value-input">
-          ${this._localize("device.automation_action_delay_value")}
-        </label>
-        <input
-          id="ae-delay-value-input"
-          type="text"
-          inputmode="decimal"
-          .value=${numericValue}
-          placeholder="0"
-          ?disabled=${this.disabled}
-          @input=${(e: Event) =>
-            this._writeDelay((e.target as HTMLInputElement).value, unit)}
-        />
-      </div>
-      <div class="ae-delay-unit">
-        <label class="field-label" id="ae-delay-unit-label">
-          ${this._localize("device.automation_action_delay_unit")}
-        </label>
-        <wa-select
-          id="ae-delay-unit-select"
-          aria-labelledby="ae-delay-unit-label"
-          value=${unit}
-          ?disabled=${this.disabled}
-          @change=${(e: Event) =>
-            this._writeDelay(
-              numericValue,
-              (e.target as HTMLSelectElement).value as DelayUnit
-            )}
-        >
-          ${DELAY_UNITS.map(
-            (u) =>
-              html`<wa-option value=${u} ?selected=${u === unit}>
-                ${this._localize(`device.automation_action_delay_unit_${u}`)}
-              </wa-option>`
-          )}
-        </wa-select>
-      </div>
-    </div>`;
-  }
-
-  private _renderDelayLambda(lambda: LambdaValue) {
-    return html`<esphome-lambda-editor
-      .value=${lambdaBodyOf(lambda)}
-      ?disabled=${this.disabled}
-      @lambda-change=${(e: CustomEvent<{ value: string }>) =>
-        this._writeDelayLambda(e.detail.value)}
-    ></esphome-lambda-editor>`;
-  }
-
-  /** The Delay value when it is a ``!lambda`` (the templatable form),
-   *  else null. The backend lands a scalar delay under ``params.id``. */
-  private _delayLambda(): LambdaValue | null {
-    const id = (this.value.params ?? {}).id;
-    return isLambdaValue(id) ? id : null;
+    return renderDelayParams({
+      params: this.value.params ?? {},
+      disabled: this.disabled,
+      localize: this._localize,
+      onWrite: (value, unit) => this._writeDelay(value, unit),
+      onWriteLambda: (body) => this._writeDelayLambda(body),
+      onToggle: (toLambda) => this._toggleDelayLambda(toLambda),
+    });
   }
 
   /** Flip the Delay action between its literal (value + unit) and
    *  ``!lambda`` forms, stashing the side being left so an accidental
    *  toggle doesn't discard the user's work before they flip back. */
   private _toggleDelayLambda(toLambda: boolean) {
-    const isLambda = this._delayLambda() !== null;
-    if (toLambda === isLambda) return;
+    const params = this.value.params ?? {};
+    const lambda = delayLambdaOf(params);
+    if (toLambda === (lambda !== null)) return;
     if (toLambda) {
-      this._delayLiteralStash = this._readDelay();
+      this._delayLiteralStash = readDelay(params);
       this._writeDelayLambda(this._delayLambdaStash);
     } else {
-      this._delayLambdaStash = lambdaBodyOf(this._delayLambda());
+      this._delayLambdaStash = lambdaBodyOf(lambda);
       const { value, unit } = this._delayLiteralStash ?? { value: "", unit: "s" };
       this._writeDelay(value, unit);
     }
   }
 
-  /** Pick a (numeric value, unit) pair out of the delay action's
-   *  params dict. Falls back to seconds when no field is set. */
-  private _readDelay(): { value: string; unit: DelayUnit } {
-    const params = this.value.params ?? {};
-    for (const u of DELAY_UNITS) {
-      const key = DELAY_UNIT_TO_KEY[u];
-      const v = params[key];
-      if (v !== undefined && v !== "" && v !== null) {
-        return { value: String(v), unit: u };
-      }
-    }
-    // Backend shortcut form: ``delay: 2s`` → ``params.id = "2s"``.
-    // Split into numeric value + canonical unit (honouring ESPHome's
-    // ``sec`` / ``seconds`` / ... aliases) so the picker doesn't blank
-    // out for round-tripped values. Requires an explicit unit — ESPHome
-    // rejects a bare-number delay, so we don't pretend ``5`` is seconds.
-    const shortcut = params.id;
-    if (typeof shortcut === "string" && looksLikeTimePeriodScalar(shortcut)) {
-      const parsed = parseTimePeriodScalar(shortcut);
-      return { value: parsed.value, unit: parsed.unit };
-    }
-    return { value: "", unit: "s" };
-  }
-
-  /** A copy of the params with every delay slot removed — the six unit
-   *  fields and the ``id`` scalar shorthand — so a writer can set
-   *  exactly one form (value + unit, or lambda) without the others
-   *  lingering as a competing value. */
-  private _clearedDelayParams(): Record<string, unknown> {
-    const next: Record<string, unknown> = { ...(this.value.params ?? {}) };
-    for (const u of DELAY_UNITS) delete next[DELAY_UNIT_TO_KEY[u]];
-    delete next.id;
-    return next;
-  }
-
   /** Write a (numeric value, unit) pair into the delay action's params,
    *  using the canonical ``<unit>: <value>`` form. */
   private _writeDelay(value: string, unit: DelayUnit) {
-    const trimmed = value.trim();
-    const next = this._clearedDelayParams();
-    if (trimmed) next[DELAY_UNIT_TO_KEY[unit]] = trimmed;
-    this._emit({ ...this.value, params: next });
+    this._emit({
+      ...this.value,
+      params: writeDelayParams(this.value.params ?? {}, value, unit),
+    });
   }
 
   /** Write a ``!lambda`` body into the delay action's scalar ``id``
@@ -590,9 +452,10 @@ export class ESPHomeAutomationActionNode extends LitElement {
    *  re-emit a lambda rather than a string literal. */
   private _writeDelayLambda(body: string) {
     this._delayLambdaStash = body;
-    const next = this._clearedDelayParams();
-    next.id = { _lambda: body, _tag: "!lambda" };
-    this._emit({ ...this.value, params: next });
+    this._emit({
+      ...this.value,
+      params: writeDelayLambdaParams(this.value.params ?? {}, body),
+    });
   }
 
   private _openPicker = () => {
