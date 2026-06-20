@@ -185,6 +185,45 @@ describe("seedDefaults", () => {
     ];
     expect(seedDefaults(entries, "", localize)).toEqual({});
   });
+
+  it("seeds a required entity sub-reading's name from resolveEntryLabel", () => {
+    // A required NESTED entity with a platform_type whose sub seeds no
+    // name/id of its own gets its label injected as `name`, so an
+    // untouched Add still produces a valid sensor. This is the only
+    // lifted branch that exercises the `localize`/`resolveEntryLabel`
+    // thread-through.
+    const entries: ConfigEntry[] = [
+      makeConfigEntry({
+        key: "tvoc",
+        type: ConfigEntryType.NESTED,
+        required: true,
+        platform_type: "sensor",
+        label: "TVOC",
+        config_entries: [makeConfigEntry({ key: "opt", type: ConfigEntryType.STRING })],
+      }),
+    ];
+    expect(seedDefaults(entries, "", localize)).toEqual({ tvoc: { name: "TVOC" } });
+  });
+
+  it("resolves the entity-name label via the localize translation_key", () => {
+    // When a translation_key is registered, the resolved translation
+    // wins over the catalog label — confirms the `localize` argument is
+    // actually consulted, not just the static `entry.label`.
+    const translate = (key: string): string =>
+      key === "entity.tvoc" ? "Total VOC" : key;
+    const entries: ConfigEntry[] = [
+      makeConfigEntry({
+        key: "tvoc",
+        type: ConfigEntryType.NESTED,
+        required: true,
+        platform_type: "sensor",
+        label: "TVOC",
+        translation_key: "entity.tvoc",
+        config_entries: [makeConfigEntry({ key: "opt", type: ConfigEntryType.STRING })],
+      }),
+    ];
+    expect(seedDefaults(entries, "", translate)).toEqual({ tvoc: { name: "Total VOC" } });
+  });
 });
 
 describe("buildInitialValues", () => {
