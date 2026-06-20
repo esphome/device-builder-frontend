@@ -104,4 +104,18 @@ describe("pair dialog open() auto-preview orchestration", () => {
     expect(d._skippedInput).toBe(false);
     expect(api.previewRemoteBuildPair).not.toHaveBeenCalled();
   });
+
+  it("seeds the receiver label from the prefill (the discovered friendly_name)", () => {
+    const api = makeApi();
+    const d = makeDialog(api);
+    d.open({ hostname: "esphome-builder-jwywnve.local", receiverLabel: "MacBook-Pro" });
+    expect(d._receiverLabel).toBe("MacBook-Pro");
+  });
+
+  it("falls back to a hostname-derived receiver label without a prefill label", () => {
+    const api = makeApi();
+    const d = makeDialog(api);
+    d.open({ hostname: "buildbox.local", port: 6055 });
+    expect(d._receiverLabel).toBe("buildbox");
+  });
 });

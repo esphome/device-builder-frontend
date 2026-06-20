@@ -298,10 +298,12 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
           esphome: peer.esphome_version,
         })
       : nothing;
+    // Prefer the friendly_name label; fall back to the instance name.
+    const displayName = trimTrailingDot(peer.friendly_name || peer.name);
     return html`
       <div class="row peer-row">
         <div class="row-label">
-          <span class="row-title">${trimTrailingDot(peer.name)}</span>
+          <span class="row-title">${displayName}</span>
           <span class="row-desc">
             ${trimTrailingDot(peer.hostname)}:${peer.port} ${versionLine}
           </span>
@@ -310,7 +312,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
           type="button"
           class="btn-pair-build-server btn-pair-row"
           aria-label=${this._localize("settings.pair_build_server_row_aria", {
-            name: trimTrailingDot(peer.name),
+            name: displayName,
           })}
           @click=${() => this._onPairDiscovered(peer)}
         >
@@ -398,6 +400,8 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       {
         hostname: peer.hostname,
         port: peer.remote_build_port > 0 ? peer.remote_build_port : undefined,
+        // Seed the receiver label from the friendly_name.
+        receiverLabel: peer.friendly_name || undefined,
       },
       // Host + peer-link port are known from mDNS — skip the manual entry step
       // and preview the fingerprint straight away.

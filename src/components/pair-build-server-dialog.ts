@@ -116,7 +116,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   // immediately and land on the confirm step. A failed preview drops back to
   // the pre-filled input form (onPreviewSubmit's error branch).
   open(
-    prefill?: { hostname?: string; port?: number },
+    prefill?: { hostname?: string; port?: number; receiverLabel?: string },
     opts?: { autoPreview?: boolean }
   ): void {
     // Supersede any preview still in flight from a previous open().
@@ -127,11 +127,11 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     this._hostname = prefill?.hostname ?? "";
     this._port = prefill?.port !== undefined ? String(prefill.port) : "6055";
     this._previewedPin = "";
-    // Pre-fill labels from known hostnames. The offloader label is sourced
-    // from window.location.hostname (the URL used to reach this dashboard)
-    // and doesn't auto-update afterwards — the page can't reload mid-dialog
-    // without losing form state anyway.
-    this._receiverLabel = friendlyHostname(this._hostname);
+    // Pre-fill the receiver label from the caller-supplied friendly_name,
+    // falling back to one derived from the hostname. The offloader label is
+    // sourced from window.location.hostname and doesn't auto-update afterwards.
+    this._receiverLabel =
+      prefill?.receiverLabel?.trim() || friendlyHostname(this._hostname);
     this._receiverLabelTouched = false;
     this._offloaderLabel = friendlyHostname(window.location.hostname);
     this._error = null;

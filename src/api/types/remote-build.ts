@@ -262,6 +262,12 @@ export interface RemoteBuildPeer {
   server_version: string;
   esphome_version: string;
   /**
+   * Human machine label from the mDNS TXT `friendly_name` key, used as
+   * the display label. Empty for older receivers that don't broadcast
+   * it; callers fall back to `name`.
+   */
+  friendly_name: string;
+  /**
    * SHA-256 of the receiver's static X25519 peer-link pubkey,
    * lowercase hex, parsed off the mDNS TXT record. Empty string
    * for receivers that haven't bound the peer-link listener at
