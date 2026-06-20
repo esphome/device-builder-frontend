@@ -34,10 +34,13 @@ export class ESPHomePinEmojiGrid extends LitElement {
       display: block;
     }
 
-    /* Emoji-only row, evenly distributed across the card width. With no
-       name labels the seven glyphs fit one line in every host context. */
+    /* Emoji-only row, evenly distributed across the card width. Wraps rather
+       than overflowing in a narrow host (e.g. the build-server identity card's
+       label/value row on mobile); with no name labels the seven glyphs fit one
+       line wherever there's room (the pair-confirm card). */
     .grid {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
       gap: var(--wa-space-xs);

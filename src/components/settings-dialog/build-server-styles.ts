@@ -33,9 +33,11 @@ export const buildServerCardStyles = css`
     flex: 1;
   }
 
-  /* Pin row stacks vertically so the emoji grid gets its own line. */
+  /* Pin row stacks vertically so the emoji grid gets the full card width
+     (beside the 110px label it shrinks and the fingerprint wraps cramped). */
   .build-server-row--pin {
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .build-server-pin-display {
