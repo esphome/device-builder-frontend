@@ -108,6 +108,11 @@ export interface BoardCatalogEntry {
   featured_components: FeaturedComponent[];
   /** Logical groups of featured components added together. */
   featured_bundles: FeaturedBundle[];
+  /**
+   * Derived (full body only): Wi-Fi is the board's only built-in network, so a
+   * generated config needs it — the wizard makes Wi-Fi mandatory (no skip).
+   */
+  requires_wifi?: boolean;
 }
 
 export interface PagedBoardsResponse extends PagedResponse {

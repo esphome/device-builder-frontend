@@ -493,10 +493,7 @@
     "section_name_device": "Name your device",
     "section_name_device_desc": "Naming your project will show up in the ESPHome dashboard. Choose a recognisable, descriptive and memorable name. You can use component names or relevant words. You can edit this after you finish this project.",
     "wifi_configuration": "Wi-Fi Configuration",
-    "wifi_configuration_desc": "How your device connects to your network. Leave blank if you use Ethernet or set up the network later.",
-    "wifi_ssid": "Wi-Fi SSID",
-    "wifi_password": "Wi-Fi password",
-    "wifi_skip": "I don't use Wi-Fi — skip this step",
+    "wifi_required_desc": "This board connects over Wi-Fi. Enter your network so the device can come online.",
     "other_boards": "Other boards",
     "starter_kit": "Featured",
     "expand_board": "Expand details",
@@ -561,7 +558,8 @@
       "shelly": "Shelly"
     },
     "create_general_error": "Failed to create the device. Please try again.",
-    "create_with_board_error": "Failed to create device for {board}: {message}"
+    "create_with_board_error": "Failed to create device for {board}: {message}",
+    "board_load_failed": "Couldn't load the board details. Please try again."
   },
   "device": {
     "navigator_title": "Device navigator",
@@ -917,16 +915,12 @@
       "saving": "Saving…",
       "save_success": "Wi-Fi credentials saved",
       "save_failed": "Failed to save Wi-Fi credentials",
-      "ack_failed": "Wi-Fi credentials saved, but the wizard couldn't be marked as completed — it may reappear next time.",
-      "decline_failed": "Couldn't update onboarding preferences",
-      "dismiss_session": "Maybe later",
-      "decline_permanent": "I don't use Wi-Fi — skip this step"
+      "cancel": "Cancel"
     },
     "wizard": {
       "back": "Back",
       "continue": "Continue",
       "finish": "Finish",
-      "skip": "Skip",
       "dismiss": "Maybe later",
       "saving": "Saving…",
       "ack_failed": "Saved your choices, but the wizard couldn't be marked as completed — it may reappear next time.",
@@ -945,10 +939,6 @@
         "beginner_desc": "Keep it simple and guided, the lightest interface.",
         "expert_title": "Expert",
         "expert_desc": "Unlock the editor diff, navigator search, and YAML search."
-      },
-      "wifi": {
-        "title": "Set up Wi-Fi",
-        "intro": "Your devices use these to join your network. They're stored once in secrets.yaml and shared across every config you create."
       }
     }
   },

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EditorLayout,
   ExperienceLevel,
@@ -13,9 +13,21 @@ import {
   loadOnboardingState,
   loadPreferences,
 } from "../../../src/components/app-shell/data-load.js";
+import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
+
+// loadOnboardingState reads the shared (session-cached) secret-keys list; mock
+// it so the kebab-wording flag is driven per-test without cache bleed.
+vi.mock("../../../src/util/secrets-cache.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/util/secrets-cache.js")>()),
+  fetchSecretKeys: vi.fn(async () => [] as string[]),
+}));
 
 const DONE = OnboardingStepStatus.DONE;
 const PENDING = OnboardingStepStatus.PENDING;
+
+beforeEach(() => {
+  vi.mocked(fetchSecretKeys).mockResolvedValue([]);
+});
 
 function state(
   steps: Array<{ id: OnboardingStepId; status: OnboardingStepStatus }>,
@@ -30,60 +42,59 @@ function makeHost(state: OnboardingState) {
     _onboardingPending: false,
     _onboardingHasUseCase: false,
     _onboardingShouldShow: false,
-    _onboardingShowWifi: false,
     _onboardingSessionDismissed: false,
     _api: { getOnboardingState: vi.fn(async () => state) },
   };
 }
 
 describe("loadOnboardingState routing", () => {
-  it("a fresh install (experience pending) routes to the wizard, not the wifi dialog", async () => {
+  it("a fresh install (experience pending) auto-pops the first-run wizard", async () => {
     const host = makeHost(
       state([
         { id: OnboardingStepId.USE_CASE, status: PENDING },
         { id: OnboardingStepId.EXPERIENCE_LEVEL, status: PENDING },
-        { id: OnboardingStepId.WIFI_CREDENTIALS, status: PENDING },
       ])
     );
     await loadOnboardingState(host as unknown as ESPHomeApp);
     expect(host._onboardingShouldShow).toBe(true);
-    expect(host._onboardingShowWifi).toBe(false);
   });
 
-  it("an existing install missing wifi routes to the wifi dialog, not the wizard", async () => {
+  it("an existing install (experience done) does not auto-pop the wizard", async () => {
     const host = makeHost(
-      state([
-        { id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE },
-        { id: OnboardingStepId.WIFI_CREDENTIALS, status: PENDING },
-      ])
+      state([{ id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE }])
     );
     await loadOnboardingState(host as unknown as ESPHomeApp);
     expect(host._onboardingShouldShow).toBe(false);
-    expect(host._onboardingShowWifi).toBe(true);
   });
 
-  it("an existing install with wifi configured pops neither", async () => {
+  it("respects a session dismissal", async () => {
     const host = makeHost(
-      state([
-        { id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE },
-        { id: OnboardingStepId.WIFI_CREDENTIALS, status: DONE },
-      ])
-    );
-    await loadOnboardingState(host as unknown as ESPHomeApp);
-    expect(host._onboardingShouldShow).toBe(false);
-    expect(host._onboardingShowWifi).toBe(false);
-  });
-
-  it("respects a session dismissal even when wifi is pending", async () => {
-    const host = makeHost(
-      state([
-        { id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE },
-        { id: OnboardingStepId.WIFI_CREDENTIALS, status: PENDING },
-      ])
+      state([{ id: OnboardingStepId.EXPERIENCE_LEVEL, status: PENDING }])
     );
     host._onboardingSessionDismissed = true;
     await loadOnboardingState(host as unknown as ESPHomeApp);
-    expect(host._onboardingShowWifi).toBe(false);
+    expect(host._onboardingShouldShow).toBe(false);
+  });
+
+  it("flags Wi-Fi as pending (kebab wording) when no wifi_ssid secret exists", async () => {
+    vi.mocked(fetchSecretKeys).mockResolvedValue(["api_key"]);
+    const host = makeHost(state([]));
+    await loadOnboardingState(host as unknown as ESPHomeApp);
+    expect(host._onboardingPending).toBe(true);
+  });
+
+  it("stays pending when only wifi_ssid exists (needs the password key too)", async () => {
+    vi.mocked(fetchSecretKeys).mockResolvedValue(["wifi_ssid"]);
+    const host = makeHost(state([]));
+    await loadOnboardingState(host as unknown as ESPHomeApp);
+    expect(host._onboardingPending).toBe(true);
+  });
+
+  it("clears the Wi-Fi pending flag once both wifi_ssid and wifi_password exist", async () => {
+    vi.mocked(fetchSecretKeys).mockResolvedValue(["wifi_ssid", "wifi_password"]);
+    const host = makeHost(state([]));
+    await loadOnboardingState(host as unknown as ESPHomeApp);
+    expect(host._onboardingPending).toBe(false);
   });
 });
 

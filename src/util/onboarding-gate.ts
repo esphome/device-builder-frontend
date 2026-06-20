@@ -15,21 +15,9 @@ export function isOnboardingPending(state: OnboardingState): boolean {
   return state.steps.some((s) => s.status === OnboardingStepStatus.PENDING);
 }
 
-/** True when the Wi-Fi step specifically is ``pending``. Drives the
- *  ``Set up Wi-Fi…`` kebab entry's wording — independent of whether the
- *  experience pick is still outstanding. */
-export function isWifiSetupPending(state: OnboardingState): boolean {
-  return state.steps.some(
-    (s) =>
-      s.id === OnboardingStepId.WIFI_CREDENTIALS &&
-      s.status === OnboardingStepStatus.PENDING
-  );
-}
-
 /** True when the experience step is already ``done`` (a stored experience
- *  level). Distinguishes an existing / migrated install, which should only
- *  ever be auto-prompted for Wi-Fi, from a fresh one that still needs the
- *  full wizard. */
+ *  level) — i.e. an existing / migrated install rather than a fresh one that
+ *  still needs the first-run wizard. */
 export function isExperienceChosen(state: OnboardingState): boolean {
   return state.steps.some(
     (s) =>
@@ -38,21 +26,14 @@ export function isExperienceChosen(state: OnboardingState): boolean {
 }
 
 /**
- * True when the wizard should auto-pop on load.
+ * True when the first-run wizard should auto-pop on load.
  *
  * Three conditions must hold simultaneously:
  *
  * 1. The user is behind the current onboarding version (a future
  *    bump re-prompts users who completed an earlier flow).
- * 2. *Something is actually pending.* A version bump alone isn't
- *    a reason to interrupt a user whose secrets are already
- *    configured — most notably, installs that pre-date the
- *    wizard have ``completed_version = 0`` but already-valid
- *    Wi-Fi credentials, and asking them to re-enter values they
- *    already set is friction with no payoff. The kebab
- *    ``Set up Wi-Fi…`` entry uses the same pending gate, so the
- *    user never loses access — they just don't get an
- *    unsolicited prompt.
+ * 2. *Something is actually pending.* A version bump alone isn't a
+ *    reason to interrupt a user who already finished onboarding.
  * 3. The user hasn't already session-dismissed the dialog (the
  *    "Maybe later" / X / Escape paths set this so a refresh
  *    doesn't re-pop the dialog they just closed).

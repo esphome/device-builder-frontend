@@ -186,12 +186,10 @@ export class ESPHomeApp extends LitElement {
     RemoteBuildJobState
   > = new Map();
 
-  // Fresh install: auto-pop the full experience wizard.
+  // Fresh install: auto-pop the full experience wizard. Wi-Fi is never
+  // auto-popped — it's collected per-device in the create wizard, or on demand
+  // via the kebab "Set up Wi-Fi" dialog.
   @state() _onboardingShouldShow = false;
-  // Existing / migrated install missing Wi-Fi: auto-pop the standalone Wi-Fi
-  // dialog only (experience is already chosen), so they still get onboarded
-  // for Wi-Fi unless they decline.
-  @state() _onboardingShowWifi = false;
   @state() _onboardingSessionDismissed = false;
   // Whether the first-run wizard should ask the remote-compute use-case
   // question (non-HA only). Seeded from the onboarding state's step list.
@@ -467,7 +465,6 @@ export class ESPHomeApp extends LitElement {
   // Refresh state so the badge reflects new data.
   _onOnboardingAcknowledged = () => {
     this._onboardingShouldShow = false;
-    this._onboardingShowWifi = false;
     void loadOnboardingState(this);
     // The wizard persists experience / remote-compute before acknowledging;
     // refresh prefs so the contexts (and the gated UI) reflect the picks.
@@ -477,16 +474,14 @@ export class ESPHomeApp extends LitElement {
   _onOnboardingDismissedSession = () => {
     this._onboardingSessionDismissed = true;
     this._onboardingShouldShow = false;
-    this._onboardingShowWifi = false;
     // Skip-Wi-Fi persists the experience pick without acknowledging; refresh
     // prefs so the contexts (yaml-diff button, experience-gated UI) reflect it
     // this session rather than waiting for the next reconnect.
     void loadPreferences(this);
   };
 
-  // Kebab "Set up Wi-Fi" — explicit user intent, overrides both gates.
+  // Kebab "Set up / Change Wi-Fi credentials" — open the manual Wi-Fi dialog.
   private _onOpenOnboarding = () => {
-    this._onboardingSessionDismissed = false;
     this._onboardingDialog?.open();
   };
 
@@ -607,10 +602,7 @@ export class ESPHomeApp extends LitElement {
         @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}
       ></esphome-firmware-jobs-dialog>
       <esphome-feedback-dialog></esphome-feedback-dialog>
-      <esphome-onboarding-wifi-dialog
-        @onboarding-acknowledged=${this._onOnboardingAcknowledged}
-        @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
-      ></esphome-onboarding-wifi-dialog>
+      <esphome-onboarding-wifi-dialog></esphome-onboarding-wifi-dialog>
       <esphome-onboarding-wizard-dialog
         .hasUseCase=${this._onboardingHasUseCase}
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
@@ -619,10 +611,9 @@ export class ESPHomeApp extends LitElement {
     `;
   }
 
-  // Auto-pop the right onboarding surface: the full wizard for a fresh
-  // install, or the standalone Wi-Fi dialog for an existing install that's
-  // only missing Wi-Fi. Both dialogs are mounted unconditionally (so listeners
-  // are wired) but start closed.
+  // Auto-pop the full first-run wizard for a fresh install. The standalone
+  // Wi-Fi dialog is mounted unconditionally (so the kebab "Set up Wi-Fi" can
+  // open it) but is never auto-popped — Wi-Fi is collected per-device now.
   protected willUpdate(changed: PropertyValues) {
     // Expert Mode is experience_level === EXPERT; keep the provided context in
     // sync so its consumers react when the level changes.
@@ -635,9 +626,6 @@ export class ESPHomeApp extends LitElement {
     super.updated?.(changed);
     if (changed.has("_onboardingShouldShow") && this._onboardingShouldShow) {
       this._onboardingWizard?.open();
-    }
-    if (changed.has("_onboardingShowWifi") && this._onboardingShowWifi) {
-      this._onboardingDialog?.open();
     }
   }
 }

@@ -77,6 +77,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
 
+  /** Board id whose full body has already been fetched into `_selectedBoard`,
+   *  so re-entering the setup step doesn't refetch (getBoard is uncached). */
+  private _upgradedBoardId: string | null = null;
+
   /** Initial platform-filter label for the board step. Set by
    *  ``openAtBoardStep`` when the caller knows the chip family
    *  (e.g. from serial chip detection) so the picker opens with
@@ -147,12 +151,15 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._resetTransientState();
   }
 
-  /** Open directly at the setup step with a pre-selected board. */
+  /** Open directly at the setup step with a pre-selected **full** board body
+   *  (callers resolve it via ``getBoard``), so ``requires_wifi`` is already
+   *  known and the Wi-Fi decision is correct on first render. */
   public openWithBoard(board: BoardCatalogEntry) {
     this._step = "setup";
     this._selectedBoard = board;
     this._initialBoardFilter = null;
     this._resetTransientState();
+    this._upgradedBoardId = board.id; // already a full body; no upgrade fetch
   }
 
   /** Open directly at the board-picker step with an optional
@@ -177,6 +184,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._advancedOpen = false;
     this._import.reset();
     this._submitting = false;
+    this._upgradedBoardId = null;
     this._resetCreateErrors();
     this._open = true;
   }
@@ -351,7 +359,36 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       this._selectedBoard = detail.board;
     }
 
+    if (detail.step === "setup" && this._selectedBoard) {
+      void this._enterSetupStep(this._selectedBoard);
+      return;
+    }
     this._step = detail.step;
+  }
+
+  /** Upgrade the slim picker entry to the full board body, then show the setup
+   *  step — so ``wizard-step-setup`` reads a known ``requires_wifi`` on first
+   *  render and can't under-collect Wi-Fi on a Wi-Fi-only board. The picker
+   *  stays up during the (uncached) fetch; a cached id skips it. On a failed /
+   *  empty fetch we stay on the picker with an error rather than advance on the
+   *  slim entry (whose ``requires_wifi`` hydrates to ``false``). */
+  private async _enterSetupStep(board: BoardCatalogEntry): Promise<void> {
+    if (this._upgradedBoardId !== board.id) {
+      let full: BoardCatalogEntry | null = null;
+      try {
+        full = await this._api.getBoard(board.id);
+      } catch (err) {
+        console.warn("Failed to load full board body:", err);
+      }
+      if (this._selectedBoard?.id !== board.id) return; // selection moved on
+      if (!full) {
+        this._createError = this._localize("wizard.board_load_failed");
+        return; // keep the user on the picker to retry
+      }
+      this._selectedBoard = full;
+      this._upgradedBoardId = board.id;
+    }
+    this._step = "setup";
   }
 
   private _onToggleAdvanced() {
@@ -460,6 +497,8 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         name,
         board_id: board.id,
         config_type: "basic",
+        // Typed credentials are persisted to secrets.yaml by the backend and
+        // referenced via !secret — never inlined.
         ssid: wifiSsid,
         psk: wifiPassword,
       },
@@ -496,6 +535,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice(args);
+      // A supplied SSID is persisted to secrets.yaml by the backend; refresh
+      // the shared secret-keys cache so the new device's editor doesn't show
+      // the just-written `!secret wifi_*` refs as missing until a reload.
+      if (args.ssid) window.dispatchEvent(new CustomEvent("secrets-saved"));
       this.navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);

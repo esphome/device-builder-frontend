@@ -34,8 +34,13 @@ const flush = async (): Promise<void> => {
 
 async function mount(api: Partial<ESPHomeAPI>): Promise<ESPHomeCreateConfigDialog> {
   const el = new ESPHomeCreateConfigDialog();
+  // Entering the setup step upgrades the slim board via getBoard; default it so
+  // navigation tests don't each have to wire it.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._api = api as ESPHomeAPI;
+  (el as any)._api = {
+    getBoard: vi.fn(async (id: string) => ({ id })),
+    ...api,
+  } as ESPHomeAPI;
   document.body.appendChild(el);
   await el.updateComplete;
   el.open();
@@ -182,6 +187,22 @@ describe("create-config-dialog create de-dupe + retry", () => {
       })
     );
   });
+
+  it("fires secrets-saved after a Wi-Fi create so secret pickers refresh", async () => {
+    // The backend persists the SSID to secrets.yaml; without this event the
+    // editor's secret pickers show the new !secret refs as missing until reload.
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "living-room.yaml" });
+    const el = await mount({ createDevice });
+    const onSaved = vi.fn();
+    window.addEventListener("secrets-saved", onSaved);
+    try {
+      emitFinish(el, "Living Room"); // emitFinish sends wifiSsid: "net"
+      await flush();
+      expect(onSaved).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("secrets-saved", onSaved);
+    }
+  });
 });
 
 // A failed create shows a dialog-level error bar that outlives step changes.
@@ -196,8 +217,12 @@ describe("create-config-dialog stale error on navigation", () => {
     el.shadowRoot!.querySelector("p.error")?.textContent ?? null;
 
   // Drive the dialog onto the setup step (where the Back button renders) by
-  // dispatching the next-step a board pick would.
-  function goToSetup(el: ESPHomeCreateConfigDialog, boardId = "esp32dev"): void {
+  // dispatching the next-step a board pick would. Awaits the board upgrade the
+  // dialog runs before showing setup.
+  async function goToSetup(
+    el: ESPHomeCreateConfigDialog,
+    boardId = "esp32dev"
+  ): Promise<void> {
     el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
       new CustomEvent("next-step", {
         detail: { step: "setup", board: { id: boardId } },
@@ -205,14 +230,15 @@ describe("create-config-dialog stale error on navigation", () => {
         composed: true,
       })
     );
+    await flush();
+    await el.updateComplete;
   }
 
   it("clears the error when pressing Back after a failed create", async () => {
     const createDevice = vi.fn().mockRejectedValue(new Error("boom"));
     const el = await mount({ createDevice });
 
-    goToSetup(el);
-    await el.updateComplete;
+    await goToSetup(el);
     emitFinish(el, "kitchen");
     await flush();
     await el.updateComplete;
@@ -227,17 +253,35 @@ describe("create-config-dialog stale error on navigation", () => {
     const createDevice = vi.fn().mockRejectedValue(new Error("boom"));
     const el = await mount({ createDevice });
 
-    goToSetup(el, "esp32dev");
-    await el.updateComplete;
+    await goToSetup(el, "esp32dev");
     emitFinish(el, "kitchen");
     await flush();
     await el.updateComplete;
     expect(errorText(el)).not.toBeNull();
 
     // Re-enter setup with a different board, as picking another board would.
-    goToSetup(el, "esp8266");
-    await el.updateComplete;
+    await goToSetup(el, "esp8266");
     expect(errorText(el)).toBeNull();
+  });
+
+  it("does not advance to setup with an error when the board body fails to load", async () => {
+    // A failed getBoard must not advance to setup on the slim entry (whose
+    // requires_wifi hydrates to false → could under-collect Wi-Fi).
+    const getBoard = vi.fn().mockRejectedValue(new Error("offline"));
+    const el = await mount({ getBoard });
+    await goToSetup(el, "esp32dev");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._step).not.toBe("setup");
+    expect(errorText(el)).not.toBeNull();
+  });
+
+  it("does not advance to setup with an error when getBoard returns null", async () => {
+    const getBoard = vi.fn().mockResolvedValue(null);
+    const el = await mount({ getBoard });
+    await goToSetup(el, "esp32dev");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._step).not.toBe("setup");
+    expect(errorText(el)).not.toBeNull();
   });
 });
 

@@ -1,12 +1,11 @@
 /**
  * Tests for the onboarding-gate helpers.
  *
- * The two helpers decide whether the wizard auto-pops on load
- * and whether the ``Set up Wi-Fi…`` kebab entry is visible. The
+ * The helpers decide whether the first-run wizard auto-pops on load. The
  * subtle case is the existing-install upgrade path: a user with
- * ``completed_version = 0`` (never ran the wizard) but already
- * valid wifi credentials must NOT be interrupted on next page
- * load. A version bump alone shouldn't trigger the wizard.
+ * ``completed_version = 0`` (never ran the wizard) but already done steps must
+ * NOT be interrupted on next page load. A version bump alone shouldn't trigger
+ * the wizard.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -18,14 +17,8 @@ import {
 import {
   isExperienceChosen,
   isOnboardingPending,
-  isWifiSetupPending,
   shouldAutoShowOnboarding,
 } from "../../src/util/onboarding-gate.js";
-
-const wifi = (status: OnboardingStepStatus) => ({
-  id: OnboardingStepId.WIFI_CREDENTIALS,
-  status,
-});
 
 const experience = (status: OnboardingStepStatus) => ({
   id: OnboardingStepId.EXPERIENCE_LEVEL,
@@ -44,13 +37,15 @@ const stateWith = (
 
 describe("isOnboardingPending", () => {
   it("returns true when any step is pending", () => {
-    expect(isOnboardingPending(stateWith([wifi(OnboardingStepStatus.PENDING)]))).toBe(
-      true
-    );
+    expect(
+      isOnboardingPending(stateWith([experience(OnboardingStepStatus.PENDING)]))
+    ).toBe(true);
   });
 
   it("returns false when every step is done", () => {
-    expect(isOnboardingPending(stateWith([wifi(OnboardingStepStatus.DONE)]))).toBe(false);
+    expect(isOnboardingPending(stateWith([experience(OnboardingStepStatus.DONE)]))).toBe(
+      false
+    );
   });
 
   it("returns false on an empty step list", () => {
@@ -58,48 +53,11 @@ describe("isOnboardingPending", () => {
   });
 });
 
-describe("isWifiSetupPending", () => {
-  it("is true only when the wifi step itself is pending", () => {
-    expect(
-      isWifiSetupPending(
-        stateWith([
-          experience(OnboardingStepStatus.PENDING),
-          wifi(OnboardingStepStatus.PENDING),
-        ])
-      )
-    ).toBe(true);
-  });
-
-  it("ignores a pending experience step when wifi is done", () => {
-    // The kebab Wi-Fi badge must not light up just because the
-    // experience pick is still outstanding.
-    expect(
-      isWifiSetupPending(
-        stateWith([
-          experience(OnboardingStepStatus.PENDING),
-          wifi(OnboardingStepStatus.DONE),
-        ])
-      )
-    ).toBe(false);
-  });
-
-  it("is false when there is no wifi step (remote-compute install)", () => {
-    expect(
-      isWifiSetupPending(stateWith([experience(OnboardingStepStatus.PENDING)]))
-    ).toBe(false);
-  });
-});
-
 describe("isExperienceChosen", () => {
   it("is true when the experience step is done", () => {
-    expect(
-      isExperienceChosen(
-        stateWith([
-          experience(OnboardingStepStatus.DONE),
-          wifi(OnboardingStepStatus.PENDING),
-        ])
-      )
-    ).toBe(true);
+    expect(isExperienceChosen(stateWith([experience(OnboardingStepStatus.DONE)]))).toBe(
+      true
+    );
   });
 
   it("is false when the experience step is still pending (fresh install)", () => {
@@ -112,16 +70,22 @@ describe("isExperienceChosen", () => {
 describe("shouldAutoShowOnboarding", () => {
   it("pops for a fresh-install user behind current with pending step", () => {
     expect(
-      shouldAutoShowOnboarding(stateWith([wifi(OnboardingStepStatus.PENDING)]), false)
+      shouldAutoShowOnboarding(
+        stateWith([experience(OnboardingStepStatus.PENDING)]),
+        false
+      )
     ).toBe(true);
   });
 
   it(
-    "does NOT pop for a pre-wizard install with secrets already configured " +
-      "(this is the bug fix — completed_version=0 + step DONE must not interrupt)",
+    "does NOT pop for a pre-wizard install already done " +
+      "(completed_version=0 + step DONE must not interrupt)",
     () => {
       expect(
-        shouldAutoShowOnboarding(stateWith([wifi(OnboardingStepStatus.DONE)]), false)
+        shouldAutoShowOnboarding(
+          stateWith([experience(OnboardingStepStatus.DONE)]),
+          false
+        )
       ).toBe(false);
     }
   );
@@ -129,7 +93,7 @@ describe("shouldAutoShowOnboarding", () => {
   it("does NOT pop when user is up to date even with pending step", () => {
     expect(
       shouldAutoShowOnboarding(
-        stateWith([wifi(OnboardingStepStatus.PENDING)], 1, 1),
+        stateWith([experience(OnboardingStepStatus.PENDING)], 1, 1),
         false
       )
     ).toBe(false);
@@ -138,7 +102,7 @@ describe("shouldAutoShowOnboarding", () => {
   it("does NOT pop when user is ahead of current (rolled back from a future build)", () => {
     expect(
       shouldAutoShowOnboarding(
-        stateWith([wifi(OnboardingStepStatus.PENDING)], 1, 2),
+        stateWith([experience(OnboardingStepStatus.PENDING)], 1, 2),
         false
       )
     ).toBe(false);
@@ -146,7 +110,10 @@ describe("shouldAutoShowOnboarding", () => {
 
   it("respects session-dismissal even with pending work", () => {
     expect(
-      shouldAutoShowOnboarding(stateWith([wifi(OnboardingStepStatus.PENDING)]), true)
+      shouldAutoShowOnboarding(
+        stateWith([experience(OnboardingStepStatus.PENDING)]),
+        true
+      )
     ).toBe(false);
   });
 

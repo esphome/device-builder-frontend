@@ -1736,16 +1736,14 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Save Wi-Fi credentials into the user's ``secrets.yaml``. The
-   * backend validates against ESPHome's own length limits
-   * (32 char SSID, 64 char password) and surfaces violations as
-   * ``CommandError(INVALID_ARGS)`` for the UI to render.
+   * Save Wi-Fi credentials into the user's ``secrets.yaml``. Backs the
+   * kebab "Set up Wi-Fi" action (the create wizard persists its own Wi-Fi
+   * via ``devices/create``). The backend validates against ESPHome's own
+   * length limits (32 char SSID, 64 char password) and surfaces violations
+   * as ``CommandError(INVALID_ARGS)`` for the UI to render.
    */
-  async setOnboardingWifi(ssid: string, password: string): Promise<OnboardingState> {
-    return this.sendCommand<OnboardingState>("onboarding/set_wifi_credentials", {
-      ssid,
-      password,
-    });
+  async setWifiCredentials(ssid: string, password: string): Promise<void> {
+    await this.sendCommand("config/set_wifi_credentials", { ssid, password });
   }
 
   /**

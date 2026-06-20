@@ -5,7 +5,6 @@ import {
   mdiCursorDefaultClickOutline,
   mdiServerNetwork,
   mdiSprout,
-  mdiWifi,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -15,7 +14,6 @@ import { ExperienceLevel } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
-import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
@@ -24,15 +22,12 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { onChoiceGroupKeydown, renderChoiceCard, rovingTabbable } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
-import { wifiFieldsStyles } from "./wifi-fields-styles.js";
-import { isWifiPasswordTooShort, renderWifiFields } from "./wifi-fields.js";
 import { type WizardScreen, wizardScreens } from "./wizard-screens.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
 
 registerMdiIcons({
-  wifi: mdiWifi,
   chip: mdiChip,
   "server-network": mdiServerNetwork,
   sprout: mdiSprout,
@@ -44,17 +39,12 @@ registerMdiIcons({
  * First-run onboarding wizard.
  *
  * Auto-popped by the app shell for a fresh install. Walks a short stepped
- * flow whose shape depends on the environment and the user's use-case
- * choice: non-HA installs lead with the remote-compute question; choosing
- * remote-compute drops the Wi-Fi step. The experience pick and remote-compute
- * choice are persisted directly via ``updatePreferences``; the Wi-Fi step
- * writes ``secrets.yaml`` directly. The final step emits
- * ``onboarding-acknowledged`` (or ``onboarding-dismissed-session`` when Wi-Fi
- * is skipped) so the app shell reloads preferences into context and the flow
- * does not auto-pop again.
- *
- * Standalone Wi-Fi credential rotation stays in ``esphome-onboarding-wifi-dialog``;
- * this component is the first-run flow only.
+ * flow whose shape depends on the environment: non-HA installs lead with the
+ * remote-compute use-case question, then everyone picks an experience level.
+ * Both are persisted via ``updatePreferences``. The final step emits
+ * ``onboarding-acknowledged`` so the app shell reloads preferences into
+ * context and the flow does not auto-pop again. Wi-Fi is collected per-device
+ * in the create wizard, not here.
  */
 @customElement("esphome-onboarding-wizard-dialog")
 export class ESPHomeOnboardingWizardDialog extends LitElement {
@@ -77,8 +67,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   @state() private _useCaseChosen = false;
   @state() private _remoteCompute = false;
   @state() private _experience: ExperienceLevel | null = null;
-  @state() private _ssid = "";
-  @state() private _password = "";
 
   private _exitedExplicitly = false;
   private _enter = new EnterController(this, () => {
@@ -93,8 +81,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._useCaseChosen = false;
     this._remoteCompute = false;
     this._experience = null;
-    this._ssid = "";
-    this._password = "";
     this._exitedExplicitly = false;
     this._enter.set(true);
   }
@@ -105,19 +91,14 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
-    inputStyles,
     dialogActionButtonStyles,
     choiceCardStyles,
-    wifiFieldsStyles,
     onboardingWizardStyles,
   ];
 
-  /** Ordered screens for the current choices. */
+  /** Ordered screens for the current environment. */
   private get _screens(): WizardScreen[] {
-    return wizardScreens({
-      hasUseCase: this.hasUseCase,
-      remoteCompute: this._remoteCompute,
-    });
+    return wizardScreens({ hasUseCase: this.hasUseCase });
   }
 
   private get _screen(): WizardScreen {
@@ -128,10 +109,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     return this._index === this._screens.length - 1;
   }
 
-  private get _passwordTooShort(): boolean {
-    return isWifiPasswordTooShort(this._password);
-  }
-
   private get _canContinue(): boolean {
     if (this._saving) return false;
     switch (this._screen) {
@@ -139,8 +116,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         return this._useCaseChosen;
       case "experience":
         return this._experience !== null;
-      case "wifi":
-        return this._ssid.trim().length > 0 && !this._passwordTooShort;
     }
   }
 
@@ -178,16 +153,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
                 ${this._localize("onboarding.wizard.dismiss")}
               </button>`}
           <span class="spacer"></span>
-          ${this._screen === "wifi"
-            ? html`<button
-                type="button"
-                class="btn btn--cancel"
-                ?disabled=${this._saving}
-                @click=${this._onSkipWifi}
-              >
-                ${this._localize("onboarding.wizard.skip")}
-              </button>`
-            : nothing}
           <button
             type="button"
             class="btn btn--primary"
@@ -222,8 +187,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         return this._renderUseCase();
       case "experience":
         return this._renderExperience();
-      case "wifi":
-        return this._renderWifi();
     }
   }
 
@@ -290,27 +253,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     `;
   }
 
-  private _renderWifi() {
-    return html`
-      <p class="intro">
-        <wa-icon library="mdi" name="wifi"></wa-icon>
-        ${this._localize("onboarding.wizard.wifi.intro")}
-      </p>
-      ${renderWifiFields({
-        localize: this._localize,
-        ssid: this._ssid,
-        password: this._password,
-        disabled: this._saving,
-        onSsidInput: (v) => {
-          this._ssid = v;
-        },
-        onPasswordInput: (v) => {
-          this._password = v;
-        },
-      })}
-    `;
-  }
-
   private _chooseUseCase(remoteCompute: boolean) {
     this._useCaseChosen = true;
     this._remoteCompute = remoteCompute;
@@ -334,40 +276,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           this._index += 1;
         }
         return;
-      case "wifi":
-        await this._finishWithWifi();
-        return;
     }
-  }
-
-  private async _onSkipWifi() {
-    if (this._saving) return;
-    this._saving = true;
-    this._error = null;
-    // "Skip" is "remind me later", not a permanent decline. Persist the
-    // experience pick but do NOT acknowledge, so the standalone Wi-Fi dialog
-    // (which carries the explicit "I don't use Wi-Fi" decline) re-asks on the
-    // next login while Wi-Fi is still unconfigured. Session-dismiss so it
-    // doesn't immediately re-pop this session.
-    if (!(await this._persistChoices())) return;
-    this._saving = false;
-    this._dismissForSession();
-  }
-
-  private async _finishWithWifi() {
-    if (this._saving) return;
-    if (!this._ssid.trim() || this._passwordTooShort) return;
-    this._saving = true;
-    this._error = null;
-    try {
-      await this._api.setOnboardingWifi(this._ssid, this._password);
-    } catch (err) {
-      this._error = formatApiError(err, this._localize, "onboarding.wifi.save_failed");
-      this._saving = false;
-      return;
-    }
-    window.dispatchEvent(new CustomEvent("secrets-saved", { detail: { source: this } }));
-    await this._acknowledgeAndClose();
   }
 
   private async _finish() {
