@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { BoardCatalogEntry, BoardPin } from "../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
@@ -13,6 +14,7 @@ import {
   buildInitialValues,
   findReferencePath,
   seedDefaults,
+  seedReference,
 } from "../../../src/components/device/add-component-form-seed.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
@@ -31,6 +33,43 @@ function makeComponent(over: Partial<ComponentCatalogEntry> = {}): ComponentCata
     supported_platforms: [],
     config_entries: [],
     ...over,
+  };
+}
+
+function makePin(over: Partial<BoardPin>): BoardPin {
+  return {
+    gpio: 0,
+    label: "",
+    features: [],
+    available: null,
+    occupied_by: null,
+    notes: null,
+    ...over,
+  };
+}
+
+function makeBoard(pins: BoardPin[]): BoardCatalogEntry {
+  return {
+    id: "esp32-c3-devkitm-1",
+    name: "",
+    description: "",
+    manufacturer: "",
+    esphome: { platform: "esp32", board: "esp32-c3-devkitm-1" } as never,
+    hardware: {
+      flash_size: null,
+      ram_size: null,
+      cpu_frequency: null,
+      connectivity: [],
+    },
+    images: [],
+    tags: [],
+    pins,
+    docs_url: "",
+    product_url: "",
+    featured: false,
+    is_generic: false,
+    featured_components: [],
+    featured_bundles: [],
   };
 }
 
@@ -227,5 +266,53 @@ describe("buildInitialValues", () => {
       localize,
     });
     expect(values.i2c_id).toBe("bus_a");
+  });
+
+  it("seeds pin entries from the board manifest between id-gen and prefill", () => {
+    const component = makeComponent({
+      id: "i2c",
+      config_entries: [
+        makeConfigEntry({ key: "scl", type: ConfigEntryType.PIN, default_value: "SCL" }),
+        makeConfigEntry({ key: "sda", type: ConfigEntryType.PIN, default_value: "SDA" }),
+      ],
+    });
+    const board = makeBoard([
+      makePin({ gpio: 8, label: "GPIO8", features: ["i2c_sda"] }),
+      makePin({ gpio: 9, label: "GPIO9", features: ["i2c_scl"] }),
+    ]);
+    const values = buildInitialValues({
+      entries: component.config_entries,
+      component,
+      board,
+      yaml: "",
+      prefillReference: null,
+      prefillFields: null,
+      localize,
+    });
+    // Board's i2c_scl/i2c_sda feature tags win over the symbolic
+    // "SCL"/"SDA" catalog defaults that don't resolve on the C3.
+    expect(values.scl).toBe(9);
+    expect(values.sda).toBe(8);
+  });
+});
+
+describe("seedReference", () => {
+  it("resolves a sole same-domain candidate to its id", () => {
+    const yaml = "i2c:\n  - id: bus_a\n";
+    expect(seedReference(yaml, "i2c")).toBe("bus_a");
+  });
+
+  it("defers to undefined when several candidates are ambiguous", () => {
+    const yaml = "i2c:\n  - id: bus_a\n  - id: bus_b\n";
+    expect(seedReference(yaml, "i2c")).toBeUndefined();
+  });
+
+  it("returns undefined when no candidate matches the domain", () => {
+    expect(seedReference("i2c:\n  - id: bus_a\n", "spi")).toBeUndefined();
+  });
+
+  it("defers to undefined when a packages: merge could hide a candidate", () => {
+    const yaml = "packages:\n  base: !include base.yaml\ni2c:\n  - id: bus_a\n";
+    expect(seedReference(yaml, "i2c")).toBeUndefined();
   });
 });
