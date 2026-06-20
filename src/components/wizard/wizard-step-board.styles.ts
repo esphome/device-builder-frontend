@@ -330,6 +330,17 @@ export const wizardStepBoardStyles = css`
      with the base rules left align-items / width / height
      silently overridden. #41 */
   @media (max-width: 480px) {
+    /* The board list's inner scroller is a fixed 500px on desktop so the
+       filter chips stay pinned while only the grid scrolls. On a phone the
+       step renders inside a full-screen sheet, and that fixed height runs
+       past the viewport — the featured card's bottom is clipped and
+       unreachable (iPhone XR repro). Collapse the inner scroller so the
+       dialog body scrolls as one. */
+    .boards-scroll {
+      height: auto;
+      overflow-y: visible;
+    }
+
     .boards-grid {
       grid-template-columns: 1fr;
     }
