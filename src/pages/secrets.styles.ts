@@ -155,39 +155,19 @@ export const secretsStyles = css`
     font-size: 18px;
   }
 
-  .editor-layout {
+  .editor-pane {
     flex: 1;
     min-height: 0;
-    display: grid;
-    gap: 0;
-  }
-
-  .editor-layout--form,
-  .editor-layout--yaml {
-    grid-template-columns: 1fr;
-  }
-
-  .editor-pane {
-    min-height: 0;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* The editor scrolls itself and owns its padding, so its scrollbar
+       sits at the card edge, not over the row controls. */
+    padding: 0;
   }
 
   .editor-pane > * {
     flex: 1;
     min-height: 0;
-  }
-
-  /* The editor scrolls itself and owns its padding, so its scrollbar
-     sits at the card edge, not over the row controls. */
-  .editor-pane--form {
-    padding: 0;
-  }
-
-  .editor-layout--yaml .editor-pane--form,
-  .editor-layout--form .editor-pane--yaml {
-    display: none;
   }
 
   @media (max-width: 900px) {
