@@ -8,8 +8,8 @@ import {
   mdiDockRight,
   mdiEye,
   mdiEyeOff,
+  mdiFileCompare,
   mdiUpload,
-  mdiVectorDifference,
   mdiViewSplitVertical,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
@@ -50,7 +50,7 @@ registerMdiIcons({
   "dock-right": mdiDockRight,
   "view-split-vertical": mdiViewSplitVertical,
   upload: mdiUpload,
-  "vector-difference": mdiVectorDifference,
+  "file-compare": mdiFileCompare,
 });
 
 export type DeviceLayoutMode = "both" | "left" | "right";

@@ -61,7 +61,7 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
             @click=${p.onToggleDiff}
             title=${diffLabel}
           >
-            <wa-icon library="mdi" name="vector-difference"></wa-icon>
+            <wa-icon library="mdi" name="file-compare"></wa-icon>
           </button>`;
         })()
       : nothing}
