@@ -16,8 +16,8 @@ export const dashboardStyles = css`
        the fold and the page over-scrolls. dvh tracks the visible viewport
        so the table fills exactly header→footer and the inner .table-scroll
        still scrolls. Matches the vh/dvh pairing in device-styles.ts. */
-    height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
-    height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
+    height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     /* Single source of truth for the floating Create-device button's
        footprint. --fab-bottom is the gap between the FAB and the
@@ -28,7 +28,7 @@ export const dashboardStyles = css`
        these once stops the grid clearance and the FAB position from
        drifting if either gets tweaked later. The fab-bottom also
        includes the footer height so the FAB clears the version line. */
-    --fab-bottom: calc(var(--wa-space-l) + var(--esphome-footer-height));
+    --fab-bottom: var(--wa-space-l);
     --fab-height: 48px;
     --fab-clearance: calc(var(--fab-bottom) + var(--fab-height) + var(--wa-space-xs));
     /* Height of the floating multi-select action bar (rendered by
@@ -44,8 +44,7 @@ export const dashboardStyles = css`
     --toolbar-pad-top: var(--wa-space-l);
     /* --content-gutter (the horizontal inset shared by the toolbar, card
        grid, YAML hit list, table outline, and count row) is defined once on
-       esphome-layout's :host and inherited here, so the header and the body
-       share one gutter. The device-table shadow inherits it too. #41 */
+       app-shell's :host and inherited by all pages. #41 */
     /* Inter-row gap inside the toolbar. Card view's .toolbar and the
        table view's .toolbar-stack both use it, and the table count
        row mirrors it as padding-top, so the rows line up identically
@@ -62,7 +61,7 @@ export const dashboardStyles = css`
   :host([yaml]) {
     height: auto;
     overflow: visible;
-    padding-bottom: var(--esphome-footer-height);
+    padding-bottom: var(--wa-space-m);
   }
 
   /* When the discovered banner is present, push toolbar / content
@@ -80,14 +79,23 @@ export const dashboardStyles = css`
       padding-top: var(--wa-space-l);
     }
 
-    /* Tighten the toolbar's top padding on mobile (the --content-gutter
-       mobile trim lives on esphome-layout now, inherited here). #41 */
+    /* Tighten the toolbar's top padding on mobile (--content-gutter
+       is defined on app-shell's :host with a mobile override). #41 */
     :host {
       --toolbar-pad-top: var(--wa-space-s);
     }
   }
 
   /* ─── Search toolbar ─── */
+
+  /* Standalone kebab menu shown when the full toolbar is absent
+     (no devices, table view, device-creation hidden). Positioned
+     at the top-right so the overflow menu stays reachable. */
+  .toolbar-standalone-kebab {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--toolbar-pad-top) var(--content-gutter) 0;
+  }
 
   .toolbar {
     display: flex;

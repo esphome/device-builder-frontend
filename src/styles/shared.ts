@@ -66,8 +66,6 @@ export const espHomeStyles = css`
     );
 
     /* ─── Layout ─── */
-    --esphome-header-height: 56px;
-    --esphome-footer-height: 20px;
     /* Height shared by the toolbar's interactive controls (search input,
        view-toggle, facet pills, clear-filters) so the search row stays
        pixel-aligned from one source. */
@@ -76,18 +74,6 @@ export const espHomeStyles = css`
     --esphome-button-padding: var(--wa-space-xs) 18px;
 
     font-family: var(--wa-font-family-body);
-  }
-
-  /* Compact the header on narrow viewports. 870px is HA's
-     sidebar-collapse breakpoint, so embedded in the HA panel this
-     fires exactly when HA swaps to its own 40px top bar — matching
-     its height avoids a chunky doubled-up bar. Defined on the shared
-     token so the header element, the content-area height calcs, and
-     the actions-menu top offset all shrink together. */
-  @media (max-width: 870px) {
-    :host {
-      --esphome-header-height: 40px;
-    }
   }
 
   /* ─── Custom wa-button variants ─── */

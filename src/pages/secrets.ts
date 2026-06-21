@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiContentSave, mdiDockLeft, mdiDockRight, mdiEye, mdiEyeOff } from "@mdi/js";
+import { mdiArrowLeft, mdiContentSave, mdiDockLeft, mdiDockRight, mdiEye, mdiEyeOff } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -16,7 +16,7 @@ import {
   secretsLayoutToPref,
   type SecretsLayout,
 } from "../util/editor-layout.js";
-import { setLeaveGuard } from "../util/navigation.js";
+import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
@@ -27,11 +27,13 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/confirm-dialog.js";
+import "../components/esphome-header-actions.js";
 import "../components/secrets/secrets-structured-editor.js";
 import "../components/unsaved-changes-dialog.js";
 import "../components/yaml-editor.js";
 
 registerMdiIcons({
+  "arrow-left": mdiArrowLeft,
   "content-save": mdiContentSave,
   "dock-left": mdiDockLeft,
   "dock-right": mdiDockRight,
@@ -248,9 +250,18 @@ export class ESPHomePageSecrets extends LitElement {
     const revealLabel = this._localize(
       this._revealSensitive ? "secrets.hide_values" : "secrets.reveal_values"
     );
+    const backLabel = this._localize("layout.back");
     return html`
       <div class="page">
         <div class="page-header">
+          <button
+            class="page-back"
+            @click=${() => navigate("/")}
+            title=${backLabel}
+            aria-label=${backLabel}
+          >
+            <wa-icon library="mdi" name="arrow-left"></wa-icon>
+          </button>
           <div class="page-title">
             <h1>${this._localize("secrets.title")}</h1>
             <p>${this._localize("secrets.desc")}</p>
@@ -291,6 +302,7 @@ export class ESPHomePageSecrets extends LitElement {
             ></wa-icon>
             ${revealLabel}
           </button>
+          <esphome-header-actions></esphome-header-actions>
         </div>
         <div class="editor-card">
           ${this._loaded

@@ -954,31 +954,27 @@ export class ESPHomePageDevice extends LitElement {
             ?hasUpdateAvailable=${this._device?.update_available === true}
             ?busy=${this._activeJobs.has(this.id)}
           >
-            ${showEdgeTab || this._selectedSection
-              ? html`<div slot="header-start" class="header-start-group">
-                  ${showEdgeTab
-                    ? html`<button
-                        type="button"
-                        class="ghost-icon-btn nav-toggle-btn"
-                        @click=${this._onNavExpand}
-                        title=${this._localize("device.show_navigator")}
-                        aria-label=${this._localize("device.show_navigator")}
-                      >
-                        <wa-icon library="mdi" name="menu"></wa-icon>
-                      </button>`
-                    : nothing}
-                  ${this._selectedSection
-                    ? html`<button
-                        class="ghost-icon-btn back-btn"
-                        @click=${this._onBack}
-                        title=${backLabel}
-                        aria-label=${backLabel}
-                      >
-                        <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                      </button>`
-                    : nothing}
-                </div>`
-              : nothing}
+            <div slot="header-start" class="header-start-group">
+              ${showEdgeTab
+                ? html`<button
+                    type="button"
+                    class="ghost-icon-btn nav-toggle-btn"
+                    @click=${this._onNavExpand}
+                    title=${this._localize("device.show_navigator")}
+                    aria-label=${this._localize("device.show_navigator")}
+                  >
+                    <wa-icon library="mdi" name="menu"></wa-icon>
+                  </button>`
+                : nothing}
+              <button
+                class="ghost-icon-btn back-btn"
+                @click=${this._onBack}
+                title=${backLabel}
+                aria-label=${backLabel}
+              >
+                <wa-icon library="mdi" name="arrow-left"></wa-icon>
+              </button>
+            </div>
           </esphome-device-editor>
         </div>
         <esphome-unsaved-changes-dialog
@@ -1017,11 +1013,17 @@ export class ESPHomePageDevice extends LitElement {
     `;
   }
 
-  /** Step one section back along the user's visit trail. With no
-   *  trail left we land on the board-info / next-steps view. Leaving
-   *  the device entirely is the app-shell's top-left back button —
-   *  not this one. */
+  /** Go back one step. When a section is selected, navigate within
+   *  the device page (section history → previous section or board-info).
+   *  When already on the board-info / next-steps view, navigate back
+   *  to the dashboard — same behaviour the removed layout header's
+   *  back arrow provided. */
   private _onBack = () => {
+    if (!this._selectedSection && this._sectionHistory.length === 0) {
+      // On the board-info view: leave the device page entirely.
+      navigate("/");
+      return;
+    }
     this._guardSectionSwitch(() => {
       const prev = this._sectionHistory.length
         ? this._sectionHistory[this._sectionHistory.length - 1]

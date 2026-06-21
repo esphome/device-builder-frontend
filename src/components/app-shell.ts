@@ -52,6 +52,7 @@ import {
   serverVersionContext,
   versionContext,
 } from "../context/index.js";
+import { MOBILE_BREAKPOINT } from "../styles/breakpoints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { isExpert } from "../util/experience.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
@@ -89,7 +90,6 @@ import {
 
 import "../pages/dashboard.js";
 import "./command-palette.js";
-import "./esphome-layout.js";
 import "./esphome-login.js";
 import "./feedback-dialog.js";
 import type { ESPHomeFeedbackDialog } from "./feedback-dialog.js";
@@ -240,6 +240,15 @@ export class ESPHomeApp extends LitElement {
         width: 100vw;
         overflow-y: auto;
         background: var(--wa-color-surface-default, #f8f9fa);
+        /* Content gutter shared across pages: the dashboard toolbar and
+           card grid, device editor, and secrets page all inherit this
+           through the slot so they share one horizontal inset. */
+        --content-gutter: var(--wa-space-l);
+      }
+      @media (max-width: ${MOBILE_BREAKPOINT}px) {
+        :host {
+          --content-gutter: var(--wa-space-s);
+        }
       }
 
       .auth-status-screen {
@@ -547,7 +556,7 @@ export class ESPHomeApp extends LitElement {
     }
 
     return html`
-      <esphome-layout
+      <div
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
@@ -559,7 +568,7 @@ export class ESPHomeApp extends LitElement {
         @open-onboarding-wifi=${this._onOpenOnboarding}
       >
         ${this._router.outlet()}
-      </esphome-layout>
+      </div>
       <esphome-command-palette
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}

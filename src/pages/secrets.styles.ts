@@ -4,7 +4,8 @@ export const secretsStyles = css`
   :host {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
+    height: 100vh;
+    height: 100dvh;
     box-sizing: border-box;
   }
 
@@ -22,6 +23,31 @@ export const secretsStyles = css`
     align-items: center;
     gap: var(--wa-space-m);
     flex-shrink: 0;
+  }
+
+  .page-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--wa-color-text-quiet);
+    padding: 6px;
+    border-radius: var(--wa-border-radius-m);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+      opacity 0.12s,
+      background 0.12s;
+  }
+
+  .page-back:hover {
+    background: var(--esphome-tint);
+    color: var(--esphome-primary);
+  }
+
+  .page-back wa-icon {
+    font-size: 20px;
   }
 
   .page-title {

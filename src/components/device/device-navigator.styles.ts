@@ -29,7 +29,8 @@ export const deviceNavigatorStyles = css`
     align-items: center;
     justify-content: space-between;
     gap: var(--wa-space-2xs);
-    padding: var(--wa-space-s) var(--wa-space-s) var(--wa-space-s) var(--wa-space-m);
+    padding-inline: var(--wa-space-m) var(--wa-space-s);
+    min-height: 48px;
     background: var(--esphome-tint);
     color: var(--esphome-primary);
     border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);

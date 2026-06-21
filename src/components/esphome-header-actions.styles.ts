@@ -5,6 +5,7 @@ export const headerActionsStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 0;
+    position: relative;
   }
 
   .menu-btn {
@@ -13,7 +14,7 @@ export const headerActionsStyles = css`
     align-items: center;
     border: none;
     background: none;
-    color: var(--esphome-on-primary);
+    color: var(--wa-color-text-quiet);
     cursor: pointer;
     padding: 6px;
     border-radius: var(--wa-border-radius-m);
@@ -25,11 +26,12 @@ export const headerActionsStyles = css`
 
   .menu-btn:hover {
     opacity: 1;
-    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+    background: var(--esphome-tint);
+    color: var(--esphome-primary);
   }
 
   .menu-btn:focus-visible {
-    outline: 2px solid var(--esphome-on-primary);
+    outline: 2px solid var(--esphome-primary);
     outline-offset: 2px;
     opacity: 1;
   }
@@ -46,7 +48,7 @@ export const headerActionsStyles = css`
     height: 8px;
     border-radius: 50%;
     background: var(--esphome-warning, #f59e0b);
-    box-shadow: 0 0 0 2px var(--esphome-primary);
+    box-shadow: 0 0 0 2px var(--wa-color-surface-default);
   }
 
   .backdrop {
@@ -56,7 +58,9 @@ export const headerActionsStyles = css`
   }
 
   .menu {
-    position: fixed;
+    position: absolute;
+    top: 100%;
+    right: 0;
     z-index: 101;
     min-width: 220px;
     background: var(--wa-color-surface-raised);
@@ -158,5 +162,50 @@ export const headerActionsStyles = css`
     color: var(--wa-color-text-quiet);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+  }
+
+  /* ─── Version info in menu footer ─── */
+  .menu-version-info {
+    padding: var(--wa-space-2xs) var(--wa-space-m);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .menu-version-badge {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: 9px;
+    font-weight: var(--wa-font-weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: var(--wa-border-radius-s);
+    background: var(--esphome-tint);
+    color: var(--esphome-primary);
+    border: 1px solid color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .menu-version-row {
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+    line-height: 1.4;
+  }
+
+  .menu-version-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .menu-version-link:hover {
+    text-decoration: underline;
+    color: var(--esphome-primary);
+  }
+
+  .menu-version-text {
+    color: inherit;
   }
 `;

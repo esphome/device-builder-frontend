@@ -4,6 +4,8 @@ import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { renderFacets } from "./render-facets.js";
 import { renderYamlPreviewPivot } from "./render-yaml.js";
 
+import "../esphome-header-actions.js";
+
 export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
   const view = host._view;
   const yaml = host._yamlMode;
@@ -158,7 +160,9 @@ export function renderToolbar(
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
+        ${renderSearchInput(host)} ${renderViewToggle(host)}
+        ${renderFacets(host)}
+        <esphome-header-actions dashboard-route></esphome-header-actions>
       </div>
       ${renderDeviceCountRow(host, matchCount, total)}
     </div>
@@ -172,7 +176,10 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   const unit = host._localize("yaml_search.match_count", { count: matchCount ?? 0 });
   return html`
     <div class="toolbar">
-      <div class="toolbar-row">${renderSearchInput(host)} ${renderViewToggle(host)}</div>
+      <div class="toolbar-row">
+        ${renderSearchInput(host)} ${renderViewToggle(host)}
+        <esphome-header-actions dashboard-route></esphome-header-actions>
+      </div>
       ${matchCount !== null
         ? html`<span class="device-count"><strong>${matchCount}</strong> ${unit}</span>`
         : ""}

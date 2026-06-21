@@ -114,8 +114,9 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   // Catch open-reset-build-env from the inner command-dialog so the
   // post-failure hint works when reviewing a past failed install from this
-  // list. The app-shell listener sits on esphome-layout, but this dialog is
-  // a sibling of that layout — without local handling the event bubbles past.
+  // list. The app-shell listener sits on the page wrapper, but this dialog
+  // is a sibling of that wrapper — without local handling the event bubbles
+  // past.
   private _onLocalResetEvent = (e: Event) => {
     e.stopPropagation();
     this.openResetBuildEnv();

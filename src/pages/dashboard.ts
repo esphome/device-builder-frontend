@@ -142,6 +142,7 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
 import "../components/select-bar.js";
+import "../components/esphome-header-actions.js";
 import "../components/wizard/create-config-dialog.js";
 import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
 
@@ -603,11 +604,19 @@ export class ESPHomePageDashboard extends LitElement {
       filtered.length === 0 &&
       this._hasActiveFilters;
 
+    // Show a standalone kebab menu when the toolbar isn't rendered
+    // (no devices, table view, or device-creation hidden) so the
+    // overflow menu (settings, firmware jobs, secrets, etc.) is
+    // always accessible.
+    const showToolbar = this._devices.length > 0 && this._view === DashboardView.CARDS;
+
     return html`
       ${renderDiscoveredSection(this)}
-      ${this._devices.length > 0 && this._view === DashboardView.CARDS
+      ${showToolbar
         ? renderToolbar(this, filtered.length, this._devices.length)
-        : ""}
+        : html`<div class="toolbar-standalone-kebab">
+            <esphome-header-actions dashboard-route></esphome-header-actions>
+          </div>`}
       ${showCardEmptyState ? renderEmptySearch(this) : ""}
       ${this._view === DashboardView.CARDS
         ? renderCardGrid(this, filtered)

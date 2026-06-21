@@ -35,6 +35,7 @@ import { renderInstallAction } from "./install-action.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../esphome-header-actions.js";
 import "../yaml-diff.js";
 import "../yaml-editor.js";
 import "./device-board-info.js";
@@ -244,6 +245,7 @@ export class ESPHomeDeviceEditor extends LitElement {
             onToggleDiff: () => this._toggleDiff(),
             onSetLayout: (layout) => this._setLayout(layout),
           })}
+          <esphome-header-actions></esphome-header-actions>
         </header>
         <div class="card-body">
           <div class="editor-floating-actions">

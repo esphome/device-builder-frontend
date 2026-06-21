@@ -22,7 +22,8 @@ export const deviceEditorStyles = css`
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--wa-space-s) var(--wa-space-m);
+    padding-inline: var(--wa-space-m);
+    min-height: 48px;
     background: var(--esphome-tint);
     color: var(--esphome-primary);
     border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
@@ -37,7 +38,8 @@ export const deviceEditorStyles = css`
      YAML editor back the vertical space the user already implicitly
      asked for by collapsing both panels. */
   .card-header--compact {
-    padding: var(--wa-space-2xs) var(--wa-space-m);
+    padding-inline: var(--wa-space-m);
+    min-height: 36px;
   }
 
   .card-header--compact .editor-header-title {

@@ -26,11 +26,18 @@ import {
   importableDevicesContext,
   localizeContext,
   onboardingPendingContext,
+  serverVersionContext,
+  versionContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { deviceBuilderChannel } from "../util/device-builder-channel.js";
+import {
+  deviceBuilderReleaseUrl,
+  esphomeChangelogUrl,
+} from "../util/release-notes-url.js";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-actions.js";
 import { headerActionsStyles } from "./esphome-header-actions.styles.js";
 
@@ -118,6 +125,22 @@ export class ESPHomeHeaderActions extends LitElement {
   @state()
   private _showIgnored = false;
 
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  private _esphomeVersion = "";
+
+  @consume({ context: serverVersionContext, subscribe: true })
+  @state()
+  private _serverVersion = "";
+
+  /** Badge label for a non-stable backend ("Dev" or "Beta"), else null. */
+  private get _versionBadge(): string | null {
+    if (!this._serverVersion) return null;
+    const channel = deviceBuilderChannel(this._serverVersion);
+    if (!channel) return null;
+    return channel === "dev" ? "Dev" : "Beta";
+  }
+
   static styles = [espHomeStyles, headerActionsStyles];
 
   connectedCallback(): void {
@@ -167,11 +190,7 @@ export class ESPHomeHeaderActions extends LitElement {
       ${this._open
         ? html`
             <div class="backdrop" @click=${this._close}></div>
-            <div
-              class="menu"
-              role="menu"
-              style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);"
-            >
+            <div class="menu" role="menu">
               <div
                 class="menu-item"
                 role="menuitem"
@@ -293,6 +312,28 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="comment-question-outline"></wa-icon>
                 ${this._localize("layout.feedback_menu")}
               </div>
+              <div class="menu-divider" role="separator"></div>
+              <div class="menu-version-info" role="status">
+                ${this._versionBadge
+                  ? html`<span class="menu-version-badge">${this._versionBadge}</span>`
+                  : nothing}
+                ${this._serverVersion
+                  ? html`<div class="menu-version-row">
+                      ${this._versionLink(
+                        `ESPHome Device Builder v${this._serverVersion}`,
+                        deviceBuilderReleaseUrl(this._serverVersion)
+                      )}
+                    </div>`
+                  : nothing}
+                ${this._esphomeVersion
+                  ? html`<div class="menu-version-row">
+                      ${this._versionLink(
+                        `ESPHome ${this._esphomeVersion}`,
+                        esphomeChangelogUrl(this._esphomeVersion)
+                      )}
+                    </div>`
+                  : nothing}
+              </div>
             </div>
           `
         : nothing}
@@ -413,6 +454,19 @@ export class ESPHomeHeaderActions extends LitElement {
         composed: true,
       })
     );
+  }
+
+  /** Render a version string as a link when the URL exists, else as plain text. */
+  private _versionLink(text: string, href: string | null) {
+    return href
+      ? html`<a
+          class="menu-version-link"
+          href=${href}
+          target="_blank"
+          rel="noopener noreferrer"
+          >${text}</a
+        >`
+      : html`<span class="menu-version-text">${text}</span>`;
   }
 }
 

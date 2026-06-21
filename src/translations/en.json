@@ -2,8 +2,6 @@
   "language": "English",
   "flag": "🇬🇧",
   "dashboard": {
-    "title": "ESPHome Device Builder",
-    "subtitle": "Create and make your smart devices and automations",
     "discovered_count": "{count, plural, one {Discovered # device} other {Discovered # devices}}",
     "discovered_status": "Discovered",
     "discovered_ignored": "Ignored",
@@ -936,7 +934,6 @@
     }
   },
   "layout": {
-    "release_notes": "View release notes",
     "secrets": "Secrets",
     "update_all_started": "{count, plural, one {# device update started} other {# device updates started}}",
     "update_all_none": "No online devices to update",
@@ -960,9 +957,7 @@
     "feedback_menu": "Found a bug? Have an idea?",
     "back": "Back",
     "close": "Close",
-    "more_options_with_count": "More options ({count, plural, one {# firmware task active} other {# firmware tasks active}})",
-    "editor": "Editor",
-    "preview_badge": "Beta"
+    "more_options_with_count": "More options ({count, plural, one {# firmware task active} other {# firmware tasks active}})"
   },
   "feedback": {
     "title": "Found a bug? Have an idea?",
