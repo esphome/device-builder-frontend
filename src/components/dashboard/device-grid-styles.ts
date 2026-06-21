@@ -320,14 +320,14 @@ export const deviceGridStyles = css`
   .fab-btn {
     display: inline-flex;
     align-items: center;
-    gap: var(--wa-space-xs);
-    padding: 12px 22px;
+    gap: var(--wa-space-2xs);
+    padding: 12px 20px 12px 16px;
     border-radius: 999px;
     border: none;
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
     font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
+    font-weight: var(--wa-font-weight-semibold);
     font-family: inherit;
     cursor: pointer;
     box-shadow:
@@ -337,7 +337,6 @@ export const deviceGridStyles = css`
       transform 0.15s,
       box-shadow 0.15s,
       background 0.15s;
-    letter-spacing: 0.01em;
   }
   .fab-btn:hover {
     background: var(--esphome-primary-hover);

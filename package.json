@@ -4,10 +4,12 @@
   "description": "Frontend for ESPHome Dashboard",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.13.0",
   "engines": {
     "node": ">=22.18"
   },
   "scripts": {
+    "preinstall": "node build-scripts/only-npm.cjs",
     "dev": "node build-scripts/dev-server.cjs",
     "build": "node build-scripts/build.cjs",
     "gen:languages": "node build-scripts/gen-language-manifest.cjs",
