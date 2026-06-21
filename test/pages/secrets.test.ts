@@ -83,7 +83,8 @@ describe("esphome-page-secrets editor gating", () => {
       _savedYaml: "wifi_password: hunter2\n",
     }).render();
     expect(findTemplatesByAnchor(tree, "<wa-spinner")).toHaveLength(0);
-    const editors = findTemplatesByAnchor(tree, "<esphome-yaml-editor");
+    // Default layout is "form" so the structured editor is shown.
+    const editors = findTemplatesByAnchor(tree, "<esphome-secrets-structured-editor");
     expect(editors).toHaveLength(1);
     expect(extractAttributeBindings(editors[0])[".value"]).toBe(
       "wifi_password: hunter2\n"
@@ -533,14 +534,22 @@ describe("esphome-page-secrets layout persistence", () => {
       _layout: "form",
       _yaml: "wifi_ssid: home\n",
     });
+    // In "form" layout only the structured editor renders.
     const editors = findTemplatesByAnchor(
       page.render(),
       "<esphome-secrets-structured-editor"
     );
-    const yaml = findTemplatesByAnchor(page.render(), "<esphome-yaml-editor");
     expect(editors).toHaveLength(1);
-    expect(yaml).toHaveLength(1);
     expect(extractAttributeBindings(editors[0])[".value"]).toBe("wifi_ssid: home\n");
+
+    // Switching to "yaml" layout hides the structured editor and shows the
+    // yaml editor, both sharing the same _yaml buffer.
+    page._layout = "yaml";
+    const yaml = findTemplatesByAnchor(page.render(), "<esphome-yaml-editor");
+    expect(yaml).toHaveLength(1);
+    expect(
+      findTemplatesByAnchor(page.render(), "<esphome-secrets-structured-editor")
+    ).toHaveLength(0);
     expect(extractAttributeBindings(yaml[0])[".value"]).toBe("wifi_ssid: home\n");
 
     page._onYamlChange(

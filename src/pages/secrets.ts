@@ -1,5 +1,11 @@
 import { consume } from "@lit/context";
-import { mdiCodeBraces, mdiContentSave, mdiEye, mdiEyeOff, mdiFormTextbox } from "@mdi/js";
+import {
+  mdiCodeBraces,
+  mdiContentSave,
+  mdiEye,
+  mdiEyeOff,
+  mdiFormTextbox,
+} from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
