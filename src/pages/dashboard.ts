@@ -100,9 +100,16 @@ import {
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
-import { matchesDeviceName, matchesMacAddress } from "../util/device-search.js";
+import {
+  activeFacetCount,
+  applyFacetFilters,
+  hasActiveFilters,
+  matchesDeviceSearch,
+  type FacetSelection,
+} from "../util/device-filter.js";
+import { matchesDeviceName } from "../util/device-search.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
-import { UPDATE_FACET_BUCKETS, UPDATE_FACET_PREDICATES } from "../util/facets.js";
+import { UPDATE_FACET_BUCKETS } from "../util/facets.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
@@ -629,26 +636,25 @@ export class ESPHomePageDashboard extends LitElement {
    *  render the "no devices match" pivot, and by the toolbar to
    *  pick the right messaging for the clear button. */
   get _hasActiveFilters(): boolean {
-    return (
-      this._search.trim().length > 0 ||
-      this._selectedLabels.length > 0 ||
-      this._selectedAreas.length > 0 ||
-      this._selectedPlatforms.length > 0 ||
-      this._selectedStates.length > 0 ||
-      this._selectedUpdateStatus.length > 0
-    );
+    return hasActiveFilters(this._search, this._facetSelection);
   }
 
   /** Drives the Filters-button badge — facets only. A lone search isn't
    *  a menu pill, so it clears from the search box's own × instead. */
   get _activeFacetCount(): number {
-    return (
-      this._selectedLabels.length +
-      this._selectedAreas.length +
-      this._selectedPlatforms.length +
-      this._selectedStates.length +
-      this._selectedUpdateStatus.length
-    );
+    return activeFacetCount(this._facetSelection);
+  }
+
+  /** The five facet selections bundled for the pure ``device-filter``
+   *  helpers. */
+  private get _facetSelection(): FacetSelection {
+    return {
+      selectedLabels: this._selectedLabels,
+      selectedAreas: this._selectedAreas,
+      selectedPlatforms: this._selectedPlatforms,
+      selectedStates: this._selectedStates,
+      selectedUpdateStatus: this._selectedUpdateStatus,
+    };
   }
 
   /** Clear just the search box (facets untouched) and refocus it so the
@@ -695,40 +701,14 @@ export class ESPHomePageDashboard extends LitElement {
       selectedPlatforms: string[],
       selectedStates: string[],
       selectedUpdateStatus: string[]
-    ): ConfiguredDevice[] => {
-      let out = devices;
-      if (selectedLabels.length > 0) {
-        out = out.filter((d) => {
-          const ids = d.labels;
-          if (!ids || ids.length === 0) return false;
-          const set = new Set(ids);
-          return selectedLabels.every((id) => set.has(id));
-        });
-      }
-      if (selectedAreas.length > 0) {
-        const set = new Set(selectedAreas);
-        out = out.filter((d) => !!d.area && set.has(d.area));
-      }
-      if (selectedPlatforms.length > 0) {
-        const set = new Set(selectedPlatforms);
-        out = out.filter((d) => set.has(d.target_platform));
-      }
-      if (selectedStates.length > 0) {
-        const set = new Set(selectedStates);
-        out = out.filter((d) => set.has(d.state));
-      }
-      if (selectedUpdateStatus.length > 0) {
-        // AND / narrowing: a device must satisfy every selected
-        // bucket (mirrors the labels facet, not the OR facets above).
-        const set = new Set(selectedUpdateStatus);
-        out = out.filter((d) =>
-          UPDATE_FACET_BUCKETS.every(
-            (id) => !set.has(id) || UPDATE_FACET_PREDICATES[id](d)
-          )
-        );
-      }
-      return out;
-    }
+    ): ConfiguredDevice[] =>
+      applyFacetFilters(devices, {
+        selectedLabels,
+        selectedAreas,
+        selectedPlatforms,
+        selectedStates,
+        selectedUpdateStatus,
+      })
   );
 
   _applyFacetFilters(devices: ConfiguredDevice[]): ConfiguredDevice[] {
@@ -751,16 +731,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (!q) return sorted.map((d) => d.configuration);
     const isTable = this._view === DashboardView.TABLE;
     return sorted
-      .filter((d) => {
-        if (matchesDeviceName(d, q)) return true;
-        if (!isTable) return false;
-        return (
-          d.address.toLowerCase().includes(q) ||
-          d.ip_addresses.some((ip) => ip.toLowerCase().includes(q)) ||
-          d.target_platform.toLowerCase().includes(q) ||
-          matchesMacAddress(d.mac_address, q)
-        );
-      })
+      .filter((d) => matchesDeviceSearch(d, q, isTable))
       .map((d) => d.configuration);
   }
 
