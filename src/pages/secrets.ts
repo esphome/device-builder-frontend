@@ -1,11 +1,11 @@
 import { consume } from "@lit/context";
 import {
   mdiArrowLeft,
+  mdiCodeBraces,
   mdiContentSave,
-  mdiDockLeft,
-  mdiDockRight,
   mdiEye,
   mdiEyeOff,
+  mdiFormTextbox,
 } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
@@ -41,11 +41,11 @@ import "../components/yaml-editor.js";
 
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,
+  "code-braces": mdiCodeBraces,
   "content-save": mdiContentSave,
-  "dock-left": mdiDockLeft,
-  "dock-right": mdiDockRight,
   eye: mdiEye,
   "eye-off": mdiEyeOff,
+  "form-textbox": mdiFormTextbox,
 });
 
 const SECRETS_FILE = "secrets.yaml";
@@ -285,7 +285,7 @@ export class ESPHomePageSecrets extends LitElement {
               title=${this._localize("secrets.layout_form")}
               @click=${() => this._setLayout("form")}
             >
-              <wa-icon library="mdi" name="dock-left"></wa-icon>
+              <wa-icon library="mdi" name="form-textbox"></wa-icon>
             </button>
             <button
               type="button"
@@ -294,7 +294,7 @@ export class ESPHomePageSecrets extends LitElement {
               title=${this._localize("secrets.layout_yaml")}
               @click=${() => this._setLayout("yaml")}
             >
-              <wa-icon library="mdi" name="dock-right"></wa-icon>
+              <wa-icon library="mdi" name="code-braces"></wa-icon>
             </button>
           </div>
           <button
@@ -325,22 +325,19 @@ export class ESPHomePageSecrets extends LitElement {
                     ? this._localize("secrets.saving")
                     : this._localize("secrets.save")}
                 </button>
-                <div class=${`editor-layout editor-layout--${this._layout}`}>
-                  <div class="editor-pane editor-pane--form">
-                    <esphome-secrets-structured-editor
-                      .value=${this._yaml}
-                      .revealSensitive=${this._revealSensitive}
-                      @yaml-change=${this._onYamlChange}
-                    ></esphome-secrets-structured-editor>
-                  </div>
-                  <div class="editor-pane editor-pane--yaml">
-                    <esphome-yaml-editor
-                      .value=${this._yaml}
-                      .maskAllValues=${true}
-                      .revealSensitive=${this._revealSensitive}
-                      @yaml-change=${this._onYamlChange}
-                    ></esphome-yaml-editor>
-                  </div>
+                <div class="editor-pane">
+                  ${this._layout === "form"
+                    ? html`<esphome-secrets-structured-editor
+                        .value=${this._yaml}
+                        .revealSensitive=${this._revealSensitive}
+                        @yaml-change=${this._onYamlChange}
+                      ></esphome-secrets-structured-editor>`
+                    : html`<esphome-yaml-editor
+                        .value=${this._yaml}
+                        .maskAllValues=${true}
+                        .revealSensitive=${this._revealSensitive}
+                        @yaml-change=${this._onYamlChange}
+                      ></esphome-yaml-editor>`}
                 </div>
               `
             : html`<div class="loading"><wa-spinner></wa-spinner></div>`}

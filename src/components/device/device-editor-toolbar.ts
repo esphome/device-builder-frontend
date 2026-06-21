@@ -61,7 +61,7 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
             @click=${p.onToggleDiff}
             title=${diffLabel}
           >
-            <wa-icon library="mdi" name="vector-difference"></wa-icon>
+            <wa-icon library="mdi" name="file-compare"></wa-icon>
           </button>`;
         })()
       : nothing}
@@ -78,7 +78,7 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
         aria-label=${p.localize("device.layout_components_only")}
         title=${p.localize("device.layout_components_only")}
       >
-        <wa-icon library="mdi" name="layout-left"></wa-icon>
+        <wa-icon library="mdi" name="dock-left"></wa-icon>
       </button>
       <button
         class="ghost-icon-btn split-btn"
@@ -88,7 +88,7 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
         aria-label=${p.localize("device.layout_split")}
         title=${p.localize("device.layout_split")}
       >
-        <wa-icon library="mdi" name="layout-split"></wa-icon>
+        <wa-icon library="mdi" name="view-split-vertical"></wa-icon>
       </button>
       <button
         type="button"
@@ -98,7 +98,7 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
         aria-label=${p.localize("device.layout_yaml_only")}
         title=${p.localize("device.layout_yaml_only")}
       >
-        <wa-icon library="mdi" name="layout-right"></wa-icon>
+        <wa-icon library="mdi" name="dock-right"></wa-icon>
       </button>
     </div>
   </div>`;

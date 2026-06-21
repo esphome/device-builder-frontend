@@ -14,8 +14,7 @@ export interface SectionDef {
   icon: string;
   /** MDI icon name used when this nav item is the active section.
    *  Falls back to `icon` if omitted (for icons like `translate`
-   *  and `vector-difference` that have no outline/filled pair in
-   *  MDI). */
+   *  and `file-compare` that have no outline/filled pair in MDI). */
   iconActive?: string;
   labelKey: string;
 }

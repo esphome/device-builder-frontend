@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiCodeBraces, mdiMagnify, mdiVectorDifference } from "@mdi/js";
+import { mdiCodeBraces, mdiFileCompare, mdiMagnify } from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
@@ -24,12 +24,12 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 registerMdiIcons({
   "code-braces": mdiCodeBraces,
   magnify: mdiMagnify,
-  "vector-difference": mdiVectorDifference,
+  "file-compare": mdiFileCompare,
 });
 
 const EXPERT_FEATURES: { icon: string; titleKey: string; descKey: string }[] = [
   {
-    icon: "vector-difference",
+    icon: "file-compare",
     titleKey: "settings.expert_mode_feature_diff",
     descKey: "settings.expert_mode_feature_diff_desc",
   },
