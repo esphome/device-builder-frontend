@@ -81,6 +81,10 @@ export function buildDeviceUrl(
   // Open navigator sections
   const open = [...state.openSections];
   if (open.length > 0) {
+    // `params.toString()` percent-encodes the comma, so `open`
+    // serializes as e.g. `0%2C2%2C5`. That encoding is inherited from
+    // the original `_updateUrl` and is intentional — don't "fix" it to a
+    // raw comma, which would silently change the emitted URL.
     params.set("open", open.join(","));
   } else {
     params.delete("open");
