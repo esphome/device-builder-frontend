@@ -1,9 +1,13 @@
 import { consume } from "@lit/context";
 import { mdiOpenInNew } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
-import type { LanguageChoice, LocalizeFunc } from "../../common/localize.js";
+import type {
+  LanguageChoice,
+  LanguageOption,
+  LocalizeFunc,
+} from "../../common/localize.js";
 import { LANGUAGES, languageLabel, readStoredLocale } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
@@ -35,7 +39,8 @@ export class ESPHomeSettingsLanguage extends LitElement {
     settingsSharedStyles,
     settingsRowStyles,
     css`
-      .language-help {
+      .language-help,
+      .language-note {
         margin: var(--wa-space-xs) 0 0;
         font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
@@ -53,6 +58,11 @@ export class ESPHomeSettingsLanguage extends LitElement {
         font-size: 1em;
         vertical-align: -0.15em;
       }
+      .language-completeness {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+        font-variant-numeric: tabular-nums;
+      }
     `,
   ];
 
@@ -67,11 +77,17 @@ export class ESPHomeSettingsLanguage extends LitElement {
           ${LANGUAGES.map(
             (l) => html`
               <wa-option value=${l.value}
-                >${l.flag} ${languageLabel(l, this._localize)}</wa-option
+                >${l.flag}
+                ${languageLabel(l, this._localize)}${this._renderCompleteness(
+                  l
+                )}</wa-option
               >
             `
           )}
         </wa-select>
+        <p class="language-note">
+          ${this._localize("settings.language_completeness_note")}
+        </p>
         <p class="language-help">
           <span aria-hidden="true">💡</span>
           ${this._localize("settings.language_help")}
@@ -87,6 +103,26 @@ export class ESPHomeSettingsLanguage extends LitElement {
         </p>
       </div>
     `;
+  }
+
+  // A muted "{n}% translated" badge in the option's trailing slot, shown only
+  // for locales that aren't fully translated. English and any complete locale
+  // (completeness === 100) and the "system" option (completeness undefined)
+  // render no badge, so the badge reads as "this language still needs work".
+  private _renderCompleteness(option: LanguageOption) {
+    if (option.completeness === undefined || option.completeness >= 100) {
+      return nothing;
+    }
+    const label = this._localize("settings.language_completeness", {
+      percent: option.completeness,
+    });
+    return html`<span
+      slot="end"
+      class="language-completeness"
+      title=${label}
+      aria-label=${label}
+      >${option.completeness}%</span
+    >`;
   }
 
   private _onChange(e: Event) {

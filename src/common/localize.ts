@@ -48,6 +48,9 @@ const asMessages = (mod: unknown): Record<string, unknown> => {
 interface LanguageMeta {
   language: string;
   flag: string;
+  /** Percentage (0–100) of English source keys this locale has translated,
+   *  precomputed at build time (untranslated keys fall back to English). */
+  completeness: number;
 }
 
 // Build-time manifest of every shipped locale's autonym + flag, generated
@@ -107,6 +110,9 @@ export interface LanguageOption {
   /** Localize key, used only for the "system" option so it reads in the
    *  active UI language. Real locales use the literal `label`. */
   labelKey?: string;
+  /** Percentage (0–100) of English source keys this locale has translated.
+   *  Absent for the "system" option, which has no single underlying locale. */
+  completeness?: number;
 }
 
 /** Single source of truth for the language picker. Consumed by the
@@ -125,6 +131,7 @@ export const LANGUAGES: LanguageOption[] = [
       value: locale,
       label: meta?.language ?? locale,
       flag: meta?.flag ?? "🏳️",
+      completeness: meta?.completeness ?? 0,
     };
   }),
 ];

@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-import type { TemplateResult } from "lit";
+import { type TemplateResult, nothing } from "lit";
 import { describe, expect, it } from "vitest";
 
-import type { LocalizeFunc } from "../../../src/common/localize.js";
+import type { LanguageOption, LocalizeFunc } from "../../../src/common/localize.js";
 import { ESPHomeSettingsLanguage } from "../../../src/components/settings-dialog/language-section.js";
 import { visitTemplates } from "../../_lit-template-walker.js";
 
@@ -26,6 +26,16 @@ function render(): TemplateResult {
   return (el as unknown as { render(): TemplateResult }).render();
 }
 
+function renderCompleteness(option: LanguageOption): TemplateResult | typeof nothing {
+  const el = new ESPHomeSettingsLanguage();
+  (el as unknown as { _localize: LocalizeFunc })._localize = localize;
+  return (
+    el as unknown as {
+      _renderCompleteness(o: LanguageOption): TemplateResult | typeof nothing;
+    }
+  )._renderCompleteness(option);
+}
+
 describe("esphome-settings-language translation help", () => {
   it("renders an external link to the ESPHome translations guide", () => {
     const text = renderedText(render());
@@ -34,5 +44,46 @@ describe("esphome-settings-language translation help", () => {
     expect(text).toContain('rel="noopener noreferrer"');
     expect(text).toContain("settings.language_help");
     expect(text).toContain("settings.language_help_link");
+  });
+});
+
+describe("esphome-settings-language completeness badge", () => {
+  it("renders a translated-percentage badge in the trailing slot for an incomplete locale", () => {
+    const text = renderedText(
+      renderCompleteness({
+        value: "de",
+        flag: "🇩🇪",
+        label: "Deutsch",
+        completeness: 85,
+      }) as TemplateResult
+    );
+    expect(text).toContain('slot="end"');
+    expect(text).toContain("settings.language_completeness");
+    expect(text).toContain("%");
+  });
+
+  it("omits the badge for a fully translated locale", () => {
+    expect(
+      renderCompleteness({
+        value: "en",
+        flag: "🇬🇧",
+        label: "English",
+        completeness: 100,
+      })
+    ).toBe(nothing);
+  });
+
+  it("explains what the percentage means in a note under the select", () => {
+    expect(renderedText(render())).toContain("settings.language_completeness_note");
+  });
+
+  it("omits the badge when completeness is unknown (the system option)", () => {
+    expect(
+      renderCompleteness({
+        value: "system",
+        flag: "🌐",
+        labelKey: "settings.language_system",
+      })
+    ).toBe(nothing);
   });
 });

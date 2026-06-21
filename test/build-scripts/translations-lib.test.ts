@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   flagValue,
+  localeCompleteness,
   localeFromZipEntry,
   resolveDownloadSource,
   toBcp47,
@@ -83,5 +84,70 @@ describe("resolveDownloadSource", () => {
     expect(() => resolveDownloadSource(["download", "--source", "bogus"])).toThrow(
       /got 'bogus'/
     );
+  });
+});
+
+describe("localeCompleteness", () => {
+  it("is 100% when every English key has a value", () => {
+    expect(localeCompleteness({ a: "A", b: { c: "C" } }, { a: "x", b: { c: "y" } })).toBe(
+      100
+    );
+  });
+
+  it("counts a value identical to English as translated", () => {
+    // Proper nouns / shared terms are legitimately the same string in both
+    // languages; Lokalise counts them as translated, so we do too.
+    expect(localeCompleteness({ a: "A", b: "B" }, { a: "A", b: "x" })).toBe(100);
+  });
+
+  it("ignores empty-string and missing values", () => {
+    expect(localeCompleteness({ a: "A", b: "B" }, { a: "x", b: "" })).toBe(50);
+    expect(localeCompleteness({ a: "A", b: "B" }, { a: "x" })).toBe(50);
+  });
+
+  it("ignores keys the locale carries that English has dropped", () => {
+    expect(localeCompleteness({ a: "A", b: "B" }, { a: "x", stale: "z" })).toBe(50);
+  });
+
+  it("flattens nested keys on both sides", () => {
+    const en = { a: { b: { c: "C" } } };
+    expect(localeCompleteness(en, { a: { b: { c: "x" } } })).toBe(100);
+    expect(localeCompleteness(en, { a: { b: {} } })).toBe(0);
+  });
+
+  it("skips non-string English leaves so they don't dilute the total", () => {
+    expect(localeCompleteness({ a: "A", n: 1 }, { a: "x" })).toBe(100);
+  });
+
+  it("returns 100 when English has no translatable keys", () => {
+    expect(localeCompleteness({}, { a: "x" })).toBe(100);
+  });
+
+  it("returns 0 when nothing is translated", () => {
+    expect(localeCompleteness({ a: "A", b: "B" }, { other: "z" })).toBe(0);
+  });
+
+  it("never rounds a partial locale up to 100%", () => {
+    const en: Record<string, string> = {};
+    const locale: Record<string, string> = {};
+    for (let i = 0; i < 200; i++) en[`k${i}`] = "v";
+    for (let i = 0; i < 199; i++) locale[`k${i}`] = "v";
+    // 199/200 = 99.5% would round to 100; the clamp keeps it honest at 99.
+    expect(localeCompleteness(en, locale)).toBe(99);
+  });
+
+  it("shows at least 1% for a barely-started locale", () => {
+    const en: Record<string, string> = {};
+    for (let i = 0; i < 300; i++) en[`k${i}`] = "v";
+    // 1/300 = 0.33% rounds to 0; the floor keeps the locale visible at 1.
+    expect(localeCompleteness(en, { k0: "v" })).toBe(1);
+  });
+
+  it("rounds intermediate coverage to the nearest percent", () => {
+    const en: Record<string, string> = {};
+    const locale: Record<string, string> = {};
+    for (let i = 0; i < 1000; i++) en[`k${i}`] = "v";
+    for (let i = 0; i < 850; i++) locale[`k${i}`] = "v";
+    expect(localeCompleteness(en, locale)).toBe(85);
   });
 });
