@@ -30,10 +30,10 @@ import {
   versionContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { deviceBuilderChannel } from "../util/device-builder-channel.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { deviceBuilderChannel } from "../util/device-builder-channel.js";
 import {
   deviceBuilderReleaseUrl,
   esphomeChangelogUrl,

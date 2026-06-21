@@ -160,8 +160,7 @@ export function renderToolbar(
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderViewToggle(host)}
-        ${renderFacets(host)}
+        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
         <esphome-header-actions dashboard-route></esphome-header-actions>
       </div>
       ${renderDeviceCountRow(host, matchCount, total)}

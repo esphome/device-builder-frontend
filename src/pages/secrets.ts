@@ -1,5 +1,12 @@
 import { consume } from "@lit/context";
-import { mdiArrowLeft, mdiContentSave, mdiDockLeft, mdiDockRight, mdiEye, mdiEyeOff } from "@mdi/js";
+import {
+  mdiArrowLeft,
+  mdiContentSave,
+  mdiDockLeft,
+  mdiDockRight,
+  mdiEye,
+  mdiEyeOff,
+} from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";

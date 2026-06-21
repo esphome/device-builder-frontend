@@ -129,6 +129,7 @@ import "../components/dashboard/device-table.js";
 import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
 import "../components/discovered-device-card.js";
+import "../components/esphome-header-actions.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import "../components/friendly-name-dialog.js";
@@ -142,7 +143,6 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
 import "../components/select-bar.js";
-import "../components/esphome-header-actions.js";
 import "../components/wizard/create-config-dialog.js";
 import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
 
