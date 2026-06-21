@@ -86,14 +86,7 @@ export function applyFacetFilters(
  *  device list — drives the empty-state "no devices match" pivot and
  *  the toolbar's clear-button messaging. */
 export function hasActiveFilters(search: string, selection: FacetSelection): boolean {
-  return (
-    search.trim().length > 0 ||
-    selection.selectedLabels.length > 0 ||
-    selection.selectedAreas.length > 0 ||
-    selection.selectedPlatforms.length > 0 ||
-    selection.selectedStates.length > 0 ||
-    selection.selectedUpdateStatus.length > 0
-  );
+  return search.trim().length > 0 || activeFacetCount(selection) > 0;
 }
 
 /** Count of lit facet pills — facets only, so a lone text search
