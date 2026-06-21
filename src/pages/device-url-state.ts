@@ -4,12 +4,13 @@
 // string: the selected section (`section`), the line within it
 // (`line`), and the set of open navigator sections (`open`). Keeping
 // the parse/build logic free of `window` makes the edge cases —
-// notably #650 (empty/non-numeric `open` fragments) and the
-// `history.state` preservation in `_updateUrl` — unit-testable.
+// notably #650 (empty/non-numeric `open` fragments) — unit-testable.
 //
 // The component keeps the thin `window.location` / `history` wrappers;
 // everything that turns a search string into values, or values into a
-// new URL, lives here.
+// new URL, lives here. The `history.state` preservation in `_updateUrl`
+// stays in the component wrapper — this module only builds the
+// `pathname?query` string and never touches `history.state`.
 
 /**
  * Read a single query param, returning `fallback` when absent. The
