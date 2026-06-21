@@ -63,6 +63,8 @@ export const headerActionsStyles = css`
     right: 0;
     z-index: 101;
     min-width: 220px;
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
     background: var(--wa-color-surface-raised);
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-l);

@@ -32,7 +32,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { navigate, setLeaveGuard } from "../util/navigation.js";
+import { navigate, runLeaveGuard, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { LIST_SECTIONS } from "../util/section-entry-overrides.js";
@@ -1024,9 +1024,20 @@ export class ESPHomePageDevice extends LitElement {
    *  When already on the board-info / next-steps view, navigate back
    *  to the dashboard — same behaviour the removed layout header's
    *  back arrow provided. */
-  private _onBack = () => {
+  private _onBack = async () => {
     if (!this._selectedSection && this._sectionHistory.length === 0) {
       // On the board-info view: leave the device page entirely.
+      // Prefer popping the history stack so the previous URL — and
+      // therefore the dashboard's filter / search state encoded in
+      // its query string — is restored verbatim. history.state is
+      // set to an object by navigate() on every pushState; null
+      // means we landed via a fresh page load (deep link / refresh)
+      // so there's nothing useful to pop and we fall back to navigate("/").
+      if (window.history.state !== null && typeof window.history.state === "object") {
+        if (!(await runLeaveGuard())) return;
+        window.history.back();
+        return;
+      }
       navigate("/");
       return;
     }

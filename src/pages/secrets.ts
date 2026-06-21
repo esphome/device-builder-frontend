@@ -23,7 +23,7 @@ import {
   secretsLayoutToPref,
   type SecretsLayout,
 } from "../util/editor-layout.js";
-import { navigate, setLeaveGuard } from "../util/navigation.js";
+import { navigate, runLeaveGuard, setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
@@ -263,7 +263,7 @@ export class ESPHomePageSecrets extends LitElement {
         <div class="page-header">
           <button
             class="page-back"
-            @click=${() => navigate("/")}
+            @click=${this._goBack}
             title=${backLabel}
             aria-label=${backLabel}
           >
@@ -364,6 +364,17 @@ export class ESPHomePageSecrets extends LitElement {
 
   private _toggleRevealSensitive() {
     this._revealSensitive = !this._revealSensitive;
+  }
+
+  /** Navigate back to the dashboard, preferring to pop the history stack
+   *  so the dashboard's search/filter URL state is preserved verbatim. */
+  private async _goBack() {
+    if (window.history.state !== null && typeof window.history.state === "object") {
+      if (!(await runLeaveGuard())) return;
+      window.history.back();
+      return;
+    }
+    navigate("/");
   }
 
   // Both panes are views over the same buffer, so either editor's

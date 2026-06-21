@@ -46,6 +46,11 @@ export const secretsStyles = css`
     color: var(--esphome-primary);
   }
 
+  .page-back:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 2px;
+  }
+
   .page-back wa-icon {
     font-size: 20px;
   }
