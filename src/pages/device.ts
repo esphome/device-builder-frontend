@@ -48,6 +48,12 @@ import {
 } from "../util/yaml-sections.js";
 import { summarizeValidation } from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
+import {
+  buildDeviceUrl,
+  readUrlLine,
+  readUrlParam,
+  readUrlSections,
+} from "./device-url-state.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/command-dialog.js";
@@ -1430,55 +1436,23 @@ export class ESPHomePageDevice extends LitElement {
   private _readUrlParam(key: string, fallback: string): string;
   private _readUrlParam(key: string, fallback: null): string | null;
   private _readUrlParam(key: string, fallback: string | null): string | null {
-    const params = new URLSearchParams(window.location.search);
-    return params.get(key) ?? fallback;
+    return readUrlParam(window.location.search, key, fallback);
   }
 
   private _readUrlLine(): number | undefined {
-    const raw = new URLSearchParams(window.location.search).get("line");
-    if (!raw) return undefined;
-    const n = Number(raw);
-    return Number.isNaN(n) ? undefined : n;
+    return readUrlLine(window.location.search);
   }
 
   private _readUrlSections(): number[] {
-    const raw = new URLSearchParams(window.location.search).get("open");
-    if (!raw) return [];
-    // Section indices are numeric, so a value can never contain a comma —
-    // ``split(",")`` is safe. ``map(Number)`` then ``filter(!isNaN)``
-    // discards non-numeric fragments; an empty fragment coerces to ``0``
-    // (a valid index), not ``NaN`` (#650).
-    return raw
-      .split(",")
-      .map(Number)
-      .filter((n) => !Number.isNaN(n));
+    return readUrlSections(window.location.search);
   }
 
   private _updateUrl() {
-    const params = new URLSearchParams(window.location.search);
-
-    // Selected section + line
-    if (this._selectedSection) {
-      params.set("section", this._selectedSection);
-      if (this._selectedFromLine !== undefined) {
-        params.set("line", String(this._selectedFromLine));
-      } else {
-        params.delete("line");
-      }
-    } else {
-      params.delete("section");
-      params.delete("line");
-    }
-
-    // Open navigator sections
-    if (this._openSections.size > 0) {
-      params.set("open", [...this._openSections].join(","));
-    } else {
-      params.delete("open");
-    }
-
-    const qs = params.toString();
-    const newUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    const newUrl = buildDeviceUrl(window.location.search, window.location.pathname, {
+      selectedSection: this._selectedSection,
+      selectedFromLine: this._selectedFromLine,
+      openSections: this._openSections,
+    });
     // Preserve the existing state object rather than nulling it: the
     // header back button's _goHome() reads history.state to tell an
     // in-app arrival ({} -> pop back to the filtered dashboard) from a

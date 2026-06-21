@@ -61,7 +61,7 @@ function applyEspHomeTokens(): void {
       --esphome-svg-filter: invert(1) hue-rotate(180deg);
       --wa-color-surface-default: var(--primary-background-color, #111111);
       --wa-color-surface-raised: var(--card-background-color, #1c1c1c);
-      --wa-color-surface-lowered: var(--secondary-background-color, #282828);
+      --wa-color-surface-lowered: color-mix(in oklch, var(--primary-background-color, #111111) 50%, black);
       --wa-color-surface-border: var(--divider-color, rgba(225, 225, 225, 0.12));
       --wa-color-text-normal: var(--primary-text-color, #e1e1e1);
       --wa-color-text-quiet: var(--secondary-text-color, #9b9b9b);

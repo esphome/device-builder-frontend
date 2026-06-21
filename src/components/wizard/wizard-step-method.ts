@@ -120,7 +120,6 @@ export class ESPHomeWizardStepMethod extends LitElement {
         margin: 0;
         font-size: var(--wa-font-size-s);
         color: var(--wa-color-text-quiet);
-        min-height: 2lh;
       }
 
       .option-card wa-icon {
