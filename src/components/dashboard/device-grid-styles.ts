@@ -321,7 +321,7 @@ export const deviceGridStyles = css`
     display: inline-flex;
     align-items: center;
     gap: var(--wa-space-2xs);
-    padding: 12px 22px;
+    padding: 12px 20px 12px 16px;
     border-radius: 999px;
     border: none;
     background: var(--esphome-primary);
