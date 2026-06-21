@@ -54,7 +54,7 @@ export const deviceBoardInfoStyles = css`
   .board-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--wa-space-2xs);
+    gap: var(--wa-space-s);
   }
 
   .board-info-link {
@@ -64,7 +64,6 @@ export const deviceBoardInfoStyles = css`
     font-size: var(--wa-font-size-xs);
     color: var(--esphome-primary);
     text-decoration: underline;
-    margin-left: var(--wa-space-s);
   }
 
   .board-info-link:hover {
@@ -80,7 +79,6 @@ export const deviceBoardInfoStyles = css`
     font-family: inherit;
     color: var(--esphome-primary);
     text-decoration: underline;
-    margin-left: var(--wa-space-s);
     padding: 0;
     border: none;
     background: none;
