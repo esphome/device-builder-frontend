@@ -14,6 +14,7 @@ interface PrivateView {
   _serverVersion: string;
   _esphomeVersion: string;
   readonly _versionBadge: string | null;
+  _open: boolean;
 }
 
 async function renderVersions(
@@ -69,8 +70,7 @@ describe("header-actions version links", () => {
   test("stable Device Builder links to release notes; stable ESPHome links to changelog", async () => {
     el = await renderVersions("1.0.3", "2026.5.3");
     // Force the menu open so the version info renders
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._open = true;
+    (el as unknown as PrivateView)._open = true;
     await el.updateComplete;
 
     const links =
@@ -90,8 +90,7 @@ describe("header-actions version links", () => {
 
   test("dev Device Builder stays plain text; dev ESPHome links to next docs", async () => {
     el = await renderVersions("0.0.0", "2026.7.0-dev");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._open = true;
+    (el as unknown as PrivateView)._open = true;
     await el.updateComplete;
 
     const links =
@@ -108,8 +107,7 @@ describe("header-actions version links", () => {
 
   test("badge renders in the menu when server version is dev", async () => {
     el = await renderVersions("0.0.0", "2026.7.0-dev");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._open = true;
+    (el as unknown as PrivateView)._open = true;
     await el.updateComplete;
 
     const badge = el.shadowRoot!.querySelector(".menu-version-badge");
@@ -119,8 +117,7 @@ describe("header-actions version links", () => {
 
   test("no badge when server version is stable", async () => {
     el = await renderVersions("1.0.0", "2026.5.3");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._open = true;
+    (el as unknown as PrivateView)._open = true;
     await el.updateComplete;
 
     expect(el.shadowRoot!.querySelector(".menu-version-badge")).toBeNull();

@@ -63,7 +63,14 @@ export const headerActionsStyles = css`
     right: 0;
     z-index: 101;
     min-width: 220px;
-    max-height: calc(100vh - 20px);
+    /* Pair vh + dvh so mobile browsers with dynamic toolbars don't
+       let the menu over-measure (repo idiom; see device-styles.ts).
+       80px accounts for the ~48px top offset (top: 100% from the host,
+       which sits below the toolbar/device-editor card header) plus
+       20px breathing room and ~12px buffer so the menu isn't clipped
+       by overflow:hidden ancestors on short viewports. */
+    max-height: calc(100vh - 80px);
+    max-height: calc(100dvh - 80px);
     overflow-y: auto;
     background: var(--wa-color-surface-raised);
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);

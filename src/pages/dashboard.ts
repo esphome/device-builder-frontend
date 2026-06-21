@@ -612,9 +612,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._hasActiveFilters;
 
     // Show a standalone kebab menu when the toolbar isn't rendered
-    // (no devices, table view, or device-creation hidden) so the
-    // overflow menu (settings, firmware jobs, secrets, etc.) is
-    // always accessible.
+    // (no devices or non-CARDS view) so the overflow menu (settings,
+    // firmware jobs, secrets, etc.) is always accessible.
     const showToolbar = this._devices.length > 0 && this._view === DashboardView.CARDS;
 
     return html`

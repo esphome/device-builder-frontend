@@ -7,7 +7,7 @@
  *   and overlays it on top of the English base (per-key English fallback).
  *
  * Translation files use nested objects; keys are accessed with dot-notation,
- * e.g. `localize("dashboard.title")`.
+ * e.g. `localize("dashboard.select_all")`.
  */
 import { IntlMessageFormat } from "intl-messageformat";
 
