@@ -10,7 +10,7 @@ import {
   mdiEyeOff,
   mdiUpload,
   mdiVectorDifference,
-  mdiViewSplitHorizontal,
+  mdiViewSplitVertical,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -46,9 +46,9 @@ registerMdiIcons({
   "content-save": mdiContentSave,
   eye: mdiEye,
   "eye-off": mdiEyeOff,
-  "layout-left": mdiDockLeft,
-  "layout-right": mdiDockRight,
-  "layout-split": mdiViewSplitHorizontal,
+  "dock-left": mdiDockLeft,
+  "dock-right": mdiDockRight,
+  "view-split-vertical": mdiViewSplitVertical,
   upload: mdiUpload,
   "vector-difference": mdiVectorDifference,
 });
