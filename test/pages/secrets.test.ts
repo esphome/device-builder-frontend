@@ -528,7 +528,7 @@ describe("esphome-page-secrets layout persistence", () => {
     expect(page._layout).toBe("form");
   });
 
-  test("both panes bind the same buffer and either change advances it", () => {
+  test("the active editor binds the shared buffer across a layout switch", () => {
     const page = makePage({
       _loaded: true,
       _layout: "form",
