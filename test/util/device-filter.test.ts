@@ -65,7 +65,7 @@ describe("applyFacetFilters", () => {
 
   it("labels facet drops devices with null/empty labels", () => {
     const tagged = device({ name: "tagged", labels: ["a"] });
-    const untagged = device({ name: "untagged", labels: undefined as never });
+    const untagged = device({ name: "untagged", labels: undefined });
     const out = applyFacetFilters(
       [tagged, untagged],
       selection({ selectedLabels: ["a"] })
