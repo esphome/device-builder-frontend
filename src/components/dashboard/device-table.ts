@@ -37,7 +37,7 @@ import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { matchesMacAddress } from "../../util/device-search.js";
+import { matchesDeviceRow } from "../../util/device-search.js";
 import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderDeviceTableBody, renderDeviceTableHead } from "./device-table-grid.js";
@@ -220,22 +220,11 @@ export class ESPHomeDeviceTable extends LitElement {
     _columnId: string,
     filterValue: unknown
   ): boolean => {
+    // Full-text matching lives in util/device-search.ts so the
+    // dashboard's select-all scoping helper matches the same rows
+    // this filter makes visible (single source of truth).
     const q = (filterValue as string).trim().toLowerCase();
-    if (!q) return true;
-    const d: DeviceRow = row.original;
-    if (
-      (d.friendly_name || d.name).toLowerCase().includes(q) ||
-      d.config.toLowerCase().includes(q) ||
-      d.address.toLowerCase().includes(q) ||
-      d.ip_addresses.some((ip) => ip.toLowerCase().includes(q)) ||
-      d.platform.toLowerCase().includes(q)
-    ) {
-      return true;
-    }
-    // MAC search via the shared predicate so the dashboard's
-    // select-all scoping helper matches the same rows this filter
-    // makes visible (see util/device-search.ts).
-    return matchesMacAddress(d.mac_address, q);
+    return matchesDeviceRow(row.original as DeviceRow, q);
   };
 
   // ─── Lifecycle ───

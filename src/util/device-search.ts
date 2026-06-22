@@ -54,3 +54,53 @@ export function matchesMacAddress(
   if (!strippedQuery) return false;
   return mac.toLowerCase().replace(/[:.-]/g, "").includes(strippedQuery);
 }
+
+/**
+ * Structural subset of a dashboard device row consulted by the
+ * table's full-text global filter. Declared here (rather than
+ * importing the component's ``DeviceRow``) so this leaf util keeps
+ * no dependency on the dashboard component layer — any object with
+ * these fields can be matched.
+ */
+export interface DeviceRowSearchFields {
+  name: string;
+  friendly_name: string;
+  config: string;
+  address: string;
+  ip_addresses: string[];
+  platform: string;
+  mac_address: string | null | undefined;
+}
+
+/**
+ * True when *row* matches *loweredQuery* across any of its
+ * user-visible identity fields: friendly_name (or name),
+ * configuration filename, address, any resolved IP, platform, or
+ * MAC address (separator-insensitive, via ``matchesMacAddress``).
+ *
+ * ``loweredQuery`` must already be lower-cased (matching
+ * ``matchesDeviceName`` / ``matchesMacAddress``). An empty query
+ * matches every row, mirroring the table filter's match-all
+ * behaviour when the search box is cleared.
+ *
+ * Centralising the row filter here keeps the table's render-time
+ * global filter and the select-all scoping helper agreeing on
+ * which rows a search makes visible — see the module docstring's
+ * single-source-of-truth note.
+ */
+export function matchesDeviceRow(
+  row: DeviceRowSearchFields,
+  loweredQuery: string
+): boolean {
+  if (!loweredQuery) return true;
+  if (
+    (row.friendly_name || row.name).toLowerCase().includes(loweredQuery) ||
+    row.config.toLowerCase().includes(loweredQuery) ||
+    row.address.toLowerCase().includes(loweredQuery) ||
+    row.ip_addresses.some((ip) => ip.toLowerCase().includes(loweredQuery)) ||
+    row.platform.toLowerCase().includes(loweredQuery)
+  ) {
+    return true;
+  }
+  return matchesMacAddress(row.mac_address, loweredQuery);
+}

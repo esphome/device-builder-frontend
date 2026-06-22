@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { DeviceState } from "../../src/api/types/devices.js";
-import { matchesDeviceName, matchesMacAddress } from "../../src/util/device-search.js";
+import {
+  matchesDeviceName,
+  matchesDeviceRow,
+  matchesMacAddress,
+  type DeviceRowSearchFields,
+} from "../../src/util/device-search.js";
 
 function _device(overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice {
   return {
@@ -106,5 +111,58 @@ describe("matchesMacAddress", () => {
     expect(matchesMacAddress(MAC, "")).toBe(false);
     expect(matchesMacAddress(MAC, ":")).toBe(false);
     expect(matchesMacAddress(MAC, "-:.")).toBe(false);
+  });
+});
+
+describe("matchesDeviceRow", () => {
+  function _row(overrides: Partial<DeviceRowSearchFields> = {}): DeviceRowSearchFields {
+    return {
+      name: "kitchen",
+      friendly_name: "Kitchen Lamp",
+      config: "kitchen.yaml",
+      address: "kitchen.local",
+      ip_addresses: ["192.168.1.42"],
+      platform: "esp32",
+      mac_address: "94:c9:60:12:34:56",
+      ...overrides,
+    };
+  }
+
+  it("matches on friendly_name (falling back to name when empty)", () => {
+    expect(matchesDeviceRow(_row(), "lamp")).toBe(true);
+    expect(matchesDeviceRow(_row({ friendly_name: "" }), "kitchen")).toBe(true);
+    expect(matchesDeviceRow(_row({ friendly_name: "" }), "lamp")).toBe(false);
+  });
+
+  it("matches on config, address, IP and platform fields", () => {
+    expect(matchesDeviceRow(_row(), ".yaml")).toBe(true);
+    expect(matchesDeviceRow(_row(), "kitchen.local")).toBe(true);
+    expect(matchesDeviceRow(_row(), "192.168.1.42")).toBe(true);
+    expect(matchesDeviceRow(_row(), "esp32")).toBe(true);
+  });
+
+  it("matches across any of several IP addresses", () => {
+    const row = _row({ ip_addresses: ["10.0.0.1", "10.0.0.2"] });
+    expect(matchesDeviceRow(row, "10.0.0.2")).toBe(true);
+  });
+
+  it("matches on MAC address via the shared separator-insensitive rule", () => {
+    expect(matchesDeviceRow(_row(), "94c9")).toBe(true);
+    expect(matchesDeviceRow(_row(), "94-c9-60")).toBe(true);
+  });
+
+  it("returns false when no field contains the query", () => {
+    expect(matchesDeviceRow(_row(), "bedroom")).toBe(false);
+  });
+
+  it("matches every row on an empty query (cleared search box)", () => {
+    expect(matchesDeviceRow(_row(), "")).toBe(true);
+  });
+
+  it("tolerates a missing MAC without matching on it", () => {
+    const row = _row({ mac_address: null });
+    expect(matchesDeviceRow(row, "94c9")).toBe(false);
+    // Other fields still match.
+    expect(matchesDeviceRow(row, "lamp")).toBe(true);
   });
 });
