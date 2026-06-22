@@ -308,10 +308,12 @@ export function nestedPathForParent(
 ): string[] {
   let path = getKeyPath(state, pos);
   let idx = path.lastIndexOf(parentKey);
-  if (idx < 1) {
-    // The AST can't anchor on a blank indented line (no Pair). Rebuild the
-    // chain from indentation so nested discovery still resolves there.
-    const line = state.doc.lineAt(pos);
+  const line = state.doc.lineAt(pos);
+  // Only rebuild from indentation on a genuinely blank line, where the AST
+  // has no Pair to anchor on. Elsewhere a missing parentKey means the AST and
+  // regex walkers disagree (e.g. a list-item context), and the indent walk
+  // could synthesise a sibling-laden path — keep the safe no-descent result.
+  if (idx < 1 && line.text.slice(0, pos - line.from).trim() === "") {
     path = keyPathByIndent(state.doc, line.number - 1, indentOf(line.text));
     idx = path.lastIndexOf(parentKey);
   }
