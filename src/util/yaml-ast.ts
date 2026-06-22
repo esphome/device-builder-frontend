@@ -304,14 +304,23 @@ export function collectSiblingKeys(state: EditorState, pos: number): Set<string>
   while (map && map.name !== "BlockMapping") map = map.parent;
   if (!map) return out;
   // The pair being edited stays out of the set so an in-place key edit
-  // still completes itself. A bare partial line that didn't parse as a
-  // Pair yields an ``ownPair`` outside this mapping, which simply never
-  // matches a child below.
+  // still completes itself — but only when its key sits on the cursor's
+  // line. An empty ``key:`` opener absorbs the line below as its value, so
+  // a new sibling typed beneath one would otherwise wrongly exclude that
+  // key (and re-suggest it).
   const ownPair = findEnclosingPair(inner);
+  const cursorLine = state.doc.lineAt(pos).number;
+  let ownKeyOnCursorLine = false;
+  if (ownPair) {
+    const k = ownPair.getChild("Key");
+    ownKeyOnCursorLine = !!k && state.doc.lineAt(k.from).number === cursorLine;
+  }
   for (let pair = map.firstChild; pair; pair = pair.nextSibling) {
     if (pair.name !== "Pair") continue;
     // Lezer nodes aren't reference-equal across traversals; compare by span.
-    if (ownPair && pair.from === ownPair.from && pair.to === ownPair.to) continue;
+    if (ownKeyOnCursorLine && pair.from === ownPair!.from && pair.to === ownPair!.to) {
+      continue;
+    }
     const k = getPairKey(state, pair);
     if (k) out.add(k);
   }

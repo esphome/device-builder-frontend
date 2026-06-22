@@ -39,6 +39,14 @@ describe("collectSiblingKeys", () => {
     expect(siblingsAt(yaml, yaml.length)).toEqual(["platform"]);
   });
 
+  it("includes an empty block opener above the cursor", () => {
+    // ``captive_portal:`` / ``debug:`` etc. with no children absorb the
+    // line below as their value; the new sibling key beneath must still
+    // see them so they aren't re-suggested.
+    const yaml = ["wifi:", "  ssid: x", "captive_portal:", "d"].join("\n");
+    expect(siblingsAt(yaml, yaml.length)).toEqual(["captive_portal", "wifi"]);
+  });
+
   it("returns an empty set when the cursor isn't inside a mapping", () => {
     expect(siblingsAt("", 0)).toEqual([]);
   });
