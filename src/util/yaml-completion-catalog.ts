@@ -254,11 +254,14 @@ export async function resolveAvailableEntries(
   // path's AST walk stays off the common (cursor-under-a-component) path.
   const nestedPath = topLevelKey ? resolveNestedPath() : [];
   if (nestedPath.length > 0) {
+    // ``null`` means the path didn't resolve (fall through to the alias
+    // fetch); an empty array means a real but childless nested group, which
+    // should surface no suggestions rather than trigger the network fallback.
     const descended = descendNestedEntries(
       await componentEntries(topLevelKey!),
       nestedPath
     );
-    if (descended.length > 0) return descended;
+    if (descended !== null) return descended;
   }
   // No direct hit — try fetching the component (handles aliases the
   // catalog list call doesn't return). Routes through the session-
@@ -294,17 +297,19 @@ export function nestedPathForParent(
 
 /**
  * Walk *entries* down *path*, descending into each matching entry's
- * nested ``config_entries``. Returns the deepest level reached, or
- * ``[]`` when any step has no nested group for that key.
+ * nested ``config_entries``. Returns the deepest level reached (possibly
+ * empty for a childless nested group), or ``null`` when any step has no
+ * nested group for that key — letting the caller tell "resolved but empty"
+ * apart from "path missing".
  */
 export function descendNestedEntries(
   entries: ConfigEntry[],
   path: string[]
-): ConfigEntry[] {
+): ConfigEntry[] | null {
   let cur = entries;
   for (const key of path) {
     const next = cur.find((e) => e.key === key && e.config_entries);
-    if (!next?.config_entries) return [];
+    if (!next?.config_entries) return null;
     cur = next.config_entries;
   }
   return cur;

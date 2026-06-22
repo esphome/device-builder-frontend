@@ -29,7 +29,7 @@ describe("descendNestedEntries", () => {
   const entries = [FRAMEWORK];
 
   it("descends one level into a nested group", () => {
-    expect(descendNestedEntries(entries, ["framework"]).map((e) => e.key)).toEqual([
+    expect(descendNestedEntries(entries, ["framework"])!.map((e) => e.key)).toEqual([
       "advanced",
       "version",
       "type",
@@ -38,13 +38,18 @@ describe("descendNestedEntries", () => {
 
   it("descends multiple levels", () => {
     expect(
-      descendNestedEntries(entries, ["framework", "advanced"]).map((e) => e.key)
+      descendNestedEntries(entries, ["framework", "advanced"])!.map((e) => e.key)
     ).toEqual(["compiler_optimization"]);
   });
 
-  it("returns [] when a path step has no nested group", () => {
-    expect(descendNestedEntries(entries, ["framework", "bogus"])).toEqual([]);
-    expect(descendNestedEntries(entries, ["version"])).toEqual([]);
+  it("returns an empty array for a real but childless nested group", () => {
+    const empty = [nested("framework", [nested("advanced", [])])];
+    expect(descendNestedEntries(empty, ["framework", "advanced"])).toEqual([]);
+  });
+
+  it("returns null when a path step has no nested group", () => {
+    expect(descendNestedEntries(entries, ["framework", "bogus"])).toBeNull();
+    expect(descendNestedEntries(entries, ["version"])).toBeNull();
   });
 
   it("returns the input level for an empty path", () => {
