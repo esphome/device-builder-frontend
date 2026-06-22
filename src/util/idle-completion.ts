@@ -28,10 +28,10 @@ export function shouldIdleComplete(state: EditorState): boolean {
   const line = state.doc.lineAt(sel.head);
   if (sel.head !== line.to) return false;
   const before = line.text.slice(0, sel.head - line.from);
-  const valuePos = matchValuePosition(before);
-  if (valuePos) return valuePos.partial === "" && valuePos.leading.length > 0;
-  const keyPos = matchKeyPosition(before);
-  return keyPos !== null && keyPos.partial === "" && keyPos.leading.length > 0;
+  // An empty partial at an indented position (a blank nested key line or an
+  // empty ``key: `` value). Value position wins where both could match.
+  const match = matchValuePosition(before) ?? matchKeyPosition(before);
+  return match !== null && match.partial === "" && match.leading.length > 0;
 }
 
 /** Open the completion popup *delayMs* after the caret last moved or the

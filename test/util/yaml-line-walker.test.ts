@@ -185,7 +185,14 @@ describe("keyPathByIndent", () => {
     expect(keyPathByIndent(t(lines), 2, 0)).toEqual([]);
   });
 
-  it("collectSiblingKeysByIndent collects the mapping's keys at the cursor indent", () => {
+  it("skips blank lines between siblings", () => {
+    const lines = ["esp32:", "  framework:", "", "    type: a", "    "];
+    expect(keyPathByIndent(t(lines), 4, 4)).toEqual(["esp32", "framework"]);
+  });
+});
+
+describe("collectSiblingKeysByIndent", () => {
+  it("collects the mapping's keys at the cursor indent", () => {
     const lines = ["ethernet:", "  clk:", "    mode: CLK_EXT_IN", "    pin: 0", "    "];
     expect([...collectSiblingKeysByIndent(t(lines), 4, 4)].sort()).toEqual([
       "mode",
@@ -193,7 +200,7 @@ describe("keyPathByIndent", () => {
     ]);
   });
 
-  it("collectSiblingKeysByIndent skips deeper descendants and other blocks", () => {
+  it("skips deeper descendants and other blocks", () => {
     const lines = [
       "esp32:",
       "  framework:",
@@ -207,16 +214,13 @@ describe("keyPathByIndent", () => {
       "version",
     ]);
   });
+});
 
-  it("blankLineContext reports a blank indented line, else null", () => {
+describe("blankLineContext", () => {
+  it("reports a blank indented line, else null", () => {
     const blank = t(["esp32:", "  framework:", "    "]);
     expect(blankLineContext(blank, blank.length)).toEqual({ lineIdx: 2, indent: 4 });
     const filled = t(["esp32:", "  board: x"]);
     expect(blankLineContext(filled, filled.length)).toBeNull();
-  });
-
-  it("skips blank lines between siblings", () => {
-    const lines = ["esp32:", "  framework:", "", "    type: a", "    "];
-    expect(keyPathByIndent(t(lines), 4, 4)).toEqual(["esp32", "framework"]);
   });
 });

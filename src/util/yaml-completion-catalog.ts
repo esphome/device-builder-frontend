@@ -17,8 +17,8 @@ import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.j
 import { fetchComponent } from "./component-name-cache.js";
 import { getKeyPath, resolveBundleContext } from "./yaml-ast.js";
 import {
+  blankLineContext,
   findTopLevelBlock,
-  indentOf,
   keyPathByIndent,
   readPlatformSibling,
 } from "./yaml-line-walker.js";
@@ -306,17 +306,17 @@ export function nestedPathForParent(
   pos: number,
   parentKey: string
 ): string[] {
-  let path = getKeyPath(state, pos);
-  let idx = path.lastIndexOf(parentKey);
-  const line = state.doc.lineAt(pos);
-  // Only rebuild from indentation on a genuinely blank line, where the AST
-  // has no Pair to anchor on. Elsewhere a missing parentKey means the AST and
-  // regex walkers disagree (e.g. a list-item context), and the indent walk
-  // could synthesise a sibling-laden path — keep the safe no-descent result.
-  if (idx < 1 && line.text.slice(0, pos - line.from).trim() === "") {
-    path = keyPathByIndent(state.doc, line.number - 1, indentOf(line.text));
-    idx = path.lastIndexOf(parentKey);
-  }
+  // On a genuinely blank line the AST has no Pair to anchor on (``getKeyPath``
+  // returns ``[]``), so build the chain from indentation instead. Elsewhere
+  // stay on the AST: a missing parentKey there means the walkers disagree
+  // (e.g. a list-item context), where the indent walk could synthesise a
+  // sibling-laden path. (The fallback is kept here, not inside ``getKeyPath``,
+  // so its AST-only callers — hover, the cursor-line event — still get ``[]``.)
+  const blank = blankLineContext(state.doc, pos);
+  const path = blank
+    ? keyPathByIndent(state.doc, blank.lineIdx, blank.indent)
+    : getKeyPath(state, pos);
+  const idx = path.lastIndexOf(parentKey);
   if (idx < 1) return [];
   return path.slice(1, idx + 1);
 }
