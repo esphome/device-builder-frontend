@@ -166,4 +166,11 @@ describe("createYamlCompletionSource (already-set key filtering)", () => {
     );
     expect(labels).toEqual(["true", "false"]);
   });
+
+  it("auto-offers platform at a fresh list-item dash (no partial typed)", async () => {
+    // Typing ``- `` under a platform domain should immediately offer
+    // ``platform:`` rather than wait for a partial or ctrl-space.
+    const labels = await labelsAt(["sensor:", "  - "].join("\n"));
+    expect(labels).toContain("platform");
+  });
 });

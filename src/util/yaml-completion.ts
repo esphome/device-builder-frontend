@@ -277,7 +277,11 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     const indent = leading.length;
     const keyFrom = pos - partial.length;
 
-    if (!ctx.explicit && partial.length === 0) return null;
+    // A fresh ``- `` is itself the signal to offer list-item keys
+    // (``platform:``, the action registry), the same way ``key:`` auto-fires
+    // value completion. A plain blank key line still waits for a partial or
+    // an explicit/idle trigger.
+    if (!ctx.explicit && partial.length === 0 && !isListItem) return null;
 
     const catalog = await loadCatalog(api);
 
