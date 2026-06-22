@@ -92,12 +92,19 @@ export function basename(path: string): string {
 
 /**
  * Whether a validator ``document`` path refers to the currently open
- * configuration rather than an ``!include``d file. The main file's
- * document is ``<config_dir>/<configuration>``; an include resolves to a
- * different path.
+ * configuration rather than an ``!include``d file. The ``--ace`` loader
+ * leaves the main file's stream unnamed, so its nodes report the
+ * ``"<file>"`` sentinel (and a missing document means the same thing);
+ * only ``!include``d files carry a real path, resolved to
+ * ``<config_dir>/<configuration>``. A suffix match on the full
+ * configuration path identifies the open file; a plain basename match is
+ * deliberately avoided so an included file sharing the open file's name
+ * (open ``sub/light.yaml``, error in ``common/light.yaml``) isn't
+ * mistaken for the open buffer.
  */
 export function isOpenConfigFile(document: string, configuration: string): boolean {
+  if (!document || document === "<file>") return true;
   const doc = document.replace(/\\/g, "/");
   const cfg = configuration.replace(/\\/g, "/");
-  return doc === cfg || doc.endsWith(`/${cfg}`) || basename(doc) === basename(cfg);
+  return doc === cfg || doc.endsWith(`/${cfg}`);
 }

@@ -198,12 +198,30 @@ describe("isOpenConfigFile", () => {
     );
   });
 
-  it("matches a windows document path by basename", () => {
+  it("matches a normalized windows document path", () => {
     expect(isOpenConfigFile("C:\\config\\esphome\\light.yaml", "light.yaml")).toBe(true);
+  });
+
+  it("treats the --ace main-file sentinel as the open config", () => {
+    // The `esphome vscode --ace` loader leaves the main stream unnamed,
+    // so main-file errors report "<file>" rather than a real path.
+    expect(isOpenConfigFile("<file>", "light.yaml")).toBe(true);
+  });
+
+  it("treats a missing document as the open config", () => {
+    expect(isOpenConfigFile("", "light.yaml")).toBe(true);
   });
 
   it("treats an included file as not the open config", () => {
     expect(isOpenConfigFile("/config/esphome/common/base.yaml", "light.yaml")).toBe(
+      false
+    );
+  });
+
+  it("does not match an included file that merely shares the open file's name", () => {
+    // open sub/light.yaml, error in common/light.yaml — same basename,
+    // different file; a basename match would navigate the wrong document.
+    expect(isOpenConfigFile("/config/esphome/common/light.yaml", "sub/light.yaml")).toBe(
       false
     );
   });
