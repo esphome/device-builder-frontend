@@ -47,6 +47,17 @@ describe("descendNestedEntries", () => {
     expect(descendNestedEntries(empty, ["framework", "advanced"])).toEqual([]);
   });
 
+  it("descends a nested group whose children are null", () => {
+    // ``config_entries`` is ``ConfigEntry[] | null``; a nested group with
+    // null children resolves to an empty level, not a missing path.
+    const nullChildren = makeConfigEntry({
+      key: "framework",
+      type: ConfigEntryType.NESTED,
+      config_entries: null,
+    });
+    expect(descendNestedEntries([nullChildren], ["framework"])).toEqual([]);
+  });
+
   it("returns null when a path step has no nested group", () => {
     expect(descendNestedEntries(entries, ["framework", "bogus"])).toBeNull();
     expect(descendNestedEntries(entries, ["version"])).toBeNull();

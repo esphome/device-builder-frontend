@@ -13,7 +13,7 @@
 import type { EditorState } from "@codemirror/state";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
-import type { ConfigEntry } from "../api/types/config-entries.js";
+import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
 import { getKeyPath, resolveBundleContext } from "./yaml-ast.js";
 import { findTopLevelBlock, readPlatformSibling } from "./yaml-line-walker.js";
@@ -317,9 +317,16 @@ export function descendNestedEntries(
 ): ConfigEntry[] | null {
   let cur = entries;
   for (const key of path) {
-    const next = cur.find((e) => e.key === key && e.config_entries);
-    if (!next?.config_entries) return null;
-    cur = next.config_entries;
+    // Descend into any entry that carries child entries (``nested`` / ``pin``
+    // / ``map``); a ``nested`` group can legitimately have ``null`` children
+    // (treated as empty), so match it by type too rather than only by a
+    // truthy ``config_entries``.
+    const next = cur.find(
+      (e) =>
+        e.key === key && (e.config_entries != null || e.type === ConfigEntryType.NESTED)
+    );
+    if (!next) return null;
+    cur = next.config_entries ?? [];
   }
   return cur;
 }
