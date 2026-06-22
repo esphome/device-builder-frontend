@@ -103,7 +103,7 @@ export function createYamlCompletionSource(
 ) {
   return async (ctx: CompletionContext): Promise<CompletionResult | null> => {
     const { state, pos } = ctx;
-    const target = getTarget?.();
+    const deviceTarget = getTarget?.();
     const lineInfo = state.doc.lineAt(pos);
     const lineText = lineInfo.text;
     const colInLine = pos - lineInfo.from;
@@ -197,7 +197,7 @@ export function createYamlCompletionSource(
         completionCtx.platformValue,
         completionCtx.topLevelKey,
         () => nestedPathForParent(state, pos, parent.key),
-        target
+        deviceTarget
       );
       const entry = entries.find((e) => e.key === key);
 
@@ -338,7 +338,7 @@ export function createYamlCompletionSource(
       partial,
       parent,
       isListItem,
-      deviceTarget: target,
+      deviceTarget,
       bundleCtx: completionCtx.bundleCtx,
       platformValue: completionCtx.platformValue,
       topLevelKey: completionCtx.topLevelKey,

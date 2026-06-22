@@ -254,11 +254,13 @@ describe("resolveAvailableEntries (nested descent)", () => {
       byCategory: new Map(),
     };
     const fakeApi = {
-      getComponentBodies: async (ids: string[], platform?: string) =>
+      // Resolve options only when BOTH platform and boardId are forwarded, so a
+      // regression that drops boardId fails this test.
+      getComponentBodies: async (ids: string[], platform?: string, boardId?: string) =>
         Object.fromEntries(
           ids
             .filter((id) => id === "logger")
-            .map((id) => [id, platform ? resolved : generic])
+            .map((id) => [id, platform && boardId ? resolved : generic])
         ),
     } as never;
     const withTarget = await resolveAvailableEntries(
