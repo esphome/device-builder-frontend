@@ -131,3 +131,64 @@ export function renderMarkdown(
   const segments = parseMarkdown(input);
   return html`${segments.map(renderSegment)}`;
 }
+
+/** Bare http(s) URLs embedded in otherwise-plain text (validation messages). */
+const BARE_URL_RE = /https?:\/\/[^\s<>]+/g;
+
+/** Sentence punctuation that trails a URL in prose but isn't part of it. */
+const TRAILING_PUNCT_RE = /[.,;:!?]+$/;
+
+export interface TextLinkSegment {
+  text: string;
+  /** Present only when 'text' is a safe, clickable URL. */
+  href?: string;
+}
+
+/**
+ * Split plain text into text / URL segments, autolinking bare http(s) URLs.
+ *
+ * Trailing sentence punctuation (and an unbalanced close paren) is peeled back
+ * into the following text so the link stops at the URL. The isSafeLinkHref gate
+ * keeps this in lockstep with renderMarkdown. Plain text only, no Markdown.
+ */
+export function splitTextLinks(input: string): TextLinkSegment[] {
+  const segments: TextLinkSegment[] = [];
+  let last = 0;
+  for (const match of input.matchAll(BARE_URL_RE)) {
+    const start = match.index ?? 0;
+    let url = match[0];
+    let tail = "";
+    const punct = url.match(TRAILING_PUNCT_RE);
+    if (punct) {
+      tail = punct[0];
+      url = url.slice(0, -tail.length);
+    }
+    if (url.endsWith(")") && !url.includes("(")) {
+      tail = `)${tail}`;
+      url = url.slice(0, -1);
+    }
+    if (start > last) segments.push({ text: input.slice(last, start) });
+    segments.push(isSafeLinkHref(url) ? { text: url, href: url } : { text: url });
+    if (tail) segments.push({ text: tail });
+    last = start + match[0].length;
+  }
+  if (last < input.length) segments.push({ text: input.slice(last) });
+  return segments;
+}
+
+/**
+ * Render plain text as a Lit template, autolinking bare URLs as new-tab
+ * anchors. Returns `nothing` for empty input; output is escaped (no unsafeHTML).
+ */
+export function renderTextLinks(
+  input: string | null | undefined
+): TemplateResult | typeof nothing {
+  if (!input) return nothing;
+  return html`${splitTextLinks(input).map((seg) =>
+    seg.href
+      ? html`<a class="md-link" href=${seg.href} target="_blank" rel="noopener noreferrer"
+          >${seg.text}</a
+        >`
+      : seg.text
+  )}`;
+}

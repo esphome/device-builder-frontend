@@ -23,6 +23,7 @@ import {
 import { gutterLineClass, GutterMarker, type EditorView } from "@codemirror/view";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { EditorValidateResponse } from "../api/types/editor.js";
+import { splitTextLinks } from "./markdown.js";
 
 interface BackendLinterOptions {
   api: ESPHomeAPI;
@@ -94,6 +95,25 @@ const CORE_BLOCK_KEY = "esphome";
  */
 export function sanitizeMessage(message: string): string {
   return message.replace(QUOTED_PATH_RE, '"$2"');
+}
+
+/** Lint-tooltip DOM for a message, autolinking bare URLs to new-tab anchors. */
+function renderMessageNode(message: string): HTMLSpanElement {
+  const span = document.createElement("span");
+  for (const seg of splitTextLinks(message)) {
+    if (seg.href) {
+      const link = document.createElement("a");
+      link.href = seg.href;
+      link.textContent = seg.text;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.className = "cm-diagnostic-link";
+      span.appendChild(link);
+    } else {
+      span.appendChild(document.createTextNode(seg.text));
+    }
+  }
+  return span;
 }
 
 /**
@@ -278,7 +298,14 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           continue;
         }
         const { from, to } = lineToOffsets(view, pos.line, pos.col);
-        diagnostics.push({ from, to, severity: "error", source: "yaml", message });
+        diagnostics.push({
+          from,
+          to,
+          severity: "error",
+          source: "yaml",
+          message,
+          renderMessage: () => renderMessageNode(message),
+        });
       }
 
       // Schema/validation errors carry an explicit range.
@@ -294,7 +321,14 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           bannerErrors.push(message);
           continue;
         }
-        diagnostics.push({ from, to, severity: "error", source: "esphome", message });
+        diagnostics.push({
+          from,
+          to,
+          severity: "error",
+          source: "esphome",
+          message,
+          renderMessage: () => renderMessageNode(message),
+        });
       }
 
       opts.onResult?.(bannerErrors, configuration);

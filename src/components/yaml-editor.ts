@@ -239,6 +239,10 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         ".cm-diagnostic + .cm-diagnostic": {
           borderTop: this._darkMode ? "1px solid #2a2a32" : "1px solid #f0f1f3",
         },
+        ".cm-diagnostic a.cm-diagnostic-link": {
+          color: this._darkMode ? "#8cc2ff" : "#0b5cad",
+          textDecoration: "underline",
+        },
         ".cm-diagnostic-error": {
           borderLeftColor: this._darkMode ? "#ff6b6b" : "#d92d20",
         },

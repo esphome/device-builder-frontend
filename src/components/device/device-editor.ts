@@ -18,6 +18,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { renderTextLinks } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
 import {
@@ -329,7 +330,10 @@ export class ESPHomeDeviceEditor extends LitElement {
                       ${this._liveErrors
                         .slice(0, MAX_BANNER_ERRORS)
                         .map(
-                          (msg) => html`<span class="invalid-banner-error">${msg}</span>`
+                          (msg) =>
+                            html`<span class="invalid-banner-error"
+                              >${renderTextLinks(msg)}</span
+                            >`
                         )}
                       ${this._liveErrors.length > MAX_BANNER_ERRORS
                         ? html`<span class="invalid-banner-more"

@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { isSafeLinkHref } from "../../src/util/markdown.js";
+import { isSafeLinkHref, splitTextLinks } from "../../src/util/markdown.js";
 
 describe("isSafeLinkHref — accepted schemes", () => {
   it("accepts http://", () => {
@@ -107,5 +107,62 @@ describe("isSafeLinkHref — rejected schemes", () => {
     // tweak can't accidentally widen the prefix.
     expect(isSafeLinkHref("\tjavascript:alert(1)")).toBe(false);
     expect(isSafeLinkHref("\njavascript:alert(1)")).toBe(false);
+  });
+});
+
+describe("splitTextLinks", () => {
+  it("returns a single text segment when there is no URL", () => {
+    expect(splitTextLinks("Invalid POSIX timezone string 'CDT'")).toEqual([
+      { text: "Invalid POSIX timezone string 'CDT'" },
+    ]);
+  });
+
+  it("links a bare URL and keeps a trailing period as text", () => {
+    // The real esphome timezone error: the sentence-ending period
+    // must not become part of the href.
+    expect(
+      splitTextLinks(
+        "check the list at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones."
+      )
+    ).toEqual([
+      { text: "check the list at " },
+      {
+        text: "https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
+        href: "https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
+      },
+      { text: "." },
+    ]);
+  });
+
+  it("links a URL embedded mid-sentence", () => {
+    expect(splitTextLinks("see https://esphome.io/foo for details")).toEqual([
+      { text: "see " },
+      { text: "https://esphome.io/foo", href: "https://esphome.io/foo" },
+      { text: " for details" },
+    ]);
+  });
+
+  it("links each of several URLs", () => {
+    const segs = splitTextLinks("https://a.example and https://b.example");
+    expect(segs.filter((s) => s.href).map((s) => s.href)).toEqual([
+      "https://a.example",
+      "https://b.example",
+    ]);
+  });
+
+  it("keeps a paren inside the URL but peels an unbalanced trailing one", () => {
+    // Wikipedia-style '_(disambiguation)' stays in the link; a closing
+    // paren with no opener (prose wrapping) is pushed back to text.
+    expect(splitTextLinks("https://en.wikipedia.org/wiki/Foo_(bar)")).toEqual([
+      {
+        text: "https://en.wikipedia.org/wiki/Foo_(bar)",
+        href: "https://en.wikipedia.org/wiki/Foo_(bar)",
+      },
+    ]);
+    expect(splitTextLinks("(see https://esphome.io/foo)")).toEqual([
+      { text: "(see " },
+      { text: "https://esphome.io/foo", href: "https://esphome.io/foo" },
+      { text: ")" },
+    ]);
   });
 });
