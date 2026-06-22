@@ -79,6 +79,48 @@ describe("yaml-validation-dialog ENTER", () => {
   });
 });
 
+// When the first error lives in an `!include`d file the reported line is
+// meaningless against the open buffer, so "Go to error" must disable rather
+// than navigate nowhere, and the dialog names the offending file instead.
+describe("yaml-validation-dialog included-file error", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const gotoButton = (el: ESPHomeYamlValidationDialog): HTMLButtonElement =>
+    el.shadowRoot!.querySelector(".btn--goto")!;
+
+  it("disables Go to error when the error is in an included file", async () => {
+    const el = await mount();
+    el.firstErrorLine = 42;
+    el.firstErrorFile = "base.yaml";
+    await el.updateComplete;
+    expect(gotoButton(el).disabled).toBe(true);
+    expect(el.shadowRoot!.querySelector(".included-file")).not.toBeNull();
+  });
+
+  it("does not fire goto on Enter when the error is in an included file", async () => {
+    const el = await mount();
+    el.firstErrorLine = 42;
+    el.firstErrorFile = "base.yaml";
+    await el.updateComplete;
+    const onGoto = vi.fn();
+    el.addEventListener("goto", onGoto);
+    el.open();
+    pressEnter();
+    expect(onGoto).not.toHaveBeenCalled();
+  });
+
+  it("keeps Go to error enabled when the error is in the open file", async () => {
+    const el = await mount();
+    el.firstErrorLine = 42;
+    el.firstErrorFile = "";
+    await el.updateComplete;
+    expect(gotoButton(el).disabled).toBe(false);
+    expect(el.shadowRoot!.querySelector(".included-file")).toBeNull();
+  });
+});
+
 // The migration onto esphome-base-dialog introduced the reactive ?open binding,
 // the request-close handler, and the after-hide -> cancel path. Pin them so the
 // dismiss-cancels contract (the page-leave guard depends on it) can't regress.

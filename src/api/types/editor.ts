@@ -8,6 +8,8 @@
 
 /** Range emitted by the upstream `esphome vscode --ace` validator. 0-indexed. */
 export interface EditorRange {
+  /** Source file the range came from; differs from the open config when the error is in an `!include`d file. */
+  document?: string;
   start_line: number;
   start_col: number;
   end_line: number;

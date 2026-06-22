@@ -46,7 +46,11 @@ import {
   sectionKeyOf,
   type YamlSection,
 } from "../util/yaml-sections.js";
-import { summarizeValidation } from "../util/yaml-validation-summary.js";
+import {
+  basename,
+  isOpenConfigFile,
+  summarizeValidation,
+} from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
 import {
   buildDeviceUrl,
@@ -263,6 +267,9 @@ export class ESPHomePageDevice extends LitElement {
 
   @state()
   private _validationFirstMessage = "";
+
+  @state()
+  private _validationFirstFile = "";
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
@@ -726,6 +733,14 @@ export class ESPHomePageDevice extends LitElement {
           this._validationFirstLine = summary.first?.line ?? 0;
           this._validationFirstCol = summary.first?.col ?? 0;
           this._validationFirstMessage = summary.first?.message ?? "";
+          // The reported line is meaningless against the open buffer when
+          // the error is inside an `!include`d file; name that file instead
+          // of leaving the editor to navigate nowhere.
+          const errorFile = summary.first?.file ?? null;
+          this._validationFirstFile =
+            errorFile && this.id && !isOpenConfigFile(errorFile, this.id)
+              ? basename(errorFile)
+              : "";
           // A previous prompt that's somehow still pending (the
           // unsaved-guard already prevents overlapping page-leave
           // dialogs, but a manual Save click reaches this branch
@@ -1015,6 +1030,7 @@ export class ESPHomePageDevice extends LitElement {
           .firstErrorLine=${this._validationFirstLine}
           .firstErrorCol=${this._validationFirstCol}
           .firstErrorMessage=${this._validationFirstMessage}
+          .firstErrorFile=${this._validationFirstFile}
           @save-anyway=${this._onValidationSaveAnyway}
           @goto=${this._onValidationGoTo}
           @cancel=${this._onValidationCancel}

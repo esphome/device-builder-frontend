@@ -19,7 +19,11 @@
 
 import { describe, expect, it } from "vitest";
 import type { EditorValidateResponse } from "../../src/api/types/editor.js";
-import { summarizeValidation } from "../../src/util/yaml-validation-summary.js";
+import {
+  basename,
+  isOpenConfigFile,
+  summarizeValidation,
+} from "../../src/util/yaml-validation-summary.js";
 
 function res(
   yaml_errors: EditorValidateResponse["yaml_errors"] = [],
@@ -108,6 +112,47 @@ describe("summarizeValidation", () => {
     );
   });
 
+  it("carries the validation-error source document as first.file", () => {
+    const summary = summarizeValidation(
+      res(
+        [],
+        [
+          {
+            message: "'foo' is an invalid option for [sensor]",
+            range: {
+              document: "/config/esphome/common/base.yaml",
+              start_line: 41,
+              start_col: 2,
+              end_line: 41,
+              end_col: 5,
+            },
+          },
+        ]
+      )
+    );
+    expect(summary.first?.file).toBe("/config/esphome/common/base.yaml");
+  });
+
+  it("leaves first.file null when the validator reports no document", () => {
+    const summary = summarizeValidation(
+      res(
+        [],
+        [
+          {
+            message: "Invalid value",
+            range: { start_line: 1, start_col: 0, end_line: 1, end_col: 1 },
+          },
+        ]
+      )
+    );
+    expect(summary.first?.file).toBeNull();
+  });
+
+  it("leaves first.file null for yaml parse errors", () => {
+    const summary = summarizeValidation(res([{ message: "boom at line 3, column 1" }]));
+    expect(summary.first?.file).toBeNull();
+  });
+
   it("counts every error across both buckets", () => {
     const summary = summarizeValidation(
       res(
@@ -125,5 +170,41 @@ describe("summarizeValidation", () => {
       )
     );
     expect(summary.count).toBe(3);
+  });
+});
+
+describe("basename", () => {
+  it("returns the last segment of a posix path", () => {
+    expect(basename("/config/esphome/common/base.yaml")).toBe("base.yaml");
+  });
+
+  it("returns the last segment of a windows path", () => {
+    expect(basename("C:\\config\\esphome\\base.yaml")).toBe("base.yaml");
+  });
+
+  it("returns the input when there is no separator", () => {
+    expect(basename("base.yaml")).toBe("base.yaml");
+  });
+});
+
+describe("isOpenConfigFile", () => {
+  it("matches the open config by full document path", () => {
+    expect(isOpenConfigFile("/config/esphome/light.yaml", "light.yaml")).toBe(true);
+  });
+
+  it("matches when the configuration carries a subpath", () => {
+    expect(isOpenConfigFile("/config/esphome/sub/light.yaml", "sub/light.yaml")).toBe(
+      true
+    );
+  });
+
+  it("matches a windows document path by basename", () => {
+    expect(isOpenConfigFile("C:\\config\\esphome\\light.yaml", "light.yaml")).toBe(true);
+  });
+
+  it("treats an included file as not the open config", () => {
+    expect(isOpenConfigFile("/config/esphome/common/base.yaml", "light.yaml")).toBe(
+      false
+    );
   });
 });

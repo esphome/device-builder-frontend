@@ -29,6 +29,8 @@ export interface ValidationFirstError {
   col: number;
   /** Trimmed message — feeds the dialog's "first error" hint. */
   message: string;
+  /** Source file the error came from, or null when the validator didn't report one. */
+  file: string | null;
 }
 
 export interface ValidationSummary {
@@ -66,7 +68,10 @@ export function summarizeValidation(res: EditorValidateResponse): ValidationSumm
     }
     if (!Number.isFinite(line) || line < 1) line = 0;
     if (!Number.isFinite(col) || col < 1) col = 0;
-    return { count, first: { line, col, message: message || "Invalid YAML" } };
+    return {
+      count,
+      first: { line, col, message: message || "Invalid YAML", file: null },
+    };
   }
 
   const err = validationErrors[0];
@@ -75,5 +80,24 @@ export function summarizeValidation(res: EditorValidateResponse): ValidationSumm
   const line = Math.max(1, (err.range?.start_line ?? 0) + 1);
   const col = Math.max(1, (err.range?.start_col ?? 0) + 1);
   const message = (err.message ?? "Invalid configuration").trim();
-  return { count, first: { line, col, message } };
+  return { count, first: { line, col, message, file: err.range?.document ?? null } };
+}
+
+/** Last path segment of a ``/``- or ``\``-separated path. */
+export function basename(path: string): string {
+  const normalized = path.replace(/\\/g, "/");
+  const idx = normalized.lastIndexOf("/");
+  return idx === -1 ? normalized : normalized.slice(idx + 1);
+}
+
+/**
+ * Whether a validator ``document`` path refers to the currently open
+ * configuration rather than an ``!include``d file. The main file's
+ * document is ``<config_dir>/<configuration>``; an include resolves to a
+ * different path.
+ */
+export function isOpenConfigFile(document: string, configuration: string): boolean {
+  const doc = document.replace(/\\/g, "/");
+  const cfg = configuration.replace(/\\/g, "/");
+  return doc === cfg || doc.endsWith(`/${cfg}`) || basename(doc) === basename(cfg);
 }

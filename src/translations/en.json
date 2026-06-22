@@ -592,6 +592,7 @@
     "yaml_invalid_title": "Configuration has errors",
     "yaml_invalid_message": "{count, plural, one {ESPHome reported # error in this configuration. Save anyway, jump to it to fix it, or cancel.} other {ESPHome reported # errors in this configuration. Save anyway, jump to the first one to fix it, or cancel.}}",
     "yaml_invalid_go_to_error": "Go to error",
+    "yaml_invalid_in_included_file": "The first error is in {file} (line {line}), an included file that can't be opened here; open that file to fix it.",
     "yaml_invalid_save_anyway": "Save anyway",
     "more_info": "More info",
     "change_board_link": "Change board",

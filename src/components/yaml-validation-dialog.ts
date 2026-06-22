@@ -50,6 +50,9 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   /** First error's message, used as a hint under the count. */
   @property() firstErrorMessage = "";
 
+  /** Included file the first error lives in, or "" when it's in the open config. */
+  @property() firstErrorFile = "";
+
   @state() private _open = false;
 
   static styles = [
@@ -63,6 +66,11 @@ export class ESPHomeYamlValidationDialog extends LitElement {
       .icon-wrap {
         background: color-mix(in srgb, var(--esphome-error), transparent 88%);
         color: var(--esphome-error);
+      }
+
+      .included-file {
+        margin-top: var(--wa-space-xs);
+        color: var(--wa-color-text-normal);
       }
 
       .first-error {
@@ -102,8 +110,13 @@ export class ESPHomeYamlValidationDialog extends LitElement {
 
   // Enter goes to the first error (the safe path), never force-save.
   private _enter = new EnterController(this, () => {
-    if (this.firstErrorLine > 0) this._goto();
+    if (this._canGoToError) this._goto();
   });
+
+  /** Navigation only works when the error is in the open buffer at a known line. */
+  private get _canGoToError(): boolean {
+    return this.firstErrorLine > 0 && !this.firstErrorFile;
+  }
 
   open() {
     this._resolvedExit = null;
@@ -127,7 +140,12 @@ export class ESPHomeYamlValidationDialog extends LitElement {
     const message = this._localize("device.yaml_invalid_message", {
       count: this.errorCount,
     });
-    const canGoToError = this.firstErrorLine > 0;
+    const includedFileNote = this.firstErrorFile
+      ? this._localize("device.yaml_invalid_in_included_file", {
+          file: this.firstErrorFile,
+          line: this.firstErrorLine,
+        })
+      : "";
     return html`
       <esphome-base-dialog
         ?open=${this._open}
@@ -141,6 +159,9 @@ export class ESPHomeYamlValidationDialog extends LitElement {
           </div>
           <div class="text">
             ${message}
+            ${includedFileNote
+              ? html`<div class="included-file">${includedFileNote}</div>`
+              : nothing}
             ${this.firstErrorMessage
               ? html`<div class="first-error">${this.firstErrorMessage}</div>`
               : nothing}
@@ -150,7 +171,11 @@ export class ESPHomeYamlValidationDialog extends LitElement {
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
-          <button class="btn btn--goto" ?disabled=${!canGoToError} @click=${this._goto}>
+          <button
+            class="btn btn--goto"
+            ?disabled=${!this._canGoToError}
+            @click=${this._goto}
+          >
             ${this._localize("device.yaml_invalid_go_to_error")}
           </button>
           <button class="btn btn--save-anyway" @click=${this._saveAnyway}>
@@ -162,6 +187,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   }
 
   private _goto() {
+    if (!this._canGoToError) return; // error is in an included file we can't open here
     if (this._resolvedExit !== null) return; // a repeated Enter must not dispatch twice
     this._resolvedExit = "goto";
     this.close();
