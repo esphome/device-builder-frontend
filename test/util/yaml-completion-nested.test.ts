@@ -93,6 +93,16 @@ describe("nestedPathForParent", () => {
     const yaml = ["esp32:", "  framework:", "    a"].join("\n");
     expect(pathAt(yaml, "platform")).toEqual([]);
   });
+
+  it("resolves a blank indented line via indentation (AST is silent there)", () => {
+    const yaml = ["esp32:", "  framework:", "    "].join("\n");
+    expect(pathAt(yaml, "framework")).toEqual(["framework"]);
+  });
+
+  it("resolves a deep blank line via indentation", () => {
+    const yaml = ["esp32:", "  framework:", "    advanced:", "      "].join("\n");
+    expect(pathAt(yaml, "advanced")).toEqual(["framework", "advanced"]);
+  });
 });
 
 describe("resolveAvailableEntries (nested descent)", () => {

@@ -93,6 +93,28 @@ export function findParentKey(
   return null;
 }
 
+/**
+ * Build the full ancestor key chain (top-down) for a line by walking
+ * outward through strictly-decreasing indents — e.g. a line under
+ * ``esp32:`` → ``framework:`` yields ``["esp32", "framework"]``. Unlike
+ * the AST ``getKeyPath``, this is blank-line tolerant, so it resolves the
+ * nested context of an empty indented line (which has no Pair to anchor
+ * on). Returns ``[]`` at the top level.
+ */
+export function keyPathByIndent(doc: Text, lineIdx: number, indent: number): string[] {
+  const chain: string[] = [];
+  let below = indent;
+  let from = lineIdx;
+  for (;;) {
+    const p = findParentKey(doc, from, below);
+    if (!p) break;
+    chain.push(p.key);
+    below = p.indent;
+    from = p.lineIdx;
+  }
+  return chain.reverse();
+}
+
 /** Walk back from *lineIdx* to the first column-0 ``key:`` line. */
 export function findTopLevelBlock(doc: Text, lineIdx: number): string | null {
   for (let i = lineIdx - 1; i >= 0; i--) {

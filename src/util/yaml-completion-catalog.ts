@@ -16,7 +16,12 @@ import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
 import { getKeyPath, resolveBundleContext } from "./yaml-ast.js";
-import { findTopLevelBlock, readPlatformSibling } from "./yaml-line-walker.js";
+import {
+  findTopLevelBlock,
+  indentOf,
+  keyPathByIndent,
+  readPlatformSibling,
+} from "./yaml-line-walker.js";
 
 // ``validFor`` regex constants — consumed by CodeMirror to decide
 // whether cached completion options stay valid as the user types.
@@ -293,16 +298,23 @@ export async function resolveAvailableEntries(
  * Compute the nested-group descent path for ``resolveAvailableEntries``:
  * the key chain from just under the top-level component down to and
  * including *parentKey*. Returns ``[]`` when *parentKey* is the top-level
- * key itself or doesn't appear on the cursor's AST key path (safe
- * no-descent fallback when the AST and the regex walker disagree).
+ * key itself or doesn't appear on the cursor's key path (safe no-descent
+ * fallback).
  */
 export function nestedPathForParent(
   state: EditorState,
   pos: number,
   parentKey: string
 ): string[] {
-  const path = getKeyPath(state, pos);
-  const idx = path.lastIndexOf(parentKey);
+  let path = getKeyPath(state, pos);
+  let idx = path.lastIndexOf(parentKey);
+  if (idx < 1) {
+    // The AST can't anchor on a blank indented line (no Pair). Rebuild the
+    // chain from indentation so nested discovery still resolves there.
+    const line = state.doc.lineAt(pos);
+    path = keyPathByIndent(state.doc, line.number - 1, indentOf(line.text));
+    idx = path.lastIndexOf(parentKey);
+  }
   if (idx < 1) return [];
   return path.slice(1, idx + 1);
 }

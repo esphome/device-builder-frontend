@@ -25,6 +25,7 @@ import {
 } from "../util/codemirror-theme.js";
 import { editorSearchPhrases } from "../util/editor-search-phrases.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { idleCompletion } from "../util/idle-completion.js";
 import { getKeyPath } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
@@ -42,6 +43,9 @@ import { yamlStickyScroll } from "../util/yaml-sticky-scroll.js";
 import { CodeMirrorEditorElement } from "./codemirror-editor-element.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
+
+// Delay before an at-rest caret opens the completion popup for discovery.
+const IDLE_COMPLETION_DELAY_MS = 1500;
 
 // `#` must be percent-encoded (`%23`) inside a data-URI background-image.
 const errorDot = (fill: string, stroke: string): string =>
@@ -449,7 +453,10 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
           icons: true,
           closeOnBlur: true,
           maxRenderedOptions: 60,
-        })
+        }),
+        // Open the popup when the caret idles on a blank/empty line, so
+        // keys/values are discoverable without typing a partial first.
+        idleCompletion(IDLE_COMPLETION_DELAY_MS)
       );
       // Catalog-backed hover docs (description + "See also" link).
       extensions.push(

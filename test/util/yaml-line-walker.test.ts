@@ -4,6 +4,7 @@ import {
   findParentKey,
   findTopLevelBlock,
   indentOf,
+  keyPathByIndent,
   readPlatformSibling,
   stripComment,
 } from "../../src/util/yaml-line-walker.js";
@@ -163,5 +164,27 @@ describe("readPlatformSibling (regex fallback)", () => {
   it("returns null when there's no platform sibling", () => {
     const lines = ["wifi:", "  ssid: x", "  password: y"];
     expect(readPlatformSibling(t(lines), 2, 2)).toBeNull();
+  });
+});
+
+describe("keyPathByIndent", () => {
+  it("builds the full ancestor chain for a blank nested line", () => {
+    const lines = ["esp32:", "  framework:", "    type: esp-idf", "    "];
+    expect(keyPathByIndent(t(lines), 3, 4)).toEqual(["esp32", "framework"]);
+  });
+
+  it("descends two nested levels", () => {
+    const lines = ["esp32:", "  framework:", "    advanced:", "      "];
+    expect(keyPathByIndent(t(lines), 3, 6)).toEqual(["esp32", "framework", "advanced"]);
+  });
+
+  it("returns [] at the top level", () => {
+    const lines = ["esp32:", "  board: x", ""];
+    expect(keyPathByIndent(t(lines), 2, 0)).toEqual([]);
+  });
+
+  it("skips blank lines between siblings", () => {
+    const lines = ["esp32:", "  framework:", "", "    type: a", "    "];
+    expect(keyPathByIndent(t(lines), 4, 4)).toEqual(["esp32", "framework"]);
   });
 });
