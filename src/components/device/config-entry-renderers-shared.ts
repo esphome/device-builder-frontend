@@ -22,6 +22,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import {
   generateApiEncryptionKey,
   isApiEncryptionKeyField,
+  isValidApiEncryptionKey,
 } from "../../util/api-encryption-key.js";
 import { stripConstraintProse } from "../../util/constraint-groups.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
@@ -362,13 +363,16 @@ export function renderStringField(
           ctx.emitChange(path, e.detail.value)}
       ></esphome-secret-picker>`
     : nothing;
-  // The API encryption key is a base64 Noise PSK — offer an inline generator
-  // so the user needn't leave for the docs page to mint a valid one. Only with
-  // a literal value (in secret mode the picker owns the field); generating
-  // replaces the literal, and the typed value can still be migrated to a
-  // secret afterwards via the picker.
+  // The API encryption key is a base64 Noise PSK — offer an inline generator so
+  // the user needn't leave for the docs page to mint a valid one. Shown only
+  // when the field doesn't already hold a valid key, so one click can't clobber
+  // a working key (clear the field to deliberately rotate); suppressed in secret
+  // mode, where the picker owns the field.
   const showGenerate =
-    isApiEncryptionKeyField(ctx.sectionKey, path) && !secretMode && !disabled;
+    isApiEncryptionKeyField(ctx.sectionKey, path) &&
+    !secretMode &&
+    !disabled &&
+    !isValidApiEncryptionKey(value);
   const generateAffordance = showGenerate
     ? html`<button
         type="button"
