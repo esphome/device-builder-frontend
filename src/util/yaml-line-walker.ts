@@ -94,18 +94,23 @@ export function findParentKey(
 }
 
 /**
- * When everything before *pos* on its line is whitespace (a blank line the
- * caret sits on), return that line's 0-based index and indent — the inputs
- * the indent walkers need. The AST can't anchor on such a line (no Pair), so
- * callers fall back to the indent-based walkers. ``null`` otherwise.
+ * When the caret sits on a wholly blank line, return that line's 0-based
+ * index and the caret's indent — the inputs the indent walkers need. The AST
+ * can't anchor on such a line (no Pair), so callers fall back to the
+ * indent-based walkers. ``null`` otherwise (including a caret in the
+ * indentation of a non-blank ``key:`` line, which the AST resolves fine).
  */
 export function blankLineContext(
   doc: Text,
   pos: number
 ): { lineIdx: number; indent: number } | null {
   const line = doc.lineAt(pos);
-  if (line.text.slice(0, pos - line.from).trim() !== "") return null;
-  return { lineIdx: line.number - 1, indent: indentOf(line.text) };
+  // The whole line must be blank, not just the text before the caret — a
+  // caret in the indentation of an existing ``key:`` line is not a blank line
+  // (the AST resolves it fine), and treating it as blank would switch callers
+  // to the indent scan and miss that line's key.
+  if (line.text.trim() !== "") return null;
+  return { lineIdx: line.number - 1, indent: pos - line.from };
 }
 
 /**

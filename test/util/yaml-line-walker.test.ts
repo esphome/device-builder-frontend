@@ -223,4 +223,12 @@ describe("blankLineContext", () => {
     const filled = t(["esp32:", "  board: x"]);
     expect(blankLineContext(filled, filled.length)).toBeNull();
   });
+
+  it("returns null for a caret in the indentation of a non-blank line", () => {
+    // Whole-line check: a caret at column 2 of ``  board: x`` is not a blank
+    // line, even though the text before the caret is whitespace.
+    const doc = t(["esp32:", "  board: x"]);
+    const line2 = doc.line(2);
+    expect(blankLineContext(doc, line2.from + 2)).toBeNull();
+  });
 });
