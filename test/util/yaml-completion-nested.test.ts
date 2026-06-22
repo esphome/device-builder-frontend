@@ -109,4 +109,56 @@ describe("resolveAvailableEntries (nested descent)", () => {
     );
     expect(out.map((e) => e.key)).toEqual(["advanced", "version", "type"]);
   });
+
+  it("descends a nested group whose key collides with a component id", async () => {
+    // ``web_server`` is both a top-level component and a per-entity nested
+    // group; the descent must win over the same-named component so the user
+    // gets the nested group's fields, not the component's.
+    const ws = makeComponentEntry("web_server", { category: ComponentCategory.CORE });
+    const wsBody: ComponentCatalogEntry = {
+      ...ws,
+      config_entries: [
+        makeConfigEntry({ key: "port" }),
+        makeConfigEntry({ key: "auth" }),
+      ],
+    };
+    const host = makeComponentEntry("esphome", { category: ComponentCategory.CORE });
+    const hostBody: ComponentCatalogEntry = {
+      ...host,
+      config_entries: [
+        nested("web_server", [makeConfigEntry({ key: "sorting_weight" })]),
+      ],
+    };
+    const catalog = {
+      components: [ws, host],
+      byId: new Map([
+        ["web_server", ws],
+        ["esphome", host],
+      ]),
+      byCategory: new Map(),
+    };
+    const fakeApi = {
+      getComponentBodies: async (ids: string[]) =>
+        Object.fromEntries(
+          ids
+            .map((id) =>
+              id === "web_server"
+                ? [id, wsBody]
+                : id === "esphome"
+                  ? [id, hostBody]
+                  : null
+            )
+            .filter((e): e is [string, ComponentCatalogEntry] => e !== null)
+        ),
+    } as never;
+    const out = await resolveAvailableEntries(
+      fakeApi,
+      catalog,
+      "web_server", // parentKey collides with a component id
+      null,
+      "esphome", // but the top-level block is esphome, so descend
+      () => ["web_server"]
+    );
+    expect(out.map((e) => e.key)).toEqual(["sorting_weight"]);
+  });
 });

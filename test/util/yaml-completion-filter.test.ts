@@ -1,5 +1,8 @@
+// @vitest-environment happy-dom
 import { CompletionContext } from "@codemirror/autocomplete";
+import { forceParsing } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ComponentCategory } from "../../src/api/types/components.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
@@ -36,7 +39,9 @@ const BODIES: Record<
         makeConfigEntry({
           key: "advanced",
           type: ConfigEntryType.NESTED,
-          config_entries: [],
+          config_entries: [
+            makeConfigEntry({ key: "verbose", type: ConfigEntryType.BOOLEAN }),
+          ],
         }),
         makeConfigEntry({ key: "version" }),
       ]),
@@ -52,10 +57,19 @@ const fakeApi = {
 } as never;
 
 async function labelsAt(yaml: string): Promise<string[]> {
-  const state = EditorState.create({ doc: yaml, extensions: [esphomeYaml()] });
-  const ctx = new CompletionContext(state, yaml.length, false);
-  const result = await createYamlCompletionSource(fakeApi)(ctx);
-  return (result?.options ?? []).map((o) => o.label);
+  // Drive a real view + full parse so the AST helpers see the same tree a
+  // live editor does (a bare state parses lazily and misses the cursor's tail).
+  const view = new EditorView({
+    state: EditorState.create({ doc: yaml, extensions: [esphomeYaml()] }),
+  });
+  try {
+    forceParsing(view, yaml.length, 60000);
+    const ctx = new CompletionContext(view.state, yaml.length, false);
+    const result = await createYamlCompletionSource(fakeApi)(ctx);
+    return (result?.options ?? []).map((o) => o.label);
+  } finally {
+    view.destroy();
+  }
 }
 
 describe("createYamlCompletionSource (already-set key filtering)", () => {
@@ -95,5 +109,16 @@ describe("createYamlCompletionSource (already-set key filtering)", () => {
     );
     expect(labels).toContain("advanced");
     expect(labels).toContain("version");
+  });
+
+  it("completes a value inside a deeply nested mapping", async () => {
+    // Value position two levels deep (``framework: advanced: verbose:``)
+    // exercises the value-position nested descent end to end. A partial
+    // value is present so the AST resolves the key path (an empty ``key: ``
+    // resolves to the document root and falls back to the schema lookup).
+    const labels = await labelsAt(
+      ["esp32:", "  framework:", "    advanced:", "      verbose: t"].join("\n")
+    );
+    expect(labels).toEqual(["true", "false"]);
   });
 });

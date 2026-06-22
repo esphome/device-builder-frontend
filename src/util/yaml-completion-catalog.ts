@@ -243,7 +243,16 @@ export async function resolveAvailableEntries(
     if (!topLevelKey || !platformValue) return [];
     return entriesFor(`${topLevelKey}.${platformValue}`);
   }
-  if (catalog.byId.has(parentKey)) {
+  // Treat the parent as a top-level component only when it actually *is* the
+  // top-level block. A nested group key can collide with a component id
+  // (``web_server``, ``uart``, ``time``, …); preferring the component would
+  // shadow the descent and surface the wrong fields. When the AST is silent
+  // (``topLevelKey`` null) keep the direct lookup — the descent can't run
+  // without it anyway.
+  if (
+    catalog.byId.has(parentKey) &&
+    (topLevelKey === null || parentKey === topLevelKey)
+  ) {
     return componentEntries(parentKey);
   }
   // Nested mapping (``esp32: framework:`` → parentKey="framework", not a
