@@ -128,6 +128,14 @@ export function isUnderThenItem(state: EditorState, pos: number): boolean {
  *  legacy ``then``-only carve-out. */
 const RE_AUTOMATION_KEY = /^(?:then|else|on_[a-z0-9_]*|[a-z0-9_]+_action)$/;
 
+/** True for pair keys whose value is a list of actions: ``then`` /
+ *  ``else`` / ``on_*`` / ``*_action``. The indent-based completion
+ *  fallback uses this when the Lezer parse mis-nests an empty trailing
+ *  ``- `` and ``isUnderAutomationItem`` can't see the enclosing key. */
+export function isAutomationKey(key: string): boolean {
+  return RE_AUTOMATION_KEY.test(key);
+}
+
 /**
  * True when *pos* is inside a list ``Item`` whose enclosing Pair
  * is an automation-shaped key. Generalised from the legacy
@@ -149,7 +157,7 @@ export function isUnderAutomationItem(state: EditorState, pos: number): boolean 
         const pair = seq.parent;
         if (pair?.name === "Pair") {
           const key = getPairKey(state, pair);
-          if (key && RE_AUTOMATION_KEY.test(key)) return true;
+          if (key && isAutomationKey(key)) return true;
         }
       }
     }

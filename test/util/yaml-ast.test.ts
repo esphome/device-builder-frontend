@@ -6,6 +6,7 @@ import {
   collectTopLevelKeys,
   getPlatformValue,
   getTopLevelKey,
+  isAutomationKey,
   isUnderThenItem,
   resolveBundleContext,
 } from "../../src/util/yaml-ast.js";
@@ -243,6 +244,30 @@ describe("isUnderThenItem", () => {
     const state = makeState(yaml);
     // Cursor on the ``- delay: 2s`` line under ``else:``.
     expect(isUnderThenItem(state, posAt(yaml, 10, 14))).toBe(true);
+  });
+});
+
+describe("isAutomationKey", () => {
+  // The completion source ORs this against isUnderAutomationItem so the
+  // action registry still fires on an empty trailing "- " (where the
+  // Lezer parse mis-nests and the AST can't see the enclosing key).
+  it("matches action-list keys", () => {
+    for (const key of [
+      "then",
+      "else",
+      "on_press",
+      "on_multi_click",
+      "open_action",
+      "unlock_action",
+    ]) {
+      expect(isAutomationKey(key)).toBe(true);
+    }
+  });
+
+  it("rejects ordinary config / trigger-host keys", () => {
+    for (const key of ["web_server", "platform", "zigbee_id", "filters", "pin"]) {
+      expect(isAutomationKey(key)).toBe(false);
+    }
   });
 });
 

@@ -31,6 +31,7 @@ import { getConfigVarValueOptions } from "./esphome-schema.js";
 import {
   collectSiblingKeys,
   collectSubstitutionKeys,
+  isAutomationKey,
   isUnderAutomationItem,
 } from "./yaml-ast.js";
 import {
@@ -346,7 +347,11 @@ export function createYamlCompletionSource(
       // and ``*_action:`` (cover ``open_action`` / ``close_action`` /
       // ``stop_action``, lock ``unlock_action``, etc.) all surface
       // the action registry at list-item position.
-      inAutomation: isListItem && isUnderAutomationItem(state, pos),
+      // ``isUnderAutomationItem`` reads the Lezer tree, which mis-nests an
+      // empty trailing ``- `` so the enclosing ``then:``/``on_*:`` is lost;
+      // the indent-derived ``parent`` survives that, so OR it in.
+      inAutomation:
+        isListItem && (isUnderAutomationItem(state, pos) || isAutomationKey(parent.key)),
       // Triggers all start with ``on_``; gate the schema fetch on
       // the partial's prefix so non-trigger keystrokes don't burn
       // a round-trip.
