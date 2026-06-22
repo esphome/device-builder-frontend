@@ -26,6 +26,7 @@ interface DialogInternals {
   _devices: ReturnType<typeof makeConfiguredDevice>[];
   _api: ESPHomeAPI;
   _selection: FacetSelection;
+  _localize: (key: string, args?: { count?: number }) => string;
 }
 
 function fakeApi() {
@@ -44,6 +45,10 @@ async function mount(
   const internals = el as unknown as DialogInternals;
   internals._devices = devices;
   internals._api = api;
+  // Surface the {count} arg the production localize interpolates so the
+  // summary tally is assertable (the default stub drops args).
+  internals._localize = (key, args) =>
+    args?.count !== undefined ? `${key}:${args.count}` : key;
   document.body.appendChild(el);
   el.open();
   await el.updateComplete;
@@ -79,9 +84,8 @@ describe("update-all-dialog", () => {
     const { api } = fakeApi();
     const el = await mount([onlineUpdatable, onlineCurrent, offlineUpdatable], api);
     const summary = el.shadowRoot!.querySelector(".summary")!.textContent ?? "";
-    // The localize stub echoes the key with no count interpolation; assert the
-    // button is enabled (one device matched) instead.
-    expect(summary).toContain("update_all_dialog.count");
+    // Only the online + update-available device (a.yaml) matches the defaults.
+    expect(summary).toContain("update_all_dialog.count:1");
     expect(primaryButton(el).disabled).toBe(false);
   });
 
