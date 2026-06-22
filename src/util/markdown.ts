@@ -170,6 +170,8 @@ export function splitTextLinks(input: string): TextLinkSegment[] {
       url = url.slice(0, -1);
     }
     if (start > last) segments.push({ text: input.slice(last, start) });
+    // href is set for every match today (BARE_URL_RE is http(s)-only); the gate
+    // mirrors renderMarkdown so a broader matcher later can't emit an unsafe anchor.
     segments.push(isSafeLinkHref(url) ? { text: url, href: url } : { text: url });
     if (tail) segments.push({ text: tail });
     last = start + match[0].length;

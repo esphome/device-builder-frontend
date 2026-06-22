@@ -98,7 +98,7 @@ export function sanitizeMessage(message: string): string {
 }
 
 /** Lint-tooltip DOM for a message, autolinking bare URLs to new-tab anchors. */
-function renderMessageNode(message: string): HTMLSpanElement {
+export function renderMessageNode(message: string): HTMLSpanElement {
   const span = document.createElement("span");
   for (const seg of splitTextLinks(message)) {
     if (seg.href) {
