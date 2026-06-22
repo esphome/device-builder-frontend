@@ -155,9 +155,11 @@ export function splitTextLinks(input: string): TextLinkSegment[] {
   const segments: TextLinkSegment[] = [];
   let last = 0;
   for (const match of input.matchAll(BARE_URL_RE)) {
-    const start = match.index ?? 0;
+    const start = match.index!;
     let url = match[0];
     let tail = "";
+    // Order matters: strip the punctuation run first, then the unbalanced
+    // paren, so 'Foo_(bar).' keeps ')' but drops '.'.
     const punct = url.match(TRAILING_PUNCT_RE);
     if (punct) {
       tail = punct[0];
