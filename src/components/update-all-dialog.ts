@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -157,49 +157,51 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   }
 
   protected render() {
-    // This element is a persistent child of app-shell and `_devices` is a
-    // hot subscribed context, so skip the facet/match computation entirely
-    // while closed — there's nothing on screen to recompute.
-    if (!this._open) {
-      return html`<esphome-base-dialog
-        @after-hide=${this._onAfterHide}
-      ></esphome-base-dialog>`;
-    }
-    const matched = this._matched();
+    // Keep one <esphome-base-dialog> so a close flips ?open reactively and
+    // wa-dialog's exit animation plays on every path. Gate only the body +
+    // the facet/match compute on _open — this is a persistent child on the
+    // hot `devices` context, so nothing should recompute while closed.
+    const matched = this._open ? this._matched() : [];
     return html`
       <esphome-base-dialog
         ?open=${this._open}
         .label=${this._localize("update_all_dialog.title")}
         @after-hide=${this._onAfterHide}
       >
-        <div class="sections" @filter-section-toggle=${this._onSectionToggle}>
-          ${renderFacetSections({
-            devices: this._devices,
-            localize: this._localize,
-            selection: this._selection,
-            labelUsage: this._labelUsageMemo(this._devices),
-            yamlMode: false,
-            manageLabels: false,
-            onChange: (patch) => {
-              this._selection = { ...this._selection, ...patch };
-            },
-          })}
-        </div>
-        <div class="summary" role="status">
-          ${this._localize("update_all_dialog.count", { count: matched.length })}
-        </div>
-        <div class="actions">
-          <button class="btn btn--cancel" @click=${this.close}>
-            ${this._localize("layout.cancel")}
-          </button>
-          <button
-            class="btn btn--primary"
-            ?disabled=${matched.length === 0}
-            @click=${this._confirm}
-          >
-            ${this._localize("update_all_dialog.confirm")}
-          </button>
-        </div>
+        ${this._open
+          ? html`
+              <div class="sections" @filter-section-toggle=${this._onSectionToggle}>
+                ${renderFacetSections({
+                  devices: this._devices,
+                  localize: this._localize,
+                  selection: this._selection,
+                  labelUsage: this._labelUsageMemo(this._devices),
+                  yamlMode: false,
+                  manageLabels: false,
+                  onChange: (patch) => {
+                    this._selection = { ...this._selection, ...patch };
+                  },
+                })}
+              </div>
+              <div class="summary" role="status">
+                ${this._localize("update_all_dialog.count", {
+                  count: matched.length,
+                })}
+              </div>
+              <div class="actions">
+                <button class="btn btn--cancel" @click=${this.close}>
+                  ${this._localize("layout.cancel")}
+                </button>
+                <button
+                  class="btn btn--primary"
+                  ?disabled=${matched.length === 0}
+                  @click=${this._confirm}
+                >
+                  ${this._localize("update_all_dialog.confirm")}
+                </button>
+              </div>
+            `
+          : nothing}
       </esphome-base-dialog>
     `;
   }
