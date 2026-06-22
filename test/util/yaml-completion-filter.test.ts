@@ -130,6 +130,17 @@ describe("createYamlCompletionSource (already-set key filtering)", () => {
     expect(labels).toContain("version");
   });
 
+  it("filters already-set siblings on a blank indented line", async () => {
+    // The AST can't read siblings on a blank line; an indent scan must still
+    // drop a key already set in the mapping (``version`` here).
+    const labels = await labelsAt(
+      ["esp32:", "  framework:", "    version: 5.0", "    "].join("\n"),
+      true
+    );
+    expect(labels).toContain("advanced");
+    expect(labels).not.toContain("version");
+  });
+
   it("offers each list item's own fields without cross-item filtering", async () => {
     // Two ``- platform: template`` sensors: ``name`` is set in the first
     // item only, so the second item must still offer it (list items are

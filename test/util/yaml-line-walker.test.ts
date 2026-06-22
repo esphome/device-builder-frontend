@@ -1,6 +1,8 @@
 import { Text } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import {
+  blankLineContext,
+  collectSiblingKeysByIndent,
   findParentKey,
   findTopLevelBlock,
   indentOf,
@@ -181,6 +183,36 @@ describe("keyPathByIndent", () => {
   it("returns [] at the top level", () => {
     const lines = ["esp32:", "  board: x", ""];
     expect(keyPathByIndent(t(lines), 2, 0)).toEqual([]);
+  });
+
+  it("collectSiblingKeysByIndent collects the mapping's keys at the cursor indent", () => {
+    const lines = ["ethernet:", "  clk:", "    mode: CLK_EXT_IN", "    pin: 0", "    "];
+    expect([...collectSiblingKeysByIndent(t(lines), 4, 4)].sort()).toEqual([
+      "mode",
+      "pin",
+    ]);
+  });
+
+  it("collectSiblingKeysByIndent skips deeper descendants and other blocks", () => {
+    const lines = [
+      "esp32:",
+      "  framework:",
+      "    advanced:",
+      "      x: 1",
+      "    version: 5",
+      "    ",
+    ];
+    expect([...collectSiblingKeysByIndent(t(lines), 5, 4)].sort()).toEqual([
+      "advanced",
+      "version",
+    ]);
+  });
+
+  it("blankLineContext reports a blank indented line, else null", () => {
+    const blank = t(["esp32:", "  framework:", "    "]);
+    expect(blankLineContext(blank, blank.length)).toEqual({ lineIdx: 2, indent: 4 });
+    const filled = t(["esp32:", "  board: x"]);
+    expect(blankLineContext(filled, filled.length)).toBeNull();
   });
 
   it("skips blank lines between siblings", () => {

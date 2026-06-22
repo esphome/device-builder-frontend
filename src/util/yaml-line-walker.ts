@@ -94,6 +94,21 @@ export function findParentKey(
 }
 
 /**
+ * When everything before *pos* on its line is whitespace (a blank line the
+ * caret sits on), return that line's 0-based index and indent — the inputs
+ * the indent walkers need. The AST can't anchor on such a line (no Pair), so
+ * callers fall back to the indent-based walkers. ``null`` otherwise.
+ */
+export function blankLineContext(
+  doc: Text,
+  pos: number
+): { lineIdx: number; indent: number } | null {
+  const line = doc.lineAt(pos);
+  if (line.text.slice(0, pos - line.from).trim() !== "") return null;
+  return { lineIdx: line.number - 1, indent: indentOf(line.text) };
+}
+
+/**
  * Build the full ancestor key chain (top-down) for a line by walking
  * outward through strictly-decreasing indents — e.g. a line under
  * ``esp32:`` → ``framework:`` yields ``["esp32", "framework"]``. Unlike
@@ -113,6 +128,37 @@ export function keyPathByIndent(doc: Text, lineIdx: number, indent: number): str
     from = p.lineIdx;
   }
   return chain.reverse();
+}
+
+/**
+ * Collect the keys of the mapping at *indent* surrounding *lineIdx* by
+ * scanning lines, not the AST. Used when the cursor is on a blank line —
+ * where the AST has no Pair to anchor on — so the already-set-key filter
+ * still works. Bounded to the enclosing block: stops at the first line that
+ * dedents below *indent* in each direction; deeper lines (children of a
+ * sibling) are skipped.
+ */
+export function collectSiblingKeysByIndent(
+  doc: Text,
+  lineIdx: number,
+  indent: number
+): Set<string> {
+  const out = new Set<string>();
+  const scan = (from: number, step: number): void => {
+    for (let i = from; i >= 0 && i < doc.lines; i += step) {
+      const stripped = stripComment(doc.line(i + 1).text);
+      if (!stripped.trim()) continue;
+      const ind = indentOf(stripped);
+      if (ind < indent) break;
+      if (ind === indent) {
+        const m = stripped.match(RE_PAIR_LINE);
+        if (m) out.add(m[1]);
+      }
+    }
+  };
+  scan(lineIdx - 1, -1);
+  scan(lineIdx + 1, 1);
+  return out;
 }
 
 /** Walk back from *lineIdx* to the first column-0 ``key:`` line. */

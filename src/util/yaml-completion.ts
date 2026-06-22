@@ -20,6 +20,7 @@
  *      block (e.g. inside `sensor:` we suggest sensor platforms).
  */
 import { type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
+import type { EditorState } from "@codemirror/state";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import {
@@ -55,10 +56,21 @@ import {
   type KeyPositionCtx,
 } from "./yaml-completion-providers.js";
 import {
+  blankLineContext,
+  collectSiblingKeysByIndent,
   findParentKey,
   findTopLevelBlock,
   RE_INLINE_COMMENT_BOUNDARY,
 } from "./yaml-line-walker.js";
+
+/** Keys already set in the cursor's mapping, for the already-set filter.
+ *  On a blank line the AST has no Pair to anchor on, so scan by indent. */
+function siblingKeysAt(state: EditorState, pos: number): Set<string> {
+  const blank = blankLineContext(state.doc, pos);
+  return blank
+    ? collectSiblingKeysByIndent(state.doc, blank.lineIdx, blank.indent)
+    : collectSiblingKeys(state, pos);
+}
 
 // ── Public surface preserved across the catalog / provider split ──
 // Consumers (``yaml-hover``, ``yaml-completion-items``, the
@@ -290,7 +302,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     // components (catalog entries whose id has no dot). See
     // ``buildTopLevelCompletions`` for the rationale.
     if (indent === 0) {
-      const present = collectSiblingKeys(state, pos);
+      const present = siblingKeysAt(state, pos);
       return {
         from: keyFrom,
         options: buildTopLevelCompletions(catalog).filter((c) => !present.has(c.label)),
@@ -337,7 +349,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     // Drop keys already set in this mapping (plain key position only —
     // list items like automation actions / filters are repeatable).
     if (!isListItem) {
-      const present = collectSiblingKeys(state, pos);
+      const present = siblingKeysAt(state, pos);
       if (present.size > 0) options = options.filter((o) => !present.has(o.label));
     }
     if (options.length === 0) return null;

@@ -15,10 +15,11 @@ import { matchKeyPosition, matchValuePosition } from "./yaml-completion-catalog.
 
 /**
  * Whether an idle trigger should open the popup at the caret: a settled
- * single caret at end of line, at an *empty* discovery position (a blank
- * indented key line or an empty ``key: `` value), with no popup already
- * open. Empty-only so it doesn't re-pop over a partial still being typed or
- * a value the user already chose.
+ * single caret at end of line, at an *empty, indented* discovery position (a
+ * blank nested key line or an empty ``key: `` value), with no popup already
+ * open. Empty-only so it doesn't re-pop over a partial still being typed or a
+ * value the user already chose; indented-only so it doesn't surface the whole
+ * top-level component list when the caret merely rests at column 0.
  */
 export function shouldIdleComplete(state: EditorState): boolean {
   if (completionStatus(state) !== null) return false;
@@ -28,9 +29,9 @@ export function shouldIdleComplete(state: EditorState): boolean {
   if (sel.head !== line.to) return false;
   const before = line.text.slice(0, sel.head - line.from);
   const valuePos = matchValuePosition(before);
-  if (valuePos) return valuePos.partial === "";
+  if (valuePos) return valuePos.partial === "" && valuePos.leading.length > 0;
   const keyPos = matchKeyPosition(before);
-  return keyPos !== null && keyPos.partial === "";
+  return keyPos !== null && keyPos.partial === "" && keyPos.leading.length > 0;
 }
 
 /** Open the completion popup *delayMs* after the caret last moved or the
