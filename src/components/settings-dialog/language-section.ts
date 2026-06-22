@@ -79,7 +79,8 @@ export class ESPHomeSettingsLanguage extends LitElement {
             // wa-select derives the collapsed display label from the option's
             // text content, which would include the slot="end" completeness
             // badge ("99%"). Pin an explicit flag-plus-name label so the
-            // collapsed value reads "Deutsch", not "Deutsch99%" (issue #1650).
+            // collapsed value reads the flag plus "Deutsch", not "Deutsch99%"
+            // (issue #1650).
             const optionLabel = `${l.flag} ${name}`;
             return html`
               <wa-option value=${l.value} .label=${optionLabel}
