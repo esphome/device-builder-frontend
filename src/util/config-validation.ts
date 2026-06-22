@@ -1,9 +1,14 @@
 import type { ConfigEntry, ConfigPrimitive } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
+import {
+  isApiEncryptionKeyField,
+  isValidApiEncryptionKey,
+} from "./api-encryption-key.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
 import { parseHexInt } from "./hex-int.js";
 import { parseIntInput } from "./int-input.js";
 import { asMappingList, asRecord } from "./nested-values.js";
+import { isSecretRef } from "./secret-ref.js";
 import { looksLikeSubstitution } from "./substitutions.js";
 import { YamlRawValue } from "./yaml-serialize.js";
 
@@ -260,7 +265,8 @@ export function validateEntries(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   presentComponents?: Set<string>,
-  targetPlatform?: string | null
+  targetPlatform?: string | null,
+  sectionKey?: string
 ): Map<string, ValidationError> {
   const errors = new Map<string, ValidationError>();
   _validateEntriesRecursive(
@@ -269,7 +275,8 @@ export function validateEntries(
     presentComponents,
     targetPlatform,
     [],
-    errors
+    errors,
+    sectionKey
   );
   return errors;
 }
@@ -286,7 +293,8 @@ function _validateEntriesRecursive(
   presentComponents: Set<string> | undefined,
   targetPlatform: string | null | undefined,
   pathPrefix: string[],
-  errors: Map<string, ValidationError>
+  errors: Map<string, ValidationError>,
+  sectionKey: string | undefined
 ): void {
   for (const entry of entries) {
     // Skip hidden entries and those whose visibility predicates fail —
@@ -329,7 +337,8 @@ function _validateEntriesRecursive(
             presentComponents,
             targetPlatform,
             [...pathPrefix, entry.key, String(idx)],
-            errors
+            errors,
+            sectionKey
           );
         });
         continue;
@@ -352,7 +361,8 @@ function _validateEntriesRecursive(
         presentComponents,
         targetPlatform,
         [...pathPrefix, entry.key],
-        errors
+        errors,
+        sectionKey
       );
       continue;
     }
@@ -393,6 +403,20 @@ function _validateEntriesRecursive(
     if (err) {
       const fullPath = [...pathPrefix, entry.key].join(".");
       errors.set(fullPath, { ...err, key: fullPath });
+    } else if (
+      // Cheap section gate first so non-api leaves never build the path array.
+      sectionKey === "api" &&
+      typeof raw === "string" &&
+      isApiEncryptionKeyField(sectionKey, [...pathPrefix, entry.key]) &&
+      isValuePresent(raw) &&
+      !looksLikeSubstitution(raw) &&
+      !isSecretRef(raw) &&
+      !isValidApiEncryptionKey(raw)
+    ) {
+      // Format-check only the api.encryption.key Noise PSK; a `!secret` ref or
+      // a `${substitution}` resolves elsewhere, so neither is base64-checkable.
+      const fullPath = [...pathPrefix, entry.key].join(".");
+      errors.set(fullPath, { key: fullPath, code: "validation.invalid_encryption_key" });
     }
   }
 }

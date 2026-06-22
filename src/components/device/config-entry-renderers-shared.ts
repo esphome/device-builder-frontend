@@ -7,6 +7,7 @@
 
 import {
   mdiAlertCircleOutline,
+  mdiAutoFix,
   mdiCodeBraces,
   mdiKeyVariant,
   mdiLockOutline,
@@ -18,6 +19,10 @@ import { warningBannerStyles } from "../../styles/banners.js";
 import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import {
+  generateApiEncryptionKey,
+  isApiEncryptionKeyField,
+} from "../../util/api-encryption-key.js";
 import { stripConstraintProse } from "../../util/constraint-groups.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { coerceIntFieldValue } from "../../util/int-input.js";
@@ -29,6 +34,7 @@ import {
   isSecretEligible,
   recommendedSecretKeys,
 } from "../../util/secret-eligibility.js";
+import { secretRefKey } from "../../util/secret-ref.js";
 import {
   hasSubstitutionReference,
   resolveSubstitutions,
@@ -70,6 +76,7 @@ export const fieldRendererStyles = [
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
+  "auto-fix": mdiAutoFix,
   "code-braces": mdiCodeBraces,
   "key-variant": mdiKeyVariant,
   "lock-outline": mdiLockOutline,
@@ -120,26 +127,16 @@ export const parseFieldKey = (attr: string): string[] => {
   return attr ? attr.split(".") : [];
 };
 
-/** ESPHome stores secret references as `!secret <key>` literal strings
- *  in the YAML — match that shape so any string-shaped field can flag
- *  values that point at the secrets store. */
-const SECRET_REF_RE = /^!secret\s+(\S+)\s*$/;
-
-/** The key a `!secret <key>` value points at, or ``null`` if not a ref. */
-export function secretRefKey(value: string): string | null {
-  return value.match(SECRET_REF_RE)?.[1] ?? null;
-}
-
 /** Render a small "Using stored secret: <name>" hint when the value
  *  is a `!secret <key>` reference. Returns `nothing` otherwise so
  *  callers can drop it inline without conditional wrapping. */
 export function renderSecretHint(value: string, ctx: RenderCtx) {
-  const match = value.match(SECRET_REF_RE);
-  if (!match) return nothing;
+  const key = secretRefKey(value);
+  if (key === null) return nothing;
   return html`<span class="secret-note">
     <wa-icon library="mdi" name="key-variant"></wa-icon>
     <span>${ctx.localize("device.value_from_secret")}</span>
-    <code>${match[1]}</code>
+    <code>${key}</code>
   </span>`;
 }
 
@@ -365,14 +362,34 @@ export function renderStringField(
           ctx.emitChange(path, e.detail.value)}
       ></esphome-secret-picker>`
     : nothing;
-  // Wrap an input with the picker beside it, or swap it out entirely in
-  // secret mode. Plain input when the field isn't secret-eligible.
+  // The API encryption key is a base64 Noise PSK — offer an inline generator
+  // so the user needn't leave for the docs page to mint a valid one. Only with
+  // a literal value (in secret mode the picker owns the field); generating
+  // replaces the literal, and the typed value can still be migrated to a
+  // secret afterwards via the picker.
+  const showGenerate =
+    isApiEncryptionKeyField(ctx.sectionKey, path) && !secretMode && !disabled;
+  const generateAffordance = showGenerate
+    ? html`<button
+        type="button"
+        class="generate-key"
+        @click=${() => ctx.emitChange(path, generateApiEncryptionKey())}
+      >
+        <wa-icon library="mdi" name="auto-fix"></wa-icon>
+        <span>${ctx.localize("device.generate_encryption_key")}</span>
+      </button>`
+    : nothing;
+  // Wrap an input with the picker (and any inline affordance) stacked below,
+  // or swap it out entirely in secret mode. Plain input when the field is
+  // neither secret-eligible nor carrying an affordance.
   const withPicker = (input: unknown) =>
-    !secretEligible
-      ? input
-      : secretMode
-        ? secretPicker
-        : html`<div class="field-input-row">${input}${secretPicker}</div>`;
+    secretMode
+      ? secretPicker
+      : !secretEligible && !showGenerate
+        ? input
+        : html`<div class="field-input-row">
+            ${input}${secretPicker}${generateAffordance}
+          </div>`;
   // Picker doubles as the secret indicator; only the no-picker path hints.
   const secretHint = secretPicker === nothing ? renderSecretHint(value, ctx) : nothing;
   // Never preview the resolved value for concealed fields — a secret kept

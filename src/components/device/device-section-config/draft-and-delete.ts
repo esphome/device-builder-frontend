@@ -26,7 +26,8 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
     renderEntries,
     host._values,
     host._presentComponents,
-    host.board?.esphome.platform ?? null
+    host.board?.esphome.platform ?? null,
+    host.sectionKey
   );
 
   const fromLine = resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine);

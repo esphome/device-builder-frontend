@@ -658,6 +658,7 @@
     "password_reveal": "Show password",
     "password_hide": "Hide password",
     "value_from_secret": "Using stored secret:",
+    "generate_encryption_key": "Generate a new key",
     "default_option_tag": "default",
     "constraint_exactly_one": "Set exactly one of: {keys}",
     "constraint_exactly_one_radio": "Set exactly one of:",
@@ -890,6 +891,7 @@
     "not_a_number": "Must be a number",
     "not_an_integer": "Must be a whole number",
     "invalid_option": "Not a valid option",
+    "invalid_encryption_key": "Must be a 32-byte base64 key",
     "invalid_device_name": "Only lowercase letters, digits, hyphens and underscores",
     "device_name_underscore": "Underscores work but aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks",
     "device_name_edge_hyphen": "Names starting or ending with a hyphen aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks"

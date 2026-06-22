@@ -135,6 +135,31 @@ export const configEntryFormStyles = css`
     color: var(--esphome-primary);
   }
 
+  /* Inline "generate a key" action stacked under the API encryption-key
+     input — a quiet link-style button, not a heavy form control. */
+  .generate-key {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    align-self: flex-start;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--esphome-primary);
+    font-size: var(--wa-font-size-2xs);
+    transition: color 0.12s;
+  }
+
+  .generate-key:hover {
+    color: var(--esphome-primary);
+    text-decoration: underline;
+  }
+
+  .generate-key wa-icon {
+    font-size: 14px;
+  }
+
   /* ─── Nested group ──────────────────────────────────────── */
   .nested-group {
     display: flex;

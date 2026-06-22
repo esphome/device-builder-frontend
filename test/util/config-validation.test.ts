@@ -602,3 +602,38 @@ describe("validateEntries", () => {
     ).toBe("validation.required");
   });
 });
+
+describe("validateEntries — api encryption key format", () => {
+  // `api:` → `encryption:` → `key:`, the shape the structured editor passes.
+  const entries = [
+    makeEntry({
+      key: "encryption",
+      type: ConfigEntryType.NESTED,
+      config_entries: [makeEntry({ key: "key", type: ConfigEntryType.SECURE_STRING })],
+    }),
+  ];
+  const validate = (key: unknown) =>
+    validateEntries(entries, { encryption: { key } }, undefined, null, "api");
+
+  it("flags a malformed key", () => {
+    expect(validate("not-a-real-key").get("encryption.key")?.code).toBe(
+      "validation.invalid_encryption_key"
+    );
+  });
+
+  it("accepts a well-formed 32-byte base64 key", () => {
+    expect(validate("a".repeat(43) + "=").size).toBe(0);
+  });
+
+  it("skips empty, substitution, and !secret values", () => {
+    expect(validate("").size).toBe(0);
+    expect(validate("${api_key}").size).toBe(0);
+    expect(validate("!secret api_encryption_key").size).toBe(0);
+  });
+
+  it("does not format-check when the section isn't api", () => {
+    expect(
+      validateEntries(entries, { encryption: { key: "bad" } }, undefined, null).size
+    ).toBe(0);
+  });
+});
