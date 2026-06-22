@@ -112,6 +112,17 @@ export interface CatalogIndex {
   byCategory: Map<string, ComponentCatalogEntry[]>;
 }
 
+/**
+ * The device's target platform/board (e.g. `esp32` / `esp32-evb`), so body
+ * hydration resolves per-platform value options (`hardware_uart` → the
+ * board's UARTs). Distinct from the `platform:` component selector. Empty
+ * fields fall back to the generic catalog body.
+ */
+export interface CompletionTarget {
+  platform?: string;
+  boardId?: string;
+}
+
 let catalogPromise: Promise<CatalogIndex> | null = null;
 
 /**
@@ -195,7 +206,8 @@ export async function resolveAvailableEntries(
   parentKey: string,
   platformValue: string | null,
   topLevelKey: string | null,
-  resolveNestedPath: () => string[] = () => []
+  resolveNestedPath: () => string[] = () => [],
+  target?: CompletionTarget
 ): Promise<ConfigEntry[]> {
   // The slim ``getComponents`` index carries no ``config_entries``
   // (those hydrate lazily through ``components/get_component_bodies``),
@@ -210,7 +222,10 @@ export async function resolveAvailableEntries(
   const entriesFor = async (id: string): Promise<ConfigEntry[]> => {
     if (!catalog.byId.has(id)) return [];
     try {
-      const body = await fetchComponent(api, id);
+      // Pass the device target so the backend resolves per-platform value
+      // options (e.g. ``hardware_uart``); buckets the same cache the
+      // structured editor populated.
+      const body = await fetchComponent(api, id, target?.platform, target?.boardId);
       return body?.config_entries ?? [];
     } catch {
       return [];
@@ -286,7 +301,7 @@ export async function resolveAvailableEntries(
   // doesn't re-issue the backend round-trip. Tolerate failures
   // silently.
   try {
-    const comp = await fetchComponent(api, parentKey);
+    const comp = await fetchComponent(api, parentKey, target?.platform, target?.boardId);
     if (comp) return comp.config_entries ?? [];
   } catch {
     /* ignore */

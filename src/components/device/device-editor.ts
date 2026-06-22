@@ -350,6 +350,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                   : html`<esphome-yaml-editor
                       .value=${this.yaml}
                       .configuration=${this.configuration}
+                      .board=${this.board}
                       .highlightRange=${this.highlightRange}
                       .scrollToHighlight=${this.scrollToHighlight}
                       .revealSensitive=${this._revealSensitive}

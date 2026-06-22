@@ -25,6 +25,7 @@ import { collectTopLevelKeys } from "./yaml-ast.js";
 import {
   bundleFor,
   type CatalogIndex,
+  type CompletionTarget,
   nestedPathForParent,
   resolveAvailableEntries,
 } from "./yaml-completion-catalog.js";
@@ -76,6 +77,9 @@ export interface KeyPositionCtx {
   topLevelKey: string | null;
   inAutomation: boolean;
   partialCouldBeTrigger: boolean;
+  /** Device platform/board so body hydration resolves per-platform
+   *  value options. */
+  deviceTarget?: CompletionTarget;
   /** Per-turn memo of ``resolveAvailableEntries`` so the catalog
    *  and schema-bundle providers don't re-walk the same answer.
    *  Populated lazily via ``resolveCatalogEntries``. */
@@ -112,7 +116,8 @@ async function resolveCatalogEntries(k: KeyPositionCtx): Promise<ConfigEntry[]> 
       k.parent.key,
       k.platformValue,
       k.topLevelKey,
-      () => nestedPathForParent(k.state, k.pos, k.parent.key)
+      () => nestedPathForParent(k.state, k.pos, k.parent.key),
+      k.deviceTarget
     );
   }
   return k._cachedCatalogEntries;

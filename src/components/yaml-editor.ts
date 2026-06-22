@@ -10,6 +10,7 @@ import { basicSetup, EditorView } from "codemirror";
 import { css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
+import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import {
@@ -112,6 +113,13 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    * back to plain YAML editing with no diagnostics or suggestions.
    */
   @property() configuration = "";
+
+  /**
+   * The device's resolved board catalog entry. Supplies the target
+   * platform/board so completion hydrates per-platform value options (e.g.
+   * `hardware_uart`) the same way the structured editor does.
+   */
+  @property({ attribute: false }) board: BoardCatalogEntry | null = null;
 
   @property({ attribute: false }) highlightRange: HighlightRange | null = null;
 
@@ -448,7 +456,12 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       // Schema-driven completion off the components catalog.
       extensions.push(
         autocompletion({
-          override: [createYamlCompletionSource(this._api)],
+          override: [
+            createYamlCompletionSource(this._api, () => ({
+              platform: this.board?.esphome.platform,
+              boardId: this.board?.id,
+            })),
+          ],
           activateOnTyping: true,
           icons: true,
           closeOnBlur: true,

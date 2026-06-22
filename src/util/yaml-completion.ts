@@ -35,6 +35,7 @@ import {
 } from "./yaml-ast.js";
 import {
   bundleFor,
+  type CompletionTarget,
   loadCatalog,
   matchKeyPosition,
   nestedPathForParent,
@@ -91,11 +92,18 @@ export {
 
 /**
  * Build the autocompletion source. Returned closure captures `api` so the
- * editor can wire it up once.
+ * editor can wire it up once. ``getTarget`` is read per invocation (not
+ * captured) so it tracks the device's platform/board as they load and
+ * change; passing the same target the structured editor uses reuses its
+ * already-hydrated component bodies (the body cache buckets by target).
  */
-export function createYamlCompletionSource(api: ESPHomeAPI) {
+export function createYamlCompletionSource(
+  api: ESPHomeAPI,
+  getTarget?: () => CompletionTarget
+) {
   return async (ctx: CompletionContext): Promise<CompletionResult | null> => {
     const { state, pos } = ctx;
+    const target = getTarget?.();
     const lineInfo = state.doc.lineAt(pos);
     const lineText = lineInfo.text;
     const colInLine = pos - lineInfo.from;
@@ -188,7 +196,8 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
         parent.key,
         completionCtx.platformValue,
         completionCtx.topLevelKey,
-        () => nestedPathForParent(state, pos, parent.key)
+        () => nestedPathForParent(state, pos, parent.key),
+        target
       );
       const entry = entries.find((e) => e.key === key);
 
@@ -329,6 +338,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       partial,
       parent,
       isListItem,
+      deviceTarget: target,
       bundleCtx: completionCtx.bundleCtx,
       platformValue: completionCtx.platformValue,
       topLevelKey: completionCtx.topLevelKey,

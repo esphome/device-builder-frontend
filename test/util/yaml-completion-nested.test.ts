@@ -230,4 +230,57 @@ describe("resolveAvailableEntries (nested descent)", () => {
     expect(keys).not.toContain("name");
     expect(keys).not.toContain("areas");
   });
+
+  it("passes the device target so platform-resolved options surface", async () => {
+    // The backend only fills `options` for fields like `hardware_uart` when
+    // given the device platform/board; the completion must forward the target.
+    const slim = makeComponentEntry("logger", { category: ComponentCategory.CORE });
+    const resolved: ComponentCatalogEntry = {
+      ...slim,
+      config_entries: [
+        makeConfigEntry({
+          key: "hardware_uart",
+          options: [{ label: "UART0", value: "UART0" }],
+        }),
+      ],
+    };
+    const generic: ComponentCatalogEntry = {
+      ...slim,
+      config_entries: [makeConfigEntry({ key: "hardware_uart", options: null })],
+    };
+    const catalog = {
+      components: [slim],
+      byId: new Map([["logger", slim]]),
+      byCategory: new Map(),
+    };
+    const fakeApi = {
+      getComponentBodies: async (ids: string[], platform?: string) =>
+        Object.fromEntries(
+          ids
+            .filter((id) => id === "logger")
+            .map((id) => [id, platform ? resolved : generic])
+        ),
+    } as never;
+    const withTarget = await resolveAvailableEntries(
+      fakeApi,
+      catalog,
+      "logger",
+      null,
+      "logger",
+      () => [],
+      { platform: "esp32", boardId: "esp32-evb" }
+    );
+    expect(withTarget.find((e) => e.key === "hardware_uart")?.options).toEqual([
+      { label: "UART0", value: "UART0" },
+    ]);
+    const noTarget = await resolveAvailableEntries(
+      fakeApi,
+      catalog,
+      "logger",
+      null,
+      "logger",
+      () => []
+    );
+    expect(noTarget.find((e) => e.key === "hardware_uart")?.options).toBeNull();
+  });
 });
