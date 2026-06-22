@@ -31,6 +31,23 @@ describe("getKeyPath", () => {
     expect(pathAt(doc, "number").slice(1)).toEqual(["pin", "number"]);
   });
 
+  it("resolves a nested empty value at a trailing space (key: )", () => {
+    // ``minimum_chip_revision: `` with the cursor after the space resolves to
+    // the document root; re-anchoring on the line's last non-space char must
+    // still yield the full path so value completion fires.
+    const doc = "esp32:\n  framework:\n    advanced:\n      minimum_chip_revision: \n";
+    const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
+    ensureSyntaxTree(state, state.doc.length);
+    const marker = "minimum_chip_revision: ";
+    const pos = doc.indexOf(marker) + marker.length;
+    expect(getKeyPath(state, pos)).toEqual([
+      "esp32",
+      "framework",
+      "advanced",
+      "minimum_chip_revision",
+    ]);
+  });
+
   it("returns [] outside any mapping pair", () => {
     expect(pathAt("# comment\n", "comment")).toEqual([]);
   });

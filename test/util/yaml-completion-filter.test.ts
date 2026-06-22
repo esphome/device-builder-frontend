@@ -150,11 +150,19 @@ describe("createYamlCompletionSource (already-set key filtering)", () => {
 
   it("completes a value inside a deeply nested mapping", async () => {
     // Value position two levels deep (``framework: advanced: verbose:``)
-    // exercises the value-position nested descent end to end. A partial
-    // value is present so the AST resolves the key path (an empty ``key: ``
-    // resolves to the document root and falls back to the schema lookup).
+    // exercises the value-position nested descent end to end.
     const labels = await labelsAt(
       ["esp32:", "  framework:", "    advanced:", "      verbose: t"].join("\n")
+    );
+    expect(labels).toEqual(["true", "false"]);
+  });
+
+  it("completes a nested value at a trailing space (empty partial)", async () => {
+    // Cursor after ``verbose: `` with no value typed yet: the empty value
+    // resolves to the document root, so getKeyPath re-anchors on the line to
+    // still surface the options instead of going silent.
+    const labels = await labelsAt(
+      ["esp32:", "  framework:", "    advanced:", "      verbose: "].join("\n")
     );
     expect(labels).toEqual(["true", "false"]);
   });

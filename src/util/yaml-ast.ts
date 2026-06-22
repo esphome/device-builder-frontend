@@ -182,7 +182,16 @@ export function getTopLevelKey(state: EditorState, pos: number): string | null {
  */
 export function getKeyPath(state: EditorState, pos: number): string[] {
   const keys: string[] = [];
-  let cur = findEnclosingPair(syntaxTree(state).resolveInner(pos, -1));
+  const tree = syntaxTree(state);
+  let cur = findEnclosingPair(tree.resolveInner(pos, -1));
+  if (!cur) {
+    // A cursor in an empty value / trailing whitespace (``key: ``) resolves to
+    // the document root, not the pair. Re-anchor on the line's last non-space
+    // char (the ``:`` or key) so a nested ``key: `` still yields its path.
+    const line = state.doc.lineAt(pos);
+    const upto = line.text.slice(0, pos - line.from).trimEnd();
+    if (upto) cur = findEnclosingPair(tree.resolveInner(line.from + upto.length - 1, -1));
+  }
   while (cur) {
     const k = getPairKey(state, cur);
     if (k) keys.push(k);
