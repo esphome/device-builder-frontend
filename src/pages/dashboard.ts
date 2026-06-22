@@ -16,11 +16,9 @@ import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import toast from "sonner-js";
-import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
-import { ErrorCode } from "../api/types/protocol.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { ArchivedDevice } from "../api/types/system.js";
 import { DashboardView } from "../api/types/system.js";
@@ -99,6 +97,7 @@ import {
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { runBulkUpdate } from "../util/bulk-update.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import {
   activeFacetCount,
@@ -116,7 +115,6 @@ import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { consumePendingSerialSetup } from "../util/pending-serial-setup.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { classifyNoCompatiblePeerReason } from "../util/version-mismatch.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/adopt-dialog.js";
@@ -213,9 +211,9 @@ export class ESPHomePageDashboard extends LitElement {
     return this._remoteComputeOnly || !this._prefsLoaded;
   }
 
-  // Used by the NO_COMPATIBLE_PEER toast classifier — see
-  // classifyNoCompatiblePeerReason. Same context the settings
-  // dialog reads; null until the subscribe_events seed lands.
+  // Passed to runBulkUpdate for the NO_COMPATIBLE_PEER toast
+  // classifier. Same context the settings dialog reads; null until
+  // the subscribe_events seed lands.
   @consume({ context: buildOffloadPairingsContext, subscribe: true })
   @state()
   _pairings: Map<string, PairingSummary> | null = null;
@@ -873,38 +871,12 @@ export class ESPHomePageDashboard extends LitElement {
     const selected = [...this._selectedDevices];
     this._selectMode = false;
     this._selectedDevices = new Set();
-    if (selected.length === 0) {
-      toast.info(this._localize("layout.update_all_none"), { richColors: true });
-      return;
-    }
-    toast.info(this._localize("layout.update_all_started", { count: selected.length }), {
-      richColors: true,
+    await runBulkUpdate(selected, {
+      api: this._api,
+      localize: this._localize,
+      appVersion: this._appVersion,
+      pairings: this._pairings?.values() ?? [],
     });
-    try {
-      await this._api.firmwareInstallBulk(selected);
-    } catch (err) {
-      if (
-        err instanceof APIError &&
-        err.errorCode === ErrorCode.NO_COMPATIBLE_PEER &&
-        this._appVersion
-      ) {
-        // ``_appVersion`` empty during a reconnect race would leak
-        // into the ``{local}`` placeholder and misattribute the
-        // bucket; fall through to the generic toast.
-        const reason = classifyNoCompatiblePeerReason(
-          this._pairings?.values() ?? [],
-          this._appVersion
-        );
-        toast.error(
-          this._localize(`layout.update_all_no_compatible_peer_${reason}`, {
-            local: this._appVersion,
-          }),
-          { richColors: true }
-        );
-      } else {
-        toast.error(this._localize("layout.update_all_error"), { richColors: true });
-      }
-    }
   };
 
   _openConfirm(pending: PendingConfirm) {
