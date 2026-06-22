@@ -1,17 +1,21 @@
 // @vitest-environment happy-dom
-import { startCompletion } from "@codemirror/autocomplete";
+import { completionStatus, startCompletion } from "@codemirror/autocomplete";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import { idleCompletion, shouldIdleComplete } from "../../src/util/idle-completion.js";
 
-// Spy on startCompletion (keep everything else real) so the timer tests can
-// assert when the plugin would open the popup without standing up the full
-// completion machinery.
+// Spy on startCompletion and make completionStatus controllable, so the timer
+// tests can assert when the plugin would open the popup (and that an active
+// popup cancels a pending timer) without standing up the completion machinery.
 vi.mock("@codemirror/autocomplete", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@codemirror/autocomplete")>();
-  return { ...actual, startCompletion: vi.fn(() => true) };
+  return {
+    ...actual,
+    startCompletion: vi.fn(() => true),
+    completionStatus: vi.fn(actual.completionStatus),
+  };
 });
 
 function stateAt(doc: string, head = doc.length, anchor = head): EditorState {
@@ -60,9 +64,12 @@ describe("shouldIdleComplete", () => {
 
 describe("idleCompletion (timer)", () => {
   const spy = vi.mocked(startCompletion);
+  const status = vi.mocked(completionStatus);
+  const realStatus = status.getMockImplementation()!;
   beforeEach(() => {
     vi.useFakeTimers();
     spy.mockClear();
+    status.mockImplementation(realStatus);
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -127,5 +134,16 @@ describe("idleCompletion (timer)", () => {
     view.destroy();
     vi.advanceTimersByTime(1000);
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("cancels a pending timer once a completion is active (no reopen after Esc)", () => {
+    const view = mkView();
+    toEnd(view); // armed while no popup is open
+    status.mockReturnValue("active"); // popup opened
+    view.dispatch({ selection: EditorSelection.single(view.state.doc.length - 1) });
+    status.mockReturnValue(null); // dismissed with Esc (no doc/selection update)
+    vi.advanceTimersByTime(2000);
+    expect(spy).not.toHaveBeenCalled();
+    view.destroy();
   });
 });

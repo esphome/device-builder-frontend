@@ -42,6 +42,14 @@ export function idleCompletion(delayMs: number) {
       private timer: ReturnType<typeof setTimeout> | null = null;
 
       update(update: ViewUpdate): void {
+        // While a popup is open (or pending), cancel any idle timer — checked
+        // on every update so the popup-open transaction clears the timer that
+        // the preceding keystroke armed. Otherwise dismissing with Esc (which
+        // fires no doc/selection update) could leave that timer to re-open it.
+        if (completionStatus(update.state) !== null) {
+          this.clear();
+          return;
+        }
         if (!update.docChanged && !update.selectionSet) return;
         this.arm(update.view);
       }
