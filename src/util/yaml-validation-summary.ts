@@ -21,6 +21,8 @@ import type { EditorValidateResponse } from "../api/types/editor.js";
 
 const YAML_LINE_COL_RE = /line\s+(\d+)\s*,\s*column\s+(\d+)/i;
 const YAML_LINE_RE = /line\s+(\d+)/i;
+/** Windows path separators, normalized to ``/`` before comparison. */
+const BACKSLASH_RE = /\\/g;
 
 export interface ValidationFirstError {
   /** 1-indexed line, or 0 if the error has no resolvable line. */
@@ -85,26 +87,24 @@ export function summarizeValidation(res: EditorValidateResponse): ValidationSumm
 
 /** Last path segment of a ``/``- or ``\``-separated path. */
 export function basename(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
+  const normalized = path.replace(BACKSLASH_RE, "/");
   const idx = normalized.lastIndexOf("/");
   return idx === -1 ? normalized : normalized.slice(idx + 1);
 }
 
 /**
- * Whether a validator ``document`` path refers to the currently open
- * configuration rather than an ``!include``d file. The ``--ace`` loader
- * leaves the main file's stream unnamed, so its nodes report the
- * ``"<file>"`` sentinel (and a missing document means the same thing);
- * only ``!include``d files carry a real path, resolved to
- * ``<config_dir>/<configuration>``. A suffix match on the full
- * configuration path identifies the open file; a plain basename match is
- * deliberately avoided so an included file sharing the open file's name
- * (open ``sub/light.yaml``, error in ``common/light.yaml``) isn't
- * mistaken for the open buffer.
+ * Whether a validator ``document`` refers to the currently open
+ * configuration rather than an ``!include``d file.
+
+ * The ``esphome vscode --ace`` loader leaves the main file's stream
+ * unnamed, so its nodes report the ``"<file>"`` sentinel (a missing
+ * document means the same thing) while every ``!include``d file carries a
+ * real resolved path — so the sentinel is the open file. A suffix match
+ * on ``configuration`` is deliberately NOT used: it is usually a bare
+ * filename, and an included ``packages/light.yaml`` would masquerade as
+ * an open ``light.yaml`` and re-enable navigation into the wrong file.
  */
 export function isOpenConfigFile(document: string, configuration: string): boolean {
   if (!document || document === "<file>") return true;
-  const doc = document.replace(/\\/g, "/");
-  const cfg = configuration.replace(/\\/g, "/");
-  return doc === cfg || doc.endsWith(`/${cfg}`);
+  return document.replace(BACKSLASH_RE, "/") === configuration.replace(BACKSLASH_RE, "/");
 }

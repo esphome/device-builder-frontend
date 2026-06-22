@@ -188,28 +188,22 @@ describe("basename", () => {
 });
 
 describe("isOpenConfigFile", () => {
-  it("matches the open config by full document path", () => {
-    expect(isOpenConfigFile("/config/esphome/light.yaml", "light.yaml")).toBe(true);
-  });
-
-  it("matches when the configuration carries a subpath", () => {
-    expect(isOpenConfigFile("/config/esphome/sub/light.yaml", "sub/light.yaml")).toBe(
-      true
-    );
-  });
-
-  it("matches a normalized windows document path", () => {
-    expect(isOpenConfigFile("C:\\config\\esphome\\light.yaml", "light.yaml")).toBe(true);
-  });
-
   it("treats the --ace main-file sentinel as the open config", () => {
     // The `esphome vscode --ace` loader leaves the main stream unnamed,
-    // so main-file errors report "<file>" rather than a real path.
+    // so main-file errors report "<file>"; only includes carry a real path.
     expect(isOpenConfigFile("<file>", "light.yaml")).toBe(true);
   });
 
   it("treats a missing document as the open config", () => {
     expect(isOpenConfigFile("", "light.yaml")).toBe(true);
+  });
+
+  it("matches an exact document path", () => {
+    expect(isOpenConfigFile("light.yaml", "light.yaml")).toBe(true);
+  });
+
+  it("matches an exact document path after normalizing separators", () => {
+    expect(isOpenConfigFile("sub\\light.yaml", "sub/light.yaml")).toBe(true);
   });
 
   it("treats an included file as not the open config", () => {
@@ -219,9 +213,9 @@ describe("isOpenConfigFile", () => {
   });
 
   it("does not match an included file that merely shares the open file's name", () => {
-    // open sub/light.yaml, error in common/light.yaml — same basename,
-    // different file; a basename match would navigate the wrong document.
-    expect(isOpenConfigFile("/config/esphome/common/light.yaml", "sub/light.yaml")).toBe(
+    // open light.yaml, error in packages/light.yaml — same basename,
+    // different file; a suffix match would navigate the wrong document.
+    expect(isOpenConfigFile("/config/esphome/packages/light.yaml", "light.yaml")).toBe(
       false
     );
   });
