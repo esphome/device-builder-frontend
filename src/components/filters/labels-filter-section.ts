@@ -68,6 +68,11 @@ export class ESPHomeLabelsFilterSection extends LitElement {
   @property({ attribute: false })
   usageCounts: Record<string, number> = {};
 
+  /** Show the per-row rename / delete buttons and the create CTA.
+   *  Off in selection-only contexts (the Update All dialog) where
+   *  label management doesn't belong. */
+  @property({ type: Boolean }) managed = true;
+
   static styles = [
     espHomeStyles,
     filterStyles,
@@ -114,12 +119,14 @@ export class ESPHomeLabelsFilterSection extends LitElement {
             >
               ${this._catalog.map((label) => this._renderRow(label, selectedSet))}
             </div>`}
-        <div class="create-section ${isEmpty ? "create-section--empty" : ""}">
-          <button class="create-trigger" type="button" @click=${this._onCreateClick}>
-            <wa-icon library="mdi" name="plus"></wa-icon>
-            ${this._localize("dashboard.labels_create")}
-          </button>
-        </div>
+        ${this.managed
+          ? html`<div class="create-section ${isEmpty ? "create-section--empty" : ""}">
+              <button class="create-trigger" type="button" @click=${this._onCreateClick}>
+                <wa-icon library="mdi" name="plus"></wa-icon>
+                ${this._localize("dashboard.labels_create")}
+              </button>
+            </div>`
+          : nothing}
       </div>
     `;
   }
@@ -145,26 +152,28 @@ export class ESPHomeLabelsFilterSection extends LitElement {
         </span>
         <span class="facet-row-count" aria-hidden="true">${count}</span>
       </button>
-      <div class="row-actions">
-        <button
-          class="row-action"
-          type="button"
-          aria-label=${this._localize("dashboard.labels_rename")}
-          title=${this._localize("dashboard.labels_rename")}
-          @click=${(e: Event) => this._onEditClick(e, label)}
-        >
-          <wa-icon library="mdi" name="pencil-outline"></wa-icon>
-        </button>
-        <button
-          class="row-action row-action--danger"
-          type="button"
-          aria-label=${this._localize("dashboard.labels_delete")}
-          title=${this._localize("dashboard.labels_delete")}
-          @click=${(e: Event) => this._onDeleteClick(e, label)}
-        >
-          <wa-icon library="mdi" name="trash-can-outline"></wa-icon>
-        </button>
-      </div>
+      ${this.managed
+        ? html`<div class="row-actions">
+            <button
+              class="row-action"
+              type="button"
+              aria-label=${this._localize("dashboard.labels_rename")}
+              title=${this._localize("dashboard.labels_rename")}
+              @click=${(e: Event) => this._onEditClick(e, label)}
+            >
+              <wa-icon library="mdi" name="pencil-outline"></wa-icon>
+            </button>
+            <button
+              class="row-action row-action--danger"
+              type="button"
+              aria-label=${this._localize("dashboard.labels_delete")}
+              title=${this._localize("dashboard.labels_delete")}
+              @click=${(e: Event) => this._onDeleteClick(e, label)}
+            >
+              <wa-icon library="mdi" name="trash-can-outline"></wa-icon>
+            </button>
+          </div>`
+        : nothing}
     </div>`;
   }
 

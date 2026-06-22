@@ -73,6 +73,19 @@ describe("esphome-labels-filter-section", () => {
     expect(changes[1]).toEqual([]);
   });
 
+  it("hides row actions and the create CTA when not managed", async () => {
+    const el = await mount({ managed: false });
+    expect(el.shadowRoot!.querySelector(".row-action")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".create-trigger")).toBeNull();
+    // Selection still works in the selection-only (dialog) mode.
+    const changes: string[][] = [];
+    el.addEventListener("labels-filter-change", (e) =>
+      changes.push((e as CustomEvent<string[]>).detail)
+    );
+    rows(el)[0].click();
+    expect(changes).toEqual([["l1"]]);
+  });
+
   it("shows the empty state and keeps the create CTA on an empty catalog", async () => {
     const el = await mount();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
