@@ -25,6 +25,7 @@ import { collectTopLevelKeys } from "./yaml-ast.js";
 import {
   bundleFor,
   type CatalogIndex,
+  nestedPathForParent,
   resolveAvailableEntries,
 } from "./yaml-completion-catalog.js";
 import {
@@ -110,7 +111,8 @@ async function resolveCatalogEntries(k: KeyPositionCtx): Promise<ConfigEntry[]> 
       k.catalog,
       k.parent.key,
       k.platformValue,
-      k.topLevelKey
+      k.topLevelKey,
+      nestedPathForParent(k.state, k.pos, k.parent.key)
     );
   }
   return k._cachedCatalogEntries;

@@ -289,6 +289,35 @@ export function collectSubstitutionKeys(state: EditorState): string[] {
   return out;
 }
 
+/**
+ * Collect the keys of the block mapping the cursor sits in, excluding
+ * the pair the cursor is editing. The new editor's equivalent of the
+ * legacy ``mapHasScalarKey`` filter — drives "don't re-suggest a key
+ * that's already set in this mapping". Returns an empty set when the
+ * cursor isn't inside a mapping (no filtering, matching prior
+ * behaviour).
+ */
+export function collectSiblingKeys(state: EditorState, pos: number): Set<string> {
+  const out = new Set<string>();
+  const inner = syntaxTree(state).resolveInner(pos, -1);
+  let map: SyntaxNode | null = inner;
+  while (map && map.name !== "BlockMapping") map = map.parent;
+  if (!map) return out;
+  // The pair being edited stays out of the set so an in-place key edit
+  // still completes itself. A bare partial line that didn't parse as a
+  // Pair yields an ``ownPair`` outside this mapping, which simply never
+  // matches a child below.
+  const ownPair = findEnclosingPair(inner);
+  for (let pair = map.firstChild; pair; pair = pair.nextSibling) {
+    if (pair.name !== "Pair") continue;
+    // Lezer nodes aren't reference-equal across traversals; compare by span.
+    if (ownPair && pair.from === ownPair.from && pair.to === ownPair.to) continue;
+    const k = getPairKey(state, pair);
+    if (k) out.add(k);
+  }
+  return out;
+}
+
 /** Memoise top-level-key collection by Lezer ``Tree`` identity.
  *  Lezer's incremental parsing reuses the same ``Tree`` object
  *  across edits that don't touch the relevant subtree, so a

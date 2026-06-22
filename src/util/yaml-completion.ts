@@ -27,11 +27,16 @@ import {
   findReferenceCandidates,
 } from "./config-entry-yaml-scan.js";
 import { getConfigVarValueOptions } from "./esphome-schema.js";
-import { collectSubstitutionKeys, isUnderAutomationItem } from "./yaml-ast.js";
+import {
+  collectSiblingKeys,
+  collectSubstitutionKeys,
+  isUnderAutomationItem,
+} from "./yaml-ast.js";
 import {
   bundleFor,
   loadCatalog,
   matchKeyPosition,
+  nestedPathForParent,
   RE_BOOLEAN_VALUE,
   RE_ENUM_VALUE,
   RE_KEY,
@@ -170,7 +175,8 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
         catalog,
         parent.key,
         completionCtx.platformValue,
-        completionCtx.topLevelKey
+        completionCtx.topLevelKey,
+        nestedPathForParent(state, pos, parent.key)
       );
       const entry = entries.find((e) => e.key === key);
 
@@ -280,9 +286,10 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     // components (catalog entries whose id has no dot). See
     // ``buildTopLevelCompletions`` for the rationale.
     if (indent === 0) {
+      const present = collectSiblingKeys(state, pos);
       return {
         from: keyFrom,
-        options: buildTopLevelCompletions(catalog),
+        options: buildTopLevelCompletions(catalog).filter((c) => !present.has(c.label)),
         validFor: RE_KEY,
       };
     }
@@ -322,7 +329,13 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     };
 
     const buckets = await Promise.all(KEY_POSITION_PROVIDERS.map((p) => p.fetch(keyCtx)));
-    const options = buckets.flat();
+    let options = buckets.flat();
+    // Drop keys already set in this mapping (plain key position only —
+    // list items like automation actions / filters are repeatable).
+    if (!isListItem) {
+      const present = collectSiblingKeys(state, pos);
+      if (present.size > 0) options = options.filter((o) => !present.has(o.label));
+    }
     if (options.length === 0) return null;
 
     // ``RE_KEY_OR_ACTION`` allows ``.`` because dotted action

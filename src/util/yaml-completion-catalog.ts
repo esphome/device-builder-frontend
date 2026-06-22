@@ -15,7 +15,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
-import { resolveBundleContext } from "./yaml-ast.js";
+import { getKeyPath, resolveBundleContext } from "./yaml-ast.js";
 import { findTopLevelBlock, readPlatformSibling } from "./yaml-line-walker.js";
 
 // ``validFor`` regex constants — consumed by CodeMirror to decide
@@ -189,7 +189,8 @@ export async function resolveAvailableEntries(
   catalog: CatalogIndex,
   parentKey: string,
   platformValue: string | null,
-  topLevelKey: string | null
+  topLevelKey: string | null,
+  nestedPath: string[] = []
 ): Promise<ConfigEntry[]> {
   // The slim ``getComponents`` index carries no ``config_entries``
   // (those hydrate lazily through ``components/get_component_bodies``),
@@ -211,6 +212,30 @@ export async function resolveAvailableEntries(
     }
   };
 
+  // Resolve a top-level component's fields, merging the platform
+  // implementation's fields when a ``platform:`` value is set (the
+  // catalog keys per-platform entries as ``<domain>.<stem>``). The merge
+  // id is resolved up front so both bodies register before the microtask
+  // flush and batch into a single ``get_component_bodies`` round trip.
+  const componentEntries = async (componentId: string): Promise<ConfigEntry[]> => {
+    let mergeId: string | null = null;
+    if (platformValue) {
+      if (catalog.byId.has(platformValue)) {
+        mergeId = platformValue;
+      } else if (catalog.byId.has(`${componentId}.${platformValue}`)) {
+        mergeId = `${componentId}.${platformValue}`;
+      }
+    }
+    if (mergeId) {
+      const [own, extra] = await Promise.all([
+        entriesFor(componentId),
+        entriesFor(mergeId),
+      ]);
+      return [...own, ...extra];
+    }
+    return entriesFor(componentId);
+  };
+
   // Cursor nested under a list-item header (``- platform: template``
   // → parentKey="platform"). The form fields live on the dotted
   // catalog id ``<domain>.<platformValue>`` (``binary_sensor.template``).
@@ -219,27 +244,19 @@ export async function resolveAvailableEntries(
     return entriesFor(`${topLevelKey}.${platformValue}`);
   }
   if (catalog.byId.has(parentKey)) {
-    // Top-level component directly. If a platform value is set, merge
-    // the platform implementation's fields in (the catalog keys
-    // per-platform entries as ``<domain>.<stem>``). Resolve the merge
-    // id up front so both bodies register before the microtask flush
-    // and batch into a single ``get_component_bodies`` round trip.
-    let mergeId: string | null = null;
-    if (platformValue) {
-      if (catalog.byId.has(platformValue)) {
-        mergeId = platformValue;
-      } else if (topLevelKey && catalog.byId.has(`${topLevelKey}.${platformValue}`)) {
-        mergeId = `${topLevelKey}.${platformValue}`;
-      }
-    }
-    if (mergeId) {
-      const [own, extra] = await Promise.all([
-        entriesFor(parentKey),
-        entriesFor(mergeId),
-      ]);
-      return [...own, ...extra];
-    }
-    return entriesFor(parentKey);
+    return componentEntries(parentKey);
+  }
+  // Nested mapping (``esp32: framework:`` → parentKey="framework", not a
+  // catalog id). Descend the top-level component's nested
+  // ``config_entries`` along the key path; the catalog models nested
+  // groups (``framework`` → ``advanced`` → …) the same way the visual
+  // form renders them.
+  if (topLevelKey && nestedPath.length > 0) {
+    const descended = descendNestedEntries(
+      await componentEntries(topLevelKey),
+      nestedPath
+    );
+    if (descended.length > 0) return descended;
   }
   // No direct hit — try fetching the component (handles aliases the
   // catalog list call doesn't return). Routes through the session-
@@ -253,6 +270,42 @@ export async function resolveAvailableEntries(
     /* ignore */
   }
   return [];
+}
+
+/**
+ * Compute the nested-group descent path for ``resolveAvailableEntries``:
+ * the key chain from just under the top-level component down to and
+ * including *parentKey*. Returns ``[]`` when *parentKey* is the top-level
+ * key itself or doesn't appear on the cursor's AST key path (safe
+ * no-descent fallback when the AST and the regex walker disagree).
+ */
+export function nestedPathForParent(
+  state: EditorState,
+  pos: number,
+  parentKey: string
+): string[] {
+  const path = getKeyPath(state, pos);
+  const idx = path.lastIndexOf(parentKey);
+  if (idx < 1) return [];
+  return path.slice(1, idx + 1);
+}
+
+/**
+ * Walk *entries* down *path*, descending into each matching entry's
+ * nested ``config_entries``. Returns the deepest level reached, or
+ * ``[]`` when any step has no nested group for that key.
+ */
+export function descendNestedEntries(
+  entries: ConfigEntry[],
+  path: string[]
+): ConfigEntry[] {
+  let cur = entries;
+  for (const key of path) {
+    const next = cur.find((e) => e.key === key && e.config_entries);
+    if (!next?.config_entries) return [];
+    cur = next.config_entries;
+  }
+  return cur;
 }
 
 /**
