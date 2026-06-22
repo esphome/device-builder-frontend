@@ -8,6 +8,7 @@ import {
   parseYamlTopLevelSections,
   resolveCurrentFromLine,
   sectionAtLine,
+  sectionForCursor,
   sectionKeyOf,
   type YamlSection,
 } from "../../src/util/yaml-sections.js";
@@ -434,6 +435,39 @@ script:
     // ``- id: my_routine`` is line 4; the ``then:`` body lives on 6-7.
     const m = sectionAtLine(yaml, 6);
     expect(m?.key).toBe("automation:script:my_routine");
+  });
+});
+
+describe("sectionForCursor", () => {
+  // A just-typed top-level block whose only child line is still blank:
+  // `http_request:` on line 3, an indented blank line 4 under it.
+  const yaml = "esphome:\n  name: x\nhttp_request:\n  \n";
+
+  it("delegates to sectionAtLine when a range covers the line", () => {
+    expect(sectionForCursor(yaml, 2, ["esphome", "name"])?.key).toBe("esphome");
+  });
+
+  it("attributes an uncovered indented child line to its top-level section", () => {
+    // sectionAtLine alone leaves line 4 unattributed (the http_request range
+    // is trimmed to its last non-blank child, i.e. just the header).
+    expect(sectionAtLine(yaml, 4)).toBeNull();
+    expect(sectionForCursor(yaml, 4, ["http_request"])?.key).toBe("http_request");
+  });
+
+  it("stays null on an uncovered line with an empty path (column-0 gap)", () => {
+    expect(sectionForCursor(yaml, 4, [])).toBeNull();
+  });
+
+  it("does not resolve a platform-variant block by its bare key", () => {
+    // The legacy bare-mapping form keys this section "ota" WITH a platform
+    // ("ota.esphome"); the fallback's !platform guard refuses to resolve it
+    // by the bare "ota" key (which would yield the wrong sectionKey). Dropping
+    // the guard would return this section, so this exercises it, not triviality.
+    const platformYaml = "esphome:\n  name: x\nota:\n  platform: esphome\n  \n";
+    const ota = parseYamlTopLevelSections(platformYaml).find((s) => s.key === "ota");
+    expect(ota?.platform).toBe("esphome"); // precondition: the guard's target exists
+    expect(sectionAtLine(platformYaml, 5)).toBeNull();
+    expect(sectionForCursor(platformYaml, 5, ["ota"])).toBeNull();
   });
 });
 

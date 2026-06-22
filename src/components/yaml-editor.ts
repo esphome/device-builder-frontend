@@ -30,6 +30,7 @@ import { idleCompletion } from "../util/idle-completion.js";
 import { getKeyPath } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
+import { blankLineContext, keyPathByIndent } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
@@ -144,6 +145,12 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    *  We only emit on line transitions so a horizontal mouse / arrow
    *  movement inside the same line doesn't churn the page state. */
   private _lastReportedCursorLine = 0;
+
+  /** Last top-level key we emitted with `yaml-cursor-line`. Typing or
+   *  completing a new block (`http_re` → `http_request:`) changes the
+   *  section without changing the line number, so we also emit when this
+   *  changes; otherwise the structured panel stays on the old section. */
+  private _lastReportedTopKey: string | null = null;
 
   static styles = css`
     :host {
@@ -412,20 +419,46 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
             })
           );
         }
-        // Cursor moved (click, arrow keys, find-jump). Emit the
-        // 1-indexed line so the page can switch the visual
-        // section editor to match. Throttle to line transitions:
-        // moving within the same line is irrelevant for section
-        // attribution, and emitting on every column change would
-        // churn page state.
+        // Cursor moved (click, arrow keys, find-jump) or a user edit
+        // moved it. Emit the 1-indexed line + key path so the page can
+        // switch the visual section editor to match. Gate on
+        // `selectionSet` only: every user edit (typing, completion
+        // accept) also moves the caret, so this still catches them, but
+        // a programmatic host doc patch (the `value` prop sync) carries
+        // no selection and must not switch sections on an unfocused
+        // editor. Throttle so a mere column move within the same line
+        // and section is ignored, but emit when EITHER the line OR the
+        // top-level key changes: typing/completing a new block (`http_re`
+        // → `http_request:`) changes the section without changing the
+        // line number, and must still re-attribute the panel.
         if (update.selectionSet) {
           const head = update.state.selection.main.head;
           const line = update.state.doc.lineAt(head).number;
-          if (line !== this._lastReportedCursorLine) {
+          // A pure horizontal move within an unchanged line can't change the
+          // line or the top-level key (only a doc edit moves the key), so skip
+          // the key-path walk on same-line cursor moves with no edit.
+          if (line === this._lastReportedCursorLine && !update.docChanged) return;
+          // Full key path; the page derives the form-relative path
+          // (it knows whether the section keys fields under its key).
+          let path = getKeyPath(update.state, head);
+          // The AST yields no Pair on a blank line, so resolve the
+          // enclosing key chain from the caret's indentation instead.
+          // This lets the page attribute a blank, indented child line —
+          // the line under a just-typed `http_request:` with no children
+          // yet — to its section. A column-0 caret resolves to [], so a
+          // true inter-section gap stays unattributed.
+          if (path.length === 0) {
+            const blank = blankLineContext(update.state.doc, head);
+            if (blank)
+              path = keyPathByIndent(update.state.doc, blank.lineIdx, blank.indent);
+          }
+          const topKey = path[0] ?? null;
+          if (
+            line !== this._lastReportedCursorLine ||
+            topKey !== this._lastReportedTopKey
+          ) {
             this._lastReportedCursorLine = line;
-            // Full key path; the page derives the form-relative path
-            // (it knows whether the section keys fields under its key).
-            const path = getKeyPath(update.state, head);
+            this._lastReportedTopKey = topKey;
             this.dispatchEvent(
               new CustomEvent("yaml-cursor-line", {
                 detail: { line, path },
@@ -524,6 +557,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     this._destroyView();
     this._container.innerHTML = "";
     this._lastReportedCursorLine = 0;
+    this._lastReportedTopKey = null;
     this._mountEditor();
   }
 

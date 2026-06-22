@@ -136,7 +136,7 @@ export function findAddedSection(
   // Top-level (non-platform) component — match the bare key, e.g.
   // adding "wifi" navigates to the `wifi:` block.
   if (!componentId.includes(".")) {
-    const match = sections.find((s) => s.key === componentId && !s.platform);
+    const match = _topLevelBlockByKey(sections, componentId);
     if (match) return { sectionKey: match.key, fromLine: match.fromLine };
   }
 
@@ -237,6 +237,39 @@ export function sectionAtLine(yaml: string, line: number): YamlSection | null {
   // by nothing. When the click lands exactly on such a header, select the
   // section's first instance instead of leaving the selection unchanged.
   return _firstItemForListHeader(tops, yaml, line);
+}
+
+/**
+ * Resolve the section the caret belongs to from its line and key path.
+ *
+ * Layers a path-based fallback over `sectionAtLine`: when no section range
+ * covers the line, attribute it to the path's top-level key. That happens on
+ * a blank, indented child line directly under a just-typed top-level block
+ * (`http_request:` then a blank child line) — `sectionAtLine` leaves it
+ * unattributed because the range is trimmed to the last non-blank child. The
+ * caret indent disambiguates: the editor only fills `path` from indentation
+ * for an indented caret, so a column-0 inter-section gap keeps an empty path
+ * and still resolves to null.
+ */
+export function sectionForCursor(
+  yaml: string,
+  line: number,
+  path: readonly string[]
+): YamlSection | null {
+  const hit = sectionAtLine(yaml, line);
+  if (hit) return hit;
+  const topKey = path[0];
+  if (!topKey) return null;
+  return _topLevelBlockByKey(parseYamlTopLevelSections(yaml), topKey);
+}
+
+/**
+ * The bare top-level `<key>:` block (never a platform list item sharing the
+ * key as a catalog id). The `!platform` guard keeps a platform value like
+ * `dht` from matching a `sensor.dht` item.
+ */
+function _topLevelBlockByKey(sections: YamlSection[], key: string): YamlSection | null {
+  return sections.find((s) => s.key === key && !s.platform) ?? null;
 }
 
 function _firstItemForListHeader(

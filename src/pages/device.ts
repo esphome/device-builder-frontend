@@ -42,7 +42,7 @@ import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
 import {
   findFieldLine,
   parseYamlTopLevelSections,
-  sectionAtLine,
+  sectionForCursor,
   sectionKeyOf,
   type YamlSection,
 } from "../util/yaml-sections.js";
@@ -1240,16 +1240,18 @@ export class ESPHomePageDevice extends LitElement {
     // The user is driving from the YAML pane now — drop any pending
     // form-field retry so it can't re-highlight after they've moved on.
     this._clearPendingFieldLine();
-    const match = sectionAtLine(this._yaml, e.detail.line);
+    const full = e.detail.path ?? [];
+    // `sectionForCursor` falls back to the caret's key path when no section
+    // range covers the line, so the panel follows the caret into a blank,
+    // indented child line under a just-typed top-level block.
+    const match = sectionForCursor(this._yaml, e.detail.line, full);
     if (!match) return;
     // Drop the top-level key to get the form-relative path. LIST_SECTIONS
-    // (globals) are the exception: their form keys fields under the
-    // section key, so keep it. (MAP sections like substitutions render at
-    // an empty path, so their fields are section-relative — slice as usual.)
-    const full = e.detail.path ?? [];
-    // LIST_SECTIONS (globals) key fields under the section key, so keep it —
-    // but only with a child segment; a bare ``["globals"]`` header reduces
-    // to [] (a non-field line), not a whole-section field highlight.
+    // (globals) are the exception: their form keys fields under the section
+    // key, so keep it — but only with a child segment; a bare
+    // ``["globals"]`` header reduces to [] (a non-field line), not a
+    // whole-section field highlight. MAP sections like substitutions render
+    // at an empty path, so their fields are section-relative — slice as usual.
     const rel = full.length > 1 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
     const sectionKey = sectionKeyOf(match);
     if (

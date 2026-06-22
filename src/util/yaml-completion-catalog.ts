@@ -326,7 +326,8 @@ export function nestedPathForParent(
   // stay on the AST: a missing parentKey there means the walkers disagree
   // (e.g. a list-item context), where the indent walk could synthesise a
   // sibling-laden path. (The fallback is kept here, not inside ``getKeyPath``,
-  // so its AST-only callers — hover, the cursor-line event — still get ``[]``.)
+  // so hover — which wants the raw AST result — still gets ``[]``. The
+  // cursor-line event applies the same blank-line fallback on its own.)
   const blank = blankLineContext(state.doc, pos);
   const path = blank
     ? keyPathByIndent(state.doc, blank.lineIdx, blank.indent)
