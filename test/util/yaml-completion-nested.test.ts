@@ -172,4 +172,50 @@ describe("resolveAvailableEntries (nested descent)", () => {
     );
     expect(out.map((e) => e.key)).toEqual(["sorting_weight"]);
   });
+
+  it("merges the dotted platform impl, not a bare component sharing its name", async () => {
+    // ``ota: - platform: esphome`` must merge ``ota.esphome`` (password/port),
+    // not the core ``esphome`` component (name/areas) whose id collides with
+    // the platform value.
+    const ota = makeComponentEntry("ota", { category: ComponentCategory.CORE });
+    const otaEsphome = makeComponentEntry("ota.esphome", {
+      category: ComponentCategory.CORE,
+    });
+    const esphome = makeComponentEntry("esphome", { category: ComponentCategory.CORE });
+    const bodies: Record<string, ComponentCatalogEntry> = {
+      ota: { ...ota, config_entries: [makeConfigEntry({ key: "platform" })] },
+      "ota.esphome": {
+        ...otaEsphome,
+        config_entries: [
+          makeConfigEntry({ key: "password" }),
+          makeConfigEntry({ key: "port" }),
+        ],
+      },
+      esphome: {
+        ...esphome,
+        config_entries: [
+          makeConfigEntry({ key: "name" }),
+          makeConfigEntry({ key: "areas" }),
+        ],
+      },
+    };
+    const catalog = {
+      components: [ota, otaEsphome, esphome],
+      byId: new Map(Object.entries({ ota, "ota.esphome": otaEsphome, esphome })),
+      byCategory: new Map(),
+    };
+    const fakeApi = {
+      getComponentBodies: async (ids: string[]) =>
+        Object.fromEntries(
+          ids.filter((id) => id in bodies).map((id) => [id, bodies[id]])
+        ),
+    } as never;
+    const keys = (
+      await resolveAvailableEntries(fakeApi, catalog, "ota", "esphome", "ota", () => [])
+    ).map((e) => e.key);
+    expect(keys).toContain("password");
+    expect(keys).toContain("port");
+    expect(keys).not.toContain("name");
+    expect(keys).not.toContain("areas");
+  });
 });

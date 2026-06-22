@@ -220,10 +220,13 @@ export async function resolveAvailableEntries(
   const componentEntries = async (componentId: string): Promise<ConfigEntry[]> => {
     let mergeId: string | null = null;
     if (platformValue) {
-      if (catalog.byId.has(platformValue)) {
-        mergeId = platformValue;
-      } else if (catalog.byId.has(`${componentId}.${platformValue}`)) {
+      // Prefer the dotted per-domain impl (``ota.esphome``) over a bare
+      // component that happens to share the platform's name (``esphome``);
+      // otherwise ``ota: - platform: esphome`` merges the core esphome fields.
+      if (catalog.byId.has(`${componentId}.${platformValue}`)) {
         mergeId = `${componentId}.${platformValue}`;
+      } else if (catalog.byId.has(platformValue)) {
+        mergeId = platformValue;
       }
     }
     if (mergeId) {
