@@ -19,8 +19,6 @@ import { html, nothing, render } from "lit";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
-import { isYamlOnlySection } from "../components/device/yaml-only-sections.js";
-import { fetchComponent } from "./component-name-cache.js";
 import {
   getActions,
   getComponentDocs,
@@ -125,22 +123,6 @@ function fieldTarget(
 }
 
 /**
- * True when the structured editor has no form for the component (no
- * ``config_entries`` like ``ethernet``, or an always-YAML section). Same
- * check the structured editor uses, so hover and form stay in sync.
- */
-async function isYamlOnlyComponent(
-  api: ESPHomeAPI,
-  topLevelKey: string,
-  platformValue: string | null
-): Promise<boolean> {
-  const componentId = platformValue ? `${topLevelKey}.${platformValue}` : topLevelKey;
-  const comp = await fetchComponent(api, componentId);
-  // `config_entries` is absent (not []) on form-less components like ethernet.
-  return isYamlOnlySection(topLevelKey, comp?.config_entries?.length ?? 0);
-}
-
-/**
  * Resolve hover docs for the YAML token under *pos*, or ``null`` when
  * nothing maps. Reuses the completion source's context helpers so hover
  * and completion agree on structure.
@@ -165,11 +147,6 @@ export async function resolveHoverTarget(
   const platformValue = bundleCtx
     ? bundleCtx.platformValue
     : readPlatformSibling(state.doc, lineIdx, indent);
-
-  // Don't duplicate the structured editor: skip components it can form-edit.
-  if (topLevelKey && !(await isYamlOnlyComponent(api, topLevelKey, platformValue))) {
-    return null;
-  }
 
   // Top-level component / domain key → its docs. Prefer the schema's
   // core component/platform docs (covers bare domains like
