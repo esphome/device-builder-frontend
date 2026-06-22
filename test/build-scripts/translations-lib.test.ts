@@ -143,6 +143,14 @@ describe("localeCompleteness", () => {
     expect(localeCompleteness(en, { k0: "v" })).toBe(1);
   });
 
+  it("reuses the flattened base across calls with the same base object", () => {
+    // The generator measures every locale against one base object; the second
+    // call here should hit the memoized base-leaf map rather than re-flatten.
+    const en = { a: "A", b: "B" };
+    expect(localeCompleteness(en, { a: "x" })).toBe(50);
+    expect(localeCompleteness(en, { a: "x", b: "y" })).toBe(100);
+  });
+
   it("rounds intermediate coverage to the nearest percent", () => {
     const en: Record<string, string> = {};
     const locale: Record<string, string> = {};

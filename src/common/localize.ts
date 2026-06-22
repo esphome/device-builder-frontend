@@ -53,12 +53,13 @@ interface LanguageMeta {
   completeness: number;
 }
 
-// Build-time manifest of every shipped locale's autonym + flag, generated
-// from src/translations/*.json by build-scripts/gen-language-manifest.cjs.
-// It carries only two keys per locale, so it's cheap to keep in the entry
-// bundle — which lets the language picker stay synchronous (see LANGUAGES /
-// AVAILABLE_LOCALES below) without pulling any locale's message body into the
-// initial download. The bodies load lazily instead (see getLocaleContext).
+// Build-time manifest of every shipped locale's autonym, flag, and
+// translation completeness, generated from src/translations/*.json by
+// build-scripts/gen-language-manifest.cjs. It carries only those few scalar
+// keys per locale, so it's cheap to keep in the entry bundle — which lets the
+// language picker stay synchronous (see LANGUAGES / AVAILABLE_LOCALES below)
+// without pulling any locale's message body into the initial download. The
+// bodies load lazily instead (see getLocaleContext).
 const LANGUAGE_MANIFEST = languageManifest as Record<string, LanguageMeta>;
 
 // Locale message bodies load lazily — `mode: "lazy"` makes rspack emit one

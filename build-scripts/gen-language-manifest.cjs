@@ -75,11 +75,25 @@ const flattenMessages = (obj, prefix = "", out = new Map()) => {
   return out;
 };
 
+// Flatten the English base once per base object and reuse it across locales
+// (every locale in a run is measured against the same base). Mirrors
+// translations-lib.ts; keep byte-compatible.
+const baseLeavesCache = new WeakMap();
+
+const flattenBase = (base) => {
+  let leaves = baseLeavesCache.get(base);
+  if (leaves === undefined) {
+    leaves = flattenMessages(base);
+    baseLeavesCache.set(base, leaves);
+  }
+  return leaves;
+};
+
 // Percentage (integer 0–100) of the English source's leaf keys that carry a
 // non-empty value in `locale`. See translations-lib.ts `localeCompleteness`
 // for the full rationale; this is the synced build-script copy.
 const localeCompleteness = (base, locale) => {
-  const baseLeaves = flattenMessages(base);
+  const baseLeaves = flattenBase(base);
   const total = baseLeaves.size;
   if (total === 0) {
     return 100;

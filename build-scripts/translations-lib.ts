@@ -67,6 +67,21 @@ function flattenMessages(
   return out;
 }
 
+// The manifest generator measures every locale against the same English base
+// object, so flatten it once per base and reuse the result. Keyed weakly so a
+// transient base doesn't pin its leaf map in memory. Deterministic, so this
+// stays referentially transparent.
+const baseLeavesCache = new WeakMap<Messages, Map<string, string>>();
+
+function flattenBase(base: Messages): Map<string, string> {
+  let leaves = baseLeavesCache.get(base);
+  if (leaves === undefined) {
+    leaves = flattenMessages(base);
+    baseLeavesCache.set(base, leaves);
+  }
+  return leaves;
+}
+
 // Percentage (integer 0–100) of the English source's leaf keys that carry a
 // non-empty value in `locale`. Mirrors how the runtime overlays a locale on
 // the English base (src/common/localize.ts): a key counts as translated when
@@ -82,7 +97,7 @@ function flattenMessages(
 // can't import this ESM module, so the two must be kept in sync. This copy is
 // the unit-tested reference.
 export function localeCompleteness(base: Messages, locale: Messages): number {
-  const baseLeaves = flattenMessages(base);
+  const baseLeaves = flattenBase(base);
   const total = baseLeaves.size;
   if (total === 0) {
     return 100;
