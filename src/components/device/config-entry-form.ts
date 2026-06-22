@@ -32,6 +32,7 @@ import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
+import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
 import {
   catalogEntryToProvider,
   type ComponentProvider,
@@ -297,9 +298,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // ones (stable, so each keeps its catalog order) so the user fills the
     // mandatory fields first. The section editor mirrors the on-disk YAML
     // order, so it's left untouched.
-    const entries = this.requiredOnly
-      ? this._floatRequiredFirst(this.entries)
-      : this.entries;
+    const entries = this.requiredOnly ? floatRequiredFirst(this.entries) : this.entries;
     // Each exclusive_group renders as one always-shown dropdown at its
     // first member's slot; other entries keep the advanced/visibility
     // filter (the Set preserves order while dropping filtered-out ones).
@@ -400,21 +399,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /** Stable-partition so required entries lead. An exclusive_group is
    *  treated atomically (required if any member is) so its members stay
    *  contiguous and ``orderExclusiveGroups`` folds them at the same slot. */
-  private _floatRequiredFirst(entries: ConfigEntry[]): ConfigEntry[] {
-    const groupRequired = new Map<string, boolean>();
-    for (const e of entries) {
-      if (e.exclusive_group) {
-        groupRequired.set(
-          e.exclusive_group,
-          (groupRequired.get(e.exclusive_group) ?? false) || !!e.required
-        );
-      }
-    }
-    const isRequired = (e: ConfigEntry): boolean =>
-      e.exclusive_group ? groupRequired.get(e.exclusive_group)! : !!e.required;
-    return [...entries.filter(isRequired), ...entries.filter((e) => !isRequired(e))];
-  }
-
   protected willUpdate(changed: PropertyValues) {
     // A different entry list means the form was re-targeted to a
     // different component (e.g. the dep-flow detour swapping
