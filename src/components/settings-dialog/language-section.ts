@@ -74,16 +74,18 @@ export class ESPHomeSettingsLanguage extends LitElement {
           <span class="row-desc">${this._localize("settings.language_desc")}</span>
         </div>
         <wa-select value=${this._language} @change=${this._onChange}>
-          ${LANGUAGES.map(
-            (l) => html`
-              <wa-option value=${l.value}
-                >${l.flag}
-                ${languageLabel(l, this._localize)}${this._renderCompleteness(
-                  l
-                )}</wa-option
+          ${LANGUAGES.map((l) => {
+            const name = languageLabel(l, this._localize);
+            // wa-select derives the collapsed display label from the option's
+            // text content, which would include the slot="end" completeness
+            // badge ("99%"). Pin an explicit flag-plus-name label so the
+            // collapsed value reads "Deutsch", not "Deutsch99%" (issue #1650).
+            return html`
+              <wa-option value=${l.value} label="${l.flag} ${name}"
+                >${l.flag} ${name}${this._renderCompleteness(l)}</wa-option
               >
-            `
-          )}
+            `;
+          })}
         </wa-select>
         <p class="language-note">
           ${this._localize("settings.language_completeness_note")}

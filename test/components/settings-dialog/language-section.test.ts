@@ -62,6 +62,13 @@ describe("esphome-settings-language completeness badge", () => {
     expect(text).toContain("%");
   });
 
+  it("pins an explicit option label so the collapsed value drops the badge", () => {
+    // Without an explicit label, wa-select derives the collapsed display from
+    // the option's text content, gluing the slot="end" badge onto the name
+    // ("Deutsch99%"). The render must carry a label= attribute (issue #1650).
+    expect(renderedText(render())).toContain('label="');
+  });
+
   it("omits the badge for a fully translated locale", () => {
     expect(
       renderCompleteness({
