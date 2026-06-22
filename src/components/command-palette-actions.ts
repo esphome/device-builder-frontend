@@ -34,6 +34,7 @@ export interface CommandActionContext {
   setTheme: (theme: string) => void;
   setLanguage: (lang: LanguageChoice) => void;
   toggleExpertMode: () => void;
+  openUpdateAll: () => void;
 }
 
 /** The default (non-YAML-mode) command list: navigation, devices,
@@ -61,6 +62,14 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
   ];
 
   const deviceGroup = t("command_palette.group_devices");
+  const updateAll: CommandAction = {
+    id: "devices.update_all",
+    group: deviceGroup,
+    label: t("command_palette.update_all"),
+    icon: "update",
+    keywords: ["update all", "ota", "firmware", "fleet", "upgrade"],
+    run: () => ctx.openUpdateAll(),
+  };
   const devices: CommandAction[] = ctx.devices.map((d) => ({
     id: `device.${d.configuration}`,
     group: deviceGroup,
@@ -121,7 +130,7 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
     run: () => ctx.setLanguage(l.value),
   }));
 
-  return [...nav, ...devices, ...themes, ...languages, ...settings];
+  return [...nav, updateAll, ...devices, ...themes, ...languages, ...settings];
 }
 
 /**

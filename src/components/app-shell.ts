@@ -99,6 +99,8 @@ import "./onboarding-wifi-dialog.js";
 import "./onboarding/onboarding-wizard-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
+import "./update-all-dialog.js";
+import type { ESPHomeUpdateAllDialog } from "./update-all-dialog.js";
 
 export type AuthState = "connecting" | "needs-login" | "authing" | "authed";
 
@@ -220,6 +222,8 @@ export class ESPHomeApp extends LitElement {
   @query("esphome-firmware-jobs-dialog")
   private _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
   @query("esphome-feedback-dialog") private _feedbackDialog!: ESPHomeFeedbackDialog;
+  @query("esphome-update-all-dialog")
+  private _updateAllDialog!: ESPHomeUpdateAllDialog;
   @query("esphome-onboarding-wifi-dialog")
   private _onboardingDialog?: HTMLElement & { open(): void };
   @query("esphome-onboarding-wizard-dialog")
@@ -565,7 +569,9 @@ export class ESPHomeApp extends LitElement {
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
+        @open-update-all=${() => this._updateAllDialog?.open()}
       ></esphome-command-palette>
+      <esphome-update-all-dialog></esphome-update-all-dialog>
       <esphome-settings-dialog
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}

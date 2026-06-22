@@ -994,7 +994,13 @@
     "close_hint": "to close",
     "yaml_search_hint": "search YAML content",
     "switch_to_yaml": "Switch to YAML content search",
-    "switch_to_commands": "Switch to command search"
+    "switch_to_commands": "Switch to command search",
+    "update_all": "Update All"
+  },
+  "update_all_dialog": {
+    "title": "Update All",
+    "count": "{count, plural, one {# device will be updated} other {# devices will be updated}}",
+    "confirm": "Update"
   },
   "yaml_search": {
     "searching": "Searching…",

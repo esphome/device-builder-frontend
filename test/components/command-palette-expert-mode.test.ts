@@ -18,6 +18,7 @@ describe("buildCommands Expert Mode entry", () => {
       setTheme: vi.fn(),
       setLanguage: vi.fn(),
       toggleExpertMode,
+      openUpdateAll: vi.fn(),
     };
 
     const off = buildCommands({ ...base, expertMode: false });

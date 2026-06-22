@@ -7,6 +7,7 @@ import {
   mdiMagnify,
   mdiThemeLightDark,
   mdiTune,
+  mdiUpdate,
   mdiWeatherNight,
   mdiWeatherSunny,
 } from "@mdi/js";
@@ -44,6 +45,7 @@ registerMdiIcons({
   magnify: mdiMagnify,
   "theme-light-dark": mdiThemeLightDark,
   tune: mdiTune,
+  update: mdiUpdate,
   "weather-night": mdiWeatherNight,
   "weather-sunny": mdiWeatherSunny,
 });
@@ -176,6 +178,7 @@ export class ESPHomeCommandPalette extends LitElement {
       setTheme: (theme) => this._setTheme(theme),
       setLanguage: (lang) => this._setLanguage(lang),
       toggleExpertMode: () => this._toggleExpertMode(),
+      openUpdateAll: () => this._openUpdateAll(),
     });
   }
 
@@ -505,6 +508,12 @@ export class ESPHomeCommandPalette extends LitElement {
         bubbles: true,
         composed: true,
       })
+    );
+  }
+
+  private _openUpdateAll() {
+    this.dispatchEvent(
+      new CustomEvent("open-update-all", { bubbles: true, composed: true })
     );
   }
 }
