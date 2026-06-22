@@ -152,7 +152,6 @@ export const configEntryFormStyles = css`
   }
 
   .generate-key:hover {
-    color: var(--esphome-primary);
     text-decoration: underline;
   }
 

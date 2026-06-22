@@ -27,8 +27,11 @@ describe("isValidApiEncryptionKey", () => {
   it("rejects wrong length, non-base64, and empty values", () => {
     expect(isValidApiEncryptionKey("")).toBe(false);
     expect(isValidApiEncryptionKey("too-short")).toBe(false);
-    // 31 bytes (missing pad) and 33 bytes are both wrong byte counts.
+    // 44 unpadded base64 chars decode to 33 bytes (one too many).
     expect(isValidApiEncryptionKey("a".repeat(44))).toBe(false);
+    // 42 chars plus "==" is a 31-byte key (one too few).
+    expect(isValidApiEncryptionKey("a".repeat(42) + "==")).toBe(false);
+    // Exactly 32 bytes: 43 chars plus a single "=".
     expect(isValidApiEncryptionKey("a".repeat(43) + "=")).toBe(true);
     // A `!` isn't in the base64 alphabet.
     expect(isValidApiEncryptionKey("a".repeat(42) + "!=")).toBe(false);
