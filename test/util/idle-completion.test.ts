@@ -64,7 +64,13 @@ describe("idleCompletion (timer)", () => {
     vi.useFakeTimers();
     spy.mockClear();
   });
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    // ``view.destroy()`` leaves the mounted DOM node in ``document.body``;
+    // clear it so editors don't accumulate and ``activeElement`` can't stay
+    // on a stale node across tests (would make the focus checks flaky).
+    document.body.replaceChildren();
+  });
 
   // Blank indented line under a block; caret starts at column 0 so the first
   // dispatch is a real selection move (arms the timer). Mounted + focused so
