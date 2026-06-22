@@ -190,7 +190,7 @@ export async function resolveAvailableEntries(
   parentKey: string,
   platformValue: string | null,
   topLevelKey: string | null,
-  nestedPath: string[] = []
+  resolveNestedPath: () => string[] = () => []
 ): Promise<ConfigEntry[]> {
   // The slim ``getComponents`` index carries no ``config_entries``
   // (those hydrate lazily through ``components/get_component_bodies``),
@@ -250,10 +250,12 @@ export async function resolveAvailableEntries(
   // catalog id). Descend the top-level component's nested
   // ``config_entries`` along the key path; the catalog models nested
   // groups (``framework`` → ``advanced`` → …) the same way the visual
-  // form renders them.
-  if (topLevelKey && nestedPath.length > 0) {
+  // form renders them. Only reached once the cheaper branches miss, so the
+  // path's AST walk stays off the common (cursor-under-a-component) path.
+  const nestedPath = topLevelKey ? resolveNestedPath() : [];
+  if (nestedPath.length > 0) {
     const descended = descendNestedEntries(
-      await componentEntries(topLevelKey),
+      await componentEntries(topLevelKey!),
       nestedPath
     );
     if (descended.length > 0) return descended;

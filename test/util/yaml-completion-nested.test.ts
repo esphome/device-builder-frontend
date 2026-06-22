@@ -100,7 +100,7 @@ describe("resolveAvailableEntries (nested descent)", () => {
       "framework", // parentKey from the indent walker (not a catalog id)
       null,
       "esp32",
-      ["framework"]
+      () => ["framework"]
     );
     expect(out.map((e) => e.key)).toEqual(["advanced", "version", "type"]);
   });

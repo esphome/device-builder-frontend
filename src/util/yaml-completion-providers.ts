@@ -112,7 +112,7 @@ async function resolveCatalogEntries(k: KeyPositionCtx): Promise<ConfigEntry[]> 
       k.parent.key,
       k.platformValue,
       k.topLevelKey,
-      nestedPathForParent(k.state, k.pos, k.parent.key)
+      () => nestedPathForParent(k.state, k.pos, k.parent.key)
     );
   }
   return k._cachedCatalogEntries;

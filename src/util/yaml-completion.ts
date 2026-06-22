@@ -176,7 +176,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
         parent.key,
         completionCtx.platformValue,
         completionCtx.topLevelKey,
-        nestedPathForParent(state, pos, parent.key)
+        () => nestedPathForParent(state, pos, parent.key)
       );
       const entry = entries.find((e) => e.key === key);
 
