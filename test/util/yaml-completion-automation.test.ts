@@ -89,14 +89,16 @@ describe("createYamlCompletionSource (automation action list)", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("offers actions, not component keys, at an empty trailing '- ' under then:", async () => {
+  // The action registry only fires when the source resolves `inAutomation`,
+  // and every other key provider bails when it does — so on a regression
+  // (the bug: `inAutomation` false at the empty dash) the action labels
+  // vanish entirely. These `toContain` assertions are therefore the
+  // regression guard; a vacuous `not.toContain("web_server")` would add
+  // nothing here since the hermetic fixtures never serve component keys.
+  it("offers actions at an empty trailing '- ' under then:", async () => {
     const labels = await labelsAt([...DEVICE, "        - "].join("\n"));
     expect(labels).toContain("delay");
     expect(labels).toContain("switch.turn_on");
-    // The bug: the enclosing binary_sensor's config keys / triggers leaked in.
-    expect(labels).not.toContain("web_server");
-    expect(labels).not.toContain("zigbee_binary_sensor");
-    expect(labels).not.toContain("on_press");
   });
 
   it("still offers actions for a partial-key list item (AST path, no regression)", async () => {
@@ -105,6 +107,5 @@ describe("createYamlCompletionSource (automation action list)", () => {
     const labels = await labelsAt([...DEVICE, "        - s"].join("\n"));
     expect(labels).toContain("delay");
     expect(labels).toContain("switch.turn_on");
-    expect(labels).not.toContain("zigbee_binary_sensor");
   });
 });
