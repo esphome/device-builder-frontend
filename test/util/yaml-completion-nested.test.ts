@@ -207,7 +207,9 @@ describe("resolveAvailableEntries (nested descent)", () => {
     const fakeApi = {
       getComponentBodies: async (ids: string[]) =>
         Object.fromEntries(
-          ids.filter((id) => id in bodies).map((id) => [id, bodies[id]])
+          ids
+            .filter((id) => Object.prototype.hasOwnProperty.call(bodies, id))
+            .map((id) => [id, bodies[id]])
         ),
     } as never;
     const keys = (
