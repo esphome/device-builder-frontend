@@ -16,9 +16,12 @@ import { makeConfigEntry } from "./_make-config-entry.js";
 const nested = (key: string, children: ReturnType<typeof makeConfigEntry>[]) =>
   makeConfigEntry({ key, type: ConfigEntryType.NESTED, config_entries: children });
 
-const SLIM = ["esphome", "wifi", "logger", "esp32"].map((id) =>
-  makeComponentEntry(id, { category: ComponentCategory.CORE })
-);
+const SLIM = [
+  ...["esphome", "wifi", "logger", "esp32"].map((id) =>
+    makeComponentEntry(id, { category: ComponentCategory.CORE })
+  ),
+  makeComponentEntry("sensor.template", { category: ComponentCategory.SENSOR }),
+];
 
 const BODIES: Record<
   string,
@@ -45,6 +48,14 @@ const BODIES: Record<
         }),
         makeConfigEntry({ key: "version" }),
       ]),
+    ],
+  },
+  "sensor.template": {
+    id: "sensor.template",
+    config_entries: [
+      makeConfigEntry({ key: "name" }),
+      makeConfigEntry({ key: "lambda" }),
+      makeConfigEntry({ key: "update_interval" }),
     ],
   },
 };
@@ -109,6 +120,32 @@ describe("createYamlCompletionSource (already-set key filtering)", () => {
     );
     expect(labels).toContain("advanced");
     expect(labels).toContain("version");
+  });
+
+  it("offers each list item's own fields without cross-item filtering", async () => {
+    // Two ``- platform: template`` sensors: ``name`` is set in the first
+    // item only, so the second item must still offer it (list items are
+    // separate mappings), along with the rest of the platform's fields.
+    const labels = await labelsAt(
+      [
+        "sensor:",
+        "  - platform: template",
+        "    name: First",
+        "  - platform: template",
+        "    n",
+      ].join("\n")
+    );
+    expect(labels).toContain("name");
+    expect(labels).toContain("lambda");
+    expect(labels).toContain("update_interval");
+  });
+
+  it("filters a key already set within the same list item", async () => {
+    const labels = await labelsAt(
+      ["sensor:", "  - platform: template", "    name: Second", "    u"].join("\n")
+    );
+    expect(labels).not.toContain("name");
+    expect(labels).toContain("update_interval");
   });
 
   it("completes a value inside a deeply nested mapping", async () => {
