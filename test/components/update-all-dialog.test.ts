@@ -7,6 +7,11 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// The confirm path runs runBulkUpdate, which fires sonner-js toasts; mock it
+// so the suite doesn't need a live toaster container.
+vi.mock("sonner-js", () => ({
+  default: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
+}));
 vi.mock("../../src/components/base-dialog.js", () => ({}));
 vi.mock("../../src/components/filters/filter-section.js", () => ({}));
 vi.mock("../../src/components/filters/labels-filter-section.js", () => ({}));
