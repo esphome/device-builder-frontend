@@ -34,6 +34,11 @@ export const RE_PAIR_LINE = /^\s*(?:-\s+)?([A-Za-z0-9_.]+)\s*:\s*(.*)$/;
  *  top-level component blocks when walking up from the cursor. */
 export const RE_TOP_LEVEL_KEY = /^([A-Za-z0-9_]+)\s*:/;
 
+/** A list-item line — optional indent then a ``- `` dash. The item is an
+ *  anonymous container, so an indent walk treating list items as parentless
+ *  uses this to skip the dash line's inline key. */
+export const RE_LIST_ITEM = /^\s*-\s/;
+
 /** ``platform: gpio`` sibling reader. Same shape as
  *  ``RE_PAIR_LINE`` but constrains the key to literal
  *  ``platform``. Accepts unquoted (``platform: gpio``),
@@ -75,12 +80,17 @@ export interface ParentKey {
 /**
  * Walk back from *lineIdx* to find the nearest key-line whose
  * indent is strictly less than *belowIndent*. The parent block of
- * the cursor.
+ * the cursor. With *skipListItems*, an inline ``- key: value`` list item
+ * contributes no key (its inline key is a sibling field, not a container),
+ * so walking continues to the named container. An empty-value ``- key:``
+ * IS a container (e.g. ``- logger.log:`` whose args nest under it), so its
+ * key is kept — matching what the AST ``getKeyPath`` yields.
  */
 export function findParentKey(
   doc: Text,
   lineIdx: number,
-  belowIndent: number
+  belowIndent: number,
+  skipListItems = false
 ): ParentKey | null {
   for (let i = lineIdx - 1; i >= 0; i--) {
     const stripped = stripComment(doc.line(i + 1).text);
@@ -88,7 +98,9 @@ export function findParentKey(
     const ind = indentOf(stripped);
     if (ind >= belowIndent) continue;
     const m = stripped.match(RE_PAIR_LINE);
-    if (m) return { key: m[1], indent: ind, lineIdx: i };
+    if (!m) continue;
+    if (skipListItems && m[2] !== "" && RE_LIST_ITEM.test(stripped)) continue;
+    return { key: m[1], indent: ind, lineIdx: i };
   }
   return null;
 }
@@ -121,18 +133,39 @@ export function blankLineContext(
  * nested context of an empty indented line (which has no Pair to anchor
  * on). Returns ``[]`` at the top level.
  */
-export function keyPathByIndent(doc: Text, lineIdx: number, indent: number): string[] {
+export function keyPathByIndent(
+  doc: Text,
+  lineIdx: number,
+  indent: number,
+  skipListItems = false
+): string[] {
   const chain: string[] = [];
   let below = indent;
   let from = lineIdx;
   for (;;) {
-    const p = findParentKey(doc, from, below);
+    const p = findParentKey(doc, from, below, skipListItems);
     if (!p) break;
     chain.push(p.key);
     below = p.indent;
     from = p.lineIdx;
   }
   return chain.reverse();
+}
+
+/**
+ * Field key path — named containers plus the caret line's own key — for a
+ * value-position caret on an empty-value ``key:`` the AST can't anchor (Lezer
+ * leaves the Pair open when the value is empty and a populated sibling
+ * precedes it, so ``getKeyPath`` drops the leaf). List items are anonymous
+ * containers, so a ``- `` line contributes no key — only named ``key:``
+ * containers above do, matching what ``getKeyPath`` yields when the parse
+ * succeeds. Returns ``null`` unless the caret line is an empty-value pair.
+ */
+export function fieldPathByIndent(doc: Text, lineIdx: number): string[] | null {
+  const stripped = stripComment(doc.line(lineIdx + 1).text);
+  const m = stripped.match(RE_PAIR_LINE);
+  if (!m || m[2] !== "") return null;
+  return [...keyPathByIndent(doc, lineIdx, indentOf(stripped), true), m[1]];
 }
 
 /**

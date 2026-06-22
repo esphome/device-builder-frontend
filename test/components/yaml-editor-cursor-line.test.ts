@@ -118,6 +118,65 @@ describe("yaml-editor cursor-line emission (#946)", () => {
     expect(events[0].path[0]).toBe("http_request");
   });
 
+  it("attributes a value-position empty-value field via the indent fallback", async () => {
+    // On `device_class:` (empty value) below a populated sibling in a list
+    // item, the AST drops the leaf; the emitted path must still end with
+    // device_class so the structured panel focuses that field, not state_class.
+    const el = await mount(
+      "sensor:\n  - platform: template\n    state_class: measurement\n    device_class:\n"
+    );
+    const view = viewOf(el);
+    parseAll(view);
+    const events = record(el);
+
+    caretToLineEnd(view, 4); // the `device_class:` line
+    expect(events).toHaveLength(1);
+    expect(events[0].path).toEqual(["sensor", "device_class"]);
+  });
+
+  it("re-emits when the field changes on the same line in a list item", async () => {
+    // Typing a field onto a blank child line of a list item changes the field
+    // but not the line or the top-level key ("sensor"). The panel must follow
+    // into the new field, so the throttle keys on the whole path, not just the
+    // top-level key. The blank line first resolves to ["sensor"] (the dash is
+    // an anonymous container, never "platform").
+    const el = await mount(
+      "sensor:\n  - platform: template\n    state_class: measurement\n    \n"
+    );
+    const view = viewOf(el);
+    parseAll(view);
+    const events = record(el);
+
+    caretToLineEnd(view, 4); // the blank "    " child line
+    expect(events).toHaveLength(1);
+    expect(events[0].path).toEqual(["sensor"]);
+
+    // Type device_class: onto the same line (line 4) in one transaction.
+    const at = view.state.doc.line(4).to;
+    view.dispatch({
+      changes: { from: at, insert: "device_class:" },
+      selection: EditorSelection.single(at + "device_class:".length),
+    });
+    expect(events).toHaveLength(2);
+    expect(events[1].line).toBe(4);
+    expect(events[1].path).toEqual(["sensor", "device_class"]);
+  });
+
+  it("does not mistake block-scalar content for a field", async () => {
+    // `done:` is a C++ label inside a lambda body — literal text. The path must
+    // come from the AST (lambda), not the indent resolver (a phantom field).
+    const el = await mount(
+      "sensor:\n  - platform: template\n    lambda: |-\n      done:\n      return 0;\n"
+    );
+    const view = viewOf(el);
+    parseAll(view);
+    const events = record(el);
+
+    caretToLineEnd(view, 4); // the `      done:` line, inside the block scalar
+    expect(events).toHaveLength(1);
+    expect(events[0].path).toEqual(["sensor", "lambda"]);
+  });
+
   it("does not emit on a programmatic doc patch with no selection", async () => {
     // A host `value`-prop sync into an unfocused split-view editor dispatches
     // a changes-only transaction (no selection). The gate is `selectionSet`

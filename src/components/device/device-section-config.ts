@@ -17,7 +17,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { actionFieldLabel } from "../../util/action-field-label.js";
 import { defaultBoardImageUrl, onBoardImageError } from "../../util/board-image.js";
-import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
+import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -136,6 +136,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state() _advancedShownSections = new Set<string>();
   @state() _presentComponents: Set<string> = new Set();
 
+  // Sections whose advanced fields we've auto-revealed for caret-follow once.
+  // Not reactive — bookkeeping so a later deliberate collapse isn't reopened.
+  private readonly _autoRevealedSections = new Set<string>();
+
   // Section's resolved fromLine against the *current* yaml. Forwarded to the
   // form so its conflict-detection stays aligned with read/write paths.
   // undefined when not found — form treats that as "no exclusion".
@@ -194,6 +198,29 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     ) {
       void loadConfig(this);
     }
+    this._revealAdvancedForFocus(changedProperties);
+  }
+
+  /**
+   * When the caret follows to an advanced field that's currently hidden (Show
+   * advanced off and the field has no value yet, so it isn't rendered), reveal
+   * the section's advanced fields here in willUpdate so the field renders this
+   * pass and the form's scroll-to-field can reach it. Revealed at most once per
+   * section so a later deliberate collapse sticks (mirrors config-entry-form's
+   * seed-once nested-disclosure behaviour — caret-follow shouldn't fight the
+   * user's choice).
+   */
+  private _revealAdvancedForFocus(changedProperties: Map<string, unknown>): void {
+    if (!changedProperties.has("focusFieldPath") && !changedProperties.has("_config")) {
+      return;
+    }
+    const path = this.focusFieldPath;
+    if (!path?.length || this._showAdvanced || !this._config) return;
+    if (this._autoRevealedSections.has(this.sectionKey)) return;
+    const entries = resolveSectionEntries(this.sectionKey, this._config.entries);
+    if (!pathIsAdvanced(entries, path)) return;
+    this._autoRevealedSections.add(this.sectionKey);
+    this._setShowAdvanced(true);
   }
 
   updated() {

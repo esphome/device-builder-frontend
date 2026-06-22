@@ -2,7 +2,7 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
-import { getKeyPath } from "../../src/util/yaml-ast.js";
+import { getKeyPath, isInsideBlockScalar } from "../../src/util/yaml-ast.js";
 
 function pathAt(doc: string, token: string): string[] {
   const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
@@ -50,5 +50,25 @@ describe("getKeyPath", () => {
 
   it("returns [] outside any mapping pair", () => {
     expect(pathAt("# comment\n", "comment")).toEqual([]);
+  });
+});
+
+describe("isInsideBlockScalar", () => {
+  const at = (doc: string, token: string): boolean => {
+    const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
+    ensureSyntaxTree(state, state.doc.length);
+    return isInsideBlockScalar(state, doc.indexOf(token) + token.length);
+  };
+
+  it("is true for a `key:`-looking line inside a block scalar body", () => {
+    // `done:` is a C++ label in a lambda body — literal text, not a YAML pair.
+    const doc =
+      "sensor:\n  - platform: template\n    lambda: |-\n      done:\n      return 0;\n";
+    expect(at(doc, "done:")).toBe(true);
+  });
+
+  it("is false on a real empty-value key line", () => {
+    const doc = "sensor:\n  - platform: template\n    device_class:\n";
+    expect(at(doc, "device_class:")).toBe(false);
   });
 });

@@ -27,10 +27,14 @@ import {
 import { editorSearchPhrases } from "../util/editor-search-phrases.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { idleCompletion } from "../util/idle-completion.js";
-import { getKeyPath } from "../util/yaml-ast.js";
+import { getKeyPath, isInsideBlockScalar } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
-import { blankLineContext, keyPathByIndent } from "../util/yaml-line-walker.js";
+import {
+  blankLineContext,
+  fieldPathByIndent,
+  keyPathByIndent,
+} from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
@@ -146,11 +150,13 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    *  movement inside the same line doesn't churn the page state. */
   private _lastReportedCursorLine = 0;
 
-  /** Last top-level key we emitted with `yaml-cursor-line`. Typing or
-   *  completing a new block (`http_re` → `http_request:`) changes the
-   *  section without changing the line number, so we also emit when this
-   *  changes; otherwise the structured panel stays on the old section. */
-  private _lastReportedTopKey: string | null = null;
+  /** Joined key path last emitted with `yaml-cursor-line`. We re-emit when the
+   *  resolved path changes — a different section OR a different field on the
+   *  same line (typing/completing a new block, or moving between fields of a
+   *  list item, where the line and top-level key stay put). Throttling on the
+   *  whole path keeps both section- and field-following in sync without
+   *  churning on plain column moves. */
+  private _lastReportedPathKey = "";
 
   static styles = css`
     :host {
@@ -426,39 +432,50 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         // accept) also moves the caret, so this still catches them, but
         // a programmatic host doc patch (the `value` prop sync) carries
         // no selection and must not switch sections on an unfocused
-        // editor. Throttle so a mere column move within the same line
-        // and section is ignored, but emit when EITHER the line OR the
-        // top-level key changes: typing/completing a new block (`http_re`
-        // → `http_request:`) changes the section without changing the
-        // line number, and must still re-attribute the panel.
+        // editor. Throttle so a mere column move within the same line and
+        // field is ignored, but emit whenever the resolved path changes —
+        // a new section OR a new field on the same line (typing a block or
+        // moving between a list item's fields).
         if (update.selectionSet) {
           const head = update.state.selection.main.head;
           const line = update.state.doc.lineAt(head).number;
           // A pure horizontal move within an unchanged line can't change the
-          // line or the top-level key (only a doc edit moves the key), so skip
-          // the key-path walk on same-line cursor moves with no edit.
+          // path (only a doc edit can), so skip the walk on same-line cursor
+          // moves with no edit.
           if (line === this._lastReportedCursorLine && !update.docChanged) return;
-          // Full key path; the page derives the form-relative path
-          // (it knows whether the section keys fields under its key).
-          let path = getKeyPath(update.state, head);
-          // The AST yields no Pair on a blank line, so resolve the
-          // enclosing key chain from the caret's indentation instead.
-          // This lets the page attribute a blank, indented child line —
-          // the line under a just-typed `http_request:` with no children
-          // yet — to its section. A column-0 caret resolves to [], so a
-          // true inter-section gap stays unattributed.
-          if (path.length === 0) {
-            const blank = blankLineContext(update.state.doc, head);
-            if (blank)
-              path = keyPathByIndent(update.state.doc, blank.lineIdx, blank.indent);
+          // Resolve the caret's key path field-first (the page derives the
+          // form-relative path from it). The AST can't anchor an empty-value
+          // `key:` (Lezer leaves the Pair open) and yields nothing on a blank
+          // line, so prefer the indent walkers there: fieldPathByIndent gives
+          // the field path including the leaf key for an empty-value pair, else
+          // fall back to the AST, else the ancestor chain from a blank line.
+          // `skipListItems` keeps an anonymous `- ` dash from masquerading as a
+          // container key.
+          let path = fieldPathByIndent(update.state.doc, line - 1);
+          // Inside a block scalar (a `lambda: |-` body) a `key:`-looking
+          // content line is literal text, not a field; the regex can't tell,
+          // so defer to the AST there.
+          if (path && isInsideBlockScalar(update.state, head)) path = null;
+          if (!path) {
+            path = getKeyPath(update.state, head);
+            if (path.length === 0) {
+              const blank = blankLineContext(update.state.doc, head);
+              if (blank)
+                path = keyPathByIndent(
+                  update.state.doc,
+                  blank.lineIdx,
+                  blank.indent,
+                  true
+                );
+            }
           }
-          const topKey = path[0] ?? null;
+          const pathKey = JSON.stringify(path);
           if (
             line !== this._lastReportedCursorLine ||
-            topKey !== this._lastReportedTopKey
+            pathKey !== this._lastReportedPathKey
           ) {
             this._lastReportedCursorLine = line;
-            this._lastReportedTopKey = topKey;
+            this._lastReportedPathKey = pathKey;
             this.dispatchEvent(
               new CustomEvent("yaml-cursor-line", {
                 detail: { line, path },
@@ -557,7 +574,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     this._destroyView();
     this._container.innerHTML = "";
     this._lastReportedCursorLine = 0;
-    this._lastReportedTopKey = null;
+    this._lastReportedPathKey = "";
     this._mountEditor();
   }
 

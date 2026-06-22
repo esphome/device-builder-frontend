@@ -39,6 +39,23 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
 }
 
 /**
+ * Whether the entry at *path* — or any NESTED ancestor along it — is
+ * `advanced`. Used to reveal a section's hidden advanced fields when the
+ * caret follows to one. Returns false if the path doesn't resolve.
+ */
+export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean {
+  let level = entries;
+  let advanced = false;
+  for (const key of path) {
+    const entry = level.find((e) => e.key === key);
+    if (!entry) return false;
+    if (entry.advanced) advanced = true;
+    level = entry.config_entries ?? [];
+  }
+  return advanced;
+}
+
+/**
  * Walk the entries in render order and return the first error target.
  * `path` is the dotted path of the failing leaf field;
  * `hasAdvancedAncestor` is true when the leaf itself or any

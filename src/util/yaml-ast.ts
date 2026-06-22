@@ -209,6 +209,23 @@ export function getKeyPath(state: EditorState, pos: number): string[] {
 }
 
 /**
+ * Whether *pos* sits inside a block scalar's content (a ``key: |`` / ``>``
+ * body), where an indented ``key:``-looking line is literal text, not a real
+ * pair. Indent-based path resolvers (which the regex can't tell apart from a
+ * field) must defer to the AST here — Lezer parses the body as ``BlockLiteral``.
+ */
+export function isInsideBlockScalar(state: EditorState, pos: number): boolean {
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1);
+  while (node) {
+    if (node.name === "BlockLiteral" || node.name === "BlockLiteralContent") {
+      return true;
+    }
+    node = node.parent;
+  }
+  return false;
+}
+
+/**
  * Read the ``platform:`` value of the enclosing list-item, if any
  * (``binary_sensor: - platform: gpio`` → ``"gpio"``). Returns
  * ``null`` when the cursor isn't inside a list-item that declares

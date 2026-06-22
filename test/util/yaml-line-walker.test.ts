@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   blankLineContext,
   collectSiblingKeysByIndent,
+  fieldPathByIndent,
   findParentKey,
   findTopLevelBlock,
   indentOf,
@@ -213,6 +214,65 @@ describe("collectSiblingKeysByIndent", () => {
       "advanced",
       "version",
     ]);
+  });
+});
+
+describe("fieldPathByIndent", () => {
+  it("resolves a flat list-item field, skipping the anonymous dash key", () => {
+    // keyPathByIndent would wrongly include `platform` from the dash line; the
+    // field path treats the list item as anonymous and yields just the parent.
+    const lines = [
+      "sensor:",
+      "  - platform: template",
+      "    state_class: measurement",
+      "    device_class:",
+    ];
+    expect(fieldPathByIndent(t(lines), 3)).toEqual(["sensor", "device_class"]);
+  });
+
+  it("keeps an empty-value dash container key (action args), drops inline ones", () => {
+    // `- logger.log:` is a container (its args nest under it) so its key stays
+    // in the path; `- platform: gpio` is an inline item whose key is a sibling
+    // field and is dropped — matching what getKeyPath yields.
+    const lines = [
+      "binary_sensor:",
+      "  - platform: gpio",
+      "    on_press:",
+      "      then:",
+      "        - logger.log:",
+      "            format:",
+    ];
+    expect(fieldPathByIndent(t(lines), 5)).toEqual([
+      "binary_sensor",
+      "on_press",
+      "then",
+      "logger.log",
+      "format",
+    ]);
+  });
+
+  it("resolves a nested map field through named containers", () => {
+    const lines = ["esp32:", "  framework:", "    advanced:", "      x:"];
+    expect(fieldPathByIndent(t(lines), 3)).toEqual([
+      "esp32",
+      "framework",
+      "advanced",
+      "x",
+    ]);
+  });
+
+  it("resolves a top-level empty-value field", () => {
+    expect(fieldPathByIndent(t(["esphome:", "  name: x", "http_request:"]), 2)).toEqual([
+      "http_request",
+    ]);
+  });
+
+  it("returns null on a valued pair, a blank line, and a comment", () => {
+    const lines = ["sensor:", "  - platform: template", "    name: x", "", "# c"];
+    expect(fieldPathByIndent(t(lines), 2)).toBeNull(); // name: x has a value
+    expect(fieldPathByIndent(t(lines), 1)).toBeNull(); // dash line with a value
+    expect(fieldPathByIndent(t(lines), 3)).toBeNull(); // blank
+    expect(fieldPathByIndent(t(lines), 4)).toBeNull(); // comment-only
   });
 });
 
