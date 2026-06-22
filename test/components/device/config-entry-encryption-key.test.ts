@@ -57,4 +57,9 @@ describe("api encryption key field", () => {
     const { tpl } = renderKeyField("a".repeat(43) + "=");
     expect(findElementBindings(tpl, "button")).toHaveLength(0);
   });
+
+  it("omits the affordance over a ${substitution}, so a click can't clobber the reference", () => {
+    const { tpl } = renderKeyField("${api_key}");
+    expect(findElementBindings(tpl, "button")).toHaveLength(0);
+  });
 });

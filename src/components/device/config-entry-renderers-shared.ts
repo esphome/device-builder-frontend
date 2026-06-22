@@ -38,6 +38,7 @@ import {
 import { secretRefKey } from "../../util/secret-ref.js";
 import {
   hasSubstitutionReference,
+  looksLikeSubstitution,
   resolveSubstitutions,
 } from "../../util/substitutions.js";
 import {
@@ -365,13 +366,15 @@ export function renderStringField(
     : nothing;
   // The API encryption key is a base64 Noise PSK — offer an inline generator so
   // the user needn't leave for the docs page to mint a valid one. Shown only
-  // when the field doesn't already hold a valid key, so one click can't clobber
-  // a working key (clear the field to deliberately rotate); suppressed in secret
-  // mode, where the picker owns the field.
+  // when the field holds nothing worth keeping, so one click can't clobber a
+  // working key, a `!secret` ref (suppressed via secretMode, where the picker
+  // owns the field), or a `${substitution}` that resolves at build time. Clear
+  // the field to deliberately rotate.
   const showGenerate =
     isApiEncryptionKeyField(ctx.sectionKey, path) &&
     !secretMode &&
     !disabled &&
+    !looksLikeSubstitution(value) &&
     !isValidApiEncryptionKey(value);
   const generateAffordance = showGenerate
     ? html`<button
