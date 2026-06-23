@@ -1,10 +1,11 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html } from "lit";
+import { LitElement, type PropertyValues, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { EnterController } from "../../util/enter-controller.js";
 
 /** Terminal result of a bundle import that left some existing files in
  *  place, so a partial import reads as partial rather than a silent
@@ -17,6 +18,21 @@ export class ESPHomeWizardStepImportPartial extends LitElement {
 
   /** Existing files the import kept (did not overwrite). */
   @property({ type: Array }) kept: string[] = [];
+
+  // Set by the parent dialog; the step stays mounted while the dialog is
+  // hidden, so the Enter listener follows this rather than connectedCallback.
+  @property({ type: Boolean }) active = false;
+
+  // Enter mirrors the sole primary "open device" button. Ignore OS key-repeat
+  // so a held Enter from the previous step can't auto-advance through here.
+  private _enter = new EnterController(this, (e) => {
+    if (e.repeat) return;
+    this._open();
+  });
+
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("active")) this._enter.set(this.active);
+  }
 
   static styles = [
     espHomeStyles,

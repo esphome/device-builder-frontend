@@ -338,6 +338,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       case "import-partial":
         return html`<esphome-wizard-step-import-partial
           .kept=${this._import.partial?.kept ?? []}
+          ?active=${this._open}
         ></esphome-wizard-step-import-partial>`;
     }
   }

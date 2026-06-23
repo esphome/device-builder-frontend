@@ -17,6 +17,7 @@ import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { inputStyles } from "../styles/inputs.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EnterController } from "../util/enter-controller.js";
 import { friendlyHostname, parsePortInput } from "../util/hostname.js";
 import "./base-dialog.js";
 import {
@@ -100,6 +101,16 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   // still in flight or failed).
   @state() _offloaderIdentity: IdentityView | null = null;
 
+  // Enter submits the current step. This dialog stays open across input→confirm,
+  // so it drives its own controller (rather than base-dialog's confirmOnEnter)
+  // to add the held-Enter guard: without it a single held key would carry from
+  // the input step straight through the confirm submit, sending the pair request
+  // past the unreviewed pin fingerprint.
+  private _enter = new EnterController(this, (e) => {
+    if (e.repeat) return;
+    this._enterAction()?.();
+  });
+
   static styles = [
     espHomeStyles,
     inputStyles,
@@ -177,6 +188,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   protected willUpdate(changed: Map<string, unknown>): void {
     super.willUpdate(changed);
     watchPairingApproval(this, changed);
+    if (changed.has("_open")) this._enter.set(this._open);
   }
 
   _onPreviewSubmit = () => onPreviewSubmit(this);
@@ -231,6 +243,14 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     if (this._step === "input") return renderInputStep(this);
     if (this._step === "confirm") return renderConfirmStep(this);
     return renderSentStep(this);
+  }
+
+  // Enter submits the current step; the read-only "sent" step has no action.
+  // Each handler self-guards on its own validity (empty hostname, labels).
+  private _enterAction(): (() => void) | undefined {
+    if (this._step === "input") return this._onPreviewSubmit;
+    if (this._step === "confirm") return this._onConfirmSubmit;
+    return undefined;
   }
 }
 

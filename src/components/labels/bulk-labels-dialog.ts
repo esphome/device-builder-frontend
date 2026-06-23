@@ -272,6 +272,12 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     return this._pendingChanges.size > 0;
   }
 
+  /** Apply is reachable (button enabled, Enter armed) only with staged
+   *  changes and no in-flight save. */
+  get _canApply(): boolean {
+    return this._hasPendingChanges && !this._saving;
+  }
+
   static styles = [
     espHomeStyles,
     labelChipStyles,
@@ -343,6 +349,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         .label=${this._localize("dashboard.labels_bulk_dialog_title", {
           count: targetCount,
         })}
+        .confirmOnEnter=${this._canApply ? this._apply : undefined}
         @after-hide=${this._onAfterHide}
       >
         ${this._catalog.length === 0
@@ -372,7 +379,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
           <button
             class="btn btn--primary"
             type="button"
-            ?disabled=${this._saving || !this._hasPendingChanges}
+            ?disabled=${!this._canApply}
             @click=${this._apply}
           >
             ${this._localize("dashboard.labels_bulk_apply")}
@@ -467,7 +474,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     // two ``_apply`` calls before the Lit re-render disables the
     // button via ``_saving``. Drop the second call here so we don't
     // send two ``set_labels_bulk`` requests for the same payload.
-    if (this._saving || !this._hasPendingChanges) return;
+    if (!this._canApply) return;
     const updates = this.computeUpdates();
     const count = updates.length;
     if (count === 0) {
