@@ -48,7 +48,6 @@ import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
-import { applyParamPatch } from "../../../util/param-patch.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
@@ -58,7 +57,7 @@ import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
-import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
+import { applyParamChange, applyYamlDiff, emptyAutomationTree } from "./serialise.js";
 
 /** ``AutomationLocation`` variant for top-level ``script:`` blocks
  *  — pulled out as a separate type because the script editor only
@@ -501,7 +500,7 @@ export class ESPHomeScriptEditor extends LitElement {
       path.length === 1 && path[0] === "id"
         ? normalizeEspHomeId(String(value ?? ""))
         : value;
-    const next = applyParamPatch(automation.trigger_params, path, normalizedValue);
+    const next = applyParamChange(automation.trigger_params, path, normalizedValue);
     if (path.length === 1 && path[0] === "id") {
       // Match wire shape: ``trigger_params.id`` round-trips with
       // ``location.id``, so keep both pinned to the normalized id.

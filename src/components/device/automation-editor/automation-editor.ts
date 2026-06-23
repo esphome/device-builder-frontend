@@ -55,7 +55,6 @@ import {
 } from "../../../util/component-name-cache.js";
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
-import { applyParamPatch } from "../../../util/param-patch.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
@@ -68,6 +67,7 @@ import { CatalogLoadController } from "./catalog-load-controller.js";
 import { componentDomain, instanceName } from "./component-targets.js";
 import { ParseErrorController } from "./parse-error-controller.js";
 import {
+  applyParamChange,
   applyYamlDiff,
   emptyAutomationTree,
   sectionKeyFromLocation,
@@ -642,7 +642,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     // into the trigger_params dict.
     const { path, value } = e.detail;
     const automation = this.value ?? emptyAutomationTree();
-    const next = applyParamPatch(automation.trigger_params, path, value);
+    const next = applyParamChange(automation.trigger_params, path, value);
     this._withValue({ trigger_params: next });
   };
 
