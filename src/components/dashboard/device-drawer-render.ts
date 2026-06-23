@@ -9,6 +9,8 @@
  * and the localize signature.
  */
 import { html, nothing } from "lit";
+import { DeviceState } from "../../api/types/devices.js";
+import type { ReachabilityStateEvent } from "../../api/types/reachability.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 
@@ -88,6 +90,65 @@ export function renderMdnsTxtRecords(
           `
         )}
       </dl>
+    </details>
+  `;
+}
+
+/**
+ * Render the collapsible warning shown when a device is reachable but
+ * the dashboard can't see it over mDNS (different subnet, no mDNS
+ * reflector, …) — not an assertion the device stopped announcing.
+ *
+ * MAC address, ESPHome version, and config hash are read from the mDNS
+ * TXT payload, so on a Ping/MQTT-only device the cached values (and the
+ * Modified / Update-available indicators derived from them) may be
+ * stale. The drawer's per-row "Waiting for mDNS discovery…" text doesn't
+ * explain why; this surfaces the reason once, in the same `<details>`
+ * chevron idiom as ``renderMdnsTxtRecords`` so it sits naturally in the
+ * section.
+ *
+ * Returns ``nothing`` unless mDNS has never been seen
+ * (``mdns_last_seen_seconds_ago === null``) while another source is
+ * live and the device is not OFFLINE. UNKNOWN counts: a Ping/MQTT-only
+ * device's online state is mDNS-driven, so it sits at UNKNOWN even while
+ * reachable — exactly the case this warns about. OFFLINE is excluded
+ * because the Ping/MQTT timestamps linger as stale history once a device
+ * drops; a fully-offline device gets the existing "Waiting for first
+ * signal…" line, and a device heard over mDNS isn't stale.
+ */
+export function renderMdnsStaleWarning(
+  reachability: ReachabilityStateEvent | null,
+  localize: LocalizeFunc
+) {
+  if (reachability === null) return nothing;
+  // Exclude only OFFLINE, not "not ONLINE": a device reachable solely over
+  // Ping/MQTT reports UNKNOWN (the online state is mDNS-driven), and that is
+  // exactly the case this warns about. OFFLINE is excluded because the
+  // *_last_seen_seconds_ago stamps linger as stale history once a device
+  // drops, and "reachable over {source}" must not show for a dead device.
+  if (reachability.state === DeviceState.OFFLINE) return nothing;
+  const mdnsSeen = reachability.mdns_last_seen_seconds_ago !== null;
+  const mqttSeen = reachability.mqtt_last_seen_seconds_ago !== null;
+  const pingSeen = reachability.ping_last_seen_seconds_ago !== null;
+  if (mdnsSeen || (!mqttSeen && !pingSeen)) return nothing;
+  // Name the channel the device IS reachable on. active_source is the
+  // priority winner (MQTT > Ping while mDNS is dark); fall back to
+  // whichever is live if it isn't already one of those two.
+  const viaMqtt =
+    reachability.active_source === "mqtt" ||
+    (reachability.active_source !== "ping" && mqttSeen);
+  const source = localize(
+    viaMqtt ? "dashboard.drawer_source_mqtt" : "dashboard.drawer_source_ping"
+  );
+  return html`
+    <details class="reachability-warning">
+      <summary>
+        <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
+        ${localize("dashboard.drawer_mdns_stale_warning")}
+      </summary>
+      <div class="reachability-warning-body">
+        ${localize("dashboard.drawer_mdns_stale_detail", { source })}
+      </div>
     </details>
   `;
 }

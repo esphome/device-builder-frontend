@@ -11,7 +11,7 @@ import {
   getNumberFormatter,
 } from "../../../util/relative-time.js";
 import type { ESPHomeDeviceDrawerContent } from "../device-drawer-content.js";
-import { renderMdnsTxtRecords } from "../device-drawer-render.js";
+import { renderMdnsStaleWarning, renderMdnsTxtRecords } from "../device-drawer-render.js";
 
 interface ReachabilityRowSpec {
   source: "mdns" | "ping" | "mqtt";
@@ -69,6 +69,7 @@ export function renderReachabilitySection(
         : rows.map((row) =>
             renderReachabilityRow(row, r.active_source, lang, host._localize)
           )}
+      ${renderMdnsStaleWarning(r, host._localize)}
     </div>
   `;
 }
