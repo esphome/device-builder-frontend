@@ -187,19 +187,20 @@ export class ESPHomeAddComponentForm extends LitElement {
   /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
    *  superseded async results via `_providesSeq`. */
   private async _resolveProvidedDeps(): Promise<void> {
+    // Bump first so every re-entry — even one that early-returns below —
+    // invalidates an older in-flight lookup that would otherwise pass the
+    // `seq === this._providesSeq` guard and write a stale result.
+    const seq = ++this._providesSeq;
     // Drop the prior result up front so the submit gate fails closed while a
-    // fresh lookup is in flight, rather than trusting a stale `(component,
-    // yaml)` set. Empty stays empty (no needless re-render).
+    // fresh lookup is in flight. Empty stays empty (no needless re-render).
     if (this._providedDeps.size) this._providedDeps = new Set();
     const api = this._api;
+    const deps = this.component?.dependencies ?? [];
+    // Common dep-free case: nothing to resolve, so skip the YAML parse too.
+    if (!api || deps.length === 0) return;
     const present = parseTopLevelComponents(this.yaml);
-    const missing = findMissingDependencies(
-      this.component?.dependencies ?? [],
-      this.yaml,
-      present
-    );
-    if (!api || missing.length === 0) return;
-    const seq = ++this._providesSeq;
+    const missing = findMissingDependencies(deps, this.yaml, present);
+    if (missing.length === 0) return;
     try {
       const satisfied = await depsSatisfiedByProvides(api, missing, present, {
         platform: this.board?.esphome.platform ?? null,
