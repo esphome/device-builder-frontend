@@ -1046,7 +1046,7 @@
     "language_desc": "Choose the language used across the interface.",
     "language_system": "System",
     "language_completeness": "{percent}% translated",
-    "language_completeness_note": "Percentages show how much of each language is translated. Untranslated text falls back to English.",
+    "language_completeness_note": "Percentages show how much of each language is translated. Untranslated text falls back to English. Component library documentation is only available in English.",
     "language_help": "Is your language missing or incomplete?",
     "language_help_link": "Help translate ESPHome",
     "theme_desc": "Choose between light, dark, or follow your system preference.",
