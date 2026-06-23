@@ -1,4 +1,8 @@
-import type { ConfigEntry, ConfigPrimitive } from "../api/types/config-entries.js";
+import type {
+  ConfigEntry,
+  ConfigPrimitive,
+  ConfigValueOption,
+} from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import {
   isApiEncryptionKeyField,
@@ -125,6 +129,25 @@ export function getDeviceNameWarning(name: string): ValidationError | null {
     return { key: "name", code: "validation.device_name_edge_hyphen" };
   }
   return null;
+}
+
+/** The canonical option whose value matches `value` case-insensitively but not
+ *  exactly, else null. Drives a soft "did you mean" hint for custom-value
+ *  comboboxes — a user who typed `l` where the catalog only offers `L`. Matches
+ *  on option value only (never label), and yields nothing when an exact-case
+ *  option exists, so a deliberately case-distinct custom value never nags. */
+export function nearCanonicalOption(
+  value: string,
+  options: readonly ConfigValueOption[] | null
+): string | null {
+  if (!value || !options || options.length === 0) return null;
+  const lower = value.toLowerCase();
+  let near: string | null = null;
+  for (const opt of options) {
+    if (opt.value === value) return null;
+    if (near === null && opt.value.toLowerCase() === lower) near = opt.value;
+  }
+  return near;
 }
 
 /**

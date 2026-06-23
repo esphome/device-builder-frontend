@@ -40,6 +40,12 @@ export const configEntryFormStyles = css`
     margin-top: var(--wa-space-2xs);
   }
 
+  .field-warning {
+    color: var(--esphome-warning, #d97706);
+    font-size: var(--wa-font-size-2xs);
+    margin-top: var(--wa-space-2xs);
+  }
+
   .field-description {
     font-size: var(--wa-font-size-2xs);
     color: var(--wa-color-text-quiet);

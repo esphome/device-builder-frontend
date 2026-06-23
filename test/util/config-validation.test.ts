@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { ConfigValueOption } from "../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import {
   getDeviceNameWarning,
+  nearCanonicalOption,
   validateDeviceName,
   validateEntries,
   validateEntry,
@@ -58,6 +60,39 @@ describe("getDeviceNameWarning", () => {
   it("returns null for clean hyphenated names", () => {
     expect(getDeviceNameWarning("my-device")).toBeNull();
     expect(getDeviceNameWarning("device42")).toBeNull();
+  });
+});
+
+describe("nearCanonicalOption", () => {
+  const opt = (value: string, label = value): ConfigValueOption => ({ label, value });
+  const units = [opt("L"), opt("L/s"), opt("m³")];
+
+  it("suggests the canonical value for a case-only mismatch", () => {
+    expect(nearCanonicalOption("l", units)).toBe("L");
+    expect(nearCanonicalOption("l/S", units)).toBe("L/s");
+  });
+
+  it("returns null when the value exactly matches an option", () => {
+    expect(nearCanonicalOption("L", units)).toBeNull();
+    expect(nearCanonicalOption("L/s", units)).toBeNull();
+  });
+
+  it("returns null for a genuinely custom value", () => {
+    expect(nearCanonicalOption("L/min", units)).toBeNull();
+  });
+
+  it("matches the first case-insensitive option when several collide", () => {
+    expect(nearCanonicalOption("foo", [opt("FOO"), opt("Foo")])).toBe("FOO");
+  });
+
+  it("never matches on the label alone", () => {
+    expect(nearCanonicalOption("litre", [opt("L", "litre")])).toBeNull();
+  });
+
+  it("returns null for empty value or empty/null options", () => {
+    expect(nearCanonicalOption("", units)).toBeNull();
+    expect(nearCanonicalOption("l", [])).toBeNull();
+    expect(nearCanonicalOption("l", null)).toBeNull();
   });
 });
 

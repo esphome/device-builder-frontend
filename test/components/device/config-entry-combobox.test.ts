@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ConfigValueOption } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderSelectField } from "../../../src/components/device/config-entry-renderers/primitives.js";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const BOARDS: ConfigValueOption[] = [
@@ -74,6 +75,47 @@ describe("renderSelectField — allow_custom_value combobox", () => {
     const tpl = renderSelectField(entry, ["board"], makeRenderCtx({ board: "bw15" }));
     expect(findElementBindings(tpl, "esphome-options-combobox")).toHaveLength(0);
     expect(findElementBindings(tpl, "wa-select")).toHaveLength(1);
+  });
+});
+
+const UNITS: ConfigValueOption[] = [
+  { value: "L", label: "L" },
+  { value: "L/s", label: "L/s" },
+];
+
+function unitEntry() {
+  return makeEntry(ConfigEntryType.STRING, {
+    key: "unit_of_measurement",
+    label: "Unit",
+    options: UNITS,
+    allow_custom_value: true,
+  });
+}
+
+// Render the combobox for *value* and return the did-you-mean hint's localized
+// text, or null when no hint renders. The ctx localize echoes the suggestion
+// param so the assertion can see which canonical spelling was offered.
+function hintText(value: string): string | null {
+  const ctx = makeRenderCtx(
+    { unit_of_measurement: value },
+    { overrides: { localize: (k, v) => (v ? `${k}:${v.suggestion}` : k) } }
+  );
+  const tpl = renderSelectField(unitEntry(), ["unit_of_measurement"], ctx);
+  const [span] = findTemplatesByAnchor(tpl, '<span class="field-warning"');
+  return span ? String(span.values[0]) : null;
+}
+
+describe("renderSelectField — did-you-mean hint", () => {
+  it("offers the canonical spelling for a case-only custom value", () => {
+    expect(hintText("l")).toBe("validation.did_you_mean:L");
+  });
+
+  it("renders no hint for the canonical value", () => {
+    expect(hintText("L")).toBeNull();
+  });
+
+  it("renders no hint for a genuinely custom unit", () => {
+    expect(hintText("L/min")).toBeNull();
   });
 });
 

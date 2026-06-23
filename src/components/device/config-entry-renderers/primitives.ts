@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { chipNameToVariant } from "../../../util/chip-variant.js";
+import { nearCanonicalOption } from "../../../util/config-validation.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
 import {
@@ -158,6 +159,10 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   // the esp32 variant default below); resolved once per render.
   const variant = resolveEsp32Variant(ctx);
   if (entry.allow_custom_value && entry.options && entry.options.length > 0) {
+    // A custom value that matches a canonical option by case only (`l` vs the
+    // catalog's `L`) compiles but breaks downstream unit recognition; nudge
+    // toward the canonical spelling without blocking submit.
+    const suggestion = nearCanonicalOption(value, entry.options);
     // ``label`` only names the combobox's shadow-DOM input (renderLabel's
     // visible label isn't associated via for=); the combobox draws no label
     // chrome of its own, so this isn't a duplicate visible label.
@@ -177,6 +182,11 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
             ctx.emitChange(path, coerceValueToEntryType(entry, e.detail.value))}
         ></esphome-options-combobox>
         ${renderFieldError(path, ctx)}
+        ${suggestion
+          ? html`<span class="field-warning"
+              >${ctx.localize("validation.did_you_mean", { suggestion })}</span
+            >`
+          : nothing}
       </div>
     `;
   }

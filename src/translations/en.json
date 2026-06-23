@@ -894,7 +894,8 @@
     "invalid_encryption_key": "Must be a 32-byte base64 key",
     "invalid_device_name": "Only lowercase letters, digits, hyphens and underscores",
     "device_name_underscore": "Underscores work but aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks",
-    "device_name_edge_hyphen": "Names starting or ending with a hyphen aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks"
+    "device_name_edge_hyphen": "Names starting or ending with a hyphen aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks",
+    "did_you_mean": "Did you mean \"{suggestion}\"?"
   },
   "onboarding": {
     "menu_item_setup_wifi": "Set up Wi-Fi",
