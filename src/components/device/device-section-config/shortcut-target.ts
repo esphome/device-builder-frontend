@@ -23,7 +23,7 @@ export type ShortcutTarget =
  * their navigator CTAs; the rest are data-only blocks where a trigger
  * handler doesn't make sense.
  */
-export const SHORTCUT_HIDE_KEYS = new Set([
+export const SHORTCUT_HIDE_KEYS: ReadonlySet<string> = new Set([
   "api",
   "script",
   "interval",
