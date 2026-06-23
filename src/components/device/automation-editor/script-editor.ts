@@ -48,6 +48,7 @@ import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
+import { applyParamPatch } from "../../../util/param-patch.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
@@ -500,7 +501,7 @@ export class ESPHomeScriptEditor extends LitElement {
       path.length === 1 && path[0] === "id"
         ? normalizeEspHomeId(String(value ?? ""))
         : value;
-    const next = this._patchParams(automation.trigger_params, path, normalizedValue);
+    const next = applyParamPatch(automation.trigger_params, path, normalizedValue);
     if (path.length === 1 && path[0] === "id") {
       // Match wire shape: ``trigger_params.id`` round-trips with
       // ``location.id``, so keep both pinned to the normalized id.
@@ -513,30 +514,6 @@ export class ESPHomeScriptEditor extends LitElement {
     }
     this._withValue({ trigger_params: next });
   };
-
-  /** Shallow path patch — mirrors automation-editor's helper but
-   *  inlined here because the script form's shape is flat (one
-   *  level of keys). Returning a fresh object so Lit's
-   *  property-update mechanism actually re-renders. */
-  private _patchParams(
-    params: Record<string, unknown>,
-    path: string[],
-    value: unknown
-  ): Record<string, unknown> {
-    if (path.length === 0) {
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        return { ...(value as Record<string, unknown>) };
-      }
-      return {};
-    }
-    const [head] = path;
-    if (value === undefined || value === "") {
-      const next = { ...params };
-      delete next[head];
-      return next;
-    }
-    return { ...params, [head]: value };
-  }
 
   /**
    * Declared parameter list. ``{name: type}`` map under
