@@ -183,7 +183,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         ></esphome-options-combobox>
         ${renderFieldError(path, ctx)}
         ${suggestion
-          ? html`<span class="field-warning"
+          ? html`<span class="field-warning" role="status"
               >${ctx.localize("validation.did_you_mean", { suggestion })}</span
             >`
           : nothing}

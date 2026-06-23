@@ -117,6 +117,13 @@ describe("renderSelectField — did-you-mean hint", () => {
   it("renders no hint for a genuinely custom unit", () => {
     expect(hintText("L/min")).toBeNull();
   });
+
+  it("marks the hint as a polite status region so it announces to screen readers", () => {
+    const ctx = makeRenderCtx({ unit_of_measurement: "l" });
+    const tpl = renderSelectField(unitEntry(), ["unit_of_measurement"], ctx);
+    const [span] = findTemplatesByAnchor(tpl, '<span class="field-warning"');
+    expect(span.strings.join("")).toContain('role="status"');
+  });
 });
 
 const BAUD_RATES: ConfigValueOption[] = [
