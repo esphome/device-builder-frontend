@@ -67,6 +67,7 @@ import { CatalogLoadController } from "./catalog-load-controller.js";
 import { componentDomain, instanceName } from "./component-targets.js";
 import { ParseErrorController } from "./parse-error-controller.js";
 import {
+  applyParamChange,
   applyYamlDiff,
   emptyAutomationTree,
   sectionKeyFromLocation,
@@ -641,40 +642,9 @@ export class ESPHomeAutomationEditor extends LitElement {
     // into the trigger_params dict.
     const { path, value } = e.detail;
     const automation = this.value ?? emptyAutomationTree();
-    const next = this._applyParamPatch(automation.trigger_params, path, value);
+    const next = applyParamChange(automation.trigger_params, path, value);
     this._withValue({ trigger_params: next });
   };
-
-  /** Apply a single value-change patch into a params dict. */
-  private _applyParamPatch(
-    params: Record<string, unknown>,
-    path: string[],
-    value: unknown
-  ): Record<string, unknown> {
-    if (path.length === 0) {
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        return { ...(value as Record<string, unknown>) };
-      }
-      return {};
-    }
-    const [head, ...rest] = path;
-    if (rest.length === 0) {
-      if (value === undefined || value === "") {
-        const next = { ...params };
-        delete next[head];
-        return next;
-      }
-      return { ...params, [head]: value };
-    }
-    const child =
-      params[head] && typeof params[head] === "object" && !Array.isArray(params[head])
-        ? (params[head] as Record<string, unknown>)
-        : {};
-    return {
-      ...params,
-      [head]: this._applyParamPatch(child, rest, value),
-    };
-  }
 
   /**
    * Component-style header card. Title is the catalog-resolved

@@ -22,13 +22,7 @@ import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
-import {
-  instanceComponentId,
-  parseYamlAutomations,
-  parseYamlTopLevelSections,
-  sectionKeyOf,
-  type YamlSection,
-} from "../../util/yaml-sections.js";
+import { parseYamlAutomations, type YamlSection } from "../../util/yaml-sections.js";
 import { renderAdvancedToggle } from "./advanced-toggle.js";
 import {
   applyYamlDiff,
@@ -60,6 +54,11 @@ import {
   loadConfig,
   type SectionConfigResponse,
 } from "./device-section-config/loading.js";
+import {
+  resolveComponentId,
+  resolveShortcutTarget,
+  type ShortcutTarget,
+} from "./device-section-config/shortcut-target.js";
 // The value import (isSecuritySection) already executes the module, registering
 // the <esphome-security-notice> element — no separate side-effect import needed.
 import { isSecuritySection, type ApplySecuritySecretsDetail } from "./security-notice.js";
@@ -579,57 +578,21 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   /**
    * Target for the per-section "+ Add automation" / triggers-list
-   * shortcut: ``null`` for ``SHORTCUT_HIDE_KEYS`` and domains with no
-   * catalog triggers (so trigger-less components like ``web_server:`` show
-   * no panel); ``device_on`` for ``esphome:``; else ``component_on`` keyed
-   * by the instance's addressable id (list item or flat singleton).
+   * shortcut. Thin wrapper over the pure ``resolveShortcutTarget``,
+   * injecting this section's catalog gate.
    */
-  private _shortcutTarget():
-    | null
-    | { kind: "device_on" }
-    | { kind: "component_on"; componentId: string } {
-    if (SHORTCUT_HIDE_KEYS.has(this.sectionKey)) return null;
-    if (this.sectionKey === "esphome") return { kind: "device_on" };
-    const matched = this._resolveComponentMatch();
-    if (matched === null) return null;
-    // Only host automations where the section actually has triggers
-    // (mirrors the backend's ``_component_trigger_domains`` gate), so a
-    // trigger-less component like ``web_server:`` shows no panel. Check the
-    // bare domain and the qualified ``<domain>.<platform>``, since a
-    // trigger may be scoped to either (``switch`` vs ``output.slow_pwm``).
-    const scopes = [matched.match.parentKey ?? matched.match.key, this.sectionKey];
-    if (!this._triggerCatalog.hasTriggersFor(scopes)) return null;
-    return {
-      kind: "component_on",
-      componentId: instanceComponentId(matched.sections, matched.match),
-    };
-  }
-
-  /**
-   * The configured component instance this section edits, matched by
-   * section key and biased to the resolved fromLine for multi-instance
-   * domains. ``null`` for non-component sections. Shared by the
-   * triggers shortcut, the action-fields list, and the in-form
-   * "Edit actions" routing so all three attribute the same id.
-   */
-  private _resolveComponentMatch(): {
-    sections: YamlSection[];
-    match: YamlSection;
-  } | null {
-    const sections = parseYamlTopLevelSections(this.yaml);
-    const candidates = sections.filter((s) => sectionKeyOf(s) === this.sectionKey);
-    if (candidates.length === 0) return null;
-    const match =
-      this._resolvedFromLine !== undefined
-        ? (candidates.find((s) => s.fromLine === this._resolvedFromLine) ?? candidates[0])
-        : candidates[0];
-    return { sections, match };
+  private _shortcutTarget(): ShortcutTarget {
+    return resolveShortcutTarget(
+      this.yaml,
+      this.sectionKey,
+      this._resolvedFromLine,
+      (scopes) => this._triggerCatalog.hasTriggersFor(scopes)
+    );
   }
 
   /** Addressable id of the component instance this section edits, or null. */
   private _resolveComponentId(): string | null {
-    const matched = this._resolveComponentMatch();
-    return matched === null ? null : instanceComponentId(matched.sections, matched.match);
+    return resolveComponentId(this.yaml, this.sectionKey, this._resolvedFromLine);
   }
 
   /**
@@ -776,24 +739,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
   };
 }
-
-/**
- * Sections that don't host inline ``on_*:`` automations. The
- * shortcut is hidden on these. ``api`` has its own ``+ Add API
- * action`` flow (PR #360); ``script`` / ``interval`` get their
- * dedicated navigator CTAs; the rest are data-only blocks where a
- * trigger handler doesn't make sense.
- */
-const SHORTCUT_HIDE_KEYS = new Set([
-  "api",
-  "script",
-  "interval",
-  "external_components",
-  "packages",
-  "substitutions",
-  "globals",
-  "dashboard_import",
-]);
 
 declare global {
   interface HTMLElementTagNameMap {
