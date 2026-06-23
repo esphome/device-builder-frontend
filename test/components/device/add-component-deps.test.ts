@@ -1,5 +1,25 @@
-import { describe, expect, it } from "vitest";
-import { findMissingDependencies } from "../../../src/components/device/add-component-deps.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ESPHomeAPI } from "../../../src/api/index.js";
+import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
+import {
+  depsSatisfiedByProvides,
+  findMissingDependencies,
+} from "../../../src/components/device/add-component-deps.js";
+import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
+
+function providersResponse(ids: string[]) {
+  return {
+    components: ids.map((id) => ({ id }) as ComponentCatalogEntry),
+    categories: [],
+    total: ids.length,
+    offset: 0,
+    limit: 200,
+  };
+}
+
+function stubApi(getComponents: ReturnType<typeof vi.fn>): ESPHomeAPI {
+  return { getComponents } as unknown as ESPHomeAPI;
+}
 
 describe("findMissingDependencies", () => {
   it("flags a top-level hub dep that isn't configured", () => {
@@ -59,5 +79,106 @@ describe("findMissingDependencies", () => {
     // Caller passes its already-parsed top-level set; the empty yaml
     // would otherwise report ld2410 missing.
     expect(findMissingDependencies(["ld2410"], "", new Set(["ld2410"]))).toEqual([]);
+  });
+});
+
+describe("depsSatisfiedByProvides", () => {
+  beforeEach(_clearProvidesCache);
+
+  it("satisfies a dep when a present component provides it", async () => {
+    // bk72xx provides libretiny; the board's `bk72xx:` block covers the
+    // libretiny_pwm dependency without the user adding anything.
+    const getComponents = vi
+      .fn()
+      .mockResolvedValue(providersResponse(["bk72xx", "rtl87xx"]));
+    const satisfied = await depsSatisfiedByProvides(
+      stubApi(getComponents),
+      ["libretiny"],
+      new Set(["bk72xx", "output"]),
+      { platform: "bk72xx", boardId: "generic-bk7231t" }
+    );
+    expect([...satisfied]).toEqual(["libretiny"]);
+    expect(getComponents).toHaveBeenCalledTimes(1);
+    expect(getComponents.mock.calls[0][0]).toMatchObject({
+      provides: "libretiny",
+      platform: "bk72xx",
+      board_id: "generic-bk7231t",
+    });
+  });
+
+  it("leaves a dep missing when no provider is present", async () => {
+    const getComponents = vi
+      .fn()
+      .mockResolvedValue(providersResponse(["bk72xx", "rtl87xx"]));
+    const satisfied = await depsSatisfiedByProvides(
+      stubApi(getComponents),
+      ["libretiny"],
+      new Set(["esp32", "output"]),
+      { platform: "esp32", boardId: null }
+    );
+    expect(satisfied.size).toBe(0);
+  });
+
+  it("leaves a dep missing when nothing provides it", async () => {
+    const getComponents = vi.fn().mockResolvedValue(providersResponse([]));
+    const satisfied = await depsSatisfiedByProvides(
+      stubApi(getComponents),
+      ["i2c"],
+      new Set(["sensor"]),
+      { platform: "esp32", boardId: null }
+    );
+    expect(satisfied.size).toBe(0);
+  });
+
+  it("satisfies a dep from a non-platform provider block", async () => {
+    // usb_uart provides uart; a `usb_uart:` block covers a `uart` dep
+    // without a literal `uart:` block.
+    const getComponents = vi
+      .fn()
+      .mockResolvedValue(providersResponse(["usb_uart", "ble_nus"]));
+    const satisfied = await depsSatisfiedByProvides(
+      stubApi(getComponents),
+      ["uart"],
+      new Set(["usb_uart", "sensor"]),
+      { platform: "esp32", boardId: null }
+    );
+    expect([...satisfied]).toEqual(["uart"]);
+  });
+
+  it("short-circuits an empty missing list without an API call", async () => {
+    const getComponents = vi.fn();
+    const satisfied = await depsSatisfiedByProvides(
+      stubApi(getComponents),
+      [],
+      new Set(["bk72xx"]),
+      { platform: "bk72xx", boardId: null }
+    );
+    expect(satisfied.size).toBe(0);
+    expect(getComponents).not.toHaveBeenCalled();
+  });
+
+  it("skips dotted deps, which never key the provides index", async () => {
+    const getComponents = vi.fn();
+    const satisfied = await depsSatisfiedByProvides(
+      stubApi(getComponents),
+      ["ota.http_request"],
+      new Set(["ota"]),
+      { platform: "esp32", boardId: null }
+    );
+    expect(satisfied.size).toBe(0);
+    expect(getComponents).not.toHaveBeenCalled();
+  });
+
+  it("caches provider lookups so a repeat resolution skips the query", async () => {
+    const getComponents = vi.fn().mockResolvedValue(providersResponse(["bk72xx"]));
+    const api = stubApi(getComponents);
+    const args = [
+      ["libretiny"],
+      new Set(["bk72xx"]),
+      { platform: "bk72xx", boardId: "b" },
+    ] as const;
+    await depsSatisfiedByProvides(api, ...args);
+    await depsSatisfiedByProvides(api, ...args);
+    expect(getComponents).toHaveBeenCalledTimes(1);
   });
 });

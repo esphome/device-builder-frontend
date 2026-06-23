@@ -1,4 +1,6 @@
+import type { ESPHomeAPI } from "../../api/index.js";
 import { ComponentCategory } from "../../api/types/components.js";
+import { providerIds } from "../../util/provides-cache.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -43,4 +45,47 @@ export function findMissingDependencies(
     if (!PLATFORM_DOMAINS.has(dep) && platformStems.has(dep)) return false;
     return true;
   });
+}
+
+/**
+ * Of the deps `findMissingDependencies` still flags, the subset a present
+ * top-level component already *provides* under a different name.
+ *
+ * A `bk72xx:` block provides `libretiny` (the `output.libretiny_pwm` dep);
+ * a `tca9548a:` / `usb_uart:` block provides `i2c` / `uart`. The
+ * literal-name scan can't tie provider to dep, so each still-missing dep is
+ * matched against its providers from the `provides` index. Lookups are
+ * cached for the process lifetime (`providerIds`), so re-resolving on every
+ * YAML change costs one query per interface total; empty `missing`
+ * short-circuits with no round trip.
+ */
+export async function depsSatisfiedByProvides(
+  api: ESPHomeAPI,
+  missing: readonly string[],
+  present: ReadonlySet<string>,
+  ctx: { platform?: string | null; boardId?: string | null }
+): Promise<ReadonlySet<string>> {
+  const satisfied = new Set<string>();
+  // Dotted `<domain>.<platform>` deps are resolved by `findMissingDependencies`
+  // and never key the bare-id `provides` index, so a query for them always
+  // comes back empty — skip them rather than pay the round trip.
+  const resolvable = missing.filter((dep) => !dep.includes("."));
+  if (resolvable.length === 0) return satisfied;
+  await Promise.all(
+    resolvable.map(async (dep) => {
+      const providers = await providerIds(
+        api,
+        dep,
+        ctx.platform ?? undefined,
+        ctx.boardId ?? undefined
+      );
+      for (const id of providers) {
+        if (present.has(id)) {
+          satisfied.add(dep);
+          break;
+        }
+      }
+    })
+  );
+  return satisfied;
 }

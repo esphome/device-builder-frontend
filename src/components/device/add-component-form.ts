@@ -21,7 +21,10 @@ import {
   parseTopLevelComponents,
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
-import { findMissingDependencies } from "./add-component-deps.js";
+import {
+  depsSatisfiedByProvides,
+  findMissingDependencies,
+} from "./add-component-deps.js";
 import { coerceFields } from "./add-component-form-coerce.js";
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
@@ -105,6 +108,15 @@ export class ESPHomeAddComponentForm extends LitElement {
   @state()
   private _showYaml = false;
 
+  /** Missing deps a present component already provides; resolved async,
+   *  subtracted from the banner. See `depsSatisfiedByProvides`. */
+  @state()
+  private _providedDeps: ReadonlySet<string> = new Set();
+
+  /** Bumps per resolution so a superseded `(component, yaml)` result can't
+   *  overwrite a newer one. */
+  private _providesSeq = 0;
+
   /** Resolves dep ids (``i2c``) to their catalog name (``I²C Bus``)
    * for the missing-deps banner. Owns the cache subscription so a
    * fresh entry triggers a re-render without bookkeeping here. */
@@ -151,6 +163,60 @@ export class ESPHomeAddComponentForm extends LitElement {
         this._depResolver.kickoff(this.component.dependencies ?? []);
       }
     }
+    // Re-resolve when the present components shift (YAML) or the query scope
+    // shifts (component deps, or a late/changed board platform/id).
+    if (
+      changedProperties.has("component") ||
+      changedProperties.has("yaml") ||
+      changedProperties.has("board")
+    ) {
+      void this._resolveProvidedDeps();
+    }
+  }
+
+  /** Net-missing deps driving the banner and submit gate: the literal-name
+   *  scan minus those a present component provides (`_providedDeps`). */
+  private _missingDeps(present: ReadonlySet<string>): string[] {
+    return findMissingDependencies(
+      this.component.dependencies ?? [],
+      this.yaml,
+      present
+    ).filter((d) => !this._providedDeps.has(d));
+  }
+
+  /** Refresh `_providedDeps` for the current `(component, yaml)`, dropping
+   *  superseded async results via `_providesSeq`. */
+  private async _resolveProvidedDeps(): Promise<void> {
+    // Drop the prior result up front so the submit gate fails closed while a
+    // fresh lookup is in flight, rather than trusting a stale `(component,
+    // yaml)` set. Empty stays empty (no needless re-render).
+    if (this._providedDeps.size) this._providedDeps = new Set();
+    const api = this._api;
+    const present = parseTopLevelComponents(this.yaml);
+    const missing = findMissingDependencies(
+      this.component?.dependencies ?? [],
+      this.yaml,
+      present
+    );
+    if (!api || missing.length === 0) return;
+    const seq = ++this._providesSeq;
+    try {
+      const satisfied = await depsSatisfiedByProvides(api, missing, present, {
+        platform: this.board?.esphome.platform ?? null,
+        boardId: this.board?.id ?? null,
+      });
+      // Skip an empty-over-empty assignment: on the common "nothing provides"
+      // path it would only flip Set identity and force an identical re-render.
+      if (seq === this._providesSeq && (satisfied.size || this._providedDeps.size)) {
+        this._providedDeps = satisfied;
+      }
+    } catch (err) {
+      // Fail closed: the up-front clear already left the deps flagged, so the
+      // banner still guides the user. Warn (not swallow) so a provides-lookup
+      // failure is observable rather than silently re-showing the original
+      // false banner — mirrors config-entry-form's provider fetch.
+      console.warn("[add-component-form] provides lookup failed", err);
+    }
   }
 
   /**
@@ -178,11 +244,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // configured platform for hub-style deps (`atm90e32` under
     // `sensor:`). Surface these instead of letting the user submit a
     // config that won't validate.
-    const missingDeps = findMissingDependencies(
-      this.component.dependencies ?? [],
-      this.yaml,
-      presentComponents
-    );
+    const missingDeps = this._missingDeps(presentComponents);
 
     // The shared form filters its own visibility — but we still need
     // to know whether everything required is filled in to enable the
@@ -410,11 +472,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // Block submit when a declared dependency isn't satisfied. The
     // button should already be disabled in that case, but defend here
     // too in case the YAML changed under us between renders.
-    const missingDeps = findMissingDependencies(
-      this.component.dependencies ?? [],
-      this.yaml,
-      presentComponents
-    );
+    const missingDeps = this._missingDeps(presentComponents);
     if (missingDeps.length > 0) {
       // Should be unreachable — the button-disabled predicate uses the
       // same check. If we get here, the YAML changed under us between
