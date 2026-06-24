@@ -690,6 +690,12 @@ export class ESPHomePageDevice extends LitElement {
    * the return value.
    */
   private _saveYaml = async (): Promise<boolean> => {
+    // Mark the Save button busy up front so it acknowledges the
+    // click immediately. The slow phases that follow are the
+    // section-editor flushPending (a backend upsert for the
+    // automation/script editors) and the validate round-trip on a
+    // large config; both deserve the spinner.
+    this._saving = true;
     // Promote any in-flight form keystroke (still inside its 200ms
     // debounce window) into ``_yaml`` so the save commits exactly
     // what the user typed — not what was last flushed. The
@@ -706,7 +712,10 @@ export class ESPHomePageDevice extends LitElement {
     // saved buffer (e.g. user typed and undid a character, or the
     // splice normalised to the same serialisation). Bail before
     // toasting / hitting the backend — neither has anything to do.
-    if (!this._isYamlDirty) return true;
+    if (!this._isYamlDirty) {
+      this._saving = false;
+      return true;
+    }
 
     // Re-validate against the backend before committing. The
     // editor's inline linter runs the same call on a 600ms
@@ -723,10 +732,6 @@ export class ESPHomePageDevice extends LitElement {
     // below is the authority on whether the save worked, and a
     // toast at this layer would shout-down its result.
     if (this.id) {
-      // The validate round-trip is the slow phase on a large config
-      // (a full ESPHome validate pass); mark the Save button busy so
-      // it acknowledges the click instead of looking unresponsive.
-      this._saving = true;
       try {
         // Reuse the linter's last result when it matches the
         // current buffer exactly — saves a WS round-trip and an

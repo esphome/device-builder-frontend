@@ -112,14 +112,16 @@ describe("device-editor save button", () => {
     const el = await mount({ hasUnsavedEdits: true });
     const btn = q(el, ".save-button") as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
+    expect(btn.getAttribute("aria-busy")).toBe("false");
     expect(btn.querySelector("wa-icon")!.getAttribute("name")).toBe("content-save");
     expect(btn.querySelector("wa-spinner")).toBeNull();
   });
 
-  it("disables and shows a spinner while a save is in flight", async () => {
+  it("disables, announces aria-busy, and shows a spinner while a save is in flight", async () => {
     const el = await mount({ hasUnsavedEdits: true, saving: true });
     const btn = q(el, ".save-button") as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute("aria-busy")).toBe("true");
     expect(btn.querySelector("wa-spinner")).not.toBeNull();
     expect(btn.querySelector("wa-icon")).toBeNull();
   });

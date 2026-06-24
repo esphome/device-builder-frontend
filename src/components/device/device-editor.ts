@@ -281,6 +281,7 @@ export class ESPHomeDeviceEditor extends LitElement {
               type="button"
               class="save-button"
               ?disabled=${!this.hasUnsavedEdits || this.saving}
+              aria-busy=${this.saving}
               @click=${this._onSave}
               title=${this._localize("device.save_yaml")}
             >
