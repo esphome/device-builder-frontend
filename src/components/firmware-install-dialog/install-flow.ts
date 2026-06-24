@@ -3,7 +3,7 @@ import {
   JobStatus,
   type FirmwareBinary,
 } from "../../api/types/firmware-jobs.js";
-import { chipNameToVariant } from "../../util/chip-variant.js";
+import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
@@ -101,7 +101,9 @@ export async function startWebSerialInstall(
   // until the first compile fills in specifics. Resolve the actual variant
   // via the board catalog and only strict-compare when we have authoritative info.
   host._statusMessage = host._localize("firmware.status_verifying");
-  const detectedVariant = chipNameToVariant(detected.chipName);
+  // chipPlatformFamily folds esp8285 into esp8266 — they're one ESPHome
+  // platform, so an ESP8285 chip on a `board: esp8285` (esp8266) config matches.
+  const detectedVariant = chipPlatformFamily(detected.chipName);
   let expected = device.target_platform;
   let hasAuthoritativeVariant = false;
   if (device.board_id) {
@@ -116,7 +118,10 @@ export async function startWebSerialInstall(
       // Network hiccup — fall back to target_platform.
     }
   }
-  const expectedNorm = expected ? expected.toLowerCase().replace(/-/g, "") : "";
+  // Fold the expected side through the same helper so a board catalog stamping
+  // the esp8285 variant still matches a detected ESP8266/ESP8285. Idempotent on
+  // an already-normalized platform token.
+  const expectedNorm = expected ? chipPlatformFamily(expected) : "";
   // Without a resolved variant, "esp32" stands in for any ESP32 family chip.
   const expectedIsCoarseEsp32 = !hasAuthoritativeVariant && expectedNorm === "esp32";
   if (

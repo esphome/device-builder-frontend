@@ -38,3 +38,14 @@ export function chipNameToVariant(name: string): string {
   if (n.startsWith("esp32")) return "esp32";
   return n;
 }
+
+/**
+ * Like ``chipNameToVariant`` but folds the esp82 family (esp8266 / esp8285) to
+ * the one ``esp8266`` platform they share. Other chips keep their variant token
+ * unchanged (e.g. ``ESP32-S3`` → ``esp32s3``); use this for comparisons that
+ * must treat esp8285 and esp8266 as equal.
+ */
+export function chipPlatformFamily(name: string): string {
+  const v = chipNameToVariant(name);
+  return v.startsWith("esp82") ? "esp8266" : v;
+}

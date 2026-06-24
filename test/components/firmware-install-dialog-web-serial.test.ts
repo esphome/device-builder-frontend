@@ -167,4 +167,42 @@ describe("Web Serial install — HTTP byte download", () => {
     expect(host._fail).toHaveBeenCalledWith("firmware.download_failed");
     expect(wsSerial.flashFirmware).not.toHaveBeenCalled();
   });
+
+  // ESP8285 is an ESP8266 with embedded flash; `board: esp8285` resolves to the
+  // esp8266 platform, so a detected ESP8285 must not trip the chip-mismatch guard.
+  it("flashes an ESP8285 chip on an esp8266 config (#1673)", async () => {
+    const { host, api } = makeHost();
+    host._device.target_platform = "esp8266";
+    host._device.board_id = "esp8285";
+    api.getBoard.mockResolvedValue({ esphome: { platform: "esp8266" } });
+    api.firmwareGetBinaries.mockResolvedValue([
+      { title: "Firmware", file: "firmware.bin" },
+    ]);
+    wsSerial.detectChip.mockResolvedValue({ ...CHIP, chipName: "ESP8285" });
+    wsSerial.connectToPort.mockResolvedValue({ ...CHIP, chipName: "ESP8285" });
+    wsSerial.disconnect.mockResolvedValue(undefined);
+    wsSerial.flashFirmware.mockResolvedValue(undefined);
+    wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(wsSerial.flashFirmware).toHaveBeenCalledTimes(1);
+    expect(wsSerial.flashFirmware.mock.calls[0][2]).toBe(0x0); // esp8266 flashes at 0x0
+    expect(host._step).toBe("done");
+  });
+
+  it("still rejects a genuine chip mismatch (#1673)", async () => {
+    const { host, api } = makeHost();
+    host._device.target_platform = "esp8266";
+    host._device.board_id = "esp8285";
+    api.getBoard.mockResolvedValue({ esphome: { platform: "esp8266" } });
+    wsSerial.detectChip.mockResolvedValue({ ...CHIP, chipName: "ESP32" });
+    wsSerial.disconnect.mockResolvedValue(undefined);
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._fail).toHaveBeenCalledWith("firmware.chip_mismatch");
+    expect(wsSerial.flashFirmware).not.toHaveBeenCalled();
+  });
 });

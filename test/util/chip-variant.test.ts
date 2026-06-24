@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chipNameToVariant } from "../../src/util/chip-variant.js";
+import { chipNameToVariant, chipPlatformFamily } from "../../src/util/chip-variant.js";
 
 describe("chipNameToVariant", () => {
   it("maps plain ESP32 to esp32", () => {
@@ -82,5 +82,19 @@ describe("chipNameToVariant", () => {
   it("returns the normalized input for unknown chips", () => {
     expect(chipNameToVariant("RP2040")).toBe("rp2040");
     expect(chipNameToVariant("Unknown-Chip")).toBe("unknownchip");
+  });
+});
+
+describe("chipPlatformFamily", () => {
+  it("folds the esp82 family to the esp8266 platform (#1673)", () => {
+    expect(chipPlatformFamily("ESP8285")).toBe("esp8266");
+    expect(chipPlatformFamily("ESP8266")).toBe("esp8266");
+    expect(chipPlatformFamily("ESP8266EX")).toBe("esp8266");
+  });
+
+  it("passes other variants through unchanged", () => {
+    expect(chipPlatformFamily("ESP32")).toBe("esp32");
+    expect(chipPlatformFamily("ESP32-S3")).toBe("esp32s3");
+    expect(chipPlatformFamily("RP2040")).toBe("rp2040");
   });
 });

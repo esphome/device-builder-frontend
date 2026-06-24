@@ -15,7 +15,7 @@
  *   two chip series (RP2040 / RP2350). Absent for other platforms.
  * - ``label`` is the user-facing chip text.
  */
-import { chipNameToVariant } from "../../util/chip-variant.js";
+import { chipPlatformFamily } from "../../util/chip-variant.js";
 
 export interface WizardBoardPlatform {
   readonly platform: string;
@@ -51,16 +51,16 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
 /**
  * Map an esptool-js chip name (e.g. ``"ESP32-C6 (QFN32) (revision
  * v0.2)"``) to the platform-filter label the board picker uses
- * (e.g. ``"ESP32-C6"``). Normalises through ``chipNameToVariant``
+ * (e.g. ``"ESP32-C6"``). Normalises through ``chipPlatformFamily``
  * (handles package-specific descriptions like ``ESP32-D0WD`` →
- * ``esp32`` and ``ESP8266EX`` → ``esp8266``), then matches an
- * existing filter chip. Returns ``null`` when no chip represents the
+ * ``esp32`` and folds the esp82 family, so ``ESP8266EX`` / ``ESP8285``
+ * → ``esp8266``), then matches an existing filter chip. Returns
+ * ``null`` when no chip represents the
  * variant (e.g. ESP32-S31/C31/H21) so the caller shows the full
  * picker rather than narrowing to the wrong family.
  */
 export function chipNameToFilterLabel(chipName: string): string | null {
-  let family = chipNameToVariant(chipName);
-  if (family.startsWith("esp82")) family = "esp8266"; // esp8266 / esp8285
+  const family = chipPlatformFamily(chipName); // folds esp8285 → esp8266
   const match = WIZARD_BOARD_PLATFORMS.find(
     (p) =>
       (p.variant && p.variant === family) ||
