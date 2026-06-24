@@ -85,4 +85,19 @@ describe("collectUnsatisfiedConstraints", () => {
       collect({ entries, requiredGroups: [], values: { cert: "a.pem", key: "b.pem" } })
     ).toEqual([]);
   });
+
+  it("orders cardinality banners before inclusive all_or_none banners", () => {
+    // Both groups unsatisfied at once: the required at_least_one (ssid/networks
+    // empty) and the half-filled inclusive tls group. The host renders the array
+    // in order, so cardinality must precede the residual all_or_none banner.
+    const entries: ConfigEntry[] = [
+      ...ENTRIES,
+      makeConfigEntry({ key: "cert", type: ConfigEntryType.STRING, group: "tls" }),
+      makeConfigEntry({ key: "key", type: ConfigEntryType.STRING, group: "tls" }),
+    ];
+    expect(collect({ entries, values: { cert: "a.pem" } })).toEqual([
+      { kind: "at_least_one", keys: "ssid,networks" },
+      { kind: "all_or_none", keys: "cert,key" },
+    ]);
+  });
 });
