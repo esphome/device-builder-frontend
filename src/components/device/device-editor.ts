@@ -36,6 +36,7 @@ import { renderInstallAction } from "./install-action.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../yaml-diff.js";
 import "../yaml-editor.js";
 import "./device-board-info.js";
@@ -149,6 +150,11 @@ export class ESPHomeDeviceEditor extends LitElement {
    *  resulting commit is correct. */
   @property({ type: Boolean })
   hasUnsavedEdits = false;
+
+  /** A save round-trip (validate + write) is in flight; the Save
+   *  button shows a spinner and stays disabled until it settles. */
+  @property({ type: Boolean })
+  saving = false;
 
   @property({ type: Boolean })
   hasPendingChanges = false;
@@ -274,11 +280,13 @@ export class ESPHomeDeviceEditor extends LitElement {
             <button
               type="button"
               class="save-button"
-              ?disabled=${!this.hasUnsavedEdits}
+              ?disabled=${!this.hasUnsavedEdits || this.saving}
               @click=${this._onSave}
               title=${this._localize("device.save_yaml")}
             >
-              <wa-icon library="mdi" name="content-save"></wa-icon>
+              ${this.saving
+                ? html`<wa-spinner></wa-spinner>`
+                : html`<wa-icon library="mdi" name="content-save"></wa-icon>`}
               ${this._localize("device.save")}
             </button>
           </div>

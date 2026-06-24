@@ -253,6 +253,13 @@ export const deviceEditorStyles = css`
     font-size: 16px;
   }
 
+  .save-button wa-spinner {
+    font-size: 14px;
+    --track-width: 2px;
+    --indicator-color: currentColor;
+    --track-color: color-mix(in srgb, currentColor 30%, transparent);
+  }
+
   /* Tooltip carrier so the "why disabled" hint reaches mouse users
      even when the underlying button has the disabled attribute
      (which suppresses pointer events on the button itself). */

@@ -226,6 +226,9 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _savedYaml = "";
 
+  @state()
+  private _saving = false;
+
   @query("esphome-unsaved-changes-dialog")
   private _unsavedDialog!: ESPHomeUnsavedChangesDialog;
 
@@ -720,6 +723,10 @@ export class ESPHomePageDevice extends LitElement {
     // below is the authority on whether the save worked, and a
     // toast at this layer would shout-down its result.
     if (this.id) {
+      // The validate round-trip is the slow phase on a large config
+      // (a full ESPHome validate pass); mark the Save button busy so
+      // it acknowledges the click instead of looking unresponsive.
+      this._saving = true;
       try {
         // Reuse the linter's last result when it matches the
         // current buffer exactly — saves a WS round-trip and an
@@ -755,6 +762,12 @@ export class ESPHomePageDevice extends LitElement {
         }
       } catch (e) {
         console.debug("[save-yaml] validate_yaml failed, saving anyway:", e);
+      } finally {
+        // Drop busy here so the spinner stops while the validation
+        // dialog is open (waiting on the user, not the backend); the
+        // pass-through to _doSaveYaml re-arms it for the commit with
+        // no await in between, so the button never flickers enabled.
+        this._saving = false;
       }
     }
 
@@ -784,6 +797,7 @@ export class ESPHomePageDevice extends LitElement {
     // claim "saved" against a buffer the backend rejected.
     const prevSavedYaml = this._savedYaml;
     this._savedYaml = this._yaml;
+    this._saving = true;
     let saved = true;
     try {
       await this._api.updateConfig(this.id, this._yaml);
@@ -800,6 +814,8 @@ export class ESPHomePageDevice extends LitElement {
         this._savedYaml = prevSavedYaml;
         console.error("Failed to save YAML:", e);
       }
+    } finally {
+      this._saving = false;
     }
     // A committed save ends the fix-the-error errand the error-jump
     // highlight was guiding (validation passed, or the user chose
@@ -971,6 +987,7 @@ export class ESPHomePageDevice extends LitElement {
             @just-created-dismiss=${this._dismissJustCreated}
             @change-board=${this._onChangeBoard}
             ?hasUnsavedEdits=${this._isDirty}
+            ?saving=${this._saving}
             ?hasPendingChanges=${this._device?.has_pending_changes === true}
             ?hasUpdateAvailable=${this._device?.update_available === true}
             ?busy=${this._activeJobs.has(this.id)}

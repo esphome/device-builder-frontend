@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 // Stub the heavy children (they pull in CodeMirror / wa-button); the toolbar
 // under test uses plain buttons, so this keeps the mount light and quiet.
 vi.mock("../../../src/components/device/device-board-info.js", () => ({}));
@@ -99,5 +100,27 @@ describe("device-editor header toolbar", () => {
     await on.updateComplete;
     // Flips into diff view: the button now offers the way back to the editor.
     expect(q(on, '[aria-label="device.diff_view_editor"]')).not.toBeNull();
+  });
+});
+
+describe("device-editor save button", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("enables on unsaved edits and shows the save icon", async () => {
+    const el = await mount({ hasUnsavedEdits: true });
+    const btn = q(el, ".save-button") as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    expect(btn.querySelector("wa-icon")!.getAttribute("name")).toBe("content-save");
+    expect(btn.querySelector("wa-spinner")).toBeNull();
+  });
+
+  it("disables and shows a spinner while a save is in flight", async () => {
+    const el = await mount({ hasUnsavedEdits: true, saving: true });
+    const btn = q(el, ".save-button") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    expect(btn.querySelector("wa-spinner")).not.toBeNull();
+    expect(btn.querySelector("wa-icon")).toBeNull();
   });
 });
