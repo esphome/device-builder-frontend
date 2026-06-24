@@ -91,6 +91,7 @@ interface SaveView {
   _savedYaml: string;
   _saving: boolean;
   _pendingValidationResolve: ((saved: boolean) => void) | null;
+  _activeSection: { flushPending(): Promise<void> | void } | null;
   _saveYaml(): Promise<boolean>;
   _doSaveYaml(): Promise<boolean>;
 }
@@ -129,6 +130,23 @@ describe("esphome-page-device save re-entrancy", () => {
     expect(await page._saveYaml()).toBe(false);
     expect(validateYaml).not.toHaveBeenCalled();
     expect(updateConfig).not.toHaveBeenCalled();
+  });
+
+  test("clears the busy flag when flushPending rejects, so later saves aren't bricked", async () => {
+    // flushPending is a backend upsert for the section editors; if it ever
+    // rejects, the busy flag must not strand true and lock out every save.
+    const flushPending = vi.fn(() => Promise.reject(new Error("upsert failed")));
+    const validateYaml = vi.fn();
+    const page = makeSaveView({ validateYaml });
+    page._activeSection = { flushPending };
+
+    await expect(page._saveYaml()).rejects.toThrow("upsert failed");
+    expect(page._saving).toBe(false); // not stranded
+
+    // The guard isn't stuck: a second attempt runs again (and rejects again).
+    await expect(page._saveYaml()).rejects.toThrow("upsert failed");
+    expect(flushPending).toHaveBeenCalledTimes(2);
+    expect(validateYaml).not.toHaveBeenCalled();
   });
 
   test("a keyboard re-entry during validate doesn't launch a second save", async () => {

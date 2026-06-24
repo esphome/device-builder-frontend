@@ -707,83 +707,89 @@ export class ESPHomePageDevice extends LitElement {
     // automation/script editors) and the validate round-trip on a
     // large config; both deserve the spinner.
     this._saving = true;
-    // Promote any in-flight form keystroke (still inside its 200ms
-    // debounce window) into ``_yaml`` so the save commits exactly
-    // what the user typed — not what was last flushed. The
-    // component editor's flushPending is sync (local YAML splice
-    // only); the automation/script editors return a Promise
-    // because their pending change is a backend upsert call.
-    // ``await`` handles both shapes — awaiting ``undefined``
-    // resolves immediately.
-    await this._activeSection?.flushPending();
-    // The Save button activates on ``_isDirty`` (yaml diff OR the
-    // section editor's transient pre-flush dirty flag), so a click
-    // inside the debounce window can land here with the form
-    // marked dirty but the post-flush yaml unchanged from the
-    // saved buffer (e.g. user typed and undid a character, or the
-    // splice normalised to the same serialisation). Bail before
-    // toasting / hitting the backend — neither has anything to do.
-    if (!this._isYamlDirty) {
-      this._saving = false;
-      return true;
-    }
+    // Everything from here runs inside try/finally so any throw — most
+    // notably a flushPending backend upsert that rejects — clears the
+    // busy flag instead of stranding ``_saving=true``, which the guard
+    // above would then read as a permanent in-progress save and brick
+    // every later attempt. The not-dirty bail and the validation-dialog
+    // branch return through this finally too, stopping the spinner while
+    // the prompt waits on the user. The commit path uses ``return
+    // await`` so the finally fires only after _doSaveYaml settles, not
+    // the moment it's called — _doSaveYaml owns ``_saving`` across the
+    // write (and on the standalone "Save anyway" path), so the flag
+    // stays true with no await between, and the button never flickers.
+    try {
+      // Promote any in-flight form keystroke (still inside its 200ms
+      // debounce window) into ``_yaml`` so the save commits exactly
+      // what the user typed — not what was last flushed. The
+      // component editor's flushPending is sync (local YAML splice
+      // only); the automation/script editors return a Promise
+      // because their pending change is a backend upsert call.
+      // ``await`` handles both shapes — awaiting ``undefined``
+      // resolves immediately.
+      await this._activeSection?.flushPending();
+      // The Save button activates on ``_isDirty`` (yaml diff OR the
+      // section editor's transient pre-flush dirty flag), so a click
+      // inside the debounce window can land here with the form
+      // marked dirty but the post-flush yaml unchanged from the
+      // saved buffer (e.g. user typed and undid a character, or the
+      // splice normalised to the same serialisation). Bail before
+      // toasting / hitting the backend — neither has anything to do.
+      if (!this._isYamlDirty) return true;
 
-    // Re-validate against the backend before committing. The
-    // editor's inline linter runs the same call on a 600ms
-    // debounce, but a save click inside that window would
-    // otherwise commit invalid YAML against a stale "no
-    // diagnostics" snapshot. Authoritative re-check here, then
-    // the prompt only opens when the freshly-saved buffer really
-    // is invalid.
-    //
-    // Network / backend failures fall through to the save —
-    // we'd rather risk an unvalidated commit than block the user
-    // on a backend hiccup. The fall-through stays silent (no
-    // ``toast.error`` here): the actual ``updateConfig`` call
-    // below is the authority on whether the save worked, and a
-    // toast at this layer would shout-down its result.
-    if (this.id) {
-      try {
-        // Reuse the linter's last result when it matches the
-        // current buffer exactly — saves a WS round-trip and an
-        // ESPHome validate pass that just ran in the background.
-        const res =
-          getLastValidatedResult(this.id, this._yaml) ??
-          (await this._api.validateYaml(this.id, this._yaml));
-        const summary = summarizeValidation(res);
-        if (summary.count > 0) {
-          this._validationErrorCount = summary.count;
-          this._validationFirstLine = summary.first?.line ?? 0;
-          this._validationFirstCol = summary.first?.col ?? 0;
-          this._validationFirstMessage = summary.first?.message ?? "";
-          // The reported line is meaningless against the open buffer when
-          // the error is inside an `!include`d file; name that file instead
-          // of leaving the editor to navigate nowhere.
-          const errorFile = summary.first?.file ?? null;
-          this._validationFirstFile =
-            errorFile && this.id && !isOpenConfigFile(errorFile, this.id)
-              ? basename(errorFile)
-              : "";
-          // The re-entrancy guard at the top of _saveYaml bails while a
-          // prompt is already pending, so the resolver is null here and
-          // can be assigned fresh without dangling a prior caller.
-          return new Promise<boolean>((resolve) => {
-            this._pendingValidationResolve = resolve;
-            this._yamlValidationDialog.open();
-          });
+      // Re-validate against the backend before committing. The
+      // editor's inline linter runs the same call on a 600ms
+      // debounce, but a save click inside that window would
+      // otherwise commit invalid YAML against a stale "no
+      // diagnostics" snapshot. Authoritative re-check here, then
+      // the prompt only opens when the freshly-saved buffer really
+      // is invalid.
+      //
+      // Network / backend failures fall through to the save —
+      // we'd rather risk an unvalidated commit than block the user
+      // on a backend hiccup. The fall-through stays silent (no
+      // ``toast.error`` here): the actual ``updateConfig`` call
+      // below is the authority on whether the save worked, and a
+      // toast at this layer would shout-down its result.
+      if (this.id) {
+        try {
+          // Reuse the linter's last result when it matches the
+          // current buffer exactly — saves a WS round-trip and an
+          // ESPHome validate pass that just ran in the background.
+          const res =
+            getLastValidatedResult(this.id, this._yaml) ??
+            (await this._api.validateYaml(this.id, this._yaml));
+          const summary = summarizeValidation(res);
+          if (summary.count > 0) {
+            this._validationErrorCount = summary.count;
+            this._validationFirstLine = summary.first?.line ?? 0;
+            this._validationFirstCol = summary.first?.col ?? 0;
+            this._validationFirstMessage = summary.first?.message ?? "";
+            // The reported line is meaningless against the open buffer when
+            // the error is inside an `!include`d file; name that file instead
+            // of leaving the editor to navigate nowhere.
+            const errorFile = summary.first?.file ?? null;
+            this._validationFirstFile =
+              errorFile && this.id && !isOpenConfigFile(errorFile, this.id)
+                ? basename(errorFile)
+                : "";
+            // The re-entrancy guard at the top of _saveYaml bails while a
+            // prompt is already pending, so the resolver is null here and
+            // can be assigned fresh without dangling a prior caller.
+            return new Promise<boolean>((resolve) => {
+              this._pendingValidationResolve = resolve;
+              this._yamlValidationDialog.open();
+            });
+          }
+        } catch (e) {
+          console.debug("[save-yaml] validate_yaml failed, saving anyway:", e);
         }
-      } catch (e) {
-        console.debug("[save-yaml] validate_yaml failed, saving anyway:", e);
-      } finally {
-        // Drop busy here so the spinner stops while the validation
-        // dialog is open (waiting on the user, not the backend); the
-        // pass-through to _doSaveYaml re-arms it for the commit with
-        // no await in between, so the button never flickers enabled.
-        this._saving = false;
       }
-    }
 
-    return this._doSaveYaml();
+      return await this._doSaveYaml();
+    } finally {
+      this._saving = false;
+    }
   };
 
   /** Commit the current ``_yaml`` to the backend.
