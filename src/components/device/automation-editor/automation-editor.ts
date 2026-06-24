@@ -48,7 +48,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import { actionFieldLabel } from "../../../util/action-field-label.js";
+import { automationHeaderTitle } from "../../../util/automation-header-title.js";
 import {
   fetchComponent,
   getCachedComponent,
@@ -707,17 +707,7 @@ export class ESPHomeAutomationEditor extends LitElement {
    *   anything else / fallback                   → static "Automation"
    */
   private _headerTitle(trigger: AutomationTrigger | null): string {
-    const loc = this.location;
-    if (loc?.kind === "interval") {
-      return this._localize("device.automation_interval_label");
-    }
-    if (trigger && (loc?.kind === "device_on" || loc?.kind === "component_on")) {
-      return trigger.name;
-    }
-    if (loc?.kind === "component_action") {
-      return actionFieldLabel(loc.field, this._localize);
-    }
-    return this._localize("device.automation_header_title_static");
+    return automationHeaderTitle(this.location, trigger, this._localize);
   }
 
   /**
