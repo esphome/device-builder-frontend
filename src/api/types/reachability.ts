@@ -44,6 +44,15 @@ export interface ReachabilityStateEvent {
    *  several windows already". ``null`` when ``mdns_last_seen``
    *  is null. */
   mdns_ttl_remaining_seconds: number | null;
+  /** The device's PTR record (``_esphomelib._tcp.local.``) full
+   *  announced lifetime in seconds (mDNS default ~4500s). The
+   *  drawer's "Expires in N" fold-down is this lifetime minus
+   *  ``mdns_last_seen_seconds_ago``, so the countdown re-anchors in
+   *  lockstep with "last seen" rather than tracking the PTR's
+   *  remaining TTL (which the browser refreshes at ~80% of the
+   *  lifetime and would drift against the probed A record).
+   *  ``null`` when no PTR is cached. */
+  mdns_ptr_ttl_seconds: number | null;
   /** Decoded TXT key/value pairs from the device's
    *  ``_esphomelib._tcp.local.`` TXT record — same payload the
    *  dashboard already mines for ``version`` / ``config_hash`` /

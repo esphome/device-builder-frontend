@@ -209,6 +209,7 @@ export const deviceDrawerContentStyles = css`
 
   .auto-loaded-details > summary,
   .mdns-txt-details > summary,
+  .mdns-expiry-details > summary,
   .reachability-warning > summary {
     cursor: pointer;
     font-size: var(--wa-font-size-2xs);
@@ -218,8 +219,20 @@ export const deviceDrawerContentStyles = css`
   }
 
   .auto-loaded-details > summary:hover,
-  .mdns-txt-details > summary:hover {
+  .mdns-txt-details > summary:hover,
+  .mdns-expiry-details > summary:hover {
     color: var(--wa-color-text-normal);
+  }
+
+  .mdns-expiry-details {
+    margin-top: var(--wa-space-2xs);
+  }
+
+  .mdns-expiry-body {
+    margin-top: var(--wa-space-2xs);
+    font-size: var(--wa-font-size-2xs);
+    line-height: 1.45;
+    color: var(--wa-color-text-quiet);
   }
 
   .auto-loaded-details {

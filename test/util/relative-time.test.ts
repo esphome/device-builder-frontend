@@ -15,6 +15,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ageOf,
+  formatCountdown,
   formatSecondsAgo,
   getNumberFormatter,
   remainingOf,
@@ -156,5 +157,38 @@ describe("remainingOf", () => {
     // than the baseline; the clamp at 0 elapsed keeps the
     // displayed countdown bounded above by what the server said.
     expect(remainingOf(120, 5000, 1000)).toBe(120);
+  });
+});
+
+describe("formatCountdown", () => {
+  it("returns empty string for null / undefined", () => {
+    expect(formatCountdown(null, "en")).toBe("");
+    expect(formatCountdown(undefined, "en")).toBe("");
+  });
+
+  it("renders sub-minute values in seconds", () => {
+    expect(formatCountdown(0, "en")).toBe("0s");
+    expect(formatCountdown(45, "en")).toBe("45s");
+    expect(formatCountdown(59.9, "en")).toBe("59s");
+  });
+
+  it("renders sub-hour values in whole minutes", () => {
+    expect(formatCountdown(60, "en")).toBe("1m");
+    expect(formatCountdown(8 * 60 + 30, "en")).toBe("8m");
+    expect(formatCountdown(3599, "en")).toBe("59m");
+  });
+
+  it("renders hour-plus values as Xh Ym, dropping a zero minute", () => {
+    expect(formatCountdown(3600, "en")).toBe("1h");
+    expect(formatCountdown(3600 + 14 * 60, "en")).toBe("1h 14m");
+    expect(formatCountdown(2 * 3600 + 59, "en")).toBe("2h");
+  });
+
+  it("clamps negative input to zero", () => {
+    expect(formatCountdown(-5, "en")).toBe("0s");
+  });
+
+  it("does not crash without a language argument", () => {
+    expect(() => formatCountdown(75)).not.toThrow();
   });
 });

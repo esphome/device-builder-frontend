@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
+import { DeviceState } from "../../../api/types/devices.js";
 import type {
   ReachabilitySource,
   ReachabilityStateEvent,
@@ -11,7 +12,11 @@ import {
   getNumberFormatter,
 } from "../../../util/relative-time.js";
 import type { ESPHomeDeviceDrawerContent } from "../device-drawer-content.js";
-import { renderMdnsStaleWarning, renderMdnsTxtRecords } from "../device-drawer-render.js";
+import {
+  renderMdnsExpiry,
+  renderMdnsStaleWarning,
+  renderMdnsTxtRecords,
+} from "../device-drawer-render.js";
 
 interface ReachabilityRowSpec {
   source: "mdns" | "ping" | "mqtt";
@@ -19,8 +24,16 @@ interface ReachabilityRowSpec {
   labelKey: string;
   age: number | null;
   rttMs?: number | null;
+  ttlRemaining?: number | null;
+  ttlLifetime?: number | null;
   txtRecords?: Record<string, string> | null;
 }
+
+// Only surface the "Expires in" hint once the device has been quiet for
+// longer than this, so a freshly-heard healthy device shows no shrinking
+// timer (which would read as a false alarm). A UI threshold, not tied to
+// any record's TTL.
+const SHOW_EXPIRES_HINT_AFTER_SECONDS = 120;
 
 export function renderReachabilitySection(
   host: ESPHomeDeviceDrawerContent
@@ -32,15 +45,32 @@ export function renderReachabilitySection(
   const now = Date.now();
   const anchor = host._reachabilityAnchorMs;
 
-  // mdns_ttl_remaining_seconds isn't surfaced — the backend's refresh loop
-  // drives it back to ~120s on every probe, so the value would be a function
-  // of when our tick last fired, not the device's announce expiry.
+  // The mDNS row's "Expires in N" countdown is the PTR record's full
+  // lifetime minus how long since we last heard the device, so it
+  // re-anchors in lockstep with "last seen" (both move off mdnsAge)
+  // rather than the PTR's remaining TTL, which the browser refreshes
+  // erratically and would drift against the actively-probed A record.
+  // Held back until the device has been quiet a while (see the
+  // threshold) so a healthy device shows no shrinking timer, and never
+  // shown once the device is OFFLINE — by then it has already expired,
+  // and the reachability snapshot can be stale (no push fires on the
+  // mDNS Removed that took it offline), so trust the live device state.
+  const mdnsAge = ageOf(r.mdns_last_seen_seconds_ago, anchor, now);
+  const deviceOffline = host.device?.state === DeviceState.OFFLINE;
   const rows: ReachabilityRowSpec[] = [
     {
       source: "mdns",
       icon: "access-point-network",
       labelKey: "dashboard.drawer_source_mdns",
-      age: ageOf(r.mdns_last_seen_seconds_ago, anchor, now),
+      age: mdnsAge,
+      ttlRemaining:
+        deviceOffline ||
+        r.mdns_ptr_ttl_seconds === null ||
+        mdnsAge === null ||
+        mdnsAge <= SHOW_EXPIRES_HINT_AFTER_SECONDS
+          ? null
+          : Math.max(0, r.mdns_ptr_ttl_seconds - mdnsAge),
+      ttlLifetime: r.mdns_ptr_ttl_seconds,
       txtRecords: r.mdns_txt_records ?? null,
     },
     {
@@ -110,6 +140,14 @@ function renderReachabilityRow(
             ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
             : nothing}
         </div>
+        ${row.source === "mdns" && isActive
+          ? renderMdnsExpiry(
+              row.ttlRemaining ?? null,
+              row.ttlLifetime ?? null,
+              localize,
+              lang
+            )
+          : nothing}
         ${renderMdnsTxtRecords(row.txtRecords, localize)}
       </div>
     </div>
@@ -196,8 +234,9 @@ export function teardownSubscription(host: ESPHomeDeviceDrawerContent): void {
   }
 }
 
-// 1Hz tick: rendered values resolve at second precision. Probes for WS
-// reconnect / failed-initial-subscribe via reconcileSubscription on every tick.
+// 1Hz tick: rendered values (ages, the mDNS-expiry countdown) resolve at
+// second precision. Also probes for WS reconnect / failed-initial-subscribe
+// via reconcileSubscription on every tick.
 export function syncTickInterval(host: ESPHomeDeviceDrawerContent): void {
   const wantTick =
     host.drawerOpen && host.device !== undefined && host._api !== undefined;

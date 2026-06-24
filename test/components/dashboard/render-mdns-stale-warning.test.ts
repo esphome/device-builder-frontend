@@ -27,6 +27,7 @@ function reachability(
     ip: "192.168.1.10",
     mdns_last_seen_seconds_ago: null,
     mdns_ttl_remaining_seconds: null,
+    mdns_ptr_ttl_seconds: null,
     ping_last_seen_seconds_ago: 5,
     mqtt_last_seen_seconds_ago: null,
     ping_rtt_ms: 4.2,
