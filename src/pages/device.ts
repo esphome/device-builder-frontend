@@ -690,6 +690,14 @@ export class ESPHomePageDevice extends LitElement {
    * the return value.
    */
   private _saveYaml = async (): Promise<boolean> => {
+    // Refuse to start a second save while one is in flight. The Save
+    // button's disabled attribute blocks the mouse, but Cmd/Ctrl+S
+    // (SaveShortcutController) only checks dirtiness — and during the
+    // multi-second validate phase ``_savedYaml`` hasn't been written
+    // yet, so the buffer still reads dirty. Without this guard a
+    // keystroke re-enters and double-validates, double-writes, and
+    // churns the validation-prompt resolver.
+    if (this._saving) return false;
     // Mark the Save button busy up front so it acknowledges the
     // click immediately. The slow phases that follow are the
     // section-editor flushPending (a backend upsert for the

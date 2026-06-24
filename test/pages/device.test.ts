@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
+import type { EditorValidateResponse } from "../../src/api/types/editor.js";
 import type { DeviceLayoutMode } from "../../src/components/device/device-editor.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 
@@ -80,5 +81,61 @@ describe("esphome-page-device layout persistence", () => {
     expect(page._layout).toBe("both");
     expect(localStorage.getItem("esphome-editor-layout")).toBe("both");
     expect(updatePreferences).not.toHaveBeenCalled();
+  });
+});
+
+interface SaveView {
+  _api: ESPHomeAPI;
+  id: string;
+  _yaml: string;
+  _savedYaml: string;
+  _saving: boolean;
+  _saveYaml(): Promise<boolean>;
+  _doSaveYaml(): Promise<boolean>;
+}
+
+function makeSaveView(api: Partial<ESPHomeAPI>): SaveView {
+  const page = new ESPHomePageDevice() as unknown as SaveView;
+  page._api = api as unknown as ESPHomeAPI;
+  page.id = "editortest";
+  page._yaml = "esphome:\n  name: x\n";
+  page._savedYaml = ""; // _yaml !== _savedYaml, so the buffer reads dirty
+  return page;
+}
+
+describe("esphome-page-device save re-entrancy", () => {
+  test("refuses to start a save while one is already in flight", async () => {
+    const validateYaml = vi.fn();
+    const updateConfig = vi.fn();
+    const page = makeSaveView({ validateYaml, updateConfig });
+    page._saving = true; // a save is mid-validate
+
+    expect(await page._saveYaml()).toBe(false);
+    expect(validateYaml).not.toHaveBeenCalled();
+    expect(updateConfig).not.toHaveBeenCalled();
+  });
+
+  test("a keyboard re-entry during validate doesn't launch a second save", async () => {
+    // Hold validate in flight so the second (Cmd/Ctrl+S) re-entry lands while
+    // the first save is still awaiting it; resolve at the end so nothing leaks.
+    let resolveValidate!: (res: EditorValidateResponse) => void;
+    const validateYaml = vi.fn(
+      () => new Promise<EditorValidateResponse>((r) => (resolveValidate = r))
+    );
+    const page = makeSaveView({ validateYaml });
+    // Stub the commit so the first run finishes without touching toasts.
+    const doSave = vi.fn(() => Promise.resolve(true));
+    page._doSaveYaml = doSave;
+
+    const first = page._saveYaml(); // enters, sets _saving, awaits validateYaml
+    await new Promise((r) => setTimeout(r, 0)); // flush to the validate await
+    const second = await page._saveYaml(); // re-entry mid-validate
+    expect(second).toBe(false);
+
+    // Valid (no errors) → first run falls through to the stubbed commit.
+    resolveValidate({ yaml_errors: [], validation_errors: [] });
+    expect(await first).toBe(true);
+    expect(validateYaml).toHaveBeenCalledTimes(1);
+    expect(doSave).toHaveBeenCalledTimes(1);
   });
 });
