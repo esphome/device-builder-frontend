@@ -90,6 +90,7 @@ interface SaveView {
   _yaml: string;
   _savedYaml: string;
   _saving: boolean;
+  _pendingValidationResolve: ((saved: boolean) => void) | null;
   _saveYaml(): Promise<boolean>;
   _doSaveYaml(): Promise<boolean>;
 }
@@ -109,6 +110,21 @@ describe("esphome-page-device save re-entrancy", () => {
     const updateConfig = vi.fn();
     const page = makeSaveView({ validateYaml, updateConfig });
     page._saving = true; // a save is mid-validate
+
+    expect(await page._saveYaml()).toBe(false);
+    expect(validateYaml).not.toHaveBeenCalled();
+    expect(updateConfig).not.toHaveBeenCalled();
+  });
+
+  test("refuses a re-entry while the validation-error dialog is open", async () => {
+    // The validate-phase finally clears _saving so the spinner stops while the
+    // dialog waits on the user, but _pendingValidationResolve stays set — the
+    // guard must still treat that as a save in progress.
+    const validateYaml = vi.fn();
+    const updateConfig = vi.fn();
+    const page = makeSaveView({ validateYaml, updateConfig });
+    page._saving = false;
+    page._pendingValidationResolve = () => {};
 
     expect(await page._saveYaml()).toBe(false);
     expect(validateYaml).not.toHaveBeenCalled();

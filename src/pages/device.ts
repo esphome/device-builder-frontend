@@ -690,14 +690,17 @@ export class ESPHomePageDevice extends LitElement {
    * the return value.
    */
   private _saveYaml = async (): Promise<boolean> => {
-    // Refuse to start a second save while one is in flight. The Save
-    // button's disabled attribute blocks the mouse, but Cmd/Ctrl+S
-    // (SaveShortcutController) only checks dirtiness — and during the
-    // multi-second validate phase ``_savedYaml`` hasn't been written
-    // yet, so the buffer still reads dirty. Without this guard a
-    // keystroke re-enters and double-validates, double-writes, and
-    // churns the validation-prompt resolver.
-    if (this._saving) return false;
+    // Refuse to start a second save while one is already in progress.
+    // The Save button's disabled attribute blocks the mouse, but
+    // Cmd/Ctrl+S (SaveShortcutController, bound on window) only checks
+    // dirtiness — and ``_savedYaml`` stays stale both through the
+    // multi-second validate phase and while the validation-error
+    // dialog awaits the user, so the buffer keeps reading dirty.
+    // ``_pendingValidationResolve`` is non-null exactly while that
+    // dialog is open; guarding on it too stops a keystroke from
+    // double-validating, double-writing, or resolving the open
+    // prompt's pending promise out from under it.
+    if (this._saving || this._pendingValidationResolve !== null) return false;
     // Mark the Save button busy up front so it acknowledges the
     // click immediately. The slow phases that follow are the
     // section-editor flushPending (a backend upsert for the
@@ -761,13 +764,9 @@ export class ESPHomePageDevice extends LitElement {
             errorFile && this.id && !isOpenConfigFile(errorFile, this.id)
               ? basename(errorFile)
               : "";
-          // A previous prompt that's somehow still pending (the
-          // unsaved-guard already prevents overlapping page-leave
-          // dialogs, but a manual Save click reaches this branch
-          // unguarded) gets resolved as "not saved" before we
-          // reset the resolver — without this the prior caller
-          // would dangle forever.
-          this._pendingValidationResolve?.(false);
+          // The re-entrancy guard at the top of _saveYaml bails while a
+          // prompt is already pending, so the resolver is null here and
+          // can be assigned fresh without dangling a prior caller.
           return new Promise<boolean>((resolve) => {
             this._pendingValidationResolve = resolve;
             this._yamlValidationDialog.open();
