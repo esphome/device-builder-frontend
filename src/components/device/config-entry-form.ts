@@ -37,8 +37,7 @@ import {
   catalogEntryToProvider,
   type ComponentProvider,
 } from "../../util/config-entry-yaml-scan.js";
-import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
-import { evaluateGroup } from "../../util/constraint-groups.js";
+import { type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -100,6 +99,7 @@ import {
   renderTimePeriodField,
   type RenderCtx,
 } from "./config-entry-renderers.js";
+import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constraint-banners.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
 import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
 import "./password-input.js";
@@ -339,58 +339,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  whose members render inside a `constraint-cluster` box are skipped — the
    *  box header carries their prompt. */
   private _renderConstraintBanners(ctx: RenderCtx, clusteredKeys: Set<string>) {
-    const messages: string[] = [];
-    // Skip a banner when none of its members currently render (gated off by
-    // hidden / depends_on / platform, or simply not a rendered entry), matching
-    // the cluster box — otherwise the prompt nags about fields the user can't set.
-    const targetPlatform = ctx.board?.esphome.platform ?? null;
-    const byKey = new Map(this.entries.map((e) => [e.key, e]));
-    const anyVisible = (keys: string[]): boolean =>
-      keys.some((k) => {
-        const entry = byKey.get(k);
-        return (
-          entry !== undefined &&
-          (getIn(this.values, [k]) !== undefined ||
-            isEntryVisible(entry, this.values, this.presentComponents, targetPlatform))
-        );
-      });
-    for (const group of this.requiredGroups) {
-      if (group.keys.some((k) => clusteredKeys.has(k))) continue;
-      if (!anyVisible(group.keys)) continue;
-      if (evaluateGroup(group.kind, group.keys, this.values)) continue;
-      messages.push(
-        ctx.localize(`device.constraint_${group.kind}`, {
-          keys: formatConstraintKeys(group.keys, this.entries, ctx),
-        })
-      );
-    }
-    // buildConstraintClusters folds every *non-exclusive* inclusive group into
-    // a cluster (whose members land in clusteredKeys), so this loop only fires
-    // for the residual case it skips: an inclusive group whose members are all
-    // also exclusive_group members. The collection here is deliberately broader
-    // (entry.group, no !exclusive_group guard) to still surface that banner.
-    const inclusive = new Map<string, string[]>();
-    for (const entry of this.entries) {
-      if (entry.group) {
-        inclusive.set(entry.group, [...(inclusive.get(entry.group) ?? []), entry.key]);
-      }
-    }
-    for (const keys of inclusive.values()) {
-      if (keys.some((k) => clusteredKeys.has(k))) continue;
-      if (!anyVisible(keys)) continue;
-      if (evaluateGroup("all_or_none", keys, this.values)) continue;
-      messages.push(
-        ctx.localize("device.constraint_all_or_none", {
-          keys: formatConstraintKeys(keys, this.entries, ctx),
-        })
-      );
-    }
-    if (messages.length === 0) return nothing;
-    return messages.map(
-      (text) => html`
+    const unsatisfied = collectUnsatisfiedConstraints(
+      {
+        entries: this.entries,
+        requiredGroups: this.requiredGroups,
+        values: this.values,
+        presentComponents: this.presentComponents,
+        targetPlatform: ctx.board?.esphome.platform ?? null,
+        formatKeys: (keys) => formatConstraintKeys(keys, this.entries, ctx),
+      },
+      clusteredKeys
+    );
+    if (unsatisfied.length === 0) return nothing;
+    return unsatisfied.map(
+      ({ kind, keys }) => html`
         <div class="warning-banner constraint-banner">
           <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
-          <span>${text}</span>
+          <span>${ctx.localize(`device.constraint_${kind}`, { keys })}</span>
         </div>
       `
     );
