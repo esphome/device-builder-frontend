@@ -380,7 +380,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
     const hasFeaturedPresets =
       isFeaturedId(result.entry.id) && result.entry.config_entries.length > 0;
     const hasMissingDeps = (result.entry.dependencies ?? []).some((d) => !present.has(d));
-    if (renderable.size === 0 && !hasFeaturedPresets && !hasMissingDeps) {
+    // Detour/restore flows set `_selected` directly and bypass this handler,
+    // so prefill is null here today. Guard anyway: a prefilled selection
+    // carries overlays/values the `{}`-seeded probe can't predict, so show
+    // the form rather than fast-path with stale inputs.
+    const noPrefill = this._prefillReference === null && this._depPrefill === null;
+    if (renderable.size === 0 && !hasFeaturedPresets && !hasMissingDeps && noPrefill) {
       const fields = coerceFields(result.entry.config_entries, seeded);
       await this._submitComponent(fields, /* notify */ true);
     }

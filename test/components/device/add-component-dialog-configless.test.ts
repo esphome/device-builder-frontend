@@ -241,6 +241,27 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _open: boolean })._open).toBe(false);
   });
 
+  it("opens the form for an advanced-only component when a prefill is active", async () => {
+    // A prefilled selection carries overlays/values the `{}`-seeded probe
+    // can't predict, so the gate must not fast-path even when the bare
+    // schema renders blank.
+    const entry = makeComponentEntry("socket", {
+      name: "Socket",
+      config_entries: [makeConfigEntry({ key: "implementation", advanced: true })],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+    (dialog as unknown as { _prefillReference: unknown })._prefillReference = {
+      domain: "i2c",
+      id: "bus_a",
+    };
+
+    await select(dialog, "socket");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
+    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
   it("opens the form for an advanced-only component with a missing dependency", async () => {
     const entry = makeComponentEntry("socket", {
       name: "Socket",
