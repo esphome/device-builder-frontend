@@ -16,7 +16,7 @@ import {
   foldNodeProp,
   indentService,
 } from "@codemirror/language";
-import type { Input, SyntaxNodeRef } from "@lezer/common";
+import type { Input, SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import { parseMixed } from "@lezer/common";
 import { parser as yamlParser } from "@lezer/yaml";
 import { indentOf, stripComment } from "./yaml-line-walker.js";
@@ -39,6 +39,21 @@ const RE_BLOCK_SCALAR_OPENER = /:\s*[|>][+-]?\s*$/;
 export const ESPHOME_YAML_INDENT = "  ";
 
 /**
+ * Document span of a `!lambda` value's C++ content: the Literal as-is, the
+ * QuotedLiteral's interior (inside the quotes), or the BlockLiteralContent.
+ * Null when the Tagged node carries no recognised value node.
+ */
+function lambdaSpan(node: SyntaxNode): { from: number; to: number } | null {
+  const literal = node.getChild("Literal");
+  if (literal) return { from: literal.from, to: literal.to };
+  const quoted = node.getChild("QuotedLiteral");
+  if (quoted) return { from: quoted.from + 1, to: quoted.to - 1 };
+  const content = node.getChild("BlockLiteral")?.getChild("BlockLiteralContent");
+  if (content) return { from: content.from, to: content.to };
+  return null;
+}
+
+/**
  * Mixed parser wrapper: when we encounter a Tagged node whose Tag is
  * `!lambda`, overlay the C++ parser on the value content.
  */
@@ -52,39 +67,12 @@ function nestLambdas(node: SyntaxNodeRef, input: Input) {
   const tagText = input.read(tagNode.from, tagNode.to);
   if (tagText !== LAMBDA_TAG) return null;
 
-  // Find the value node — could be Literal, QuotedLiteral, or BlockLiteral
-  const literal = node.node.getChild("Literal");
-  const quoted = node.node.getChild("QuotedLiteral");
-  const block = node.node.getChild("BlockLiteral");
-
-  if (literal) {
-    // Inline: `!lambda return x;` → overlay the Literal
-    return {
-      parser: cppLanguage.parser,
-      overlay: [{ from: literal.from, to: literal.to }],
-    };
-  }
-
-  if (quoted) {
-    // Quoted: `!lambda 'return x;'` → overlay content inside quotes
-    return {
-      parser: cppLanguage.parser,
-      overlay: [{ from: quoted.from + 1, to: quoted.to - 1 }],
-    };
-  }
-
-  if (block) {
-    // Block: `!lambda |-\n  code` → overlay the BlockLiteralContent
-    const content = block.getChild("BlockLiteralContent");
-    if (content) {
-      return {
-        parser: cppLanguage.parser,
-        overlay: [{ from: content.from, to: content.to }],
-      };
-    }
-  }
-
-  return null;
+  // A just-toggled `!lambda` with no code yet has an empty (or, for a lone
+  // quote, inverted) value span; parseMixed's checkRanges rejects a
+  // non-positive overlay range and throws. Skip until there's content.
+  const span = lambdaSpan(node.node);
+  if (!span || span.from >= span.to) return null;
+  return { parser: cppLanguage.parser, overlay: [span] };
 }
 
 /**

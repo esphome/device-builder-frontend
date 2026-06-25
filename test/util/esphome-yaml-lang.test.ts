@@ -196,3 +196,40 @@ describe("esphome-yaml language extension shape", () => {
     expect(flat.length).toBeGreaterThan(0);
   });
 });
+
+describe("esphome-yaml lambda C++ overlay", () => {
+  // Forcing a full parse runs parseMixed; an empty `!lambda` value (the shape
+  // produced the instant the Value/λ Lambda toggle is flipped, before any code
+  // is typed) used to overlay a zero-length C++ range and crash checkRanges.
+  const parse = (yaml: string): void => {
+    const state = EditorState.create({
+      doc: yaml,
+      extensions: [indentUnit.of(ESPHOME_YAML_INDENT), esphomeYaml()],
+    });
+    ensureSyntaxTree(state, state.doc.length);
+  };
+
+  it("does not crash on an empty block lambda", () => {
+    expect(() =>
+      parse("mdns:\n  services:\n    - txt:\n        new_1: !lambda |-\n")
+    ).not.toThrow();
+  });
+
+  it("does not crash on an empty quoted lambda", () => {
+    expect(() =>
+      parse("sensor:\n  - filters:\n      - lambda: !lambda ''\n")
+    ).not.toThrow();
+  });
+
+  it("does not crash on a bare !lambda with no value node", () => {
+    // The instant the toggle flips, before any code is typed, the tag has
+    // no value child at all — lambdaSpan returns null, no overlay.
+    expect(() => parse("x: !lambda\n")).not.toThrow();
+  });
+
+  it("still parses a non-empty block lambda without throwing", () => {
+    expect(() =>
+      parse("light:\n  - on_turn_on:\n      - lambda: !lambda |-\n          return 1;\n")
+    ).not.toThrow();
+  });
+});
