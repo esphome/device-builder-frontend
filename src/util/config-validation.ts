@@ -55,7 +55,7 @@ export function platformSupported(
 export function isEntryVisible(
   entry: ConfigEntry,
   values: Record<string, unknown>,
-  presentComponents?: Set<string>,
+  presentComponents?: ReadonlySet<string>,
   targetPlatform?: string | null
 ): boolean {
   if (entry.hidden) return false;
@@ -295,7 +295,7 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
 export function validateEntries(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
-  presentComponents?: Set<string>,
+  presentComponents?: ReadonlySet<string>,
   targetPlatform?: string | null,
   sectionKey?: string
 ): Map<string, ValidationError> {
@@ -321,7 +321,7 @@ export function validateEntries(
 function _validateEntriesRecursive(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
-  presentComponents: Set<string> | undefined,
+  presentComponents: ReadonlySet<string> | undefined,
   targetPlatform: string | null | undefined,
   pathPrefix: string[],
   errors: Map<string, ValidationError>,

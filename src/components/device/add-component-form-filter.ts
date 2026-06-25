@@ -14,7 +14,7 @@ export function addFormRenderablePaths(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   board: BoardCatalogEntry | null,
-  presentComponents: Set<string>
+  presentComponents: ReadonlySet<string>
 ): Set<string> {
   return collectRenderablePaths(entries, values, {
     requiredOnly: true,

@@ -66,7 +66,7 @@ export interface RenderFilterOptions {
    *  clearing them in YAML lets them collapse back. */
   showAdvanced: boolean;
   /** Pass-through to ``isEntryVisible`` for cross-component checks. */
-  presentComponents?: Set<string>;
+  presentComponents?: ReadonlySet<string>;
   /**
    * The device's target platform (``esp32`` / ``esp8266`` /
    * ``rp2040`` / ...). Forwarded to ``isEntryVisible`` which
@@ -90,7 +90,7 @@ export interface RenderFilterOptions {
 export interface RenderFilterSource {
   requiredOnly: boolean;
   showAdvanced: boolean;
-  presentComponents: Set<string>;
+  presentComponents: ReadonlySet<string>;
   board: BoardCatalogEntry | null;
 }
 
