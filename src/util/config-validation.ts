@@ -17,6 +17,20 @@ import { looksLikeSubstitution } from "./substitutions.js";
 import { YamlRawValue } from "./yaml-serialize.js";
 
 /**
+ * Whether an entry restricted to ``supportedPlatforms`` is allowed on the
+ * device's ``targetPlatform``. Empty / missing list is "no constraint";
+ * an unknown target (``""`` / null) allows everything.
+ */
+export function platformSupported(
+  supportedPlatforms: string[] | undefined,
+  targetPlatform?: string | null
+): boolean {
+  if (!targetPlatform) return true;
+  if (!supportedPlatforms || supportedPlatforms.length === 0) return true;
+  return supportedPlatforms.includes(targetPlatform);
+}
+
+/**
  * Determine if a config entry is currently visible.
  *
  * Visibility is the AND of four checks:
@@ -51,14 +65,7 @@ export function isEntryVisible(
   }
 
   // Platform gate: only check when caller provided the target platform.
-  // Empty / missing ``supported_platforms`` is "no constraint" (the
-  // common case) and the field stays visible.
-  if (
-    targetPlatform &&
-    entry.supported_platforms &&
-    entry.supported_platforms.length > 0 &&
-    !entry.supported_platforms.includes(targetPlatform)
-  ) {
+  if (!platformSupported(entry.supported_platforms, targetPlatform)) {
     return false;
   }
 

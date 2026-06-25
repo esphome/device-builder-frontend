@@ -4,6 +4,7 @@ import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import {
   getDeviceNameWarning,
   nearCanonicalOption,
+  platformSupported,
   validateDeviceName,
   validateEntries,
   validateEntry,
@@ -670,5 +671,27 @@ describe("validateEntries — api encryption key format", () => {
     expect(
       validateEntries(entries, { encryption: { key: "bad" } }, undefined, null).size
     ).toBe(0);
+  });
+});
+
+describe("platformSupported", () => {
+  it("allows when the entry has no platform constraint", () => {
+    expect(platformSupported([], "esp32")).toBe(true);
+    expect(platformSupported(undefined, "esp32")).toBe(true);
+  });
+
+  it("allows when the target platform is unknown", () => {
+    expect(platformSupported(["bk72xx"], "")).toBe(true);
+    expect(platformSupported(["bk72xx"], null)).toBe(true);
+    expect(platformSupported(["bk72xx"], undefined)).toBe(true);
+  });
+
+  it("drops a component restricted to other platforms", () => {
+    expect(platformSupported(["bk72xx"], "esp32")).toBe(false);
+  });
+
+  it("keeps a component that lists the target platform", () => {
+    expect(platformSupported(["esp32"], "esp32")).toBe(true);
+    expect(platformSupported(["esp32", "esp8266"], "esp8266")).toBe(true);
   });
 });
