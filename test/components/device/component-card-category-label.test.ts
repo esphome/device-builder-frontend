@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   categoryChipLabel,
   componentDialogTitle,
+  platformLabel,
   shouldShowCategoryChip,
 } from "../../../src/components/device/component-card-category-label.js";
 
@@ -53,8 +54,32 @@ describe("categoryChipLabel", () => {
   });
 });
 
+describe("platformLabel", () => {
+  it("upper-cases the platform stem after the domain", () => {
+    // stepper.a4988 and stepper.uln2003 both carry the name
+    // "Stepper Component"; the stem is the only thing that tells
+    // the two cards apart. Colliding stems are part numbers, so
+    // full upper-case reads right where title-case mangles ULN2003.
+    expect(platformLabel("stepper.a4988")).toBe("A4988");
+    expect(platformLabel("stepper.uln2003")).toBe("ULN2003");
+  });
+
+  it("upper-cases each token of an underscored stem", () => {
+    // display.lcd_gpio / display.lcd_pcf8574 and the bmp581_i2c /
+    // bmp581_spi bus split collide within one category too.
+    expect(platformLabel("display.lcd_gpio")).toBe("LCD GPIO");
+    expect(platformLabel("sensor.bmp581_i2c")).toBe("BMP581 I2C");
+  });
+
+  it("returns an empty string for an id with no platform stem", () => {
+    expect(platformLabel("wifi")).toBe("");
+    expect(platformLabel("")).toBe("");
+    expect(platformLabel("stepper.")).toBe("");
+  });
+});
+
 describe("componentDialogTitle", () => {
-  it("appends the platform label so same-name entries stay distinct", () => {
+  it("appends the category label so cross-category entries stay distinct", () => {
     // All four ``*.atm90e32`` platforms ship the name "ATM90E32
     // Power Sensor"; the form view drops the card chip, so the
     // header is the only thing left to tell them apart

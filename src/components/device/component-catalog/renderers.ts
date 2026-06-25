@@ -5,6 +5,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import {
   categoryChipLabel,
+  platformLabel,
   shouldShowCategoryChip,
 } from "../component-card-category-label.js";
 import type { ESPHomeComponentCatalog } from "../component-catalog.js";
@@ -75,7 +76,8 @@ export function renderCard(
   component: ComponentCatalogEntry,
   expanded: boolean,
   featured: boolean,
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  showPlatform = false
 ): TemplateResult {
   const hasImage = !!component.image_url && !host._imageFailed.has(component.id);
   // Skip the chip entirely when the label is empty (defensive against an
@@ -84,6 +86,9 @@ export function renderCard(
   const categoryLabel = shouldShowCategoryChip(host._category)
     ? categoryChipLabel(component.category)
     : "";
+  // Surfaced only when this card shares a name with another in the same
+  // category; the category chip can't tell same-domain platforms apart.
+  const platform = showPlatform ? platformLabel(component.id) : "";
   return html`
     <article
       class="component-card ${expanded ? "component-card--expanded" : ""} ${featured
@@ -111,6 +116,9 @@ export function renderCard(
           <h3 class="component-title">${component.name}</h3>
           ${categoryLabel
             ? html`<span class="component-category-chip">${categoryLabel}</span>`
+            : nothing}
+          ${platform
+            ? html`<span class="component-category-chip">${platform}</span>`
             : nothing}
         </div>
         <button

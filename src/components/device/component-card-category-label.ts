@@ -37,13 +37,38 @@ export function categoryChipLabel(category: string): string {
 }
 
 /**
+ * Upper-case the platform stem of a catalog id (the part after the
+ * domain in ``<domain>.<stem>``) so two entries that share a name
+ * within one category stay distinguishable — ``stepper.a4988`` and
+ * ``stepper.uln2003`` both carry the name "Stepper Component", and the
+ * category chip can't separate them. Every colliding stem is a part
+ * number or bus token (a4988, uln2003, lcd_gpio, bmp581_i2c), so full
+ * upper-case reads right ("ULN2003", "BMP581 I2C") where title-casing
+ * would mangle it ("Uln2003"). Returns "" for an id with no stem.
+ */
+export function platformLabel(id: string): string {
+  const dot = id.indexOf(".");
+  if (dot === -1) return "";
+  return id
+    .slice(dot + 1)
+    .split("_")
+    .filter((word) => word.length > 0)
+    .map((word) => word.toUpperCase())
+    .join(" ");
+}
+
+/**
  * Compose the Add-Component dialog header for a selected entry,
- * appending the platform label (the same string the card chip
- * shows) so same-name entries from different platforms stay
- * distinguishable once the form view drops the chip. The
- * core-config flow keeps the bare name: its components are
- * unique top-level domains with no same-name collisions, where a
- * "Wi-Fi · Wifi" suffix would be pure redundancy.
+ * appending the category label so same-name entries from
+ * different categories stay distinguishable once the form view
+ * drops the card chip. Same-domain collisions (stepper.a4988 /
+ * stepper.uln2003) share a category, so the header stays
+ * identical there — the grid's platformLabel chip disambiguates
+ * those, and the user has already picked the right card by the
+ * time the form opens. The core-config flow keeps the bare name:
+ * its components are unique top-level domains with no same-name
+ * collisions, where a "Wi-Fi · Wifi" suffix would be pure
+ * redundancy.
  */
 export function componentDialogTitle(
   name: string,

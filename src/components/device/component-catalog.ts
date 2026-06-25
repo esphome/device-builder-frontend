@@ -20,6 +20,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
+  ambiguousNameIds,
   buildCategories,
   filteredBundles,
   visibleComponents,
@@ -191,6 +192,7 @@ export class ESPHomeComponentCatalog extends LitElement {
     const bundles =
       this._category === ComponentCategory.FEATURED ? filteredBundles(this) : [];
     const visible = visibleComponents(this);
+    const ambiguous = ambiguousNameIds(visible);
 
     return html`
       ${showSidebar
@@ -247,7 +249,8 @@ export class ESPHomeComponentCatalog extends LitElement {
                         c,
                         c.id === this._expandedId,
                         this._category === ComponentCategory.FEATURED,
-                        this._localize
+                        this._localize,
+                        ambiguous.has(c.id)
                       )
                     )}
                   `

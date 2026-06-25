@@ -47,6 +47,26 @@ export function visibleComponents(
   });
 }
 
+// Ids of entries that share a name with another visible entry in the same
+// category — two platforms of one domain (stepper.a4988 / stepper.uln2003)
+// both inherit the domain's docs-page name. Keying on category as well as
+// name leaves cross-category collisions (sensor.debug / text_sensor.debug)
+// out: the category chip already separates those, and their stems match.
+export function ambiguousNameIds(components: ComponentCatalogEntry[]): Set<string> {
+  const byKey = new Map<string, ComponentCatalogEntry[]>();
+  for (const c of components) {
+    const key = JSON.stringify([c.category, c.name]);
+    const group = byKey.get(key);
+    if (group) group.push(c);
+    else byKey.set(key, [c]);
+  }
+  const ids = new Set<string>();
+  for (const group of byKey.values()) {
+    if (group.length > 1) for (const c of group) ids.add(c.id);
+  }
+  return ids;
+}
+
 // Bundles live on boards/get_board (not components/*) — filter client-side
 // so a search behaves consistently across featured + bundles + components.
 export function filteredBundles(host: ESPHomeComponentCatalog): FeaturedBundle[] {
