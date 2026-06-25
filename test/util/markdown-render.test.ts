@@ -29,6 +29,13 @@ describe("renderMarkdown — bold-wrapped inline formatting", () => {
     expect(host.textContent).toBe("Action: do a thing");
   });
 
+  it("renders a link inside italic as a clickable anchor", () => {
+    const host = renderInto("_[Action](https://esphome.io/x)_");
+    const anchor = host.querySelector("em a.md-link")!;
+    expect(anchor.getAttribute("href")).toBe("https://esphome.io/x");
+    expect(anchor.textContent).toBe("Action");
+  });
+
   it("renders code inside bold", () => {
     const host = renderInto("**`true`**");
     const code = host.querySelector("strong code.md-code")!;
