@@ -27,6 +27,7 @@ import {
   type SelectionHost,
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
+import { coerceFields } from "./add-component-form-coerce.js";
 import { addFormRenderablePaths } from "./add-component-form-filter.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
 import { componentDialogTitle } from "./component-card-category-label.js";
@@ -348,15 +349,18 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // that keep the form: a missing top-level dependency (e.g.
     // `captive_portal` needs `wifi`, surfaced by the deps banner) and
     // featured entries with presets (their locked `config_entries` must be
-    // submitted, so `{}` would fail backend validation; a degenerate
-    // featured entry with no entries has nothing to lose, so it fast-paths
-    // too). The empty payload is provably `{}`; on the rare API failure
-    // `_submitComponent` toasts the error (no form surface).
+    // submitted, so a thin payload would fail backend validation; a
+    // degenerate featured entry with no entries has nothing to lose, so it
+    // fast-paths too). On the rare API failure `_submitComponent` toasts
+    // the error (no form surface).
     //
-    // Probe with the values the form would seed (`buildInitialValues`), not
-    // `{}`: a required+advanced or board-pinned entry only renders once
-    // seeding makes it material, so an empty-values probe would fast-path
-    // and drop a value the form-driven submit would have sent.
+    // The probe and the payload both use the values the form would seed
+    // (`buildInitialValues`) coerced exactly as the form's Add does
+    // (`coerceFields`), so the fast-path is provably equivalent to opening
+    // the form and clicking Add: a required+advanced or board-pinned entry
+    // only renders once seeding makes it material (so `{}` would wrongly
+    // fast-path and the form would render it), and a seeded `id`/pin the
+    // form would submit unrendered isn't silently dropped.
     const present = parseTopLevelComponents(this.yaml);
     const seeded = buildInitialValues({
       entries: result.entry.config_entries,
@@ -377,7 +381,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
       isFeaturedId(result.entry.id) && result.entry.config_entries.length > 0;
     const hasMissingDeps = (result.entry.dependencies ?? []).some((d) => !present.has(d));
     if (renderable.size === 0 && !hasFeaturedPresets && !hasMissingDeps) {
-      await this._submitComponent({}, /* notify */ true);
+      const fields = coerceFields(result.entry.config_entries, seeded);
+      await this._submitComponent(fields, /* notify */ true);
     }
   }
 

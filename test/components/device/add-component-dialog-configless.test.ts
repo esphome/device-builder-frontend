@@ -18,6 +18,7 @@ vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import toast from "sonner-js";
 
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
@@ -212,6 +213,32 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect(addComponent).not.toHaveBeenCalled();
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
     expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
+  it("fast-paths but submits the seeded id the form would have sent (not {})", async () => {
+    // The form seeds and submits an auto id even though required-only hides
+    // it; the fast-path must submit the same coerced values, not `{}`.
+    const entry = makeComponentEntry("widget", {
+      name: "Widget",
+      multi_conf: true,
+      config_entries: [
+        makeConfigEntry({ key: "id", type: ConfigEntryType.ID }),
+        makeConfigEntry({ key: "tweak", advanced: true }),
+      ],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "widget");
+
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      {
+        component_id: "widget",
+        fields: expect.objectContaining({ id: expect.any(String) }),
+      },
+      "esphome:\n  name: foo\n"
+    );
+    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
   });
 
   it("opens the form for an advanced-only component with a missing dependency", async () => {
