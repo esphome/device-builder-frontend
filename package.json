@@ -43,7 +43,7 @@
   },
   "devDependencies": {
     "@rspack/core": "2.0.8",
-    "@rspack/dev-server": "2.0.3",
+    "@rspack/dev-server": "2.1.0",
     "@swc/helpers": "0.5.23",
     "@types/node": "25.9.3",
     "@types/w3c-web-serial": "^1.0.8",
