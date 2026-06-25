@@ -190,6 +190,30 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
   });
 
+  it("opens the form for a required advanced field with a default (seeded becomes material)", async () => {
+    // The form seeds required defaults, so a required+advanced entry with a
+    // default_value renders once mounted; the gate seeds too, so it must NOT
+    // fast-path and drop that value.
+    const entry = makeComponentEntry("thing", {
+      name: "Thing",
+      config_entries: [
+        makeConfigEntry({
+          key: "mode",
+          required: true,
+          advanced: true,
+          default_value: "AUTO",
+        }),
+      ],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "thing");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
+    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
   it("opens the form for an advanced-only component with a missing dependency", async () => {
     const entry = makeComponentEntry("socket", {
       name: "Socket",

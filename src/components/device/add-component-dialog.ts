@@ -28,6 +28,7 @@ import {
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
 import { addFormRenderablePaths } from "./add-component-form-filter.js";
+import { buildInitialValues } from "./add-component-form-seed.js";
 import { componentDialogTitle } from "./component-card-category-label.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -351,10 +352,24 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // featured entry with no entries has nothing to lose, so it fast-paths
     // too). The empty payload is provably `{}`; on the rare API failure
     // `_submitComponent` toasts the error (no form surface).
+    //
+    // Probe with the values the form would seed (`buildInitialValues`), not
+    // `{}`: a required+advanced or board-pinned entry only renders once
+    // seeding makes it material, so an empty-values probe would fast-path
+    // and drop a value the form-driven submit would have sent.
     const present = parseTopLevelComponents(this.yaml);
+    const seeded = buildInitialValues({
+      entries: result.entry.config_entries,
+      component: result.entry,
+      board: this.board,
+      yaml: this.yaml,
+      prefillReference: null,
+      prefillFields: null,
+      localize: this._localize,
+    });
     const renderable = addFormRenderablePaths(
       result.entry.config_entries,
-      {},
+      seeded,
       this.board,
       present
     );
