@@ -12,7 +12,6 @@ import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
-import { isFeaturedId } from "../../util/featured-id.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
@@ -350,20 +349,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
    * nothing (`addFormPaintsAnything` reads the same `buildFormRenderPlan`
    * `render()` does, so the gate can't drift from what the user sees) and the
    * payload matches the form's Add. The payload is `buildInitialValues` +
-   * `coerceFields`, exactly the form's seed/submit, so a seeded `id`/pin isn't
-   * dropped; the one thing skipped is the form's `validateEntries` bail, so a
-   * contradictory required+advanced+no-default schema (unfillable in the form
-   * anyway) surfaces a backend-error toast instead of a client-side block.
+   * `coerceFields`, exactly the form's seed/submit, so a seeded `id`/pin (and
+   * a featured entry's `seedAll`-seeded locked presets) isn't dropped; the one
+   * thing skipped is the form's `validateEntries` bail, so a contradictory
+   * required+advanced+no-default schema (unfillable in the form anyway)
+   * surfaces a backend-error toast instead of a client-side block.
    */
   private _fastPathFields(entry: ComponentCatalogEntry): Record<string, unknown> | null {
     // A prefilled/detour selection carries overlays the `{}`-seeded probe
     // can't predict; show the form. (Detour/restore set `_selected` directly
     // and bypass this handler, so this is null today — a forward guard.)
     if (this._prefillReference !== null || this._depPrefill !== null) return null;
-    // Featured entries with presets must submit their locked `config_entries`;
-    // a thin payload would fail backend validation. A degenerate featured
-    // entry with no entries has nothing to lose, so it fast-paths.
-    if (isFeaturedId(entry.id) && entry.config_entries.length > 0) return null;
     const present = parseTopLevelComponents(this.yaml);
     // `findMissingDependencies` (dotted deps, platform stems) over a plain
     // top-level-block check, so a stem-satisfied dep doesn't keep a blank

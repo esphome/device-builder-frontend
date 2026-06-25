@@ -332,21 +332,26 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _open: boolean })._open).toBe(true);
   });
 
-  it("opens the form for a featured advanced-only entry (locked presets)", async () => {
-    // A featured entry seeds locked presets the backend requires; a `{}`
-    // fast-path would drop them, so it must always show the form even when
-    // every entry is advanced/optional.
+  it("fast-paths a featured entry but submits its seedAll-locked presets", async () => {
+    // A featured id seeds every default (seedAll), so its locked preset rides
+    // in the coerced payload even when the field is advanced and the form
+    // paints nothing — no `{}`-drop, no need to force the form open.
     const entry = makeComponentEntry("featured.bw15.socket", {
       name: "Socket",
-      config_entries: [makeConfigEntry({ key: "implementation", advanced: true })],
+      config_entries: [
+        makeConfigEntry({ key: "implementation", advanced: true, default_value: "lwip" }),
+      ],
     });
     const { dialog, addComponent } = makeDialog(entry);
 
     await select(dialog, "featured.bw15.socket");
 
-    expect(addComponent).not.toHaveBeenCalled();
-    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "featured.bw15.socket", fields: { implementation: "lwip" } },
+      "esphome:\n  name: foo\n"
+    );
+    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
   });
 
   it("fast-paths a featured entry that has no config entries (no presets to lose)", async () => {
