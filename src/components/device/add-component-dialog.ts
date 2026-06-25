@@ -16,6 +16,7 @@ import { isFeaturedId } from "../../util/featured-id.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
+import { findMissingDependencies } from "./add-component-deps.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
   matchesDepDomain,
@@ -383,7 +384,15 @@ export class ESPHomeAddComponentDialog extends LitElement {
     );
     const hasFeaturedPresets =
       isFeaturedId(result.entry.id) && result.entry.config_entries.length > 0;
-    const hasMissingDeps = (result.entry.dependencies ?? []).some((d) => !present.has(d));
+    // Use the form's own `findMissingDependencies` (dotted deps, platform
+    // stems) rather than a plain top-level-block check, so a dep satisfied
+    // by e.g. a `sensor: platform:` stem doesn't keep a blank form. The
+    // form's async `provides` subtraction isn't replicated here — this stays
+    // stricter (never wrongly auto-adds), only keeping the form a touch more
+    // often for a provides-satisfied dep.
+    const hasMissingDeps =
+      findMissingDependencies(result.entry.dependencies ?? [], this.yaml, present)
+        .length > 0;
     // Detour/restore flows set `_selected` directly and bypass this handler,
     // so prefill is null here today. Guard anyway: a prefilled selection
     // carries overlays/values the `{}`-seeded probe can't predict, so show
