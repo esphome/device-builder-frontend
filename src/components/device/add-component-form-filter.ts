@@ -3,6 +3,7 @@ import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.
 import { buildFormRenderPlan, planRendersContent } from "./config-entry-form-plan.js";
 import {
   collectRenderablePaths,
+  renderFilterOptions,
   type RenderFilterOptions,
 } from "./config-entry-render-filter.js";
 import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constraint-banners.js";
@@ -10,18 +11,20 @@ import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constrai
 /**
  * The add-component form's fixed render filter: required-only, no advanced
  * toggle (the inner config-entry form is always mounted `required-only` and
- * the add-form never exposes a show-advanced toggle).
+ * the add-form never exposes a show-advanced toggle). Routes through
+ * `renderFilterOptions` so the `board`→`targetPlatform` derivation stays in
+ * lockstep with the form's own paint.
  */
 function addFormFilterOptions(
   board: BoardCatalogEntry | null,
   presentComponents: ReadonlySet<string>
 ): RenderFilterOptions {
-  return {
+  return renderFilterOptions({
     requiredOnly: true,
     showAdvanced: false,
     presentComponents,
-    targetPlatform: board?.esphome.platform ?? null,
-  };
+    board,
+  });
 }
 
 /**

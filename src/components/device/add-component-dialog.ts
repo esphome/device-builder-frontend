@@ -340,69 +340,57 @@ export class ESPHomeAddComponentDialog extends LitElement {
     }
     this._selected = result.entry;
     this._submitError = "";
-    // Skip the empty form and add directly only when the add-form would
-    // paint nothing. `addFormPaintsAnything` reads the same
-    // `buildFormRenderPlan` the form's `render()` uses (fields, exclusive
-    // groups, constraint clusters, unsatisfied-constraint banners) under the
-    // add-form's fixed filter, so the gate can't drift from what the user
-    // sees: an advanced-only component like `socket` and a component whose
-    // only fields are optional non-`name` both paint blank and fast-path
-    // instead of stranding the user. Carve-outs that keep the form: a missing
-    // top-level dependency (e.g. `captive_portal` needs `wifi`, surfaced by
-    // the deps banner) and featured entries with presets (their locked
-    // `config_entries` must be submitted, so a thin payload would fail backend
-    // validation; a degenerate featured entry with no entries has nothing to
-    // lose, so it fast-paths too). On the rare API failure `_submitComponent`
-    // toasts the error (no form surface).
-    //
-    // The probe and the payload both use the values the form would seed
-    // (`buildInitialValues`) coerced exactly as the form's Add does
-    // (`coerceFields`), so the fast-path matches opening the form and
-    // clicking Add: a required+advanced or board-pinned entry only renders
-    // once seeding makes it material (so `{}` would wrongly fast-path and
-    // the form would render it), and a seeded `id`/pin the form would submit
-    // unrendered isn't silently dropped. The one thing it skips is the
-    // form's `validateEntries` bail, so a contradictory schema (a required
-    // field that is also `advanced` with no default — unfillable in the
-    // form anyway) surfaces a backend-error toast here instead of the
-    // form's client-side block.
+    const fields = this._fastPathFields(result.entry);
+    if (fields) await this._submitComponent(fields, /* notify */ true);
+  }
+
+  /**
+   * Coerced fields to add *entry* directly, skipping the form, or null when
+   * the form should open. Fast-paths only when the add-form would paint
+   * nothing (`addFormPaintsAnything` reads the same `buildFormRenderPlan`
+   * `render()` does, so the gate can't drift from what the user sees) and the
+   * payload matches the form's Add. The payload is `buildInitialValues` +
+   * `coerceFields`, exactly the form's seed/submit, so a seeded `id`/pin isn't
+   * dropped; the one thing skipped is the form's `validateEntries` bail, so a
+   * contradictory required+advanced+no-default schema (unfillable in the form
+   * anyway) surfaces a backend-error toast instead of a client-side block.
+   */
+  private _fastPathFields(entry: ComponentCatalogEntry): Record<string, unknown> | null {
+    // A prefilled/detour selection carries overlays the `{}`-seeded probe
+    // can't predict; show the form. (Detour/restore set `_selected` directly
+    // and bypass this handler, so this is null today — a forward guard.)
+    if (this._prefillReference !== null || this._depPrefill !== null) return null;
+    // Featured entries with presets must submit their locked `config_entries`;
+    // a thin payload would fail backend validation. A degenerate featured
+    // entry with no entries has nothing to lose, so it fast-paths.
+    if (isFeaturedId(entry.id) && entry.config_entries.length > 0) return null;
     const present = parseTopLevelComponents(this.yaml);
+    // `findMissingDependencies` (dotted deps, platform stems) over a plain
+    // top-level-block check, so a stem-satisfied dep doesn't keep a blank
+    // form. The form's async `provides` subtraction isn't replicated — this
+    // stays stricter, only keeping the form a touch more often.
+    if (findMissingDependencies(entry.dependencies ?? [], this.yaml, present).length > 0)
+      return null;
     const seeded = buildInitialValues({
-      entries: result.entry.config_entries,
-      component: result.entry,
+      entries: entry.config_entries,
+      component: entry,
       board: this.board,
       yaml: this.yaml,
       prefillReference: null,
       prefillFields: null,
       localize: this._localize,
     });
-    const paintsNothing = !addFormPaintsAnything(
-      result.entry.config_entries,
-      seeded,
-      result.entry.required_groups ?? [],
-      this.board,
-      present
-    );
-    const hasFeaturedPresets =
-      isFeaturedId(result.entry.id) && result.entry.config_entries.length > 0;
-    // Use the form's own `findMissingDependencies` (dotted deps, platform
-    // stems) rather than a plain top-level-block check, so a dep satisfied
-    // by e.g. a `sensor: platform:` stem doesn't keep a blank form. The
-    // form's async `provides` subtraction isn't replicated here — this stays
-    // stricter (never wrongly auto-adds), only keeping the form a touch more
-    // often for a provides-satisfied dep.
-    const hasMissingDeps =
-      findMissingDependencies(result.entry.dependencies ?? [], this.yaml, present)
-        .length > 0;
-    // Detour/restore flows set `_selected` directly and bypass this handler,
-    // so prefill is null here today. Guard anyway: a prefilled selection
-    // carries overlays/values the `{}`-seeded probe can't predict, so show
-    // the form rather than fast-path with stale inputs.
-    const noPrefill = this._prefillReference === null && this._depPrefill === null;
-    if (paintsNothing && !hasFeaturedPresets && !hasMissingDeps && noPrefill) {
-      const fields = coerceFields(result.entry.config_entries, seeded);
-      await this._submitComponent(fields, /* notify */ true);
-    }
+    if (
+      addFormPaintsAnything(
+        entry.config_entries,
+        seeded,
+        entry.required_groups ?? [],
+        this.board,
+        present
+      )
+    )
+      return null;
+    return coerceFields(entry.config_entries, seeded);
   }
 
   /**
