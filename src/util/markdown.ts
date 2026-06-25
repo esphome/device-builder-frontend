@@ -12,12 +12,11 @@
  * templates so user content is escaped safely (no `unsafeHTML`,
  * nothing gets injected into innerHTML).
  *
- * Nesting is intentionally NOT supported — inline formatting won't
- * cascade inside other inline formatting (no `**bold with `code`**`).
- * The descriptions we get are simple enough that one level of
- * formatting per token covers the vocabulary; supporting nesting
- * would need a real Markdown parser. If that becomes a real problem
- * later, swap this util for `marked` or `micromark`.
+ * Bold and italic render one level of nested inline formatting, so a
+ * link or `` `code` `` inside `**...**` still renders — ESPHome
+ * docstrings bold-wrap links (`**[Action](url)**:`). Deeper nesting
+ * isn't supported; the descriptions we get don't need it. If that
+ * changes, swap this util for `marked` or `micromark`.
  */
 import type { TemplateResult } from "lit";
 import { html, nothing } from "lit";
@@ -113,9 +112,9 @@ function renderSegment(seg: Segment): TemplateResult | string {
     case "code":
       return html`<code class="md-code">${seg.text}</code>`;
     case "bold":
-      return html`<strong>${seg.text}</strong>`;
+      return html`<strong>${parseMarkdown(seg.text).map(renderSegment)}</strong>`;
     case "italic":
-      return html`<em>${seg.text}</em>`;
+      return html`<em>${parseMarkdown(seg.text).map(renderSegment)}</em>`;
   }
 }
 
