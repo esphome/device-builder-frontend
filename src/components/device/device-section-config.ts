@@ -45,6 +45,10 @@ import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import "./device-section-automation-list.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import {
+  selectActionFieldRows,
+  selectTriggerRows,
+} from "./device-section-config/automation-rows.js";
+import {
   applySecuritySecrets,
   flushDraft,
   onDeleteConfirmed,
@@ -604,23 +608,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _renderTriggersTable() {
     const target = this._shortcutTarget();
     if (target === null) return nothing;
-    const rows = parseYamlAutomations(this.yaml)
-      .filter((s) => {
-        if (!s.eventKey) return false;
-        if (target.kind === "device_on") return s.parentKey === "esphome";
-        // Include the component's own triggers and those on its sub-entities.
-        return s.id === target.componentId || s.parentComponentId === target.componentId;
-      })
-      .map((s) => ({
-        key: s.key,
-        // A sub-entity row is prefixed with its name so two readings'
-        // identically-named triggers (Temperature/Humidity → On Value) read
-        // distinctly within the parent component's section.
-        label:
-          s.parentComponentId !== undefined
-            ? `${s.name ?? s.id} → ${this._triggerLabel(s)}`
-            : this._triggerLabel(s),
-      }));
+    const rows = selectTriggerRows(parseYamlAutomations(this.yaml), target, (s) =>
+      this._triggerLabel(s)
+    );
     const heading =
       target.kind === "device_on"
         ? this._localize("device.automations_list_title_device")
@@ -648,12 +638,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _renderActionFieldsTable() {
     const componentId = this._resolveComponentId();
     if (componentId === null) return nothing;
-    const rows = parseYamlAutomations(this.yaml)
-      .filter((s) => s.actionField !== undefined && s.id === componentId)
-      .map((s) => ({
-        key: s.key,
-        label: actionFieldLabel(s.actionField ?? "", this._localize),
-      }));
+    const rows = selectActionFieldRows(
+      parseYamlAutomations(this.yaml),
+      componentId,
+      (field) => actionFieldLabel(field, this._localize)
+    );
     return html`<esphome-section-automation-list
       .heading=${this._localize("device.action_fields_list_title")}
       .rows=${rows}
