@@ -356,11 +356,15 @@ export class ESPHomeAddComponentDialog extends LitElement {
     //
     // The probe and the payload both use the values the form would seed
     // (`buildInitialValues`) coerced exactly as the form's Add does
-    // (`coerceFields`), so the fast-path is provably equivalent to opening
-    // the form and clicking Add: a required+advanced or board-pinned entry
-    // only renders once seeding makes it material (so `{}` would wrongly
-    // fast-path and the form would render it), and a seeded `id`/pin the
-    // form would submit unrendered isn't silently dropped.
+    // (`coerceFields`), so the fast-path matches opening the form and
+    // clicking Add: a required+advanced or board-pinned entry only renders
+    // once seeding makes it material (so `{}` would wrongly fast-path and
+    // the form would render it), and a seeded `id`/pin the form would submit
+    // unrendered isn't silently dropped. The one thing it skips is the
+    // form's `validateEntries` bail, so a contradictory schema (a required
+    // field that is also `advanced` with no default — unfillable in the
+    // form anyway) surfaces a backend-error toast here instead of the
+    // form's client-side block.
     const present = parseTopLevelComponents(this.yaml);
     const seeded = buildInitialValues({
       entries: result.entry.config_entries,
