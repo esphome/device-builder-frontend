@@ -50,9 +50,12 @@ export function selectActionFieldRows(
   fieldLabel: (field: string) => string
 ): AutomationRow[] {
   return sections
-    .filter((s) => s.actionField !== undefined && s.id === componentId)
+    .filter(
+      (s): s is YamlSection & { actionField: string } =>
+        s.actionField !== undefined && s.id === componentId
+    )
     .map((s) => ({
       key: s.key,
-      label: fieldLabel(s.actionField ?? ""),
+      label: fieldLabel(s.actionField),
     }));
 }
