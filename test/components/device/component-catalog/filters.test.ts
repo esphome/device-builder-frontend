@@ -3,24 +3,29 @@ import type { ComponentCatalogEntry } from "../../../../src/api/types/components
 import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
 import { visibleComponents } from "../../../../src/components/device/component-catalog/filters.js";
 
-function entry(id: string, supported_platforms: string[] = []): ComponentCatalogEntry {
+function entry(
+  id: string,
+  supported_platforms: string[] = [],
+  dependencies: string[] = []
+): ComponentCatalogEntry {
   return {
     id,
     multi_conf: true,
-    dependencies: [],
+    dependencies,
     supported_platforms,
   } as unknown as ComponentCatalogEntry;
 }
 
 function host(
   components: ComponentCatalogEntry[],
-  platform: string
+  platform: string,
+  lockedCategories: string[] = []
 ): ESPHomeComponentCatalog {
   return {
     _components: components,
     platform,
     yaml: "",
-    lockedCategories: [],
+    lockedCategories,
   } as unknown as ESPHomeComponentCatalog;
 }
 
@@ -44,5 +49,16 @@ describe("visibleComponents platform gate", () => {
   it("keeps a bk72xx component for a bk72xx board", () => {
     const ids = visibleComponents(host(components, "bk72xx")).map((c) => c.id);
     expect(ids).toEqual(["async_tcp", "bk72xx"]);
+  });
+
+  it("does not count a platform-incompatible dep as satisfied when core-locked", () => {
+    // The variant's only dep is hidden by the platform gate, so it can't be
+    // satisfied from this dialog and the variant must drop too.
+    const locked = [
+      entry("dep.bk72xx", ["bk72xx"]),
+      entry("time.foo", [], ["dep.bk72xx"]),
+    ];
+    const ids = visibleComponents(host(locked, "esp32", ["core"])).map((c) => c.id);
+    expect(ids).toEqual([]);
   });
 });

@@ -19,7 +19,8 @@ import { YamlRawValue } from "./yaml-serialize.js";
 /**
  * Whether an entry restricted to ``supportedPlatforms`` is allowed on the
  * device's ``targetPlatform``. Empty / missing list is "no constraint";
- * an unknown target (``""`` / null) allows everything.
+ * a falsy target (``""`` / null / undefined — platform not yet resolved)
+ * allows everything.
  */
 export function platformSupported(
   supportedPlatforms: string[] | undefined,

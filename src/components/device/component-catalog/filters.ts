@@ -13,18 +13,21 @@ import { categoryChipLabel } from "../component-card-category-label.js";
 import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 
 // Three filters applied client-side:
-//  1. Single-instance components already in the YAML get hidden.
-//     - bare top-level (`web_server`, `wifi`) → match presence of `<id>:`
-//     - platform variant (`time.homeassistant`) → match `<domain>.<platform>`
-//     Multi-conf components always stay visible.
-//  2. Core-locked: drop platform variants whose dependencies can't be
-//     satisfied from this dialog. A dep counts as satisfied when it's
-//     already in the user's YAML OR one of the IDs in this response.
-//  3. Platform gate: drop components incompatible with the device's
+//  1. Platform gate: drop components incompatible with the device's
 //     platform (e.g. bk72xx on an esp32 board). The backend filters too
 //     when it receives `platform`, but the fetch fires once on open and
 //     can race the board resolving with an empty platform; this re-applies
-//     the gate on every render once `host.platform` settles.
+//     the gate on every render once `host.platform` settles. Applied first
+//     so the core dependency-satisfaction set below only counts components
+//     that survive the gate.
+//  2. Single-instance components already in the YAML get hidden.
+//     - bare top-level (`web_server`, `wifi`) → match presence of `<id>:`
+//     - platform variant (`time.homeassistant`) → match `<domain>.<platform>`
+//     Multi-conf components always stay visible.
+//  3. Core-locked: drop platform variants whose dependencies can't be
+//     satisfied from this dialog. A dep counts as satisfied when it's
+//     already in the user's YAML OR one of the platform-compatible IDs in
+//     this response.
 export function visibleComponents(
   host: ESPHomeComponentCatalog
 ): ComponentCatalogEntry[] {
@@ -33,10 +36,14 @@ export function visibleComponents(
     ? parseConfiguredPlatforms(host.yaml)
     : new Set<string>();
   const lockedToCore = host.lockedCategories.length > 0;
-  const coreCompatible = lockedToCore ? new Set(host._components.map((c) => c.id)) : null;
+  const platformCompatible = host._components.filter((c) =>
+    platformSupported(c.supported_platforms, host.platform)
+  );
+  const coreCompatible = lockedToCore
+    ? new Set(platformCompatible.map((c) => c.id))
+    : null;
 
-  return host._components.filter((c) => {
-    if (!platformSupported(c.supported_platforms, host.platform)) return false;
+  return platformCompatible.filter((c) => {
     if (!c.multi_conf) {
       if (c.id.includes(".")) {
         if (presentPlatforms.has(c.id)) return false;
