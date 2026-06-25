@@ -29,7 +29,7 @@ import {
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
 import { coerceFields } from "./add-component-form-coerce.js";
-import { addFormRenderablePaths } from "./add-component-form-filter.js";
+import { addFormPaintsAnything } from "./add-component-form-filter.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
 import { componentDialogTitle } from "./component-card-category-label.js";
 
@@ -341,19 +341,19 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._selected = result.entry;
     this._submitError = "";
     // Skip the empty form and add directly only when the add-form would
-    // paint nothing. `addFormRenderablePaths` is the add-form's own fixed
-    // filter (required-only, no advanced toggle), so the gate matches what
-    // the user would see: an advanced-only component like `socket` (one
-    // `advanced: true` entry) and a component whose only fields are
-    // optional non-`name` (deferred to the section editor) both render
-    // blank, so both fast-path instead of stranding the user. Carve-outs
-    // that keep the form: a missing top-level dependency (e.g.
-    // `captive_portal` needs `wifi`, surfaced by the deps banner) and
-    // featured entries with presets (their locked `config_entries` must be
-    // submitted, so a thin payload would fail backend validation; a
-    // degenerate featured entry with no entries has nothing to lose, so it
-    // fast-paths too). On the rare API failure `_submitComponent` toasts
-    // the error (no form surface).
+    // paint nothing. `addFormPaintsAnything` reads the same
+    // `buildFormRenderPlan` the form's `render()` uses (fields, exclusive
+    // groups, constraint clusters, unsatisfied-constraint banners) under the
+    // add-form's fixed filter, so the gate can't drift from what the user
+    // sees: an advanced-only component like `socket` and a component whose
+    // only fields are optional non-`name` both paint blank and fast-path
+    // instead of stranding the user. Carve-outs that keep the form: a missing
+    // top-level dependency (e.g. `captive_portal` needs `wifi`, surfaced by
+    // the deps banner) and featured entries with presets (their locked
+    // `config_entries` must be submitted, so a thin payload would fail backend
+    // validation; a degenerate featured entry with no entries has nothing to
+    // lose, so it fast-paths too). On the rare API failure `_submitComponent`
+    // toasts the error (no form surface).
     //
     // The probe and the payload both use the values the form would seed
     // (`buildInitialValues`) coerced exactly as the form's Add does
@@ -376,9 +376,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
       prefillFields: null,
       localize: this._localize,
     });
-    const renderable = addFormRenderablePaths(
+    const paintsNothing = !addFormPaintsAnything(
       result.entry.config_entries,
       seeded,
+      result.entry.required_groups ?? [],
       this.board,
       present
     );
@@ -398,7 +399,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // carries overlays/values the `{}`-seeded probe can't predict, so show
     // the form rather than fast-path with stale inputs.
     const noPrefill = this._prefillReference === null && this._depPrefill === null;
-    if (renderable.size === 0 && !hasFeaturedPresets && !hasMissingDeps && noPrefill) {
+    if (paintsNothing && !hasFeaturedPresets && !hasMissingDeps && noPrefill) {
       const fields = coerceFields(result.entry.config_entries, seeded);
       await this._submitComponent(fields, /* notify */ true);
     }

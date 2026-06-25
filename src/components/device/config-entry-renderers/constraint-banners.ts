@@ -10,7 +10,7 @@ export interface ConstraintBannerInputs {
   entries: ConfigEntry[];
   requiredGroups: RequiredGroup[];
   values: Record<string, unknown>;
-  presentComponents: Set<string>;
+  presentComponents: ReadonlySet<string>;
   targetPlatform: string | null;
   formatKeys: (keys: string[]) => string;
 }

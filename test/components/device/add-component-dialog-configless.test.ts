@@ -167,6 +167,43 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _open: boolean })._open).toBe(false);
   });
 
+  it("opens the form for an advanced-only exclusive group (always-shown dropdown)", async () => {
+    // An exclusive_group renders as an always-shown dropdown the user must
+    // choose from, outside the required-only field filter; the gate reads the
+    // same render plan, so it must not fast-path past that choice.
+    const entry = makeComponentEntry("chooser", {
+      name: "Chooser",
+      config_entries: [
+        makeConfigEntry({ key: "mode_a", exclusive_group: "mode", advanced: true }),
+        makeConfigEntry({ key: "mode_b", exclusive_group: "mode", advanced: true }),
+      ],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "chooser");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
+  it("opens the form for an advanced-only constraint cluster (always-shown box)", async () => {
+    // An inclusive `group` folds into an always-shown constraint-cluster box;
+    // like the exclusive case, the gate must keep the form.
+    const entry = makeComponentEntry("clustered", {
+      name: "Clustered",
+      config_entries: [
+        makeConfigEntry({ key: "a", group: "g", advanced: true }),
+        makeConfigEntry({ key: "b", group: "g", advanced: true }),
+      ],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "clustered");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
   it("adds an advanced-only component directly (Socket), toasts, and closes", async () => {
     // `socket` has one entry, `implementation`, marked advanced; the
     // add-form (required-only, no advanced toggle) paints nothing, so it

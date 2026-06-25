@@ -72,13 +72,12 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
 import "../options-combobox.js";
+import { buildFormRenderPlan } from "./config-entry-form-plan.js";
 import {
-  buildConstraintClusters,
   fieldRendererStyles,
   formatConstraintKeys,
   isRadioCluster,
   labelFor,
-  orderExclusiveGroups,
   renderBooleanField,
   renderConstraintClusterField,
   renderConstraintRadioField,
@@ -299,22 +298,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // mandatory fields first. The section editor mirrors the on-disk YAML
     // order, so it's left untouched.
     const entries = this.requiredOnly ? floatRequiredFirst(this.entries) : this.entries;
-    // Each exclusive_group renders as one always-shown dropdown at its
-    // first member's slot; other entries keep the advanced/visibility
-    // filter (the Set preserves order while dropping filtered-out ones).
-    const ordered = orderExclusiveGroups(entries);
-    // Either/or constraints (chipset OR the timing group) fold into one
-    // bordered box at the first member's slot, like exclusive_group; drop the
-    // members from the normal flow so they aren't also rendered loose.
-    const { clusters, memberKeys } = buildConstraintClusters(
+    // Each exclusive_group renders as one always-shown dropdown at its first
+    // member's slot; either/or constraints fold into one bordered box at the
+    // first member's slot; other entries keep the advanced/visibility filter.
+    // `buildFormRenderPlan` is the shared source of truth the dialog's
+    // empty-form gate reads — keep paint decisions there, not inline here.
+    const { ordered, clusters, memberKeys, visible } = buildFormRenderPlan(
       entries,
-      this.requiredGroups
+      this.values,
+      this.requiredGroups,
+      renderFilterOptions(this)
     );
     const clusterByFirstKey = new Map(clusters.map((c) => [c.members[0].key, c]));
-    const nonExclusive = entries.filter(
-      (entry) => !entry.exclusive_group && !memberKeys.has(entry.key)
-    );
-    const visible = new Set(this._filterRenderable(nonExclusive, this.values));
     // An empty key means "this entry IS the whole values dict" —
     // used by top-level user-keyed sections (substitutions:) where
     // the component itself is the map. Pass ``[]`` so the entry's
