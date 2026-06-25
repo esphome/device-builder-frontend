@@ -12,6 +12,7 @@ import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
+import { isFeaturedId } from "../../util/featured-id.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
@@ -26,8 +27,8 @@ import {
   type SelectionHost,
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
+import { addFormRenderablePaths } from "./add-component-form-filter.js";
 import { componentDialogTitle } from "./component-card-category-label.js";
-import { collectRenderablePaths } from "./config-entry-render-filter.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -336,44 +337,32 @@ export class ESPHomeAddComponentDialog extends LitElement {
     }
     this._selected = result.entry;
     this._submitError = "";
-    // Skip the empty form and add directly only when the form would
-    // paint nothing. We probe with the add-form's exact render filter
-    // (`requiredOnly: true`, no advanced toggle — see
-    // `add-component-form.ts:415-417`, and the lockstep probe in
-    // `_anyErrorIsVisible`), so the gate matches what the user would see:
-    // an advanced-only component like `socket` (one `advanced: true`
-    // entry) and a component whose only fields are optional non-`name`
-    // (deferred to the section editor) both render blank, so both
-    // fast-path instead of stranding the user. Carve-outs that keep the
-    // form: a missing top-level dependency (e.g. `captive_portal` needs
-    // `wifi`, surfaced by the deps banner) and featured entries (their
-    // locked presets must be submitted, so `{}` would fail backend
-    // validation). The empty payload is provably `{}`; on the rare API
-    // failure `_submitComponent` toasts the error (no form surface).
+    // Skip the empty form and add directly only when the add-form would
+    // paint nothing. `addFormRenderablePaths` is the add-form's own fixed
+    // filter (required-only, no advanced toggle), so the gate matches what
+    // the user would see: an advanced-only component like `socket` (one
+    // `advanced: true` entry) and a component whose only fields are
+    // optional non-`name` (deferred to the section editor) both render
+    // blank, so both fast-path instead of stranding the user. Carve-outs
+    // that keep the form: a missing top-level dependency (e.g.
+    // `captive_portal` needs `wifi`, surfaced by the deps banner) and
+    // featured entries with presets (their locked `config_entries` must be
+    // submitted, so `{}` would fail backend validation; a degenerate
+    // featured entry with no entries has nothing to lose, so it fast-paths
+    // too). The empty payload is provably `{}`; on the rare API failure
+    // `_submitComponent` toasts the error (no form surface).
     const present = parseTopLevelComponents(this.yaml);
-    const renderable = collectRenderablePaths(
+    const renderable = addFormRenderablePaths(
       result.entry.config_entries,
       {},
-      {
-        requiredOnly: true,
-        showAdvanced: false,
-        presentComponents: present,
-        targetPlatform: this.board?.esphome.platform ?? null,
-      }
+      this.board,
+      present
     );
-    // Featured entries carry locked presets in their `config_entries`;
-    // keep the form so those submit. A degenerate featured entry with no
-    // entries has no presets to lose, so let it fast-path like any other
-    // configless component.
     const hasFeaturedPresets =
-      result.entry.id.startsWith("featured.") && result.entry.config_entries.length > 0;
-    if (renderable.size === 0 && !hasFeaturedPresets) {
-      const hasMissingDeps = (result.entry.dependencies ?? []).some(
-        (d) => !present.has(d)
-      );
-      if (!hasMissingDeps) {
-        await this._submitComponent({}, /* notify */ true);
-      }
+      isFeaturedId(result.entry.id) && result.entry.config_entries.length > 0;
+    const hasMissingDeps = (result.entry.dependencies ?? []).some((d) => !present.has(d));
+    if (renderable.size === 0 && !hasFeaturedPresets && !hasMissingDeps) {
+      await this._submitComponent({}, /* notify */ true);
     }
   }
 

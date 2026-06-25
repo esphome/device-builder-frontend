@@ -13,6 +13,7 @@ import {
   generateDefaultComponentId,
 } from "../../util/default-component-id.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
+import { isFeaturedId } from "../../util/featured-id.js";
 import { setIn } from "../../util/nested-values.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
@@ -150,7 +151,7 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   // when filling a featured entry so a board-pinned (locked) optional
   // field actually emits its preset on submit — otherwise the
   // backend's locked-validation would reject the empty payload.
-  const seedAll = component.id.startsWith("featured.");
+  const seedAll = isFeaturedId(component.id);
   let next = seedDefaults(entries, yaml, localize, seedAll);
 
   const idEntry = entries.find((e) => e.key === "id" && e.type === ConfigEntryType.ID);

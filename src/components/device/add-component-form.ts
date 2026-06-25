@@ -26,12 +26,12 @@ import {
   findMissingDependencies,
 } from "./add-component-deps.js";
 import { coerceFields } from "./add-component-form-coerce.js";
+import { addFormRenderablePaths } from "./add-component-form-filter.js";
 import { overlayOptions, overlayRequired } from "./add-component-form-overlays.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
-import { collectRenderablePaths } from "./config-entry-render-filter.js";
 import { resolveEntryLabel } from "./config-entry-renderers-shared.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -408,13 +408,9 @@ export class ESPHomeAddComponentForm extends LitElement {
   /**
    * True when at least one error in the map lands on an entry the
    * shared ``esphome-config-entry-form`` actually renders. Built on
-   * ``collectRenderablePaths`` so the visibility check stays in
-   * lockstep with the form's render filter — without that lockstep
+   * ``addFormRenderablePaths`` so the visibility check stays in
+   * lockstep with the add-form's render filter — without that lockstep
    * an error on a hidden field would bail the submit silently.
-   *
-   * The add-component form passes ``required-only`` and never
-   * exposes a show-advanced toggle, so we always pass
-   * ``showAdvanced: false`` here.
    */
   private _anyErrorIsVisible(
     errors: Map<string, ValidationError>,
@@ -424,12 +420,12 @@ export class ESPHomeAddComponentForm extends LitElement {
     // ``errors.size > 0``, but we keep the guard so the helper is
     // safe to call from anywhere.
     if (errors.size === 0) return false;
-    const renderedPaths = collectRenderablePaths(this._entries, this._values, {
-      requiredOnly: true,
-      showAdvanced: false,
-      presentComponents,
-      targetPlatform: this.board?.esphome.platform ?? null,
-    });
+    const renderedPaths = addFormRenderablePaths(
+      this._entries,
+      this._values,
+      this.board,
+      presentComponents
+    );
     for (const key of errors.keys()) {
       if (renderedPaths.has(key)) return true;
     }
