@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseYamlSectionValues } from "../../src/util/yaml-section-reader.js";
 import { updateSectionInYaml } from "../../src/util/yaml-section-values.js";
+import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 // A multi_conf list item whose FIRST field is a nested mapping (font.file's
 // structured form). The child-indent detection used to read the item's child
@@ -167,5 +168,165 @@ describe("parseYamlSectionValues — inline comment on the dash-line key", () =>
     const v = parseYamlSectionValues(yaml, "font", 2);
     expect(v.file).toBe("gfonts://Roboto");
     expect(v.id).toBe("f");
+  });
+});
+
+// An mdns service item has scalar keys (service/protocol/port) alongside a
+// nested ``txt:`` map. Under the nested-list-under-a-key path this used to
+// drop the scalar siblings (nested map first) or fall back to YamlRawValue
+// (nested map last/middle), and the under-covered span made the YAML grow a
+// duplicate protocol/service pair on every keystroke.
+describe("parseYamlSectionValues — nested-under-a-key list item with a txt map", () => {
+  const expectFull = (yaml: string) => {
+    const v = parseYamlSectionValues(yaml, "mdns", 1) as Record<string, unknown>;
+    expect(v.services).toEqual([
+      {
+        service: "aioesphome._tcp.local.",
+        protocol: "_tcp",
+        port: "0",
+        txt: { new_1: "fdfd" },
+      },
+    ]);
+  };
+
+  it("captures siblings when the txt map is FIRST", () => {
+    expectFull(`mdns:
+  services:
+    - txt:
+        new_1: fdfd
+      service: aioesphome._tcp.local.
+      protocol: _tcp
+      port: 0
+`);
+  });
+
+  it("captures the txt map when it is LAST", () => {
+    expectFull(`mdns:
+  services:
+    - service: aioesphome._tcp.local.
+      protocol: _tcp
+      port: 0
+      txt:
+        new_1: fdfd
+`);
+  });
+
+  it("captures the txt map when it is in the MIDDLE", () => {
+    expectFull(`mdns:
+  services:
+    - service: aioesphome._tcp.local.
+      txt:
+        new_1: fdfd
+      protocol: _tcp
+      port: 0
+`);
+  });
+
+  it("does not misread a flat sibling as nested when the dash has extra spaces", () => {
+    // ``-   txt:`` (3 spaces after the dash) puts the key column past the
+    // canonical ``dashIndent + 2``. With an empty ``txt:`` followed straight by
+    // flat siblings, the nested-vs-sibling threshold must track the real key
+    // column or ``protocol`` / ``service`` get swallowed as txt's nested map.
+    const v = parseYamlSectionValues(
+      `mdns:
+  services:
+    -   txt:
+        protocol: _tcp
+        service: aioesphome._tcp.local.
+`,
+      "mdns",
+      1
+    ) as Record<string, unknown>;
+    expect(v.services).toEqual([
+      { txt: null, protocol: "_tcp", service: "aioesphome._tcp.local." },
+    ]);
+  });
+
+  it("round-trips and does not grow when one field is edited (regression)", () => {
+    const yaml = `mdns:
+  services:
+    - service: aioesphome._tcp.local.
+      protocol: _tcp
+      txt:
+        new_1: fdfd
+`;
+    const v = parseYamlSectionValues(yaml, "mdns", 1) as Record<string, unknown>;
+    // Idempotent: re-emitting the parsed values reproduces the input.
+    expect(updateSectionInYaml(yaml, "mdns", v, 1)).toBe(yaml);
+    // Editing protocol yields exactly one protocol/service line, no growth.
+    (v.services as Record<string, unknown>[])[0].protocol = "_tcpx";
+    const out = updateSectionInYaml(yaml, "mdns", v, 1);
+    expect((out.match(/protocol:/g) ?? []).length).toBe(1);
+    expect((out.match(/service:/g) ?? []).length).toBe(1);
+    expect(out).toContain("protocol: _tcpx");
+  });
+
+  it("heals an already-corrupted item once a field is edited", () => {
+    const corrupt = `mdns:
+  services:
+    - txt:
+        new_1: fdfd
+      protocol: _tcpnewest
+      service: aioesphome._tcp.local.
+      protocol: _tcpolder
+      service: aioesphome._tcp.local.
+`;
+    const v = parseYamlSectionValues(corrupt, "mdns", 1) as Record<string, unknown>;
+    (v.services as Record<string, unknown>[])[0].protocol = "_tcp";
+    const out = updateSectionInYaml(corrupt, "mdns", v, 1);
+    expect(parseYamlSectionValues(out, "mdns", 1).services).toEqual([
+      {
+        txt: { new_1: "fdfd" },
+        protocol: "_tcp",
+        service: "aioesphome._tcp.local.",
+      },
+    ]);
+  });
+
+  it("captures every entry of a multi-key txt map", () => {
+    const yaml = `mdns:
+  services:
+    - service: aioesphome._tcp.local.
+      txt:
+        new_1: fdfd
+        version: "1.0"
+      protocol: _tcp
+`;
+    expect(parseYamlSectionValues(yaml, "mdns", 1).services).toEqual([
+      {
+        service: "aioesphome._tcp.local.",
+        txt: { new_1: "fdfd", version: "1.0" },
+        protocol: "_tcp",
+      },
+    ]);
+  });
+
+  it("parses every item when the first leads with a txt map and a later one does not", () => {
+    // childIndent is derived once from the first dash; a txt-first first item
+    // must not mis-level the sibling columns of a service-first second item.
+    const yaml = `mdns:
+  services:
+    - txt:
+        new_1: fdfd
+      service: a._tcp.local.
+      protocol: _tcp
+    - service: b._tcp.local.
+      protocol: _udp
+`;
+    expect(parseYamlSectionValues(yaml, "mdns", 1).services).toEqual([
+      { txt: { new_1: "fdfd" }, service: "a._tcp.local.", protocol: "_tcp" },
+      { service: "b._tcp.local.", protocol: "_udp" },
+    ]);
+  });
+
+  it("still falls back to YamlRawValue for a nested LIST (automation handler)", () => {
+    const yaml = `mdns:
+  services:
+    - service: aioesphome._tcp.local.
+      on_press:
+        - logger.log: hi
+`;
+    const v = parseYamlSectionValues(yaml, "mdns", 1) as Record<string, unknown>;
+    expect(v.services).toBeInstanceOf(YamlRawValue);
   });
 });

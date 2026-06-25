@@ -25,6 +25,7 @@ import {
   isListItemLine,
   KEY_PATTERN,
   LIST_ITEM_BARE_DASH_RE,
+  LIST_ITEM_INLINE_KEY_PREFIX_RE,
   listItemRegexFor,
   parseBlockScalarHeader,
 } from "./yaml-section-lexer.js";
@@ -73,9 +74,18 @@ const parseListBlock = (
     startIdx,
     canonicalDashIndent
   );
-  const childIndent =
-    _detectListItemChildIndent(lines, firstDashIdx + 1, dashIndent) ??
-    `${dashIndent}${ESPHOME_YAML_INDENT}`;
+  // An inline key on the dash line (``- service:`` / ``- txt:``) fixes the
+  // item's child-key column at that key, even when its value is a deeper
+  // nested map — scanning the next line would read the grandchild indent and
+  // drop the siblings (#1389). Mirrors `_detectSectionChildIndent`; bare-dash
+  // placeholders fall through to the next-line scan. Child keys hand-indented
+  // *deeper* than this column route to the safe raw fallback rather than
+  // parsing structurally — the same tradeoff `_detectSectionChildIndent` makes.
+  const inlineKey = (lines[firstDashIdx] ?? "").match(LIST_ITEM_INLINE_KEY_PREFIX_RE);
+  const childIndent = inlineKey
+    ? " ".repeat(inlineKey[1].length)
+    : (_detectListItemChildIndent(lines, firstDashIdx + 1, dashIndent) ??
+      `${dashIndent}${ESPHOME_YAML_INDENT}`);
   const { endIdx, isComplex } = _scanValueBlock(lines, startIdx, parentIndent);
 
   // Complex blocks are anything beyond a flat scalar list (block
@@ -118,12 +128,32 @@ const parseListBlock = (
 };
 
 /**
+ * Parse a nested mapping under an empty-valued ``key:`` line (``txt:`` then a
+ * deeper ``new_1: …``). *keyLineIdx* is the ``key:`` line; the block must
+ * begin on the next non-blank line strictly deeper than *minIndent*. Returns
+ * the parsed values + resume index, ``"bail"`` for a nested *list* (``- …`` —
+ * an automation handler the editor can't round-trip inline), or ``null`` when
+ * no deeper block follows (the key is a plain empty scalar).
+ */
+const _nestedMappingUnderKey = (
+  lines: string[],
+  keyLineIdx: number,
+  minIndent: number
+): { values: Record<string, unknown>; endIdx: number } | "bail" | null => {
+  const peek = _skipBlankAndCommentLines(lines, keyLineIdx + 1);
+  if (peek >= lines.length) return null;
+  const peekLead = _leadingIndent(lines[peek]);
+  if (peekLead.length <= minIndent) return null;
+  if (lines[peek].slice(peekLead.length).startsWith("-")) return "bail";
+  return parseNestedBlock(lines, keyLineIdx + 1, peekLead);
+};
+
+/**
  * Walk follow-up sub-key lines under a list-item dash and merge
  * them into *item*. Stops at the next sibling dash, blank-then-EOF,
  * or a back-out. Returns the line index after the last sub-key,
  * or ``null`` if anything outside the flat-mapping contract turned
- * up (line strictly deeper than ``childIndent`` ⇒ nested mapping;
- * unmatched key shape; dotted key; block scalar; empty raw).
+ * up (unmatched key shape; dotted key; block scalar; nested list).
  * Mutates *item* in place — keeps the caller's outer loop from
  * having to thread two return values.
  */
@@ -147,6 +177,20 @@ const _parseItemSubKeys = (
     if (sub.startsWith(`${childIndent} `)) return null;
     const field = _matchFlatMappingField(sub, childRe);
     if (!field) return null;
+    // An empty ``key:`` may open a nested mapping (an mdns ``txt:`` map);
+    // capture it as the value and resume so siblings on either side survive.
+    if (field.value === null) {
+      const nested = _nestedMappingUnderKey(lines, j, childIndent.length);
+      if (nested === "bail") return null;
+      if (nested) {
+        // Match the polymorphic call site: store the map only when non-empty,
+        // else keep the bare ``key:`` (null) rather than an empty ``{}``.
+        item[field.key] =
+          Object.keys(nested.values).length > 0 ? nested.values : field.value;
+        j = nested.endIdx;
+        continue;
+      }
+    }
     item[field.key] = field.value;
     j++;
   }
@@ -244,29 +288,28 @@ const collectBlockListMappings = (
       // upgrade the value from ``null`` to ``{params}``.
       if (header.value === null) firstEmptyKey = header.key;
     }
-    // Polymorphic branch (#941, light ``effects:``): a dash header
-    // with a single-key empty value can carry its params at strictly
-    // deeper indent than the dash-line key column. The threshold is
-    // ``dashIndent.length + 2`` (the column of the key after ``- ``),
-    // NOT the detected ``childIndent`` — the latter collapses to the
-    // deeper indent when no flat sibling exists, breaking the
-    // discriminator between "nested under empty key" and "flat sibling
-    // sub-keys". Bail on list-shaped nested content (``- then:`` →
-    // ``  - logger.log:``) so automation handlers still round-trip via
-    // YamlRawValue.
+    // Polymorphic branch (#941, light ``effects:``): a dash header with a
+    // single-key empty value can carry its params at strictly deeper indent
+    // than the dash-line key column. The threshold is that inline-key column,
+    // derived from this item's ``-`` + spaces prefix so a non-canonical
+    // ``-   key:`` doesn't misread a flat sibling at the key column as nested.
+    // Bail on list-shaped nested content (``- then:`` → ``  - logger.log:``)
+    // so automation handlers still round-trip via YamlRawValue.
     if (firstEmptyKey !== null) {
-      const dashKeyColumn = dashIndent.length + 2;
-      const peek = _skipBlankAndCommentLines(lines, at + 1);
-      if (peek < lines.length) {
-        const peekLead = _leadingIndent(lines[peek]);
-        if (peekLead.length > dashKeyColumn) {
-          if (lines[peek].slice(peekLead.length).startsWith("-")) return null;
-          const sub = parseNestedBlock(lines, at + 1, peekLead);
-          if (Object.keys(sub.values).length > 0) {
-            item[firstEmptyKey] = sub.values;
-          }
-          return { item, endIdx: sub.endIdx };
+      const keyColumn =
+        lines[at].match(LIST_ITEM_INLINE_KEY_PREFIX_RE)?.[1].length ??
+        dashIndent.length + 2;
+      const nested = _nestedMappingUnderKey(lines, at, keyColumn);
+      if (nested === "bail") return null;
+      if (nested) {
+        if (Object.keys(nested.values).length > 0) {
+          item[firstEmptyKey] = nested.values;
         }
+        // Absorb trailing flat siblings after the leading nested map (an mdns
+        // ``- txt:`` item followed by ``protocol`` / ``service``). With no
+        // siblings (light ``effects:``) the walk stops at the next dash.
+        const after = _parseItemSubKeys(lines, nested.endIdx, childIndent, childRe, item);
+        return after === null ? null : { item, endIdx: after };
       }
     }
     const after = _parseItemSubKeys(lines, at + 1, childIndent, childRe, item);

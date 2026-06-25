@@ -1742,11 +1742,10 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     expect(values.actions).toBeInstanceOf(YamlRawValue);
   });
 
-  it("falls back to YamlRawValue when items have nested mappings under a sub-key", () => {
-    // ``- key:\n      sub_key:`` (sub_key with empty raw, opening
-    // a deeper mapping) carries shape the flat-mapping helper
-    // can't model. The conservative bail-out keeps the block raw
-    // so the deeper content survives a round-trip.
+  it("structures items that have a nested mapping under a sub-key", () => {
+    // ``- key:\n      sub_key:`` (sub_key opening a deeper mapping) is now
+    // captured as a structured item with its nested value, and round-trips
+    // byte-identically, so the field stays editable in the visual form.
     const yaml = `sensor:
   - platform: template
     name: outside_temp
@@ -1756,7 +1755,8 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
           delta: 0.5
 `;
     const values = parseYamlSectionValues(yaml, "sensor.template", 2);
-    expect(values.triggers).toBeInstanceOf(YamlRawValue);
+    expect(values.triggers).toEqual([{ id: "my_trigger", filters: { delta: "0.5" } }]);
+    expect(updateSectionInYaml(yaml, "sensor.template", values, 2)).toBe(yaml);
   });
 
   it("parses effects from the #941 reporter's exact YAML shape", () => {
