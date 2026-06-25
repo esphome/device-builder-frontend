@@ -130,6 +130,62 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _open: boolean })._open).toBe(false);
   });
 
+  it("adds an advanced-only component directly (Socket), toasts, and closes", async () => {
+    // `socket` has one entry, `implementation`, marked advanced; the
+    // add-form (required-only, no advanced toggle) paints nothing, so it
+    // must fast-path like a configless component instead of an empty form.
+    const entry = makeComponentEntry("socket", {
+      name: "Socket",
+      config_entries: [makeConfigEntry({ key: "implementation", advanced: true })],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "socket");
+
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "socket", fields: {} },
+      "esphome:\n  name: foo\n"
+    );
+    expect(toast.success).toHaveBeenCalledWith("device.component_added", {
+      richColors: true,
+    });
+    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
+  });
+
+  it("opens the form for an advanced-only component with a missing dependency", async () => {
+    const entry = makeComponentEntry("socket", {
+      name: "Socket",
+      config_entries: [makeConfigEntry({ key: "implementation", advanced: true })],
+      dependencies: ["network"],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "socket");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
+    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
+  it("opens the form for a featured advanced-only entry (locked presets)", async () => {
+    // A featured entry seeds locked presets the backend requires; a `{}`
+    // fast-path would drop them, so it must always show the form even when
+    // every entry is advanced/optional.
+    const entry = makeComponentEntry("featured.bw15.socket", {
+      name: "Socket",
+      config_entries: [makeConfigEntry({ key: "implementation", advanced: true })],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "featured.bw15.socket");
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
+    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
   it("toasts the error and keeps the dialog open when a configless add fails", async () => {
     const entry = makeComponentEntry("async_tcp", {
       name: "Async TCP",

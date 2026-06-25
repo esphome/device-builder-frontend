@@ -27,6 +27,7 @@ import {
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
 import { componentDialogTitle } from "./component-card-category-label.js";
+import { collectRenderablePaths } from "./config-entry-render-filter.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -335,16 +336,32 @@ export class ESPHomeAddComponentDialog extends LitElement {
     }
     this._selected = result.entry;
     this._submitError = "";
-    // Skip the empty form and add directly only when there is genuinely
-    // nothing to show: no config fields AND no missing top-level
-    // dependencies. A configless component can still require other
-    // components (e.g. `captive_portal` needs `wifi`), in which case the
-    // form's deps banner guides the user, so keep showing it. The empty
-    // schema makes the fields payload provably `{}` (no defaults, id, or
-    // pins to seed); on the rare API failure `_submitComponent` toasts
-    // the error (see its catch) since there's no form surface for it.
-    if (result.entry.config_entries.length === 0) {
-      const present = parseTopLevelComponents(this.yaml);
+    // Skip the empty form and add directly only when there is no
+    // non-advanced field to show. The add-form has no "show advanced"
+    // toggle, so an advanced-only component like `socket` (one
+    // `advanced: true` entry) would otherwise strand the user behind a
+    // blank dialog, same dead-end as a configless component. We probe
+    // with `requiredOnly: false` so a component with an *optional*
+    // non-advanced field still opens the form (only advanced/hidden/
+    // platform-gated entries are dropped). Carve-outs that keep the form:
+    // a missing top-level dependency (e.g. `captive_portal` needs `wifi`,
+    // surfaced by the deps banner) and featured entries (their locked
+    // presets must be submitted, so `{}` would fail backend validation).
+    // The empty schema makes the fields payload provably `{}`; on the rare
+    // API failure `_submitComponent` toasts the error (no form surface).
+    const present = parseTopLevelComponents(this.yaml);
+    const renderable = collectRenderablePaths(
+      result.entry.config_entries,
+      {},
+      {
+        requiredOnly: false,
+        showAdvanced: false,
+        presentComponents: present,
+        targetPlatform: this.board?.esphome.platform ?? null,
+      }
+    );
+    const isFeatured = result.entry.id.startsWith("featured.");
+    if (renderable.size === 0 && !isFeatured) {
       const hasMissingDeps = (result.entry.dependencies ?? []).some(
         (d) => !present.has(d)
       );
