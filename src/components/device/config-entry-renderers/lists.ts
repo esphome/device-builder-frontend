@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
@@ -217,12 +218,16 @@ export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCt
   };
 
   // Key input commits on blur — committing on every keystroke would re-key
-  // the row mid-edit and steal focus. Non-primitive values render as a
-  // "edit in YAML" placeholder so substitutions carrying arbitrary YAML
-  // aren't stringified to [object Object] and lost on save.
+  // the row mid-edit and steal focus. Complex (non-primitive, non-lambda)
+  // values render as a "edit in YAML" placeholder so substitutions carrying
+  // arbitrary YAML aren't stringified to [object Object] and lost on save.
   const renderRow = (rowKey: string) => {
     const valuePath = [...path, rowKey];
-    const complex = !isPrimitiveOrNullish(map[rowKey]);
+    // A lambda (``!lambda`` object) isn't a structural complex value — it's a
+    // templatable scalar the value template renders inline (lambda mode), so
+    // route it through the template rather than the edit-in-YAML placeholder.
+    const rawValue = map[rowKey];
+    const complex = !isPrimitiveOrNullish(rawValue) && !isLambdaValue(rawValue);
     return html`
       <div class="map-row" data-field-key=${fieldKeyAttr(valuePath)}>
         <input

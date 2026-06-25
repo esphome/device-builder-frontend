@@ -131,6 +131,20 @@ describe("renderMapField (substitutions / logger.logs / etc.)", () => {
     expect(paths).toEqual([["simple"]]);
   });
 
+  it("renders a lambda value inline via the value template (not the placeholder)", () => {
+    // A ``!lambda`` value is an object, but it isn't a structural complex
+    // value — the templatable value template edits it inline (lambda mode),
+    // so it must reach renderEntry rather than the edit-in-YAML placeholder.
+    const values = {
+      simple: "hello",
+      code: { _lambda: "return 1;", _tag: "!lambda" },
+    };
+    const stub = makeCtx(values);
+    renderMapField(makeMapEntry(), [], stub.ctx);
+    const paths = stub.renderEntry.mock.calls.map((c) => c[1]);
+    expect(paths).toEqual([["simple"], ["code"]]);
+  });
+
   it("treats every primitive shape as editable: string, number, boolean, null", () => {
     // Validates that ``isPrimitiveOrNullish`` covers the YAML
     // scalar set ESPHome substitutions surface as.
