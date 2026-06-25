@@ -321,17 +321,14 @@ export class ESPHomeLogsDialog extends LitElement {
           ?streaming=${streaming}
         >
           ${this._backToInstall
-            ? html`<button
-                slot="toolbar-left"
-                class="term-btn term-btn--ghost term-btn--with-icon"
-                @click=${this._onBackToInstall}
-                title=${this._localize("dashboard.logs_back_to_install_tooltip")}
-              >
-                <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                <span class="term-btn__label"
-                  >${this._localize("dashboard.logs_back_to_install")}</span
-                >
-              </button>`
+            ? html`<div class="toolbar-slot" slot="toolbar-left">
+                ${renderTermButton({
+                  icon: "arrow-left",
+                  label: this._localize("dashboard.logs_back_to_install"),
+                  title: this._localize("dashboard.logs_back_to_install_tooltip"),
+                  onClick: this._onBackToInstall,
+                })}
+              </div>`
             : ""}
           <div class="toolbar-slot" slot="toolbar-right">
             ${passive
