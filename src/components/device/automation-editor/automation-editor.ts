@@ -56,6 +56,7 @@ import {
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
@@ -585,14 +586,7 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  ``interval.then``'s own config_entries is empty); everything
    *  else stays on the trigger's own config_entries. */
   private _paramFormEntries(activeTrigger: AutomationTrigger | null): ConfigEntry[] {
-    if (this.location?.kind === "interval") {
-      const comp = this._intervalComponent;
-      if (!comp) return [];
-      // ``then:`` is the actions block — we render it via the
-      // action-list, not the form.
-      return comp.config_entries.filter((e) => e.key !== "then");
-    }
-    return activeTrigger?.config_entries ?? [];
+    return triggerParamFormEntries(this.location, this._intervalComponent, activeTrigger);
   }
 
   /**
