@@ -109,10 +109,14 @@ export const termButtonStyles = css`
      toolbar stays on one row instead of wrapping (#542 follow-up). The label
      is visually hidden, not removed, so it still names the button for screen
      readers; the title attribute keeps the tooltip. Icon-less buttons (e.g.
-     the command dialog's text-only Close) have no wa-icon, so they keep their
-     label and are never left empty. */
+     the command dialog's text-only Close) lack term-btn--with-icon, so they
+     keep their label and are never left empty. Class-driven, not :has(wa-icon):
+     when Lit recycles a button across a state change (running Stop becoming an
+     icon-less Close), Safari does not re-invalidate :has() on the removed icon,
+     leaving the label clipped on an empty button; the class binding updates
+     reliably. */
   @media (max-width: ${MOBILE_BREAKPOINT}px) {
-    .term-btn:has(wa-icon) .term-btn__label {
+    .term-btn--with-icon .term-btn__label {
       position: absolute;
       width: 1px;
       height: 1px;

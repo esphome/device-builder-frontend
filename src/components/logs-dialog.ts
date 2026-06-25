@@ -323,7 +323,7 @@ export class ESPHomeLogsDialog extends LitElement {
           ${this._backToInstall
             ? html`<button
                 slot="toolbar-left"
-                class="term-btn term-btn--ghost"
+                class="term-btn term-btn--ghost term-btn--with-icon"
                 @click=${this._onBackToInstall}
                 title=${this._localize("dashboard.logs_back_to_install_tooltip")}
               >

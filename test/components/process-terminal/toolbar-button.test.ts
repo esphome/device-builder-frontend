@@ -43,6 +43,16 @@ describe("renderTermButton", () => {
     expect(btn.querySelector("wa-icon")?.getAttribute("name")).toBe("restart");
   });
 
+  it("marks icon buttons with term-btn--with-icon so only they collapse on mobile", () => {
+    const withIcon = mount(
+      renderTermButton({ icon: "stop", label: "Stop", onClick: () => {} })
+    );
+    expect(withIcon.className).toContain("term-btn--with-icon");
+    // Icon-less buttons (Close) keep their label and must not be collapsed.
+    const iconless = mount(renderTermButton({ label: "Close", onClick: () => {} }));
+    expect(iconless.className).not.toContain("term-btn--with-icon");
+  });
+
   it("uses title as the accessible name for an icon-only button", () => {
     const btn = mount(
       renderTermButton({ icon: "download", title: "Download", onClick: () => {} })
