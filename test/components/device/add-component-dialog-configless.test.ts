@@ -76,10 +76,10 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
   });
 
-  it("opens the form (no direct add) when the component has options", async () => {
+  it("opens the form (no direct add) when the component has a required field", async () => {
     const entry = makeComponentEntry("wifi", {
       name: "WiFi",
-      config_entries: [makeConfigEntry({ key: "ssid" })],
+      config_entries: [makeConfigEntry({ key: "ssid", required: true })],
     });
     const { dialog, addComponent } = makeDialog(entry);
 
@@ -88,6 +88,42 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect(addComponent).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
     // Form view: the entry is selected, dialog stays open.
+    expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
+    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
+  it("adds directly when the only fields are optional and non-name", async () => {
+    // The add form renders required-only, so an optional non-`name` field
+    // is never painted; opening the form would be the same blank dead-end,
+    // so it fast-paths like an advanced-only component.
+    const entry = makeComponentEntry("debug", {
+      name: "Debug",
+      config_entries: [makeConfigEntry({ key: "update_interval" })],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "debug");
+
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "debug", fields: {} },
+      "esphome:\n  name: foo\n"
+    );
+    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+  });
+
+  it("opens the form when an always-shown name field survives required-only", async () => {
+    // `name` is on the always-shown allowlist, so a component with just a
+    // name still paints a field — keep the form.
+    const entry = makeComponentEntry("sensor.template", {
+      name: "Template Sensor",
+      config_entries: [makeConfigEntry({ key: "name" })],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "sensor.template");
+
+    expect(addComponent).not.toHaveBeenCalled();
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
     expect((dialog as unknown as { _open: boolean })._open).toBe(true);
   });
@@ -184,6 +220,23 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect(addComponent).not.toHaveBeenCalled();
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
     expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+  });
+
+  it("fast-paths a featured entry that has no config entries (no presets to lose)", async () => {
+    const entry = makeComponentEntry("featured.bw15.async_tcp", {
+      name: "Async TCP",
+      config_entries: [],
+    });
+    const { dialog, addComponent } = makeDialog(entry);
+
+    await select(dialog, "featured.bw15.async_tcp");
+
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "featured.bw15.async_tcp", fields: {} },
+      "esphome:\n  name: foo\n"
+    );
+    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
   });
 
   it("toasts the error and keeps the dialog open when a configless add fails", async () => {

@@ -336,32 +336,38 @@ export class ESPHomeAddComponentDialog extends LitElement {
     }
     this._selected = result.entry;
     this._submitError = "";
-    // Skip the empty form and add directly only when there is no
-    // non-advanced field to show. The add-form has no "show advanced"
-    // toggle, so an advanced-only component like `socket` (one
-    // `advanced: true` entry) would otherwise strand the user behind a
-    // blank dialog, same dead-end as a configless component. We probe
-    // with `requiredOnly: false` so a component with an *optional*
-    // non-advanced field still opens the form (only advanced/hidden/
-    // platform-gated entries are dropped). Carve-outs that keep the form:
-    // a missing top-level dependency (e.g. `captive_portal` needs `wifi`,
-    // surfaced by the deps banner) and featured entries (their locked
-    // presets must be submitted, so `{}` would fail backend validation).
-    // The empty schema makes the fields payload provably `{}`; on the rare
-    // API failure `_submitComponent` toasts the error (no form surface).
+    // Skip the empty form and add directly only when the form would
+    // paint nothing. We probe with the add-form's exact render filter
+    // (`requiredOnly: true`, no advanced toggle — see
+    // `add-component-form.ts:415-417`, and the lockstep probe in
+    // `_anyErrorIsVisible`), so the gate matches what the user would see:
+    // an advanced-only component like `socket` (one `advanced: true`
+    // entry) and a component whose only fields are optional non-`name`
+    // (deferred to the section editor) both render blank, so both
+    // fast-path instead of stranding the user. Carve-outs that keep the
+    // form: a missing top-level dependency (e.g. `captive_portal` needs
+    // `wifi`, surfaced by the deps banner) and featured entries (their
+    // locked presets must be submitted, so `{}` would fail backend
+    // validation). The empty payload is provably `{}`; on the rare API
+    // failure `_submitComponent` toasts the error (no form surface).
     const present = parseTopLevelComponents(this.yaml);
     const renderable = collectRenderablePaths(
       result.entry.config_entries,
       {},
       {
-        requiredOnly: false,
+        requiredOnly: true,
         showAdvanced: false,
         presentComponents: present,
         targetPlatform: this.board?.esphome.platform ?? null,
       }
     );
-    const isFeatured = result.entry.id.startsWith("featured.");
-    if (renderable.size === 0 && !isFeatured) {
+    // Featured entries carry locked presets in their `config_entries`;
+    // keep the form so those submit. A degenerate featured entry with no
+    // entries has no presets to lose, so let it fast-path like any other
+    // configless component.
+    const hasFeaturedPresets =
+      result.entry.id.startsWith("featured.") && result.entry.config_entries.length > 0;
+    if (renderable.size === 0 && !hasFeaturedPresets) {
       const hasMissingDeps = (result.entry.dependencies ?? []).some(
         (d) => !present.has(d)
       );
