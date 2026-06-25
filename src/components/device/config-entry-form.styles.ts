@@ -391,14 +391,35 @@ export const configEntryFormStyles = css`
 
   /* Inside a map row the value's label and description are
      redundant (the map itself has those at the top) — suppress
-     them so each row stays compact. */
+     them so each row stays compact. A templatable value (Value / λ
+     Lambda toggle) nests its field one level deeper under
+     .templatable-field, so match that too or the label re-appears
+     and offsets the input. */
   .map-row .map-value > .field > label,
-  .map-row .map-value > .field > p.field-description {
+  .map-row .map-value > .field > p.field-description,
+  .map-row .map-value > .templatable-field > .field > label,
+  .map-row .map-value > .templatable-field > .field > p.field-description {
     display: none;
   }
 
-  .map-row .map-value > .field {
+  .map-row .map-value > .field,
+  .map-row .map-value > .templatable-field > .field {
     gap: 0;
+  }
+
+  /* A templatable value stacks its Value / λ Lambda toggle above the input
+     (a full-width field column). In a compact map row that drops the input
+     below the toggle and out of line with the key; lay the toggle and input
+     on one row instead so the value aligns with the key input. */
+  .map-row .map-value > .templatable-field {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+  }
+
+  .map-row .map-value > .templatable-field > .field {
+    flex: 1;
+    min-width: 0;
   }
 
   /* "Complex value — edit in YAML" placeholder for map rows whose
