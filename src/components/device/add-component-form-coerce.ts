@@ -1,6 +1,7 @@
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { coerceIntFieldValue } from "../../util/int-input.js";
+import { asMappingList } from "../../util/nested-values.js";
 import { parseYamlBoolean } from "../../util/yaml-serialize.js";
 
 /**
@@ -20,6 +21,17 @@ export function coerceFields(
     const raw = values[entry.key];
 
     if (entry.type === ConfigEntryType.NESTED) {
+      // multi_value NESTED is a repeatable list of mappings (usb_uart
+      // channels, esphome.devices/areas): coerce each item and keep the
+      // array; without this the field is silently dropped from the
+      // payload and the backend rejects the required field.
+      if (entry.multi_value) {
+        const items = asMappingList(raw)
+          .map((item) => coerceFields(entry.config_entries ?? [], item))
+          .filter((item) => Object.keys(item).length > 0);
+        if (items.length > 0) out[entry.key] = items;
+        continue;
+      }
       const childValues =
         raw !== null && typeof raw === "object" && !Array.isArray(raw)
           ? (raw as Record<string, unknown>)

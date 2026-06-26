@@ -81,3 +81,50 @@ describe("coerceFields nested entity readings", () => {
     expect(coerceFields([tvoc], { tvoc: {} })).toEqual({});
   });
 });
+
+describe("coerceFields multi_value nested list (usb_uart channels)", () => {
+  const channels = makeConfigEntry({
+    key: "channels",
+    type: ConfigEntryType.NESTED,
+    multi_value: true,
+    required: true,
+    config_entries: [
+      makeConfigEntry({ key: "id", type: ConfigEntryType.ID, required: true }),
+      makeConfigEntry({
+        key: "baud_rate",
+        type: ConfigEntryType.INTEGER,
+        required: true,
+      }),
+    ],
+  });
+
+  test("a populated channels list survives with its baud_rate coerced to a number", () => {
+    expect(
+      coerceFields([channels], { channels: [{ id: "usb_cdc_0", baud_rate: "4800" }] })
+    ).toEqual({ channels: [{ id: "usb_cdc_0", baud_rate: 4800 }] });
+  });
+
+  test("multiple channels round-trip in order", () => {
+    expect(
+      coerceFields([channels], {
+        channels: [
+          { id: "usb_cdc_0", baud_rate: "4800" },
+          { id: "usb_cdc_1", baud_rate: "9600" },
+        ],
+      })
+    ).toEqual({
+      channels: [
+        { id: "usb_cdc_0", baud_rate: 4800 },
+        { id: "usb_cdc_1", baud_rate: 9600 },
+      ],
+    });
+  });
+
+  test("an empty list drops out of the payload", () => {
+    expect(coerceFields([channels], { channels: [] })).toEqual({});
+  });
+
+  test("a list of only-empty items drops out of the payload", () => {
+    expect(coerceFields([channels], { channels: [{}] })).toEqual({});
+  });
+});
