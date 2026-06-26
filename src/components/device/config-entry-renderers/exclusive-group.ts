@@ -8,8 +8,8 @@ import {
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
-// Non-empty sentinel so _syncSelectedAttr (which no-ops on "") still
-// selects the placeholder on first paint; mapped back to "" in onChange.
+// Non-empty sentinel so the group always has a `?selected` option for
+// _syncSelectedAttr to push on first paint; mapped back to "" in onChange.
 const NO_SELECTION = "__none__";
 
 // Fold each exclusive_group to its member array at its first member's slot;
