@@ -1,3 +1,4 @@
+import { isFeaturedId } from "./featured-id.js";
 import { readInstanceScalar } from "./yaml-sections-core.js";
 
 /**
@@ -29,10 +30,17 @@ export function generateDefaultComponentId(
   multiConf: boolean,
   existing: ReadonlySet<string>
 ): string | null {
-  const isSingleton = !multiConf && !componentId.includes(".");
+  // A featured id (`featured.<board>.<local>`) carries dots but wraps one
+  // underlying component, so judge singleton-ness by `multiConf` alone —
+  // the dotted form would otherwise always read as a platform entry and a
+  // single-instance wrap (ethernet, wifi) would wrongly get an id.
+  const looksPlatform = isFeaturedId(componentId) ? false : componentId.includes(".");
+  const isSingleton = !multiConf && !looksPlatform;
   if (isSingleton) return null;
 
-  const slug = componentId.replace(/\./g, "_").toLowerCase();
+  // Normalise to a valid ESPHome id ([a-zA-Z_][a-zA-Z0-9_]*): a featured
+  // board id carries dashes (`esp32-poe-iso`) which dots-only wouldn't strip.
+  const slug = componentId.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
   let n = 1;
   let candidate = `${slug}_${n}`;
   while (existing.has(candidate)) {

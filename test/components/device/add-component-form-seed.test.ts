@@ -79,6 +79,7 @@ describe("add-component-form resolves featured id references to the live config"
           references_component: "i2c",
           default_value: "i2c_bus",
           locked: presetLocked,
+          from_preset: true,
         }),
       ],
     } as unknown as ComponentCatalogEntry;

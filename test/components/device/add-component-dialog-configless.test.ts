@@ -332,14 +332,19 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect((dialog as unknown as { _open: boolean })._open).toBe(true);
   });
 
-  it("fast-paths a featured entry but submits its seedAll-locked presets", async () => {
-    // A featured id seeds every default (seedAll), so its locked preset rides
-    // in the coerced payload even when the field is advanced and the form
+  it("fast-paths a featured entry but submits its from_preset values", async () => {
+    // A featured id seeds its `from_preset` fields, so the preset rides in
+    // the coerced payload even when the field is advanced and the form
     // paints nothing — no `{}`-drop, no need to force the form open.
     const entry = makeComponentEntry("featured.bw15.socket", {
       name: "Socket",
       config_entries: [
-        makeConfigEntry({ key: "implementation", advanced: true, default_value: "lwip" }),
+        makeConfigEntry({
+          key: "implementation",
+          advanced: true,
+          default_value: "lwip",
+          from_preset: true,
+        }),
       ],
     });
     const { dialog, addComponent } = makeDialog(entry);

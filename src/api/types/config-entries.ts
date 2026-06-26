@@ -168,6 +168,14 @@ export interface ConfigEntry {
    * whose pin can land on one of a few GPIOs.
    */
   suggestions: ConfigPrimitive[] | null;
+  /**
+   * Backend-baked, only on materialised featured-component entries. True
+   * when this field carries a board-side preset value (locked, suggestion,
+   * or plain). The add form seeds `required` + `from_preset` fields but
+   * leaves plain optional catalog defaults unseeded, so a featured add
+   * emits the preset fields rather than every catalog default.
+   */
+  from_preset?: boolean;
 
   // === conditional visibility ===
   /** Key of another entry this one depends on. */

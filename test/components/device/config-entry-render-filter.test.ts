@@ -212,6 +212,61 @@ describe("filterRenderable", () => {
     expect(out.map((e) => e.key)).toEqual([]);
   });
 
+  it("drops a required-only NESTED group whose only value is on filtered-out children", () => {
+    // manual_ip: seeded optional/advanced dns leaves give the group a
+    // value, but every child filters out in required-only mode; the
+    // group must not render as an empty box.
+    const entries = [
+      makeEntry({
+        key: "manual_ip",
+        type: ConfigEntryType.NESTED,
+        advanced: true,
+        config_entries: [
+          makeEntry({ key: "static_ip", required: true, advanced: true }),
+          makeEntry({ key: "dns1", advanced: true }),
+        ],
+      }),
+    ];
+    const out = filterRenderable(
+      entries,
+      { manual_ip: { dns1: "0.0.0.0" } },
+      { requiredOnly: true, showAdvanced: false }
+    );
+    expect(out.map((e) => e.key)).toEqual([]);
+  });
+
+  it("drops an empty NESTED group whose own value is null (not a scalar shorthand)", () => {
+    const entries = [
+      makeEntry({
+        key: "manual_ip",
+        type: ConfigEntryType.NESTED,
+        config_entries: [makeEntry({ key: "static_ip" })],
+      }),
+    ];
+    const out = filterRenderable(
+      entries,
+      { manual_ip: null },
+      { requiredOnly: true, showAdvanced: false }
+    );
+    expect(out.map((e) => e.key)).toEqual([]);
+  });
+
+  it("keeps a NESTED group whose own value is a scalar shorthand", () => {
+    const entries = [
+      makeEntry({
+        key: "pin",
+        type: ConfigEntryType.NESTED,
+        config_entries: [makeEntry({ key: "number" })],
+      }),
+    ];
+    const out = filterRenderable(
+      entries,
+      { pin: "GPIO5" },
+      { requiredOnly: true, showAdvanced: false }
+    );
+    expect(out.map((e) => e.key)).toEqual(["pin"]);
+  });
+
   it("keeps NESTED groups with at least one renderable child", () => {
     const entries = [
       makeEntry({

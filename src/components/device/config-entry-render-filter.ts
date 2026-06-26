@@ -173,11 +173,14 @@ export function filterRenderable(
           asRecord(values[entry.key]),
           opts
         );
-        // Keep a group whose own value is a scalar shorthand (no child
-        // renders for it, but the user set it) so it stays visible.
-        if (renderableChildren.length === 0 && !hasMaterialValue(entry, values)) {
-          continue;
-        }
+        // Drop a group with nothing to render. A scalar shorthand at the
+        // group key (e.g. ``pin: GPIO5``) still renders the user's value
+        // read-only; an object/null whose children all filtered out (seeded
+        // optional/advanced leaves in required-only mode) leaves an empty box.
+        const own = values[entry.key];
+        const isScalarShorthand =
+          typeof own === "string" || typeof own === "number" || typeof own === "boolean";
+        if (renderableChildren.length === 0 && !isScalarShorthand) continue;
       }
     } else if (
       opts.requiredOnly &&

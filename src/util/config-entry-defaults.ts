@@ -51,6 +51,7 @@ export function makeConfigEntry(overrides: Partial<ConfigEntry> = {}): ConfigEnt
     pin_mode: null,
     locked: false,
     suggestions: null,
+    from_preset: false,
     config_entries: null,
     platform_type: null,
     supported_platforms: undefined,

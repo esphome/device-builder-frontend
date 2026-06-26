@@ -46,6 +46,30 @@ describe("generateDefaultComponentId", () => {
     );
   });
 
+  it("returns null for a single-instance featured wrap (dotted id, multi_conf false)", () => {
+    // `featured.<board>.<local>` has dots but wraps one underlying
+    // component; a single-instance wrap (ethernet, wifi) must not get an id.
+    expect(
+      generateDefaultComponentId(
+        "featured.esp32-poe-iso.onboard_ethernet",
+        false,
+        new Set()
+      )
+    ).toBe(null);
+  });
+
+  it("suffixes a multi-instance featured wrap and normalises board dashes", () => {
+    // Board dashes (`esp32-poe-iso`) must become underscores so the id is
+    // a valid ESPHome identifier ([a-zA-Z_][a-zA-Z0-9_]*).
+    expect(
+      generateDefaultComponentId(
+        "featured.athom-smart-plug-v3.power_monitor",
+        true,
+        new Set()
+      )
+    ).toBe("featured_athom_smart_plug_v3_power_monitor_1");
+  });
+
   it("walks the suffix counter on collision", () => {
     const existing = new Set(["switch_gpio_1", "switch_gpio_2"]);
     expect(generateDefaultComponentId("switch.gpio", true, existing)).toBe(
