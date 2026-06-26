@@ -35,10 +35,8 @@ import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 export function visibleComponents(
   host: ESPHomeComponentCatalog
 ): ComponentCatalogEntry[] {
-  const present = host.yaml ? parseTopLevelComponents(host.yaml) : new Set<string>();
-  const presentPlatforms = host.yaml
-    ? parseConfiguredPlatforms(host.yaml)
-    : new Set<string>();
+  const present = parseTopLevelComponents(host.yaml);
+  const presentPlatforms = parseConfiguredPlatforms(host.yaml);
   const lockedToCore = host.lockedCategories.length > 0;
   const platformCompatible = host._components.filter((c) =>
     platformSupported(c.supported_platforms, host.platform)
@@ -114,11 +112,11 @@ export function filteredBundles(host: ESPHomeComponentCatalog): FeaturedBundle[]
 export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
   const board = host.board;
   if (!board) return 0;
-  const present = host.yaml ? parseTopLevelComponents(host.yaml) : new Set<string>();
-  const presentPlatforms = host.yaml
-    ? parseConfiguredPlatforms(host.yaml)
-    : new Set<string>();
+  const present = parseTopLevelComponents(host.yaml);
+  const presentPlatforms = parseConfiguredPlatforms(host.yaml);
   const components = board.featured_components ?? [];
+  // `!== false`, not truthy: the backend omits the `true` default, so an
+  // absent multi_conf means multi-conf (still addable).
   const addable = (fc: FeaturedComponent) =>
     fc.multi_conf !== false ||
     !isComponentPresent(fc.component_id, present, presentPlatforms);
