@@ -6,6 +6,7 @@ import {
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { isComponentPresent } from "../../../util/component-presence.js";
 import { platformSupported } from "../../../util/config-validation.js";
+import { collectExistingIds } from "../../../util/default-component-id.js";
 import { buildFeaturedId } from "../../../util/featured-id.js";
 import {
   parseConfiguredPlatforms,
@@ -32,6 +33,18 @@ import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 //     satisfied from this dialog. A dep counts as satisfied when it's
 //     already in the user's YAML OR one of the platform-compatible IDs in
 //     this response.
+// A featured card pins a specific board peripheral via a preset `id`
+// (apollo `rgb_leds`). Once that id is in the YAML the peripheral is
+// configured, so the card is effectively single-instance even when its
+// underlying type is multi_conf (many LED strips exist, but only one of this).
+function featuredIdPresent(
+  fc: FeaturedComponent,
+  existingIds: ReadonlySet<string>
+): boolean {
+  const presetId = fc.fields?.["id"]?.value;
+  return typeof presetId === "string" && existingIds.has(presetId);
+}
+
 export function visibleComponents(
   host: ESPHomeComponentCatalog
 ): ComponentCatalogEntry[] {
@@ -45,18 +58,23 @@ export function visibleComponents(
     ? new Set(platformCompatible.map((c) => c.id))
     : null;
 
-  // Map a featured card's synthetic id back to the component it actually adds.
-  const featuredRefId = new Map<string, string>();
+  // Map a featured card's synthetic id back to its FeaturedComponent.
+  const existingIds = collectExistingIds(host.yaml);
+  const featuredById = new Map<string, FeaturedComponent>();
   const board = host.board;
   if (board) {
     // Slim board entries omit featured_components; guard like the catalog's load().
     for (const fc of board.featured_components ?? []) {
-      featuredRefId.set(buildFeaturedId(board.id, fc.id), fc.component_id);
+      featuredById.set(buildFeaturedId(board.id, fc.id), fc);
     }
   }
 
   return platformCompatible.filter((c) => {
-    const refId = featuredRefId.get(c.id) ?? c.id;
+    const fc = featuredById.get(c.id);
+    if (fc && featuredIdPresent(fc, existingIds)) {
+      return false;
+    }
+    const refId = fc?.component_id ?? c.id;
     if (!c.multi_conf && isComponentPresent(refId, present, presentPlatforms)) {
       return false;
     }
@@ -117,11 +135,14 @@ export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
   if (!board) return 0;
   const present = parseTopLevelComponents(host.yaml);
   const presentPlatforms = parseConfiguredPlatforms(host.yaml);
+  const existingIds = collectExistingIds(host.yaml);
   // `!== false`, not truthy: the backend omits the `true` default, so an
-  // absent multi_conf means multi-conf (still addable).
+  // absent multi_conf means multi-conf (still addable). A featured peripheral
+  // whose preset id is already configured is never addable, regardless.
   const addable = (fc: FeaturedComponent) =>
-    fc.multi_conf !== false ||
-    !isComponentPresent(fc.component_id, present, presentPlatforms);
+    !featuredIdPresent(fc, existingIds) &&
+    (fc.multi_conf !== false ||
+      !isComponentPresent(fc.component_id, present, presentPlatforms));
   const components = (board.featured_components ?? []).filter(addable).length;
   return components + (board.featured_bundles?.length ?? 0);
 }

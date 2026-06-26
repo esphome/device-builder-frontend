@@ -112,6 +112,44 @@ describe("visibleComponents featured present-filter", () => {
     ).map((c) => c.id);
     expect(ids).toEqual(["featured.demo.relay"]);
   });
+
+  // A featured peripheral pins a preset id, so it is single-instance even when
+  // its underlying type is multi_conf (apollo RGB LEDs / esp32_rmt_led_strip).
+  const ledBoard = {
+    id: "apollo-esk-1",
+    featured_components: [
+      {
+        id: "rgb_leds",
+        component_id: "light.esp32_rmt_led_strip",
+        fields: { id: { value: "rgb_leds" } },
+      },
+      {
+        id: "onboard_rgb_led",
+        component_id: "light.esp32_rmt_led_strip",
+        fields: { id: { value: "onboard_rgb_led" } },
+      },
+    ],
+  } as unknown as BoardCatalogEntry;
+  const rgbLeds = entry("featured.apollo-esk-1.rgb_leds", [], [], true);
+  const onboardRgb = entry("featured.apollo-esk-1.onboard_rgb_led", [], [], true);
+
+  it("hides a multi_conf featured component whose preset id is already configured", () => {
+    const ids = visibleComponents(
+      host([rgbLeds, onboardRgb], "esp32", {
+        yaml: "light:\n  - platform: esp32_rmt_led_strip\n    id: rgb_leds\n",
+        board: ledBoard,
+      })
+    ).map((c) => c.id);
+    // rgb_leds hidden (its id is present); the sibling onboard_rgb_led stays.
+    expect(ids).toEqual(["featured.apollo-esk-1.onboard_rgb_led"]);
+  });
+
+  it("keeps a multi_conf featured component whose preset id is not configured", () => {
+    const ids = visibleComponents(host([rgbLeds], "esp32", { board: ledBoard })).map(
+      (c) => c.id
+    );
+    expect(ids).toEqual(["featured.apollo-esk-1.rgb_leds"]);
+  });
 });
 
 describe("availableFeaturedCount", () => {
@@ -149,6 +187,26 @@ describe("availableFeaturedCount", () => {
         host([], "esp32", { yaml: "switch:\n  - platform: gpio\n", board: b })
       )
     ).toBe(1);
+  });
+
+  it("drops a multi_conf featured component whose preset id is configured", () => {
+    const b = board([
+      {
+        id: "rgb_leds",
+        component_id: "light.esp32_rmt_led_strip",
+        multi_conf: true,
+        fields: { id: { value: "rgb_leds" } },
+      },
+    ]);
+    expect(availableFeaturedCount(host([], "esp32", { board: b }))).toBe(1);
+    expect(
+      availableFeaturedCount(
+        host([], "esp32", {
+          yaml: "light:\n  - platform: esp32_rmt_led_strip\n    id: rgb_leds\n",
+          board: b,
+        })
+      )
+    ).toBe(0);
   });
 
   it("counts bundles as-is (matching the grid), plus addable components", () => {
