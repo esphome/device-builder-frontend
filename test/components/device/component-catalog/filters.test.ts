@@ -151,7 +151,7 @@ describe("availableFeaturedCount", () => {
     ).toBe(1);
   });
 
-  it("counts a bundle while at least one of its components is addable", () => {
+  it("counts bundles as-is (matching the grid), plus addable components", () => {
     const b = board(
       [
         { id: "eth", component_id: "ethernet", multi_conf: false },
@@ -159,7 +159,7 @@ describe("availableFeaturedCount", () => {
       ],
       [{ id: "kit", component_ids: ["eth", "relay"] }]
     );
-    // ethernet present but relay still addable -> the one bundle counts (+ relay)
+    // ethernet present (dropped), relay addable (1), bundle always counts (1)
     expect(
       availableFeaturedCount(host([], "esp32", { yaml: "ethernet:\n", board: b }))
     ).toBe(2);
@@ -168,11 +168,16 @@ describe("availableFeaturedCount", () => {
 
 describe("buildCategories Recommended collapse", () => {
   const localize = (k: string) => k;
-  const hostWith = (board: BoardCatalogEntry | null, yaml: string) =>
+  const hostWith = (
+    board: BoardCatalogEntry | null,
+    yaml: string,
+    lockedCategories: string[] = []
+  ) =>
     ({
       _categories: [{ id: "featured", count: 1 }],
       _total: 1,
       excludeCategories: [],
+      lockedCategories,
       board,
       yaml,
     }) as unknown as ESPHomeComponentCatalog;
@@ -193,5 +198,10 @@ describe("buildCategories Recommended collapse", () => {
     const cats = buildCategories(hostWith(board, ""), localize);
     const featured = cats.find((c) => c.id === "featured");
     expect(featured?.count).toBe(1);
+  });
+
+  it("omits the Featured row in locked-category mode", () => {
+    const ids = buildCategories(hostWith(board, "", ["core"]), localize).map((c) => c.id);
+    expect(ids).not.toContain("featured");
   });
 });

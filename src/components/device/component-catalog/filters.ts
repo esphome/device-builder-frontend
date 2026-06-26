@@ -104,32 +104,23 @@ export function filteredBundles(host: ESPHomeComponentCatalog): FeaturedBundle[]
   );
 }
 
-// Recommendations still addable for this board: a featured component counts
-// when it's multi-conf or not yet configured; a bundle counts when at least
-// one of its components is still addable. Drives the Recommended badge and the
-// auto-select so an all-configured board collapses the category instead of
-// showing an empty "0 of N" list.
+// Recommendations shown for this board: a featured component counts when it's
+// multi-conf or not yet configured; bundles are counted as-is, matching the
+// grid (`filteredBundles`) which doesn't present-filter them. Drives the
+// Recommended badge and the auto-select so an all-configured board collapses
+// the category instead of showing an empty "0 of N" list.
 export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
   const board = host.board;
   if (!board) return 0;
   const present = parseTopLevelComponents(host.yaml);
   const presentPlatforms = parseConfiguredPlatforms(host.yaml);
-  const components = board.featured_components ?? [];
   // `!== false`, not truthy: the backend omits the `true` default, so an
   // absent multi_conf means multi-conf (still addable).
   const addable = (fc: FeaturedComponent) =>
     fc.multi_conf !== false ||
     !isComponentPresent(fc.component_id, present, presentPlatforms);
-  const byLocalId = new Map(components.map((fc) => [fc.id, fc]));
-  const bundleAvailable = (b: FeaturedBundle) =>
-    b.component_ids.some((localId) => {
-      const fc = byLocalId.get(localId);
-      return !fc || addable(fc);
-    });
-  return (
-    components.filter(addable).length +
-    (board.featured_bundles ?? []).filter(bundleAvailable).length
-  );
+  const components = (board.featured_components ?? []).filter(addable).length;
+  return components + (board.featured_bundles?.length ?? 0);
 }
 
 interface CategoryEntry {
@@ -146,8 +137,9 @@ export function buildCategories(
   const visibleCats = host._categories.filter((c) => !excluded.has(c.id));
   // Badge the post-filter available count so an all-configured board drops the
   // "Featured" row entirely (the if-guard below); the backend category count is
-  // pre-filter and would leave a stale, empty badge.
-  const featuredBadge = availableFeaturedCount(host);
+  // pre-filter and would leave a stale, empty badge. Skipped in locked mode —
+  // the sidebar is hidden, so the YAML reparse would be pure overhead.
+  const featuredBadge = host.lockedCategories.length ? 0 : availableFeaturedCount(host);
   const sortableCats = visibleCats.filter((c) => c.id !== ComponentCategory.FEATURED);
   const visibleTotal = excluded.size
     ? sortableCats.reduce((sum, c) => sum + c.count, 0)
