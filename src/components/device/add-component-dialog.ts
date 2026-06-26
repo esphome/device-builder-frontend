@@ -216,12 +216,19 @@ export class ESPHomeAddComponentDialog extends LitElement {
   /** See ``navigateToDep`` for the seq-counter contract. */
   private _depNavSeq = 0;
 
-  private _resetDetourState() {
+  /** Null every in-flight dep-detour field. Shared with `_onBundleSelected`,
+   *  which abandons the detour but must NOT bump the selection seqs (its
+   *  hydrate already validated against the current token). */
+  private _clearDetourFields() {
     this._returnTo = null;
     this._depDomain = null;
     this._prefillReference = null;
     this._depPrefill = null;
     this._returnValues = null;
+  }
+
+  private _resetDetourState() {
+    this._clearDetourFields();
     this._bundleQueue = [];
     this._bundleProgress = null;
     this._depNavSeq++;
@@ -448,11 +455,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // the `_returnTo` branch in `_onFormSubmit`, restoring the unrelated
     // component while the bundle queue + banner stayed live, and the
     // next submit would jump into bundle step 2 from there.
-    this._returnTo = null;
-    this._depDomain = null;
-    this._prefillReference = null;
-    this._depPrefill = null;
-    this._returnValues = null;
+    this._clearDetourFields();
     this._bundleQueue = rest;
     this._bundleProgress = {
       current: 1,
@@ -627,6 +630,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
           ...this._bundleProgress,
           current: this._bundleProgress.current + 1,
         };
+        // The next bundle step is a fresh component; drop the snapshot from a
+        // detour the prior step took so it can't bleed onto this one.
+        this._returnValues = null;
         this._selected = nextComponent;
       } else {
         // Auto-select the just-added component so the navigator
