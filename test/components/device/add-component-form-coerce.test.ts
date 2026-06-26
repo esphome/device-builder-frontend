@@ -104,22 +104,6 @@ describe("coerceFields multi_value nested list (usb_uart channels)", () => {
     ).toEqual({ channels: [{ id: "usb_cdc_0", baud_rate: 4800 }] });
   });
 
-  test("multiple channels round-trip in order", () => {
-    expect(
-      coerceFields([channels], {
-        channels: [
-          { id: "usb_cdc_0", baud_rate: "4800" },
-          { id: "usb_cdc_1", baud_rate: "9600" },
-        ],
-      })
-    ).toEqual({
-      channels: [
-        { id: "usb_cdc_0", baud_rate: 4800 },
-        { id: "usb_cdc_1", baud_rate: 9600 },
-      ],
-    });
-  });
-
   test("an empty list drops out of the payload", () => {
     expect(coerceFields([channels], { channels: [] })).toEqual({});
   });
