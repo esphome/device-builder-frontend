@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { BoardCatalogEntry } from "../../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../../src/api/types/components.js";
 import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
-import { visibleComponents } from "../../../../src/components/device/component-catalog/filters.js";
+import {
+  availableFeaturedCount,
+  buildCategories,
+  visibleComponents,
+} from "../../../../src/components/device/component-catalog/filters.js";
 
 function entry(
   id: string,
@@ -107,5 +111,87 @@ describe("visibleComponents featured present-filter", () => {
       host([multi], "esp32", { yaml: "switch:\n  - platform: gpio\n", board: multiBoard })
     ).map((c) => c.id);
     expect(ids).toEqual(["featured.demo.relay"]);
+  });
+});
+
+describe("availableFeaturedCount", () => {
+  const board = (
+    featured_components: unknown[],
+    featured_bundles: unknown[] = []
+  ): BoardCatalogEntry =>
+    ({ id: "b", featured_components, featured_bundles }) as unknown as BoardCatalogEntry;
+
+  it("is 0 with no board", () => {
+    expect(availableFeaturedCount(host([], "esp32"))).toBe(0);
+  });
+
+  it("drops a single-instance featured component already configured", () => {
+    const b = board([{ id: "eth", component_id: "ethernet", multi_conf: false }]);
+    expect(availableFeaturedCount(host([], "esp32", { board: b }))).toBe(1);
+    expect(
+      availableFeaturedCount(host([], "esp32", { yaml: "ethernet:\n", board: b }))
+    ).toBe(0);
+  });
+
+  it("keeps a multi-conf featured component even when its domain is present", () => {
+    const b = board([{ id: "relay", component_id: "switch.gpio", multi_conf: true }]);
+    expect(
+      availableFeaturedCount(
+        host([], "esp32", { yaml: "switch:\n  - platform: gpio\n", board: b })
+      )
+    ).toBe(1);
+  });
+
+  it("treats a missing multi_conf as multi-conf (available)", () => {
+    const b = board([{ id: "relay", component_id: "switch.gpio" }]);
+    expect(
+      availableFeaturedCount(
+        host([], "esp32", { yaml: "switch:\n  - platform: gpio\n", board: b })
+      )
+    ).toBe(1);
+  });
+
+  it("counts a bundle while at least one of its components is addable", () => {
+    const b = board(
+      [
+        { id: "eth", component_id: "ethernet", multi_conf: false },
+        { id: "relay", component_id: "switch.gpio", multi_conf: true },
+      ],
+      [{ id: "kit", component_ids: ["eth", "relay"] }]
+    );
+    // ethernet present but relay still addable -> the one bundle counts (+ relay)
+    expect(
+      availableFeaturedCount(host([], "esp32", { yaml: "ethernet:\n", board: b }))
+    ).toBe(2);
+  });
+});
+
+describe("buildCategories Recommended collapse", () => {
+  const localize = (k: string) => k;
+  const hostWith = (board: BoardCatalogEntry | null, yaml: string) =>
+    ({
+      _categories: [{ id: "featured", count: 1 }],
+      _total: 1,
+      excludeCategories: [],
+      board,
+      yaml,
+    }) as unknown as ESPHomeComponentCatalog;
+  const board = {
+    id: "b",
+    featured_components: [{ id: "eth", component_id: "ethernet", multi_conf: false }],
+    featured_bundles: [],
+  } as unknown as BoardCatalogEntry;
+
+  it("omits the Featured row when nothing is available", () => {
+    const ids = buildCategories(hostWith(board, "ethernet:\n"), localize).map(
+      (c) => c.id
+    );
+    expect(ids).not.toContain("featured");
+  });
+
+  it("keeps the Featured row when a recommendation is available", () => {
+    const cats = buildCategories(hostWith(board, ""), localize);
+    const featured = cats.find((c) => c.id === "featured");
+    expect(featured?.count).toBe(1);
   });
 });

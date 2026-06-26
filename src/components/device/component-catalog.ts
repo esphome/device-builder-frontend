@@ -21,6 +21,7 @@ import { debounce } from "../../util/debounce.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   ambiguousNameIds,
+  availableFeaturedCount,
   buildCategories,
   filteredBundles,
   visibleComponents,
@@ -95,13 +96,12 @@ export class ESPHomeComponentCatalog extends LitElement {
   // request would go out with empty platform / board_id.
   public load() {
     this._provides = "";
-    // Auto-select "Featured" when the board has any recommendations; reset
-    // away from it when reopening against a board without any.
-    const featuredCount =
-      (this.board?.featured_components?.length ?? 0) +
-      (this.board?.featured_bundles?.length ?? 0);
+    // Auto-select "Featured" when the board has recommendations still addable;
+    // reset away from it when every recommendation is already configured.
     const hasFeatured =
-      this.lockedCategories.length === 0 && !!this.boardId && featuredCount > 0;
+      this.lockedCategories.length === 0 &&
+      !!this.boardId &&
+      availableFeaturedCount(this) > 0;
     if (hasFeatured) {
       this._category = ComponentCategory.FEATURED;
     } else if (this._category === ComponentCategory.FEATURED) {

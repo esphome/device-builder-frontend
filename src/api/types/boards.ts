@@ -71,6 +71,8 @@ export interface FeaturedComponent {
   name: string | null;
   description: string | null;
   fields: Record<string, FieldPreset>;
+  /** Underlying component's multi_conf; absent means multi-conf (omit_default). */
+  multi_conf?: boolean;
 }
 
 /**

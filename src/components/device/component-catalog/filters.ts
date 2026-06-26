@@ -1,9 +1,10 @@
-import type { FeaturedBundle } from "../../../api/types/boards.js";
+import type { FeaturedBundle, FeaturedComponent } from "../../../api/types/boards.js";
 import {
   type ComponentCatalogEntry,
   ComponentCategory,
 } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
+import { isComponentPresent } from "../../../util/component-presence.js";
 import { platformSupported } from "../../../util/config-validation.js";
 import { buildFeaturedId } from "../../../util/featured-id.js";
 import {
@@ -58,12 +59,8 @@ export function visibleComponents(
 
   return platformCompatible.filter((c) => {
     const refId = featuredRefId.get(c.id) ?? c.id;
-    if (!c.multi_conf) {
-      if (refId.includes(".")) {
-        if (presentPlatforms.has(refId)) return false;
-      } else if (present.has(refId)) {
-        return false;
-      }
+    if (!c.multi_conf && isComponentPresent(refId, present, presentPlatforms)) {
+      return false;
     }
     if (coreCompatible && c.id.includes(".") && c.dependencies.length > 0) {
       const allSatisfied = c.dependencies.every(
@@ -109,6 +106,34 @@ export function filteredBundles(host: ESPHomeComponentCatalog): FeaturedBundle[]
   );
 }
 
+// Recommendations still addable for this board: a featured component counts
+// when it's multi-conf or not yet configured; a bundle counts when at least
+// one of its components is still addable. Drives the Recommended badge and the
+// auto-select so an all-configured board collapses the category instead of
+// showing an empty "0 of N" list.
+export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
+  const board = host.board;
+  if (!board) return 0;
+  const present = host.yaml ? parseTopLevelComponents(host.yaml) : new Set<string>();
+  const presentPlatforms = host.yaml
+    ? parseConfiguredPlatforms(host.yaml)
+    : new Set<string>();
+  const components = board.featured_components ?? [];
+  const addable = (fc: FeaturedComponent) =>
+    fc.multi_conf !== false ||
+    !isComponentPresent(fc.component_id, present, presentPlatforms);
+  const byLocalId = new Map(components.map((fc) => [fc.id, fc]));
+  const bundleAvailable = (b: FeaturedBundle) =>
+    b.component_ids.some((localId) => {
+      const fc = byLocalId.get(localId);
+      return !fc || addable(fc);
+    });
+  return (
+    components.filter(addable).length +
+    (board.featured_bundles ?? []).filter(bundleAvailable).length
+  );
+}
+
 interface CategoryEntry {
   id: string;
   label: string;
@@ -121,12 +146,10 @@ export function buildCategories(
 ): CategoryEntry[] {
   const excluded = new Set(host.excludeCategories);
   const visibleCats = host._categories.filter((c) => !excluded.has(c.id));
-  // Pin "Featured" — peel it out so it doesn't appear twice in the alpha list.
-  const featuredCat = visibleCats.find((c) => c.id === ComponentCategory.FEATURED);
-  const bundleCount = host.board?.featured_bundles?.length ?? 0;
-  // Bundles live on the board manifest, not in components categories —
-  // add them to the headline count so the badge matches the rendered grid.
-  const featuredBadge = featuredCat ? featuredCat.count + bundleCount : bundleCount;
+  // Badge the post-filter available count so an all-configured board drops the
+  // "Featured" row entirely (the if-guard below); the backend category count is
+  // pre-filter and would leave a stale, empty badge.
+  const featuredBadge = availableFeaturedCount(host);
   const sortableCats = visibleCats.filter((c) => c.id !== ComponentCategory.FEATURED);
   const visibleTotal = excluded.size
     ? sortableCats.reduce((sum, c) => sum + c.count, 0)
