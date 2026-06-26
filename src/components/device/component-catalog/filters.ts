@@ -5,6 +5,7 @@ import {
 } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { platformSupported } from "../../../util/config-validation.js";
+import { buildFeaturedId } from "../../../util/featured-id.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -23,7 +24,9 @@ import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 //  2. Single-instance components already in the YAML get hidden.
 //     - bare top-level (`web_server`, `wifi`) → match presence of `<id>:`
 //     - platform variant (`time.homeassistant`) → match `<domain>.<platform>`
-//     Multi-conf components always stay visible.
+//     Multi-conf components always stay visible. Featured entries carry a
+//     synthetic `featured.<board>.<localId>` id, so match them by their
+//     underlying `component_id` (e.g. an Onboard Ethernet card → `ethernet`).
 //  3. Core-locked: drop platform variants whose dependencies can't be
 //     satisfied from this dialog. A dep counts as satisfied when it's
 //     already in the user's YAML OR one of the platform-compatible IDs in
@@ -43,11 +46,21 @@ export function visibleComponents(
     ? new Set(platformCompatible.map((c) => c.id))
     : null;
 
+  // Map a featured card's synthetic id back to the component it actually adds.
+  const featuredRefId = new Map<string, string>();
+  const board = host.board;
+  if (board) {
+    for (const fc of board.featured_components) {
+      featuredRefId.set(buildFeaturedId(board.id, fc.id), fc.component_id);
+    }
+  }
+
   return platformCompatible.filter((c) => {
+    const refId = featuredRefId.get(c.id) ?? c.id;
     if (!c.multi_conf) {
-      if (c.id.includes(".")) {
-        if (presentPlatforms.has(c.id)) return false;
-      } else if (present.has(c.id)) {
+      if (refId.includes(".")) {
+        if (presentPlatforms.has(refId)) return false;
+      } else if (present.has(refId)) {
         return false;
       }
     }

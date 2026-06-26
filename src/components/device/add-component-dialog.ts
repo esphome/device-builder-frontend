@@ -12,6 +12,7 @@ import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
+import { buildFeaturedId } from "../../util/featured-id.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
@@ -431,8 +432,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
     if (this._submitting) return;
     const { bundle, boardId } = e.detail;
     if (!boardId || bundle.component_ids.length === 0) return;
-    const fullIds = bundle.component_ids.map(
-      (localId) => `featured.${boardId}.${localId}`
+    const fullIds = bundle.component_ids.map((localId) =>
+      buildFeaturedId(boardId, localId)
     );
     const [first, ...rest] = fullIds;
     // Same selection guard as `_onComponentSelected`; a quick

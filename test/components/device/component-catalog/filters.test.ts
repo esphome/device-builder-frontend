@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { BoardCatalogEntry } from "../../../../src/api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../../src/api/types/components.js";
 import type { ESPHomeComponentCatalog } from "../../../../src/components/device/component-catalog.js";
 import { visibleComponents } from "../../../../src/components/device/component-catalog/filters.js";
@@ -6,11 +7,12 @@ import { visibleComponents } from "../../../../src/components/device/component-c
 function entry(
   id: string,
   supported_platforms: string[] = [],
-  dependencies: string[] = []
+  dependencies: string[] = [],
+  multi_conf = true
 ): ComponentCatalogEntry {
   return {
     id,
-    multi_conf: true,
+    multi_conf,
     dependencies,
     supported_platforms,
   } as unknown as ComponentCatalogEntry;
@@ -19,13 +21,22 @@ function entry(
 function host(
   components: ComponentCatalogEntry[],
   platform: string,
-  lockedCategories: string[] = []
+  {
+    lockedCategories = [],
+    yaml = "",
+    board = null,
+  }: {
+    lockedCategories?: string[];
+    yaml?: string;
+    board?: BoardCatalogEntry | null;
+  } = {}
 ): ESPHomeComponentCatalog {
   return {
     _components: components,
     platform,
-    yaml: "",
+    yaml,
     lockedCategories,
+    board,
   } as unknown as ESPHomeComponentCatalog;
 }
 
@@ -58,7 +69,29 @@ describe("visibleComponents platform gate", () => {
       entry("dep.bk72xx", ["bk72xx"]),
       entry("time.foo", [], ["dep.bk72xx"]),
     ];
-    const ids = visibleComponents(host(locked, "esp32", ["core"])).map((c) => c.id);
+    const ids = visibleComponents(
+      host(locked, "esp32", { lockedCategories: ["core"] })
+    ).map((c) => c.id);
     expect(ids).toEqual([]);
+  });
+});
+
+describe("visibleComponents featured present-filter", () => {
+  const board = {
+    id: "esp32-poe-iso",
+    featured_components: [{ id: "onboard_ethernet", component_id: "ethernet" }],
+  } as unknown as BoardCatalogEntry;
+  const featured = entry("featured.esp32-poe-iso.onboard_ethernet", [], [], false);
+
+  it("hides a featured single-instance component already in the YAML", () => {
+    const ids = visibleComponents(
+      host([featured], "esp32", { yaml: "ethernet:\n  type: LAN8720\n", board })
+    ).map((c) => c.id);
+    expect(ids).toEqual([]);
+  });
+
+  it("keeps the featured component when its target is not configured", () => {
+    const ids = visibleComponents(host([featured], "esp32", { board })).map((c) => c.id);
+    expect(ids).toEqual(["featured.esp32-poe-iso.onboard_ethernet"]);
   });
 });
