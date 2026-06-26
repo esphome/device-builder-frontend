@@ -198,6 +198,58 @@ describe("findUsedPins", () => {
     expect(findUsedPins("").size).toBe(0);
   });
 
+  it("detects a bare-integer pin value under a pin-field key", () => {
+    // `tx_pin: 1` has no `GPIO`/`P` prefix for the token scan to anchor on;
+    // it must still register as used (the reported ESP32-PoE-ISO bug).
+    const config = [
+      "uart:",
+      "  - baud_rate: 9600",
+      "    tx_pin: 1",
+      "    rx_pin: GPIO14",
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.get(1)).toBe("uart");
+    expect(map.get(14)).toBe("uart");
+  });
+
+  it("flags a bare-int / GPIOn conflict across sections", () => {
+    // `uart` claims GPIO1 as a bare int, `stepper` as `GPIO1` — both must land
+    // in the map so the cross-section conflict fires; first scanned domain wins.
+    const config = [
+      "uart:",
+      "  - tx_pin: 1",
+      "stepper:",
+      "  - platform: a4988",
+      "    dir_pin: GPIO1",
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.get(1)).toBe("uart");
+  });
+
+  it("detects a bare-integer long-form `number:` pin value", () => {
+    const config = ["ethernet:", "  power_pin:", "    number: 13", ""].join("\n");
+    expect(findUsedPins(config).get(13)).toBe("ethernet");
+  });
+
+  it("does not treat non-pin numeric keys as pins", () => {
+    // Only pin-field keys parse a bare int; numeric config values that happen
+    // to fall in GPIO range must not register (`phy_addr: 0`, `data_bits: 8`).
+    const config = [
+      "uart:",
+      "  - baud_rate: 9600",
+      "    data_bits: 8",
+      "ethernet:",
+      "  phy_addr: 0",
+      "stepper:",
+      "  - max_speed: 434",
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.size).toBe(0);
+  });
+
   it("returns the same Map reference on repeated calls (memoised)", () => {
     // Pin the cache contract: a re-render that hands us the
     // same yaml + exclude pair returns the cached Map without
