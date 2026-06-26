@@ -165,6 +165,12 @@ describe("serializeYamlValues — scalars and skip rules", () => {
     ]);
   });
 
+  it("threads keepEmptyStrings through a nested mapping", () => {
+    expect(
+      serializeYamlValues({ sub: { inner: "" } }, "", { keepEmptyStrings: true })
+    ).toEqual(["sub:", '  inner: ""']);
+  });
+
   it("honours the supplied indent prefix", () => {
     expect(serializeYamlValues({ name: "foo" }, "    ")).toEqual(["    name: foo"]);
   });
@@ -266,6 +272,30 @@ describe("serializeYamlValues — raw blocks and lambdas", () => {
     expect(
       serializeYamlValues({ value: { _lambda: "return 1;", _tag: "!lambda" } }, "")
     ).toEqual(["value: !lambda |-", "  return 1;"]);
+  });
+
+  it("pastes a YamlRawValue under a list-item key at the dash prefix", () => {
+    const raw = new YamlRawValue(["      return x;"], "|-");
+    expect(serializeYamlValues({ triggers: [{ lambda: raw }] }, "")).toEqual([
+      "triggers:",
+      "  - lambda: |-",
+      "      return x;",
+    ]);
+  });
+
+  it("emits an untagged lambda sentinel inside a list item as a bare block", () => {
+    expect(
+      serializeYamlValues({ triggers: [{ value: { _lambda: "return 1;" } }] }, "")
+    ).toEqual(["triggers:", "  - value: |-", "      return 1;"]);
+  });
+
+  it("emits a tagged lambda sentinel inside a list item with the !lambda tag (#940)", () => {
+    expect(
+      serializeYamlValues(
+        { triggers: [{ value: { _lambda: "return 1;", _tag: "!lambda" } }] },
+        ""
+      )
+    ).toEqual(["triggers:", "  - value: !lambda |-", "      return 1;"]);
   });
 });
 
