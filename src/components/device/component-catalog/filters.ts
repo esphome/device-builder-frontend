@@ -50,7 +50,8 @@ export function visibleComponents(
   const featuredRefId = new Map<string, string>();
   const board = host.board;
   if (board) {
-    for (const fc of board.featured_components) {
+    // Slim board entries omit featured_components; guard like the catalog's load().
+    for (const fc of board.featured_components ?? []) {
       featuredRefId.set(buildFeaturedId(board.id, fc.id), fc.component_id);
     }
   }
