@@ -94,4 +94,18 @@ describe("visibleComponents featured present-filter", () => {
     const ids = visibleComponents(host([featured], "esp32", { board })).map((c) => c.id);
     expect(ids).toEqual(["featured.esp32-poe-iso.onboard_ethernet"]);
   });
+
+  it("keeps a multi-conf featured component whose target is already present", () => {
+    // multi_conf components can be added repeatedly, so resolving the real id
+    // must not hide them even when a matching block exists.
+    const multiBoard = {
+      id: "demo",
+      featured_components: [{ id: "relay", component_id: "switch.gpio" }],
+    } as unknown as BoardCatalogEntry;
+    const multi = entry("featured.demo.relay", [], [], true);
+    const ids = visibleComponents(
+      host([multi], "esp32", { yaml: "switch:\n  - platform: gpio\n", board: multiBoard })
+    ).map((c) => c.id);
+    expect(ids).toEqual(["featured.demo.relay"]);
+  });
 });
