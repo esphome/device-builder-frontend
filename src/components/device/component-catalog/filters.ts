@@ -108,7 +108,10 @@ export function filteredBundles(host: ESPHomeComponentCatalog): FeaturedBundle[]
 // multi-conf or not yet configured; bundles are counted as-is, matching the
 // grid (`filteredBundles`) which doesn't present-filter them. Drives the
 // Recommended badge and the auto-select so an all-configured board collapses
-// the category instead of showing an empty "0 of N" list.
+// the category instead of showing an empty "0 of N" list. No platform gate
+// here (unlike `visibleComponents`): a board only recommends its own
+// platform-compatible components, and `FeaturedComponent` carries no
+// `supported_platforms` to gate on.
 export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
   const board = host.board;
   if (!board) return 0;
