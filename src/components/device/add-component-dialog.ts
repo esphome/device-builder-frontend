@@ -452,6 +452,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._depDomain = null;
     this._prefillReference = null;
     this._depPrefill = null;
+    this._returnValues = null;
     this._bundleQueue = rest;
     this._bundleProgress = {
       current: 1,
@@ -470,7 +471,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // sending them to the catalog and losing context.
     if (this._returnTo) {
       const restore = this._returnTo;
+      // Back out of the detour like a submit-return: keep the snapshot across
+      // the reset so the user's in-progress values survive on the original
+      // form (the binding reads `_returnValues` with `_returnTo` now null).
+      const snapshot = this._returnValues;
       this._resetDetourState();
+      this._returnValues = snapshot;
       this._selected = restore;
       this._submitError = "";
       return;
