@@ -114,3 +114,41 @@ describe("renderIdReferenceField — single-candidate auto-resolve default", () 
     expect(placeholderOf(renderRef("ld2410", SINGLE_LD2410, "radar"))).toBe(nothing);
   });
 });
+
+describe("renderIdReferenceField — resolves ${...} in option labels (#1709)", () => {
+  function renderRef(domain: string, yaml: string, value: string) {
+    const entry = makeEntry(ConfigEntryType.STRING, { references_component: domain });
+    return renderIdReferenceField(
+      entry,
+      ["id"],
+      makeRenderCtx({ id: value }, { overrides: { yaml } })
+    );
+  }
+
+  const SUBS = "substitutions:\n  device_friendly_name: WIFI Switch\n";
+  const SWITCH = (name: string) =>
+    `${SUBS}switch:\n  - platform: output\n    id: relay\n    name: "${name}"\n`;
+
+  const labelOf = (tmpl: unknown, value: string): unknown =>
+    findElementBindings(tmpl, "wa-option").find((o) => o.value === value)?.[".label"];
+
+  it("resolves a substitution in the option's display label", () => {
+    expect(
+      labelOf(renderRef("switch", SWITCH("${device_friendly_name} Relay"), ""), "relay")
+    ).toBe("WIFI Switch Relay");
+  });
+
+  it("leaves an unknown substitution literal (graceful degrade)", () => {
+    expect(labelOf(renderRef("switch", SWITCH("${unknown} Relay"), ""), "relay")).toBe(
+      "${unknown} Relay"
+    );
+  });
+
+  it("resolves the substitution in the sole-candidate placeholder", () => {
+    const select = findElementBindings(
+      renderRef("switch", SWITCH("${device_friendly_name} Relay"), ""),
+      "wa-select"
+    )[0];
+    expect(select?.placeholder).toBe("WIFI Switch Relay");
+  });
+});

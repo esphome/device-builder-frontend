@@ -11,6 +11,7 @@ import {
   findReferenceCandidates,
   resolveSoleCandidate,
 } from "../../util/config-entry-yaml-scan.js";
+import { resolveSubstitutions } from "../../util/substitutions.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -124,16 +125,20 @@ export function renderIdReferenceField(
         class=${invalid ? "invalid" : ""}
         ?disabled=${effectiveDisabled(entry, ctx)}
         placeholder=${defaultCandidate
-          ? defaultCandidate.name || defaultCandidate.id
+          ? resolveSubstitutions(defaultCandidate.name, ctx.substitutions) ||
+            defaultCandidate.id
           : nothing}
         @change=${onChange}
       >
         ${orphanOption}
         ${candidates.map((c) => {
           const secondary = c.name ? `${c.id} · ${domain}` : domain;
+          // The label is display-only; the stored value stays c.id. Resolve
+          // ${...} so the picker shows the same name the text field previews.
+          const displayName = resolveSubstitutions(c.name, ctx.substitutions);
           return idOption(
             c.id,
-            c.name || c.id,
+            displayName || c.id,
             c === defaultCandidate
               ? `${secondary} · ${ctx.localize("device.default_option_tag")}`
               : secondary
