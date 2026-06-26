@@ -1,3 +1,5 @@
+import type { BoardCatalogEntry } from "../api/types/boards.js";
+
 /** The `featured.<board>.<local>` id prefix marking a board-curated preset entry. */
 export const FEATURED_ID_PREFIX = "featured.";
 
@@ -9,4 +11,16 @@ export function buildFeaturedId(boardId: string, localId: string): string {
 /** True when a catalog id carries the `featured.` prefix; only the prefix is checked, not the full shape. */
 export function isFeaturedId(id: string): boolean {
   return id.startsWith(FEATURED_ID_PREFIX);
+}
+
+/** Resolve a featured catalog id to the component it actually adds; non-featured or unknown ids pass through. */
+export function resolveFeaturedComponentId(
+  id: string,
+  board: BoardCatalogEntry | null
+): string {
+  if (!board || !isFeaturedId(id)) return id;
+  const fc = (board.featured_components ?? []).find(
+    (c) => buildFeaturedId(board.id, c.id) === id
+  );
+  return fc?.component_id ?? id;
 }

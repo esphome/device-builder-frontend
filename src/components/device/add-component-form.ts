@@ -14,6 +14,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
 import { validateEntries, type ValidationError } from "../../util/config-validation.js";
+import { resolveFeaturedComponentId } from "../../util/featured-id.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -464,7 +465,10 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   private _generateYamlPreview(): string {
-    const lines: string[] = [`${this.component.id}:`];
+    // Featured ids are synthetic (`featured.<board>.<local>`); preview the
+    // underlying component the block resolves to, matching the committed YAML.
+    const key = resolveFeaturedComponentId(this.component.id, this.board);
+    const lines: string[] = [`${key}:`];
     lines.push(...serializeYamlValues(this._values, "  "));
     return lines.join("\n");
   }
