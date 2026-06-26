@@ -104,6 +104,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @state()
   private _returnValues: Record<string, unknown> | null = null;
 
+  /** Restored values for the mounted form: only the *original* component on
+   *  return (`_returnTo` cleared) gets them; the dep's own form during the
+   *  detour (`_returnTo` set) must not, or the dep would inherit the original's
+   *  id and collide. */
+  private get _restoredValuesForMount(): Record<string, unknown> | null {
+    return this._returnTo ? null : this._returnValues;
+  }
+
   @state()
   private _selected: ComponentCatalogEntry | null = null;
 
@@ -313,7 +321,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
               .yaml=${this.yaml}
               .prefillReference=${this._prefillReference}
               .prefillFields=${this._depPrefill?.fields ?? null}
-              .restoredValues=${this._returnTo ? null : this._returnValues}
+              .restoredValues=${this._restoredValuesForMount}
               .extraRequired=${this._depPrefill?.required ?? null}
               .optionOverrides=${this._depPrefill?.optionOverrides ?? null}
               .submitting=${this._submitting}
