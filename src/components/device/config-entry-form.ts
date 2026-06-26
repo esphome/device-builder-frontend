@@ -516,10 +516,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
       "wa-option[selected]"
     );
     const desired = selectedOption?.value ?? "";
-    if (!desired) return;
     const current = Array.isArray(select.value)
       ? (select.value[0] ?? "")
       : (select.value ?? "");
+    // Sync to the `?selected` option, INCLUDING the empty case: a pin select
+    // whose value is unset must clear, not keep a stale `.value`. The same
+    // pin-select DOM node is reused across a dep detour (atm90e32 -> spi ->
+    // atm90e32), so without this the CS Pin would keep showing the SPI Clk
+    // Pin's GPIO. The unit picker always has a default unit `?selected`, so it
+    // never hits the empty branch.
     if (current !== desired) {
       select.value = desired;
     }
