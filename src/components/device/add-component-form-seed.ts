@@ -25,6 +25,11 @@ export interface SeedContext {
   yaml: string;
   prefillReference: { domain: string; id: string } | null;
   prefillFields: Record<string, unknown> | null;
+  /** Values the user had entered before a "+ Add <dep>" detour, restored on
+   *  return so a field they already filled (e.g. an SPI device's `cs_pin`)
+   *  isn't lost. Overlaid before `prefillReference` so the just-added dep's id
+   *  still wins for the reference field. */
+  restoredValues: Record<string, unknown> | null;
   localize: LocalizeFunc;
 }
 
@@ -142,8 +147,16 @@ export function seedDefaults(
  *  5. Overlay constraint-derived prefill fields last.
  */
 export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
-  const { entries, component, board, yaml, prefillReference, prefillFields, localize } =
-    ctx;
+  const {
+    entries,
+    component,
+    board,
+    yaml,
+    prefillReference,
+    prefillFields,
+    restoredValues,
+    localize,
+  } = ctx;
 
   // Featured-component entries (ids prefixed with `featured.`) carry
   // backend-baked presets in `default_value` for arbitrary fields,
@@ -172,6 +185,13 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   // "Invalid pin number: 22" squiggle because the bus block
   // falls back to ESP32 GPIO22/21.
   next = seedBoardPinDefaults(component.id, entries, board, next);
+
+  // Restore what the user typed before a "+ Add <dep>" detour, over the freshly
+  // seeded defaults, but before `prefillReference` so the just-added dep's id
+  // still wins for the reference field.
+  if (restoredValues) {
+    next = { ...next, ...restoredValues };
+  }
 
   if (prefillReference) {
     const targetPath = findReferencePath(entries, prefillReference.domain, []);

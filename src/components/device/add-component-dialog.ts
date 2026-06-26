@@ -36,6 +36,7 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../base-dialog.js";
 import "./add-component-form.js";
+import type { ESPHomeAddComponentForm } from "./add-component-form.js";
 import "./component-catalog.js";
 import type { ESPHomeComponentCatalog } from "./component-catalog.js";
 
@@ -93,6 +94,15 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   @query("esphome-component-catalog")
   private _catalog!: ESPHomeComponentCatalog;
+
+  @query("esphome-add-component-form")
+  private _form?: ESPHomeAddComponentForm;
+
+  /** Snapshot of the form's in-progress values, captured when a "+ Add <dep>"
+   *  detour starts and restored when the original form re-mounts, so a field
+   *  the user already filled survives the round-trip. */
+  @state()
+  private _returnValues: Record<string, unknown> | null = null;
 
   @state()
   private _selected: ComponentCatalogEntry | null = null;
@@ -203,6 +213,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._depDomain = null;
     this._prefillReference = null;
     this._depPrefill = null;
+    this._returnValues = null;
     this._bundleQueue = [];
     this._bundleProgress = null;
     this._depNavSeq++;
@@ -302,6 +313,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
               .yaml=${this.yaml}
               .prefillReference=${this._prefillReference}
               .prefillFields=${this._depPrefill?.fields ?? null}
+              .restoredValues=${this._returnTo ? null : this._returnValues}
               .extraRequired=${this._depPrefill?.required ?? null}
               .optionOverrides=${this._depPrefill?.optionOverrides ?? null}
               .submitting=${this._submitting}
@@ -374,6 +386,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       yaml: this.yaml,
       prefillReference: null,
       prefillFields: null,
+      restoredValues: null,
       localize: this._localize,
     });
     if (
@@ -467,6 +480,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   private _onNavigateToDep(e: CustomEvent<{ domain: string }>) {
     e.stopPropagation();
+    // Snapshot what the user has filled before `navigateToDep` swaps
+    // `_selected` and unmounts the form, so it's restored on return.
+    this._returnValues = this._form?.currentValues ?? null;
     return navigateToDep(this as unknown as DepNavHost, e.detail.domain);
   }
 
