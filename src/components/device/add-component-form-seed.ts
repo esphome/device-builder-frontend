@@ -142,9 +142,11 @@ export function seedDefaults(
  *  1. Seed required entries' default values (recursively).
  *  2. Auto-generate a unique `id` for the top-level id field.
  *  3. Seed pin entries from the board manifest.
- *  4. If we were just brought back from a "+ Add <domain>" detour,
+ *  4. Restore the values the user typed before a "+ Add <dep>" detour
+ *     (over the seeded defaults, under the prefills below).
+ *  5. If we were just brought back from a "+ Add <domain>" detour,
  *     prefill the field that points at that domain with the new id.
- *  5. Overlay constraint-derived prefill fields last.
+ *  6. Overlay constraint-derived prefill fields last.
  */
 export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   const {

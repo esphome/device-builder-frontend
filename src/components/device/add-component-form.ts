@@ -101,9 +101,10 @@ export class ESPHomeAddComponentForm extends LitElement {
   private _values: Record<string, unknown> = {};
 
   /** The in-progress form values, so the dialog can snapshot them before a
-   *  "+ Add <dep>" detour unmounts this form. */
+   *  "+ Add <dep>" detour unmounts this form. A shallow copy so the snapshot
+   *  stays stable if the form keeps editing `_values`. */
   get currentValues(): Record<string, unknown> {
-    return this._values;
+    return { ...this._values };
   }
 
   @state()
