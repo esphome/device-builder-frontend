@@ -36,7 +36,7 @@ import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 // A featured card pins a specific board peripheral via a preset `id`
 // (apollo `rgb_leds`). Once that id is in the YAML the peripheral is
 // configured, so the card is effectively single-instance even when its
-// underlying type is multi_conf (many LED strips exist, but only one of this).
+// underlying type is multi_conf (many LED strips exist, but only one exists on the board).
 function featuredIdPresent(
   fc: FeaturedComponent,
   existingIds: ReadonlySet<string>
