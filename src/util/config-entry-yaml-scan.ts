@@ -17,7 +17,7 @@
  * type into a field) from O(N) per keystroke to O(1).
  */
 import type { ComponentCatalogEntry } from "../api/types/components.js";
-import { parsePinGpio, scanPinGpios } from "./pin-gpio.js";
+import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin-gpio.js";
 import { collectIdsAtPath, parseYamlTopLevelSections } from "./yaml-sections-core.js";
 
 /**
@@ -114,12 +114,6 @@ const FREETEXT_PIN_KEYS = new Set(["name", "friendly_name", "comment"]);
 // leading indentation (group 1) and the key (group 2) so a block-scalar
 // value under a free-text key can be skipped by indentation.
 const LINE_KEY_RE = /^(\s*)(?:-\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
-
-// A pin-field key: ESPHome's `_pin`/`_gpio` suffix convention (see
-// board-pin-defaults.ts) plus the long-form `pin:` / `number:` sub-keys.
-// Used to recognise a bare-integer pin value (`tx_pin: 1`) that the
-// prefix-anchored token scan can't see.
-const PIN_VALUE_KEY_RE = /(?:^|_)(?:pin|gpio)$|^number$/i;
 
 // A `key:` whose value is a block scalar (`|` / `>`, with optional chomping
 // `+`/`-` and explicit-indent digit, plus an optional trailing comment).
@@ -218,10 +212,10 @@ export function findUsedPins(
       continue;
     }
     const stripped = stripInlineComment(line);
-    // A bare-integer pin value (`tx_pin: 1`) carries no `GPIO`/`P` prefix, so
-    // the token scan below can't see it; parse it from a pin-field key's value.
-    if (keyMatch && PIN_VALUE_KEY_RE.test(keyMatch[2])) {
-      const gpio = parsePinGpio(stripped.slice(stripped.indexOf(":") + 1).trim());
+    // A bare-integer pin value (`tx_pin: 1`) carries no prefix for the token
+    // scan to anchor on; parse it from a pin-field key's value instead.
+    if (keyMatch && isPinFieldKey(keyMatch[2])) {
+      const gpio = parsePinGpio(stripped.slice(keyMatch[0].length).trim());
       if (gpio !== null && !used.has(gpio)) used.set(gpio, currentDomain);
     }
     for (const num of scanPinGpios(stripped)) {

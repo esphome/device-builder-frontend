@@ -4,7 +4,7 @@
  * pin-selector renderer (current value + suggestions) and the YAML
  * used-pin scanner (cross-section conflict detection).
  *
- * Three exported functions, each with a load-bearing contract:
+ * Four exported functions, each with a load-bearing contract:
  *
  *  - ``parsePinGpio`` — strict, anchored parse of a *single* pin value
  *    (a field value or one suggestion entry). Returns ``null`` for
@@ -17,6 +17,8 @@
  *    raw lines from the used-pin scan), so the tests pin its known
  *    over-match behaviour on free-text P-tokens too — that's the
  *    contract its caller (``findUsedPins``) is written against.
+ *  - ``isPinFieldKey`` — whether a mapping key names a pin field, so the
+ *    used-pin scan can accept a bare-integer value the token scan misses.
  *
  * Platform pin forms covered (see the module header for the full
  * derivation):
@@ -28,7 +30,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { formatPinValue, parsePinGpio, scanPinGpios } from "../../src/util/pin-gpio.js";
+import {
+  formatPinValue,
+  isPinFieldKey,
+  parsePinGpio,
+  scanPinGpios,
+} from "../../src/util/pin-gpio.js";
 
 describe("parsePinGpio", () => {
   it("returns finite numbers verbatim", () => {
@@ -189,5 +196,26 @@ describe("scanPinGpios", () => {
     expect(scanPinGpios("Pump P0.5 valve")).toEqual([5]); // P0.5 -> port0 pin5
     expect(scanPinGpios("P3.invalid")).toEqual([3]); // dotted alt fails, bare P3 wins
     expect(scanPinGpios("P0.5V")).toEqual([0]); // dotted \b fails on V, bare P0 wins
+  });
+});
+
+describe("isPinFieldKey", () => {
+  it("matches the _pin / _gpio suffix and the long-form pin / number keys", () => {
+    for (const key of ["pin", "tx_pin", "dir_pin", "led_gpio", "gpio", "number"]) {
+      expect(isPinFieldKey(key)).toBe(true);
+    }
+  });
+
+  it("rejects numeric config keys that aren't pins", () => {
+    for (const key of [
+      "baud_rate",
+      "phy_addr",
+      "data_bits",
+      "max_speed",
+      "id",
+      "pin_x",
+    ]) {
+      expect(isPinFieldKey(key)).toBe(false);
+    }
   });
 });

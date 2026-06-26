@@ -141,3 +141,16 @@ export function scanPinGpios(line: string): number[] {
   }
   return out;
 }
+
+// ESPHome's `_pin`/`_gpio` suffix convention (mirrors `board-pin-defaults.ts`'s
+// role strip) plus the long-form `pin:` / `number:` sub-keys.
+const PIN_FIELD_KEY_RE = /(?:^|_)(?:pin|gpio)$|^number$/i;
+
+/**
+ * Whether a mapping key names a pin field. Lets the used-pin scan accept a
+ * bare-integer value (`tx_pin: 1`) that {@link scanPinGpios} can't see — the
+ * token forms it matches all carry a distinctive prefix, a bare int doesn't.
+ */
+export function isPinFieldKey(key: string): boolean {
+  return PIN_FIELD_KEY_RE.test(key);
+}
