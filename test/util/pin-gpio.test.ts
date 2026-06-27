@@ -120,25 +120,20 @@ describe("parsePinGpio", () => {
     expect(parsePinGpio({ pcf8574: "hub" })).toBeNull();
     // Provider present but hub id empty (mid-edit) -> null, NOT board GPIO 0.
     expect(parsePinGpio({ pcf8574: "", number: 0 })).toBeNull();
-    // A pin-level `id` is a board-GPIO key, not a provider: an expander pin that
-    // also carries an id must still resolve to its provider token, not `id`.
+    // A pin-level id is a board-GPIO key: an expander pin carrying one still
+    // resolves to its provider token, not the id.
     expect(parsePinGpio({ pcf8574: "hub", number: 0, id: "relay1" })).toBe(
       "pcf8574:hub:0"
     );
-    // A plain board pin with an id (and the esp32-only validation key) stays a
-    // board GPIO, not a bogus `id`/`ignore_pin_validation_error` provider token.
+    // A board pin with id and the esp32-only validation key stays a board GPIO.
     expect(
       parsePinGpio({ number: 5, id: "btn", ignore_pin_validation_error: true })
     ).toBe(5);
   });
 
   it("treats every long-form board-GPIO key as a board pin, never an expander provider", () => {
-    // Characterizes the provider-detection contract: any key NOT in
-    // LONG_FORM_PIN_KEYS is read as an I/O-expander provider, so each member
-    // must round-trip a plain board GPIO (here 7) to a number, not a token.
-    // This set mirrors the backend BOARD_PIN_KEYS in lockstep; dropping a key
-    // (or letting it drift) would misclassify a board pin as an expander
-    // channel, and this trips a red test instead of shipping silently.
+    // Each member must round-trip a plain board GPIO to a number; guards the set
+    // against drift that would misclassify a board pin as an expander channel.
     for (const key of LONG_FORM_PIN_KEYS) {
       if (key === "number") continue;
       expect(parsePinGpio({ number: 7, [key]: "x" }), key).toBe(7);
