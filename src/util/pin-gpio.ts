@@ -62,8 +62,9 @@ const PORT_A_PIN_RE = /^\s*PA(\d+)\s*$/i;
 const PORT_B_PIN_RE = /^\s*PB(\d+)\s*$/i;
 
 /**
- * Parse a pin reference into a GPIO number. Used both for the field's
- * current value and for individual `suggestions` entries. Featured
+ * Parse a pin reference into a board GPIO number, or an I/O-expander
+ * channel's namespaced `provider:hub_id:channel` token. Used both for the
+ * field's current value and for individual `suggestions` entries. Featured
  * manifests write pins as bare ints (`12`), string forms (`"GPIO12"`,
  * `"gpio12"`), nRF52 port.pin notation (`"P0.27"`, `"P1.1"`), LibreTiny
  * forms (`"P23"` bk72xx, `"PA02"` rtl87xx), or — for fields whose locked
