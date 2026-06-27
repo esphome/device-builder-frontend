@@ -586,10 +586,12 @@ export class ESPHomePageDashboard extends LitElement {
     this._persistFilterState(changed);
   }
 
-  /** Persist filter/search/view state on change. Two layers, kept in one
-   *  seam: the URL (authoritative, shareable) and the session store (seeds
-   *  facets when the URL doesn't carry them). The initial paint re-writes the
-   *  values that ``_hydrateFromUrl`` just read, which is a harmless no-op. */
+  /** Persist filter/search/view state on change. Two layers in one seam: the
+   *  URL (authoritative, shareable) and the session store (seeds facets the URL
+   *  doesn't carry). On the initial paint this writes the hydrated state back: a
+   *  no-op when it came from the URL, but when facets were session-seeded it
+   *  promotes them into the address bar via ``replaceState`` so the URL keeps
+   *  mirroring the active filters (back stack stays clean). */
   private _persistFilterState(changed: PropertyValues): void {
     if (
       ESPHomePageDashboard._urlSyncedFields.some((f) => changed.has(f)) ||
