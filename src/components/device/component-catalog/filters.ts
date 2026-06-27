@@ -8,7 +8,7 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { isComponentPresent } from "../../../util/component-presence.js";
-import { findUsedPins } from "../../../util/config-entry-yaml-scan.js";
+import { findUsedPins, parseCatalogId } from "../../../util/config-entry-yaml-scan.js";
 import { platformSupported } from "../../../util/config-validation.js";
 import { collectExistingIds } from "../../../util/default-component-id.js";
 import { buildFeaturedId } from "../../../util/featured-id.js";
@@ -27,7 +27,6 @@ import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 const memoPresent = memoizeOne(parseTopLevelComponents);
 const memoPlatforms = memoizeOne(parseConfiguredPlatforms);
 const memoIds = memoizeOne(collectExistingIds);
-const memoUsedPins = memoizeOne(findUsedPins);
 
 // Three filters applied client-side:
 //  1. Platform gate: drop components incompatible with the device's
@@ -61,19 +60,14 @@ function featuredIdPresent(
 
 // A featured card's LOCKED pins are the board peripheral's fixed wiring. Unlocked
 // default pins are user-editable, so they don't count as a fixed footprint.
-function featuredFixedPins(entry: ComponentCatalogEntry): number[] {
-  const pins: number[] = [];
-  const walk = (entries: ConfigEntry[]): void => {
-    for (const e of entries) {
-      if (e.type === ConfigEntryType.PIN && e.locked) {
-        const gpio = parsePinGpio(e.default_value);
-        if (gpio !== null) pins.push(gpio);
-      }
-      if (e.config_entries) walk(e.config_entries);
+function collectFixedPins(entries: ConfigEntry[], pins: number[]): void {
+  for (const e of entries) {
+    if (e.type === ConfigEntryType.PIN && e.locked) {
+      const gpio = parsePinGpio(e.default_value);
+      if (gpio !== null) pins.push(gpio);
     }
-  };
-  walk(entry.config_entries ?? []);
-  return pins;
+    if (e.config_entries) collectFixedPins(e.config_entries, pins);
+  }
 }
 
 // Same component + same pins = duplicate: if an instance in the card's own
@@ -85,9 +79,10 @@ function featuredPinsTaken(
   fc: FeaturedComponent,
   usedPins: ReadonlyMap<number, string>
 ): boolean {
-  const pins = featuredFixedPins(entry);
+  const pins: number[] = [];
+  collectFixedPins(entry.config_entries ?? [], pins);
   if (pins.length === 0) return false;
-  const domain = fc.component_id.split(".")[0];
+  const domain = parseCatalogId(fc.component_id).domain;
   return pins.every((pin) => usedPins.get(pin) === domain);
 }
 
@@ -115,8 +110,9 @@ export function visibleComponents(
   }
   // Only scan the YAML for ids/pins when there are featured cards to match against.
   const existingIds = featuredById.size ? memoIds(host.yaml) : new Set<string>();
+  // findUsedPins self-memoizes on the yaml string, so no memoize-one wrapper.
   const usedPins = featuredById.size
-    ? memoUsedPins(host.yaml)
+    ? findUsedPins(host.yaml)
     : new Map<number, string>();
 
   return platformCompatible.filter((c) => {
