@@ -118,10 +118,34 @@ export function ambiguousNameIds(components: ComponentCatalogEntry[]): Set<strin
   return ids;
 }
 
+// A bundle drops a fixed set of featured peripherals (each with a preset id)
+// into the config at once. It's fully configured when every component's preset
+// id is in the YAML, so hide it then — a second add would duplicate all of them.
+function presentBundleIds(host: ESPHomeComponentCatalog): Set<string> {
+  const board = host.board;
+  const bundles = board?.featured_bundles ?? [];
+  if (!board || bundles.length === 0) return new Set();
+  const presetIdByLocal = new Map<string, string>();
+  for (const fc of board.featured_components ?? []) {
+    const presetId = fc.fields?.["id"]?.value;
+    if (typeof presetId === "string") presetIdByLocal.set(fc.id, presetId);
+  }
+  const existingIds = memoIds(host.yaml);
+  const out = new Set<string>();
+  for (const bundle of bundles) {
+    const ids = bundle.component_ids
+      .map((cid) => presetIdByLocal.get(cid))
+      .filter((id): id is string => id !== undefined);
+    if (ids.length > 0 && ids.every((id) => existingIds.has(id))) out.add(bundle.id);
+  }
+  return out;
+}
+
 // Bundles live on boards/get_board (not components/*) — filter client-side
 // so a search behaves consistently across featured + bundles + components.
 export function filteredBundles(host: ESPHomeComponentCatalog): FeaturedBundle[] {
-  const bundles = host.board?.featured_bundles ?? [];
+  const present = presentBundleIds(host);
+  const bundles = (host.board?.featured_bundles ?? []).filter((b) => !present.has(b.id));
   const q = host._search.trim().toLowerCase();
   if (!q) return bundles;
   return bundles.filter(
@@ -133,8 +157,8 @@ export function filteredBundles(host: ESPHomeComponentCatalog): FeaturedBundle[]
 }
 
 // Recommendations shown for this board: a featured component counts when it's
-// multi-conf or not yet configured; bundles are counted as-is, matching the
-// grid (`filteredBundles`) which doesn't present-filter them. Drives the
+// multi-conf or not yet configured; a bundle counts until it's fully
+// configured, matching the grid (`filteredBundles`). Drives the
 // Recommended badge and the auto-select so an all-configured board collapses
 // the category instead of showing an empty "0 of N" list. No platform gate
 // here (unlike `visibleComponents`): a board only recommends its own
@@ -155,7 +179,11 @@ export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
     (fc.multi_conf !== false ||
       !isComponentPresent(fc.component_id, present, presentPlatforms));
   const components = featured.filter(addable).length;
-  return components + (board.featured_bundles?.length ?? 0);
+  const presentBundles = presentBundleIds(host);
+  const bundles = (board.featured_bundles ?? []).filter(
+    (b) => !presentBundles.has(b.id)
+  ).length;
+  return components + bundles;
 }
 
 interface CategoryEntry {

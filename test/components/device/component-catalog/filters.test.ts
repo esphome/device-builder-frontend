@@ -5,6 +5,7 @@ import type { ESPHomeComponentCatalog } from "../../../../src/components/device/
 import {
   availableFeaturedCount,
   buildCategories,
+  filteredBundles,
   visibleComponents,
 } from "../../../../src/components/device/component-catalog/filters.js";
 
@@ -37,6 +38,7 @@ function host(
 ): ESPHomeComponentCatalog {
   return {
     _components: components,
+    _search: "",
     platform,
     yaml,
     lockedCategories,
@@ -209,7 +211,7 @@ describe("availableFeaturedCount", () => {
     ).toBe(0);
   });
 
-  it("counts bundles as-is (matching the grid), plus addable components", () => {
+  it("counts a bundle whose components have no preset id (can't detect presence)", () => {
     const b = board(
       [
         { id: "eth", component_id: "ethernet", multi_conf: false },
@@ -217,10 +219,71 @@ describe("availableFeaturedCount", () => {
       ],
       [{ id: "kit", component_ids: ["eth", "relay"] }]
     );
-    // ethernet present (dropped), relay addable (1), bundle always counts (1)
+    // ethernet present (dropped), relay addable (1), bundle counts (1)
     expect(
       availableFeaturedCount(host([], "esp32", { yaml: "ethernet:\n", board: b }))
     ).toBe(2);
+  });
+
+  it("drops a bundle once all its components' preset ids are configured", () => {
+    const b = board(
+      [
+        {
+          id: "rgb",
+          component_id: "light.esp32_rmt_led_strip",
+          fields: { id: { value: "rgb_leds" } },
+        },
+        {
+          id: "buz",
+          component_id: "output.ledc",
+          fields: { id: { value: "buzzer_output" } },
+        },
+      ],
+      [{ id: "kit", component_ids: ["rgb", "buz"] }]
+    );
+    const both = "light:\n  - id: rgb_leds\noutput:\n  - id: buzzer_output\n";
+    // both featured cards drop AND the bundle drops -> 0
+    expect(availableFeaturedCount(host([], "esp32", { yaml: both, board: b }))).toBe(0);
+    // only rgb present: rgb drops, buz addable (1), bundle not fully configured (1) -> 2
+    const partial = "light:\n  - id: rgb_leds\n";
+    expect(availableFeaturedCount(host([], "esp32", { yaml: partial, board: b }))).toBe(
+      2
+    );
+  });
+});
+
+describe("filteredBundles present-filter", () => {
+  const board = {
+    id: "apollo-esk-1",
+    featured_components: [
+      {
+        id: "rgb",
+        component_id: "light.esp32_rmt_led_strip",
+        fields: { id: { value: "rgb_leds" } },
+      },
+      {
+        id: "buz",
+        component_id: "output.ledc",
+        fields: { id: { value: "buzzer_output" } },
+      },
+    ],
+    featured_bundles: [
+      { id: "kit", name: "Kit", description: "", component_ids: ["rgb", "buz"] },
+    ],
+  } as unknown as BoardCatalogEntry;
+
+  it("hides a bundle when all its components' preset ids are present", () => {
+    const yaml = "light:\n  - id: rgb_leds\noutput:\n  - id: buzzer_output\n";
+    expect(filteredBundles(host([], "esp32", { yaml, board })).map((b) => b.id)).toEqual(
+      []
+    );
+  });
+
+  it("keeps a bundle that is only partially configured", () => {
+    const yaml = "light:\n  - id: rgb_leds\n";
+    expect(filteredBundles(host([], "esp32", { yaml, board })).map((b) => b.id)).toEqual([
+      "kit",
+    ]);
   });
 });
 
