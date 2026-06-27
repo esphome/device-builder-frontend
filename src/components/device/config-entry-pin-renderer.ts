@@ -11,7 +11,7 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType, PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
-import { formatPinValue, parsePinGpio } from "../../util/pin-gpio.js";
+import { formatPinValue, parseBoardGpio, parsePinGpio } from "../../util/pin-gpio.js";
 import { expandPinModeShorthand } from "../../util/pin-mode.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 import {
@@ -69,7 +69,7 @@ function gpioFromAlias(rawValue: unknown, pins: BoardPin[]): number | null {
 function buildPinOption(
   pin: BoardPin,
   entry: ConfigEntry,
-  usedPins: Map<number, string>,
+  usedPins: Map<number | string, string>,
   ctx: RenderCtx
 ): PinOptionView {
   const optValue = formatPinValue(pin.gpio, ctx.board?.esphome.platform);
@@ -120,7 +120,7 @@ function buildPinOption(
 function renderPinOptions(
   pins: BoardPin[],
   entry: ConfigEntry,
-  usedPins: Map<number, string>,
+  usedPins: Map<number | string, string>,
   value: string,
   ctx: RenderCtx
 ): TemplateResult {
@@ -204,7 +204,7 @@ export function renderPinField(
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
   // `GPIOn` form; this drives both the selected option and the re-add of a
   // filtered-out active pin below.
-  const valueGpio = parsePinGpio(rawValue) ?? gpioFromAlias(rawValue, ctx.board.pins);
+  const valueGpio = parseBoardGpio(rawValue) ?? gpioFromAlias(rawValue, ctx.board.pins);
   const platform = ctx.board.esphome.platform;
   // Fallback to ``String(rawValue)`` only when the value is a
   // primitive — js-yaml emits null-prototype maps for partial /
@@ -225,7 +225,7 @@ export function renderPinField(
   // to its GPIO so the box shows the real pin label rather than the raw name.
   const defaultGpio =
     entry.default_value != null
-      ? (parsePinGpio(entry.default_value) ??
+      ? (parseBoardGpio(entry.default_value) ??
         gpioFromAlias(entry.default_value, ctx.board.pins))
       : null;
   const defaultPlaceholder =
@@ -247,7 +247,7 @@ export function renderPinField(
   // pin set instead, with a visible error for the field).
   if (entry.suggestions && entry.suggestions.length > 0) {
     const allowed = new Set(
-      entry.suggestions.map(parsePinGpio).filter((g): g is number => g !== null)
+      entry.suggestions.map(parseBoardGpio).filter((g): g is number => g !== null)
     );
     if (allowed.size > 0) {
       const narrowed = visible.filter((p) => allowed.has(p.gpio));

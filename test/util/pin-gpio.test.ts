@@ -33,6 +33,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatPinValue,
   isPinFieldKey,
+  parseBoardGpio,
   parsePinGpio,
   scanPinGpios,
 } from "../../src/util/pin-gpio.js";
@@ -106,6 +107,16 @@ describe("parsePinGpio", () => {
     expect(parsePinGpio({ mode: { input: true } })).toBeNull();
   });
 
+  it("namespaces an I/O-expander pin so its channel never aliases a board GPIO", () => {
+    // The pcf8574 hub channel 0 must not collide with board GPIO 0.
+    expect(parsePinGpio({ pcf8574: "pcf8574_hub_in_1", number: 0, mode: "INPUT" })).toBe(
+      "pcf8574:pcf8574_hub_in_1:0"
+    );
+    expect(parsePinGpio({ mcp23017: "hub", number: 7 })).toBe("mcp23017:hub:7");
+    // Expander key present but no resolvable channel -> null, not a board pin.
+    expect(parsePinGpio({ pcf8574: "hub" })).toBeNull();
+  });
+
   it("returns null for unparseable or non-pin inputs", () => {
     expect(parsePinGpio("abc")).toBeNull();
     expect(parsePinGpio("")).toBeNull();
@@ -113,6 +124,15 @@ describe("parsePinGpio", () => {
     expect(parsePinGpio(undefined)).toBeNull();
     expect(parsePinGpio([1])).toBeNull(); // arrays are not pin-block objects
     expect(parsePinGpio(true)).toBeNull();
+  });
+});
+
+describe("parseBoardGpio", () => {
+  it("returns the board GPIO and drops expander tokens", () => {
+    expect(parseBoardGpio(12)).toBe(12);
+    expect(parseBoardGpio({ number: 5, mode: { input: true } })).toBe(5);
+    // An expander channel is not a board pin.
+    expect(parseBoardGpio({ pcf8574: "hub", number: 0 })).toBeNull();
   });
 });
 

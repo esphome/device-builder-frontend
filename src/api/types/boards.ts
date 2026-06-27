@@ -74,12 +74,20 @@ export interface FeaturedComponent {
   /** Underlying component's multi_conf; absent means multi-conf (omit_default). */
   multi_conf?: boolean;
   /**
-   * Backend-computed canonical GPIO per locked pin field (e.g. `{scl: 0, sda: 1}`),
-   * derived from the underlying component's PIN schema. The catalog hides this
-   * card when an existing same-domain instance already occupies these exact
-   * pins. Absent for components with no locked pins (omit_default).
+   * Backend-computed canonical occupied-pin identity per locked pin field. A
+   * board GPIO is a number (`{scl: 0, sda: 1}`); a pin on an I/O expander is a
+   * `provider:hub_id:channel` token (`{pin: 'pcf8574:hub_in_1:0'}`) so it never
+   * aliases a board GPIO of the same number. The catalog hides this card when an
+   * existing same-domain instance already occupies these exact pins. Absent for
+   * components with no locked pins (omit_default).
    */
-  locked_pins?: Record<string, number>;
+  locked_pins?: Record<string, number | string>;
+  /**
+   * Local ids of other featured_components on this board that must be added
+   * first, in order (e.g. an i2c bus then the pcf8574 hub a pin sits on). The
+   * add flow adds any missing prerequisite before this component.
+   */
+  requires?: string[];
 }
 
 /**
