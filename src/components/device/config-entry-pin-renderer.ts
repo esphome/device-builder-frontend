@@ -202,15 +202,15 @@ export function renderPinField(
   // blank.
   const rawValue = ctx.getAt(path);
   const identity = parsePinGpio(rawValue);
-  if (typeof identity === "string" && effectiveDisabled(entry, ctx)) {
-    // A locked pin on an I/O expander (a featured preset) is a
-    // `provider:hub:channel` channel, not a board GPIO — the board-GPIO picker
-    // can't represent it, so show it read-only. Expander pins only ever arrive
-    // via board-locked featured presets, so this disabled branch is the only one
-    // reached in practice. An editable expander pin (tests only) falls through to
-    // the board-GPIO select (blank — it can't show the channel) plus the
-    // provider-scoped mode-flag picker in Advanced below.
-    return renderExpanderPin(entry, path, ctx, identity);
+  if (typeof identity === "string") {
+    // An I/O-expander pin is a `provider:hub:channel` channel, never a board
+    // GPIO, so the board-GPIO picker can't represent it regardless of disabled
+    // state — show the channel read-only. Gating this on disabled would let an
+    // editable expander pin fall through to the board picker, where a selection
+    // writes a board GPIO into `pin.number` and clobbers the channel. The
+    // Advanced mode-flag disclosure still renders below (the channel's mode is
+    // editable, scoped to the provider), just not the board-GPIO selector.
+    return renderExpanderPin(entry, path, ctx, identity, rawValue);
   }
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
   // `GPIOn` form; this drives both the selected option and the re-add of a
@@ -331,16 +331,17 @@ export function renderPinField(
 }
 
 /**
- * Render a pin that sits on an I/O expander read-only. Its `identity` is the
- * `provider:hub:channel` token; an expander channel isn't a board GPIO, so the
- * board-pin picker would render blank. Show the hub + channel instead — these
- * presets are always board-locked, so there's nothing for the user to pick.
+ * Render an I/O-expander pin: the `provider:hub:channel` channel shown read-only
+ * (an expander channel isn't a board GPIO, so the board-pin picker can't
+ * represent it) plus the Advanced mode-flag disclosure — the channel's mode is
+ * still editable, scoped to the provider.
  */
 function renderExpanderPin(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx,
-  identity: string
+  identity: string,
+  rawValue: unknown
 ): TemplateResult {
   const [provider, hub, channel] = identity.split(":");
   return html`
@@ -352,6 +353,14 @@ function renderExpanderPin(
         .value=${ctx.localize("device.pin_on_expander", { provider, hub, channel })}
       />
       ${renderFieldError(path, ctx)}
+      ${renderPinAdvanced(
+        entry,
+        path,
+        ctx,
+        rawValue,
+        isPlainObject(rawValue),
+        effectiveDisabled(entry, ctx)
+      )}
     </div>
   `;
 }
