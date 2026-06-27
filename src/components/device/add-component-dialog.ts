@@ -371,10 +371,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // ahead of it through the same sequential queue bundles use.
     const prereqs = this._missingRequiredPrereqs(result.entry);
     if (prereqs && prereqs.missing.length > 0) {
+      // The intermediate steps are the prerequisites (bus, hub), not the picked
+      // component, so frame the banner as "Adding prerequisites for <name>".
       await this._startFeaturedSequence(
         [...prereqs.missing, result.entry.id],
         prereqs.boardId,
-        result.entry.name
+        this._localize("device.adding_prerequisites_for", { name: result.entry.name })
       );
       return;
     }
@@ -389,6 +391,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
    * its `requires` local ids (bus then hub), resolved to full featured ids,
    * keeping only those whose locked id isn't already in the YAML. Returns null
    * for a non-featured entry or one with no requires.
+   *
+   * Invariant: `requires` must be the fully-flattened, ordered prerequisite set
+   * — only the selected component's direct `requires` is resolved here, and the
+   * queued items (added via `_startFeaturedSequence`) do NOT re-resolve their
+   * own `requires`. The backend (esphome/device-builder#1717) emits the complete
+   * chain (e.g. a gpio lists `[bus, hub]`, not just the hub).
    */
   private _missingRequiredPrereqs(
     entry: ComponentCatalogEntry

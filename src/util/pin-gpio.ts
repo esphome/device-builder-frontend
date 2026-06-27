@@ -108,8 +108,10 @@ export function parsePinGpio(s: unknown): number | string | null {
     const channel = parsePinGpio(obj.number);
     if (provider !== undefined) {
       // I/O-expander channel: namespace it so it never aliases a board GPIO.
+      // A provider key with no resolved hub id (mid-edit) is null, NOT the bare
+      // channel — falling back would alias the channel to a board GPIO.
       const hub = obj[provider];
-      return typeof hub === "string" && typeof channel === "number"
+      return typeof hub === "string" && hub !== "" && typeof channel === "number"
         ? pinIdentityToken(provider, hub, channel)
         : null;
     }

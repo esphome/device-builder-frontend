@@ -634,6 +634,7 @@
     "featured_bundle_badge": "Bundle",
     "field_locked_by_board": "Set by the board",
     "bundle_step_progress": "Step {current} of {total} — Adding {name}",
+    "adding_prerequisites_for": "prerequisites for {name}",
     "docs": "Docs",
     "see_also": "See also:",
     "advanced_options": "Advanced options",

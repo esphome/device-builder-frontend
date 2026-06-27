@@ -95,6 +95,19 @@ describe("findUsedPins", () => {
     expect(map.get("pcf8574:hub_in_1:0")).toBe("binary_sensor");
   });
 
+  it("does not alias a mid-edit expander pin (empty hub id) to a board GPIO", () => {
+    const config = [
+      "binary_sensor:",
+      "  - platform: gpio",
+      "    pin:",
+      "      pcf8574:", // hub id not filled in yet
+      "      number: 0",
+      "",
+    ].join("\n");
+    // The incomplete expander block must not register board GPIO 0 as used.
+    expect(findUsedPins(config).has(0)).toBe(false);
+  });
+
   it("excludes lines in the inclusive range", () => {
     // Skip lines 4-6 (the binary_sensor block) — pin 5 should
     // not appear.

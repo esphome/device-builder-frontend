@@ -113,8 +113,12 @@ describe("parsePinGpio", () => {
       "pcf8574:pcf8574_hub_in_1:0"
     );
     expect(parsePinGpio({ mcp23017: "hub", number: 7 })).toBe("mcp23017:hub:7");
+    // The channel is parsed like any pin value, so a string `number` works.
+    expect(parsePinGpio({ pcf8574: "hub", number: "0" })).toBe("pcf8574:hub:0");
     // Expander key present but no resolvable channel -> null, not a board pin.
     expect(parsePinGpio({ pcf8574: "hub" })).toBeNull();
+    // Provider present but hub id empty (mid-edit) -> null, NOT board GPIO 0.
+    expect(parsePinGpio({ pcf8574: "", number: 0 })).toBeNull();
   });
 
   it("returns null for unparseable or non-pin inputs", () => {
