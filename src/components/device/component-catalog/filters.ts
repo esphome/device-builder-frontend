@@ -59,7 +59,6 @@ export function visibleComponents(
     : null;
 
   // Map a featured card's synthetic id back to its FeaturedComponent.
-  const existingIds = collectExistingIds(host.yaml);
   const featuredById = new Map<string, FeaturedComponent>();
   const board = host.board;
   if (board) {
@@ -68,6 +67,10 @@ export function visibleComponents(
       featuredById.set(buildFeaturedId(board.id, fc.id), fc);
     }
   }
+  // Only scan the YAML for ids when there are featured cards to match against.
+  const existingIds = featuredById.size
+    ? collectExistingIds(host.yaml)
+    : new Set<string>();
 
   return platformCompatible.filter((c) => {
     const fc = featuredById.get(c.id);
@@ -133,9 +136,10 @@ export function filteredBundles(host: ESPHomeComponentCatalog): FeaturedBundle[]
 export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
   const board = host.board;
   if (!board) return 0;
+  const featured = board.featured_components ?? [];
   const present = parseTopLevelComponents(host.yaml);
   const presentPlatforms = parseConfiguredPlatforms(host.yaml);
-  const existingIds = collectExistingIds(host.yaml);
+  const existingIds = featured.length ? collectExistingIds(host.yaml) : new Set<string>();
   // `!== false`, not truthy: the backend omits the `true` default, so an
   // absent multi_conf means multi-conf (still addable). A featured peripheral
   // whose preset id is already configured is never addable, regardless.
@@ -143,7 +147,7 @@ export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
     !featuredIdPresent(fc, existingIds) &&
     (fc.multi_conf !== false ||
       !isComponentPresent(fc.component_id, present, presentPlatforms));
-  const components = (board.featured_components ?? []).filter(addable).length;
+  const components = featured.filter(addable).length;
   return components + (board.featured_bundles?.length ?? 0);
 }
 
