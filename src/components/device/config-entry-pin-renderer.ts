@@ -206,9 +206,10 @@ export function renderPinField(
     // A locked pin on an I/O expander (a featured preset) is a
     // `provider:hub:channel` channel, not a board GPIO — the board-GPIO picker
     // can't represent it, so show it read-only. Expander pins only ever arrive
-    // via board-locked featured presets, so the editable case is unreachable
-    // today; an editable expander pin would need its own provider-scoped picker
-    // (none exists below) rather than the board-GPIO select.
+    // via board-locked featured presets, so this disabled branch is the only one
+    // reached in practice. An editable expander pin (tests only) falls through to
+    // the board-GPIO select (blank — it can't show the channel) plus the
+    // provider-scoped mode-flag picker in Advanced below.
     return renderExpanderPin(entry, path, ctx, identity);
   }
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
