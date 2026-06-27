@@ -17,6 +17,7 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { updateButtonTitle } from "../../util/update-tooltip.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./device-drawer-content.js";
@@ -363,6 +364,12 @@ export class ESPHomeDeviceDrawer extends LitElement {
                 class="action action--accent"
                 ?disabled=${this.busy}
                 @click=${() => this._emitAction("update-device")}
+                title=${updateButtonTitle(
+                  this._localize,
+                  device.deployed_version,
+                  device.current_version,
+                  "dashboard.drawer_update"
+                )}
               >
                 <wa-icon library="mdi" name="upload"></wa-icon>
                 ${this._localize("dashboard.drawer_update")}
