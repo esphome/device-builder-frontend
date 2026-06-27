@@ -146,8 +146,8 @@ export function renderSecretHint(value: string, ctx: RenderCtx) {
 }
 
 /**
- * Hint beneath a string field referencing a ``${var}``: previews the
- * value when it resolves against this file's ``substitutions:``, else a
+ * Hint beneath a string field referencing a ``${var}`` or bare ``$var``:
+ * previews the value when it resolves against this file's ``substitutions:``, else a
  * marker whose tooltip notes the reference is resolved at build time
  * (from a package/include), not previewed here. ``nothing`` with no ref.
  */
