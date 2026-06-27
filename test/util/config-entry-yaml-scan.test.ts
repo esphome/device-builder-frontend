@@ -285,6 +285,11 @@ describe("domainOccupiesPins", () => {
     expect(domainOccupiesPins(yaml, "i2c", { scl: 0, sda: 1 })).toBe(true);
   });
 
+  it("matches the expanded pin-block (number: sub-key) form", () => {
+    const yaml = "i2c:\n  - scl:\n      number: GPIO0\n    sda: 1\n    id: i2c_1\n";
+    expect(domainOccupiesPins(yaml, "i2c", { scl: 0, sda: 1 })).toBe(true);
+  });
+
   it("is false when the pins are split across two instances", () => {
     const yaml =
       "i2c:\n  - scl: 0\n    sda: 9\n    id: a\n  - scl: 8\n    sda: 1\n    id: b\n";

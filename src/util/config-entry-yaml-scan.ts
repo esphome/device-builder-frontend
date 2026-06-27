@@ -23,6 +23,7 @@ import {
   findFieldLine,
   parseYamlTopLevelSections,
   readInstanceScalar,
+  type YamlSection,
 } from "./yaml-sections-core.js";
 
 /**
@@ -356,6 +357,26 @@ export function findComponentsByProviders(
   return result;
 }
 
+// An instance's GPIO for a pin field, handling both the bare scalar
+// (`scl: 0`) and the expanded block (`scl:\n  number: GPIO0`) forms; null
+// when the field is absent or its value isn't a parseable pin.
+function readInstancePinGpio(
+  yaml: string,
+  lines: string[],
+  section: YamlSection,
+  key: string
+): number | null {
+  const lineNo = findFieldLine(yaml, section, [key]);
+  if (lineNo === null) return null;
+  const scalar = parsePinGpio(readInstanceScalar(lines[lineNo - 1], key));
+  if (scalar !== null) return scalar;
+  // Expanded form: descend into the `number:` sub-key.
+  const numLine = findFieldLine(yaml, section, [key, "number"]);
+  return numLine === null
+    ? null
+    : parsePinGpio(readInstanceScalar(lines[numLine - 1], "number"));
+}
+
 /**
  * True when an existing instance under `domain:` occupies every pin in
  * `lockedPins` (pin field key -> canonical GPIO) on a SINGLE instance — i.e. the
@@ -375,13 +396,9 @@ export function domainOccupiesPins(
   const lines = yaml.split("\n");
   for (const section of parseYamlTopLevelSections(yaml)) {
     if ((section.parentKey ?? section.key) !== domain) continue;
-    const occupies = keys.every((key) => {
-      const lineNo = findFieldLine(yaml, section, [key]);
-      return (
-        lineNo !== null &&
-        parsePinGpio(readInstanceScalar(lines[lineNo - 1], key)) === lockedPins[key]
-      );
-    });
+    const occupies = keys.every(
+      (key) => readInstancePinGpio(yaml, lines, section, key) === lockedPins[key]
+    );
     if (occupies) return true;
   }
   return false;
