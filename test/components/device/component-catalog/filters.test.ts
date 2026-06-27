@@ -279,6 +279,28 @@ describe("availableFeaturedCount", () => {
     ).toBe(0);
   });
 
+  it("drops a featured component whose locked pins are already occupied", () => {
+    // Mirrors the visibleComponents pin-conflict hide so the badge stays in
+    // step with the grid (no badge/grid divergence).
+    const b = board([
+      {
+        id: "i2c_bus",
+        component_id: "i2c",
+        multi_conf: true,
+        locked_pins: { scl: 0, sda: 1 },
+      },
+    ]);
+    expect(availableFeaturedCount(host([], "esp32", { board: b }))).toBe(1);
+    expect(
+      availableFeaturedCount(
+        host([], "esp32", {
+          yaml: "i2c:\n  - scl: 0\n    sda: 1\n    id: i2c_1\n",
+          board: b,
+        })
+      )
+    ).toBe(0);
+  });
+
   it("counts a bundle whose components have no preset id (can't detect presence)", () => {
     const b = board(
       [
