@@ -128,6 +128,14 @@ export const UPDATE_FACET_BUCKETS = ["update_available", "modified"] as const;
 
 type UpdateBucket = (typeof UPDATE_FACET_BUCKETS)[number];
 
+/** Normalize arbitrary update-status ids (from the URL or the session store)
+ *  to the known buckets in canonical order, deduped — so an unknown or
+ *  duplicate id can't inflate the active-filter count or render duplicates. */
+export function normalizeUpdateBuckets(ids: readonly string[]): string[] {
+  const requested = new Set(ids);
+  return UPDATE_FACET_BUCKETS.filter((b) => requested.has(b));
+}
+
 /** Each bucket's membership test — the single source of truth shared
  *  by the facet's counts here and the dashboard's row filter, so the
  *  bucket → device-field mapping isn't written twice. */

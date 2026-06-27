@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
-import { computeUpdateFacet } from "../../src/util/facets.js";
+import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facets.js";
 
 // computeUpdateFacet only reads update_available / has_pending_changes.
 function device(over: Partial<ConfiguredDevice>): ConfiguredDevice {
@@ -17,6 +17,19 @@ function device(over: Partial<ConfiguredDevice>): ConfiguredDevice {
 
 // Echo the key so assertions key off the i18n id, not display copy.
 const localize = ((key: string) => key) as unknown as LocalizeFunc;
+
+describe("normalizeUpdateBuckets", () => {
+  it("keeps known buckets in canonical order, deduped, dropping unknowns", () => {
+    expect(normalizeUpdateBuckets(["modified", "update_available"])).toEqual([
+      "update_available",
+      "modified",
+    ]);
+    expect(
+      normalizeUpdateBuckets(["update_available", "bogus", "update_available"])
+    ).toEqual(["update_available"]);
+    expect(normalizeUpdateBuckets([])).toEqual([]);
+  });
+});
 
 describe("computeUpdateFacet", () => {
   it("returns [] for an up-to-date fleet", () => {
