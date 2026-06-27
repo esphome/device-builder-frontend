@@ -2,9 +2,8 @@ import { css } from "lit";
 
 /** The `${...}` resolved-preview chip rendered by ``renderSubstitutionHint``.
  *  Shadow DOM scopes styles per component, so every host that renders the hint
- *  must include this block. ``config-entry-form.styles.ts`` keeps its own copy
- *  (shared selectors with ``.secret-note``); this is the standalone version for
- *  hosts that only need the substitution chip. */
+ *  must include this block: the config-entry form via ``fieldRendererStyles``,
+ *  the automation editor via ``automationEditorStyles``. */
 export const substitutionNoteStyles = css`
   .substitution-note {
     display: inline-flex;

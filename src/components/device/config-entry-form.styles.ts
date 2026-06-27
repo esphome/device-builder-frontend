@@ -82,8 +82,10 @@ export const configEntryFormStyles = css`
   /* Hint shown below a string/password input when the value is a
      !secret reference — clarifies that the field points into
      secrets.yaml instead of holding a literal value. */
-  .secret-note,
-  .substitution-note {
+  /* The .substitution-note chip styles live in substitution-note.styles.js
+     (pulled into fieldRendererStyles) so the automation editor can share
+     them; only .secret-note is here. */
+  .secret-note {
     display: inline-flex;
     align-items: center;
     gap: var(--wa-space-2xs);
@@ -92,29 +94,12 @@ export const configEntryFormStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  .secret-note wa-icon,
-  .substitution-note wa-icon {
+  .secret-note wa-icon {
     font-size: 14px;
     color: var(--esphome-primary);
   }
 
-  /* The "defined elsewhere" marker is a quiet heads-up, not a positive
-     resolve, so its braces icon and text stay muted. */
-  .substitution-note--external {
-    color: var(--wa-color-text-quiet);
-  }
-
-  .substitution-note--external wa-icon {
-    color: var(--wa-color-text-quiet);
-  }
-
-  /* …except the warning glyph, which signals the unresolved reference. */
-  .substitution-note--external wa-icon.substitution-warn {
-    color: var(--wa-color-warning-fill-loud, #b8860b);
-  }
-
-  .secret-note code,
-  .substitution-note code {
+  .secret-note code {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: var(--wa-font-size-2xs);
     padding: 1px 4px;
