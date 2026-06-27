@@ -18,7 +18,12 @@
  */
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin-gpio.js";
-import { collectIdsAtPath, parseYamlTopLevelSections } from "./yaml-sections-core.js";
+import {
+  collectIdsAtPath,
+  findFieldLine,
+  parseYamlTopLevelSections,
+  readInstanceScalar,
+} from "./yaml-sections-core.js";
 
 /**
  * Single-entry memo for the YAML scans. The hot path is the
@@ -349,6 +354,37 @@ export function findComponentsByProviders(
   }
   providerMemo.set(probe, result);
   return result;
+}
+
+/**
+ * True when an existing instance under `domain:` occupies every pin in
+ * `lockedPins` (pin field key -> canonical GPIO) on a SINGLE instance — i.e. the
+ * same peripheral is already wired on the same pins. Drives the catalog's hide
+ * of a featured card whose fixed wiring is already present. `lockedPins` comes
+ * from the schema (backend), so the pin keys are authoritative — no key-name
+ * guessing. An empty map returns false. `parseYamlTopLevelSections` is memoized,
+ * so calling this per card is cheap.
+ */
+export function domainOccupiesPins(
+  yaml: string,
+  domain: string,
+  lockedPins: Readonly<Record<string, number>>
+): boolean {
+  const keys = Object.keys(lockedPins);
+  if (keys.length === 0) return false;
+  const lines = yaml.split("\n");
+  for (const section of parseYamlTopLevelSections(yaml)) {
+    if ((section.parentKey ?? section.key) !== domain) continue;
+    const occupies = keys.every((key) => {
+      const lineNo = findFieldLine(yaml, section, [key]);
+      return (
+        lineNo !== null &&
+        parsePinGpio(readInstanceScalar(lines[lineNo - 1], key)) === lockedPins[key]
+      );
+    });
+    if (occupies) return true;
+  }
+  return false;
 }
 
 /**

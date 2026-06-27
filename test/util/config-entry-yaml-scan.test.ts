@@ -3,6 +3,7 @@ import type { ComponentCatalogEntry } from "../../src/api/types/components.js";
 import {
   _clearScanMemos,
   catalogEntryToProvider,
+  domainOccupiesPins,
   findComponentsByProviders,
   findReferenceCandidates,
   findUsedPins,
@@ -270,6 +271,34 @@ describe("findUsedPins", () => {
     const b = findUsedPins("");
     expect(a).not.toBe(b);
     expect(a.size).toBe(0);
+  });
+});
+
+describe("domainOccupiesPins", () => {
+  it("matches a single instance occupying every locked pin", () => {
+    const yaml = "i2c:\n  - scl: 0\n    sda: 1\n    id: i2c_1\n";
+    expect(domainOccupiesPins(yaml, "i2c", { scl: 0, sda: 1 })).toBe(true);
+  });
+
+  it("canonicalizes the existing GPIO form before comparing", () => {
+    const yaml = "i2c:\n  - scl: GPIO0\n    sda: GPIO1\n    id: i2c_1\n";
+    expect(domainOccupiesPins(yaml, "i2c", { scl: 0, sda: 1 })).toBe(true);
+  });
+
+  it("is false when the pins are split across two instances", () => {
+    const yaml =
+      "i2c:\n  - scl: 0\n    sda: 9\n    id: a\n  - scl: 8\n    sda: 1\n    id: b\n";
+    expect(domainOccupiesPins(yaml, "i2c", { scl: 0, sda: 1 })).toBe(false);
+  });
+
+  it("is false on different pins, an absent domain, or an empty map", () => {
+    expect(
+      domainOccupiesPins("i2c:\n  - scl: 22\n    sda: 21\n", "i2c", { scl: 0, sda: 1 })
+    ).toBe(false);
+    expect(
+      domainOccupiesPins("switch:\n  - platform: gpio\n    pin: 0\n", "i2c", { scl: 0 })
+    ).toBe(false);
+    expect(domainOccupiesPins("i2c:\n  - scl: 0\n", "i2c", {})).toBe(false);
   });
 });
 

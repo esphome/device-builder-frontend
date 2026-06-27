@@ -73,6 +73,13 @@ export interface FeaturedComponent {
   fields: Record<string, FieldPreset>;
   /** Underlying component's multi_conf; absent means multi-conf (omit_default). */
   multi_conf?: boolean;
+  /**
+   * Backend-computed canonical GPIO per locked pin field (e.g. `{scl: 0, sda: 1}`),
+   * derived from the underlying component's PIN schema. The catalog hides this
+   * card when an existing same-domain instance already occupies these exact
+   * pins. Absent for components with no locked pins (omit_default).
+   */
+  locked_pins?: Record<string, number>;
 }
 
 /**

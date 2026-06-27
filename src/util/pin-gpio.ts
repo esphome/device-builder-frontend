@@ -143,9 +143,8 @@ export function scanPinGpios(line: string): number[] {
 }
 
 // ESPHome's `_pin`/`_gpio` suffix convention (mirrors `board-pin-defaults.ts`'s
-// role strip) plus the long-form `pin:` / `number:` sub-keys, and the bare i2c
-// bus pin keys (`scl` / `sda`) which carry a bare-int GPIO with no suffix.
-const PIN_FIELD_KEY_RE = /(?:^|_)(?:pin|gpio)$|^(?:number|scl|sda)$/i;
+// role strip) plus the long-form `pin:` / `number:` sub-keys.
+const PIN_FIELD_KEY_RE = /(?:^|_)(?:pin|gpio)$|^number$/i;
 
 /**
  * Whether a mapping key names a pin field. Lets the used-pin scan accept a
