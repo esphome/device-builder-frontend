@@ -173,3 +173,64 @@ describe("esphome-page-device save re-entrancy", () => {
     expect(doSave).toHaveBeenCalledTimes(1);
   });
 });
+
+interface InstallView {
+  _installCtrl: { onInstall: () => void; onUpdate: () => void };
+  _saveYaml(): Promise<boolean>;
+  _saveThenInstall(): Promise<void>;
+  _saveThenUpdate(): Promise<void>;
+}
+
+function makeInstallView(saveResult: boolean | Promise<boolean>): {
+  page: InstallView;
+  onInstall: ReturnType<typeof vi.fn>;
+  onUpdate: ReturnType<typeof vi.fn>;
+  saveYaml: ReturnType<typeof vi.fn>;
+} {
+  const page = new ESPHomePageDevice() as unknown as InstallView;
+  const onInstall = vi.fn();
+  const onUpdate = vi.fn();
+  const saveYaml = vi.fn(() => Promise.resolve(saveResult));
+  page._installCtrl = { onInstall, onUpdate };
+  page._saveYaml = saveYaml;
+  return { page, onInstall, onUpdate, saveYaml };
+}
+
+describe("esphome-page-device save before install", () => {
+  test("saves the buffer, then installs, when the save succeeds", async () => {
+    const { page, onInstall, saveYaml } = makeInstallView(true);
+    await page._saveThenInstall();
+    expect(saveYaml).toHaveBeenCalledTimes(1);
+    expect(onInstall).toHaveBeenCalledTimes(1);
+  });
+
+  test("saves the buffer, then updates, when the save succeeds", async () => {
+    const { page, onUpdate, saveYaml } = makeInstallView(true);
+    await page._saveThenUpdate();
+    expect(saveYaml).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not install when the save is cancelled or fails", async () => {
+    // The regression pin: a refused save must abort the build so it can't
+    // flash the stale on-disk version.
+    const { page, onInstall, onUpdate } = makeInstallView(false);
+    await page._saveThenInstall();
+    await page._saveThenUpdate();
+    expect(onInstall).not.toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  test("waits for the save to resolve before installing", async () => {
+    let resolveSave!: (ok: boolean) => void;
+    const { page, onInstall } = makeInstallView(
+      new Promise<boolean>((r) => (resolveSave = r))
+    );
+    const pending = page._saveThenInstall();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onInstall).not.toHaveBeenCalled(); // save still in flight
+    resolveSave(true);
+    await pending;
+    expect(onInstall).toHaveBeenCalledTimes(1);
+  });
+});

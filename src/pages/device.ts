@@ -902,6 +902,17 @@ export class ESPHomePageDevice extends LitElement {
     this._commandDialog.open("validate");
   };
 
+  // Persist the editor buffer before building — install/compile build the
+  // on-disk file, so an unsaved edit would flash the previous version.
+  // ``_saveYaml`` flushes in-flight form edits and re-validates; it returns
+  // false when the save is cancelled or fails, in which case the build is
+  // aborted.
+  private _installAfterSave = async (run: () => void): Promise<void> => {
+    if (await this._saveYaml()) run();
+  };
+  private _saveThenInstall = () => this._installAfterSave(this._installCtrl.onInstall);
+  private _saveThenUpdate = () => this._installAfterSave(this._installCtrl.onUpdate);
+
   /** Catch ``clean-build`` from the install dialog's post-failure
    *  hint and route it through this page's command-dialog —
    *  mirrors dashboard's page-level handler so the "clean the
@@ -984,8 +995,8 @@ export class ESPHomePageDevice extends LitElement {
           @nav-collapse=${this._onNavCollapse}
           @save-yaml=${this._saveYaml}
           @validate-device=${this._onValidateClick}
-          @install-device=${this._installCtrl.onInstall}
-          @update-device=${this._installCtrl.onUpdate}
+          @install-device=${this._saveThenInstall}
+          @update-device=${this._saveThenUpdate}
         >
           ${this._renderNavigator("desktop-nav")}
           <esphome-device-editor
