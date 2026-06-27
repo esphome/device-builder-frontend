@@ -107,4 +107,17 @@ describe("automation-editor auto-apply / delete contract", () => {
     expect(body.includes("_deleting")).toBe(true);
     expect(body.includes("_applyInFlight")).toBe(true);
   });
+
+  it("renders the ${...} resolved hint under the read-only Target field (#1711)", async () => {
+    const src = await readSource();
+    // The editor can't mount in vitest (CodeMirror), so pin the wiring:
+    // _renderIdentityFields must feed the target value through
+    // renderSubstitutionHint with the substitutions parsed from this.yaml.
+    const onIdx = src.indexOf("_renderIdentityFields");
+    const after = src.slice(onIdx);
+    const nextSibling = after.search(/\n\s*private\s+_targetMetadataValue/);
+    const slice = nextSibling > 0 ? after.slice(0, nextSibling) : after;
+    expect(slice).toMatch(/renderSubstitutionHint\(/);
+    expect(slice).toMatch(/_parseSubstitutions\(this\.yaml\)/);
+  });
 });

@@ -30,6 +30,7 @@ import { consume } from "@lit/context";
 import { mdiArrowDecisionOutline, mdiDelete, mdiOpenInNew } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
@@ -56,9 +57,11 @@ import {
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { parseSubstitutions } from "../../../util/substitutions.js";
 import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
+import { renderSubstitutionHint } from "../config-entry-renderers-shared.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -215,6 +218,10 @@ export class ESPHomeAutomationEditor extends LitElement {
   public get inFlightWrite(): boolean {
     return this._deleting || this._applyInFlight;
   }
+
+  /** Parse ``substitutions:`` from the current YAML once per edit so the
+   *  read-only Target field can preview ${...} like the text fields do. */
+  private _parseSubstitutions = memoizeOne(parseSubstitutions);
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
@@ -723,6 +730,11 @@ export class ESPHomeAutomationEditor extends LitElement {
     return html`<div class="field">
       <label class="field-label"> ${this._localize("device.automation_target")} </label>
       <input type="text" readonly .value=${targetValue} />
+      ${renderSubstitutionHint(
+        targetValue,
+        this._parseSubstitutions(this.yaml),
+        this._localize
+      )}
     </div>`;
   }
 
