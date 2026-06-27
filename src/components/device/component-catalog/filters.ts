@@ -1,3 +1,4 @@
+import memoizeOne from "memoize-one";
 import type { FeaturedBundle, FeaturedComponent } from "../../../api/types/boards.js";
 import {
   type ComponentCatalogEntry,
@@ -14,6 +15,14 @@ import {
 } from "../../../util/yaml-serialize.js";
 import { categoryChipLabel } from "../component-card-category-label.js";
 import type { ESPHomeComponentCatalog } from "../component-catalog.js";
+
+// The catalog re-renders on every search keystroke, and visibleComponents +
+// availableFeaturedCount each scan the YAML, so the same string is parsed
+// several times per render. memoize-one caches the last result per scan; its
+// single slot fits one open catalog at a time (the catalog is a dialog).
+const memoPresent = memoizeOne(parseTopLevelComponents);
+const memoPlatforms = memoizeOne(parseConfiguredPlatforms);
+const memoIds = memoizeOne(collectExistingIds);
 
 // Three filters applied client-side:
 //  1. Platform gate: drop components incompatible with the device's
@@ -48,8 +57,8 @@ function featuredIdPresent(
 export function visibleComponents(
   host: ESPHomeComponentCatalog
 ): ComponentCatalogEntry[] {
-  const present = parseTopLevelComponents(host.yaml);
-  const presentPlatforms = parseConfiguredPlatforms(host.yaml);
+  const present = memoPresent(host.yaml);
+  const presentPlatforms = memoPlatforms(host.yaml);
   const lockedToCore = host.lockedCategories.length > 0;
   const platformCompatible = host._components.filter((c) =>
     platformSupported(c.supported_platforms, host.platform)
@@ -68,9 +77,7 @@ export function visibleComponents(
     }
   }
   // Only scan the YAML for ids when there are featured cards to match against.
-  const existingIds = featuredById.size
-    ? collectExistingIds(host.yaml)
-    : new Set<string>();
+  const existingIds = featuredById.size ? memoIds(host.yaml) : new Set<string>();
 
   return platformCompatible.filter((c) => {
     const fc = featuredById.get(c.id);
@@ -137,9 +144,9 @@ export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
   const board = host.board;
   if (!board) return 0;
   const featured = board.featured_components ?? [];
-  const present = parseTopLevelComponents(host.yaml);
-  const presentPlatforms = parseConfiguredPlatforms(host.yaml);
-  const existingIds = featured.length ? collectExistingIds(host.yaml) : new Set<string>();
+  const present = memoPresent(host.yaml);
+  const presentPlatforms = memoPlatforms(host.yaml);
+  const existingIds = featured.length ? memoIds(host.yaml) : new Set<string>();
   // `!== false`, not truthy: the backend omits the `true` default, so an
   // absent multi_conf means multi-conf (still addable). A featured peripheral
   // whose preset id is already configured is never addable, regardless.
