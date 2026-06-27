@@ -370,6 +370,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // on a pcf8574 needs the pcf8574 + i2c). Add the missing prerequisites
     // ahead of it through the same sequential queue bundles use.
     const prereqs = this._missingRequiredPrereqs(result.entry);
+    if (prereqs && prereqs.unresolved.length > 0) {
+      // A declared prerequisite isn't in the catalog (a same-release catalog
+      // bug). Refuse rather than add the component without its hub/bus and ship
+      // the broken config this flow exists to prevent.
+      this._submitError = this._localize("device.prereq_unresolved", {
+        name: result.entry.name,
+        ids: prereqs.unresolved.join(", "),
+      });
+      return;
+    }
     if (prereqs && prereqs.missing.length > 0) {
       // The intermediate steps are the prerequisites (bus, hub), not the picked
       // component, so frame the banner as "Adding prerequisites for <name>".
@@ -400,7 +410,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
    */
   private _missingRequiredPrereqs(
     entry: ComponentCatalogEntry
-  ): { boardId: string; missing: string[] } | null {
+  ): { boardId: string; missing: string[]; unresolved: string[] } | null {
     const board = this.board;
     if (!board || !isFeaturedId(entry.id)) return null;
     const featured = board.featured_components ?? [];
@@ -408,23 +418,26 @@ export class ESPHomeAddComponentDialog extends LitElement {
     if (!fc?.requires?.length) return null;
     const existingIds = collectExistingIds(this.yaml);
     const missing: string[] = [];
+    const unresolved: string[] = [];
     for (const reqLocal of fc.requires) {
       const prereq = featured.find((c) => c.id === reqLocal);
       if (!prereq) {
         // A requires id with no matching featured component is a catalog bug in
         // this same (lockstep) release, not version drift: adding the component
         // without its prereq ships the broken hub-referencing config this flow
-        // exists to prevent. Surface it to a developer rather than silently.
+        // exists to prevent. Record it so the caller refuses the add (and warn
+        // with the precise id for a developer).
         console.warn(
-          `Featured component '${entry.id}' requires '${reqLocal}', which is not in the board catalog; skipping it.`
+          `Featured component '${entry.id}' requires '${reqLocal}', which is not in the board catalog.`
         );
+        unresolved.push(reqLocal);
         continue;
       }
       const presetId = prereq.fields.id?.value;
       if (typeof presetId === "string" && existingIds.has(presetId)) continue;
       missing.push(buildFeaturedId(board.id, reqLocal));
     }
-    return { boardId: board.id, missing };
+    return { boardId: board.id, missing, unresolved };
   }
 
   /**

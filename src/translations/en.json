@@ -635,6 +635,7 @@
     "field_locked_by_board": "Set by the board",
     "bundle_step_progress": "Step {current} of {total} — Adding {name}",
     "adding_prerequisites_for": "prerequisites for {name}",
+    "prereq_unresolved": "Can't add {name}: required prerequisites missing from the board catalog: {ids}",
     "docs": "Docs",
     "see_also": "See also:",
     "advanced_options": "Advanced options",

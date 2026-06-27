@@ -52,6 +52,7 @@ function makeDialog(yaml: string) {
     _missingRequiredPrereqs: (entry: { id: string }) => {
       boardId: string;
       missing: string[];
+      unresolved: string[];
     } | null;
   };
 }
@@ -67,6 +68,7 @@ describe("_missingRequiredPrereqs", () => {
         buildFeaturedId(BOARD_ID, "bus_a"),
         buildFeaturedId(BOARD_ID, "pcf8574_hub_in_1"),
       ],
+      unresolved: [],
     });
   });
 
@@ -82,7 +84,7 @@ describe("_missingRequiredPrereqs", () => {
     expect(dialog._missingRequiredPrereqs({ id: "binary_sensor.gpio" })).toBeNull();
   });
 
-  it("warns and skips a requires id with no matching featured component", () => {
+  it("reports (and warns about) a requires id with no matching featured component", () => {
     const dialog = new ESPHomeAddComponentDialog();
     const board = {
       id: BOARD_ID,
@@ -95,10 +97,15 @@ describe("_missingRequiredPrereqs", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = (
       dialog as unknown as {
-        _missingRequiredPrereqs: (e: { id: string }) => { missing: string[] } | null;
+        _missingRequiredPrereqs: (e: {
+          id: string;
+        }) => { missing: string[]; unresolved: string[] } | null;
       }
     )._missingRequiredPrereqs({ id: ENTITY_ID });
+    // Recorded as unresolved (so the caller refuses the add), not stamped as a
+    // resolvable prerequisite to auto-add.
     expect(result?.missing).toEqual([]);
+    expect(result?.unresolved).toEqual(["ghost_hub"]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("ghost_hub"));
     warn.mockRestore();
   });
