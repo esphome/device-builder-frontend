@@ -4,15 +4,13 @@ import {
   type ComponentCatalogEntry,
   ComponentCategory,
 } from "../../../api/types/components.js";
-import type { ConfigEntry } from "../../../api/types/config-entries.js";
-import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { isComponentPresent } from "../../../util/component-presence.js";
 import { findUsedPins, parseCatalogId } from "../../../util/config-entry-yaml-scan.js";
 import { platformSupported } from "../../../util/config-validation.js";
 import { collectExistingIds } from "../../../util/default-component-id.js";
 import { buildFeaturedId } from "../../../util/featured-id.js";
-import { parsePinGpio } from "../../../util/pin-gpio.js";
+import { isPinFieldKey, parsePinGpio } from "../../../util/pin-gpio.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -58,16 +56,20 @@ function featuredIdPresent(
   return typeof presetId === "string" && existingIds.has(presetId);
 }
 
-// A featured card's LOCKED pins are the board peripheral's fixed wiring. Unlocked
-// default pins are user-editable, so they don't count as a fixed footprint.
-function collectFixedPins(entries: ConfigEntry[], pins: number[]): void {
-  for (const e of entries) {
-    if (e.type === ConfigEntryType.PIN && e.locked) {
-      const gpio = parsePinGpio(e.default_value);
+// A featured card's LOCKED pin presets are the board peripheral's fixed wiring.
+// Read them off the board manifest (`fc.fields`), since the slim catalog list
+// carries no config_entries; a field is a pin when its key matches
+// `isPinFieldKey` (e.g. `scl` / `sda` / `*_pin`). Unlocked presets are
+// user-editable, so they don't count as a fixed footprint.
+function featuredFixedPins(fc: FeaturedComponent): number[] {
+  const pins: number[] = [];
+  for (const [key, preset] of Object.entries(fc.fields ?? {})) {
+    if (preset.locked && isPinFieldKey(key)) {
+      const gpio = parsePinGpio(preset.value);
       if (gpio !== null) pins.push(gpio);
     }
-    if (e.config_entries) collectFixedPins(e.config_entries, pins);
   }
+  return pins;
 }
 
 // Same component + same pins = duplicate: if an instance in the card's own
@@ -75,12 +77,10 @@ function collectFixedPins(entries: ConfigEntry[], pins: number[]): void {
 // its preset id differs (apollo's featured i2c bus vs a generic `i2c` the
 // dependency flow added on the same scl/sda).
 function featuredPinsTaken(
-  entry: ComponentCatalogEntry,
   fc: FeaturedComponent,
   usedPins: ReadonlyMap<number, string>
 ): boolean {
-  const pins: number[] = [];
-  collectFixedPins(entry.config_entries ?? [], pins);
+  const pins = featuredFixedPins(fc);
   if (pins.length === 0) return false;
   const domain = parseCatalogId(fc.component_id).domain;
   return pins.every((pin) => usedPins.get(pin) === domain);
@@ -117,10 +117,7 @@ export function visibleComponents(
 
   return platformCompatible.filter((c) => {
     const fc = featuredById.get(c.id);
-    if (
-      fc &&
-      (featuredIdPresent(fc, existingIds) || featuredPinsTaken(c, fc, usedPins))
-    ) {
+    if (fc && (featuredIdPresent(fc, existingIds) || featuredPinsTaken(fc, usedPins))) {
       return false;
     }
     const refId = fc?.component_id ?? c.id;
@@ -210,11 +207,14 @@ export function availableFeaturedCount(host: ESPHomeComponentCatalog): number {
   const present = memoPresent(host.yaml);
   const presentPlatforms = memoPlatforms(host.yaml);
   const existingIds = featured.length ? memoIds(host.yaml) : new Set<string>();
+  const usedPins = featured.length ? findUsedPins(host.yaml) : new Map<number, string>();
   // `!== false`, not truthy: the backend omits the `true` default, so an
   // absent multi_conf means multi-conf (still addable). A featured peripheral
-  // whose preset id is already configured is never addable, regardless.
+  // whose preset id or fixed pins are already configured is never addable,
+  // regardless — keeps the badge count in step with the grid.
   const addable = (fc: FeaturedComponent) =>
     !featuredIdPresent(fc, existingIds) &&
+    !featuredPinsTaken(fc, usedPins) &&
     (fc.multi_conf !== false ||
       !isComponentPresent(fc.component_id, present, presentPlatforms));
   const components = featured.filter(addable).length;
