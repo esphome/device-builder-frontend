@@ -162,11 +162,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ type: Boolean })
   hasUpdateAvailable = false;
 
-  /** Installed (running) ESPHome version, for the Update button hover. */
+  // Installed + target ESPHome versions for the Update button hover.
   @property()
   installedVersion = "";
 
-  /** Target version an update would install, for the Update button hover. */
   @property()
   availableVersion = "";
 

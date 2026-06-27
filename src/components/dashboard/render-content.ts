@@ -105,8 +105,8 @@ export function renderCardGrid(
             .labelIds=${device.labels ?? []}
             ?has-pending-changes=${device.has_pending_changes === true}
             ?has-update-available=${device.update_available}
-            .installedVersion=${device.deployed_version ?? ""}
-            .availableVersion=${device.current_version ?? ""}
+            .installedVersion=${device.deployed_version}
+            .availableVersion=${device.current_version}
             ?api-enabled=${device.api_enabled === true}
             ?api-encrypted=${device.api_encrypted === true}
             .apiEncryptionActive=${device.api_encryption_active ?? null}

@@ -53,10 +53,10 @@ describe("device-editor footer install action", () => {
     expect(install).toHaveBeenCalledTimes(1);
   });
 
-  it("titles the Update button with the version hover when both versions are known", async () => {
-    // The identity localize keeps the key; we assert the version branch is
-    // selected (wired installed + target through to the button) rather than the
-    // plain "dashboard.update" fallback.
+  it("wires the installed + target versions into the Update button title", async () => {
+    // Identity localize keeps the key; asserting the version key proves both
+    // versions threaded through to the title (the helper's branch logic and
+    // fallback are unit-tested in update-tooltip.test.ts).
     const el = await mount({
       hasUpdateAvailable: true,
       installedVersion: "2024.6.0",
@@ -65,11 +65,6 @@ describe("device-editor footer install action", () => {
     expect(q(el, ".install-split__main")!.title).toBe(
       "dashboard.update_available_version"
     );
-  });
-
-  it("falls back to the plain Update title when a version is missing", async () => {
-    const el = await mount({ hasUpdateAvailable: true, installedVersion: "2024.6.0" });
-    expect(q(el, ".install-split__main")!.title).toBe("dashboard.update");
   });
 
   it("renders a highlighted plain Install (-> picker) when there are pending changes", async () => {

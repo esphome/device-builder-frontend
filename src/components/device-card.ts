@@ -81,7 +81,7 @@ export class ESPHomeDeviceCard extends LitElement {
   @property({ type: Boolean, attribute: "has-update-available" }) hasUpdateAvailable =
     false;
 
-  // Installed (running) and target ESPHome versions, for the Update hover.
+  // Installed + target ESPHome versions for the Update hover.
   @property({ attribute: false }) installedVersion = "";
   @property({ attribute: false }) availableVersion = "";
   @property({ type: Boolean, attribute: "api-enabled" }) apiEnabled = false;

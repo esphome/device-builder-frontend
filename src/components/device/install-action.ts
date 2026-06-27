@@ -7,9 +7,8 @@ export interface InstallActionProps {
   hasUpdateAvailable: boolean;
   hasPendingChanges: boolean;
   busy: boolean;
-  /** Installed (running) ESPHome version, for the Update hover. */
+  // Installed + target ESPHome versions for the Update hover (see updateButtonTitle).
   installedVersion: string;
-  /** Target version an update would install, for the Update hover. */
   availableVersion: string;
   onUpdate: () => void;
   onInstall: () => void;
