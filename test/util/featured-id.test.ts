@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import { isFeaturedId, resolveFeaturedComponentId } from "../../src/util/featured-id.js";
 
 describe("isFeaturedId", () => {
@@ -22,7 +21,7 @@ describe("resolveFeaturedComponentId", () => {
   const board = {
     id: "esp32-poe-iso",
     featured_components: [{ id: "onboard_ethernet", component_id: "ethernet" }],
-  } as unknown as BoardCatalogEntry;
+  };
 
   it("resolves a featured id to its underlying component_id", () => {
     expect(
