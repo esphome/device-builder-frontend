@@ -95,6 +95,22 @@ describe("findUsedPins", () => {
     expect(map.get("pcf8574:hub_in_1:0")).toBe("binary_sensor");
   });
 
+  it("reads expander pin keys even when a comment leads the long-form block", () => {
+    const config = [
+      "binary_sensor:",
+      "  - platform: gpio",
+      "    pin:",
+      "        # wired to hub input channel 0", // deeper-indented comment first
+      "      pcf8574: hub_in_1",
+      "      number: 0",
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    // The leading comment must not anchor the child indent and hide the keys.
+    expect(map.get("pcf8574:hub_in_1:0")).toBe("binary_sensor");
+    expect(map.has(0)).toBe(false);
+  });
+
   it("does not alias a mid-edit expander pin (empty hub id) to a board GPIO", () => {
     const config = [
       "binary_sensor:",

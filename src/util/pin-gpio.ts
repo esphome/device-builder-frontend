@@ -33,8 +33,8 @@
 
 // Long-form pin sub-keys that describe a board GPIO. Any other key in a pin
 // object names an I/O-expander provider (`pcf8574`, `mcp23xxx`, ...): its value
-// is the hub id and its `number` is an expander channel, not a board GPIO. Kept
-// in sync with the backend's `_BOARD_PIN_KEYS` (script/sync_boards.py).
+// is the hub id and its `number` is an expander channel, not a board GPIO. The
+// backend mirrors this set (BOARD_PIN_KEYS) when it generates the catalog.
 export const LONG_FORM_PIN_KEYS = new Set([
   "number",
   "mode",

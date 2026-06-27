@@ -175,10 +175,10 @@ function readLongFormPin(
     }
     if (indentWidth(line) <= openIndent) break;
     end = j;
+    const m = line.match(LINE_KEY_RE);
+    if (m === null) continue; // comment / non-key line — don't anchor childIndent on it
     if (childIndent === -1) childIndent = indentWidth(line);
     if (indentWidth(line) !== childIndent) continue; // skip grandchildren (mode flags)
-    const m = line.match(LINE_KEY_RE);
-    if (m === null) continue;
     // Record the key even when it has no inline scalar (an empty, mid-edit
     // `pcf8574:`), so parsePinGpio sees the provider and returns null rather
     // than letting the bare `number:` alias a board GPIO.
