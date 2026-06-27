@@ -904,11 +904,18 @@ export class ESPHomePageDevice extends LitElement {
 
   // Persist the editor buffer before building — install/compile build the
   // on-disk file, so an unsaved edit would flash the previous version.
-  // ``_saveYaml`` flushes in-flight form edits and re-validates; it returns
-  // false when the save is cancelled or fails, in which case the build is
-  // aborted.
   private _installAfterSave = async (run: () => void): Promise<void> => {
-    if (await this._saveYaml()) run();
+    let saved: boolean;
+    try {
+      saved = await this._saveYaml();
+    } catch (e) {
+      // _saveYaml rejects when a section editor's flushPending upsert fails;
+      // surface it and abort rather than leak an unhandled rejection.
+      console.error("Failed to save before install:", e);
+      toast.error(this._localize("device.yaml_save_error"), { richColors: true });
+      return;
+    }
+    if (saved) run();
   };
   private _saveThenInstall = () => this._installAfterSave(this._installCtrl.onInstall);
   private _saveThenUpdate = () => this._installAfterSave(this._installCtrl.onUpdate);

@@ -1,5 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
+import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { EditorValidateResponse } from "../../src/api/types/editor.js";
 import type { DeviceLayoutMode } from "../../src/components/device/device-editor.js";
@@ -181,7 +187,7 @@ interface InstallView {
   _saveThenUpdate(): Promise<void>;
 }
 
-function makeInstallView(saveResult: boolean | Promise<boolean>): {
+function makeInstallView(saveResult: boolean): {
   page: InstallView;
   onInstall: ReturnType<typeof vi.fn>;
   onUpdate: ReturnType<typeof vi.fn>;
@@ -221,16 +227,13 @@ describe("esphome-page-device save before install", () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
-  test("waits for the save to resolve before installing", async () => {
-    let resolveSave!: (ok: boolean) => void;
-    const { page, onInstall } = makeInstallView(
-      new Promise<boolean>((r) => (resolveSave = r))
-    );
-    const pending = page._saveThenInstall();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(onInstall).not.toHaveBeenCalled(); // save still in flight
-    resolveSave(true);
-    await pending;
-    expect(onInstall).toHaveBeenCalledTimes(1);
+  test("aborts the build and toasts when the save rejects, with no unhandled rejection", async () => {
+    // _saveYaml rejects when a section editor's flushPending upsert fails; the
+    // wrapper must catch it, surface an error, and not build.
+    const { page, onInstall } = makeInstallView(true);
+    page._saveYaml = vi.fn(() => Promise.reject(new Error("upsert failed")));
+    await expect(page._saveThenInstall()).resolves.toBeUndefined();
+    expect(onInstall).not.toHaveBeenCalled();
+    expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1);
   });
 });
