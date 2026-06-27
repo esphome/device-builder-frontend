@@ -60,7 +60,7 @@ describe("esphome-command-palette open shortcut", () => {
     expect(isOpen(palette)).toBe(false);
   });
 
-  test("Cmd+K already handled by a focused editor does not open the palette", async () => {
+  test("Ctrl+K already handled by a focused editor does not open the palette", async () => {
     const palette = await mount();
     // A deeper handler (e.g. CodeMirror) consumed the keystroke first.
     window.addEventListener("keydown", (e) => e.preventDefault(), {

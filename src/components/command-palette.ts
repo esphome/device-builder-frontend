@@ -107,10 +107,13 @@ export class ESPHomeCommandPalette extends LitElement {
      dedicated keydown listener. Esc is wa-dialog's job: its
      dismissible stack closes only the topmost open dialog. */
   private _onGlobalKeyDown = (e: KeyboardEvent) => {
-    // A focused editor may already own this keystroke: CodeMirror runs on
-    // contentDOM (deeper than window) and preventDefaults the keys it binds,
-    // so bail when it did rather than firing on top of it. Shift is excluded
-    // too so Cmd/Ctrl+Shift+K stays the editor's deleteLine (#1705).
+    // A focused editor may already own this keystroke. This listener is on
+    // window in the bubble phase (no capture: true), so CodeMirror's
+    // contentDOM handler runs first and preventDefaults the keys it binds
+    // before the event bubbles up to here; bail when it did rather than
+    // firing on top of it. Switching this to capture would see the event
+    // before CodeMirror and break the guard. Shift is excluded too so
+    // Cmd/Ctrl+Shift+K stays the editor's deleteLine (#1705).
     if (e.defaultPrevented) return;
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") {
       e.preventDefault();
