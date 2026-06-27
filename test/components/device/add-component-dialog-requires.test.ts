@@ -6,7 +6,7 @@
  * already in the YAML — by their locked id — so the add flow can land them
  * first. Covers `_missingRequiredPrereqs`, the decision behind the auto-add.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type {
   BoardCatalogEntry,
@@ -80,5 +80,26 @@ describe("_missingRequiredPrereqs", () => {
   it("returns null for a non-featured catalog entry", () => {
     const dialog = makeDialog("esphome:\n  name: foo\n");
     expect(dialog._missingRequiredPrereqs({ id: "binary_sensor.gpio" })).toBeNull();
+  });
+
+  it("warns and skips a requires id with no matching featured component", () => {
+    const dialog = new ESPHomeAddComponentDialog();
+    const board = {
+      id: BOARD_ID,
+      featured_components: [
+        fc("input_1", "binary_sensor.gpio", "binary_sensor_gpio_1", ["ghost_hub"]),
+      ],
+    } as unknown as BoardCatalogEntry;
+    Object.assign(dialog as unknown as Record<string, unknown>, { board });
+    dialog.yaml = "esphome:\n  name: foo\n";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = (
+      dialog as unknown as {
+        _missingRequiredPrereqs: (e: { id: string }) => { missing: string[] } | null;
+      }
+    )._missingRequiredPrereqs({ id: ENTITY_ID });
+    expect(result?.missing).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("ghost_hub"));
+    warn.mockRestore();
   });
 });

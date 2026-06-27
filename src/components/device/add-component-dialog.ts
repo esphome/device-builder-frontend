@@ -410,7 +410,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
     const missing: string[] = [];
     for (const reqLocal of fc.requires) {
       const prereq = featured.find((c) => c.id === reqLocal);
-      if (!prereq) continue;
+      if (!prereq) {
+        // A requires id with no matching featured component is a catalog bug in
+        // this same (lockstep) release, not version drift: adding the component
+        // without its prereq ships the broken hub-referencing config this flow
+        // exists to prevent. Surface it to a developer rather than silently.
+        console.warn(
+          `Featured component '${entry.id}' requires '${reqLocal}', which is not in the board catalog; skipping it.`
+        );
+        continue;
+      }
       const presetId = prereq.fields.id?.value;
       if (typeof presetId === "string" && existingIds.has(presetId)) continue;
       missing.push(buildFeaturedId(board.id, reqLocal));
