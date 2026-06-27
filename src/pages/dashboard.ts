@@ -603,8 +603,16 @@ export class ESPHomePageDashboard extends LitElement {
     // The session store carries only the facets (search / view stay out of
     // scope), so it survives a return to a bare "/" not just browser-Back.
     if (ESPHomePageDashboard._sessionSyncedFields.some((f) => changed.has(f))) {
+      // While URL label *names* are still resolving to ids, ``_selectedLabels``
+      // is still ``[]`` — keep the previously saved ids rather than clobbering
+      // them with the empty placeholder (the resolved ids get saved once the
+      // catalog arrives and ``_selectedLabels`` changes).
+      const labels =
+        this._pendingLabelNames !== null
+          ? (loadDashboardFilters()?.labels ?? [])
+          : this._selectedLabels;
       saveDashboardFilters({
-        labels: this._selectedLabels,
+        labels,
         areas: this._selectedAreas,
         platforms: this._selectedPlatforms,
         states: this._selectedStates,

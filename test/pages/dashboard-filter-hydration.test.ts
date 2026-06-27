@@ -10,7 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
-import { saveDashboardFilters } from "../../src/util/dashboard-filters-session.js";
+import {
+  loadDashboardFilters,
+  saveDashboardFilters,
+} from "../../src/util/dashboard-filters-session.js";
 
 const FULL = {
   labels: ["lbl-1"],
@@ -69,6 +72,29 @@ describe("dashboard filter session seeding", () => {
     const page = makePage();
     hydrate(page);
     expect(page._selectedUpdateStatus).toEqual(["update_available"]);
+  });
+
+  it("preserves saved label ids while URL label names are still resolving", () => {
+    // URL labels arrive as names that resolve to ids once the catalog loads;
+    // until then _selectedLabels is [], and persisting that must not wipe the
+    // previously saved label selection from the session store.
+    saveDashboardFilters({
+      labels: ["lbl-1"],
+      areas: [],
+      platforms: [],
+      states: [],
+      updates: [],
+    });
+    const page = makePage();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const internals = page as any;
+    internals._pendingLabelNames = ["Office"];
+    internals._selectedLabels = [];
+    internals._selectedPlatforms = ["esp32"];
+    internals._persistFilterState(new Map([["_selectedPlatforms", undefined]]));
+    const saved = loadDashboardFilters();
+    expect(saved?.labels).toEqual(["lbl-1"]); // preserved, not clobbered to []
+    expect(saved?.platforms).toEqual(["esp32"]); // other facets still saved
   });
 
   it("leaves facets at their empty defaults with no URL and no session", () => {
