@@ -98,6 +98,10 @@ import {
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { runBulkUpdate } from "../util/bulk-update.js";
+import {
+  loadDashboardFilters,
+  saveDashboardFilters,
+} from "../util/dashboard-filters-session.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import {
   activeFacetCount,
@@ -428,6 +432,27 @@ export class ESPHomePageDashboard extends LitElement {
     if (urlState.view !== undefined) this._view = urlState.view;
     if (urlState.yaml !== undefined) this._yamlMode = urlState.yaml;
 
+    // Seed any facet the URL didn't carry from the session store, so filters
+    // survive returning to a bare "/" (command palette, fresh-load back), not
+    // just browser-Back. The URL stays authoritative per-field — a deep link or
+    // shared URL that sets a facet wins over the session seed. Labels are stored
+    // as ids here, so no name resolution is needed (unlike the URL path).
+    const saved = loadDashboardFilters();
+    if (saved) {
+      if (urlState.labels === undefined && saved.labels.length > 0)
+        this._selectedLabels = saved.labels;
+      if (urlState.areas === undefined && saved.areas.length > 0)
+        this._selectedAreas = saved.areas;
+      if (urlState.platforms === undefined && saved.platforms.length > 0)
+        this._selectedPlatforms = saved.platforms;
+      if (urlState.states === undefined && saved.states.length > 0)
+        this._selectedStates = saved.states;
+      if (urlState.updates === undefined && saved.updates.length > 0) {
+        const requested = new Set(saved.updates);
+        this._selectedUpdateStatus = UPDATE_FACET_BUCKETS.filter((b) => requested.has(b));
+      }
+    }
+
     this._syncYamlSearch();
   }
 
@@ -462,6 +487,16 @@ export class ESPHomePageDashboard extends LitElement {
     "_selectedUpdateStatus",
     "_view",
     "_yamlMode",
+  ] as const;
+
+  /** Facet fields persisted to the session store (the URL-synced set minus
+   *  ``_search`` / ``_view`` / ``_yamlMode``, which aren't session-seeded). */
+  private static readonly _sessionSyncedFields = [
+    "_selectedLabels",
+    "_selectedAreas",
+    "_selectedPlatforms",
+    "_selectedStates",
+    "_selectedUpdateStatus",
   ] as const;
 
   private _syncUrl(): void {
@@ -572,6 +607,17 @@ export class ESPHomePageDashboard extends LitElement {
       (changed.has("_labelsCatalog") && this._selectedLabels.length > 0)
     ) {
       this._syncUrl();
+    }
+    // Mirror the facet selection to the session store so it survives a return
+    // to a bare "/" (not just browser-Back). Search / view stay out of scope.
+    if (ESPHomePageDashboard._sessionSyncedFields.some((f) => changed.has(f))) {
+      saveDashboardFilters({
+        labels: this._selectedLabels,
+        areas: this._selectedAreas,
+        platforms: this._selectedPlatforms,
+        states: this._selectedStates,
+        updates: this._selectedUpdateStatus,
+      });
     }
   }
 

@@ -19,6 +19,7 @@ vi.mock("../../src/components/filters/labels-filter-section.js", () => ({}));
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import { ESPHomeUpdateAllDialog } from "../../src/components/update-all-dialog.js";
+import { saveDashboardFilters } from "../../src/util/dashboard-filters-session.js";
 import type { FacetSelection } from "../../src/util/device-filter.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 
@@ -87,6 +88,28 @@ describe("update-all-dialog", () => {
     // Only the online + update-available device (a.yaml) matches the defaults.
     expect(summary).toContain("update_all_dialog.count:1");
     expect(primaryButton(el).disabled).toBe(false);
+  });
+
+  it("ignores persisted dashboard filters (its own default selection wins)", async () => {
+    // Persisting dashboard list filters must not leak into Update All, which
+    // always opens on its own Online + update_available default. A saved filter
+    // that would exclude the matching device (a different platform) must not
+    // change what the dialog targets.
+    saveDashboardFilters({
+      labels: [],
+      areas: [],
+      platforms: ["rp2040"],
+      states: [DeviceState.OFFLINE],
+      updates: ["modified"],
+    });
+    try {
+      const { api } = fakeApi();
+      const el = await mount([onlineUpdatable, onlineCurrent, offlineUpdatable], api);
+      const summary = el.shadowRoot!.querySelector(".summary")!.textContent ?? "";
+      expect(summary).toContain("update_all_dialog.count:1");
+    } finally {
+      sessionStorage.clear();
+    }
   });
 
   it("installs exactly the matched configurations on confirm", async () => {
