@@ -201,10 +201,20 @@ export function renderPinField(
   // for nRF52), so normalise before comparing or the disabled select renders
   // blank.
   const rawValue = ctx.getAt(path);
+  const identity = parsePinGpio(rawValue);
+  if (typeof identity === "string" && effectiveDisabled(entry, ctx)) {
+    // A locked pin on an I/O expander (a featured preset) is a
+    // `provider:hub:channel` channel, not a board GPIO — the board-GPIO picker
+    // can't represent it, so show it read-only. An editable expander pin falls
+    // through and keeps the mode-flag picker (scoped to the provider below).
+    return renderExpanderPin(entry, path, ctx, identity);
+  }
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
   // `GPIOn` form; this drives both the selected option and the re-add of a
-  // filtered-out active pin below.
-  const valueGpio = parseBoardGpio(rawValue) ?? gpioFromAlias(rawValue, ctx.board.pins);
+  // filtered-out active pin below. An expander token isn't a board GPIO.
+  const valueGpio =
+    (typeof identity === "number" ? identity : null) ??
+    gpioFromAlias(rawValue, ctx.board.pins);
   const platform = ctx.board.esphome.platform;
   // Fallback to ``String(rawValue)`` only when the value is a
   // primitive — js-yaml emits null-prototype maps for partial /
@@ -313,6 +323,28 @@ export function renderPinField(
       </wa-select>
       ${renderFieldError(path, ctx)}
       ${renderPinAdvanced(entry, path, ctx, rawValue, isLongForm, fieldDisabled)}
+    </div>
+  `;
+}
+
+/**
+ * Render a pin that sits on an I/O expander read-only. Its `identity` is the
+ * `provider:hub:channel` token; an expander channel isn't a board GPIO, so the
+ * board-pin picker would render blank. Show the hub + channel instead — these
+ * presets are always board-locked, so there's nothing for the user to pick.
+ */
+function renderExpanderPin(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  identity: string
+): TemplateResult {
+  const [provider, hub, channel] = identity.split(":");
+  return html`
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
+      ${renderLabel(entry, ctx)}
+      <input type="text" readonly .value=${`${provider} ${hub} · channel ${channel}`} />
+      ${renderFieldError(path, ctx)}
     </div>
   `;
 }
