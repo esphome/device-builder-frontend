@@ -17,13 +17,7 @@
  * type into a field) from O(N) per keystroke to O(1).
  */
 import type { ComponentCatalogEntry } from "../api/types/components.js";
-import {
-  isPinFieldKey,
-  LONG_FORM_PIN_KEYS,
-  parsePinGpio,
-  pinIdentityToken,
-  scanPinGpios,
-} from "./pin-gpio.js";
+import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin-gpio.js";
 import {
   collectIdsAtPath,
   findFieldLine,
@@ -157,11 +151,13 @@ function stripInlineComment(line: string): string {
 
 /**
  * Read a long-form pin block opened at `openerIdx` (a `pin:` / `*_pin:` key
- * with no inline value) into its canonical identity: a board GPIO `number`, or
- * the `provider:hub_id:channel` token when the block sits on an I/O expander.
- * Only the block's direct children are inspected so a nested `mode:` map's
- * flags aren't mistaken for a provider key. Returns the identity plus the
- * 0-indexed last line the block spans so the caller can skip past it.
+ * with no inline value) into its canonical identity via {@link parsePinGpio} — a
+ * board GPIO `number`, or the `provider:hub_id:channel` token when the block
+ * sits on an I/O expander. Reconstructs the block's direct-child scalars into a
+ * mapping and defers the identity decision to `parsePinGpio`; only the direct
+ * children are collected so a nested `mode:` map's flags can't masquerade as a
+ * provider key. Returns the identity plus the 0-indexed last line the block
+ * spans so the caller can skip past it.
  */
 function readLongFormPin(
   lines: string[],
@@ -169,9 +165,7 @@ function readLongFormPin(
 ): { pin: number | string | null; end: number } {
   const openIndent = indentWidth(lines[openerIdx]);
   let childIndent = -1;
-  let channel: number | null = null;
-  let provider: string | null = null;
-  let hub: string | null = null;
+  const block: Record<string, string> = {};
   let end = openerIdx;
   for (let j = openerIdx + 1; j < lines.length; j++) {
     const line = lines[j];
@@ -185,22 +179,10 @@ function readLongFormPin(
     if (indentWidth(line) !== childIndent) continue; // skip grandchildren (mode flags)
     const m = line.match(LINE_KEY_RE);
     if (m === null) continue;
-    const key = m[2];
-    if (key === "number") {
-      const gpio = parsePinGpio(readInstanceScalar(stripInlineComment(line), "number"));
-      if (typeof gpio === "number") channel = gpio;
-    } else if (!LONG_FORM_PIN_KEYS.has(key)) {
-      const value = readInstanceScalar(stripInlineComment(line), key);
-      if (value) {
-        provider = key;
-        hub = value;
-      }
-    }
+    const value = readInstanceScalar(stripInlineComment(line), m[2]);
+    if (value !== null) block[m[2]] = value;
   }
-  if (provider !== null && hub !== null && channel !== null) {
-    return { pin: pinIdentityToken(provider, hub, channel), end };
-  }
-  return { pin: channel, end };
+  return { pin: parsePinGpio(block), end };
 }
 
 /**

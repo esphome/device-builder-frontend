@@ -103,17 +103,17 @@ export function parsePinGpio(s: unknown): number | string | null {
   if (s !== null && typeof s === "object" && !Array.isArray(s)) {
     const obj = s as Record<string, unknown>;
     const provider = Object.keys(obj).find((k) => !LONG_FORM_PIN_KEYS.has(k));
+    // The ``number`` is parsed the same way whichever branch we take, so an
+    // expander channel written ``GPIO0`` resolves like a bare ``0``.
+    const channel = parsePinGpio(obj.number);
     if (provider !== undefined) {
       // I/O-expander channel: namespace it so it never aliases a board GPIO.
       const hub = obj[provider];
-      const channel = obj.number;
-      return typeof hub === "string" &&
-        typeof channel === "number" &&
-        Number.isFinite(channel)
+      return typeof hub === "string" && typeof channel === "number"
         ? pinIdentityToken(provider, hub, channel)
         : null;
     }
-    return parsePinGpio(obj.number);
+    return channel;
   }
   return null;
 }
