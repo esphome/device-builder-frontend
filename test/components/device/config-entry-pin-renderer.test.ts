@@ -726,9 +726,17 @@ describe("renderPinField long-form Advanced disclosure", () => {
 
 describe("renderPinField on an I/O-expander pin", () => {
   it("shows the locked channel read-only instead of an empty board-GPIO picker", () => {
-    const ctx = makeRenderCtx({
-      pin: { pcf8574: "pcf8574_hub_in_1", number: 9, mode: "INPUT" },
-    });
+    const ctx = makeRenderCtx(
+      { pin: { pcf8574: "pcf8574_hub_in_1", number: 9, mode: "INPUT" } },
+      {
+        overrides: {
+          localize: (k, params) =>
+            k === "device.pin_on_expander"
+              ? `${params?.provider} ${params?.hub} · channel ${params?.channel}`
+              : k,
+        },
+      }
+    );
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
         key: "pin",

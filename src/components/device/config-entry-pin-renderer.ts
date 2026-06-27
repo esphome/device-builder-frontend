@@ -343,7 +343,11 @@ function renderExpanderPin(
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
-      <input type="text" readonly .value=${`${provider} ${hub} · channel ${channel}`} />
+      <input
+        type="text"
+        readonly
+        .value=${ctx.localize("device.pin_on_expander", { provider, hub, channel })}
+      />
       ${renderFieldError(path, ctx)}
     </div>
   `;
