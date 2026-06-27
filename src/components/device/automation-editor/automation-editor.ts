@@ -61,7 +61,6 @@ import { parseSubstitutions } from "../../../util/substitutions.js";
 import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
 import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
-import { renderSubstitutionHint } from "../config-entry-renderers-shared.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -70,6 +69,7 @@ import "./automation-trigger-picker.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { componentDomain, instanceName } from "./component-targets.js";
 import { ParseErrorController } from "./parse-error-controller.js";
+import { renderTargetField } from "./render-target-field.js";
 import {
   applyParamChange,
   applyYamlDiff,
@@ -727,15 +727,11 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (!loc) return nothing;
     if (loc.kind !== "component_on" && loc.kind !== "component_action") return nothing;
     const targetValue = this._targetMetadataValue(loc);
-    return html`<div class="field">
-      <label class="field-label"> ${this._localize("device.automation_target")} </label>
-      <input type="text" readonly .value=${targetValue} />
-      ${renderSubstitutionHint(
-        targetValue,
-        this._parseSubstitutions(this.yaml),
-        this._localize
-      )}
-    </div>`;
+    return renderTargetField(
+      targetValue,
+      this._parseSubstitutions(this.yaml),
+      this._localize
+    );
   }
 
   /**
