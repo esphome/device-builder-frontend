@@ -30,6 +30,7 @@
     "add_new_device_hint": "Create a new ESPHome configuration",
     "esphome_web": "ESPHome web",
     "update": "Update",
+    "update_available_version": "Update available: {installed} → {target}",
     "edit": "Edit",
     "logs": "Logs",
     "create_device": "Create device",

@@ -1026,6 +1026,8 @@ export class ESPHomePageDevice extends LitElement {
             ?saving=${this._saving}
             ?hasPendingChanges=${this._device?.has_pending_changes === true}
             ?hasUpdateAvailable=${this._device?.update_available === true}
+            .installedVersion=${this._device?.deployed_version ?? ""}
+            .availableVersion=${this._device?.current_version ?? ""}
             ?busy=${this._activeJobs.has(this.id)}
           >
             ${showEdgeTab || this._selectedSection

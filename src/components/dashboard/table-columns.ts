@@ -9,6 +9,7 @@ import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
+import { updateButtonTitle } from "../../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
@@ -325,7 +326,12 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             ? html`<button
                 class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
                 aria-label=${localize("dashboard.table_action_update")}
-                title=${localize("dashboard.table_action_update")}
+                title=${updateButtonTitle(
+                  localize,
+                  device.deployed_version,
+                  device.current_version,
+                  "dashboard.table_action_update"
+                )}
                 ?disabled=${row.busy}
                 @click=${(e: Event) => dispatchRowEvent(e, "update-device", device)}
               >

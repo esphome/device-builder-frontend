@@ -53,6 +53,25 @@ describe("device-editor footer install action", () => {
     expect(install).toHaveBeenCalledTimes(1);
   });
 
+  it("titles the Update button with the version hover when both versions are known", async () => {
+    // The identity localize keeps the key; we assert the version branch is
+    // selected (wired installed + target through to the button) rather than the
+    // plain "dashboard.update" fallback.
+    const el = await mount({
+      hasUpdateAvailable: true,
+      installedVersion: "2024.6.0",
+      availableVersion: "2024.12.0",
+    });
+    expect(q(el, ".install-split__main")!.title).toBe(
+      "dashboard.update_available_version"
+    );
+  });
+
+  it("falls back to the plain Update title when a version is missing", async () => {
+    const el = await mount({ hasUpdateAvailable: true, installedVersion: "2024.6.0" });
+    expect(q(el, ".install-split__main")!.title).toBe("dashboard.update");
+  });
+
   it("renders a highlighted plain Install (-> picker) when there are pending changes", async () => {
     const el = await mount({ hasPendingChanges: true });
     const install = vi.fn();

@@ -1,11 +1,16 @@
 import { html, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { updateButtonTitle } from "../../util/update-tooltip.js";
 
 export interface InstallActionProps {
   localize: LocalizeFunc;
   hasUpdateAvailable: boolean;
   hasPendingChanges: boolean;
   busy: boolean;
+  /** Installed (running) ESPHome version, for the Update hover. */
+  installedVersion: string;
+  /** Target version an update would install, for the Update hover. */
+  availableVersion: string;
   onUpdate: () => void;
   onInstall: () => void;
 }
@@ -27,7 +32,12 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
         class="install-fab install-split__main"
         ?disabled=${p.busy}
         @click=${p.onUpdate}
-        title=${p.localize("dashboard.update")}
+        title=${updateButtonTitle(
+          p.localize,
+          p.installedVersion,
+          p.availableVersion,
+          "dashboard.update"
+        )}
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
         ${p.localize("dashboard.update")}
