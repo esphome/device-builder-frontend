@@ -4,11 +4,15 @@ import {
   type ComponentCatalogEntry,
   ComponentCategory,
 } from "../../../api/types/components.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { isComponentPresent } from "../../../util/component-presence.js";
+import { findUsedPins } from "../../../util/config-entry-yaml-scan.js";
 import { platformSupported } from "../../../util/config-validation.js";
 import { collectExistingIds } from "../../../util/default-component-id.js";
 import { buildFeaturedId } from "../../../util/featured-id.js";
+import { parsePinGpio } from "../../../util/pin-gpio.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -23,6 +27,7 @@ import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 const memoPresent = memoizeOne(parseTopLevelComponents);
 const memoPlatforms = memoizeOne(parseConfiguredPlatforms);
 const memoIds = memoizeOne(collectExistingIds);
+const memoUsedPins = memoizeOne(findUsedPins);
 
 // Three filters applied client-side:
 //  1. Platform gate: drop components incompatible with the device's
@@ -54,6 +59,38 @@ function featuredIdPresent(
   return typeof presetId === "string" && existingIds.has(presetId);
 }
 
+// A featured card's LOCKED pins are the board peripheral's fixed wiring. Unlocked
+// default pins are user-editable, so they don't count as a fixed footprint.
+function featuredFixedPins(entry: ComponentCatalogEntry): number[] {
+  const pins: number[] = [];
+  const walk = (entries: ConfigEntry[]): void => {
+    for (const e of entries) {
+      if (e.type === ConfigEntryType.PIN && e.locked) {
+        const gpio = parsePinGpio(e.default_value);
+        if (gpio !== null) pins.push(gpio);
+      }
+      if (e.config_entries) walk(e.config_entries);
+    }
+  };
+  walk(entry.config_entries ?? []);
+  return pins;
+}
+
+// Same component + same pins = duplicate: if an instance in the card's own
+// domain already occupies all of its fixed pins, the card is a dupe even when
+// its preset id differs (apollo's featured i2c bus vs a generic `i2c` the
+// dependency flow added on the same scl/sda).
+function featuredPinsTaken(
+  entry: ComponentCatalogEntry,
+  fc: FeaturedComponent,
+  usedPins: ReadonlyMap<number, string>
+): boolean {
+  const pins = featuredFixedPins(entry);
+  if (pins.length === 0) return false;
+  const domain = fc.component_id.split(".")[0];
+  return pins.every((pin) => usedPins.get(pin) === domain);
+}
+
 export function visibleComponents(
   host: ESPHomeComponentCatalog
 ): ComponentCatalogEntry[] {
@@ -76,12 +113,18 @@ export function visibleComponents(
       featuredById.set(buildFeaturedId(board.id, fc.id), fc);
     }
   }
-  // Only scan the YAML for ids when there are featured cards to match against.
+  // Only scan the YAML for ids/pins when there are featured cards to match against.
   const existingIds = featuredById.size ? memoIds(host.yaml) : new Set<string>();
+  const usedPins = featuredById.size
+    ? memoUsedPins(host.yaml)
+    : new Map<number, string>();
 
   return platformCompatible.filter((c) => {
     const fc = featuredById.get(c.id);
-    if (fc && featuredIdPresent(fc, existingIds)) {
+    if (
+      fc &&
+      (featuredIdPresent(fc, existingIds) || featuredPinsTaken(c, fc, usedPins))
+    ) {
       return false;
     }
     const refId = fc?.component_id ?? c.id;

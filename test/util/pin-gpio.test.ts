@@ -200,8 +200,17 @@ describe("scanPinGpios", () => {
 });
 
 describe("isPinFieldKey", () => {
-  it("matches the _pin / _gpio suffix and the long-form pin / number keys", () => {
-    for (const key of ["pin", "tx_pin", "dir_pin", "led_gpio", "gpio", "number"]) {
+  it("matches the _pin / _gpio suffix, long-form pin / number, and bare i2c scl / sda", () => {
+    for (const key of [
+      "pin",
+      "tx_pin",
+      "dir_pin",
+      "led_gpio",
+      "gpio",
+      "number",
+      "scl",
+      "sda",
+    ]) {
       expect(isPinFieldKey(key)).toBe(true);
     }
   });
