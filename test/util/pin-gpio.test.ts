@@ -120,6 +120,16 @@ describe("parsePinGpio", () => {
     expect(parsePinGpio({ pcf8574: "hub" })).toBeNull();
     // Provider present but hub id empty (mid-edit) -> null, NOT board GPIO 0.
     expect(parsePinGpio({ pcf8574: "", number: 0 })).toBeNull();
+    // A pin-level `id` is a board-GPIO key, not a provider: an expander pin that
+    // also carries an id must still resolve to its provider token, not `id`.
+    expect(parsePinGpio({ pcf8574: "hub", number: 0, id: "relay1" })).toBe(
+      "pcf8574:hub:0"
+    );
+    // A plain board pin with an id (and the esp32-only validation key) stays a
+    // board GPIO, not a bogus `id`/`ignore_pin_validation_error` provider token.
+    expect(
+      parsePinGpio({ number: 5, id: "btn", ignore_pin_validation_error: true })
+    ).toBe(5);
   });
 
   it("treats every long-form board-GPIO key as a board pin, never an expander provider", () => {

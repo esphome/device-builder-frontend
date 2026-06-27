@@ -35,12 +35,18 @@
 // object names an I/O-expander provider (`pcf8574`, `mcp23xxx`, ...): its value
 // is the hub id and its `number` is an expander channel, not a board GPIO. The
 // backend mirrors this set (BOARD_PIN_KEYS) when it generates the catalog.
+// It's the union of esphome's gpio_base_schema keys (id / number / mode /
+// inverted / allow_other_uses) and the esp32 additions; `id` is included
+// because expander pin schemas extend the same base, so a channel that carries
+// an `id` must not have that `id` mistaken for the provider key.
 export const LONG_FORM_PIN_KEYS = new Set([
+  "id",
   "number",
   "mode",
   "inverted",
-  "ignore_strapping_warning",
   "allow_other_uses",
+  "ignore_strapping_warning",
+  "ignore_pin_validation_error",
   "drive_strength",
 ]);
 
