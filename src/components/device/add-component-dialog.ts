@@ -399,10 +399,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
     const fc = featured.find((c) => buildFeaturedId(board.id, c.id) === entry.id);
     if (!fc?.requires?.length) return null;
     const existingIds = collectExistingIds(this.yaml);
-    const byLocal = new Map(featured.map((c) => [c.id, c]));
     const missing: string[] = [];
     for (const reqLocal of fc.requires) {
-      const prereq = byLocal.get(reqLocal);
+      const prereq = featured.find((c) => c.id === reqLocal);
       if (!prereq) continue;
       const presetId = prereq.fields.id?.value;
       if (typeof presetId === "string" && existingIds.has(presetId)) continue;

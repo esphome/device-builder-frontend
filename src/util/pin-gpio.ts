@@ -110,12 +110,21 @@ export function parsePinGpio(s: unknown): number | string | null {
       return typeof hub === "string" &&
         typeof channel === "number" &&
         Number.isFinite(channel)
-        ? `${provider}:${hub}:${channel}`
+        ? pinIdentityToken(provider, hub, channel)
         : null;
     }
     return parsePinGpio(obj.number);
   }
   return null;
+}
+
+/**
+ * The namespaced identity for a pin on an I/O expander
+ * (`pcf8574:hub_id:0`). Single source of the token shape so the YAML scanner
+ * and the value parser can't drift on what "the same expander channel" means.
+ */
+export function pinIdentityToken(provider: string, hub: string, channel: number): string {
+  return `${provider}:${hub}:${channel}`;
 }
 
 /**

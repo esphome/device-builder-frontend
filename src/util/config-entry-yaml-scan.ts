@@ -21,6 +21,7 @@ import {
   isPinFieldKey,
   LONG_FORM_PIN_KEYS,
   parsePinGpio,
+  pinIdentityToken,
   scanPinGpios,
 } from "./pin-gpio.js";
 import {
@@ -197,7 +198,7 @@ function readLongFormPin(
     }
   }
   if (provider !== null && hub !== null && channel !== null) {
-    return { pin: `${provider}:${hub}:${channel}`, end };
+    return { pin: pinIdentityToken(provider, hub, channel), end };
   }
   return { pin: channel, end };
 }
