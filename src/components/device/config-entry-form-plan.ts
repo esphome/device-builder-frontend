@@ -43,23 +43,13 @@ export function buildFormRenderPlan(
   return { ordered, clusters, memberKeys, visible };
 }
 
-/** Whether the plan paints any field, exclusive-group dropdown, or cluster box. */
-export function planRendersContent(plan: FormRenderPlan): boolean {
-  return (
-    plan.visible.size > 0 ||
-    plan.clusters.length > 0 ||
-    plan.ordered.some((item) => Array.isArray(item))
-  );
-}
-
 /**
- * Whether the plan paints anything the user can actually act on.
+ * Whether the plan paints anything the user can act on: an unlocked plain
+ * field, an exclusive-group dropdown, or a cluster box.
  *
- * Like :func:`planRendersContent`, but a locked plain field doesn't count — it
- * renders read-only ("Set by the board"), so a form whose only visible fields
- * are locked is a dead-end screen. Group dropdowns and cluster boxes still
- * count (they're interactive). Lets a caller skip the form when every input is
- * fixed by the board.
+ * A locked plain field doesn't count — it renders read-only ("Set by the
+ * board"), so a form whose only visible fields are locked is a dead-end screen.
+ * Lets a caller skip the form when every input is fixed by the board.
  */
 export function planNeedsUserInput(plan: FormRenderPlan): boolean {
   return (
