@@ -37,6 +37,7 @@ describe("PagedListController", () => {
 
     ctrl.reset(fetchPage);
     expect(ctrl.loading).toBe(true);
+    expect(ctrl.hasLoaded).toBe(false);
     await flush();
 
     expect(fetchPage).toHaveBeenCalledWith(0, 50);
@@ -44,6 +45,7 @@ describe("PagedListController", () => {
     expect(ctrl.total).toBe(120);
     expect(ctrl.hasMore).toBe(true);
     expect(ctrl.loading).toBe(false);
+    expect(ctrl.hasLoaded).toBe(true);
   });
 
   it("loadMore appends the next page and advances the offset", async () => {

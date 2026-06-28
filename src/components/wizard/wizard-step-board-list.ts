@@ -104,12 +104,9 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   }
 
   protected updated() {
-    const sentinel = this._sentinel;
-    const scroll = this._scroll;
     // Prefetch a screenful early so the next page is ready before the user
     // hits the bottom; the sentinel only exists while more pages remain.
-    if (sentinel && scroll) this._intersection.observe(sentinel, scroll, "200px");
-    else this._intersection.disconnect();
+    this._intersection.observeIfPresent(this._sentinel, this._scroll, "200px");
   }
 
   private _renderFeatured(board: BoardCatalogEntry) {

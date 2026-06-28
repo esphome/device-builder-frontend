@@ -1,6 +1,6 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
-export const PAGED_LIST_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
 
 export type PagedFetch<T> = (
   offset: number,
@@ -23,16 +23,18 @@ export class PagedListController<T> implements ReactiveController {
   loading = false;
   /** A ``loadMore`` page in flight. */
   loadingMore = false;
+  /** True once the first ``reset`` has resolved (success or error); lets the
+   *  host show a first-paint loader without tracking its own flag. */
+  hasLoaded = false;
   error: unknown = null;
 
   private _cycle = 0;
   private _offset = 0;
-  private _inFlight = false;
   private _fetchPage: PagedFetch<T> | null = null;
 
   constructor(
     private readonly _host: ReactiveControllerHost,
-    private readonly _pageSize: number = PAGED_LIST_PAGE_SIZE
+    private readonly _pageSize: number = DEFAULT_PAGE_SIZE
   ) {
     _host.addController(this);
   }
@@ -42,9 +44,12 @@ export class PagedListController<T> implements ReactiveController {
   }
 
   hostDisconnected(): void {
-    // Drop any in-flight page so a late resolve can't touch a dead host.
+    // Drop any in-flight page so a late resolve can't touch a dead host; the
+    // bumped cycle stops the pending fetch's ``finally`` from clearing the
+    // flags itself, so clear them here.
     this._cycle++;
-    this._inFlight = false;
+    this.loading = false;
+    this.loadingMore = false;
   }
 
   /** Start a fresh query: drop the accumulated list and fetch page 0. */
@@ -57,25 +62,27 @@ export class PagedListController<T> implements ReactiveController {
     this.error = null;
     this.loading = true;
     this.loadingMore = false;
-    void this._fetch(false);
+    void this._fetch();
   }
 
   /** Append the next page; no-op while one is in flight or the list is full. */
   loadMore(): void {
-    if (this._inFlight || !this.hasMore || this._fetchPage === null) return;
+    if (this.loading || this.loadingMore || !this.hasMore || this._fetchPage === null) {
+      return;
+    }
     this.loadingMore = true;
-    void this._fetch(true);
+    void this._fetch();
   }
 
-  private async _fetch(append: boolean): Promise<void> {
+  private async _fetch(): Promise<void> {
     const fetchPage = this._fetchPage;
     if (fetchPage === null) return;
     const cycle = this._cycle;
-    this._inFlight = true;
     try {
       const { items, total } = await fetchPage(this._offset, this._pageSize);
       if (cycle !== this._cycle) return; // superseded by a newer reset()
-      this.items = append ? [...this.items, ...items] : items;
+      // reset() clears items first, so the spread also covers the first page.
+      this.items = [...this.items, ...items];
       this.total = total;
       this._offset = this.items.length;
       this.error = null;
@@ -84,12 +91,12 @@ export class PagedListController<T> implements ReactiveController {
       console.error("Failed to load paged list:", err);
       this.error = err;
     } finally {
-      // Only the live cycle clears in-flight / loading state; a stale page
-      // resolving after a reset must leave the new cycle's flags untouched.
+      // Only the live cycle clears state; a stale page resolving after a reset
+      // must leave the new cycle's flags untouched.
       if (cycle === this._cycle) {
         this.loading = false;
         this.loadingMore = false;
-        this._inFlight = false;
+        this.hasLoaded = true;
         this._host.requestUpdate();
       }
     }

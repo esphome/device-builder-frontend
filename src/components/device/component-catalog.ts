@@ -87,7 +87,6 @@ export class ESPHomeComponentCatalog extends LitElement {
   }
 
   @state() _categories: Array<{ id: string; name: string; count: number }> = [];
-  @state() _initialLoad = true;
   @state() _search = "";
   @state() _category = "all";
   // Interface to probe via the ``provides`` filter (set by ``filterByDomain``
@@ -189,17 +188,13 @@ export class ESPHomeComponentCatalog extends LitElement {
   static styles = [espHomeStyles, inputStyles, componentCatalogStyles];
 
   protected updated() {
-    if (this._initialLoad && !this._list.loading) this._initialLoad = false;
-    const sentinel = this._sentinel;
-    const scroll = this._scroll;
     // Prefetch a screenful early; the sentinel only exists while more pages
     // remain (see render), so a missing one tears the observer down.
-    if (sentinel && scroll) this._intersection.observe(sentinel, scroll, "200px");
-    else this._intersection.disconnect();
+    this._intersection.observeIfPresent(this._sentinel, this._scroll, "200px");
   }
 
   protected render() {
-    if (this._initialLoad && this._list.loading) {
+    if (this._list.loading && !this._list.hasLoaded) {
       return html`<div class="loading">
         ${this._localize("device.loading_components")}
       </div>`;

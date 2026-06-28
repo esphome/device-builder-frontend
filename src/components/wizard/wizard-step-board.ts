@@ -59,9 +59,6 @@ export class ESPHomeWizardStepBoard extends LitElement {
   private _list = new PagedListController<BoardCatalogEntry>(this);
 
   @state()
-  private _initialLoad = true;
-
-  @state()
   private _search = "";
 
   @state()
@@ -112,7 +109,6 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   willUpdate(changed: PropertyValues<this>) {
     super.willUpdate(changed);
-    if (this._initialLoad && !this._list.loading) this._initialLoad = false;
     if (
       changed.has("presetFilterLabel") &&
       this.presetFilterLabel &&
@@ -158,7 +154,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       `;
     }
 
-    if (this._initialLoad && this._list.loading) {
+    if (this._list.loading && !this._list.hasLoaded) {
       return html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`;
     }
 
