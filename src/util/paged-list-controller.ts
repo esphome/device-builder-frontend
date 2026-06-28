@@ -62,6 +62,9 @@ export class PagedListController<T> implements ReactiveController {
     this.error = null;
     this.loading = true;
     this.loadingMore = false;
+    // Paint the loading state now; a reset off a debounced search isn't a
+    // reactive property change, so nothing else would request a render.
+    this._host.requestUpdate();
     void this._fetch();
   }
 
@@ -71,6 +74,9 @@ export class PagedListController<T> implements ReactiveController {
       return;
     }
     this.loadingMore = true;
+    // The IntersectionObserver sentinel drives this with no reactive change,
+    // so request a render to surface the loading-more state.
+    this._host.requestUpdate();
     void this._fetch();
   }
 

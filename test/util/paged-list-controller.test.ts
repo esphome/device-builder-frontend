@@ -68,6 +68,22 @@ describe("PagedListController", () => {
     expect(ctrl.hasMore).toBe(false);
   });
 
+  it("requests a host update synchronously on reset and loadMore", async () => {
+    const { host, ctrl } = make();
+    const { fetchPage } = datasetFetch(120);
+
+    ctrl.reset(fetchPage);
+    // Painted immediately, before the fetch resolves, so the loading state
+    // shows even when reset comes off a debounced (non-reactive) callback.
+    expect(host.updates).toBe(1);
+    await flush();
+    const afterFirstPage = host.updates;
+
+    ctrl.loadMore();
+    expect(host.updates).toBe(afterFirstPage + 1);
+    await flush();
+  });
+
   it("loadMore is a no-op when the list is already full", async () => {
     const { ctrl } = make();
     const { fetchPage } = datasetFetch(30);
