@@ -23,4 +23,20 @@ describe("addFormNeedsUserInput", () => {
     ];
     expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(true);
   });
+
+  it("skips a fully board-locked exclusive group (every choice is read-only)", () => {
+    const entries = [
+      makeConfigEntry({ key: "i2c", exclusive_group: "bus", locked: true }),
+      makeConfigEntry({ key: "spi", exclusive_group: "bus", locked: true }),
+    ];
+    expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(false);
+  });
+
+  it("shows the form when an exclusive group still has an unlocked choice", () => {
+    const entries = [
+      makeConfigEntry({ key: "i2c", exclusive_group: "bus", locked: true }),
+      makeConfigEntry({ key: "spi", exclusive_group: "bus", locked: false }),
+    ];
+    expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(true);
+  });
 });
