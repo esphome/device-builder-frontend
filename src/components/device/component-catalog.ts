@@ -98,7 +98,6 @@ export class ESPHomeComponentCatalog extends LitElement {
   // card down to the placeholder.
   @state() _imageFailed: Set<string> = new Set();
 
-  @query(".grid-scroll") private _scroll?: HTMLElement | null;
   @query(".sentinel") private _sentinel?: HTMLElement | null;
 
   private _intersection = new IntersectionController(this, () => this._list.loadMore());
@@ -188,9 +187,11 @@ export class ESPHomeComponentCatalog extends LitElement {
   static styles = [espHomeStyles, inputStyles, componentCatalogStyles];
 
   protected updated() {
-    // Prefetch a screenful early; the sentinel only exists while more pages
+    // Observe against the viewport (null root) so paging works whether the
+    // grid scrolls itself or the surrounding dialog does; the sentinel is
+    // still clipped by the scroll container, and only exists while more pages
     // remain (see render), so a missing one tears the observer down.
-    this._intersection.observeIfPresent(this._sentinel, this._scroll, "200px");
+    this._intersection.observeIfPresent(this._sentinel, null, "200px");
   }
 
   protected render() {

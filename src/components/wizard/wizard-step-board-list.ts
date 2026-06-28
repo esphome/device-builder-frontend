@@ -49,9 +49,6 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   @state()
   private _expandedBoardId: string | null = null;
 
-  @query(".boards-scroll")
-  private _scroll?: HTMLElement | null;
-
   @query(".sentinel")
   private _sentinel?: HTMLElement | null;
 
@@ -104,9 +101,13 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   }
 
   protected updated() {
-    // Prefetch a screenful early so the next page is ready before the user
-    // hits the bottom; the sentinel only exists while more pages remain.
-    this._intersection.observeIfPresent(this._sentinel, this._scroll, "200px");
+    // Observe against the viewport (null root), not the inner scroll box: on
+    // mobile the board list isn't its own scroll container (the dialog body
+    // scrolls as one), so a fixed root would never see the sentinel cross and
+    // paging would stall after one page. IntersectionObserver still clips the
+    // sentinel by the desktop scroll box, so this works in both layouts. The
+    // 200px margin prefetches the next page before the sentinel is in view.
+    this._intersection.observeIfPresent(this._sentinel, null, "200px");
   }
 
   private _renderFeatured(board: BoardCatalogEntry) {

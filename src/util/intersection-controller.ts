@@ -21,14 +21,15 @@ export class IntersectionController implements ReactiveController {
     host.addController(this);
   }
 
-  /** Observe ``target`` within ``root`` when both are present, else tear down.
-   *  Hosts call this from ``updated`` with their (possibly missing) sentinel. */
+  /** Observe ``target`` when present, else tear down. ``root`` may be null
+   *  (the viewport). Hosts call this from ``updated`` with their (possibly
+   *  missing) sentinel. */
   observeIfPresent(
     target: Element | null | undefined,
-    root: Element | null | undefined,
+    root: Element | null,
     rootMargin?: string
   ): void {
-    if (target && root) this.observe(target, root, rootMargin);
+    if (target) this.observe(target, root, rootMargin);
     else this.disconnect();
   }
 
