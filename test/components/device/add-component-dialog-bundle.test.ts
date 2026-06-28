@@ -1,0 +1,137 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * One-shot bundle add. Picking a bundle merges every member with its board
+ * presets and no form, threading the editor draft; a member that needs input
+ * the presets don't cover hands off to the interactive sequence from there so
+ * the bundle still completes, keeping anything already added.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+vi.mock("../../../src/components/device/add-component-form.js", () => ({}));
+vi.mock("../../../src/components/device/component-catalog.js", () => ({}));
+vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+
+import { ComponentCategory } from "../../../src/api/types/components.js";
+import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
+import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
+import { makeComponentEntry } from "../../util/_make-component-entry.js";
+
+interface Internals {
+  _open: boolean;
+  _prefillReference: { domain: string; id: string } | null;
+  _fastPathFields: (entry: unknown) => Record<string, unknown> | null;
+  _startFeaturedSequence: (
+    fullIds: string[],
+    boardId: string,
+    name: string
+  ) => Promise<void>;
+  _onBundleSelected: (e: CustomEvent) => Promise<void>;
+}
+
+function makeDialog() {
+  const addComponent = vi.fn().mockResolvedValue({ yaml: "MERGED" });
+  const getComponentBodies = vi.fn().mockResolvedValue({});
+  const dialog = new ESPHomeAddComponentDialog();
+  Object.assign(dialog as unknown as Record<string, unknown>, {
+    _api: { addComponent, getComponentBodies },
+  });
+  dialog.configuration = "foo.yaml";
+  dialog.yaml = "esphome:\n  name: foo\n";
+  return { dialog, d: dialog as unknown as Internals, addComponent, getComponentBodies };
+}
+
+function bundleEvent(componentIds: string[], boardId = "bd") {
+  return new CustomEvent("add-bundle", {
+    detail: { bundle: { name: "Full setup", component_ids: componentIds }, boardId },
+  });
+}
+
+afterEach(() => {
+  _clearComponentCache();
+  vi.clearAllMocks();
+});
+
+describe("add-component-dialog one-shot bundle", () => {
+  it("adds every member with no form, threading the merged draft", async () => {
+    const { d, addComponent, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    addComponent
+      .mockResolvedValueOnce({ yaml: "Y1" })
+      .mockResolvedValueOnce({ yaml: "Y2" });
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    expect(addComponent).toHaveBeenCalledTimes(2);
+    // First member merges into the editor draft, the second into the result of
+    // the first — one accumulating chain, not two independent merges.
+    expect(addComponent.mock.calls[0]).toEqual([
+      "foo.yaml",
+      { component_id: "featured.bd.a", fields: { id: "x" } },
+      "esphome:\n  name: foo\n",
+    ]);
+    expect(addComponent.mock.calls[1]).toEqual([
+      "foo.yaml",
+      { component_id: "featured.bd.b", fields: { id: "x" } },
+      "Y1",
+    ]);
+    expect(d._open).toBe(false);
+  });
+
+  it("hands off to the interactive sequence when a member needs the form", async () => {
+    const { d, addComponent, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.OUTPUT,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.LIGHT,
+      }),
+    });
+    const startSequence = vi.fn();
+    d._startFeaturedSequence = startSequence;
+    // First member fast-paths; the second needs the form.
+    d._fastPathFields = vi
+      .fn()
+      .mockReturnValueOnce({ id: "dep" })
+      .mockReturnValueOnce(null);
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // Only the silent first member was added; the rest is handed off.
+    expect(addComponent).toHaveBeenCalledTimes(1);
+    expect(addComponent.mock.calls[0][1]).toEqual({
+      component_id: "featured.bd.a",
+      fields: { id: "dep" },
+    });
+    expect(startSequence).toHaveBeenCalledWith(["featured.bd.b"], "bd", "Full setup");
+    // The just-added dependency is carried into the opened form's reference.
+    expect(d._prefillReference).toEqual({ domain: ComponentCategory.OUTPUT, id: "dep" });
+  });
+
+  it("opens the form on the first member when nothing can be fast-pathed", async () => {
+    const { d, addComponent, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a"),
+    });
+    const startSequence = vi.fn();
+    d._startFeaturedSequence = startSequence;
+    d._fastPathFields = vi.fn().mockReturnValue(null);
+
+    await d._onBundleSelected(bundleEvent(["a"]));
+
+    expect(addComponent).not.toHaveBeenCalled();
+    expect(startSequence).toHaveBeenCalledWith(["featured.bd.a"], "bd", "Full setup");
+  });
+});

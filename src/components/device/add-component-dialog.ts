@@ -521,11 +521,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
   }
 
   /**
-   * Picking a bundle queues the bundle's components and opens the
-   * form view on the first one. Each successful submit advances the
-   * queue (`_onFormSubmit`); cancelling clears state but keeps any
-   * already-added components in the YAML — no rollback, consistent
-   * with the regular flow.
+   * Add a whole bundle in one shot: each member is merged with its board
+   * presets and no form, threading the editor draft so unsaved edits survive.
+   * The form only opens for a member needing input the presets don't cover —
+   * from there the rest continues through the interactive queue, so a bundle
+   * that can't be filled blind still completes. Already-added members are kept
+   * on hand-off (no rollback, consistent with the regular flow).
    */
   private async _onBundleSelected(
     e: CustomEvent<{ bundle: FeaturedBundle; boardId: string }>
@@ -533,11 +534,87 @@ export class ESPHomeAddComponentDialog extends LitElement {
     e.stopPropagation();
     if (this._submitting) return;
     const { bundle, boardId } = e.detail;
-    if (!boardId || bundle.component_ids.length === 0) return;
+    if (!boardId || bundle.component_ids.length === 0 || !this.configuration) return;
     const fullIds = bundle.component_ids.map((localId) =>
       buildFeaturedId(boardId, localId)
     );
-    await this._startFeaturedSequence(fullIds, boardId, bundle.name);
+
+    // Fresh sequence — abandon any in-flight dep-detour state, and invalidate
+    // any in-flight dep-nav lookup the way `_submitComponent` does.
+    this._clearDetourFields();
+    this._submitting = true;
+    this._submitError = "";
+    this._depNavSeq++;
+    let draft = this.yaml || undefined;
+    let merged = "";
+    let lastAdded: { domain: string; id: string } | null = null;
+    let addedAny = false;
+    // Publish progress so far, then resume from member *idx* through the
+    // interactive queue, carrying the just-added dependency's id into the
+    // opened form's matching reference field (the chaining bundles rely on).
+    const handOff = async (idx: number) => {
+      this._submitting = false;
+      if (addedAny) this._dispatchDraft(merged);
+      await this._startFeaturedSequence(fullIds.slice(idx), boardId, bundle.name);
+      if (lastAdded) this._prefillReference = lastAdded;
+    };
+    try {
+      for (let i = 0; i < fullIds.length; i++) {
+        const result = await hydrateForSelection(
+          this as unknown as SelectionHost,
+          fullIds[i],
+          boardId
+        );
+        if (result.kind === "stale") return;
+        if (result.kind === "error") {
+          await handOff(i);
+          return;
+        }
+        const entry = result.entry;
+        // A member needing input the presets don't cover opens the form.
+        const fields = this._fastPathFields(entry);
+        if (fields === null) {
+          await handOff(i);
+          return;
+        }
+        const { yaml } = await this._api.addComponent(
+          this.configuration,
+          { component_id: fullIds[i], fields },
+          draft
+        );
+        draft = yaml;
+        merged = yaml;
+        addedAny = true;
+        // Keep `this.yaml` current so the next member's dep check + reference
+        // dropdown see what this batch already added.
+        this.yaml = yaml;
+        this._dispatchDraft(yaml);
+        const addedId = fields["id"];
+        lastAdded =
+          typeof addedId === "string" && entry.category
+            ? { domain: entry.category, id: addedId }
+            : null;
+      }
+      this._open = false;
+      this._selected = null;
+      this._resetDetourState();
+      toast.success(this._localize("device.bundle_added", { name: bundle.name }), {
+        richColors: true,
+      });
+    } catch (err) {
+      this._submitError =
+        err instanceof Error ? err.message : this._localize("device.add_component_error");
+      toast.error(this._submitError, { richColors: true });
+    } finally {
+      this._submitting = false;
+    }
+  }
+
+  /** Surface the merged YAML as an unsaved editor draft (host saves explicitly). */
+  private _dispatchDraft(yaml: string) {
+    this.dispatchEvent(
+      new CustomEvent("yaml-draft", { detail: { yaml }, bubbles: true, composed: true })
+    );
   }
 
   private _onBack() {
