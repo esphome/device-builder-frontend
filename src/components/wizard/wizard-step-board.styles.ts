@@ -145,6 +145,12 @@ export const wizardStepBoardStyles = css`
     gap: var(--wa-space-s);
   }
 
+  /* Infinite-scroll trigger: a zero-content marker the IntersectionObserver
+     watches; given a sliver of height so it reliably crosses the root. */
+  .sentinel {
+    height: 1px;
+  }
+
   .board-card {
     position: relative;
     border-radius: var(--wa-border-radius-l);

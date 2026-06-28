@@ -126,6 +126,12 @@ export const componentCatalogStyles = css`
     align-content: start;
   }
 
+  /* Infinite-scroll trigger: a zero-content marker the IntersectionObserver
+     watches; given a sliver of height so it reliably crosses the root. */
+  .sentinel {
+    height: 1px;
+  }
+
   /* Below the shared phone breakpoint (modal viewport on phones) collapse sidebar into a
      horizontal chip row above the grid. */
   @media (max-width: ${MOBILE_BREAKPOINT}px) {

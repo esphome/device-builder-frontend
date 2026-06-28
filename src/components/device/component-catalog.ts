@@ -8,7 +8,7 @@ import {
   mdiPlus,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
@@ -18,6 +18,8 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
+import { IntersectionController } from "../../util/intersection-controller.js";
+import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   ambiguousNameIds,
@@ -71,10 +73,20 @@ export class ESPHomeComponentCatalog extends LitElement {
   // Ignored when lockedCategories is set.
   @property({ attribute: false }) excludeCategories: string[] = [];
 
-  @state() _components: ComponentCatalogEntry[] = [];
+  private _list = new PagedListController<ComponentCatalogEntry>(this);
+
+  // ``_components`` / ``_total`` read straight off the paged list so the
+  // client-side filter helpers (visibleComponents, buildCategories) keep
+  // their existing ``host._components`` / ``host._total`` access.
+  get _components(): ComponentCatalogEntry[] {
+    return this._list.items;
+  }
+
+  get _total(): number {
+    return this._list.total;
+  }
+
   @state() _categories: Array<{ id: string; name: string; count: number }> = [];
-  @state() _total = 0;
-  @state() _loading = true;
   @state() _initialLoad = true;
   @state() _search = "";
   @state() _category = "all";
@@ -86,6 +98,11 @@ export class ESPHomeComponentCatalog extends LitElement {
   // Per-id tracking — a single broken image_url shouldn't pull every other
   // card down to the placeholder.
   @state() _imageFailed: Set<string> = new Set();
+
+  @query(".grid-scroll") private _scroll?: HTMLElement | null;
+  @query(".sentinel") private _sentinel?: HTMLElement | null;
+
+  private _intersection = new IntersectionController(this, () => this._list.loadMore());
 
   private _debouncedSearch = debounce(() => this._fetchComponents(), 300);
 
@@ -130,54 +147,59 @@ export class ESPHomeComponentCatalog extends LitElement {
     this._fetchComponents();
   }
 
-  private async _fetchComponents() {
-    this._loading = true;
-    try {
-      const query = this._search.trim() || undefined;
-      // lockedCategories (parent-set, e.g. CORE_CATEGORIES) wins over the
-      // user's sidebar selection.
-      const locked = this.lockedCategories.length > 0;
-      const category: string | string[] | undefined = locked
-        ? this.lockedCategories
-        : this._category !== "all"
-          ? this._category
-          : undefined;
-      const exclude_category: string[] | undefined =
-        !locked && this.excludeCategories.length > 0 ? this.excludeCategories : undefined;
-      const base = {
-        category,
-        exclude_category,
-        platform: this.platform || undefined,
-        board_id: this.boardId || undefined,
-        limit: 50,
-      };
+  private _fetchComponents() {
+    const query = this._search.trim() || undefined;
+    // lockedCategories (parent-set, e.g. CORE_CATEGORIES) wins over the
+    // user's sidebar selection.
+    const locked = this.lockedCategories.length > 0;
+    const category: string | string[] | undefined = locked
+      ? this.lockedCategories
+      : this._category !== "all"
+        ? this._category
+        : undefined;
+    const exclude_category: string[] | undefined =
+      !locked && this.excludeCategories.length > 0 ? this.excludeCategories : undefined;
+    const base = {
+      category,
+      exclude_category,
+      platform: this.platform || undefined,
+      board_id: this.boardId || undefined,
+    };
+    this._list.reset(async (offset, limit) => {
       // Interface probe first; a homeless interface (voltage_sampler) has no
-      // matching id/name, so an empty result means it was a plain domain and
-      // we retry as a search (an i2c dependency still resolves). Clear
-      // ``_provides`` on that empty branch so a later fetch (board/platform
-      // prop change) goes straight to search instead of re-probing.
-      let response = this._provides
-        ? await this._api.getComponents({ ...base, provides: this._provides })
-        : await this._api.getComponents({ ...base, query });
-      if (this._provides && response.components.length === 0) {
+      // matching id/name, so an empty first page means it was a plain domain
+      // and we retry as a search (an i2c dependency still resolves). Clear
+      // ``_provides`` on that empty branch so the next page (and later fetches)
+      // go straight to search instead of re-probing. The probe/retry and the
+      // category snapshot only matter on page 0; later pages reuse the
+      // resolved ``_provides``.
+      const provides = this._provides;
+      let response = provides
+        ? await this._api.getComponents({ ...base, offset, limit, provides })
+        : await this._api.getComponents({ ...base, offset, limit, query });
+      if (offset === 0 && provides && response.components.length === 0) {
         this._provides = "";
-        response = await this._api.getComponents({ ...base, query });
+        response = await this._api.getComponents({ ...base, offset, limit, query });
       }
-      this._components = response.components;
-      this._categories = response.categories;
-      this._total = response.total;
-    } catch (e) {
-      console.error("Failed to load component catalog:", e);
-    } finally {
-      this._loading = false;
-      this._initialLoad = false;
-    }
+      if (offset === 0) this._categories = response.categories;
+      return { items: response.components, total: response.total };
+    });
   }
 
   static styles = [espHomeStyles, inputStyles, componentCatalogStyles];
 
+  protected updated() {
+    if (this._initialLoad && !this._list.loading) this._initialLoad = false;
+    const sentinel = this._sentinel;
+    const scroll = this._scroll;
+    // Prefetch a screenful early; the sentinel only exists while more pages
+    // remain (see render), so a missing one tears the observer down.
+    if (sentinel && scroll) this._intersection.observe(sentinel, scroll, "200px");
+    else this._intersection.disconnect();
+  }
+
   protected render() {
-    if (this._initialLoad && this._loading) {
+    if (this._initialLoad && this._list.loading) {
       return html`<div class="loading">
         ${this._localize("device.loading_components")}
       </div>`;
@@ -228,7 +250,7 @@ export class ESPHomeComponentCatalog extends LitElement {
           @input=${this._onSearchInput}
           placeholder=${this._localize("device.search_components_placeholder")}
         />
-        ${!this._loading
+        ${!this._list.loading
           ? html`<span class="result-count"
               >${this._localize("device.components_count", {
                 visible: visible.length + bundles.length,
@@ -238,7 +260,7 @@ export class ESPHomeComponentCatalog extends LitElement {
           : nothing}
         <div class="grid-scroll">
           <div class="components-grid">
-            ${this._loading
+            ${this._list.loading
               ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
               : visible.length + bundles.length
                 ? html`
@@ -258,6 +280,10 @@ export class ESPHomeComponentCatalog extends LitElement {
                     ${this._localize("device.no_components_found")}
                   </p>`}
           </div>
+          ${this._list.hasMore ? html`<div class="sentinel"></div>` : nothing}
+          ${this._list.loadingMore
+            ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
+            : nothing}
         </div>
       </div>
     `;
