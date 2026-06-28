@@ -546,15 +546,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._depNavSeq++;
     let draft = this.yaml || undefined;
-    let merged = "";
     let lastAdded: { domain: string; id: string } | null = null;
     let addedAny = false;
-    // Publish progress so far, then resume from member *idx* through the
-    // interactive queue, carrying the just-added dependency's id into the
-    // opened form's matching reference field (the chaining bundles rely on).
+    // Publish the merged draft so far, then resume from member *idx* through the
+    // interactive queue, carrying the just-added dependency's id into the opened
+    // form's matching reference field (the chaining bundles rely on).
     const handOff = async (idx: number) => {
       this._submitting = false;
-      if (addedAny) this._dispatchDraft(merged);
+      if (addedAny) this._dispatchDraft(this.yaml);
       await this._startFeaturedSequence(fullIds.slice(idx), boardId, bundle.name);
       if (lastAdded) this._prefillReference = lastAdded;
     };
@@ -583,18 +582,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
           draft
         );
         draft = yaml;
-        merged = yaml;
         addedAny = true;
         // Keep `this.yaml` current so the next member's dep check + reference
-        // dropdown see what this batch already added.
+        // dropdown see what this batch already added; the host draft is
+        // published once at the end rather than churning the editor per member.
         this.yaml = yaml;
-        this._dispatchDraft(yaml);
-        const addedId = fields["id"];
-        lastAdded =
-          typeof addedId === "string" && entry.category
-            ? { domain: entry.category, id: addedId }
-            : null;
+        lastAdded = this._chainReference(entry, fields);
       }
+      if (addedAny) this._dispatchDraft(this.yaml);
       this._open = false;
       this._selected = null;
       this._resetDetourState();
@@ -615,6 +610,20 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this.dispatchEvent(
       new CustomEvent("yaml-draft", { detail: { yaml }, bubbles: true, composed: true })
     );
+  }
+
+  /**
+   * The ``{domain, id}`` a just-added component hands to a later member's
+   * matching reference field, or null when it has no id to chain.
+   */
+  private _chainReference(
+    entry: ComponentCatalogEntry,
+    fields: Record<string, unknown>
+  ): { domain: string; id: string } | null {
+    const id = fields["id"];
+    return typeof id === "string" && entry.category
+      ? { domain: entry.category, id }
+      : null;
   }
 
   private _onBack() {
@@ -696,13 +705,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       // (so the dependency we just added shows up in the original
       // component's dropdown). `yaml-draft` advances only the working
       // buffer, leaving the dirty flag on so the user saves explicitly.
-      this.dispatchEvent(
-        new CustomEvent("yaml-draft", {
-          detail: { yaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      this._dispatchDraft(yaml);
 
       if (this._returnTo) {
         // Just finished adding a dependency — restore the original
@@ -766,16 +769,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // `light.binary` whose `output:` field has to point at it — and
         // without this prefill the user has to re-pick the id they just
         // typed in the previous step from a dropdown.
-        const justAddedId = fields["id"];
-        const justAddedDomain = this._selected.category;
-        if (typeof justAddedId === "string" && justAddedDomain) {
-          this._prefillReference = {
-            domain: justAddedDomain,
-            id: justAddedId,
-          };
-        } else {
-          this._prefillReference = null;
-        }
+        this._prefillReference = this._chainReference(this._selected, fields);
         this._bundleQueue = remaining;
         this._bundleProgress = {
           ...this._bundleProgress,
