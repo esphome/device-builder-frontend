@@ -176,6 +176,26 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   static styles = [espHomeStyles, inputStyles, componentCatalogStyles];
 
+  // The sidebar badge / auto-select read availableFeaturedCount over the board's
+  // recommendations (fetch-independent), while the grid reads the fetched
+  // featured cards; during prop settling (yaml/board/platform arrive at
+  // different times) they can briefly disagree and strand the view on an empty
+  // "Recommended" category. Once a featured fetch has settled, if its grid is
+  // empty fall back to "all" so we never sit on "0 of N / No components found".
+  protected updated() {
+    if (
+      this._loading ||
+      this.lockedCategories.length > 0 ||
+      this._category !== ComponentCategory.FEATURED
+    ) {
+      return;
+    }
+    if (visibleComponents(this).length + filteredBundles(this).length === 0) {
+      this._category = "all";
+      this._fetchComponents();
+    }
+  }
+
   protected render() {
     if (this._initialLoad && this._loading) {
       return html`<div class="loading">
