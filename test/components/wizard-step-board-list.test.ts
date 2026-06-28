@@ -108,6 +108,15 @@ describe("esphome-wizard-step-board-list infinite scroll", () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
+  it("shows an error message instead of the empty state when a fetch failed", async () => {
+    const el = await mount([], false);
+    el.error = true;
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".loading")!.textContent!.trim()).toBe(
+      "wizard.boards_load_error"
+    );
+  });
+
   it("dispatches add-board with the chosen board", async () => {
     const b = board(0);
     const el = await mount([b], false);

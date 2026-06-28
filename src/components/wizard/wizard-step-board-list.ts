@@ -43,6 +43,9 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   @property({ type: Boolean })
   hasMore = false;
 
+  @property({ type: Boolean })
+  error = false;
+
   @property({ attribute: false })
   localize: LocalizeFunc = (key) => key;
 
@@ -73,7 +76,11 @@ export class ESPHomeWizardStepBoardList extends LitElement {
         ${this.loading
           ? html`<p class="loading">${this.localize("wizard.loading_boards")}</p>`
           : this.boards.length === 0
-            ? html`<p class="loading">${this.localize("wizard.no_boards_found")}</p>`
+            ? html`<p class="loading">
+                ${this.localize(
+                  this.error ? "wizard.boards_load_error" : "wizard.no_boards_found"
+                )}
+              </p>`
             : html`
                 ${featured
                   ? html`

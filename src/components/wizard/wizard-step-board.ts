@@ -223,6 +223,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
         .loading=${this._list.loading}
         .loadingMore=${this._list.loadingMore}
         .hasMore=${this._list.hasMore}
+        .error=${this._list.error !== null}
         .localize=${this._localize}
         @load-more=${this._onLoadMore}
         @add-board=${this._onAddBoard}
