@@ -15,43 +15,41 @@ function board(flags: Partial<BoardCatalogEntry>): BoardCatalogEntry {
   } as unknown as BoardCatalogEntry;
 }
 
+const allRecommended = (ids: string[]) =>
+  [{ id: "all_recommended", name: "x", component_ids: ids }] as never;
+
 describe("boardOffersFullSetup", () => {
-  it("is true only for a full-config board with recommended components", () => {
+  it("is true only for a full-config board with an all_recommended bundle", () => {
+    expect(
+      boardOffersFullSetup(
+        board({ full_config: true, featured_bundles: allRecommended(["a", "b"]) })
+      )
+    ).toBe(true);
+    // Full config but no synthesized bundle (a chained curated bundle covered
+    // it) → not offered as one click.
     expect(
       boardOffersFullSetup(
         board({ full_config: true, featured_components: [{ id: "a" }] as never })
       )
-    ).toBe(true);
-    // No recommended components → nothing to set up.
-    expect(boardOffersFullSetup(board({ full_config: true }))).toBe(false);
-    // Optional-component board (not a full config) → never offered.
+    ).toBe(false);
+    // Has the bundle but isn't a full config → never offered.
     expect(
-      boardOffersFullSetup(
-        board({ full_config: false, featured_components: [{ id: "a" }] as never })
-      )
+      boardOffersFullSetup(board({ featured_bundles: allRecommended(["a", "b"]) }))
     ).toBe(false);
     expect(boardOffersFullSetup(null)).toBe(false);
   });
 });
 
 describe("fullSetupComponentIds", () => {
-  it("uses the synthesized all_recommended bundle's order when present", () => {
-    const b = board({
-      featured_components: [{ id: "a" }, { id: "b" }, { id: "c" }] as never,
-      featured_bundles: [
-        { id: "all_recommended", name: "x", component_ids: ["c", "a", "b"] },
-      ] as never,
-    });
+  it("returns the all_recommended bundle's order", () => {
+    const b = board({ featured_bundles: allRecommended(["c", "a", "b"]) });
     expect(fullSetupComponentIds(b)).toEqual(["c", "a", "b"]);
   });
 
-  it("falls back to every featured component when no all_recommended bundle exists", () => {
+  it("returns empty when there is no all_recommended bundle", () => {
     const b = board({
-      featured_components: [{ id: "a" }, { id: "b" }] as never,
-      featured_bundles: [
-        { id: "light_setup", name: "x", component_ids: ["a", "b"] },
-      ] as never,
+      featured_bundles: [{ id: "light_setup", name: "x", component_ids: ["a"] }] as never,
     });
-    expect(fullSetupComponentIds(b)).toEqual(["a", "b"]);
+    expect(fullSetupComponentIds(b)).toEqual([]);
   });
 });

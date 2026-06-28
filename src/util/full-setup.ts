@@ -1,25 +1,27 @@
-import type { BoardCatalogEntry } from "../api/types/boards.js";
+import type { BoardCatalogEntry, FeaturedBundle } from "../api/types/boards.js";
 
 /** Local id of the all-recommended bundle the backend synthesizes (see #1726). */
 const ALL_RECOMMENDED_BUNDLE_ID = "all_recommended";
 
-/**
- * Whether the create wizard should offer a "set up with everything" choice:
- * the board is a complete onboard config with recommended components to add.
- */
-export function boardOffersFullSetup(board: BoardCatalogEntry | null): boolean {
-  return !!board?.full_config && board.featured_components.length > 0;
+/** The backend-synthesized dependency-ordered full-setup bundle, or null. */
+function allRecommendedBundle(board: BoardCatalogEntry): FeaturedBundle | null {
+  return board.featured_bundles.find((b) => b.id === ALL_RECOMMENDED_BUNDLE_ID) ?? null;
 }
 
 /**
- * The featured local ids to add for a board's full setup, dependency-ordered.
+ * Whether the create wizard should offer a "set up with everything" choice.
  *
- * Reuses the backend's synthesized ``all_recommended`` bundle when present (its
- * member order is authoritative); falls back to every featured component when a
- * curated bundle already covered them all and synthesis was skipped.
+ * Only when the board is a complete onboard config (``full_config``) AND the
+ * backend synthesized an ``all_recommended`` bundle — i.e. there's a single
+ * dependency-ordered list to apply. Boards whose recommended set is only
+ * reachable through a chained curated bundle aren't offered the one-click setup
+ * (it would add components out of order); they use the Add Component dialog.
  */
+export function boardOffersFullSetup(board: BoardCatalogEntry | null): boolean {
+  return !!board?.full_config && allRecommendedBundle(board) !== null;
+}
+
+/** The featured local ids to add for a board's full setup, dependency-ordered. */
 export function fullSetupComponentIds(board: BoardCatalogEntry): string[] {
-  const bundle = board.featured_bundles.find((b) => b.id === ALL_RECOMMENDED_BUNDLE_ID);
-  if (bundle) return bundle.component_ids;
-  return board.featured_components.map((fc) => fc.id);
+  return allRecommendedBundle(board)?.component_ids ?? [];
 }

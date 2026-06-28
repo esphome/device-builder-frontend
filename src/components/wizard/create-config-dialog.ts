@@ -508,7 +508,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         ssid: wifiSsid,
         psk: wifiPassword,
       },
-      { board, fullSetup: fullSetup ? board : null }
+      { board, fullSetup }
     );
   }
 
@@ -536,7 +536,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     },
     options: {
       board?: BoardCatalogEntry | null;
-      fullSetup?: BoardCatalogEntry | null;
+      fullSetup?: boolean;
     } = {}
   ): Promise<void> {
     if (this._submitting) return;
@@ -548,7 +548,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       // the shared secret-keys cache so the new device's editor doesn't show
       // the just-written `!secret wifi_*` refs as missing until a reload.
       if (args.ssid) window.dispatchEvent(new CustomEvent("secrets-saved"));
-      if (options.fullSetup) await this._applyFullSetup(configuration, options.fullSetup);
+      if (options.fullSetup && options.board) {
+        await this._applyFullSetup(configuration, options.board);
+      }
       this.navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);

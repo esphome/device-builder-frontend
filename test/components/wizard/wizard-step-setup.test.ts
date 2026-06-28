@@ -228,6 +228,9 @@ describe("wizard-step-setup", () => {
       requires_wifi: false,
       full_config: true,
       featured_components: [{ id: "relay_1" }] as never,
+      featured_bundles: [
+        { id: "all_recommended", name: "x", component_ids: ["relay_1"] },
+      ] as never,
     });
 
   it("offers a pre-checked full-setup option for a full-config board", async () => {
