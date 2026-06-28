@@ -23,6 +23,7 @@ import { makeComponentEntry } from "../../util/_make-component-entry.js";
 interface Internals {
   _open: boolean;
   _prefillReference: { domain: string; id: string } | null;
+  _bundleProgress: { current: number; total: number; bundleName: string } | null;
   _fastPathFields: (entry: unknown) => Record<string, unknown> | null;
   _startFeaturedSequence: (
     fullIds: string[],
@@ -133,5 +134,56 @@ describe("add-component-dialog one-shot bundle", () => {
 
     expect(addComponent).not.toHaveBeenCalled();
     expect(startSequence).toHaveBeenCalledWith(["featured.bd.a"], "bd", "Full setup");
+  });
+
+  it("publishes the merged draft so far when a member fails mid-batch", async () => {
+    const { dialog, d, addComponent, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    addComponent
+      .mockResolvedValueOnce({ yaml: "Y1" })
+      .mockRejectedValueOnce(new Error("boom"));
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+    const drafts: string[] = [];
+    dialog.addEventListener("yaml-draft", (e) => {
+      drafts.push((e as CustomEvent).detail.yaml);
+    });
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // The first member's merge is surfaced so the host keeps it; not lost to the
+    // throw on the second.
+    expect(drafts).toEqual(["Y1"]);
+  });
+
+  it("counts silently-added members in the hand-off progress banner", async () => {
+    const { d, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.OUTPUT,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.LIGHT,
+      }),
+      "featured.bd.c": makeComponentEntry("featured.bd.c", {
+        category: ComponentCategory.LIGHT,
+      }),
+    });
+    // First member fast-paths silently; the second needs the form.
+    d._fastPathFields = vi
+      .fn()
+      .mockReturnValueOnce({ id: "dep" })
+      .mockReturnValueOnce(null);
+
+    await d._onBundleSelected(bundleEvent(["a", "b", "c"]));
+
+    // Member b opens at step 2 of 3, not step 1 of 2.
+    expect(d._bundleProgress).toEqual({ current: 2, total: 3, bundleName: "Full setup" });
   });
 });

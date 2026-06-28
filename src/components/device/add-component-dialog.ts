@@ -556,6 +556,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
       if (addedAny) this._dispatchDraft(this.yaml);
       await this._startFeaturedSequence(fullIds.slice(idx), boardId, bundle.name);
       if (lastAdded) this._prefillReference = lastAdded;
+      // `_startFeaturedSequence` counts from 1 over the remaining slice; restate
+      // the banner against the whole bundle so members already added silently
+      // still count toward the step number.
+      if (this._bundleProgress) {
+        this._bundleProgress = {
+          current: idx + 1,
+          total: fullIds.length,
+          bundleName: bundle.name,
+        };
+      }
     };
     try {
       for (let i = 0; i < fullIds.length; i++) {
@@ -597,6 +607,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         richColors: true,
       });
     } catch (err) {
+      // A member failed mid-batch: publish what merged so far so the host keeps
+      // the already-added members (the draft is otherwise only published on the
+      // success or hand-off paths, not on a throw).
+      if (addedAny) this._dispatchDraft(this.yaml);
       this._submitError =
         err instanceof Error ? err.message : this._localize("device.add_component_error");
       toast.error(this._submitError, { richColors: true });
