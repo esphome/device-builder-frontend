@@ -191,6 +191,12 @@ export class ESPHomeComponentCatalog extends LitElement {
     // grid scrolls itself or the surrounding dialog does; the sentinel is
     // still clipped by the scroll container, and only exists while more pages
     // remain (see render), so a missing one tears the observer down.
+    //
+    // Re-paging relies on each appended page overflowing the scroll container
+    // so the sentinel re-crosses on the next scroll. That holds because a full
+    // page far exceeds the container height and the only short page is the
+    // last (hasMore=false, sentinel removed); a short non-final page never
+    // occurs.
     this._intersection.observeIfPresent(this._sentinel, null, "200px");
   }
 

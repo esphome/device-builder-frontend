@@ -107,6 +107,13 @@ export class ESPHomeWizardStepBoardList extends LitElement {
     // paging would stall after one page. IntersectionObserver still clips the
     // sentinel by the desktop scroll box, so this works in both layouts. The
     // 200px margin prefetches the next page before the sentinel is in view.
+    //
+    // Re-paging relies on each appended page overflowing the scroll container
+    // so the sentinel leaves the viewport and re-crosses on the next scroll.
+    // That always holds: a full page is far taller than the container, and the
+    // only short page is the last one, which lands hasMore=false and removes
+    // the sentinel. A short non-final page (which would keep the sentinel in
+    // view and not re-fire) never occurs.
     this._intersection.observeIfPresent(this._sentinel, null, "200px");
   }
 
