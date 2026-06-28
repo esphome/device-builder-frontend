@@ -39,4 +39,20 @@ describe("addFormNeedsUserInput", () => {
     ];
     expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(true);
   });
+
+  it("skips a fully board-locked constraint cluster (every member read-only)", () => {
+    const entries = [
+      makeConfigEntry({ key: "a", group: "g", required: true, locked: true }),
+      makeConfigEntry({ key: "b", group: "g", required: true, locked: true }),
+    ];
+    expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(false);
+  });
+
+  it("shows the form when a constraint cluster has an unlocked member", () => {
+    const entries = [
+      makeConfigEntry({ key: "a", group: "g", required: true, locked: true }),
+      makeConfigEntry({ key: "b", group: "g", required: true, locked: false }),
+    ];
+    expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(true);
+  });
 });
