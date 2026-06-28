@@ -491,6 +491,8 @@
     "finish_setup": "Finish setup",
     "section_name_device": "Name your device",
     "section_name_device_desc": "Naming your project will show up in the ESPHome dashboard. Choose a recognisable, descriptive and memorable name. You can use component names or relevant words. You can edit this after you finish this project.",
+    "full_setup": "Set up with all recommended components",
+    "full_setup_desc": "Adds this device's onboard components (relays, sensors, and more) so it's ready to use. You can change them afterwards in the editor.",
     "wifi_configuration": "Wi-Fi Configuration",
     "wifi_required_desc": "This board connects over Wi-Fi. Enter your network so the device can come online.",
     "other_boards": "Other boards",

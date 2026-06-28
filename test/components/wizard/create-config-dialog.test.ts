@@ -188,6 +188,65 @@ describe("create-config-dialog create de-dupe + retry", () => {
     );
   });
 
+  it("applies the full setup after create when the wizard checkbox is on", async () => {
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "relays.yaml" });
+    const addComponent = vi.fn().mockResolvedValue({ yaml: "merged" });
+    const el = await mount({ createDevice, addComponent });
+    const board = {
+      id: "esp32_relay_x4",
+      full_config: true,
+      featured_components: [{ id: "relay_1" }, { id: "relay_2" }],
+      featured_bundles: [
+        { id: "all_recommended", name: "x", component_ids: ["relay_1", "relay_2"] },
+      ],
+    };
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("finish-setup", {
+        detail: {
+          board,
+          name: "Relays",
+          wifiSsid: "",
+          wifiPassword: "",
+          fullSetup: true,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await flush();
+
+    expect(addComponent.mock.calls.map((c) => c[1].component_id)).toEqual([
+      "featured.esp32_relay_x4.relay_1",
+      "featured.esp32_relay_x4.relay_2",
+    ]);
+  });
+
+  it("skips the full setup when the checkbox is off", async () => {
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "relays.yaml" });
+    const addComponent = vi.fn().mockResolvedValue({ yaml: "merged" });
+    const el = await mount({ createDevice, addComponent });
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("finish-setup", {
+        detail: {
+          board: {
+            id: "esp32_relay_x4",
+            full_config: true,
+            featured_components: [{ id: "relay_1" }],
+          },
+          name: "Relays",
+          wifiSsid: "",
+          wifiPassword: "",
+          fullSetup: false,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await flush();
+
+    expect(addComponent).not.toHaveBeenCalled();
+  });
+
   it("fires secrets-saved after a Wi-Fi create so secret pickers refresh", async () => {
     // The backend persists the SSID to secrets.yaml; without this event the
     // editor's secret pickers show the new !secret refs as missing until reload.

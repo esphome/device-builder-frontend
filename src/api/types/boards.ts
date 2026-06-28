@@ -121,6 +121,12 @@ export interface BoardCatalogEntry {
   product_url: string;
   featured: boolean;
   is_generic: boolean;
+  /**
+   * The featured components are a complete onboard config (a devices.esphome.io
+   * import or a hand-curated product opting in), not optional add-ons. Drives
+   * the create wizard's "set up with everything" default. Body-only.
+   */
+  full_config?: boolean;
   /** Components recommended for this board. */
   featured_components: FeaturedComponent[];
   /** Logical groups of featured components added together. */

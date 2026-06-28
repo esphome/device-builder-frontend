@@ -12,6 +12,11 @@ import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-st
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
 import { pressEnter } from "../../_press-enter.js";
 
+// The real wa-checkbox is a form-associated element that crashes under happy-dom
+// (no ElementInternals); the step only needs its checked/change contract, so
+// render it as a plain unknown element.
+vi.mock("@home-assistant/webawesome/dist/components/checkbox/checkbox.js", () => ({}));
+
 // connectedCallback reads the shared (session-cached) secret-keys list to
 // decide whether Wi-Fi is already configured; mock it per-test (no cache bleed).
 vi.mock("../../../src/util/secrets-cache.js", async (importOriginal) => ({
@@ -214,5 +219,47 @@ describe("wizard-step-setup", () => {
     const el = await mount(wifiBoard());
     const deviceName = el.shadowRoot!.querySelector<HTMLInputElement>("#device-name");
     expect(deviceName?.getAttribute("autocomplete")).toBe("off");
+  });
+
+  // A complete onboard config with recommended components → offer "set up with
+  // everything", pre-checked.
+  const fullConfigBoard = () =>
+    board({
+      requires_wifi: false,
+      full_config: true,
+      featured_components: [{ id: "relay_1" }] as never,
+    });
+
+  it("offers a pre-checked full-setup option for a full-config board", async () => {
+    const el = await mount(fullConfigBoard());
+    expect(el.shadowRoot!.querySelector("wa-checkbox")).not.toBeNull();
+    await setName(el, "kitchen");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.fullSetup).toBe(true);
+  });
+
+  it("omits the full-setup option for an optional-component board", async () => {
+    const el = await mount(noWifiBoard());
+    expect(el.shadowRoot!.querySelector("wa-checkbox")).toBeNull();
+    await setName(el, "kitchen");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.fullSetup).toBe(false);
+  });
+
+  it("finishes without the full setup when the option is unchecked", async () => {
+    const el = await mount(fullConfigBoard());
+    await setName(el, "kitchen");
+    const checkbox = el.shadowRoot!.querySelector<HTMLInputElement>("wa-checkbox")!;
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event("change"));
+    await el.updateComplete;
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.fullSetup).toBe(false);
   });
 });

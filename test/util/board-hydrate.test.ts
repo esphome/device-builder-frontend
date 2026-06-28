@@ -196,6 +196,7 @@ describe("hydrateBoard", () => {
       product_url: "https://shop.example.com",
       featured: true,
       is_generic: false,
+      full_config: false,
       featured_components: [],
       featured_bundles: [],
       requires_wifi: false,

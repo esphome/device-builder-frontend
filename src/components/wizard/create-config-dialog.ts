@@ -11,6 +11,8 @@ import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
+import { buildFeaturedId } from "../../util/featured-id.js";
+import { fullSetupComponentIds } from "../../util/full-setup.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -488,9 +490,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       name: string;
       wifiSsid: string;
       wifiPassword: string;
+      fullSetup?: boolean;
     }>
   ) {
-    const { board, name, wifiSsid, wifiPassword } = e.detail;
+    const { board, name, wifiSsid, wifiPassword, fullSetup } = e.detail;
     if (!board) return;
     await this._runCreate(
       {
@@ -505,7 +508,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         ssid: wifiSsid,
         psk: wifiPassword,
       },
-      { board }
+      { board, fullSetup: fullSetup ? board : null }
     );
   }
 
@@ -531,7 +534,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       psk?: string;
       file_content?: string;
     },
-    options: { board?: BoardCatalogEntry | null } = {}
+    options: {
+      board?: BoardCatalogEntry | null;
+      fullSetup?: BoardCatalogEntry | null;
+    } = {}
   ): Promise<void> {
     if (this._submitting) return;
     this._resetCreateErrors();
@@ -542,12 +548,36 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       // the shared secret-keys cache so the new device's editor doesn't show
       // the just-written `!secret wifi_*` refs as missing until a reload.
       if (args.ssid) window.dispatchEvent(new CustomEvent("secrets-saved"));
+      if (options.fullSetup) await this._applyFullSetup(configuration, options.fullSetup);
       this.navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
       this._createError = this._extractCreateErrorMessage(err, options.board ?? null);
     } finally {
       this._submitting = false;
+    }
+  }
+
+  /**
+   * Add the board's recommended components to a just-created device.
+   *
+   * Each featured member is merged with its board presets and persisted in
+   * turn (the backend applies the presets from an empty payload). Best-effort:
+   * a member the presets can't fill on their own is skipped so the device
+   * still opens; the user finishes it in the editor.
+   */
+  private async _applyFullSetup(
+    configuration: string,
+    board: BoardCatalogEntry
+  ): Promise<void> {
+    for (const localId of fullSetupComponentIds(board)) {
+      try {
+        await this._api.addComponent(configuration, {
+          component_id: buildFeaturedId(board.id, localId),
+        });
+      } catch (err) {
+        console.error(`Full setup: failed to add ${localId} to ${configuration}:`, err);
+      }
     }
   }
 

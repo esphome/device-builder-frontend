@@ -37,6 +37,7 @@ export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
     product_url: entry.product_url ?? "",
     featured: entry.featured ?? false,
     is_generic: entry.is_generic ?? false,
+    full_config: entry.full_config ?? false,
     featured_components: (entry.featured_components ?? []).map(_hydrateFeaturedComponent),
     featured_bundles: (entry.featured_bundles ?? []).map(_hydrateFeaturedBundle),
     requires_wifi: entry.requires_wifi ?? false,

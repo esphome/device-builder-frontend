@@ -9,9 +9,12 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl } from "../../util/board-image.js";
 import { EnterController } from "../../util/enter-controller.js";
+import { boardOffersFullSetup } from "../../util/full-setup.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../../util/secrets-cache.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
+
+import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
 
 @customElement("esphome-wizard-step-setup")
 export class ESPHomeWizardStepSetup extends LitElement {
@@ -45,6 +48,11 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   @state()
   private _deviceName = "";
+
+  // Pre-checked: a complete onboard device is almost always wanted whole, not
+  // assembled component by component. Only shown for full-config boards.
+  @state()
+  private _fullSetup = true;
 
   @state()
   private _wifiSsid = "";
@@ -167,6 +175,12 @@ export class ESPHomeWizardStepSetup extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--wa-space-xs);
+      }
+
+      .full-setup {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-2xs);
       }
 
       label {
@@ -310,6 +324,19 @@ export class ESPHomeWizardStepSetup extends LitElement {
             }}
           />
         </div>
+
+        ${boardOffersFullSetup(this.board)
+          ? html`<div class="full-setup">
+              <wa-checkbox
+                .checked=${this._fullSetup}
+                @change=${(e: Event) => {
+                  this._fullSetup = (e.target as HTMLInputElement).checked;
+                }}
+                >${this._localize("wizard.full_setup")}</wa-checkbox
+              >
+              <p class="section-subtitle">${this._localize("wizard.full_setup_desc")}</p>
+            </div>`
+          : null}
       </section>
     `;
   }
@@ -377,6 +404,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           name: this._deviceName,
           wifiSsid,
           wifiPassword,
+          fullSetup: boardOffersFullSetup(this.board) && this._fullSetup,
         },
         bubbles: true,
         composed: true,
