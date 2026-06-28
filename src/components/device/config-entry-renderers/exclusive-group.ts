@@ -46,7 +46,9 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
   const present = members.filter((m) => ctx.getAt([m.key]) !== undefined);
   const selectedKey = present[0]?.key ?? "";
   const selected = members.find((m) => m.key === selectedKey);
-  const disabled = ctx.disabled;
+  // Board-locked every option → the choice is fixed; render the dropdown
+  // read-only so it matches `planNeedsUserInput` treating it as non-actionable.
+  const disabled = ctx.disabled || members.every((m) => m.locked);
 
   // Gate options through isEntryVisible so a board-incompatible / hidden /
   // depends_on member can't be picked; keep an already-set one selectable.
