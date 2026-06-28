@@ -13,6 +13,8 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
 export class IntersectionController implements ReactiveController {
   private _observer: IntersectionObserver | null = null;
   private _target: Element | null = null;
+  private _root: Element | null = null;
+  private _rootMargin = "";
 
   constructor(
     host: ReactiveControllerHost,
@@ -34,11 +36,21 @@ export class IntersectionController implements ReactiveController {
   }
 
   observe(target: Element, root: Element | null, rootMargin = "0px"): void {
-    // Guard keys on ``target`` only; ``root`` / ``rootMargin`` are constant per
-    // call site, so a same-sentinel re-observe is a cheap no-op.
-    if (this._target === target && this._observer !== null) return;
+    // Re-observe only when the target or an observer option actually changes,
+    // so a same-config call from ``updated`` is a cheap no-op but a new
+    // ``root`` / ``rootMargin`` rebuilds the observer.
+    if (
+      this._observer !== null &&
+      this._target === target &&
+      this._root === root &&
+      this._rootMargin === rootMargin
+    ) {
+      return;
+    }
     this.disconnect();
     this._target = target;
+    this._root = root;
+    this._rootMargin = rootMargin;
     this._observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) this._onIntersect();
@@ -56,5 +68,7 @@ export class IntersectionController implements ReactiveController {
     this._observer?.disconnect();
     this._observer = null;
     this._target = null;
+    this._root = null;
+    this._rootMargin = "";
   }
 }

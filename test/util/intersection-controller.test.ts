@@ -72,6 +72,16 @@ describe("IntersectionController", () => {
     expect(MockObserver.instances[1].observed).toEqual([b]);
   });
 
+  it("re-observes the same target when root or rootMargin changes", () => {
+    const ctrl = new IntersectionController(new FakeHost(), vi.fn());
+    const a = el("a");
+    ctrl.observe(a, null, "0px");
+    ctrl.observe(a, null, "200px");
+    expect(MockObserver.instances).toHaveLength(2);
+    expect(MockObserver.instances[0].disconnected).toBe(true);
+    expect(MockObserver.instances[1].options).toMatchObject({ rootMargin: "200px" });
+  });
+
   it("observeIfPresent tears down when the target is missing", () => {
     const ctrl = new IntersectionController(new FakeHost(), vi.fn());
     ctrl.observe(el("a"), null);
