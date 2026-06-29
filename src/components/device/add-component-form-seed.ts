@@ -14,7 +14,7 @@ import {
 } from "../../util/default-component-id.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
-import { setIn } from "../../util/nested-values.js";
+import { getIn, setIn } from "../../util/nested-values.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
 export interface SeedContext {
@@ -34,33 +34,37 @@ export interface SeedContext {
 }
 
 /**
- * Walk the schema recursively to find the path of the first entry
- * with `references_component === domain`. Returns null if the
- * schema doesn't reference the domain — defensive against the
- * dialog passing a prefill that doesn't apply to this form.
+ * Walk the schema recursively for the path of the first
+ * `references_component === domain` entry that `seeded` has not already
+ * filled. Returns null when the schema references no such unfilled field —
+ * defensive against a prefill that doesn't apply, and so a chained prefill
+ * lands on a still-empty reference instead of overwriting a seeded one.
  */
 export function findReferencePath(
   entries: ConfigEntry[],
   domain: string,
-  prefix: string[]
+  prefix: string[],
+  seeded: Record<string, unknown> = {}
 ): string[] | null {
   for (const entry of entries) {
     if (entry.type === ConfigEntryType.NESTED) {
-      const found = findReferencePath(entry.config_entries ?? [], domain, [
-        ...prefix,
-        entry.key,
-      ]);
+      const found = findReferencePath(
+        entry.config_entries ?? [],
+        domain,
+        [...prefix, entry.key],
+        seeded
+      );
       if (found) return found;
       continue;
     }
     if (entry.references_component === domain) {
-      // Skip a field the featured preset already pinned (`from_preset` + a literal
-      // `default_value`): preset seeding fills it from the live candidates, so a
-      // chained bundle `_prefillReference` (the last sibling added) must not
-      // overwrite an earlier preset-pinned field. A non-preset ref (the dep
-      // detour) still matches, so its just-added dep id lands as before.
-      if (entry.from_preset && entry.default_value != null) continue;
-      return [...prefix, entry.key];
+      const path = [...prefix, entry.key];
+      // Skip a field seedDefaults already filled (from its preset or the sole
+      // candidate) so the chained prefill can't overwrite it; a reference
+      // seedDefaults left empty (a stale or ambiguous preset) still takes the
+      // prefill rather than being stranded.
+      if (getIn(seeded, path) !== undefined) continue;
+      return path;
     }
   }
   return null;
@@ -172,7 +176,10 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   // locked-validation would reject the empty payload. Plain catalog
   // defaults stay unseeded so the add matches the create-time auto-add.
   const seedPresets = isFeaturedId(component.id);
-  let next = seedDefaults(entries, yaml, localize, seedPresets);
+  // Snapshot what seeding owns so a later prefill skips exactly those refs
+  // (not every preset-flagged one), without treating a restored value as seeded.
+  const seededDefaults = seedDefaults(entries, yaml, localize, seedPresets);
+  let next = seededDefaults;
 
   const idEntry = entries.find((e) => e.key === "id" && e.type === ConfigEntryType.ID);
   if (idEntry && next["id"] === undefined) {
@@ -201,7 +208,12 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   }
 
   if (prefillReference) {
-    const targetPath = findReferencePath(entries, prefillReference.domain, []);
+    const targetPath = findReferencePath(
+      entries,
+      prefillReference.domain,
+      [],
+      seededDefaults
+    );
     if (targetPath) {
       next = setIn(next, targetPath, prefillReference.id);
     }

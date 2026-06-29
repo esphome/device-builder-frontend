@@ -101,36 +101,28 @@ describe("findReferencePath", () => {
     expect(findReferencePath(entries, "spi", [])).toBeNull();
   });
 
-  it("skips a preset-pinned reference but targets a non-pinned one", () => {
+  it("skips a reference seeding already filled but targets an unfilled one", () => {
     const entries: ConfigEntry[] = [
-      makeConfigEntry({
-        key: "blue",
-        references_component: "output",
-        from_preset: true,
-        default_value: "output_blue",
-      }),
+      makeConfigEntry({ key: "blue", references_component: "output" }),
       makeConfigEntry({ key: "warm", references_component: "output" }),
     ];
-    expect(findReferencePath(entries, "output", [])).toEqual(["warm"]);
+    expect(findReferencePath(entries, "output", [], { blue: "output_blue" })).toEqual([
+      "warm",
+    ]);
   });
 
-  it("returns null when the only match is preset-pinned", () => {
+  it("returns null when seeding already filled the only matching reference", () => {
     const entries: ConfigEntry[] = [
-      makeConfigEntry({
-        key: "blue",
-        references_component: "output",
-        from_preset: true,
-        default_value: "output_blue",
-      }),
+      makeConfigEntry({ key: "blue", references_component: "output" }),
     ];
-    expect(findReferencePath(entries, "output", [])).toBeNull();
+    expect(findReferencePath(entries, "output", [], { blue: "output_blue" })).toBeNull();
   });
 
-  it("still targets a from_preset reference whose default_value is null", () => {
+  it("targets a reference seeding left empty so a chained prefill isn't stranded", () => {
     const entries: ConfigEntry[] = [
-      makeConfigEntry({ key: "i2c_id", references_component: "i2c", from_preset: true }),
+      makeConfigEntry({ key: "blue", references_component: "output" }),
     ];
-    expect(findReferencePath(entries, "i2c", [])).toEqual(["i2c_id"]);
+    expect(findReferencePath(entries, "output", [], {})).toEqual(["blue"]);
   });
 });
 
@@ -459,6 +451,38 @@ describe("buildInitialValues", () => {
     });
     expect(values.blue).toBe("output_blue");
     expect(values.warm).toBe("output_warm");
+  });
+
+  it("applies a chained prefillReference to a from_preset ref that seeding left empty", () => {
+    // Stale preset id among several same-domain candidates: seedDefaults can't
+    // fill blue, so the just-added dep must still land there, not be stranded.
+    const component = makeComponent({
+      id: "featured.bd.thing",
+      config_entries: [
+        makeConfigEntry({
+          key: "blue",
+          type: ConfigEntryType.ID,
+          required: true,
+          references_component: "output",
+          from_preset: true,
+          default_value: "output_stale",
+        }),
+      ],
+    });
+    const yaml =
+      "output:\n  - platform: ledc\n    id: output_a\n" +
+      "  - platform: ledc\n    id: output_b\n";
+    const values = buildInitialValues({
+      entries: component.config_entries,
+      component,
+      board: null,
+      yaml,
+      prefillReference: { domain: "output", id: "output_a" },
+      prefillFields: null,
+      restoredValues: null,
+      localize,
+    });
+    expect(values.blue).toBe("output_a");
   });
 
   it("seeds pin entries from the board manifest between id-gen and prefill", () => {
