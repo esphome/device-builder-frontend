@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import toast from "sonner-js";
 import { apiErrorDetails } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
@@ -572,6 +573,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     configuration: string,
     board: BoardCatalogEntry
   ): Promise<void> {
+    let skipped = 0;
     for (const localId of fullSetupComponentIds(board)) {
       try {
         await this._api.addComponent(configuration, {
@@ -579,7 +581,15 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         });
       } catch (err) {
         console.error(`Full setup: failed to add ${localId} to ${configuration}:`, err);
+        skipped += 1;
       }
+    }
+    // A partially-applied device would otherwise look complete; tell the user
+    // some recommended components need finishing in the editor.
+    if (skipped > 0) {
+      toast.warning(this._localize("wizard.full_setup_partial", { count: skipped }), {
+        richColors: true,
+      });
     }
   }
 

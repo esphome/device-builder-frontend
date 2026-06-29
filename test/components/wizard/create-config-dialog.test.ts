@@ -17,6 +17,11 @@ vi.mock("../../../src/components/wizard/wizard-step-method.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-overwrite-device.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-resolve-conflicts.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-setup.js", () => ({}));
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
+
+import toast from "sonner-js";
 
 import { APIError } from "../../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
@@ -219,6 +224,40 @@ describe("create-config-dialog create de-dupe + retry", () => {
       "featured.esp32_relay_x4.relay_1",
       "featured.esp32_relay_x4.relay_2",
     ]);
+  });
+
+  it("warns when a full-setup member can't be added so a partial device isn't silent", async () => {
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "relays.yaml" });
+    // Second member fails to add; the first succeeds.
+    const addComponent = vi
+      .fn()
+      .mockResolvedValueOnce({ yaml: "merged" })
+      .mockRejectedValueOnce(new Error("boom"));
+    const el = await mount({ createDevice, addComponent });
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("finish-setup", {
+        detail: {
+          board: {
+            id: "esp32_relay_x4",
+            full_config: true,
+            featured_components: [{ id: "relay_1" }, { id: "relay_2" }],
+            featured_bundles: [
+              { id: "all_recommended", name: "x", component_ids: ["relay_1", "relay_2"] },
+            ],
+          },
+          name: "Relays",
+          wifiSsid: "",
+          wifiPassword: "",
+          fullSetup: true,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await flush();
+
+    expect(addComponent).toHaveBeenCalledTimes(2);
+    expect(toast.warning).toHaveBeenCalledTimes(1);
   });
 
   it("skips the full setup when the checkbox is off", async () => {

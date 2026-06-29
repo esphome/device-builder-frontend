@@ -330,7 +330,9 @@ export class ESPHomeWizardStepSetup extends LitElement {
               <wa-checkbox
                 .checked=${this._fullSetup}
                 @change=${(e: Event) => {
-                  this._fullSetup = (e.target as HTMLInputElement).checked;
+                  this._fullSetup = (
+                    e.currentTarget as HTMLElement & { checked: boolean }
+                  ).checked;
                 }}
                 >${this._localize("wizard.full_setup")}</wa-checkbox
               >
