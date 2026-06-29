@@ -50,6 +50,31 @@ describe("boardOffersFullSetup", () => {
     ).toBe(true);
   });
 
+  it("covers a single featured component (no over-broad >=2 guard)", () => {
+    expect(
+      boardOffersFullSetup(
+        board({
+          full_config: true,
+          featured_components: components(["only"]),
+          featured_bundles: [
+            { id: "setup", name: "x", component_ids: ["only"] },
+          ] as never,
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("is false when the featured set is empty (no vacuous bundle match)", () => {
+    expect(
+      boardOffersFullSetup(
+        board({
+          full_config: true,
+          featured_bundles: [{ id: "stray", name: "x", component_ids: ["a"] }] as never,
+        })
+      )
+    ).toBe(false);
+  });
+
   it("is false when no bundle covers the full featured set", () => {
     // A partial bundle that misses a featured component → no blind apply.
     expect(

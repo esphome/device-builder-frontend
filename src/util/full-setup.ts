@@ -17,7 +17,9 @@ function fullSetupBundle(board: BoardCatalogEntry): FeaturedBundle | null {
   );
   if (synthesized) return synthesized;
   const featuredIds = board.featured_components.map((c) => c.id);
-  if (featuredIds.length < 2) return null;
+  // every() is vacuously true on an empty set; without this a board with no
+  // featured components would match an arbitrary bundle.
+  if (featuredIds.length === 0) return null;
   return (
     board.featured_bundles.find((b) => {
       const members = new Set(b.component_ids);
