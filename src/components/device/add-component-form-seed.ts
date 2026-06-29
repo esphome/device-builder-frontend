@@ -67,22 +67,6 @@ export function findReferencePath(
 }
 
 /**
- * Seed an unlocked id-reference field with the matching component already in
- * the config, so a stale featured preset can't write an id that doesn't
- * exist. Ambiguous cases — none, several, or a `packages:`/`<<:` merge that
- * could hide one — stay unset, deferring to the dep detour or the picker.
- */
-export function seedReference(yaml: string, domain: string): string | undefined {
-  // Resolve against same-domain candidates only (i2c/spi/uart buses); the
-  // picker also folds in async interface providers. A cross-domain ref finds
-  // nothing here and defers to the picker; for a domain that is both a block
-  // and a provided interface, seeding may fill a value the picker would call
-  // ambiguous — harmless, since it's a real id the user can still change.
-  const candidates = findReferenceCandidates(yaml, domain, []);
-  return resolveSoleCandidate(candidates, yaml)?.id;
-}
-
-/**
  * Seed initial form values. By default only required fields' defaults
  * are pre-filled — pre-filling optional fields the user can't see
  * would just bloat the payload with values they never explicitly

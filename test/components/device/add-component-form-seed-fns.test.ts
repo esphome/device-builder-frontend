@@ -14,7 +14,6 @@ import {
   buildInitialValues,
   findReferencePath,
   seedDefaults,
-  seedReference,
 } from "../../../src/components/device/add-component-form-seed.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
@@ -488,26 +487,5 @@ describe("buildInitialValues", () => {
     // "SCL"/"SDA" catalog defaults that don't resolve on the C3.
     expect(values.scl).toBe(9);
     expect(values.sda).toBe(8);
-  });
-});
-
-describe("seedReference", () => {
-  it("resolves a sole same-domain candidate to its id", () => {
-    const yaml = "i2c:\n  - id: bus_a\n";
-    expect(seedReference(yaml, "i2c")).toBe("bus_a");
-  });
-
-  it("defers to undefined when several candidates are ambiguous", () => {
-    const yaml = "i2c:\n  - id: bus_a\n  - id: bus_b\n";
-    expect(seedReference(yaml, "i2c")).toBeUndefined();
-  });
-
-  it("returns undefined when no candidate matches the domain", () => {
-    expect(seedReference("i2c:\n  - id: bus_a\n", "spi")).toBeUndefined();
-  });
-
-  it("defers to undefined when a packages: merge could hide a candidate", () => {
-    const yaml = "packages:\n  base: !include base.yaml\ni2c:\n  - id: bus_a\n";
-    expect(seedReference(yaml, "i2c")).toBeUndefined();
   });
 });
