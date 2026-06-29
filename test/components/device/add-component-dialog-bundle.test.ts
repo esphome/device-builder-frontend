@@ -220,4 +220,31 @@ describe("add-component-dialog one-shot bundle", () => {
     // Member b opens at step 2 of 3, not step 1 of 2.
     expect(d._bundleProgress).toEqual({ current: 2, total: 3, bundleName: "Full setup" });
   });
+
+  it("surfaces the message and keeps partial progress when a member fails to hydrate", async () => {
+    const { dialog, d, addComponent, getComponentBodies } = makeDialog();
+    // b is absent from the bodies, so its hydrate resolves to an error.
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    const startSequence = vi.fn();
+    d._startFeaturedSequence = startSequence;
+    addComponent.mockResolvedValueOnce({ yaml: "Y1" });
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+    const drafts: string[] = [];
+    dialog.addEventListener("yaml-draft", (e) => {
+      drafts.push((e as CustomEvent).detail.yaml);
+    });
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // a merged to Y1 and is published; b's error is surfaced directly, with no
+    // redundant re-fetch through the interactive hand-off.
+    expect(addComponent).toHaveBeenCalledTimes(1);
+    expect(drafts).toEqual(["Y1"]);
+    expect(startSequence).not.toHaveBeenCalled();
+    expect((d as unknown as { _submitError: string })._submitError).not.toBe("");
+  });
 });

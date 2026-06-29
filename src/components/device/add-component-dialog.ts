@@ -582,7 +582,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
           return;
         }
         if (result.kind === "error") {
-          await handOff(i);
+          // A body fetch failed; routing through hand-off would only re-fetch
+          // the same member and drop this message. Surface it directly and keep
+          // what merged so far.
+          if (addedAny) this._dispatchDraft(this.yaml);
+          this._submitError = result.message;
           return;
         }
         const entry = result.entry;
