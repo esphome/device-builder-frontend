@@ -15,6 +15,8 @@ vi.mock("../../../src/components/device/add-component-form.js", () => ({}));
 vi.mock("../../../src/components/device/component-catalog.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
+import toast from "sonner-js";
+
 import { ComponentCategory } from "../../../src/api/types/components.js";
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
@@ -117,6 +119,25 @@ describe("add-component-dialog one-shot bundle", () => {
       fields: { id: "new_b" },
     });
     expect(d._open).toBe(false);
+  });
+
+  it("shows 'already set up' instead of 'Added' when every member is present", async () => {
+    const { d, addComponent, getComponentBodies, dialog } = makeDialog();
+    dialog.yaml = "switch:\n  - platform: gpio\n    id: present_a\n";
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "present_a" });
+
+    await d._onBundleSelected(bundleEvent(["a"]));
+
+    // Nothing was added, so the toast must not claim "Added".
+    expect(addComponent).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith("device.bundle_already_present", {
+      richColors: true,
+    });
   });
 
   it("hands off to the interactive sequence when a member needs the form", async () => {

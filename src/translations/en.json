@@ -642,6 +642,7 @@
     "featured_bundle_badge": "Bundle",
     "field_locked_by_board": "Set by the board",
     "bundle_added": "Added {name}",
+    "bundle_already_present": "{name} is already set up",
     "bundle_step_progress": "Step {current} of {total} — Adding {name}",
     "adding_prerequisites_for": "prerequisites for {name}",
     "prereq_unresolved": "Can't add {name}: required prerequisites missing from the board catalog: {ids}",

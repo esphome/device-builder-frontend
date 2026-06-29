@@ -633,9 +633,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._open = false;
       this._selected = null;
       this._resetDetourState();
-      toast.success(this._localize("device.bundle_added", { name: bundle.name }), {
-        richColors: true,
-      });
+      // Every member already present is a no-op; don't claim we "Added" it.
+      const message = addedAny
+        ? this._localize("device.bundle_added", { name: bundle.name })
+        : this._localize("device.bundle_already_present", { name: bundle.name });
+      toast.success(message, { richColors: true });
     } catch (err) {
       // A member failed mid-batch: publish what merged so far so the host keeps
       // the already-added members (the draft is otherwise only published on the
