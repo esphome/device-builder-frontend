@@ -136,8 +136,13 @@ export function seedDefaults(
       continue;
     }
     if (entry.default_value != null) {
+      // A multi_value default can already be a list (octal SPI `data_pins`,
+      // `[6, 7, 15, ...]`); spread it element-wise so each value seeds its own
+      // row with its original type. Only wrap a scalar default into a list.
       out[entry.key] = entry.multi_value
-        ? [String(entry.default_value)]
+        ? Array.isArray(entry.default_value)
+          ? [...entry.default_value]
+          : [String(entry.default_value)]
         : entry.default_value;
     } else if (entry.multi_value && entry.required) {
       out[entry.key] = [];

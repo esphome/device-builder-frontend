@@ -577,6 +577,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         bundleName: bundle.name,
       };
     };
+    // Snapshot the ids already in the device once, then extend it as members
+    // are added — so the per-member presence check stays O(1) instead of
+    // re-scanning the whole YAML each step on a large config.
+    const existingIds = collectExistingIds(this.yaml);
     try {
       for (let i = 0; i < fullIds.length; i++) {
         const result = await hydrateForSelection(
@@ -606,6 +610,20 @@ export class ESPHomeAddComponentDialog extends LitElement {
           await handOff(i);
           return;
         }
+        // Skip a member already in the device: a bundle re-applied after a
+        // partial prior run (or with members overlapping existing config) must
+        // not append a duplicate block. The preset id identifies the member in
+        // the running YAML; still chain it so a later member's reference field
+        // resolves to it. This guards the fast path only; a present member that
+        // needs form input (``_fastPathFields`` null, handed off above) can
+        // still be re-added — a rarer path, scoped out alongside the
+        // create-wizard ``_applyFullSetup`` follow-up and backstopped by
+        // ESPHome's global id uniqueness.
+        const memberId = fields["id"];
+        if (typeof memberId === "string" && existingIds.has(memberId)) {
+          lastAdded = this._chainReference(entry, fields);
+          continue;
+        }
         const { yaml } = await this._api.addComponent(
           this.configuration,
           { component_id: fullIds[i], fields },
@@ -613,6 +631,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         );
         draft = yaml;
         addedAny = true;
+        if (typeof memberId === "string") existingIds.add(memberId);
         // Keep `this.yaml` current so the next member's dep check + reference
         // dropdown see what this batch already added; the host draft is
         // published once at the end rather than churning the editor per member.
@@ -623,9 +642,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._open = false;
       this._selected = null;
       this._resetDetourState();
-      toast.success(this._localize("device.bundle_added", { name: bundle.name }), {
-        richColors: true,
-      });
+      // Every member already present is a no-op; don't claim we "Added" it.
+      const message = addedAny
+        ? this._localize("device.bundle_added", { name: bundle.name })
+        : this._localize("device.bundle_already_present", { name: bundle.name });
+      toast.success(message, { richColors: true });
     } catch (err) {
       // A member failed mid-batch: publish what merged so far so the host keeps
       // the already-added members (the draft is otherwise only published on the

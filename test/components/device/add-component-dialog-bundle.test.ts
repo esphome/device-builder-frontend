@@ -15,6 +15,8 @@ vi.mock("../../../src/components/device/add-component-form.js", () => ({}));
 vi.mock("../../../src/components/device/component-catalog.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
+import toast from "sonner-js";
+
 import { ComponentCategory } from "../../../src/api/types/components.js";
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
@@ -70,7 +72,10 @@ describe("add-component-dialog one-shot bundle", () => {
     addComponent
       .mockResolvedValueOnce({ yaml: "Y1" })
       .mockResolvedValueOnce({ yaml: "Y2" });
-    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+    // Distinct member ids — two bundle members never share one in practice.
+    d._fastPathFields = vi.fn().mockImplementation((entry: { id: string }) => ({
+      id: entry.id === "featured.bd.a" ? "xa" : "xb",
+    }));
 
     await d._onBundleSelected(bundleEvent(["a", "b"]));
 
@@ -79,15 +84,63 @@ describe("add-component-dialog one-shot bundle", () => {
     // the first — one accumulating chain, not two independent merges.
     expect(addComponent.mock.calls[0]).toEqual([
       "foo.yaml",
-      { component_id: "featured.bd.a", fields: { id: "x" } },
+      { component_id: "featured.bd.a", fields: { id: "xa" } },
       "esphome:\n  name: foo\n",
     ]);
     expect(addComponent.mock.calls[1]).toEqual([
       "foo.yaml",
-      { component_id: "featured.bd.b", fields: { id: "x" } },
+      { component_id: "featured.bd.b", fields: { id: "xb" } },
       "Y1",
     ]);
     expect(d._open).toBe(false);
+  });
+
+  it("skips a member already present in the device instead of re-adding it", async () => {
+    const { d, addComponent, getComponentBodies, dialog } = makeDialog();
+    // The device already has member "a" (id `present_a`); re-applying the
+    // bundle must not append it again.
+    dialog.yaml = "switch:\n  - platform: gpio\n    id: present_a\n";
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    addComponent.mockResolvedValue({ yaml: "Y_AFTER_B" });
+    d._fastPathFields = vi.fn().mockImplementation((entry: { id: string }) => ({
+      id: entry.id === "featured.bd.a" ? "present_a" : "new_b",
+    }));
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // Only the absent member "b" is added; "a" is skipped, not duplicated.
+    expect(addComponent).toHaveBeenCalledTimes(1);
+    expect(addComponent.mock.calls[0][1]).toEqual({
+      component_id: "featured.bd.b",
+      fields: { id: "new_b" },
+    });
+    expect(d._open).toBe(false);
+  });
+
+  it("shows 'already set up' instead of 'Added' when every member is present", async () => {
+    const { d, addComponent, getComponentBodies, dialog } = makeDialog();
+    dialog.yaml = "switch:\n  - platform: gpio\n    id: present_a\n";
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "present_a" });
+
+    await d._onBundleSelected(bundleEvent(["a"]));
+
+    // Nothing was added, so the toast must not claim "Added".
+    expect(addComponent).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith("device.bundle_already_present", {
+      richColors: true,
+    });
   });
 
   it("hands off to the interactive sequence when a member needs the form", async () => {
