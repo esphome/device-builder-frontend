@@ -4,11 +4,13 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl } from "../../util/board-image.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderLoadMoreFooter } from "../shared/load-more-footer.js";
 
 import { wizardStepBoardStyles } from "./wizard-step-board.styles.js";
 
@@ -67,7 +69,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
     regular: boards.filter((b) => !b.featured),
   }));
 
-  static styles = [espHomeStyles, wizardStepBoardStyles];
+  static styles = [espHomeStyles, wizardStepBoardStyles, loadMoreFooterStyles];
 
   protected render() {
     const { featured, regular } = this._splitBoards(this.boards);
@@ -98,28 +100,19 @@ export class ESPHomeWizardStepBoardList extends LitElement {
                       </div>
                     `
                   : nothing}
-                ${this._renderLoadMoreFooter()}
+                ${renderLoadMoreFooter({
+                  loadingMore: this.loadingMore,
+                  error: this.error,
+                  hasMore: this.hasMore,
+                  localize: this.localize,
+                  loadingLabelKey: "wizard.loading_boards",
+                  errorLabelKey: "wizard.boards_load_more_error",
+                  onRetry: this._onRetry,
+                  loadingClass: "loading",
+                })}
               `}
       </div>
     `;
-  }
-
-  // Footer below the grid: a spinner while a page loads, a retry affordance if
-  // the last loadMore failed (rendered instead of the sentinel so the observer
-  // tears down and can't silently re-fire), else the infinite-scroll sentinel.
-  private _renderLoadMoreFooter() {
-    if (this.loadingMore) {
-      return html`<p class="loading">${this.localize("wizard.loading_boards")}</p>`;
-    }
-    if (this.error) {
-      return html`<div class="load-more-error" role="alert">
-        <span>${this.localize("wizard.boards_load_more_error")}</span>
-        <button class="retry-link" type="button" @click=${this._onRetry}>
-          ${this.localize("command.retry")}
-        </button>
-      </div>`;
-    }
-    return this.hasMore ? html`<div class="sentinel"></div>` : nothing;
   }
 
   protected updated() {

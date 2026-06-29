@@ -43,6 +43,12 @@ export class PagedListController<T> implements ReactiveController {
     return this.items.length < this.total;
   }
 
+  /** Whether the last fetch failed; ``error`` is typed ``unknown`` and may be
+   *  a falsy value, so consumers should test this rather than ``error``. */
+  get hasError(): boolean {
+    return this.error !== null;
+  }
+
   hostDisconnected(): void {
     // Drop any in-flight page so a late resolve can't touch a dead host; the
     // bumped cycle stops the pending fetch's ``finally`` from clearing the

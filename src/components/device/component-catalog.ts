@@ -16,11 +16,13 @@ import { ComponentCategory } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
+import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderLoadMoreFooter } from "../shared/load-more-footer.js";
 import {
   ambiguousNameIds,
   availableFeaturedCount,
@@ -189,7 +191,12 @@ export class ESPHomeComponentCatalog extends LitElement {
     });
   }
 
-  static styles = [espHomeStyles, inputStyles, componentCatalogStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    componentCatalogStyles,
+    loadMoreFooterStyles,
+  ];
 
   protected updated() {
     // The sidebar badge / auto-select read availableFeaturedCount over the
@@ -307,35 +314,25 @@ export class ESPHomeComponentCatalog extends LitElement {
                   `
                 : html`<p class="empty">
                     ${this._localize(
-                      this._list.error !== null
+                      this._list.hasError
                         ? "device.components_load_error"
                         : "device.no_components_found"
                     )}
                   </p>`}
           </div>
-          ${this._renderLoadMoreFooter()}
+          ${renderLoadMoreFooter({
+            loadingMore: this._list.loadingMore,
+            error: this._list.hasError && this._list.items.length > 0,
+            hasMore: this._list.hasMore,
+            localize: this._localize,
+            loadingLabelKey: "device.loading_components",
+            errorLabelKey: "device.components_load_more_error",
+            onRetry: () => this._list.loadMore(),
+            loadingClass: "empty",
+          })}
         </div>
       </div>
     `;
-  }
-
-  // Footer below the grid: a spinner while a page loads, a retry affordance if
-  // the last loadMore failed with results already shown (rendered instead of
-  // the sentinel so the observer tears down and can't silently re-fire), else
-  // the infinite-scroll sentinel.
-  private _renderLoadMoreFooter() {
-    if (this._list.loadingMore) {
-      return html`<p class="empty">${this._localize("device.loading_components")}</p>`;
-    }
-    if (this._list.error !== null && this._list.items.length > 0) {
-      return html`<div class="load-more-error" role="alert">
-        <span>${this._localize("device.components_load_more_error")}</span>
-        <button class="retry-link" type="button" @click=${() => this._list.loadMore()}>
-          ${this._localize("command.retry")}
-        </button>
-      </div>`;
-    }
-    return this._list.hasMore ? html`<div class="sentinel"></div>` : nothing;
   }
 
   _onToggleExpand(component: ComponentCatalogEntry) {
