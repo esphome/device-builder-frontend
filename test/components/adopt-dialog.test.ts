@@ -91,12 +91,13 @@ describe("adopt-dialog wifi step (#1742)", () => {
     window.addEventListener("secrets-saved", savedListener);
     priv.open(wifiDevice());
     await vi.waitFor(() => expect(priv._collectWifi).toBe(true));
-    priv._ssid = "  MyHomeWifi  ";
+    // Whitespace in an SSID is significant; the raw value is stored verbatim.
+    priv._ssid = " My Home Wifi ";
     priv._password = "hunter2hunter";
 
     await priv._submit();
 
-    expect(setWifiCredentials).toHaveBeenCalledWith("MyHomeWifi", "hunter2hunter");
+    expect(setWifiCredentials).toHaveBeenCalledWith(" My Home Wifi ", "hunter2hunter");
     expect(setWifiCredentials.mock.invocationCallOrder[0]).toBeLessThan(
       importDevice.mock.invocationCallOrder[0]
     );

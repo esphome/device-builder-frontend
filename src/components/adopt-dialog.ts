@@ -486,10 +486,13 @@ export class ESPHomeAdoptDialog extends LitElement {
       // Persist the shared Wi-Fi secret first so the imported config's
       // ``!secret wifi_ssid`` resolves; a failure here surfaces in the same
       // catch and leaves the dialog open. ``secrets-saved`` refreshes the
-      // editor's secret pickers and the kebab wording.
+      // editor's secret pickers and the kebab wording. Store the raw SSID
+      // (whitespace is significant); the trim is only the non-empty gate.
       if (this._collectWifi) {
-        await this._api.setWifiCredentials(this._ssid.trim(), this._password);
-        window.dispatchEvent(new CustomEvent("secrets-saved"));
+        await this._api.setWifiCredentials(this._ssid, this._password);
+        window.dispatchEvent(
+          new CustomEvent("secrets-saved", { detail: { source: this } })
+        );
       }
       // ``encryption`` is sent only when the user opted in. Backend
       // signature is ``encryption: str | None = None``; omitting it
