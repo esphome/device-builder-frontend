@@ -23,6 +23,13 @@ import { tags as t } from "@lezer/highlight";
 export const EDITOR_FONT_FAMILY = '"JetBrains Mono", "Fira Code", monospace';
 export const EDITOR_FONT_SIZE = "13px";
 
+/** Left inset of the line-number gutter. Zero so the gutter column sits flush
+ *  with the pane's own padding (the numbers don't read as extra left padding
+ *  beyond the matching right inset). Shared so the sticky-scroll overlay's
+ *  first-paint fallback (``yaml-sticky-theme.ts``) matches the editor before
+ *  the runtime measurement kicks in. */
+export const EDITOR_GUTTER_PADDING_LEFT = "0";
+
 /** Editor background per mode — shared so the sticky-scroll overlay
  *  paints the same colour as the editor it floats over. */
 export const EDITOR_BG_DARK = "#1e1e1e";
