@@ -131,4 +131,82 @@ describe("adopt-dialog wifi step (#1742)", () => {
     expect(setWifiCredentials).not.toHaveBeenCalled();
     expect(importDevice).toHaveBeenCalledTimes(1);
   });
+
+  it("blocks submit while the secret probe is still in flight", async () => {
+    // The probe never resolves, so _hasWifiSecrets stays undefined.
+    let release: (keys: string[]) => void = () => {};
+    const getSecretKeys = vi.fn(
+      () => new Promise<string[]>((resolve) => (release = resolve))
+    );
+    const setWifiCredentials = vi.fn(async () => {});
+    const importDevice = vi.fn(async () => ({ configuration: "foo-1234.yaml" }));
+    const priv = new ESPHomeAdoptDialog() as Priv;
+    priv._api = { getSecretKeys, setWifiCredentials, importDevice };
+    priv.open(wifiDevice());
+
+    // A fast Enter (calls _submit directly) before the probe resolves must
+    // neither store a half-known secret nor import an unresolved !secret.
+    expect(priv._wifiBlocking).toBe(true);
+    await priv._submit();
+    expect(setWifiCredentials).not.toHaveBeenCalled();
+    expect(importDevice).not.toHaveBeenCalled();
+    release([]); // let the dangling promise settle
+  });
+
+  it("blocks submit when the password is too short", async () => {
+    const { priv, setWifiCredentials, importDevice } = makeDialog([]);
+    priv.open(wifiDevice());
+    await vi.waitFor(() => expect(priv._collectWifi).toBe(true));
+    priv._ssid = "My Home Wifi";
+    priv._password = "short"; // 1–7 chars trips isWifiPasswordTooShort
+
+    expect(priv._wifiBlocking).toBe(true);
+    await priv._submit();
+
+    expect(setWifiCredentials).not.toHaveBeenCalled();
+    expect(importDevice).not.toHaveBeenCalled();
+  });
+
+  it("allows an open network (empty password) and stores it verbatim", async () => {
+    const { priv, setWifiCredentials, importDevice } = makeDialog([]);
+    priv.open(wifiDevice());
+    await vi.waitFor(() => expect(priv._collectWifi).toBe(true));
+    priv._ssid = "OpenNet";
+    priv._password = ""; // empty is not "too short" — open network
+
+    expect(priv._wifiBlocking).toBe(false);
+    await priv._submit();
+
+    expect(setWifiCredentials).toHaveBeenCalledWith("OpenNet", "");
+    expect(importDevice).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the dialog open and skips import when storing the secret fails", async () => {
+    const { priv, importDevice } = makeDialog([]);
+    priv._api.setWifiCredentials = vi.fn(async () => {
+      throw new Error("disk full");
+    });
+    priv.open(wifiDevice());
+    await vi.waitFor(() => expect(priv._collectWifi).toBe(true));
+    priv._ssid = "My Home Wifi";
+    priv._password = "hunter2hunter";
+
+    await priv._submit();
+
+    // The store threw, so import never ran and the dialog stays open with
+    // the error surfaced and the button live again.
+    expect(importDevice).not.toHaveBeenCalled();
+    expect(priv._error).toBe("disk full");
+    expect(priv._busy).toBe(false);
+    expect(priv._open).toBe(true);
+  });
+
+  it("does not collect wifi when the device advertised no network", async () => {
+    const { priv, getSecretKeys } = makeDialog([]);
+    priv.open({ ...DEVICE, network: "" } as unknown as AdoptableDevice);
+
+    expect(getSecretKeys).not.toHaveBeenCalled();
+    expect(priv._collectWifi).toBe(false);
+    expect(priv._wifiBlocking).toBe(false);
+  });
 });
