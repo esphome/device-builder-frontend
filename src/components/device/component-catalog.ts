@@ -163,20 +163,25 @@ export class ESPHomeComponentCatalog extends LitElement {
       platform: this.platform || undefined,
       board_id: this.boardId || undefined,
     };
+    // Snapshot _provides once for this cycle: a debounced search clears
+    // _provides immediately but defers its reset, so a loadMore firing in that
+    // window must not flip this cycle's later pages from provides-paging to
+    // query-paging. The offset=0 fallback updates the snapshot so the rest of
+    // the cycle stays consistent.
+    let provides = this._provides;
     this._list.reset(async (offset, limit) => {
       // Interface probe first; a homeless interface (voltage_sampler) has no
       // matching id/name, so an empty first page means it was a plain domain
       // and we retry as a search (an i2c dependency still resolves). Clear
-      // ``_provides`` on that empty branch so the next page (and later fetches)
-      // go straight to search instead of re-probing. The probe/retry and the
-      // category snapshot only matter on page 0; later pages reuse the
-      // resolved ``_provides``.
-      const provides = this._provides;
+      // ``_provides`` on that empty branch so later fetches go straight to
+      // search instead of re-probing. The probe/retry and the category
+      // snapshot only matter on page 0; later pages reuse the resolved value.
       let response = provides
         ? await this._api.getComponents({ ...base, offset, limit, provides })
         : await this._api.getComponents({ ...base, offset, limit, query });
       if (offset === 0 && provides && response.components.length === 0) {
         this._provides = "";
+        provides = "";
         response = await this._api.getComponents({ ...base, offset, limit, query });
       }
       if (offset === 0) this._categories = response.categories;
