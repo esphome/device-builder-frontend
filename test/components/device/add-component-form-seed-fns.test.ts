@@ -230,6 +230,25 @@ describe("seedDefaults", () => {
     expect(seedDefaults(entries, "", localize)).toEqual({ tags: ["a"] });
   });
 
+  it("spreads a multi_value list default element-wise (octal SPI data_pins)", () => {
+    const entries: ConfigEntry[] = [
+      makeConfigEntry({
+        key: "data_pins",
+        type: ConfigEntryType.PIN,
+        required: true,
+        multi_value: true,
+        locked: true,
+        from_preset: true,
+        default_value: [6, 7, 15, 16, 10, 9, 46, 3],
+      }),
+    ];
+    // Each pin seeds its own row, ints preserved — not joined into one
+    // "6,7,15,..." string in a single-element array.
+    expect(seedDefaults(entries, "", localize, true)).toEqual({
+      data_pins: [6, 7, 15, 16, 10, 9, 46, 3],
+    });
+  });
+
   it("emits an empty array for a required multi_value with no default", () => {
     const entries: ConfigEntry[] = [
       makeConfigEntry({
