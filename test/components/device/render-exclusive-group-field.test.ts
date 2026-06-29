@@ -81,6 +81,39 @@ describe("renderExclusiveGroupField", () => {
     expect(emitChange).toHaveBeenCalledWith(["jvc"], {}); // chosen → scaffolded
   });
 
+  it("disables the dropdown when every member is board-locked", () => {
+    const ctx = makeRenderCtx({ raw: { code: "x" } });
+    const locked = members().map((m) => ({ ...m, locked: true }));
+    const tpl = renderExclusiveGroupField(locked, ctx);
+    expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(true);
+  });
+
+  it("keeps the dropdown enabled when a member is still unlocked", () => {
+    const ctx = makeRenderCtx({ raw: { code: "x" } });
+    const [a, b] = members();
+    const tpl = renderExclusiveGroupField([{ ...a, locked: true }, b], ctx);
+    expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(false);
+  });
+
+  it("disables when every visible option is locked, ignoring a hidden unlocked member", () => {
+    // The unlocked member is platform-incompatible (hidden), so it isn't a
+    // selectable option; the dropdown should still be read-only.
+    const ms = [
+      makeEntry(ConfigEntryType.NESTED, {
+        key: "raw",
+        exclusive_group: "g",
+        locked: true,
+      }),
+      makeEntry(ConfigEntryType.NESTED, {
+        key: "esp8266only",
+        exclusive_group: "g",
+        supported_platforms: ["esp8266"],
+      }),
+    ];
+    const tpl = renderExclusiveGroupField(ms, makeRenderCtx({}));
+    expect(findElementBindings(tpl, "wa-select")[0]["?disabled"]).toBe(true);
+  });
+
   it("preserves an existing member's values when switching to it", () => {
     // Conflict case (both set): picking the one to keep must clear only the
     // others, never overwrite the chosen member's config with {}.

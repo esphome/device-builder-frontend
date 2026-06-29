@@ -93,8 +93,8 @@ export const deviceEditorStyles = css`
 
   .editor-floating-actions {
     position: absolute;
-    bottom: var(--wa-space-m);
-    right: var(--wa-space-m);
+    bottom: var(--wa-space-xs);
+    right: var(--wa-space-xs);
     z-index: 10;
     display: inline-flex;
     align-items: center;
@@ -349,21 +349,23 @@ export const deviceEditorStyles = css`
     overflow-y: auto;
   }
 
-  /* The floating Install / Validate / Save row overlays the
-     bottom-right of the card body. Reserve room below the
-     content so the last lines sit a header-matching
-     var(--wa-space-m) above the buttons (button bottom inset +
-     button height + the same top-of-pane gap the editor already
-     has via .editor-pane's padding).
-     Applied to:
-     - .editor-pane--right always (the row sits over its bottom-right
-       in both-pane + right-only layouts).
-     - .editor-layout--left .editor-pane--left (board-info-only
-       layout, where the right pane is hidden and the buttons now
-       overlap the full-width left pane). */
+  /* The floating Install / Validate / Save row overlays the bottom-right and
+     must sit BELOW the content, never over it. Reserve room below: button
+     bottom inset (var(--wa-space-xs)) + button height (2.25rem) + a matching
+     gap. Applies to the code editor (right pane) and the board-info-only layout
+     where the row overlaps the full-width left pane. */
   .editor-pane--right,
   .editor-layout--left .editor-pane--left {
-    padding-bottom: calc(var(--wa-space-m) * 2 + 2.25rem);
+    padding-bottom: calc(2.25rem + var(--wa-space-xs) * 2);
+  }
+
+  /* The code editor brings its own line-number gutter, so the full
+     var(--wa-space-m) inset the config form needs reads as wasted padding that
+     shrinks the text area. Trim the editor pane to a tighter, even inset on the
+     top + sides; the bottom keeps the action-row reserve above. */
+  .editor-pane--right {
+    padding-top: var(--wa-space-xs);
+    padding-inline: var(--wa-space-xs);
   }
 
   .editor-pane-title {

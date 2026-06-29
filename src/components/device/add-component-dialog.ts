@@ -30,7 +30,7 @@ import {
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
 import { coerceFields } from "./add-component-form-coerce.js";
-import { addFormPaintsAnything } from "./add-component-form-filter.js";
+import { addFormNeedsUserInput } from "./add-component-form-filter.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
 import { componentDialogTitle } from "./component-card-category-label.js";
 
@@ -475,9 +475,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   /**
    * Coerced fields to add *entry* directly, skipping the form, or null when
-   * the form should open. Fast-paths only when the add-form would paint
-   * nothing (`addFormPaintsAnything` reads the same `buildFormRenderPlan`
-   * `render()` does, so the gate can't drift from what the user sees) and the
+   * the form should open. Fast-paths only when the add-form needs no input
+   * (`addFormNeedsUserInput` reads the same `buildFormRenderPlan` `render()`
+   * does, so the gate can't drift from what the user sees — a form whose only
+   * fields are board-locked is a dead-end and gets skipped) and the
    * payload matches the form's Add. The payload is `buildInitialValues` +
    * `coerceFields`, exactly the form's seed/submit, so a seeded `id`/pin (and
    * a featured entry's `seedAll`-seeded locked presets) isn't dropped; the one
@@ -508,7 +509,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       localize: this._localize,
     });
     if (
-      addFormPaintsAnything(
+      addFormNeedsUserInput(
         entry.config_entries,
         seeded,
         entry.required_groups ?? [],

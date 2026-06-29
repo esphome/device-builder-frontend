@@ -264,10 +264,19 @@ export const wizardStepBoardStyles = css`
     display: flex;
     align-items: center;
     gap: 4px;
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: inherit;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
     color: var(--esphome-primary);
     cursor: pointer;
+  }
+
+  .select-board:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 3px;
   }
 
   .platform-filters {

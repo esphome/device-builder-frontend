@@ -1,15 +1,7 @@
 import { consume } from "@lit/context";
-import {
-  mdiArrowCollapseAll,
-  mdiArrowExpandAll,
-  mdiChevronDown,
-  mdiOpenInNew,
-  mdiPlus,
-  mdiUsbPort,
-} from "@mdi/js";
+import { mdiUsbPort } from "@mdi/js";
 import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import memoizeOne from "memoize-one";
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
@@ -17,10 +9,9 @@ import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { boardImageUrl } from "../../util/board-image.js";
 import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
-import { renderMarkdown } from "../../util/markdown.js";
+import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
 import {
@@ -38,16 +29,11 @@ import {
 import { inputStyles } from "../../styles/inputs.js";
 import { wizardStepBoardStyles } from "./wizard-step-board.styles.js";
 
-import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./wizard-step-board-list.js";
 import "./wizard-step-board-port-select.js";
 
 registerMdiIcons({
-  "arrow-collapse-all": mdiArrowCollapseAll,
-  "arrow-expand-all": mdiArrowExpandAll,
-  "chevron-down": mdiChevronDown,
-  "open-in-new": mdiOpenInNew,
-  plus: mdiPlus,
   "usb-port": mdiUsbPort,
 });
 
@@ -70,30 +56,10 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @property({ attribute: false })
   presetFilterLabel: string | null = null;
 
-  @state()
-  private _boards: BoardCatalogEntry[] = [];
-
-  /** Split the live board catalog into the single featured tile +
-   *  the rest. Memoised on the ``_boards`` reference so the find +
-   *  filter pair shares one walk per catalog change (each search
-   *  keystroke replaces ``_boards`` with a freshly-filtered list,
-   *  so the cache invalidates exactly when the split needs to). */
-  private _splitBoards = memoizeOne((boards: BoardCatalogEntry[]) => ({
-    featured: boards.find((b) => b.featured),
-    regular: boards.filter((b) => !b.featured),
-  }));
-
-  @state()
-  private _loading = true;
-
-  @state()
-  private _initialLoad = true;
+  private _list = new PagedListController<BoardCatalogEntry>(this);
 
   @state()
   private _search = "";
-
-  @state()
-  private _expandedBoardId: string | null = null;
 
   @state()
   private _selectedFilter = "";
@@ -150,35 +116,24 @@ export class ESPHomeWizardStepBoard extends LitElement {
     ) {
       this._selectedFilter = this.presetFilterLabel;
       this._filterFromDetection = true;
-      void this._fetchBoards();
+      this._fetchBoards();
     }
     this._portsPoll.set(this._view === "select-port");
   }
 
-  private async _fetchBoards() {
-    this._loading = true;
-    try {
-      const query = this._search.trim() || undefined;
-      const filter = ESPHomeWizardStepBoard.PLATFORMS.find(
-        (p) => p.label === this._selectedFilter
-      );
-      const platform = filter?.platform || undefined;
-      const variant = filter?.variant || undefined;
-      const mcu = filter?.mcu || undefined;
-      const response = await this._api.getBoards({
-        query,
-        platform,
-        variant,
-        mcu,
-        limit: 50,
-      });
-      this._boards = response.boards;
-    } catch (e) {
-      console.error("Failed to load board catalog:", e);
-    } finally {
-      this._loading = false;
-      this._initialLoad = false;
-    }
+  private _fetchBoards() {
+    const query = this._search.trim() || undefined;
+    const filter = ESPHomeWizardStepBoard.PLATFORMS.find(
+      (p) => p.label === this._selectedFilter
+    );
+    const platform = filter?.platform || undefined;
+    const variant = filter?.variant || undefined;
+    const mcu = filter?.mcu || undefined;
+    this._list.reset((offset, limit) =>
+      this._api
+        .getBoards({ query, platform, variant, mcu, offset, limit })
+        .then((r) => ({ items: r.boards, total: r.total }))
+    );
   }
 
   static styles = [espHomeStyles, inputStyles, wizardStepBoardStyles];
@@ -199,11 +154,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
       `;
     }
 
-    if (this._initialLoad && this._loading) {
+    if (this._list.loading && !this._list.hasLoaded) {
       return html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`;
     }
-
-    const { featured, regular } = this._splitBoards(this._boards);
 
     return html`
       <input
@@ -265,139 +218,30 @@ export class ESPHomeWizardStepBoard extends LitElement {
               : nothing}
           `}
 
-      <div class="boards-scroll">
-        ${this._loading
-          ? html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`
-          : this._boards.length === 0
-            ? html`<p class="loading">${this._localize("wizard.no_boards_found")}</p>`
-            : html`
-                ${featured
-                  ? html`
-                      <p class="section-label">${this._localize("wizard.starter_kit")}</p>
-                      ${this._renderFeatured(featured)}
-                    `
-                  : nothing}
-                ${regular.length
-                  ? html`
-                      <p class="section-label">
-                        ${this._localize("wizard.other_boards")}
-                      </p>
-                      <div class="boards-grid">
-                        ${regular.map((board) =>
-                          this._renderBoardCard(board, board.id === this._expandedBoardId)
-                        )}
-                      </div>
-                    `
-                  : nothing}
-              `}
-      </div>
+      <esphome-wizard-step-board-list
+        .boards=${this._list.items}
+        .loading=${this._list.loading}
+        .loadingMore=${this._list.loadingMore}
+        .hasMore=${this._list.hasMore}
+        .error=${this._list.hasError}
+        .localize=${this._localize}
+        @load-more=${this._onLoadMore}
+        @add-board=${this._onAddBoard}
+      ></esphome-wizard-step-board-list>
     `;
   }
 
-  private _renderFeatured(board: BoardCatalogEntry) {
-    const imageUrl = boardImageUrl(board);
-    return html`
-      <div class="featured-card">
-        <img class="featured-image" src=${imageUrl} alt=${board.name} />
-        <div class="featured-body">
-          <h3 class="featured-title">${board.name}</h3>
-          <p class="featured-desc">${renderMarkdown(board.description)}</p>
-          <div class="tags">
-            <wa-badge variant="neutral" pill style="font-size: var(--wa-font-size-s);"
-              >${this._localizeTag(
-                board.esphome.mcu || board.esphome.variant || board.esphome.platform
-              )}</wa-badge
-            >
-            ${board.tags.map(
-              (tag) =>
-                html`<wa-badge
-                  variant=${tag === "starter-kit" ? "success" : "brand"}
-                  pill
-                  style="font-size: var(--wa-font-size-s);"
-                  >${this._localizeTag(tag)}</wa-badge
-                >`
-            )}
-          </div>
-          <div class="featured-footer">
-            <a class="more-info" href=${board.docs_url} target="_blank" rel="noreferrer">
-              ${this._localize("wizard.more_info")}
-              <wa-icon library="mdi" name="open-in-new"></wa-icon>
-            </a>
-            <div class="select-board" @click=${() => this._onAdd(board)}>
-              <wa-icon library="mdi" name="plus"></wa-icon>
-              ${this._localize("wizard.add_board")}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
+  private _onLoadMore = () => {
+    this._list.loadMore();
+  };
 
-  private _renderBoardCard(board: BoardCatalogEntry, expanded: boolean) {
-    const imageUrl = boardImageUrl(board);
-    return html`
-      <article class="board-card ${expanded ? "board-card--expanded" : ""}">
-        <div class="board-card-header">
-          <img class="board-image" src=${imageUrl} alt=${board.name} />
-          <div class="board-card-header-text">
-            <h3 class="board-title">${board.name}</h3>
-          </div>
-          <button
-            class="expand-button"
-            type="button"
-            aria-pressed=${expanded}
-            title=${this._localize("wizard.expand_board")}
-            @click=${() => this._onToggleExpand(board)}
-          >
-            <wa-icon
-              library="mdi"
-              name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
-            ></wa-icon>
-          </button>
-        </div>
-
-        <p class="board-description ${expanded ? "" : "board-description--clamp"}">
-          ${renderMarkdown(board.description)}
-        </p>
-
-        <div class="tags">
-          <wa-badge style="font-size: var(--wa-font-size-xs);" variant="neutral" pill
-            >${this._localizeTag(
-              board.esphome.mcu || board.esphome.variant || board.esphome.platform
-            )}</wa-badge
-          >
-          ${board.tags.map(
-            (tag) =>
-              html`<wa-badge
-                style="font-size: var(--wa-font-size-xs);"
-                variant=${tag === "starter-kit" ? "success" : "brand"}
-                pill
-                >${this._localizeTag(tag)}</wa-badge
-              >`
-          )}
-        </div>
-
-        <div class="card-footer">
-          <a class="more-info" href=${board.docs_url} target="_blank" rel="noreferrer">
-            ${this._localize("wizard.more_info")}
-            <wa-icon library="mdi" name="open-in-new"></wa-icon>
-          </a>
-          <div class="select-board" @click=${() => this._onAdd(board)}>
-            <wa-icon library="mdi" name="plus"></wa-icon>
-            ${this._localize("wizard.add_board")}
-          </div>
-        </div>
-      </article>
-    `;
-  }
+  private _onAddBoard = (e: CustomEvent<{ board: BoardCatalogEntry }>) => {
+    this._onAdd(e.detail.board);
+  };
 
   private _onSearchInput(ev: Event) {
     this._search = (ev.target as HTMLInputElement).value;
     this._debouncedSearch();
-  }
-
-  private _onToggleExpand(board: BoardCatalogEntry) {
-    this._expandedBoardId = this._expandedBoardId === board.id ? null : board.id;
   }
 
   private _onPlatformFilter(label: string) {
@@ -407,13 +251,6 @@ export class ESPHomeWizardStepBoard extends LitElement {
     // the chip they plugged in.
     this._filterFromDetection = false;
     this._fetchBoards();
-  }
-
-  private _localizeTag(tag: string): string {
-    const key = `wizard.tag.${tag}`;
-    const translated = this._localize(key);
-    // If localize returns the key itself, show the raw tag instead
-    return translated === key ? tag : translated;
   }
 
   private _onAdd(board: BoardCatalogEntry) {
