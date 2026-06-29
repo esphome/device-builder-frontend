@@ -449,17 +449,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
     fullIds: string[],
     boardId: string,
     progressName: string
-  ) {
+  ): Promise<boolean> {
     const [first, ...rest] = fullIds;
     const result = await hydrateForSelection(
       this as unknown as SelectionHost,
       first,
       boardId
     );
-    if (result.kind === "stale") return;
+    if (result.kind === "stale") return false;
     if (result.kind === "error") {
       this._submitError = result.message;
-      return;
+      return false;
     }
     // Fresh sequence — abandon any in-flight dep-detour state.
     this._clearDetourFields();
@@ -471,6 +471,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     };
     this._selected = result.entry;
     this._submitError = "";
+    return true;
   }
 
   /**
@@ -553,20 +554,28 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // interactive queue, carrying the just-added dependency's id into the opened
     // form's matching reference field (the chaining bundles rely on).
     const handOff = async (idx: number) => {
-      this._submitting = false;
       if (addedAny) this._dispatchDraft(this.yaml);
-      await this._startFeaturedSequence(fullIds.slice(idx), boardId, bundle.name);
+      // Keep `_submitting` set across the hydrate so the dialog can't be
+      // dismissed or a new selection started mid-hand-off (which would make the
+      // hydrate stale); release it once the form is up.
+      const started = await this._startFeaturedSequence(
+        fullIds.slice(idx),
+        boardId,
+        bundle.name
+      );
+      this._submitting = false;
+      // A stale/errored sequence opened no form and left detour state alone;
+      // don't clobber it (or a superseding selection's state).
+      if (!started) return;
       if (lastAdded) this._prefillReference = lastAdded;
       // `_startFeaturedSequence` counts from 1 over the remaining slice; restate
       // the banner against the whole bundle so members already added silently
       // still count toward the step number.
-      if (this._bundleProgress) {
-        this._bundleProgress = {
-          current: idx + 1,
-          total: fullIds.length,
-          bundleName: bundle.name,
-        };
-      }
+      this._bundleProgress = {
+        current: idx + 1,
+        total: fullIds.length,
+        bundleName: bundle.name,
+      };
     };
     try {
       for (let i = 0; i < fullIds.length; i++) {

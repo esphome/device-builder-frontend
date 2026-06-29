@@ -29,7 +29,7 @@ interface Internals {
     fullIds: string[],
     boardId: string,
     name: string
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   _onBundleSelected: (e: CustomEvent) => Promise<void>;
 }
 
@@ -100,7 +100,7 @@ describe("add-component-dialog one-shot bundle", () => {
         category: ComponentCategory.LIGHT,
       }),
     });
-    const startSequence = vi.fn();
+    const startSequence = vi.fn().mockResolvedValue(true);
     d._startFeaturedSequence = startSequence;
     // First member fast-paths; the second needs the form.
     d._fastPathFields = vi
@@ -119,6 +119,28 @@ describe("add-component-dialog one-shot bundle", () => {
     expect(startSequence).toHaveBeenCalledWith(["featured.bd.b"], "bd", "Full setup");
     // The just-added dependency is carried into the opened form's reference.
     expect(d._prefillReference).toEqual({ domain: ComponentCategory.OUTPUT, id: "dep" });
+  });
+
+  it("does not clobber state when the hand-off sequence goes stale", async () => {
+    const { d, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.OUTPUT,
+      }),
+    });
+    // The interactive sequence reports it didn't start (stale / errored hydrate).
+    d._startFeaturedSequence = vi.fn().mockResolvedValue(false);
+    d._fastPathFields = vi
+      .fn()
+      .mockReturnValueOnce({ id: "dep" })
+      .mockReturnValueOnce(null);
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // A superseded sequence opened no form; the silent loop's prefill/progress
+    // must not overwrite the newer selection's state.
+    expect(d._prefillReference).toBeNull();
+    expect(d._bundleProgress).toBeNull();
   });
 
   it("opens the form on the first member when nothing can be fast-pathed", async () => {
