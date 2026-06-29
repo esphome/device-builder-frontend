@@ -6,10 +6,11 @@
  * double-import on a held Enter. The Enter->action wiring itself mirrors
  * friendly-name-dialog and is covered there.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AdoptableDevice } from "../../src/api/types/devices.js";
 import { ESPHomeAdoptDialog } from "../../src/components/adopt-dialog.js";
+import { _resetSecretKeysCache } from "../../src/util/secrets-cache.js";
 
 const DEVICE = {
   name: "foo-1234",
@@ -18,12 +19,34 @@ const DEVICE = {
   package_import_url: "github://acme/widget/widget.yaml@main",
 } as unknown as AdoptableDevice;
 
+const wifiDevice = (): AdoptableDevice =>
+  ({ ...DEVICE, network: "wifi" }) as unknown as AdoptableDevice;
+const ethernetDevice = (): AdoptableDevice =>
+  ({ ...DEVICE, network: "ethernet" }) as unknown as AdoptableDevice;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Priv = any;
+
+function makeDialog(secretKeys: string[]): {
+  priv: Priv;
+  getSecretKeys: ReturnType<typeof vi.fn>;
+  setWifiCredentials: ReturnType<typeof vi.fn>;
+  importDevice: ReturnType<typeof vi.fn>;
+} {
+  const getSecretKeys = vi.fn(async () => secretKeys);
+  const setWifiCredentials = vi.fn(async () => {});
+  const importDevice = vi.fn(async () => ({ configuration: "foo-1234.yaml" }));
+  const el = new ESPHomeAdoptDialog();
+  const priv = el as Priv;
+  priv._api = { getSecretKeys, setWifiCredentials, importDevice };
+  return { priv, getSecretKeys, setWifiCredentials, importDevice };
+}
+
 describe("adopt-dialog re-entry guard", () => {
   it("_submit ignores re-entry while an import is in flight", async () => {
     const importDevice = vi.fn(() => new Promise<void>(() => {})); // stays in flight
     const el = new ESPHomeAdoptDialog();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const priv = el as any;
+    const priv = el as Priv;
     priv._api = { importDevice };
     priv._device = DEVICE;
     priv._name = "foo-1234";
@@ -31,6 +54,67 @@ describe("adopt-dialog re-entry guard", () => {
     void priv._submit();
     await priv._submit();
 
+    expect(importDevice).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("adopt-dialog wifi step (#1742)", () => {
+  beforeEach(() => {
+    _resetSecretKeysCache();
+  });
+
+  it("collects wifi for a wifi device with no shared secret", async () => {
+    const { priv, getSecretKeys } = makeDialog([]);
+    priv.open(wifiDevice());
+    await vi.waitFor(() => expect(priv._hasWifiSecrets).toBe(false));
+    expect(getSecretKeys).toHaveBeenCalledTimes(1);
+    expect(priv._collectWifi).toBe(true);
+  });
+
+  it("skips the wifi step when the shared secret already exists", async () => {
+    const { priv } = makeDialog(["wifi_ssid", "wifi_password"]);
+    priv.open(wifiDevice());
+    await vi.waitFor(() => expect(priv._hasWifiSecrets).toBe(true));
+    expect(priv._collectWifi).toBe(false);
+  });
+
+  it("never probes secrets or collects wifi for an ethernet device", async () => {
+    const { priv, getSecretKeys } = makeDialog([]);
+    priv.open(ethernetDevice());
+    expect(getSecretKeys).not.toHaveBeenCalled();
+    expect(priv._collectWifi).toBe(false);
+  });
+
+  it("stores the typed credentials before importing and fires secrets-saved", async () => {
+    const { priv, setWifiCredentials, importDevice } = makeDialog([]);
+    const savedListener = vi.fn();
+    window.addEventListener("secrets-saved", savedListener);
+    priv.open(wifiDevice());
+    await vi.waitFor(() => expect(priv._collectWifi).toBe(true));
+    priv._ssid = "  MyHomeWifi  ";
+    priv._password = "hunter2hunter";
+
+    await priv._submit();
+
+    expect(setWifiCredentials).toHaveBeenCalledWith("MyHomeWifi", "hunter2hunter");
+    expect(setWifiCredentials.mock.invocationCallOrder[0]).toBeLessThan(
+      importDevice.mock.invocationCallOrder[0]
+    );
+    expect(savedListener).toHaveBeenCalled();
+    window.removeEventListener("secrets-saved", savedListener);
+  });
+
+  it("does not store credentials when the shared secret already exists", async () => {
+    const { priv, setWifiCredentials, importDevice } = makeDialog([
+      "wifi_ssid",
+      "wifi_password",
+    ]);
+    priv.open(wifiDevice());
+    await vi.waitFor(() => expect(priv._hasWifiSecrets).toBe(true));
+
+    await priv._submit();
+
+    expect(setWifiCredentials).not.toHaveBeenCalled();
     expect(importDevice).toHaveBeenCalledTimes(1);
   });
 });

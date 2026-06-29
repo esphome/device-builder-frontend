@@ -13,6 +13,9 @@ import { EnterController } from "../util/enter-controller.js";
 import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { renderInlineError } from "../util/render-error.js";
+import { fetchSecretKeys, hasSharedWifiSecret } from "../util/secrets-cache.js";
+import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
+import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
 import "./base-dialog.js";
 
@@ -38,12 +41,20 @@ export class ESPHomeAdoptDialog extends LitElement {
   @state() private _busy = false;
   @state() private _error: string | null = null;
   @state() private _open = false;
+  @state() private _ssid = "";
+  @state() private _password = "";
+  // undefined until config/get_secrets resolves; only fetched for a
+  // network=wifi device, so a non-wifi adopt never blocks on it.
+  @state() private _hasWifiSecrets: boolean | undefined = undefined;
 
   static styles = [
     espHomeStyles,
     inputStyles,
     // Neutral header + title + footer (shared) — dialog-chrome.ts.
     dialogChromeStyles,
+    // Before the local block so this dialog's own `.field` / `label`
+    // spacing wins; only `.field-label` / `.error` (unique here) apply.
+    wifiFieldsStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -239,7 +250,30 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._encryption = true;
     this._busy = false;
     this._error = null;
+    this._ssid = "";
+    this._password = "";
+    this._hasWifiSecrets = undefined;
     this._open = true;
+    // A Wi-Fi device whose install has no shared wifi_ssid/wifi_password
+    // would import a config referencing an undefined !secret and fail to
+    // validate (esphome/device-builder#1742). Probe the shared secrets so
+    // the Wi-Fi step can prompt + store them before importing.
+    if (device.network === "wifi" && this._api) {
+      fetchSecretKeys(this._api).then((keys) => {
+        this._hasWifiSecrets = hasSharedWifiSecret(keys);
+      });
+    }
+  }
+
+  private get _needsWifi(): boolean {
+    return this._device?.network === "wifi";
+  }
+
+  // Show the Wi-Fi step only for a Wi-Fi device with no shared secret yet;
+  // a device with its own network or an install that already has the secret
+  // skips it, mirroring the create wizard and the legacy adopt dialog.
+  private get _collectWifi(): boolean {
+    return this._needsWifi && this._hasWifiSecrets === false;
   }
 
   close = () => {
@@ -271,7 +305,16 @@ export class ESPHomeAdoptDialog extends LitElement {
     const device = this._device;
     const nameTrimmed = this._name.trim();
     const nameErr = nameTrimmed ? validateDeviceName(nameTrimmed) : null;
-    const canSubmit = !!device && !!nameTrimmed && !nameErr && !this._busy;
+    // Block submit while a wifi device's secrets are still loading
+    // (_hasWifiSecrets undefined) so a fast click can't skip the store, and
+    // once the Wi-Fi step shows require an SSID + a valid-length password.
+    const wifiBlocking = this._needsWifi
+      ? this._hasWifiSecrets === undefined ||
+        (this._collectWifi &&
+          (!this._ssid.trim() || isWifiPasswordTooShort(this._password)))
+      : false;
+    const canSubmit =
+      !!device && !!nameTrimmed && !nameErr && !this._busy && !wifiBlocking;
     const displayName = device ? device.friendly_name || device.name : "";
 
     return html`
@@ -324,6 +367,24 @@ export class ESPHomeAdoptDialog extends LitElement {
                   }}
                 />
               </div>
+
+              ${this._collectWifi
+                ? html`
+                    <p class="description">${this._localize("onboarding.wifi.intro")}</p>
+                    ${renderWifiFields({
+                      localize: this._localize,
+                      ssid: this._ssid,
+                      password: this._password,
+                      disabled: this._busy,
+                      onSsidInput: (value) => {
+                        this._ssid = value;
+                      },
+                      onPasswordInput: (value) => {
+                        this._password = value;
+                      },
+                    })}
+                  `
+                : nothing}
 
               <label class="checkbox-row">
                 <input
@@ -410,6 +471,14 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._busy = true;
     this._error = null;
     try {
+      // Persist the shared Wi-Fi secret first so the imported config's
+      // ``!secret wifi_ssid`` resolves; a failure here surfaces in the same
+      // catch and leaves the dialog open. ``secrets-saved`` refreshes the
+      // editor's secret pickers and the kebab wording.
+      if (this._collectWifi) {
+        await this._api.setWifiCredentials(this._ssid.trim(), this._password);
+        window.dispatchEvent(new CustomEvent("secrets-saved"));
+      }
       // ``encryption`` is sent only when the user opted in. Backend
       // signature is ``encryption: str | None = None``; omitting it
       // when False keeps the call site clean and avoids relying on
