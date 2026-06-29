@@ -606,6 +606,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
           await handOff(i);
           return;
         }
+        // Skip a member already in the device: a bundle re-applied after a
+        // partial prior run (or with members overlapping existing config) must
+        // not append a duplicate block. The preset id identifies the member in
+        // the running YAML; still chain it so a later member's reference field
+        // resolves to it.
+        const memberId = fields["id"];
+        if (typeof memberId === "string" && collectExistingIds(this.yaml).has(memberId)) {
+          lastAdded = this._chainReference(entry, fields);
+          continue;
+        }
         const { yaml } = await this._api.addComponent(
           this.configuration,
           { component_id: fullIds[i], fields },

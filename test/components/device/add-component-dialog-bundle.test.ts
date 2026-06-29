@@ -90,6 +90,35 @@ describe("add-component-dialog one-shot bundle", () => {
     expect(d._open).toBe(false);
   });
 
+  it("skips a member already present in the device instead of re-adding it", async () => {
+    const { d, addComponent, getComponentBodies, dialog } = makeDialog();
+    // The device already has member "a" (id `present_a`); re-applying the
+    // bundle must not append it again.
+    dialog.yaml = "switch:\n  - platform: gpio\n    id: present_a\n";
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    addComponent.mockResolvedValue({ yaml: "Y_AFTER_B" });
+    d._fastPathFields = vi.fn().mockImplementation((entry: { id: string }) => ({
+      id: entry.id === "featured.bd.a" ? "present_a" : "new_b",
+    }));
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // Only the absent member "b" is added; "a" is skipped, not duplicated.
+    expect(addComponent).toHaveBeenCalledTimes(1);
+    expect(addComponent.mock.calls[0][1]).toEqual({
+      component_id: "featured.bd.b",
+      fields: { id: "new_b" },
+    });
+    expect(d._open).toBe(false);
+  });
+
   it("hands off to the interactive sequence when a member needs the form", async () => {
     const { d, addComponent, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
