@@ -153,10 +153,10 @@ export class ESPHomeWizardStepBoardList extends LitElement {
               ${this.localize("wizard.more_info")}
               <wa-icon library="mdi" name="open-in-new"></wa-icon>
             </a>
-            <div class="select-board" @click=${() => this._onAdd(board)}>
+            <button class="select-board" type="button" @click=${() => this._onAdd(board)}>
               <wa-icon library="mdi" name="plus"></wa-icon>
               ${this.localize("wizard.add_board")}
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -212,10 +212,10 @@ export class ESPHomeWizardStepBoardList extends LitElement {
             ${this.localize("wizard.more_info")}
             <wa-icon library="mdi" name="open-in-new"></wa-icon>
           </a>
-          <div class="select-board" @click=${() => this._onAdd(board)}>
+          <button class="select-board" type="button" @click=${() => this._onAdd(board)}>
             <wa-icon library="mdi" name="plus"></wa-icon>
             ${this.localize("wizard.add_board")}
-          </div>
+          </button>
         </div>
       </article>
     `;

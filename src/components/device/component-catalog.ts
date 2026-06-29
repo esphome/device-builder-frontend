@@ -280,7 +280,7 @@ export class ESPHomeComponentCatalog extends LitElement {
                   `
                 : html`<p class="empty">
                     ${this._localize(
-                      this._list.error
+                      this._list.error !== null
                         ? "device.components_load_error"
                         : "device.no_components_found"
                     )}
