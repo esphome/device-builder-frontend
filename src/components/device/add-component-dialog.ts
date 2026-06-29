@@ -577,6 +577,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         bundleName: bundle.name,
       };
     };
+    // Snapshot the ids already in the device once, then extend it as members
+    // are added — so the per-member presence check stays O(1) instead of
+    // re-scanning the whole YAML each step on a large config.
+    const existingIds = collectExistingIds(this.yaml);
     try {
       for (let i = 0; i < fullIds.length; i++) {
         const result = await hydrateForSelection(
@@ -610,9 +614,13 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // partial prior run (or with members overlapping existing config) must
         // not append a duplicate block. The preset id identifies the member in
         // the running YAML; still chain it so a later member's reference field
-        // resolves to it.
+        // resolves to it. This guards the fast path only; a present member that
+        // needs form input (``_fastPathFields`` null, handed off above) can
+        // still be re-added — a rarer path, scoped out alongside the
+        // create-wizard ``_applyFullSetup`` follow-up and backstopped by
+        // ESPHome's global id uniqueness.
         const memberId = fields["id"];
-        if (typeof memberId === "string" && collectExistingIds(this.yaml).has(memberId)) {
+        if (typeof memberId === "string" && existingIds.has(memberId)) {
           lastAdded = this._chainReference(entry, fields);
           continue;
         }
@@ -623,6 +631,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         );
         draft = yaml;
         addedAny = true;
+        if (typeof memberId === "string") existingIds.add(memberId);
         // Keep `this.yaml` current so the next member's dep check + reference
         // dropdown see what this batch already added; the host draft is
         // published once at the end rather than churning the editor per member.

@@ -72,7 +72,10 @@ describe("add-component-dialog one-shot bundle", () => {
     addComponent
       .mockResolvedValueOnce({ yaml: "Y1" })
       .mockResolvedValueOnce({ yaml: "Y2" });
-    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+    // Distinct member ids — two bundle members never share one in practice.
+    d._fastPathFields = vi.fn().mockImplementation((entry: { id: string }) => ({
+      id: entry.id === "featured.bd.a" ? "xa" : "xb",
+    }));
 
     await d._onBundleSelected(bundleEvent(["a", "b"]));
 
@@ -81,12 +84,12 @@ describe("add-component-dialog one-shot bundle", () => {
     // the first — one accumulating chain, not two independent merges.
     expect(addComponent.mock.calls[0]).toEqual([
       "foo.yaml",
-      { component_id: "featured.bd.a", fields: { id: "x" } },
+      { component_id: "featured.bd.a", fields: { id: "xa" } },
       "esphome:\n  name: foo\n",
     ]);
     expect(addComponent.mock.calls[1]).toEqual([
       "foo.yaml",
-      { component_id: "featured.bd.b", fields: { id: "x" } },
+      { component_id: "featured.bd.b", fields: { id: "xb" } },
       "Y1",
     ]);
     expect(d._open).toBe(false);
