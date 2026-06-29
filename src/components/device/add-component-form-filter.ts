@@ -1,5 +1,6 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
+import { isEntryVisible } from "../../util/config-validation.js";
 import { buildFormRenderPlan, planNeedsUserInput } from "./config-entry-form-plan.js";
 import {
   collectRenderablePaths,
@@ -63,7 +64,12 @@ export function addFormNeedsUserInput(
 ): boolean {
   const opts = addFormFilterOptions(board, presentComponents);
   const plan = buildFormRenderPlan(entries, values, requiredGroups, opts);
-  if (planNeedsUserInput(plan)) return true;
+  // Group/cluster members are unfiltered in the plan; gate them on the same
+  // visibility the form uses so a hidden unlocked member can't keep the form
+  // open when every rendered field is board-locked.
+  const isVisible = (entry: ConfigEntry): boolean =>
+    isEntryVisible(entry, values, opts.presentComponents, opts.targetPlatform ?? null);
+  if (planNeedsUserInput(plan, isVisible)) return true;
   // Pure-cardinality groups with no cluster box surface a banner only when
   // unsatisfied; keys are irrelevant to presence, so format to "".
   return (

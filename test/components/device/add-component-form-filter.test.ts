@@ -55,4 +55,35 @@ describe("addFormNeedsUserInput", () => {
     ];
     expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(true);
   });
+
+  // A hidden unlocked member (here platform-incompatible) isn't rendered, so it
+  // mustn't keep the form open when every visible field is locked.
+  const ESP32 = { esphome: { platform: "esp32" } } as never;
+
+  it("ignores a hidden unlocked exclusive-group member", () => {
+    const entries = [
+      makeConfigEntry({ key: "i2c", exclusive_group: "bus", locked: true }),
+      makeConfigEntry({
+        key: "spi",
+        exclusive_group: "bus",
+        locked: false,
+        supported_platforms: ["esp8266"],
+      }),
+    ];
+    expect(addFormNeedsUserInput(entries, {}, [], ESP32, NONE)).toBe(false);
+  });
+
+  it("ignores a hidden unlocked constraint-cluster member", () => {
+    const entries = [
+      makeConfigEntry({ key: "a", group: "g", required: true, locked: true }),
+      makeConfigEntry({
+        key: "b",
+        group: "g",
+        required: true,
+        locked: false,
+        supported_platforms: ["esp8266"],
+      }),
+    ];
+    expect(addFormNeedsUserInput(entries, {}, [], ESP32, NONE)).toBe(false);
+  });
 });

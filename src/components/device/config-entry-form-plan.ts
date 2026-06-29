@@ -48,14 +48,21 @@ export function buildFormRenderPlan(
  * field, an exclusive-group dropdown, or a cluster box with an unlocked member.
  *
  * A locked entry renders read-only ("Set by the board"), so a form whose only
- * fields — plain, grouped, or clustered — are locked is a dead-end screen. Lets
- * a caller skip the form when every input is fixed by the board.
+ * fields — plain, grouped, or clustered — are locked is a dead-end screen. A
+ * member is only counted when ``isVisible`` (the group/cluster member arrays are
+ * unfiltered, so a hidden unlocked member — platform-incompatible, ``depends_on``
+ * unmet — mustn't keep the form open). Lets a caller skip the form when every
+ * input is fixed by the board.
  */
-export function planNeedsUserInput(plan: FormRenderPlan): boolean {
-  const anyUnlocked = (entries: ConfigEntry[]): boolean => entries.some((e) => !e.locked);
+export function planNeedsUserInput(
+  plan: FormRenderPlan,
+  isVisible: (entry: ConfigEntry) => boolean
+): boolean {
+  const anyActionable = (entries: ConfigEntry[]): boolean =>
+    entries.some((e) => !e.locked && isVisible(e));
   return (
-    anyUnlocked([...plan.visible]) ||
-    plan.clusters.some((cluster) => anyUnlocked(cluster.members)) ||
-    plan.ordered.some((item) => Array.isArray(item) && anyUnlocked(item))
+    anyActionable([...plan.visible]) ||
+    plan.clusters.some((cluster) => anyActionable(cluster.members)) ||
+    plan.ordered.some((item) => Array.isArray(item) && anyActionable(item))
   );
 }
