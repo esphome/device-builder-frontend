@@ -286,13 +286,29 @@ export class ESPHomeComponentCatalog extends LitElement {
                     )}
                   </p>`}
           </div>
-          ${this._list.hasMore ? html`<div class="sentinel"></div>` : nothing}
-          ${this._list.loadingMore
-            ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
-            : nothing}
+          ${this._renderLoadMoreFooter()}
         </div>
       </div>
     `;
+  }
+
+  // Footer below the grid: a spinner while a page loads, a retry affordance if
+  // the last loadMore failed with results already shown (rendered instead of
+  // the sentinel so the observer tears down and can't silently re-fire), else
+  // the infinite-scroll sentinel.
+  private _renderLoadMoreFooter() {
+    if (this._list.loadingMore) {
+      return html`<p class="empty">${this._localize("device.loading_components")}</p>`;
+    }
+    if (this._list.error !== null && this._list.items.length > 0) {
+      return html`<div class="load-more-error" role="alert">
+        <span>${this._localize("device.components_load_more_error")}</span>
+        <button class="retry-link" type="button" @click=${() => this._list.loadMore()}>
+          ${this._localize("command.retry")}
+        </button>
+      </div>`;
+    }
+    return this._list.hasMore ? html`<div class="sentinel"></div>` : nothing;
   }
 
   _onToggleExpand(component: ComponentCatalogEntry) {

@@ -98,13 +98,28 @@ export class ESPHomeWizardStepBoardList extends LitElement {
                       </div>
                     `
                   : nothing}
-                ${this.hasMore ? html`<div class="sentinel"></div>` : nothing}
-                ${this.loadingMore
-                  ? html`<p class="loading">${this.localize("wizard.loading_boards")}</p>`
-                  : nothing}
+                ${this._renderLoadMoreFooter()}
               `}
       </div>
     `;
+  }
+
+  // Footer below the grid: a spinner while a page loads, a retry affordance if
+  // the last loadMore failed (rendered instead of the sentinel so the observer
+  // tears down and can't silently re-fire), else the infinite-scroll sentinel.
+  private _renderLoadMoreFooter() {
+    if (this.loadingMore) {
+      return html`<p class="loading">${this.localize("wizard.loading_boards")}</p>`;
+    }
+    if (this.error) {
+      return html`<div class="load-more-error" role="alert">
+        <span>${this.localize("wizard.boards_load_more_error")}</span>
+        <button class="retry-link" type="button" @click=${this._onRetry}>
+          ${this.localize("command.retry")}
+        </button>
+      </div>`;
+    }
+    return this.hasMore ? html`<div class="sentinel"></div>` : nothing;
   }
 
   protected updated() {
@@ -224,6 +239,11 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   private _onToggleExpand(board: BoardCatalogEntry) {
     this._expandedBoardId = this._expandedBoardId === board.id ? null : board.id;
   }
+
+  private _onRetry = () => {
+    // Same request the sentinel makes; the parent re-runs loadMore().
+    this.dispatchEvent(new CustomEvent("load-more"));
+  };
 
   private _localizeTag(tag: string): string {
     const key = `wizard.tag.${tag}`;

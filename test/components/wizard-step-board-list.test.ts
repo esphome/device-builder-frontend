@@ -117,6 +117,22 @@ describe("esphome-wizard-step-board-list infinite scroll", () => {
     );
   });
 
+  it("shows a retry affordance (not the sentinel) when a load-more page fails", async () => {
+    const el = await mount([board(0), board(1)], true);
+    el.error = true;
+    await el.updateComplete;
+
+    // Sentinel is replaced by the retry control so the observer can't re-spin.
+    expect(sentinelOf(el)).toBeNull();
+    const retry = el.shadowRoot!.querySelector<HTMLButtonElement>(".retry-link");
+    expect(retry).not.toBeNull();
+
+    const onLoadMore = vi.fn();
+    el.addEventListener("load-more", onLoadMore);
+    retry!.click();
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
   it("dispatches add-board with the chosen board", async () => {
     const b = board(0);
     const el = await mount([b], false);
