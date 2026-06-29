@@ -54,6 +54,12 @@ export function findReferencePath(
       continue;
     }
     if (entry.references_component === domain) {
+      // Skip a field the featured preset already pinned (`from_preset` + a literal
+      // `default_value`): preset seeding fills it from the live candidates, so a
+      // chained bundle `_prefillReference` (the last sibling added) must not
+      // overwrite an earlier preset-pinned field. A non-preset ref (the dep
+      // detour) still matches, so its just-added dep id lands as before.
+      if (entry.from_preset && entry.default_value != null) continue;
       return [...prefix, entry.key];
     }
   }
@@ -120,7 +126,20 @@ export function seedDefaults(
     // preset (`i2c_bus`) can't outlive the bus it names. Locked refs are
     // deliberate pins — keep their literal.
     if (entry.references_component && !entry.locked) {
-      const ref = seedReference(yaml, entry.references_component);
+      const candidates = findReferenceCandidates(yaml, entry.references_component, []);
+      // A featured preset that names a component actually present in the live
+      // config (a sibling just added in the same bundle, e.g. `output_blue`)
+      // wins — `resolveSoleCandidate` can't pick among several same-domain
+      // candidates, but the per-field preset already says which one. Check
+      // membership so a stale preset that outlived its target still defers.
+      const presetId =
+        seedPresets &&
+        entry.from_preset &&
+        typeof entry.default_value === "string" &&
+        candidates.some((c) => c.id === entry.default_value)
+          ? entry.default_value
+          : undefined;
+      const ref = presetId ?? resolveSoleCandidate(candidates, yaml)?.id;
       if (ref !== undefined) {
         out[entry.key] = entry.multi_value ? [ref] : ref;
       } else if (entry.multi_value && entry.required) {

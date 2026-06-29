@@ -24,6 +24,18 @@ describe("addFormNeedsUserInput", () => {
     expect(addFormNeedsUserInput(entries, {}, [], null, NONE)).toBe(true);
   });
 
+  it("keeps the form open for an unlocked reference even when pre-seeded", () => {
+    // A featured bundle member whose reference is pre-filled from its preset
+    // still opens (the user reviews/confirms); the gate keys off unlocked +
+    // visible, not whether a value is present.
+    const entries = [
+      makeConfigEntry({ key: "blue", required: true, references_component: "output" }),
+    ];
+    expect(addFormNeedsUserInput(entries, { blue: "output_blue" }, [], null, NONE)).toBe(
+      true
+    );
+  });
+
   it("skips a fully board-locked exclusive group (every choice is read-only)", () => {
     const entries = [
       makeConfigEntry({ key: "i2c", exclusive_group: "bus", locked: true }),

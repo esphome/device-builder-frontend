@@ -101,6 +101,38 @@ describe("findReferencePath", () => {
     ];
     expect(findReferencePath(entries, "spi", [])).toBeNull();
   });
+
+  it("skips a preset-pinned reference but targets a non-pinned one", () => {
+    const entries: ConfigEntry[] = [
+      makeConfigEntry({
+        key: "blue",
+        references_component: "output",
+        from_preset: true,
+        default_value: "output_blue",
+      }),
+      makeConfigEntry({ key: "warm", references_component: "output" }),
+    ];
+    expect(findReferencePath(entries, "output", [])).toEqual(["warm"]);
+  });
+
+  it("returns null when the only match is preset-pinned", () => {
+    const entries: ConfigEntry[] = [
+      makeConfigEntry({
+        key: "blue",
+        references_component: "output",
+        from_preset: true,
+        default_value: "output_blue",
+      }),
+    ];
+    expect(findReferencePath(entries, "output", [])).toBeNull();
+  });
+
+  it("still targets a from_preset reference whose default_value is null", () => {
+    const entries: ConfigEntry[] = [
+      makeConfigEntry({ key: "i2c_id", references_component: "i2c", from_preset: true }),
+    ];
+    expect(findReferencePath(entries, "i2c", [])).toEqual(["i2c_id"]);
+  });
 });
 
 describe("seedDefaults", () => {
@@ -142,6 +174,56 @@ describe("seedDefaults", () => {
       }),
     ];
     expect(seedDefaults(entries, "", localize, true)).toEqual({});
+  });
+
+  const TWO_OUTPUTS =
+    "output:\n  - platform: ledc\n    id: output_red\n" +
+    "  - platform: ledc\n    id: output_blue\n";
+
+  const presetRef = (over: Partial<ConfigEntry> = {}): ConfigEntry =>
+    makeConfigEntry({
+      key: "blue",
+      type: ConfigEntryType.ID,
+      required: true,
+      references_component: "output",
+      from_preset: true,
+      default_value: "output_blue",
+      ...over,
+    });
+
+  it("fills a from_preset reference from its default when that id is among several candidates", () => {
+    expect(seedDefaults([presetRef()], TWO_OUTPUTS, localize, true)).toEqual({
+      blue: "output_blue",
+    });
+  });
+
+  it("falls back to the sole candidate when the preset id is absent", () => {
+    const yaml = "output:\n  - platform: ledc\n    id: output_only\n";
+    expect(
+      seedDefaults([presetRef({ default_value: "output_missing" })], yaml, localize, true)
+    ).toEqual({ blue: "output_only" });
+  });
+
+  it("leaves the reference unset when the preset id is stale and several candidates exist", () => {
+    expect(
+      seedDefaults(
+        [presetRef({ default_value: "output_missing" })],
+        TWO_OUTPUTS,
+        localize,
+        true
+      )
+    ).toEqual({});
+  });
+
+  it("ignores the from_preset default when seedPresets is false", () => {
+    // Without seedPresets the preset path is off; >1 candidate has no sole match.
+    expect(seedDefaults([presetRef()], TWO_OUTPUTS, localize, false)).toEqual({});
+  });
+
+  it("wraps a multi_value preset reference in an array", () => {
+    expect(
+      seedDefaults([presetRef({ multi_value: true })], TWO_OUTPUTS, localize, true)
+    ).toEqual({ blue: ["output_blue"] });
   });
 
   it("wraps a multi_value default in an array", () => {
@@ -344,6 +426,40 @@ describe("buildInitialValues", () => {
     expect(values.cs_pin).toBe("GPIO5");
     // The just-added bus id still wins over the restored (empty) reference.
     expect(values.i2c_id).toBe("bus_a");
+  });
+
+  it("does not let a chained prefillReference overwrite a preset-pinned ref", () => {
+    // The bundle path hands the last-added sibling (output_warm) as a single
+    // prefill; it must land on the unpinned ref, not clobber blue's preset.
+    const component = makeComponent({
+      id: "featured.bd.id_name",
+      config_entries: [
+        makeConfigEntry({
+          key: "blue",
+          type: ConfigEntryType.ID,
+          required: true,
+          references_component: "output",
+          from_preset: true,
+          default_value: "output_blue",
+        }),
+        makeConfigEntry({ key: "warm", references_component: "output" }),
+      ],
+    });
+    const yaml =
+      "output:\n  - platform: ledc\n    id: output_blue\n" +
+      "  - platform: ledc\n    id: output_warm\n";
+    const values = buildInitialValues({
+      entries: component.config_entries,
+      component,
+      board: null,
+      yaml,
+      prefillReference: { domain: "output", id: "output_warm" },
+      prefillFields: null,
+      restoredValues: null,
+      localize,
+    });
+    expect(values.blue).toBe("output_blue");
+    expect(values.warm).toBe("output_warm");
   });
 
   it("seeds pin entries from the board manifest between id-gen and prefill", () => {
