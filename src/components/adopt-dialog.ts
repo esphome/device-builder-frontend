@@ -45,7 +45,7 @@ export class ESPHomeAdoptDialog extends LitElement {
   @state() private _password = "";
   // undefined until config/get_secrets resolves; only fetched for a
   // network=wifi device, so a non-wifi adopt never blocks on it.
-  @state() private _hasWifiSecrets: boolean | undefined = undefined;
+  @state() private _hasWifiSecrets?: boolean;
 
   static styles = [
     espHomeStyles,
@@ -258,13 +258,17 @@ export class ESPHomeAdoptDialog extends LitElement {
     // would import a config referencing an undefined !secret and fail to
     // validate (esphome/device-builder#1742). Probe the shared secrets so
     // the Wi-Fi step can prompt + store them before importing.
-    if (device.network === "wifi" && this._api) {
+    if (this._needsWifi && this._api) {
       fetchSecretKeys(this._api).then((keys) => {
         this._hasWifiSecrets = hasSharedWifiSecret(keys);
       });
     }
   }
 
+  // Strictly "wifi" to match the legacy dashboard's adopt gate. A device
+  // that advertised no network (older firmware, network === "") isn't
+  // prompted; closing that hole belongs in the backend import generator,
+  // not a frontend heuristic that would wrongly prompt Ethernet devices.
   private get _needsWifi(): boolean {
     return this._device?.network === "wifi";
   }
@@ -308,11 +312,10 @@ export class ESPHomeAdoptDialog extends LitElement {
     // Block submit while a wifi device's secrets are still loading
     // (_hasWifiSecrets undefined) so a fast click can't skip the store, and
     // once the Wi-Fi step shows require an SSID + a valid-length password.
-    const wifiBlocking = this._needsWifi
-      ? this._hasWifiSecrets === undefined ||
-        (this._collectWifi &&
-          (!this._ssid.trim() || isWifiPasswordTooShort(this._password)))
-      : false;
+    const wifiBlocking =
+      (this._needsWifi && this._hasWifiSecrets === undefined) ||
+      (this._collectWifi &&
+        (!this._ssid.trim() || isWifiPasswordTooShort(this._password)));
     const canSubmit =
       !!device && !!nameTrimmed && !nameErr && !this._busy && !wifiBlocking;
     const displayName = device ? device.friendly_name || device.name : "";
