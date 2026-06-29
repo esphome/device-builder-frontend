@@ -182,11 +182,16 @@ export class ESPHomeComponentCatalog extends LitElement {
   // different times) they can briefly disagree and strand the view on an empty
   // "Recommended" category. Once a featured fetch has settled, if its grid is
   // empty fall back to "all" so we never sit on "0 of N / No components found".
+  // Scoped to the unfiltered Featured view: search/provides are applied
+  // server-side, so an active filter that matches no recommendation empties the
+  // grid legitimately and must render "No components found", not bounce to All.
   protected updated() {
     if (
       this._loading ||
       this.lockedCategories.length > 0 ||
-      this._category !== ComponentCategory.FEATURED
+      this._category !== ComponentCategory.FEATURED ||
+      this._search.trim() ||
+      this._provides
     ) {
       return;
     }

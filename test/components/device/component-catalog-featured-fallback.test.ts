@@ -29,9 +29,18 @@ const ETHERNET_CARD = {
   supported_platforms: [],
 } as unknown as ComponentCatalogEntry;
 
-async function mountFeatured(
-  yaml: string
-): Promise<{ el: ESPHomeComponentCatalog; getComponents: ReturnType<typeof vi.fn> }> {
+async function mountFeatured({
+  yaml = "",
+  search = "",
+  components = [ETHERNET_CARD],
+}: {
+  yaml?: string;
+  search?: string;
+  components?: ComponentCatalogEntry[];
+} = {}): Promise<{
+  el: ESPHomeComponentCatalog;
+  getComponents: ReturnType<typeof vi.fn>;
+}> {
   const el = new ESPHomeComponentCatalog();
   const getComponents = vi.fn().mockResolvedValue({
     components: [],
@@ -46,9 +55,10 @@ async function mountFeatured(
     boardId: "esp32-poe-iso",
     board: POE_BOARD,
     yaml,
-    _components: [ETHERNET_CARD],
+    _search: search,
+    _components: components,
     _categories: [{ id: "featured", name: "featured", count: 1 }],
-    _total: 1,
+    _total: components.length,
     _category: "featured",
     _loading: false,
     _initialLoad: false,
@@ -64,13 +74,21 @@ describe("component-catalog featured-empty fallback", () => {
   });
 
   it("falls back to all when the only recommendation is already configured", async () => {
-    const { el, getComponents } = await mountFeatured("ethernet:\n  type: LAN8720\n");
+    const { el, getComponents } = await mountFeatured({
+      yaml: "ethernet:\n  type: LAN8720\n",
+    });
     expect(el._category).toBe("all");
     expect(getComponents).toHaveBeenCalled();
   });
 
   it("stays on featured while a recommendation is still addable", async () => {
-    const { el, getComponents } = await mountFeatured("");
+    const { el, getComponents } = await mountFeatured();
+    expect(el._category).toBe("featured");
+    expect(getComponents).not.toHaveBeenCalled();
+  });
+
+  it("stays on featured when the grid is empty only due to an active search", async () => {
+    const { el, getComponents } = await mountFeatured({ search: "zzz", components: [] });
     expect(el._category).toBe("featured");
     expect(getComponents).not.toHaveBeenCalled();
   });
