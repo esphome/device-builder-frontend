@@ -19,6 +19,7 @@ import {
   EDITOR_BG_LIGHT,
   EDITOR_FONT_FAMILY,
   EDITOR_FONT_SIZE,
+  EDITOR_GUTTER_PADDING_LEFT,
   editorHeightTheme,
   INDENT_GUIDE_COLORS,
   lightHighlight,
@@ -212,6 +213,12 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
           fontFamily: EDITOR_FONT_FAMILY,
           fontVariantLigatures: "none",
           fontSize: EDITOR_FONT_SIZE,
+        },
+        // Trim the CodeMirror default left inset so the line numbers hug the
+        // pane edge instead of reading as extra left padding. The sticky-scroll
+        // overlay measures this at runtime and mirrors it.
+        ".cm-lineNumbers .cm-gutterElement": {
+          paddingLeft: EDITOR_GUTTER_PADDING_LEFT,
         },
         ".cm-esphome-highlight": {
           background: this._darkMode

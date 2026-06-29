@@ -43,11 +43,26 @@ export function buildFormRenderPlan(
   return { ordered, clusters, memberKeys, visible };
 }
 
-/** Whether the plan paints any field, exclusive-group dropdown, or cluster box. */
-export function planRendersContent(plan: FormRenderPlan): boolean {
+/**
+ * Whether the plan paints anything the user can act on: an unlocked plain
+ * field, an exclusive-group dropdown, or a cluster box with an unlocked member.
+ *
+ * A locked entry renders read-only ("Set by the board"), so a form whose only
+ * fields — plain, grouped, or clustered — are locked is a dead-end screen. A
+ * member is only counted when ``isVisible`` (the group/cluster member arrays are
+ * unfiltered, so a hidden unlocked member — platform-incompatible, ``depends_on``
+ * unmet — mustn't keep the form open). Lets a caller skip the form when every
+ * input is fixed by the board.
+ */
+export function planNeedsUserInput(
+  plan: FormRenderPlan,
+  isVisible: (entry: ConfigEntry) => boolean
+): boolean {
+  const anyActionable = (entries: ConfigEntry[]): boolean =>
+    entries.some((e) => !e.locked && isVisible(e));
   return (
-    plan.visible.size > 0 ||
-    plan.clusters.length > 0 ||
-    plan.ordered.some((item) => Array.isArray(item))
+    anyActionable([...plan.visible]) ||
+    plan.clusters.some((cluster) => anyActionable(cluster.members)) ||
+    plan.ordered.some((item) => Array.isArray(item) && anyActionable(item))
   );
 }

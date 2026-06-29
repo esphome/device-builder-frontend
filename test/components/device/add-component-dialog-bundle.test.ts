@@ -23,12 +23,13 @@ import { makeComponentEntry } from "../../util/_make-component-entry.js";
 interface Internals {
   _open: boolean;
   _prefillReference: { domain: string; id: string } | null;
+  _bundleProgress: { current: number; total: number; bundleName: string } | null;
   _fastPathFields: (entry: unknown) => Record<string, unknown> | null;
   _startFeaturedSequence: (
     fullIds: string[],
     boardId: string,
     name: string
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   _onBundleSelected: (e: CustomEvent) => Promise<void>;
 }
 
@@ -99,7 +100,7 @@ describe("add-component-dialog one-shot bundle", () => {
         category: ComponentCategory.LIGHT,
       }),
     });
-    const startSequence = vi.fn();
+    const startSequence = vi.fn().mockResolvedValue(true);
     d._startFeaturedSequence = startSequence;
     // First member fast-paths; the second needs the form.
     d._fastPathFields = vi
@@ -120,6 +121,28 @@ describe("add-component-dialog one-shot bundle", () => {
     expect(d._prefillReference).toEqual({ domain: ComponentCategory.OUTPUT, id: "dep" });
   });
 
+  it("does not clobber state when the hand-off sequence goes stale", async () => {
+    const { d, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.OUTPUT,
+      }),
+    });
+    // The interactive sequence reports it didn't start (stale / errored hydrate).
+    d._startFeaturedSequence = vi.fn().mockResolvedValue(false);
+    d._fastPathFields = vi
+      .fn()
+      .mockReturnValueOnce({ id: "dep" })
+      .mockReturnValueOnce(null);
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // A superseded sequence opened no form; the silent loop's prefill/progress
+    // must not overwrite the newer selection's state.
+    expect(d._prefillReference).toBeNull();
+    expect(d._bundleProgress).toBeNull();
+  });
+
   it("opens the form on the first member when nothing can be fast-pathed", async () => {
     const { d, addComponent, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
@@ -133,5 +156,117 @@ describe("add-component-dialog one-shot bundle", () => {
 
     expect(addComponent).not.toHaveBeenCalled();
     expect(startSequence).toHaveBeenCalledWith(["featured.bd.a"], "bd", "Full setup");
+  });
+
+  it("publishes the merged draft so far when a member fails mid-batch", async () => {
+    const { dialog, d, addComponent, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    addComponent
+      .mockResolvedValueOnce({ yaml: "Y1" })
+      .mockRejectedValueOnce(new Error("boom"));
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+    const drafts: string[] = [];
+    dialog.addEventListener("yaml-draft", (e) => {
+      drafts.push((e as CustomEvent).detail.yaml);
+    });
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // The first member's merge is surfaced so the host keeps it; not lost to the
+    // throw on the second.
+    expect(drafts).toEqual(["Y1"]);
+  });
+
+  it("publishes the merged draft so far when a later selection makes the batch stale", async () => {
+    const { dialog, d, addComponent, getComponentBodies } = makeDialog();
+    const bodies: Record<string, unknown> = {
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.SWITCH,
+      }),
+    };
+    // Bump the selection token while member b is hydrating so its result is
+    // stale (a newer catalog selection superseded the batch).
+    getComponentBodies.mockImplementation(async (ids: string[]) => {
+      if (ids.includes("featured.bd.b")) {
+        (d as unknown as { _selectionSeq: number })._selectionSeq++;
+      }
+      return Object.fromEntries(
+        ids.filter((id) => id in bodies).map((id) => [id, bodies[id]])
+      );
+    });
+    addComponent.mockResolvedValueOnce({ yaml: "Y1" });
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+    const drafts: string[] = [];
+    dialog.addEventListener("yaml-draft", (e) => {
+      drafts.push((e as CustomEvent).detail.yaml);
+    });
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // Member a merged to Y1; b went stale; the partial draft is still published.
+    expect(addComponent).toHaveBeenCalledTimes(1);
+    expect(drafts).toEqual(["Y1"]);
+  });
+
+  it("counts silently-added members in the hand-off progress banner", async () => {
+    const { d, getComponentBodies } = makeDialog();
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.OUTPUT,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.LIGHT,
+      }),
+      "featured.bd.c": makeComponentEntry("featured.bd.c", {
+        category: ComponentCategory.LIGHT,
+      }),
+    });
+    // First member fast-paths silently; the second needs the form.
+    d._fastPathFields = vi
+      .fn()
+      .mockReturnValueOnce({ id: "dep" })
+      .mockReturnValueOnce(null);
+
+    await d._onBundleSelected(bundleEvent(["a", "b", "c"]));
+
+    // Member b opens at step 2 of 3, not step 1 of 2.
+    expect(d._bundleProgress).toEqual({ current: 2, total: 3, bundleName: "Full setup" });
+  });
+
+  it("surfaces the message and keeps partial progress when a member fails to hydrate", async () => {
+    const { dialog, d, addComponent, getComponentBodies } = makeDialog();
+    // b is absent from the bodies, so its hydrate resolves to an error.
+    getComponentBodies.mockResolvedValue({
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+    });
+    const startSequence = vi.fn();
+    d._startFeaturedSequence = startSequence;
+    addComponent.mockResolvedValueOnce({ yaml: "Y1" });
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+    const drafts: string[] = [];
+    dialog.addEventListener("yaml-draft", (e) => {
+      drafts.push((e as CustomEvent).detail.yaml);
+    });
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // a merged to Y1 and is published; b's error is surfaced directly, with no
+    // redundant re-fetch through the interactive hand-off.
+    expect(addComponent).toHaveBeenCalledTimes(1);
+    expect(drafts).toEqual(["Y1"]);
+    expect(startSequence).not.toHaveBeenCalled();
+    expect((d as unknown as { _submitError: string })._submitError).not.toBe("");
   });
 });

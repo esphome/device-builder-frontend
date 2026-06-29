@@ -1,6 +1,10 @@
 import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { EDITOR_FONT_FAMILY, EDITOR_FONT_SIZE } from "./codemirror-theme.js";
+import {
+  EDITOR_FONT_FAMILY,
+  EDITOR_FONT_SIZE,
+  EDITOR_GUTTER_PADDING_LEFT,
+} from "./codemirror-theme.js";
 
 export function buildStickyTheme(background: string): Extension {
   return EditorView.theme({
@@ -54,9 +58,9 @@ export function buildStickyTheme(background: string): Extension {
       boxSizing: "border-box",
       textAlign: "right",
       // Both paddings are set per-row inline (yaml-sticky-render) from the
-      // gutter cell's measured inset; this 5px is only the pre-measure
-      // fallback for the first paint.
-      paddingLeft: "5px",
+      // gutter cell's measured inset; this is only the pre-measure fallback for
+      // the first paint, kept in sync with the editor's gutter inset.
+      paddingLeft: EDITOR_GUTTER_PADDING_LEFT,
       opacity: "0.65",
       userSelect: "none",
     },

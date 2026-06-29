@@ -30,7 +30,7 @@ import {
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
 import { coerceFields } from "./add-component-form-coerce.js";
-import { addFormPaintsAnything } from "./add-component-form-filter.js";
+import { addFormNeedsUserInput } from "./add-component-form-filter.js";
 import { buildInitialValues } from "./add-component-form-seed.js";
 import { componentDialogTitle } from "./component-card-category-label.js";
 
@@ -449,17 +449,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
     fullIds: string[],
     boardId: string,
     progressName: string
-  ) {
+  ): Promise<boolean> {
     const [first, ...rest] = fullIds;
     const result = await hydrateForSelection(
       this as unknown as SelectionHost,
       first,
       boardId
     );
-    if (result.kind === "stale") return;
+    if (result.kind === "stale") return false;
     if (result.kind === "error") {
       this._submitError = result.message;
-      return;
+      return false;
     }
     // Fresh sequence — abandon any in-flight dep-detour state.
     this._clearDetourFields();
@@ -471,13 +471,15 @@ export class ESPHomeAddComponentDialog extends LitElement {
     };
     this._selected = result.entry;
     this._submitError = "";
+    return true;
   }
 
   /**
    * Coerced fields to add *entry* directly, skipping the form, or null when
-   * the form should open. Fast-paths only when the add-form would paint
-   * nothing (`addFormPaintsAnything` reads the same `buildFormRenderPlan`
-   * `render()` does, so the gate can't drift from what the user sees) and the
+   * the form should open. Fast-paths only when the add-form needs no input
+   * (`addFormNeedsUserInput` reads the same `buildFormRenderPlan` `render()`
+   * does, so the gate can't drift from what the user sees — a form whose only
+   * fields are board-locked is a dead-end and gets skipped) and the
    * payload matches the form's Add. The payload is `buildInitialValues` +
    * `coerceFields`, exactly the form's seed/submit, so a seeded `id`/pin (and
    * a featured entry's `seedAll`-seeded locked presets) isn't dropped; the one
@@ -508,7 +510,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       localize: this._localize,
     });
     if (
-      addFormPaintsAnything(
+      addFormNeedsUserInput(
         entry.config_entries,
         seeded,
         entry.required_groups ?? [],
@@ -552,10 +554,28 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // interactive queue, carrying the just-added dependency's id into the opened
     // form's matching reference field (the chaining bundles rely on).
     const handOff = async (idx: number) => {
-      this._submitting = false;
       if (addedAny) this._dispatchDraft(this.yaml);
-      await this._startFeaturedSequence(fullIds.slice(idx), boardId, bundle.name);
+      // Keep `_submitting` set across the hydrate so the dialog can't be
+      // dismissed or a new selection started mid-hand-off (which would make the
+      // hydrate stale); release it once the form is up.
+      const started = await this._startFeaturedSequence(
+        fullIds.slice(idx),
+        boardId,
+        bundle.name
+      );
+      this._submitting = false;
+      // A stale/errored sequence opened no form and left detour state alone;
+      // don't clobber it (or a superseding selection's state).
+      if (!started) return;
       if (lastAdded) this._prefillReference = lastAdded;
+      // `_startFeaturedSequence` counts from 1 over the remaining slice; restate
+      // the banner against the whole bundle so members already added silently
+      // still count toward the step number.
+      this._bundleProgress = {
+        current: idx + 1,
+        total: fullIds.length,
+        bundleName: bundle.name,
+      };
     };
     try {
       for (let i = 0; i < fullIds.length; i++) {
@@ -564,9 +584,19 @@ export class ESPHomeAddComponentDialog extends LitElement {
           fullIds[i],
           boardId
         );
-        if (result.kind === "stale") return;
+        if (result.kind === "stale") {
+          // A newer selection superseded this batch; publish what merged so far
+          // for symmetry with the throw/hand-off paths (the superseding flow
+          // also threads `this.yaml`, but don't rely on it cancelling).
+          if (addedAny) this._dispatchDraft(this.yaml);
+          return;
+        }
         if (result.kind === "error") {
-          await handOff(i);
+          // A body fetch failed; routing through hand-off would only re-fetch
+          // the same member and drop this message. Surface it directly and keep
+          // what merged so far.
+          if (addedAny) this._dispatchDraft(this.yaml);
+          this._submitError = result.message;
           return;
         }
         const entry = result.entry;
@@ -597,6 +627,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         richColors: true,
       });
     } catch (err) {
+      // A member failed mid-batch: publish what merged so far so the host keeps
+      // the already-added members (the draft is otherwise only published on the
+      // success or hand-off paths, not on a throw).
+      if (addedAny) this._dispatchDraft(this.yaml);
       this._submitError =
         err instanceof Error ? err.message : this._localize("device.add_component_error");
       toast.error(this._submitError, { richColors: true });
