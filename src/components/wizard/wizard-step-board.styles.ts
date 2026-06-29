@@ -141,7 +141,10 @@ export const wizardStepBoardStyles = css`
 
   .boards-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    /* minmax(0, 1fr), not 1fr (= minmax(auto, 1fr)): a card with wide
+       min-content (a long unbreakable token in a name/description) would
+       otherwise blow its column past its fair share and shrink the other. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--wa-space-s);
   }
 
@@ -151,6 +154,8 @@ export const wizardStepBoardStyles = css`
     background: var(--wa-color-surface-default);
     padding: var(--wa-space-m);
     box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-s);
@@ -194,6 +199,7 @@ export const wizardStepBoardStyles = css`
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
     line-height: 1.3;
+    overflow-wrap: anywhere;
   }
 
   .expand-button {
@@ -219,6 +225,7 @@ export const wizardStepBoardStyles = css`
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
     line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
   .board-description--clamp {
