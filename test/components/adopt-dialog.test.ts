@@ -104,6 +104,19 @@ describe("adopt-dialog wifi step (#1742)", () => {
     window.removeEventListener("secrets-saved", savedListener);
   });
 
+  it("_submit re-checks the wifi gate so Enter can't skip the store", async () => {
+    const { priv, setWifiCredentials, importDevice } = makeDialog([]);
+    priv.open(wifiDevice());
+    await vi.waitFor(() => expect(priv._collectWifi).toBe(true));
+    // SSID still empty: the Enter path (calls _submit directly, bypassing
+    // the disabled button) must refuse rather than import an unresolved
+    // !secret or store an empty SSID.
+    await priv._submit();
+
+    expect(setWifiCredentials).not.toHaveBeenCalled();
+    expect(importDevice).not.toHaveBeenCalled();
+  });
+
   it("does not store credentials when the shared secret already exists", async () => {
     const { priv, setWifiCredentials, importDevice } = makeDialog([
       "wifi_ssid",

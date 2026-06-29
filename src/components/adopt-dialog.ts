@@ -280,6 +280,19 @@ export class ESPHomeAdoptDialog extends LitElement {
     return this._needsWifi && this._hasWifiSecrets === false;
   }
 
+  // Block submit while a wifi device's secrets are still loading
+  // (_hasWifiSecrets undefined) so a fast Enter can't skip the store, and
+  // once the Wi-Fi step shows require an SSID + a valid-length password.
+  // Read by both canSubmit and _submit so the Enter path (which bypasses
+  // the disabled button) is guarded too.
+  private get _wifiBlocking(): boolean {
+    return (
+      (this._needsWifi && this._hasWifiSecrets === undefined) ||
+      (this._collectWifi &&
+        (!this._ssid.trim() || isWifiPasswordTooShort(this._password)))
+    );
+  }
+
   close = () => {
     /* Arrow function so ``@click=${this.close}`` from the cancel
        button keeps ``this`` bound to the dialog. With a plain method,
@@ -309,15 +322,8 @@ export class ESPHomeAdoptDialog extends LitElement {
     const device = this._device;
     const nameTrimmed = this._name.trim();
     const nameErr = nameTrimmed ? validateDeviceName(nameTrimmed) : null;
-    // Block submit while a wifi device's secrets are still loading
-    // (_hasWifiSecrets undefined) so a fast click can't skip the store, and
-    // once the Wi-Fi step shows require an SSID + a valid-length password.
-    const wifiBlocking =
-      (this._needsWifi && this._hasWifiSecrets === undefined) ||
-      (this._collectWifi &&
-        (!this._ssid.trim() || isWifiPasswordTooShort(this._password)));
     const canSubmit =
-      !!device && !!nameTrimmed && !nameErr && !this._busy && !wifiBlocking;
+      !!device && !!nameTrimmed && !nameErr && !this._busy && !this._wifiBlocking;
     const displayName = device ? device.friendly_name || device.name : "";
 
     return html`
@@ -470,6 +476,9 @@ export class ESPHomeAdoptDialog extends LitElement {
     const name = this._name.trim();
     const friendlyName = this._friendlyName.trim();
     if (!name || validateDeviceName(name)) return;
+    // Enter bypasses the disabled button; re-check the Wi-Fi gate so a
+    // held Enter can't import before the secret store (or with bad creds).
+    if (this._wifiBlocking) return;
 
     this._busy = true;
     this._error = null;
