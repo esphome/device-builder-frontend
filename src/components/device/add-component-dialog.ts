@@ -574,7 +574,13 @@ export class ESPHomeAddComponentDialog extends LitElement {
           fullIds[i],
           boardId
         );
-        if (result.kind === "stale") return;
+        if (result.kind === "stale") {
+          // A newer selection superseded this batch; publish what merged so far
+          // for symmetry with the throw/hand-off paths (the superseding flow
+          // also threads `this.yaml`, but don't rely on it cancelling).
+          if (addedAny) this._dispatchDraft(this.yaml);
+          return;
+        }
         if (result.kind === "error") {
           await handOff(i);
           return;

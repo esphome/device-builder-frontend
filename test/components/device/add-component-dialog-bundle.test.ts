@@ -162,6 +162,40 @@ describe("add-component-dialog one-shot bundle", () => {
     expect(drafts).toEqual(["Y1"]);
   });
 
+  it("publishes the merged draft so far when a later selection makes the batch stale", async () => {
+    const { dialog, d, addComponent, getComponentBodies } = makeDialog();
+    const bodies: Record<string, unknown> = {
+      "featured.bd.a": makeComponentEntry("featured.bd.a", {
+        category: ComponentCategory.SWITCH,
+      }),
+      "featured.bd.b": makeComponentEntry("featured.bd.b", {
+        category: ComponentCategory.SWITCH,
+      }),
+    };
+    // Bump the selection token while member b is hydrating so its result is
+    // stale (a newer catalog selection superseded the batch).
+    getComponentBodies.mockImplementation(async (ids: string[]) => {
+      if (ids.includes("featured.bd.b")) {
+        (d as unknown as { _selectionSeq: number })._selectionSeq++;
+      }
+      return Object.fromEntries(
+        ids.filter((id) => id in bodies).map((id) => [id, bodies[id]])
+      );
+    });
+    addComponent.mockResolvedValueOnce({ yaml: "Y1" });
+    d._fastPathFields = vi.fn().mockReturnValue({ id: "x" });
+    const drafts: string[] = [];
+    dialog.addEventListener("yaml-draft", (e) => {
+      drafts.push((e as CustomEvent).detail.yaml);
+    });
+
+    await d._onBundleSelected(bundleEvent(["a", "b"]));
+
+    // Member a merged to Y1; b went stale; the partial draft is still published.
+    expect(addComponent).toHaveBeenCalledTimes(1);
+    expect(drafts).toEqual(["Y1"]);
+  });
+
   it("counts silently-added members in the hand-off progress banner", async () => {
     const { d, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
