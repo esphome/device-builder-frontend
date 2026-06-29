@@ -34,7 +34,6 @@ import type {
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
-import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ESPHOME_DOCS_BASE } from "../../../common/docs.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
@@ -44,12 +43,10 @@ import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
-import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
@@ -433,13 +430,11 @@ export class ESPHomeScriptEditor extends LitElement {
     const entries = comp.config_entries.filter(
       (e) => e.key !== "parameters" && e.key !== "then"
     );
-    if (entries.length === 0) return nothing;
-    // The form is its own flex-column with gap, and the toggle and
-    // parameters/actions sit as siblings of it at the editor's root.
-    // No outer ``.field`` wrapper: that would add a label-shaped
-    // empty row of vertical rhythm above the form's first row, which
-    // is what made the spacing look "off" against the bespoke
-    // Parameters / Actions sections.
+    const hasParameters = this._hasParametersEntry();
+    if (entries.length === 0 && !hasParameters) return nothing;
+    // The form owns the "Advanced settings" control; it also gates the bespoke
+    // Parameters block (rendered below, outside the form) via the same switch,
+    // so force the control on when parameters exist and count it as one item.
     return html`
       <esphome-config-entry-form
         .entries=${entries}
@@ -447,29 +442,19 @@ export class ESPHomeScriptEditor extends LitElement {
         .board=${this.board}
         .yaml=${this.yaml}
         ?disabled=${disabled}
+        advanced-section
+        ?force-advanced-control=${hasParameters}
+        .advancedExtraCount=${hasParameters ? 1 : 0}
         ?show-advanced=${this._showAdvanced}
         @value-change=${this._onConfigFormValueChange}
+        @advanced-toggle=${this._onAdvancedToggle}
       ></esphome-config-entry-form>
-      ${this._renderAdvancedToggle(entries)}
     `;
   }
 
-  /** "Show advanced settings" toggle row. Pulled out so the same
-   *  toggle can drive both the form's advanced fields AND the
-   *  bespoke Parameters block — keeping them gated behind a single
-   *  switch matches the user's expectation that "advanced" is one
-   *  surface, not per-section. */
-  private _renderAdvancedToggle(entries: ConfigEntry[]) {
-    // Always show the toggle when ``parameters`` exists in the
-    // component schema (it does), even if the entries we're handing
-    // the form have no non-required fields — the toggle is now also
-    // gating the Parameters editor.
-    const hasAdvanced = anyAdvancedEntry(entries) || this._hasParametersEntry();
-    if (!hasAdvanced) return nothing;
-    return renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
-      this._showAdvanced = show;
-    });
-  }
+  private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
+    this._showAdvanced = e.detail.show;
+  };
 
   /** Does the script catalog define a ``parameters`` entry? Used to
    *  decide whether to show the advanced toggle even when the form

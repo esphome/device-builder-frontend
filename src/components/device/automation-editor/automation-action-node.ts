@@ -37,10 +37,8 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import { actionAdvancedState } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import "../config-entry-renderers/lambda-editor.js";
@@ -387,25 +385,25 @@ export class ESPHomeAutomationActionNode extends LitElement {
     if (!def) return nothing;
     if (def.id === "delay") return this._renderDelayParams();
     if (def.config_entries.length === 0) return nothing;
-    const { showAdvanced, showToggle } = actionAdvancedState(
-      def.config_entries,
-      this._showAdvanced
-    );
+    // The form owns the advanced section; an all-advanced action (no basic
+    // fields) renders everything with no control, matching the old
+    // force-open-no-toggle behaviour.
     return html`<esphome-config-entry-form
-        .entries=${def.config_entries}
-        .values=${this.value.params}
-        .board=${this.board}
-        .yaml=${this.yaml}
-        ?disabled=${this.disabled}
-        ?show-advanced=${showAdvanced}
-        @value-change=${this._onParamChange}
-      ></esphome-config-entry-form>
-      ${showToggle
-        ? renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
-            this._showAdvanced = show;
-          })
-        : nothing}`;
+      .entries=${def.config_entries}
+      .values=${this.value.params}
+      .board=${this.board}
+      .yaml=${this.yaml}
+      ?disabled=${this.disabled}
+      advanced-section
+      ?show-advanced=${this._showAdvanced}
+      @value-change=${this._onParamChange}
+      @advanced-toggle=${this._onAdvancedToggle}
+    ></esphome-config-entry-form>`;
   }
+
+  private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
+    this._showAdvanced = e.detail.show;
+  };
 
   /** The bespoke value+unit / lambda Delay widget. The renderer and
    *  its params read/write helpers live in ``automation-delay-params``;

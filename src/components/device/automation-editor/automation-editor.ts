@@ -54,12 +54,10 @@ import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
-import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
 import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
-import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
@@ -563,7 +561,6 @@ export class ESPHomeAutomationEditor extends LitElement {
   ) {
     const entries = this._paramFormEntries(activeTrigger);
     if (entries.length === 0) return nothing;
-    const hasAdvanced = anyAdvancedEntry(entries);
     // No outer wrapper / no synthetic group label: the form renders
     // each entry with its own catalog-derived label + description,
     // and a section header above that ("Interval" / "Trigger
@@ -577,16 +574,17 @@ export class ESPHomeAutomationEditor extends LitElement {
         .board=${this.board}
         .yaml=${this.yaml}
         ?disabled=${disabled}
+        advanced-section
         ?show-advanced=${this._showAdvanced}
         @value-change=${this._onTriggerParamsValueChange}
+        @advanced-toggle=${this._onAdvancedToggle}
       ></esphome-config-entry-form>
-      ${hasAdvanced
-        ? renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
-            this._showAdvanced = show;
-          })
-        : nothing}
     `;
   }
+
+  private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
+    this._showAdvanced = e.detail.show;
+  };
 
   /** Resolve the config_entries list that drives the trigger-params
    *  form. Interval pulls from the component schema (since

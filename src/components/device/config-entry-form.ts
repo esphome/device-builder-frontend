@@ -22,7 +22,7 @@ import {
   mdiOpenInNew,
   mdiPlus,
 } from "@mdi/js";
-import { html, LitElement, nothing, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
@@ -33,6 +33,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
+import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
 import {
   catalogEntryToProvider,
   type ComponentProvider,
@@ -52,6 +53,7 @@ import { looksLikeSubstitution, parseSubstitutions } from "../../util/substituti
 import {
   _isStructuralType,
   filterRenderable,
+  hasMaterialValue,
   renderFilterOptions,
 } from "./config-entry-render-filter.js";
 import {
@@ -182,6 +184,25 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property({ type: Boolean, attribute: "show-advanced" })
   showAdvanced = false;
 
+  /** Opt in to the collapsible advanced section: basic fields, then an
+   *  "Advanced settings" control, then the advanced fields below it (so the
+   *  control can't be pushed off-screen). The form renders the control and
+   *  emits ``advanced-toggle``; the owner keeps owning ``showAdvanced``.
+   *  Off (default) keeps the legacy inline filter — advanced fields are
+   *  dropped/interleaved by ``showAdvanced`` with no in-form control. */
+  @property({ type: Boolean, attribute: "advanced-section" })
+  advancedSection = false;
+
+  /** Show the advanced-section control even when the form itself has no
+   *  advanced fields — the owner gates extra advanced content outside the form
+   *  (the script editor's Parameters block) behind the same control. */
+  @property({ type: Boolean, attribute: "force-advanced-control" })
+  forceAdvancedControl = false;
+
+  /** Added to the advanced-section "(N)" count for that external content. */
+  @property({ type: Number, attribute: "advanced-extra-count" })
+  advancedExtraCount = 0;
+
   /** Show only required entries (recursively into nested groups).
    *  Used by the add-component dialog so the user only fills the
    *  must-have fields up front. */
@@ -278,7 +299,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  grow. */
   private _constraintClusters = new ConstraintClusterController(this);
 
-  static styles = fieldRendererStyles;
+  static styles = [
+    fieldRendererStyles,
+    css`
+      /* "Show advanced settings" switch (advanced-section mode): sits at the
+         basic/advanced boundary; flipping it on reveals the advanced fields
+         rendered below it. */
+      .advanced-toggle-row {
+        display: flex;
+        font-size: var(--wa-font-size-s);
+      }
+
+      .advanced-toggle-row wa-switch {
+        font-weight: var(--wa-font-weight-semibold);
+        color: var(--wa-color-text-quiet);
+      }
+    `,
+  ];
 
   /**
    * Filter `entries` for rendering. Delegates to the shared
@@ -298,35 +335,151 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // mandatory fields first. The section editor mirrors the on-disk YAML
     // order, so it's left untouched.
     const entries = this.requiredOnly ? floatRequiredFirst(this.entries) : this.entries;
+    return this.advancedSection
+      ? this._renderWithAdvancedSection(entries, ctx)
+      : this._renderFlat(entries, ctx);
+  }
+
+  /** Legacy paint: one ordered pass, advanced fields dropped/interleaved by the
+   *  ``showAdvanced`` filter. Used by the add-component dialog and any host that
+   *  hasn't opted into the collapsible advanced section. */
+  private _renderFlat(entries: ConfigEntry[], ctx: RenderCtx) {
     // Each exclusive_group renders as one always-shown dropdown at its first
     // member's slot; either/or constraints fold into one bordered box at the
     // first member's slot; other entries keep the advanced/visibility filter.
     // `buildFormRenderPlan` is the shared source of truth the dialog's
     // empty-form gate reads — keep paint decisions there, not inline here.
-    const { ordered, clusters, memberKeys, visible } = buildFormRenderPlan(
+    const plan = buildFormRenderPlan(
       entries,
       this.values,
       this.requiredGroups,
       renderFilterOptions(this)
     );
-    const clusterByFirstKey = new Map(clusters.map((c) => [c.members[0].key, c]));
-    // An empty key means "this entry IS the whole values dict" —
-    // used by top-level user-keyed sections (substitutions:) where
-    // the component itself is the map. Pass ``[]`` so the entry's
-    // renderer sees the values dict directly via ``ctx.getAt([])``.
-    return html`${this._renderConstraintBanners(ctx, memberKeys)}${ordered.map((item) => {
+    const renderItem = this._makeItemRenderer(plan, ctx);
+    return html`${this._renderConstraintBanners(ctx, plan.memberKeys)}${plan.ordered.map(
+      renderItem
+    )}`;
+  }
+
+  /** Collapsible-advanced paint: basic units, then the "Advanced settings"
+   *  control, then the advanced units below it (revealed when expanded). The
+   *  plan is built with ``showAdvanced: true`` to defeat ``filterRenderable``'s
+   *  drop-advanced gate so advanced units land in the plan; the basic/advanced
+   *  split + the section's open state gate them here instead. (``filterRenderable``
+   *  still owns the material-value rule, mirrored by ``forceOpen`` below.) */
+  private _renderWithAdvancedSection(entries: ConfigEntry[], ctx: RenderCtx) {
+    const plan = buildFormRenderPlan(
+      entries,
+      this.values,
+      this.requiredGroups,
+      renderFilterOptions(this, { showAdvanced: true })
+    );
+    const renderItem = this._makeItemRenderer(plan, ctx);
+    const isAdvanced = this._advancedUnitClassifier(plan);
+    const basic = plan.ordered.filter((item) => !isAdvanced(item));
+    const advanced = plan.ordered.filter((item) => isAdvanced(item));
+    // Control visibility is recursive: a nested advanced field reveals in place
+    // (it can't move to the bottom section), so the control must surface even
+    // when no top-level unit is advanced, or that field stays unreachable.
+    const hasAdvanced = anyAdvancedEntry(entries);
+    // Everything advanced (e.g. an all-advanced action): no basic fields to gate
+    // behind a control, so render it all with no control — unless the owner gates
+    // external content (script Parameters) through it, which must stay reachable.
+    const allAdvanced = advanced.length > 0 && basic.length === 0;
+    // Pre-filled advanced fields stay visible without a click, matching the
+    // legacy material-value behaviour — open the section when any is set.
+    const forceOpen = this._advancedForceOpen();
+    // all-advanced auto-opens (an all-advanced action shows its fields with no
+    // control) EXCEPT when the owner gates external content (script Parameters)
+    // through the control: there the user must drive it, or the host's
+    // showAdvanced never flips and the external block stays unreachable.
+    const open =
+      this.showAdvanced || forceOpen || (allAdvanced && !this.forceAdvancedControl);
+    const showControl = this.forceAdvancedControl || (hasAdvanced && !allAdvanced);
+    const count = advanced.length + this.advancedExtraCount;
+    return html`${this._renderConstraintBanners(ctx, plan.memberKeys)}${basic.map(
+      renderItem
+    )}${showControl ? this._renderAdvancedControl(open, count, forceOpen) : nothing}${open
+      ? advanced.map(renderItem)
+      : nothing}`;
+  }
+
+  /** Per-item renderer shared by both paint paths. An empty key means "this
+   *  entry IS the whole values dict" (top-level user-keyed sections like
+   *  ``substitutions:``); pass ``[]`` so the renderer sees the dict directly. */
+  private _makeItemRenderer(
+    plan: ReturnType<typeof buildFormRenderPlan>,
+    ctx: RenderCtx
+  ) {
+    const clusterByFirstKey = new Map(plan.clusters.map((c) => [c.members[0].key, c]));
+    return (item: ConfigEntry | ConfigEntry[]) => {
       if (Array.isArray(item)) return renderExclusiveGroupField(item, ctx);
-      if (memberKeys.has(item.key)) {
+      if (plan.memberKeys.has(item.key)) {
         const cluster = clusterByFirstKey.get(item.key);
         if (!cluster) return nothing;
         return isRadioCluster(cluster)
           ? renderConstraintRadioField(cluster, ctx)
           : renderConstraintClusterField(cluster, ctx);
       }
-      return visible.has(item)
+      return plan.visible.has(item)
         ? this._renderEntry(item, item.key ? [item.key] : [], ctx)
         : nothing;
-    })}`;
+    };
+  }
+
+  /** True when a pre-filled advanced field forces the section open — it can't be
+   *  collapsed while a value is set, matching the legacy material-value rule. */
+  private _advancedForceOpen(): boolean {
+    return this.entries.some((e) => e.advanced && hasMaterialValue(e, this.values));
+  }
+
+  /** Classify a render unit as advanced. A group (exclusive dropdown or
+   *  constraint cluster) is advanced only when *every* member is — a group
+   *  renders atomically, so it can't straddle the basic/advanced boundary. */
+  private _advancedUnitClassifier(plan: ReturnType<typeof buildFormRenderPlan>) {
+    const clusterAllAdvanced = new Map<string, boolean>();
+    for (const cluster of plan.clusters) {
+      const all = cluster.members.every((m) => m.advanced);
+      for (const m of cluster.members) clusterAllAdvanced.set(m.key, all);
+    }
+    return (item: ConfigEntry | ConfigEntry[]): boolean => {
+      if (Array.isArray(item)) return item.length > 0 && item.every((e) => e.advanced);
+      if (plan.memberKeys.has(item.key)) return clusterAllAdvanced.get(item.key) ?? false;
+      return !!item.advanced;
+    };
+  }
+
+  /** ``locked`` = the section is open because a pre-filled advanced field forces
+   *  it (forceOpen) and can't be collapsed; render the switch disabled rather
+   *  than as a toggle that silently fails, while still showing the fields. */
+  private _renderAdvancedControl(open: boolean, count: number, locked: boolean) {
+    const label =
+      count > 0
+        ? this._localize("device.show_advanced_count", { count })
+        : this._localize("device.show_advanced");
+    return html`<div class="advanced-toggle-row">
+      <wa-switch
+        size="small"
+        ?disabled=${locked}
+        .checked=${open}
+        @change=${(e: Event) =>
+          this._emitAdvancedToggle(
+            (e.target as HTMLInputElement & { checked: boolean }).checked
+          )}
+      >
+        ${label}
+      </wa-switch>
+    </div>`;
+  }
+
+  private _emitAdvancedToggle(show: boolean) {
+    this.dispatchEvent(
+      new CustomEvent("advanced-toggle", {
+        detail: { show },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   /** Fallback banner for *unsatisfied* constraint groups that aren't visually
@@ -384,6 +537,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
     void this._syncSelectValues();
     // The radio-group sync runs from ConstraintClusterController.hostUpdated().
     this._fieldScroll.maybeScroll(changed);
+    // Force-open (a pre-filled advanced field) is a form-internal decision;
+    // mirror it onto the host so externally-gated siblings (the script editor's
+    // Parameters block) track the visibly-open section. The host flipping
+    // showAdvanced true stops the condition, so this self-limits.
+    if (this.advancedSection && !this.showAdvanced && this._advancedForceOpen()) {
+      this._emitAdvancedToggle(true);
+    }
   }
 
   /**

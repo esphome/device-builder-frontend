@@ -124,7 +124,10 @@ export function renderFilterOptions(
  * any descendant leaf is set; an advanced group with at least one
  * filled child needs to render so the child is reachable.
  */
-function hasMaterialValue(entry: ConfigEntry, values: Record<string, unknown>): boolean {
+export function hasMaterialValue(
+  entry: ConfigEntry,
+  values: Record<string, unknown>
+): boolean {
   const value = values[entry.key];
   if (entry.type === ConfigEntryType.NESTED) {
     if (entry.multi_value) {

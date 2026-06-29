@@ -17,13 +17,12 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { actionFieldLabel } from "../../util/action-field-label.js";
 import { defaultBoardImageUrl, onBoardImageError } from "../../util/board-image.js";
-import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
+import { pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import { parseYamlAutomations, type YamlSection } from "../../util/yaml-sections.js";
-import { renderAdvancedToggle } from "./advanced-toggle.js";
 import {
   applyYamlDiff,
   locationFromSectionKey,
@@ -186,6 +185,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     this._advancedShownSections = next;
   }
 
+  private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
+    this._setShowAdvanced(e.detail.show);
+  };
+
   static styles = [espHomeStyles, inputStyles, deviceSectionConfigStyles];
 
   willUpdate(changedProperties: Map<string, unknown>) {
@@ -336,7 +339,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // Handles overrides for sections whose backend schema doesn't match the
     // actual user-keyed shape (currently just substitutions).
     const renderEntries = resolveSectionEntries(this.sectionKey, this._config.entries);
-    const hasAdvanced = anyAdvancedEntry(renderEntries);
     // Free-form / structural sections: show "edit via YAML" instead of the
     // form. external_components and packages are always-YAML (discriminated
     // unions don't fit the catalog — see #361 for the packages data-loss
@@ -426,15 +428,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .configuration=${this.configuration}
               .focusFieldPath=${this.focusFieldPath}
               .presentComponents=${this._presentComponents}
+              advanced-section
               ?show-advanced=${showAdvanced}
               @value-change=${this._onValueChange}
+              @advanced-toggle=${this._onAdvancedToggle}
               @edit-action-field=${this._onEditActionField}
             ></esphome-config-entry-form>
-            ${hasAdvanced
-              ? renderAdvancedToggle(showAdvanced, this._localize, (show) =>
-                  this._setShowAdvanced(show)
-                )
-              : nothing}
             ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
             ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
             ${this._renderActionsRow(canDelete)}
