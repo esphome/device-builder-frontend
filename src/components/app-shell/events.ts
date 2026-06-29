@@ -76,7 +76,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       // Settings write is in flight, so a reconnect's snapshot can't revert the
       // optimistic change.
       host._prefsLoaded = true;
-      if (host._prefsWritesInFlight === 0) {
+      if (preferences && host._prefsWritesInFlight === 0) {
         applyPreferences(host, preferences);
       }
       host._devices = devices;
