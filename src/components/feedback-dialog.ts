@@ -11,7 +11,7 @@ import {
   mdiMagnify,
   mdiOpenInNew,
 } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
@@ -48,18 +48,32 @@ const SURVEY_LINK = {
 type DrillScreen = "browse" | "bug";
 type Screen = "main" | DrillScreen;
 
-interface FeedbackLink {
+interface FeedbackLinkBase {
   icon: string;
   labelKey: string;
   descKey?: string;
-  href?: string;
-  // When set, the row navigates to that in-dialog screen instead of opening a
-  // link; rendered as a button with a chevron rather than an anchor.
-  drillTo?: DrillScreen;
-  // Prefills the destination form's "version" field from the matching context:
-  // "dashboard" is our server version, "esphome" is the installed core version.
-  versionSource?: "dashboard" | "esphome";
 }
+
+// Opens a URL. "versionSource" prefills the destination form's "version" field
+// from the matching context: "dashboard" is our server version, "esphome" is
+// the installed core version.
+interface ExternalLink extends FeedbackLinkBase {
+  href: string;
+  versionSource?: "dashboard" | "esphome";
+  drillTo?: never;
+}
+
+// Navigates to a second in-dialog screen instead of opening a link; rendered as
+// a button with a chevron rather than an anchor.
+interface DrillLink extends FeedbackLinkBase {
+  drillTo: DrillScreen;
+  href?: never;
+  versionSource?: never;
+}
+
+// Discriminated union so a link is always exactly one of the two shapes; a row
+// can never omit both href and drillTo and silently render an empty anchor.
+type FeedbackLink = ExternalLink | DrillLink;
 
 // Both the "Report a new issue" and "Browse open issues" rows drill into a
 // second screen that splits Device Builder from ESPHome core, so people stop
@@ -366,6 +380,26 @@ export class ESPHomeFeedbackDialog extends LitElement {
     this._screen = screen;
   }
 
+  // A screen swap removes the control that had focus (the drill row, or the back
+  // button), so move focus to the new screen's entry control; otherwise keyboard
+  // and screen-reader users are dropped back to document.body.
+  protected updated(changed: PropertyValues): void {
+    if (!this._open || !changed.has("_screen")) {
+      return;
+    }
+    const previous = changed.get("_screen") as Screen | undefined;
+    if (previous === undefined) {
+      return;
+    }
+    const target =
+      this._screen === "main"
+        ? this.renderRoot.querySelector<HTMLElement>(
+            `button.link[data-drill="${previous}"]`
+          )
+        : this.renderRoot.querySelector<HTMLElement>(".back-button");
+    target?.focus();
+  }
+
   private _renderLinkBody(link: FeedbackLink) {
     return html`
       <wa-icon class="link-icon" library="mdi" name=${link.icon}></wa-icon>
@@ -382,7 +416,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
     if (link.drillTo) {
       const screen = link.drillTo;
       return html`
-        <button class="link" @click=${() => this._goTo(screen)}>
+        <button class="link" data-drill=${screen} @click=${() => this._goTo(screen)}>
           ${this._renderLinkBody(link)}
           <wa-icon class="link-chevron" library="mdi" name="chevron-right"></wa-icon>
         </button>
