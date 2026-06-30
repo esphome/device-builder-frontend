@@ -147,8 +147,14 @@ export function createYamlCompletionSource(
       if (subRefMatch) {
         const subs = collectSubstitutionKeys(state);
         if (subs.length > 0) {
+          // closeBrackets (basicSetup) auto-inserts a matching ``}`` when
+          // the user types ``{``, so the buffer is already ``${<cursor>}``.
+          // Extend the replaced range over that brace so accepting an option
+          // doesn't leave a doubled ``}``.
+          const closeBrace = state.sliceDoc(pos, pos + 1) === "}" ? 1 : 0;
           return {
             from: valueFrom,
+            to: pos + closeBrace,
             options: subs.map((name) => ({
               label: `\${${name}}`,
               apply: `\${${name}}`,
