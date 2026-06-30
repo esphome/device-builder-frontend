@@ -1,0 +1,69 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * Pins the version-prefill routing: Device Builder rows carry the server
+ * version, the ESPHome row carries the installed core version, and rows
+ * without a source (or version) are left untouched.
+ */
+import { describe, expect, it } from "vitest";
+
+import { ESPHomeFeedbackDialog } from "../../src/components/feedback-dialog.js";
+
+interface HrefLink {
+  href?: string;
+  versionSource?: "dashboard" | "esphome";
+}
+
+function dialog(serverVersion = "", esphomeVersion = "") {
+  const el = new ESPHomeFeedbackDialog();
+  Object.assign(el as unknown as Record<string, unknown>, {
+    _serverVersion: serverVersion,
+    _esphomeVersion: esphomeVersion,
+  });
+  return el as unknown as { _hrefFor(link: HrefLink): string };
+}
+
+describe("feedback-dialog version prefill", () => {
+  it("appends the server version for Device Builder links", () => {
+    expect(
+      dialog("2026.6.0b1", "2026.6.0")._hrefFor({
+        href: "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml",
+        versionSource: "dashboard",
+      })
+    ).toBe(
+      "https://github.com/esphome/device-builder/issues/new?template=bug_report.yml&version=2026.6.0b1"
+    );
+  });
+
+  it("appends the installed core version for the ESPHome link", () => {
+    expect(
+      dialog("2026.6.0b1", "2026.6.0")._hrefFor({
+        href: "https://github.com/esphome/esphome/issues/new?template=bug_report.yml",
+        versionSource: "esphome",
+      })
+    ).toBe(
+      "https://github.com/esphome/esphome/issues/new?template=bug_report.yml&version=2026.6.0"
+    );
+  });
+
+  it("leaves the href untouched when the matching version is empty", () => {
+    expect(
+      dialog("", "")._hrefFor({
+        href: "https://github.com/esphome/device-builder/issues",
+        versionSource: "dashboard",
+      })
+    ).toBe("https://github.com/esphome/device-builder/issues");
+  });
+
+  it("does not append a version when no source is set", () => {
+    expect(
+      dialog("2026.6.0b1", "2026.6.0")._hrefFor({
+        href: "https://github.com/esphome/device-builder/issues",
+      })
+    ).toBe("https://github.com/esphome/device-builder/issues");
+  });
+
+  it("returns an empty string for a drill row with no href", () => {
+    expect(dialog()._hrefFor({})).toBe("");
+  });
+});

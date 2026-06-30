@@ -307,6 +307,15 @@ export class ESPHomeFeedbackDialog extends LitElement {
         transition: opacity 0.12s;
       }
 
+      /* The drill chevron is the only cue a row navigates deeper, so it stays
+         visible at rest (unlike the hover-only external-link glyph) for touch
+         users with no hover state. */
+      .link-chevron {
+        font-size: 18px;
+        color: var(--wa-color-text-quiet);
+        flex-shrink: 0;
+      }
+
       .link.featured {
         padding: var(--wa-space-s) var(--wa-space-m);
         border-color: var(--esphome-primary);
@@ -375,7 +384,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
       return html`
         <button class="link" @click=${() => this._goTo(screen)}>
           ${this._renderLinkBody(link)}
-          <wa-icon class="link-external" library="mdi" name="chevron-right"></wa-icon>
+          <wa-icon class="link-chevron" library="mdi" name="chevron-right"></wa-icon>
         </button>
       `;
     }
