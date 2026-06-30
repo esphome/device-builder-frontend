@@ -3,6 +3,7 @@ import { html, type TemplateResult } from "lit";
 import type { AdoptableDevice, ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
+import { devicePendingChanges, deviceUpdateAvailable } from "../../util/device-sync.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { downloadYaml, editDevice } from "./actions.js";
 import { renderFacets } from "./render-facets.js";
@@ -103,8 +104,8 @@ export function renderCardGrid(
             .configuration=${device.configuration}
             .state=${device.state}
             .labelIds=${device.labels ?? []}
-            ?has-pending-changes=${device.has_pending_changes === true}
-            ?has-update-available=${device.update_available}
+            ?has-pending-changes=${devicePendingChanges(device)}
+            ?has-update-available=${deviceUpdateAvailable(device)}
             .installedVersion=${device.deployed_version}
             .availableVersion=${device.current_version}
             ?api-enabled=${device.api_enabled === true}

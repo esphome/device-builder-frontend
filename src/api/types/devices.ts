@@ -3,6 +3,10 @@
  *
  * Part of the src/api/types.ts barrel split.
  */
+// Type-only: ``reachability.ts`` imports ``DeviceState`` from here, so a
+// value import would cycle. ``ReachabilitySource`` is a string-literal union,
+// erased at runtime, so the type-only edge is free.
+import type { ReachabilitySource } from "./reachability.js";
 
 // ─── Devices ─────────────────────────────────────────────────
 
@@ -84,6 +88,14 @@ export interface ConfiguredDevice {
    * mtime-based change detection.
    */
   deployed_config_hash: string;
+  /** Reachability channel currently driving the device's online state
+   *  (``mdns`` > ``mqtt`` > ``ping``). The deployed version / config
+   *  hash come only from the mDNS broadcast, so the out-of-sync /
+   *  update indicators are gated on ``active_source === "mdns"`` (see
+   *  ``src/util/device-sync.ts``): when mDNS is dark those values are
+   *  stale. Optional on the wire — absent / ``"unknown"`` means no
+   *  source has claimed the device yet, which reads as "not mDNS". */
+  active_source?: ReachabilitySource;
   /** True until successfully compiled + deployed */
   has_pending_changes: boolean;
   /** True if compiled with older ESPHome version */

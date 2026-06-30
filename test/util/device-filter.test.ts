@@ -28,6 +28,9 @@ function device(over: Partial<ConfiguredDevice> = {}): ConfiguredDevice {
     mac_address: "",
     labels: [],
     area: "",
+    // Live mDNS by default so update/modified filters match; mDNS-dark cases
+    // override active_source.
+    active_source: "mdns",
     update_available: false,
     has_pending_changes: false,
     ...over,

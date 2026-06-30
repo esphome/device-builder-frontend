@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice } from "../../../api/types/devices.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
+import { mdnsOnline } from "../../../util/device-sync.js";
 import {
   getEncryptionVisual,
   type EncryptionState,
@@ -131,7 +132,10 @@ export function renderVersionSection(
   localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   const local = d.current_version || "";
-  const deployed = d.deployed_version || "";
+  // The deployed version comes only from mDNS; when mDNS is dark it's stale, so
+  // treat it as unknown and let the existing empty-deployed path show
+  // "waiting for mDNS" instead of a false "out of sync".
+  const deployed = mdnsOnline(d) ? d.deployed_version || "" : "";
   if (!local && !deployed) return nothing;
   const matches = !!local && !!deployed && local === deployed;
   const statusIcon = matches ? "check-circle-outline" : "sync";
@@ -179,7 +183,8 @@ export function renderConfigHashSection(
   localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   const expected = d.expected_config_hash || "";
-  const deployed = d.deployed_config_hash || "";
+  // mDNS-sourced; treat as unknown when mDNS is dark (see renderVersionSection).
+  const deployed = mdnsOnline(d) ? d.deployed_config_hash || "" : "";
   if (!expected && !deployed) return nothing;
   const matches = !!expected && !!deployed && expected === deployed;
   const statusIcon = matches ? "check-circle-outline" : "sync";

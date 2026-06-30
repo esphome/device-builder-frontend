@@ -15,6 +15,7 @@ import { DeviceState } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { devicePendingChanges, deviceUpdateAvailable } from "../../util/device-sync.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { updateButtonTitle } from "../../util/update-tooltip.js";
@@ -359,7 +360,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
             <wa-icon library="mdi" name="pencil"></wa-icon>
             ${this._localize("dashboard.drawer_edit")}
           </button>
-          ${device.update_available
+          ${deviceUpdateAvailable(device)
             ? html`<button
                 class="action action--accent"
                 ?disabled=${this.busy}
@@ -374,7 +375,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
                 <wa-icon library="mdi" name="upload"></wa-icon>
                 ${this._localize("dashboard.drawer_update")}
               </button>`
-            : device.has_pending_changes === true
+            : devicePendingChanges(device)
               ? html`<button
                   class="action action--accent"
                   ?disabled=${this.busy}

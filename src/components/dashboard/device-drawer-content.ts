@@ -44,6 +44,7 @@ import {
   localizeContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { devicePendingChanges, deviceUpdateAvailable } from "../../util/device-sync.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -158,8 +159,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const d = this.device;
     if (!d) return nothing;
 
-    const hasPendingChanges = d.has_pending_changes === true;
-    const hasUpdateAvailable = d.update_available;
+    const hasPendingChanges = devicePendingChanges(d);
+    const hasUpdateAvailable = deviceUpdateAvailable(d);
     // Four-state encryption indicator. "none" = no Native API surface — no badge.
     const encState = getEncryptionState(d);
     const apiEnabled = encState !== "none";

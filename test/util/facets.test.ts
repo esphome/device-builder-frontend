@@ -12,7 +12,9 @@ import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facet
 
 // computeUpdateFacet only reads update_available / has_pending_changes.
 function device(over: Partial<ConfiguredDevice>): ConfiguredDevice {
-  return over as ConfiguredDevice;
+  // Default to a live mDNS source so update/modified buckets surface; the
+  // mDNS-dark cases pass active_source explicitly.
+  return { active_source: "mdns", ...over } as ConfiguredDevice;
 }
 
 // Echo the key so assertions key off the i18n id, not display copy.
