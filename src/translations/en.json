@@ -528,7 +528,6 @@
       "esp8266": "ESP8266",
       "rp2040": "RP2040",
       "rp2350": "RP2350",
-      "rp2": "RP2",
       "bk72xx": "BK72xx",
       "rtl87xx": "RTL87xx",
       "compact": "Compact",
