@@ -76,10 +76,15 @@ export class ESPHomeDeviceCard extends LitElement {
   @property({ attribute: false }) name = "";
   @property() configuration = "";
   @property() state: DeviceState = DeviceState.UNKNOWN;
+  // Raw device truth (``has_pending_changes``). Drives the 4-state encryption
+  // lock indicator only — a local YAML edit not yet flashed, independent of
+  // mDNS — so it stays in sync with the drawer's raw-flag badge.
   @property({ type: Boolean, attribute: "has-pending-changes" }) hasPendingChanges =
     false;
-  @property({ type: Boolean, attribute: "has-update-available" }) hasUpdateAvailable =
-    false;
+  // mDNS-gated display flags (see util/device-sync.ts): whether to surface the
+  // modified / update affordances (dot + install / update button).
+  @property({ type: Boolean, attribute: "show-modified" }) showModified = false;
+  @property({ type: Boolean, attribute: "show-update" }) showUpdate = false;
 
   // Installed + target ESPHome versions for the Update hover.
   @property({ attribute: false }) installedVersion = "";
@@ -87,8 +92,8 @@ export class ESPHomeDeviceCard extends LitElement {
   @property({ type: Boolean, attribute: "api-enabled" }) apiEnabled = false;
   @property({ type: Boolean, attribute: "api-encrypted" }) apiEncrypted = false;
 
-  // api_encryption TXT observed via mDNS. Combined with apiEncrypted and
-  // hasPendingChanges to drive the 4-state lock indicator.
+  // api_encryption TXT observed via mDNS. Combined with apiEncrypted and the
+  // raw hasPendingChanges to drive the 4-state lock indicator.
   @property({ attribute: false }) apiEncryptionActive: string | null = null;
 
   @property({ type: Boolean }) busy = false;
@@ -177,13 +182,13 @@ export class ESPHomeDeviceCard extends LitElement {
           <div class="device-card-header-left">
             <div class="device-name-wrap">
               <h3 class="device-name">${this.name}</h3>
-              ${this.hasPendingChanges
+              ${this.showModified
                 ? html`<span
                     class="indicator-dot indicator-dot--modified"
                     title=${this._localize("dashboard.status_modified")}
                   ></span>`
                 : nothing}
-              ${this.hasUpdateAvailable
+              ${this.showUpdate
                 ? html`<span
                     class="indicator-dot indicator-dot--update"
                     title=${this._localize("dashboard.status_update_available")}
@@ -240,7 +245,7 @@ export class ESPHomeDeviceCard extends LitElement {
   // Long-language locales (French / Dutch) overflow a 300px-min card if
   // every action is labelled; upload icon reads clearly without one.
   private _renderAccentAction() {
-    if (this.hasUpdateAvailable) {
+    if (this.showUpdate) {
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
         ?disabled=${this.busy}
@@ -256,7 +261,7 @@ export class ESPHomeDeviceCard extends LitElement {
         <wa-icon library="mdi" name="upload"></wa-icon>
       </button>`;
     }
-    if (this.hasPendingChanges) {
+    if (this.showModified) {
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
         ?disabled=${this.busy}

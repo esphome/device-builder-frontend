@@ -32,8 +32,12 @@ export interface DeviceRow {
   labels: Label[];
   config: string;
   build_size_bytes: number;
+  // Raw has_pending_changes (device truth) — drives the encryption lock only.
   hasPendingChanges: boolean;
-  hasUpdateAvailable: boolean;
+  // mDNS-gated display flags (see util/device-sync.ts): modified dot + install
+  // button, update column + update button.
+  showModified: boolean;
+  showUpdate: boolean;
   api_enabled: boolean;
   api_encrypted: boolean;
   api_encryption_active: string | null;
@@ -153,17 +157,20 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           api_enabled: row.api_enabled,
           api_encrypted: row.api_encrypted,
           api_encryption_active: row.api_encryption_active,
+          // Raw flag, not the mDNS-gated ``showModified``: the encryption
+          // "pending" state is about a local YAML edit not yet flashed, so it
+          // must match the drawer's raw-flag badge (mDNS freshness is irrelevant).
           has_pending_changes: row.hasPendingChanges,
         });
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
-          ${row.hasPendingChanges
+          ${row.showModified
             ? html`<span
                 class="cell-indicator cell-indicator--modified"
                 title=${localize("dashboard.status_modified")}
               ></span>`
             : nothing}
-          ${row.hasUpdateAvailable
+          ${row.showUpdate
             ? html`<span
                 class="cell-indicator cell-indicator--update"
                 title=${localize("dashboard.status_update_available")}
@@ -291,8 +298,8 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
            available newer ESPHome version is the more pressing nudge,
            and OTA-update will pick up any pending YAML changes as a
            free side-effect. Mirrors the legacy dashboard. */
-        const showUpdate = row.hasUpdateAvailable;
-        const showInstall = !showUpdate && row.hasPendingChanges;
+        const showUpdate = row.showUpdate;
+        const showInstall = !showUpdate && row.showModified;
         const visitUrl = buildWebUiUrl(device);
         const showVisit = visitUrl !== "";
         // Priority order (highest → lowest, last to drop on narrow

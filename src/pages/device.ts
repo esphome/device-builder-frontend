@@ -30,7 +30,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
-import { devicePendingChanges, deviceUpdateAvailable } from "../util/device-sync.js";
+import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
@@ -1025,12 +1025,8 @@ export class ESPHomePageDevice extends LitElement {
             @change-board=${this._onChangeBoard}
             ?hasUnsavedEdits=${this._isDirty}
             ?saving=${this._saving}
-            ?hasPendingChanges=${this._device
-              ? devicePendingChanges(this._device)
-              : false}
-            ?hasUpdateAvailable=${this._device
-              ? deviceUpdateAvailable(this._device)
-              : false}
+            ?showModified=${this._device ? showPendingChanges(this._device) : false}
+            ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
             .installedVersion=${this._device?.deployed_version ?? ""}
             .availableVersion=${this._device?.current_version ?? ""}
             ?busy=${this._activeJobs.has(this.id)}

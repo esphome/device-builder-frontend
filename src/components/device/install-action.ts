@@ -4,8 +4,8 @@ import { updateButtonTitle } from "../../util/update-tooltip.js";
 
 export interface InstallActionProps {
   localize: LocalizeFunc;
-  hasUpdateAvailable: boolean;
-  hasPendingChanges: boolean;
+  showUpdate: boolean;
+  showModified: boolean;
   busy: boolean;
   // Installed + target ESPHome versions for the Update hover (see updateButtonTitle).
   installedVersion: string;
@@ -24,7 +24,7 @@ export interface InstallActionProps {
  * device-editor shadow root, so its `.install-fab` styles apply.
  */
 export function renderInstallAction(p: InstallActionProps): TemplateResult {
-  if (p.hasUpdateAvailable) {
+  if (p.showUpdate) {
     return html`<div class="install-split">
       <button
         type="button"
@@ -55,7 +55,7 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
   }
   return html`<button
     type="button"
-    class="install-fab ${p.hasPendingChanges ? "" : "install-fab--muted"}"
+    class="install-fab ${p.showModified ? "" : "install-fab--muted"}"
     ?disabled=${p.busy}
     @click=${p.onInstall}
     title=${p.localize("dashboard.install")}

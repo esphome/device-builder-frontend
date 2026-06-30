@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  devicePendingChanges,
-  deviceUpdateAvailable,
   mdnsOnline,
+  showPendingChanges,
+  showUpdateAvailable,
 } from "../../src/util/device-sync.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 
@@ -24,8 +24,8 @@ describe("device-sync mDNS gating", () => {
       pending_changes_via_hash: true,
       update_available: true,
     });
-    expect(devicePendingChanges(dark)).toBe(false);
-    expect(deviceUpdateAvailable(dark)).toBe(false);
+    expect(showPendingChanges(dark)).toBe(false);
+    expect(showUpdateAvailable(dark)).toBe(false);
   });
 
   it("keeps a local mtime-driven modified cue while mDNS is dark", () => {
@@ -37,8 +37,8 @@ describe("device-sync mDNS gating", () => {
       has_pending_changes: true,
       update_available: true,
     });
-    expect(devicePendingChanges(dark)).toBe(true);
-    expect(deviceUpdateAvailable(dark)).toBe(false);
+    expect(showPendingChanges(dark)).toBe(true);
+    expect(showUpdateAvailable(dark)).toBe(false);
   });
 
   it("shows the modified / update signals once mDNS is the live source", () => {
@@ -47,7 +47,7 @@ describe("device-sync mDNS gating", () => {
       has_pending_changes: true,
       update_available: true,
     });
-    expect(devicePendingChanges(live)).toBe(true);
-    expect(deviceUpdateAvailable(live)).toBe(true);
+    expect(showPendingChanges(live)).toBe(true);
+    expect(showUpdateAvailable(live)).toBe(true);
   });
 });

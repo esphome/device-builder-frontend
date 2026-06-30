@@ -44,7 +44,7 @@ import {
   localizeContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { devicePendingChanges, deviceUpdateAvailable } from "../../util/device-sync.js";
+import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -159,23 +159,23 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const d = this.device;
     if (!d) return nothing;
 
-    const hasPendingChanges = devicePendingChanges(d);
-    const hasUpdateAvailable = deviceUpdateAvailable(d);
+    const showModified = showPendingChanges(d);
+    const showUpdate = showUpdateAvailable(d);
     // Four-state encryption indicator. "none" = no Native API surface — no badge.
     const encState = getEncryptionState(d);
     const apiEnabled = encState !== "none";
-    const showAnyBadge = hasPendingChanges || hasUpdateAvailable || apiEnabled;
+    const showAnyBadge = showModified || showUpdate || apiEnabled;
 
     return html`
       ${showAnyBadge
         ? html`<div class="status-badges">
-            ${hasPendingChanges
+            ${showModified
               ? html`<span class="status-badge status-badge--modified">
                   <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
                   ${this._localize("dashboard.status_modified")}
                 </span>`
               : nothing}
-            ${hasUpdateAvailable
+            ${showUpdate
               ? html`<span class="status-badge status-badge--update">
                   <wa-icon library="mdi" name="update"></wa-icon>
                   ${this._localize("dashboard.status_update_available")}

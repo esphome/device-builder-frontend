@@ -19,7 +19,7 @@
  */
 import { type ConfiguredDevice, DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { devicePendingChanges, deviceUpdateAvailable } from "./device-sync.js";
+import { showPendingChanges, showUpdateAvailable } from "./device-sync.js";
 
 /** One selectable value inside a facet. */
 export interface FacetOption {
@@ -144,8 +144,8 @@ export const UPDATE_FACET_PREDICATES: Record<
   UpdateBucket,
   (device: ConfiguredDevice) => boolean
 > = {
-  update_available: (d) => deviceUpdateAvailable(d),
-  modified: (d) => devicePendingChanges(d),
+  update_available: (d) => showUpdateAvailable(d),
+  modified: (d) => showPendingChanges(d),
 };
 
 const UPDATE_BUCKET_LABEL_KEY: Record<UpdateBucket, string> = {

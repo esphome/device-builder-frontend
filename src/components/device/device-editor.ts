@@ -157,10 +157,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   saving = false;
 
   @property({ type: Boolean })
-  hasPendingChanges = false;
+  showModified = false;
 
   @property({ type: Boolean })
-  hasUpdateAvailable = false;
+  showUpdate = false;
 
   // Installed + target ESPHome versions for the Update button hover.
   @property()
@@ -414,8 +414,8 @@ export class ESPHomeDeviceEditor extends LitElement {
   private _renderPrimaryAction() {
     return renderInstallAction({
       localize: this._localize,
-      hasUpdateAvailable: this.hasUpdateAvailable,
-      hasPendingChanges: this.hasPendingChanges,
+      showUpdate: this.showUpdate,
+      showModified: this.showModified,
       busy: this.busy,
       installedVersion: this.installedVersion,
       availableVersion: this.availableVersion,
