@@ -98,6 +98,12 @@ export interface ConfiguredDevice {
   active_source?: ReachabilitySource;
   /** True until successfully compiled + deployed */
   has_pending_changes: boolean;
+  /** True when ``has_pending_changes`` came from the mDNS-sourced
+   *  config-hash compare (vs the local mtime fallback). The UI gates
+   *  only this case on a live mDNS, so a local YAML edit still cues
+   *  "install" when mDNS is dark. Optional / absent reads as a local
+   *  (non-mDNS-dependent) pending. */
+  pending_changes_via_hash?: boolean;
   /** True if compiled with older ESPHome version */
   update_available: boolean;
   /**

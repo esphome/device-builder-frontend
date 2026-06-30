@@ -10,7 +10,8 @@ import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facets.js";
 
-// computeUpdateFacet only reads update_available / has_pending_changes.
+// computeUpdateFacet reads update_available / has_pending_changes, gated on
+// active_source via deviceUpdateAvailable / devicePendingChanges.
 function device(over: Partial<ConfiguredDevice>): ConfiguredDevice {
   // Default to a live mDNS source so update/modified buckets surface; the
   // mDNS-dark cases pass active_source explicitly.

@@ -8,10 +8,17 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 // as out-of-sync once mDNS hears from it again.
 export const mdnsOnline = (d: ConfiguredDevice): boolean => d.active_source === "mdns";
 
-// The "modified" (out-of-sync) and "update available" signals, gated on a live
-// mDNS. Every indicator site derives from these so the rule lives in one place.
+// The "modified" (needs-install) and "update available" signals, gated so a
+// stale mDNS-dark value can't flag a false "out of sync". Every indicator site
+// derives from these so the rule lives in one place.
+//
+// ``update_available`` (device version vs server) is purely mDNS-sourced, so it
+// always needs a live mDNS. ``has_pending_changes`` is only mDNS-dependent when
+// it came from the config-hash compare (``pending_changes_via_hash``); a local
+// mtime-driven edit is trustworthy without mDNS, so it still cues "install".
 export const devicePendingChanges = (d: ConfiguredDevice): boolean =>
-  d.has_pending_changes === true && mdnsOnline(d);
+  d.has_pending_changes === true &&
+  (mdnsOnline(d) || d.pending_changes_via_hash !== true);
 
 export const deviceUpdateAvailable = (d: ConfiguredDevice): boolean =>
   d.update_available === true && mdnsOnline(d);

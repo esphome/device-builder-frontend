@@ -17,13 +17,27 @@ describe("device-sync mDNS gating", () => {
     expect(mdnsOnline(makeConfiguredDevice({ active_source: undefined }))).toBe(false);
   });
 
-  it("hides the modified / update signals while mDNS is dark", () => {
+  it("hides the hash-driven modified / update signals while mDNS is dark", () => {
+    const dark = makeConfiguredDevice({
+      active_source: "ping",
+      has_pending_changes: true,
+      pending_changes_via_hash: true,
+      update_available: true,
+    });
+    expect(devicePendingChanges(dark)).toBe(false);
+    expect(deviceUpdateAvailable(dark)).toBe(false);
+  });
+
+  it("keeps a local mtime-driven modified cue while mDNS is dark", () => {
+    // pending_changes_via_hash absent / false ⇒ a local YAML edit, trustworthy
+    // without mDNS, so the needs-install cue stays. update_available is still
+    // mDNS-sourced, so it stays hidden.
     const dark = makeConfiguredDevice({
       active_source: "ping",
       has_pending_changes: true,
       update_available: true,
     });
-    expect(devicePendingChanges(dark)).toBe(false);
+    expect(devicePendingChanges(dark)).toBe(true);
     expect(deviceUpdateAvailable(dark)).toBe(false);
   });
 
