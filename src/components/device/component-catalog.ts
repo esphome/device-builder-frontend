@@ -349,6 +349,14 @@ export class ESPHomeComponentCatalog extends LitElement {
   private _onSearchInput = (ev: Event) => {
     this._search = (ev.target as HTMLInputElement).value;
     this._provides = "";
+    // A search inside "Featured" is server-scoped to the board's
+    // recommendations, so a term that matches nothing recommended strands the
+    // grid on "No components found" even when the catalog has matches. Drop to
+    // "all" the moment a search is typed so it spans the whole catalog
+    // (device-builder-frontend#1040).
+    if (this._category === ComponentCategory.FEATURED && this._search.trim()) {
+      this._category = "all";
+    }
     this._debouncedSearch();
   };
 

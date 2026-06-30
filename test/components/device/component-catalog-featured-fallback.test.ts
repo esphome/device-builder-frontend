@@ -97,3 +97,29 @@ describe("component-catalog featured-empty fallback", () => {
     expect(getComponents).not.toHaveBeenCalled();
   });
 });
+
+describe("component-catalog search switches away from featured", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const typeSearch = (el: ESPHomeComponentCatalog, value: string) => {
+    const input = { value } as HTMLInputElement;
+    (el as unknown as { _onSearchInput: (ev: Event) => void })._onSearchInput({
+      target: input,
+    } as unknown as Event);
+  };
+
+  it("drops Featured to All when a search term is typed", async () => {
+    const { el } = await mountFeatured();
+    expect(el._category).toBe("featured");
+    typeSearch(el, "relay");
+    expect(el._category).toBe("all");
+  });
+
+  it("leaves Featured intact when the search is only whitespace", async () => {
+    const { el } = await mountFeatured();
+    typeSearch(el, "   ");
+    expect(el._category).toBe("featured");
+  });
+});
