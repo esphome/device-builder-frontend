@@ -353,6 +353,78 @@ describe("renderPinField ESP8266 named aliases", () => {
   });
 });
 
+describe("renderPinField reserved pins locked to the edited component", () => {
+  // A board reserves its onboard-function pins with ``available: false``
+  // (ethernet RMII at GPIO0, SPI flash at GPIO6). ``featured_components``
+  // locks the ethernet pins to ``component_id: "ethernet"``; only those
+  // stay selectable while editing ``ethernet:``.
+  const ethBoard = () =>
+    makeTestBoard({
+      pins: [
+        makeBoardPin(0, { available: false, occupied_by: "Ethernet CLK" }),
+        makeBoardPin(6, { available: false, occupied_by: "SPI Flash" }),
+        makeBoardPin(2),
+      ],
+      overrides: {
+        featured_components: [
+          {
+            id: "ethernet",
+            component_id: "ethernet",
+            name: null,
+            description: null,
+            fields: {},
+            locked_pins: { "clk.pin": 0 },
+          },
+        ],
+      } as never,
+    });
+
+  const optionFor = (result: unknown, value: string) =>
+    findElementBindings(result, "wa-option").find((o) => o.value === value);
+
+  it("renders a locked reserved pin selectable and selected for its own component", () => {
+    const ctx = makeRenderCtx(
+      { clk: { pin: "GPIO0" } },
+      { board: ethBoard(), overrides: { sectionKey: "ethernet" } }
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin" }),
+      ["clk", "pin"],
+      ctx
+    );
+    const option = optionFor(result, "GPIO0");
+    expect(option?.["?selected"]).toBe(true);
+    expect(option?.["?disabled"]).toBe(false);
+  });
+
+  it("keeps the same pin disabled when editing a different component", () => {
+    const ctx = makeRenderCtx(
+      {},
+      { board: ethBoard(), overrides: { sectionKey: "sensor.template" } }
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin" }),
+      ["pin"],
+      ctx
+    );
+    expect(optionFor(result, "GPIO0")?.["?disabled"]).toBe(true);
+  });
+
+  it("keeps a non-locked reserved pin disabled even for its own component", () => {
+    const ctx = makeRenderCtx(
+      {},
+      { board: ethBoard(), overrides: { sectionKey: "ethernet" } }
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin" }),
+      ["pin"],
+      ctx
+    );
+    // GPIO6 (flash) isn't in ethernet's locked_pins — stays disabled.
+    expect(optionFor(result, "GPIO6")?.["?disabled"]).toBe(true);
+  });
+});
+
 describe("renderPinField wa-select binding", () => {
   // The form's ``_syncSelectValues`` clears ``wa-select.value`` to
   // ``""`` for any non-primitive value (transient autocompletion
