@@ -71,6 +71,9 @@ export class ESPHomeWizardStepSetup extends LitElement {
   // stages, so the latch idiom the dialogs use doesn't apply).
   private _enter = new EnterController(this, (e) => {
     if (e.repeat) return;
+    // Match the pointer path: the buttons are disabled while submitting, so the
+    // keyboard must honor the same lock (_onNext is the authoritative backstop).
+    if (this.submitting) return;
     if (this._canAdvance()) this._onNext();
   });
 
