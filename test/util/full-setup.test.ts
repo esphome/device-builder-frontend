@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import {
   boardOffersFullSetup,
+  featuredComponentName,
   fullSetupComponentIds,
 } from "../../src/util/full-setup.js";
 
@@ -124,5 +125,22 @@ describe("fullSetupComponentIds", () => {
       featured_bundles: [{ id: "partial", name: "x", component_ids: ["a"] }] as never,
     });
     expect(fullSetupComponentIds(b)).toEqual([]);
+  });
+});
+
+describe("featuredComponentName", () => {
+  it("prefers name, then component_id, then the raw local id", () => {
+    const b = board({
+      featured_components: [
+        { id: "eth", name: "Onboard Ethernet", component_id: "ethernet" },
+        { id: "bus", component_id: "i2c" },
+        { id: "bare" },
+      ] as never,
+    });
+    expect(featuredComponentName(b, "eth")).toBe("Onboard Ethernet");
+    expect(featuredComponentName(b, "bus")).toBe("i2c");
+    expect(featuredComponentName(b, "bare")).toBe("bare");
+    // Unknown local id falls back to itself.
+    expect(featuredComponentName(b, "nope")).toBe("nope");
   });
 });

@@ -13,7 +13,7 @@ import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { buildFeaturedId } from "../../util/featured-id.js";
-import { fullSetupComponentIds } from "../../util/full-setup.js";
+import { featuredComponentName, fullSetupComponentIds } from "../../util/full-setup.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -587,7 +587,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         });
       } catch (err) {
         console.error(`Full setup: failed to add ${localId} to ${configuration}:`, err);
-        skipped.push(this._featuredName(board, localId));
+        skipped.push(featuredComponentName(board, localId));
       }
     }
     // A partially-applied device would otherwise look complete; name which
@@ -596,18 +596,15 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       const shown = 3;
       toast.warning(
         this._localize("wizard.full_setup_partial", {
+          // count is passed for locales still on the older count-only string
+          // downloaded from Lokalise; the current copy uses names/extra.
+          count: skipped.length,
           names: skipped.slice(0, shown).join(", "),
           extra: Math.max(0, skipped.length - shown),
         }),
         { richColors: true }
       );
     }
-  }
-
-  /** Display name for a board's featured local id, falling back to the id. */
-  private _featuredName(board: BoardCatalogEntry, localId: string): string {
-    const featured = board.featured_components.find((c) => c.id === localId);
-    return featured?.name || featured?.component_id || localId;
   }
 
   /** Build a create-flow error message. Falls back to a localised generic

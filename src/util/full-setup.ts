@@ -45,3 +45,9 @@ export function boardOffersFullSetup(board: BoardCatalogEntry | null): boolean {
 export function fullSetupComponentIds(board: BoardCatalogEntry): string[] {
   return fullSetupBundle(board)?.component_ids ?? [];
 }
+
+/** Display name for a board's featured local id, falling back to the id. */
+export function featuredComponentName(board: BoardCatalogEntry, localId: string): string {
+  const featured = board.featured_components.find((c) => c.id === localId);
+  return featured?.name || featured?.component_id || localId;
+}
