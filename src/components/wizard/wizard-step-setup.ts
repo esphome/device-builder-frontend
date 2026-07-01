@@ -71,6 +71,9 @@ export class ESPHomeWizardStepSetup extends LitElement {
   // stages, so the latch idiom the dialogs use doesn't apply).
   private _enter = new EnterController(this, (e) => {
     if (e.repeat) return;
+    // Honor the same in-flight lock the disabled buttons enforce, so the
+    // keyboard path can't re-dispatch finish-setup mid-create.
+    if (this.submitting) return;
     if (this._canAdvance()) this._onNext();
   });
 

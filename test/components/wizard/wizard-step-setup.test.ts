@@ -278,6 +278,17 @@ describe("wizard-step-setup", () => {
     expect(el.shadowRoot!.querySelector("wa-spinner")).toBeNull();
   });
 
+  it("ignores Enter while submitting so the keyboard can't re-dispatch finish", async () => {
+    const el = await mount(noWifiBoard());
+    await setName(el, "kitchen");
+    el.submitting = true;
+    await el.updateComplete;
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
   it("finishes without the full setup when the option is unchecked", async () => {
     const el = await mount(fullConfigBoard());
     await setName(el, "kitchen");
