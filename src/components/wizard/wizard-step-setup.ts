@@ -393,6 +393,9 @@ export class ESPHomeWizardStepSetup extends LitElement {
   }
 
   private _onBack() {
+    // The disabled attribute blocks the click; guard the handler too so a
+    // create in flight can't be stepped back out from under.
+    if (this.submitting) return;
     if (this._stage === "wifi") {
       this._stage = "name";
       return;

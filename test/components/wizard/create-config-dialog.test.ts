@@ -156,6 +156,27 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect(createDevice).toHaveBeenCalledTimes(2);
   });
 
+  it("locks the header back arrow while a create is in flight", async () => {
+    // A never-resolving create keeps _submitting true; going back mid-add would
+    // desync the wizard from the device being written.
+    const createDevice = vi.fn(() => deferred<{ configuration: string }>().promise);
+    const el = await mount({ createDevice });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._step = "setup"; // the step whose header shows the back arrow
+    await el.updateComplete;
+
+    emitFinish(el, "kitchen");
+    await el.updateComplete;
+
+    const back = el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button")!;
+    expect(back.disabled).toBe(true);
+    // The handler is guarded too, so no back path escapes the busy gate.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._onBack();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._step).toBe("setup");
+  });
+
   it("clears submitting and surfaces an error after a failed finish-setup", async () => {
     // The setup step's spinner follows this flag, so it must clear on failure;
     // the error is what tells the user the create failed and to retry.

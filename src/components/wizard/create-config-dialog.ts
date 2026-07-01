@@ -288,6 +288,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
               class="back-button"
               title=${this._localize("layout.back")}
               aria-label=${this._localize("layout.back")}
+              ?disabled=${this._submitting}
               @click=${this._onBack}
             >
               <wa-icon library="mdi" name="arrow-left"></wa-icon>
@@ -422,6 +423,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   private _onBack() {
+    // A create is in flight (createDevice + the full-setup component adds);
+    // navigating back mid-add would desync the wizard from the device being
+    // written, so ignore every back path while submitting.
+    if (this._submitting) return;
     this._resetCreateErrors();
     switch (this._step) {
       case "board":
