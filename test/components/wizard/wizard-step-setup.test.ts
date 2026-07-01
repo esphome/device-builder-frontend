@@ -260,6 +260,7 @@ describe("wizard-step-setup", () => {
     const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
     const back = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-secondary")!;
     expect(primary.disabled).toBe(false);
+    expect(primary.hasAttribute("aria-busy")).toBe(false);
     expect(el.shadowRoot!.querySelector("wa-spinner")).toBeNull();
 
     el.submitting = true;

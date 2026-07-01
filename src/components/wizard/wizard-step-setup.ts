@@ -313,7 +313,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
             class="btn btn-primary"
             type="button"
             ?disabled=${!this._canAdvance() || this.submitting}
-            aria-busy=${this.submitting}
+            aria-busy=${this.submitting || nothing}
             @click=${this._onNext}
           >
             ${this.submitting ? html`<wa-spinner></wa-spinner>` : nothing}
