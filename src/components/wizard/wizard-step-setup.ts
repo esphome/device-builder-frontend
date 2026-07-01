@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, type PropertyValues } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
@@ -15,6 +15,7 @@ import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
 
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 @customElement("esphome-wizard-step-setup")
 export class ESPHomeWizardStepSetup extends LitElement {
@@ -31,6 +32,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
   // Set by the parent dialog; the step stays mounted while the dialog is
   // hidden, so the Enter listener follows this rather than connectedCallback.
   @property({ type: Boolean }) active = false;
+
+  // Set by the parent dialog while createDevice is in flight; a big board
+  // (128-relay full setup) takes seconds, so the button must show progress.
+  @property({ type: Boolean }) submitting = false;
 
   @state()
   private _stage: "name" | "wifi" = "name";
@@ -242,6 +247,19 @@ export class ESPHomeWizardStepSetup extends LitElement {
         opacity: 0.5;
         cursor: not-allowed;
       }
+
+      /* Pin the spinner to a 1em square (box-sizing + flex:none) so it can't
+         reflow the button, and tint it to currentColor; same treatment as the
+         editor Save button (device-editor.styles.ts). */
+      .btn wa-spinner {
+        box-sizing: border-box;
+        flex: none;
+        width: 1em;
+        height: 1em;
+        --track-width: 2px;
+        --indicator-color: currentColor;
+        --track-color: color-mix(in srgb, currentColor 30%, transparent);
+      }
     `,
   ];
 
@@ -282,16 +300,23 @@ export class ESPHomeWizardStepSetup extends LitElement {
       ${this._stage === "name" ? this._renderNameSection() : this._renderWifiSection()}
 
       <div class="actions">
-        <button class="btn btn-secondary" type="button" @click=${this._onBack}>
+        <button
+          class="btn btn-secondary"
+          type="button"
+          ?disabled=${this.submitting}
+          @click=${this._onBack}
+        >
           ${this._localize("wizard.back")}
         </button>
         <div class="actions-right">
           <button
             class="btn btn-primary"
             type="button"
-            ?disabled=${!this._canAdvance()}
+            ?disabled=${!this._canAdvance() || this.submitting}
+            aria-busy=${this.submitting}
             @click=${this._onNext}
           >
+            ${this.submitting ? html`<wa-spinner></wa-spinner>` : nothing}
             ${this._stage === "name" && this._collectWifi
               ? this._localize("wizard.next")
               : this._localize("wizard.finish_setup")}

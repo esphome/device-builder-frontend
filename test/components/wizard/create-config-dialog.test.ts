@@ -156,6 +156,21 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect(createDevice).toHaveBeenCalledTimes(2);
   });
 
+  it("clears submitting and surfaces an error after a failed finish-setup", async () => {
+    // The setup step's spinner follows this flag, so it must clear on failure;
+    // the error is what tells the user the create failed and to retry.
+    const createDevice = vi.fn().mockRejectedValueOnce(new Error("boom"));
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "kitchen");
+    await flush();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._submitting).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._createError).toBeTruthy();
+  });
+
   it("forwards the raw display name so the backend keeps it as friendly_name", async () => {
     // The wizard must NOT slugify here; the backend derives the
     // hostname slug and preserves the descriptive name as

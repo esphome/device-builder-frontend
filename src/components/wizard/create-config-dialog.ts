@@ -323,6 +323,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         return html`<esphome-wizard-step-setup
           .board=${this._selectedBoard}
           ?active=${this._open}
+          ?submitting=${this._submitting}
         ></esphome-wizard-step-setup>`;
       case "empty-config":
         return html`<esphome-wizard-step-empty-config

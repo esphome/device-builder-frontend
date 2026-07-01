@@ -16,6 +16,7 @@ import { pressEnter } from "../../_press-enter.js";
 // (no ElementInternals); the step only needs its checked/change contract, so
 // render it as a plain unknown element.
 vi.mock("@home-assistant/webawesome/dist/components/checkbox/checkbox.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
 // connectedCallback reads the shared (session-cached) secret-keys list to
 // decide whether Wi-Fi is already configured; mock it per-test (no cache bleed).
@@ -251,6 +252,29 @@ describe("wizard-step-setup", () => {
     el.addEventListener("finish-setup", onFinish as EventListener);
     pressEnter();
     expect((onFinish.mock.calls[0][0] as CustomEvent).detail.fullSetup).toBe(false);
+  });
+
+  it("spins and disables both buttons while the parent reports submitting", async () => {
+    const el = await mount(noWifiBoard());
+    await setName(el, "kitchen");
+    const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
+    const back = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-secondary")!;
+    expect(primary.disabled).toBe(false);
+    expect(el.shadowRoot!.querySelector("wa-spinner")).toBeNull();
+
+    el.submitting = true;
+    await el.updateComplete;
+    expect(primary.disabled).toBe(true);
+    expect(primary.getAttribute("aria-busy")).toBe("true");
+    expect(back.disabled).toBe(true);
+    expect(el.shadowRoot!.querySelector("wa-spinner")).not.toBeNull();
+
+    // The parent clears the flag on success or failure; the spinner goes away
+    // and a valid name is submittable again.
+    el.submitting = false;
+    await el.updateComplete;
+    expect(primary.disabled).toBe(false);
+    expect(el.shadowRoot!.querySelector("wa-spinner")).toBeNull();
   });
 
   it("finishes without the full setup when the option is unchecked", async () => {
