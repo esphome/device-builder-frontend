@@ -243,7 +243,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
         background: var(--esphome-primary-hover);
       }
 
-      .btn-primary:disabled {
+      /* Both variants set an explicit background, which overrides the UA
+         disabled greying, so a disabled button would otherwise look active;
+         dim it here (Back and Finish setup are both disabled mid-create). */
+      .btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
