@@ -579,7 +579,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     configuration: string,
     board: BoardCatalogEntry
   ): Promise<void> {
-    let skipped = 0;
+    const skipped: string[] = [];
     for (const localId of fullSetupComponentIds(board)) {
       try {
         await this._api.addComponent(configuration, {
@@ -587,16 +587,27 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         });
       } catch (err) {
         console.error(`Full setup: failed to add ${localId} to ${configuration}:`, err);
-        skipped += 1;
+        skipped.push(this._featuredName(board, localId));
       }
     }
-    // A partially-applied device would otherwise look complete; tell the user
-    // some recommended components need finishing in the editor.
-    if (skipped > 0) {
-      toast.warning(this._localize("wizard.full_setup_partial", { count: skipped }), {
-        richColors: true,
-      });
+    // A partially-applied device would otherwise look complete; name which
+    // recommended components need finishing, capped so the toast stays short.
+    if (skipped.length > 0) {
+      const shown = 3;
+      toast.warning(
+        this._localize("wizard.full_setup_partial", {
+          names: skipped.slice(0, shown).join(", "),
+          extra: Math.max(0, skipped.length - shown),
+        }),
+        { richColors: true }
+      );
     }
+  }
+
+  /** Display name for a board's featured local id, falling back to the id. */
+  private _featuredName(board: BoardCatalogEntry, localId: string): string {
+    const featured = board.featured_components.find((c) => c.id === localId);
+    return featured?.name || featured?.component_id || localId;
   }
 
   /** Build a create-flow error message. Falls back to a localised generic
