@@ -596,8 +596,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       const shown = 3;
       toast.warning(
         this._localize("wizard.full_setup_partial", {
-          // count is passed for locales still on the older count-only string
-          // downloaded from Lokalise; the current copy uses names/extra.
+          // count drives the singular/plural wording; names/extra list the
+          // skipped components, capped. Older count-only Lokalise strings
+          // still render off count alone until re-translated.
           count: skipped.length,
           names: skipped.slice(0, shown).join(", "),
           extra: Math.max(0, skipped.length - shown),
