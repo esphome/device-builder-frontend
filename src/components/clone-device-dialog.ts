@@ -211,13 +211,15 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
               this._name = (e.target as HTMLInputElement).value;
             }}
           />
-          ${err
-            ? renderInlineError(this._localize(err.code, err.params))
-            : warning
-              ? html`<span class="field-warning"
-                  >${this._localize(warning.code, warning.params)}</span
-                >`
-              : nothing}
+          ${
+            err
+              ? renderInlineError(this._localize(err.code, err.params))
+              : warning
+                ? html`<span class="field-warning"
+                    >${this._localize(warning.code, warning.params)}</span
+                  >`
+                : nothing
+          }
         </div>
         <div class="field">
           <label for="clone-friendly-name"

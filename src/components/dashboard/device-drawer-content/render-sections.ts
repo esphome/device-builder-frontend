@@ -93,20 +93,22 @@ export function renderLoadedIntegrationsSection(
       <div class="tags-wrap">
         ${direct.map((i) => renderIntegrationTag(i, integrationDocs))}
       </div>
-      ${indirect.length > 0
-        ? html`
-            <details class="auto-loaded-details">
-              <summary>
-                ${localize("dashboard.drawer_auto_loaded_integrations", {
-                  count: String(indirect.length),
-                })}
-              </summary>
-              <div class="tags-wrap tags-wrap--auto-loaded">
-                ${indirect.map((i) => renderIntegrationTag(i, integrationDocs))}
-              </div>
-            </details>
-          `
-        : nothing}
+      ${
+        indirect.length > 0
+          ? html`
+              <details class="auto-loaded-details">
+                <summary>
+                  ${localize("dashboard.drawer_auto_loaded_integrations", {
+                    count: String(indirect.length),
+                  })}
+                </summary>
+                <div class="tags-wrap tags-wrap--auto-loaded">
+                  ${indirect.map((i) => renderIntegrationTag(i, integrationDocs))}
+                </div>
+              </details>
+            `
+          : nothing
+      }
     </div>
   `;
 }
@@ -149,29 +151,33 @@ export function renderVersionSection(
   return html`
     <div class="section">
       <h4 class="section-title">${localize("dashboard.drawer_version")}</h4>
-      ${showStatus
-        ? html`<div class=${statusCls}>
-            <wa-icon library="mdi" name=${statusIcon}></wa-icon>
-            <span>${localize(statusKey)}</span>
-          </div>`
-        : nothing}
-      ${matches
-        ? renderRow("tag-multiple", localize("dashboard.drawer_version"), local, true)
-        : html`
-            ${renderRow(
-              "tag-multiple",
-              localize("dashboard.drawer_current_version"),
-              local,
-              true
-            )}
-            ${renderRow(
-              "upload",
-              localize("dashboard.drawer_deployed_version"),
-              deployed,
-              true,
-              localize("dashboard.drawer_waiting_for_mdns")
-            )}
-          `}
+      ${
+        showStatus
+          ? html`<div class=${statusCls}>
+              <wa-icon library="mdi" name=${statusIcon}></wa-icon>
+              <span>${localize(statusKey)}</span>
+            </div>`
+          : nothing
+      }
+      ${
+        matches
+          ? renderRow("tag-multiple", localize("dashboard.drawer_version"), local, true)
+          : html`
+              ${renderRow(
+                "tag-multiple",
+                localize("dashboard.drawer_current_version"),
+                local,
+                true
+              )}
+              ${renderRow(
+                "upload",
+                localize("dashboard.drawer_deployed_version"),
+                deployed,
+                true,
+                localize("dashboard.drawer_waiting_for_mdns")
+              )}
+            `
+      }
     </div>
   `;
 }
@@ -198,34 +204,38 @@ export function renderConfigHashSection(
   return html`
     <div class="section">
       <h4 class="section-title">${localize("dashboard.drawer_config_hash_title")}</h4>
-      ${showStatus
-        ? html`<div class=${statusCls}>
-            <wa-icon library="mdi" name=${statusIcon}></wa-icon>
-            <span>${localize(statusKey)}</span>
-          </div>`
-        : nothing}
-      ${matches
-        ? renderRow(
-            "fingerprint",
-            localize("dashboard.drawer_config_hash_value"),
-            expected,
-            true
-          )
-        : html`
-            ${renderRow(
+      ${
+        showStatus
+          ? html`<div class=${statusCls}>
+              <wa-icon library="mdi" name=${statusIcon}></wa-icon>
+              <span>${localize(statusKey)}</span>
+            </div>`
+          : nothing
+      }
+      ${
+        matches
+          ? renderRow(
               "fingerprint",
-              localize("dashboard.drawer_config_hash_local"),
+              localize("dashboard.drawer_config_hash_value"),
               expected,
               true
-            )}
-            ${renderRow(
-              "fingerprint",
-              localize("dashboard.drawer_config_hash_deployed"),
-              deployed,
-              true,
-              localize("dashboard.drawer_waiting_for_mdns")
-            )}
-          `}
+            )
+          : html`
+              ${renderRow(
+                "fingerprint",
+                localize("dashboard.drawer_config_hash_local"),
+                expected,
+                true
+              )}
+              ${renderRow(
+                "fingerprint",
+                localize("dashboard.drawer_config_hash_deployed"),
+                deployed,
+                true,
+                localize("dashboard.drawer_waiting_for_mdns")
+              )}
+            `
+      }
     </div>
   `;
 }
@@ -305,17 +315,19 @@ export function renderIpAddressRow(
           buildWebUiUrlForHost(list[0], d.web_port),
           host._localize
         )}
-        ${expanded
-          ? list
-              .slice(1)
-              .map((ip) =>
-                renderAddressValue(
-                  ip,
-                  buildWebUiUrlForHost(ip, d.web_port),
-                  host._localize
+        ${
+          expanded
+            ? list
+                .slice(1)
+                .map((ip) =>
+                  renderAddressValue(
+                    ip,
+                    buildWebUiUrlForHost(ip, d.web_port),
+                    host._localize
+                  )
                 )
-              )
-          : nothing}
+            : nothing
+        }
         <button
           class="ip-toggle"
           type="button"
@@ -328,9 +340,11 @@ export function renderIpAddressRow(
             library="mdi"
             name=${expanded ? "chevron-up" : "chevron-down"}
           ></wa-icon>
-          ${expanded
-            ? host._localize("dashboard.drawer_ip_hide_extra")
-            : host._localize("dashboard.drawer_ip_show_more", { n: extra })}
+          ${
+            expanded
+              ? host._localize("dashboard.drawer_ip_hide_extra")
+              : host._localize("dashboard.drawer_ip_show_more", { n: extra })
+          }
         </button>
       </div>
     </div>
@@ -449,12 +463,16 @@ export function renderBuildSizeRow(
             class="build-size-clean ${host.busy ? "build-size-clean--disabled" : ""}"
             type="button"
             aria-disabled=${host.busy ? "true" : "false"}
-            title=${host.busy
-              ? host._localize("dashboard.action_clean_build_busy")
-              : host._localize("dashboard.action_clean_build")}
-            aria-label=${host.busy
-              ? host._localize("dashboard.action_clean_build_busy")
-              : host._localize("dashboard.action_clean_build")}
+            title=${
+              host.busy
+                ? host._localize("dashboard.action_clean_build_busy")
+                : host._localize("dashboard.action_clean_build")
+            }
+            aria-label=${
+              host.busy
+                ? host._localize("dashboard.action_clean_build_busy")
+                : host._localize("dashboard.action_clean_build")
+            }
             @click=${() => (host.busy ? null : emitCleanBuild(host, d))}
           >
             <wa-icon library="mdi" name="broom"></wa-icon>

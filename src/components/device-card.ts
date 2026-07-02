@@ -161,39 +161,43 @@ export class ESPHomeDeviceCard extends LitElement {
   protected render() {
     return html`
       <div
-        class="device-card ${this.selectMode
-          ? "device-card--selectable"
-          : "device-card--clickable"} ${this.selectMode && this.selected
-          ? "device-card--selected"
-          : ""}"
+        class="device-card ${
+          this.selectMode ? "device-card--selectable" : "device-card--clickable"
+        } ${this.selectMode && this.selected ? "device-card--selected" : ""}"
       >
         <div class="device-card-header">
-          ${this.selectMode
-            ? html`
-                <wa-icon
-                  class="device-checkbox ${this.selected
-                    ? "device-checkbox--checked"
-                    : ""}"
-                  library="mdi"
-                  name=${this.selected ? "checkbox-marked" : "checkbox-blank-outline"}
-                ></wa-icon>
-              `
-            : nothing}
+          ${
+            this.selectMode
+              ? html`
+                  <wa-icon
+                    class="device-checkbox ${
+                      this.selected ? "device-checkbox--checked" : ""
+                    }"
+                    library="mdi"
+                    name=${this.selected ? "checkbox-marked" : "checkbox-blank-outline"}
+                  ></wa-icon>
+                `
+              : nothing
+          }
           <div class="device-card-header-left">
             <div class="device-name-wrap">
               <h3 class="device-name">${this.name}</h3>
-              ${this.showModified
-                ? html`<span
-                    class="indicator-dot indicator-dot--modified"
-                    title=${this._localize("dashboard.status_modified")}
-                  ></span>`
-                : nothing}
-              ${this.showUpdate
-                ? html`<span
-                    class="indicator-dot indicator-dot--update"
-                    title=${this._localize("dashboard.status_update_available")}
-                  ></span>`
-                : nothing}
+              ${
+                this.showModified
+                  ? html`<span
+                      class="indicator-dot indicator-dot--modified"
+                      title=${this._localize("dashboard.status_modified")}
+                    ></span>`
+                  : nothing
+              }
+              ${
+                this.showUpdate
+                  ? html`<span
+                      class="indicator-dot indicator-dot--update"
+                      title=${this._localize("dashboard.status_update_available")}
+                    ></span>`
+                  : nothing
+              }
               ${renderEncryptionIcon(this)}
             </div>
             <p class="device-config">${this.configuration}</p>
@@ -201,42 +205,46 @@ export class ESPHomeDeviceCard extends LitElement {
           ${renderStatusBadge(this)}
         </div>
         ${renderLabels(this)}
-        ${!this.selectMode
-          ? html`
-              <div class="device-actions" @click=${(e: Event) => e.stopPropagation()}>
-                <button
-                  class="action-btn action-btn--primary"
-                  ?disabled=${this.busy}
-                  @click=${() => this._emit("edit-device")}
-                >
-                  <wa-icon library="mdi" name="pencil"></wa-icon>
-                  ${this._localize("dashboard.edit")}
-                </button>
-                ${this._renderAccentAction()}
-                <button
-                  class="action-btn action-btn--ghost action-btn--tile"
-                  @click=${() => this._emit("open-logs")}
-                  aria-label=${this._localize("dashboard.drawer_logs")}
-                  title=${this._localize("dashboard.drawer_logs")}
-                >
-                  <wa-icon library="mdi" name="text-box-outline"></wa-icon>
-                </button>
-                ${this.webUrl
-                  ? renderVisitWebUiLink(this.webUrl, this._localize, {
-                      className: "action-btn action-btn--ghost action-btn--tile",
-                      onClick: (e) => e.stopPropagation(),
-                    })
-                  : nothing}
-                <button
-                  class="action-btn action-btn--ghost action-btn--icon-only"
-                  aria-label=${this._localize("dashboard.more_options")}
-                  @click=${this._onDotsClick}
-                >
-                  <wa-icon library="mdi" name="dots-vertical"></wa-icon>
-                </button>
-              </div>
-            `
-          : nothing}
+        ${
+          !this.selectMode
+            ? html`
+                <div class="device-actions" @click=${(e: Event) => e.stopPropagation()}>
+                  <button
+                    class="action-btn action-btn--primary"
+                    ?disabled=${this.busy}
+                    @click=${() => this._emit("edit-device")}
+                  >
+                    <wa-icon library="mdi" name="pencil"></wa-icon>
+                    ${this._localize("dashboard.edit")}
+                  </button>
+                  ${this._renderAccentAction()}
+                  <button
+                    class="action-btn action-btn--ghost action-btn--tile"
+                    @click=${() => this._emit("open-logs")}
+                    aria-label=${this._localize("dashboard.drawer_logs")}
+                    title=${this._localize("dashboard.drawer_logs")}
+                  >
+                    <wa-icon library="mdi" name="text-box-outline"></wa-icon>
+                  </button>
+                  ${
+                    this.webUrl
+                      ? renderVisitWebUiLink(this.webUrl, this._localize, {
+                          className: "action-btn action-btn--ghost action-btn--tile",
+                          onClick: (e) => e.stopPropagation(),
+                        })
+                      : nothing
+                  }
+                  <button
+                    class="action-btn action-btn--ghost action-btn--icon-only"
+                    aria-label=${this._localize("dashboard.more_options")}
+                    @click=${this._onDotsClick}
+                  >
+                    <wa-icon library="mdi" name="dots-vertical"></wa-icon>
+                  </button>
+                </div>
+              `
+            : nothing
+        }
       </div>
     `;
   }

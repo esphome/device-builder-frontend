@@ -182,11 +182,13 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
             ctx.emitChange(path, coerceValueToEntryType(entry, e.detail.value))}
         ></esphome-options-combobox>
         ${renderFieldError(path, ctx)}
-        ${suggestion
-          ? html`<span class="field-warning" role="status"
-              >${ctx.localize("validation.did_you_mean", { suggestion })}</span
-            >`
-          : nothing}
+        ${
+          suggestion
+            ? html`<span class="field-warning" role="status"
+                >${ctx.localize("validation.did_you_mean", { suggestion })}</span
+              >`
+            : nothing
+        }
       </div>
     `;
   }
@@ -216,9 +218,11 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         @change=${(e: Event) =>
           ctx.emitChange(path, (e.target as unknown as { value: string }).value)}
       >
-        ${clearable
-          ? html`<wa-icon slot="clear-icon" library="mdi" name="close"></wa-icon>`
-          : nothing}
+        ${
+          clearable
+            ? html`<wa-icon slot="clear-icon" library="mdi" name="close"></wa-icon>`
+            : nothing
+        }
         ${shownOptions.map((opt) => {
           const selected = opt.value.toLowerCase() === valueLower;
           const isDefault = defaultStr !== "" && opt.value.toLowerCase() === defaultLower;

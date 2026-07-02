@@ -62,8 +62,12 @@ export function renderDisclosure(opts: DisclosureOptions): TemplateResult {
     >
       ${iconBefore ? html`${chevron}${label}` : html`${label}${chevron}`}
     </button>
-    ${open
-      ? html`<div id=${panelId ?? nothing} class="disclosure-panel">${opts.body()}</div>`
-      : nothing}
+    ${
+      open
+        ? html`<div id=${panelId ?? nothing} class="disclosure-panel">
+            ${opts.body()}
+          </div>`
+        : nothing
+    }
   `;
 }

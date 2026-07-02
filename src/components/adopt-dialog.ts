@@ -333,111 +333,121 @@ export class ESPHomeAdoptDialog extends LitElement {
         .label=${this._localize("dashboard.adopt_title")}
         @after-hide=${this._onAfterHide}
       >
-        ${device
-          ? html`
-              <p class="description">
-                ${this._localize("dashboard.adopt_description", {
-                  name: displayName,
-                })}
-              </p>
+        ${
+          device
+            ? html`
+                <p class="description">
+                  ${this._localize("dashboard.adopt_description", {
+                    name: displayName,
+                  })}
+                </p>
 
-              ${this._renderSource(device.package_import_url)}
+                ${this._renderSource(device.package_import_url)}
 
-              <div class="field">
-                <label for="adopt-name">
-                  ${this._localize("dashboard.adopt_field_name")}
+                <div class="field">
+                  <label for="adopt-name">
+                    ${this._localize("dashboard.adopt_field_name")}
+                  </label>
+                  <input
+                    id="adopt-name"
+                    type="text"
+                    class=${nameErr ? "invalid" : ""}
+                    .value=${this._name}
+                    ?disabled=${this._busy}
+                    @input=${(e: Event) => {
+                      this._name = (e.target as HTMLInputElement).value;
+                    }}
+                  />
+                  ${renderInlineError(
+                    nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
+                  )}
+                </div>
+
+                <div class="field">
+                  <label for="adopt-friendly-name">
+                    ${this._localize("dashboard.adopt_field_friendly_name")}
+                  </label>
+                  <input
+                    id="adopt-friendly-name"
+                    type="text"
+                    .value=${this._friendlyName}
+                    ?disabled=${this._busy}
+                    @input=${(e: Event) => {
+                      this._friendlyName = (e.target as HTMLInputElement).value;
+                    }}
+                  />
+                </div>
+
+                ${
+                  this._collectWifi
+                    ? html`
+                        <p class="description">
+                          ${this._localize("onboarding.wifi.intro")}
+                        </p>
+                        ${renderWifiFields({
+                          localize: this._localize,
+                          ssid: this._ssid,
+                          password: this._password,
+                          disabled: this._busy,
+                          onSsidInput: (value) => {
+                            this._ssid = value;
+                          },
+                          onPasswordInput: (value) => {
+                            this._password = value;
+                          },
+                        })}
+                      `
+                    : nothing
+                }
+
+                <label class="checkbox-row">
+                  <input
+                    type="checkbox"
+                    .checked=${this._encryption}
+                    ?disabled=${this._busy}
+                    @change=${(e: Event) => {
+                      this._encryption = (e.target as HTMLInputElement).checked;
+                    }}
+                  />
+                  <span class="checkbox-text">
+                    <span class="checkbox-title"
+                      >${this._localize("dashboard.adopt_encryption_title")}</span
+                    >
+                    <span class="checkbox-hint"
+                      >${this._localize("dashboard.adopt_encryption_hint")}</span
+                    >
+                  </span>
                 </label>
-                <input
-                  id="adopt-name"
-                  type="text"
-                  class=${nameErr ? "invalid" : ""}
-                  .value=${this._name}
-                  ?disabled=${this._busy}
-                  @input=${(e: Event) => {
-                    this._name = (e.target as HTMLInputElement).value;
-                  }}
-                />
-                ${renderInlineError(
-                  nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
-                )}
-              </div>
 
-              <div class="field">
-                <label for="adopt-friendly-name">
-                  ${this._localize("dashboard.adopt_field_friendly_name")}
-                </label>
-                <input
-                  id="adopt-friendly-name"
-                  type="text"
-                  .value=${this._friendlyName}
-                  ?disabled=${this._busy}
-                  @input=${(e: Event) => {
-                    this._friendlyName = (e.target as HTMLInputElement).value;
-                  }}
-                />
-              </div>
+                ${
+                  this._error
+                    ? html`<div class="submit-error">${this._error}</div>`
+                    : nothing
+                }
 
-              ${this._collectWifi
-                ? html`
-                    <p class="description">${this._localize("onboarding.wifi.intro")}</p>
-                    ${renderWifiFields({
-                      localize: this._localize,
-                      ssid: this._ssid,
-                      password: this._password,
-                      disabled: this._busy,
-                      onSsidInput: (value) => {
-                        this._ssid = value;
-                      },
-                      onPasswordInput: (value) => {
-                        this._password = value;
-                      },
-                    })}
-                  `
-                : nothing}
-
-              <label class="checkbox-row">
-                <input
-                  type="checkbox"
-                  .checked=${this._encryption}
-                  ?disabled=${this._busy}
-                  @change=${(e: Event) => {
-                    this._encryption = (e.target as HTMLInputElement).checked;
-                  }}
-                />
-                <span class="checkbox-text">
-                  <span class="checkbox-title"
-                    >${this._localize("dashboard.adopt_encryption_title")}</span
+                <div class="actions">
+                  <button
+                    class="btn btn--cancel"
+                    ?disabled=${this._busy}
+                    @click=${this.close}
                   >
-                  <span class="checkbox-hint"
-                    >${this._localize("dashboard.adopt_encryption_hint")}</span
+                    ${this._localize("layout.cancel")}
+                  </button>
+                  <button
+                    class="btn btn--primary"
+                    ?disabled=${!canSubmit}
+                    @click=${this._submit}
                   >
-                </span>
-              </label>
-
-              ${this._error
-                ? html`<div class="submit-error">${this._error}</div>`
-                : nothing}
-
-              <div class="actions">
-                <button
-                  class="btn btn--cancel"
-                  ?disabled=${this._busy}
-                  @click=${this.close}
-                >
-                  ${this._localize("layout.cancel")}
-                </button>
-                <button
-                  class="btn btn--primary"
-                  ?disabled=${!canSubmit}
-                  @click=${this._submit}
-                >
-                  ${this._busy
-                    ? this._localize("dashboard.adopt_submit_busy")
-                    : this._localize("dashboard.adopt_submit")}
-                </button>
-              </div>
-            `
-          : nothing}
+                    ${
+                      this._busy
+                        ? this._localize("dashboard.adopt_submit_busy")
+                        : this._localize("dashboard.adopt_submit")
+                    }
+                  </button>
+                </div>
+              `
+            : nothing
+        }
       </esphome-base-dialog>
     `;
   }

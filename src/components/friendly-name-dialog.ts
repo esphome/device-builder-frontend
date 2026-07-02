@@ -214,11 +214,13 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
               this._value = (e.target as HTMLInputElement).value;
             }}
           />
-          ${err
-            ? renderInlineError(this._localize(err.code))
-            : html`<span class="helper"
-                >${this._localize("dashboard.action_friendly_name_helper")}</span
-              >`}
+          ${
+            err
+              ? renderInlineError(this._localize(err.code))
+              : html`<span class="helper"
+                  >${this._localize("dashboard.action_friendly_name_helper")}</span
+                >`
+          }
         </div>
         <div class="install-row">
           <wa-checkbox
@@ -231,13 +233,15 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
             )}</wa-checkbox
           >
         </div>
-        ${!this._install
-          ? html`<div class="field">
-              <span class="helper"
-                >${this._localize("dashboard.action_friendly_name_install_skipped")}</span
-              >
-            </div>`
-          : nothing}
+        ${
+          !this._install
+            ? html`<div class="field">
+                <span class="helper"
+                  >${this._localize("dashboard.action_friendly_name_install_skipped")}</span
+                >
+              </div>`
+            : nothing
+        }
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}

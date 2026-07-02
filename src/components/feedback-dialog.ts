@@ -405,9 +405,11 @@ export class ESPHomeFeedbackDialog extends LitElement {
       <wa-icon class="link-icon" library="mdi" name=${link.icon}></wa-icon>
       <span class="link-text">
         <span class="link-label">${this._localize(link.labelKey)}</span>
-        ${link.descKey
-          ? html`<span class="link-desc">${this._localize(link.descKey)}</span>`
-          : ""}
+        ${
+          link.descKey
+            ? html`<span class="link-desc">${this._localize(link.descKey)}</span>`
+            : ""
+        }
       </span>
     `;
   }
@@ -445,21 +447,25 @@ export class ESPHomeFeedbackDialog extends LitElement {
         @request-close=${this._onRequestClose}
         @after-hide=${this._onAfterHide}
       >
-        ${drill
-          ? html`<button
-              slot="header-prefix"
-              class="back-button"
-              aria-label=${this._localize("feedback.back")}
-              @click=${() => this._goTo("main")}
-            >
-              <wa-icon library="mdi" name="arrow-left"></wa-icon>
-            </button>`
-          : ""}
-        ${drill
-          ? html`<div class="links">
-              ${drill.links.map((link) => this._renderLink(link))}
-            </div>`
-          : this._renderMainScreen()}
+        ${
+          drill
+            ? html`<button
+                slot="header-prefix"
+                class="back-button"
+                aria-label=${this._localize("feedback.back")}
+                @click=${() => this._goTo("main")}
+              >
+                <wa-icon library="mdi" name="arrow-left"></wa-icon>
+              </button>`
+            : ""
+        }
+        ${
+          drill
+            ? html`<div class="links">
+                ${drill.links.map((link) => this._renderLink(link))}
+              </div>`
+            : this._renderMainScreen()
+        }
       </esphome-base-dialog>
     `;
   }

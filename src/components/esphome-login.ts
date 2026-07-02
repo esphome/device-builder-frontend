@@ -220,9 +220,11 @@ export class ESPHomeLogin extends LitElement {
               @input=${this._onPasswordInput}
             />
           </div>
-          ${this.error
-            ? html`<div class="error" role="alert">${this.error}</div>`
-            : nothing}
+          ${
+            this.error
+              ? html`<div class="error" role="alert">${this.error}</div>`
+              : nothing
+          }
           <button type="submit" ?disabled=${submitDisabled}>${submitLabel}</button>
         </form>
       </div>

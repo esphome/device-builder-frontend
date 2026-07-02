@@ -100,10 +100,12 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
         : "help-network-outline";
   return html`<div class="device-status ${card.state}">
     <wa-icon library="mdi" name=${stateIcon}></wa-icon>
-    ${card.state === DeviceState.ONLINE
-      ? card._localize("dashboard.online")
-      : card.state === DeviceState.OFFLINE
-        ? card._localize("dashboard.offline")
-        : card._localize("dashboard.unknown")}
+    ${
+      card.state === DeviceState.ONLINE
+        ? card._localize("dashboard.online")
+        : card.state === DeviceState.OFFLINE
+          ? card._localize("dashboard.offline")
+          : card._localize("dashboard.unknown")
+    }
   </div>`;
 }

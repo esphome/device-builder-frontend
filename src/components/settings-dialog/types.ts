@@ -1,9 +1,5 @@
 export type Section =
-  | "appearance"
-  | "language"
-  | "build_server"
-  | "pairing_requests"
-  | "build_offload";
+  "appearance" | "language" | "build_server" | "pairing_requests" | "build_offload";
 
 export interface SectionDef {
   id: Section;

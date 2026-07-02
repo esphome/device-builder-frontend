@@ -109,9 +109,11 @@ export class ESPHomeProcessTerminal extends LitElement {
         ${this._renderBanner()}
         <slot name="suggestion"></slot>
         <div class="terminal-toolbar">
-          ${this.streaming
-            ? html`<span class="streaming-dot" aria-hidden="true"></span>`
-            : nothing}
+          ${
+            this.streaming
+              ? html`<span class="streaming-dot" aria-hidden="true"></span>`
+              : nothing
+          }
           <slot name="toolbar-left"></slot>
           <span class="spacer"></span>
           <slot name="toolbar-right"></slot>
@@ -144,18 +146,24 @@ export class ESPHomeProcessTerminal extends LitElement {
       <div class="card">
         <div class="status">
           ${this._renderStatusIcon()}
-          ${this.statusMessage
-            ? html`<span class="status-text">${this.statusMessage}</span>`
-            : nothing}
-          ${this.statusDetail
-            ? html`<span class="status-detail">${this.statusDetail}</span>`
-            : nothing}
+          ${
+            this.statusMessage
+              ? html`<span class="status-text">${this.statusMessage}</span>`
+              : nothing
+          }
+          ${
+            this.statusDetail
+              ? html`<span class="status-detail">${this.statusDetail}</span>`
+              : nothing
+          }
         </div>
-        ${this.progress !== null
-          ? html`<div class="progress-bar">
-              <div class="progress-bar-fill" style="width:${this.progress}%"></div>
-            </div>`
-          : nothing}
+        ${
+          this.progress !== null
+            ? html`<div class="progress-bar">
+                <div class="progress-bar-fill" style="width:${this.progress}%"></div>
+              </div>`
+            : nothing
+        }
         <slot name="suggestion"></slot>
         <slot name="status-extra"></slot>
         <slot name="toolbar-right"></slot>

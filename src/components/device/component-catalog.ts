@@ -253,31 +253,35 @@ export class ESPHomeComponentCatalog extends LitElement {
     const ambiguous = ambiguousNameIds(visible);
 
     return html`
-      ${showSidebar
-        ? html`<div class="sidebar">
-            <p class="sidebar-label">${this._localize("device.component_categories")}</p>
-            ${categories.map(
-              ({ id, label, count }) => html`
-                <button
-                  class="category-btn ${this._category === id
-                    ? "category-btn--active"
-                    : ""}"
-                  type="button"
-                  @click=${() => {
-                    this._category = id;
-                    this._provides = "";
-                    this._fetchComponents();
-                  }}
-                >
-                  <span class="category-btn-inner">
-                    <span>${label}</span>
-                    <span class="category-count">${count}</span>
-                  </span>
-                </button>
-              `
-            )}
-          </div>`
-        : nothing}
+      ${
+        showSidebar
+          ? html`<div class="sidebar">
+              <p class="sidebar-label">
+                ${this._localize("device.component_categories")}
+              </p>
+              ${categories.map(
+                ({ id, label, count }) => html`
+                  <button
+                    class="category-btn ${
+                      this._category === id ? "category-btn--active" : ""
+                    }"
+                    type="button"
+                    @click=${() => {
+                      this._category = id;
+                      this._provides = "";
+                      this._fetchComponents();
+                    }}
+                  >
+                    <span class="category-btn-inner">
+                      <span>${label}</span>
+                      <span class="category-count">${count}</span>
+                    </span>
+                  </button>
+                `
+              )}
+            </div>`
+          : nothing
+      }
       <div class="main">
         <input
           type="search"
@@ -286,39 +290,45 @@ export class ESPHomeComponentCatalog extends LitElement {
           @input=${this._onSearchInput}
           placeholder=${this._localize("device.search_components_placeholder")}
         />
-        ${!this._list.loading
-          ? html`<span class="result-count"
-              >${this._localize("device.components_count", {
-                visible: visible.length + bundles.length,
-                total: this._total + bundles.length,
-              })}</span
-            >`
-          : nothing}
+        ${
+          !this._list.loading
+            ? html`<span class="result-count"
+                >${this._localize("device.components_count", {
+                  visible: visible.length + bundles.length,
+                  total: this._total + bundles.length,
+                })}</span
+              >`
+            : nothing
+        }
         <div class="grid-scroll">
           <div class="components-grid">
-            ${this._list.loading
-              ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
-              : visible.length + bundles.length
-                ? html`
-                    ${bundles.map((b) => renderBundleCard(this, b))}
-                    ${visible.map((c) =>
-                      renderCard(
-                        this,
-                        c,
-                        c.id === this._expandedId,
-                        this._category === ComponentCategory.FEATURED,
-                        this._localize,
-                        ambiguous.has(c.id)
-                      )
-                    )}
-                  `
-                : html`<p class="empty">
-                    ${this._localize(
-                      this._list.hasError
-                        ? "device.components_load_error"
-                        : "device.no_components_found"
-                    )}
-                  </p>`}
+            ${
+              this._list.loading
+                ? html`<p class="empty">
+                    ${this._localize("device.loading_components")}
+                  </p>`
+                : visible.length + bundles.length
+                  ? html`
+                      ${bundles.map((b) => renderBundleCard(this, b))}
+                      ${visible.map((c) =>
+                        renderCard(
+                          this,
+                          c,
+                          c.id === this._expandedId,
+                          this._category === ComponentCategory.FEATURED,
+                          this._localize,
+                          ambiguous.has(c.id)
+                        )
+                      )}
+                    `
+                  : html`<p class="empty">
+                      ${this._localize(
+                        this._list.hasError
+                          ? "device.components_load_error"
+                          : "device.no_components_found"
+                      )}
+                    </p>`
+            }
           </div>
           ${renderLoadMoreFooter({
             loadingMore: this._list.loadingMore,

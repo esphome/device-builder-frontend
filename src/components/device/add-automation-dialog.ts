@@ -194,11 +194,13 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       .confirmOnEnter=${this._onContinue}
       @request-close=${this._onRequestClose}
     >
-      ${this._loading && !this._available
-        ? html`<div style="text-align: center; padding: 32px;">
-            <wa-spinner></wa-spinner>
-          </div>`
-        : this._renderForm()}
+      ${
+        this._loading && !this._available
+          ? html`<div style="text-align: center; padding: 32px;">
+              <wa-spinner></wa-spinner>
+            </div>`
+          : this._renderForm()
+      }
     </esphome-base-dialog>`;
   }
 
@@ -219,30 +221,35 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       <p class="intro">
         ${renderMarkdown(this._localize("device.automation_header_description"))}
       </p>
-      ${showKindRow
-        ? html`<div class="field">
-            <label class="field-label" id="kind-label">
-              ${this._localize("device.automation_wizard_pick_target")}
-            </label>
-            <wa-select
-              aria-labelledby="kind-label"
-              value=${this._kind}
-              ?disabled=${this._saving}
-              @change=${(e: Event) =>
-                this._onKindChange((e.target as HTMLSelectElement).value)}
-            >
-              <wa-option value="device_on" ?selected=${this._kind === "device_on"}>
-                ${this._localize("device.automation_target_device")}
-              </wa-option>
-              <wa-option value="component_on" ?selected=${this._kind === "component_on"}>
-                ${this._localize("device.automation_target_component")}
-              </wa-option>
-              <wa-option value="interval" ?selected=${this._kind === "interval"}>
-                ${this._localize("device.automation_target_interval")}
-              </wa-option>
-            </wa-select>
-          </div>`
-        : nothing}
+      ${
+        showKindRow
+          ? html`<div class="field">
+              <label class="field-label" id="kind-label">
+                ${this._localize("device.automation_wizard_pick_target")}
+              </label>
+              <wa-select
+                aria-labelledby="kind-label"
+                value=${this._kind}
+                ?disabled=${this._saving}
+                @change=${(e: Event) =>
+                  this._onKindChange((e.target as HTMLSelectElement).value)}
+              >
+                <wa-option value="device_on" ?selected=${this._kind === "device_on"}>
+                  ${this._localize("device.automation_target_device")}
+                </wa-option>
+                <wa-option
+                  value="component_on"
+                  ?selected=${this._kind === "component_on"}
+                >
+                  ${this._localize("device.automation_target_component")}
+                </wa-option>
+                <wa-option value="interval" ?selected=${this._kind === "interval"}>
+                  ${this._localize("device.automation_target_interval")}
+                </wa-option>
+              </wa-select>
+            </div>`
+          : nothing
+      }
       ${showComponentRow ? this._renderComponentRow(prefillContainer) : nothing}
       ${this._kind === "interval" ? this._renderIntervalRow() : nothing}
       ${!triggerLocked ? this._renderTriggerRow(filteredTriggers) : nothing}
@@ -254,9 +261,11 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           ?disabled=${this._saving || !this._canContinue()}
           @click=${this._onContinue}
         >
-          ${this._saving
-            ? this._localize("device.adding")
-            : this._localize("device.add_automation_continue")}
+          ${
+            this._saving
+              ? this._localize("device.adding")
+              : this._localize("device.add_automation_continue")
+          }
         </button>
       </div>
     `;
@@ -341,9 +350,11 @@ export class ESPHomeAddAutomationDialog extends LitElement {
             </wa-option>`
         )}
       </wa-select>
-      ${active?.description
-        ? html`<p class="field-desc">${renderMarkdown(active.description)}</p>`
-        : nothing}
+      ${
+        active?.description
+          ? html`<p class="field-desc">${renderMarkdown(active.description)}</p>`
+          : nothing
+      }
     </div>`;
   }
 

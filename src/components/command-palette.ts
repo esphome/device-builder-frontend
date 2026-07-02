@@ -317,41 +317,45 @@ export class ESPHomeCommandPalette extends LitElement {
             mode so the affordance reads as an action rather than a
             status badge.
           -->
-        ${this._expertMode
-          ? html`<button
-              class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
-              type="button"
-              title=${this._localize(
-                inYamlMode
-                  ? "command_palette.switch_to_commands"
-                  : "command_palette.switch_to_yaml"
-              )}
-              aria-label=${this._localize(
-                inYamlMode
-                  ? "command_palette.switch_to_commands"
-                  : "command_palette.switch_to_yaml"
-              )}
-              aria-pressed=${inYamlMode ? "true" : "false"}
-              @click=${this._onToggleMode}
-            >
-              <wa-icon
-                library="mdi"
-                name=${inYamlMode ? "magnify" : "code-braces"}
-              ></wa-icon>
-            </button>`
-          : nothing}
+        ${
+          this._expertMode
+            ? html`<button
+                class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
+                type="button"
+                title=${this._localize(
+                  inYamlMode
+                    ? "command_palette.switch_to_commands"
+                    : "command_palette.switch_to_yaml"
+                )}
+                aria-label=${this._localize(
+                  inYamlMode
+                    ? "command_palette.switch_to_commands"
+                    : "command_palette.switch_to_yaml"
+                )}
+                aria-pressed=${inYamlMode ? "true" : "false"}
+                @click=${this._onToggleMode}
+              >
+                <wa-icon
+                  library="mdi"
+                  name=${inYamlMode ? "magnify" : "code-braces"}
+                ></wa-icon>
+              </button>`
+            : nothing
+        }
       </div>
       <div class="list" role="listbox">
-        ${items.length === 0
-          ? html`<div class="empty">${this._renderEmptyMessage()}</div>`
-          : groups.map(
-              (g) => html`
-                <div class="group">
-                  <div class="group-heading">${g.name}</div>
-                  ${g.items.map((item) => this._renderItem(item))}
-                </div>
-              `
-            )}
+        ${
+          items.length === 0
+            ? html`<div class="empty">${this._renderEmptyMessage()}</div>`
+            : groups.map(
+                (g) => html`
+                  <div class="group">
+                    <div class="group-heading">${g.name}</div>
+                    ${g.items.map((item) => this._renderItem(item))}
+                  </div>
+                `
+              )
+        }
       </div>
       <div class="footer">
         <span
@@ -361,11 +365,13 @@ export class ESPHomeCommandPalette extends LitElement {
         >
         <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
         <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
-        ${this._expertMode
-          ? html`<span class="yaml-hint">
-              <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
-            </span>`
-          : nothing}
+        ${
+          this._expertMode
+            ? html`<span class="yaml-hint">
+                <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
+              </span>`
+            : nothing
+        }
       </div>
     `;
   }
@@ -401,11 +407,13 @@ export class ESPHomeCommandPalette extends LitElement {
         @click=${() => this._run(item)}
         @mouseenter=${() => (this._selectedId = item.id)}
       >
-        ${item.flag
-          ? html`<span class="item-flag" aria-hidden="true">${item.flag}</span>`
-          : item.icon
-            ? html`<wa-icon library="mdi" name=${item.icon}></wa-icon>`
-            : nothing}
+        ${
+          item.flag
+            ? html`<span class="item-flag" aria-hidden="true">${item.flag}</span>`
+            : item.icon
+              ? html`<wa-icon library="mdi" name=${item.icon}></wa-icon>`
+              : nothing
+        }
         <span class="item-label">${item.label}</span>
       </div>
     `;

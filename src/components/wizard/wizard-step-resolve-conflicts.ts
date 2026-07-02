@@ -119,27 +119,33 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
               />
               <label for=${id}>
                 ${path}
-                ${isMain
-                  ? html`<span class="badge"
-                      >${this._localize("wizard.import_bundle_main_config")}</span
-                    >`
-                  : nothing}
+                ${
+                  isMain
+                    ? html`<span class="badge"
+                        >${this._localize("wizard.import_bundle_main_config")}</span
+                      >`
+                    : nothing
+                }
               </label>
               <span class="state">
-                ${overwrite
-                  ? this._localize("wizard.import_bundle_overwrite")
-                  : this._localize("wizard.import_bundle_keep")}
+                ${
+                  overwrite
+                    ? this._localize("wizard.import_bundle_overwrite")
+                    : this._localize("wizard.import_bundle_keep")
+                }
               </span>
             </div>
           `;
         })}
       </div>
 
-      ${this.hasSecrets
-        ? html`<p class="secrets-note">
-            ${this._localize("wizard.import_bundle_secrets_note")}
-          </p>`
-        : nothing}
+      ${
+        this.hasSecrets
+          ? html`<p class="secrets-note">
+              ${this._localize("wizard.import_bundle_secrets_note")}
+            </p>`
+          : nothing
+      }
 
       <div class="actions">
         <button class="btn btn--cancel" @click=${this._cancel}>

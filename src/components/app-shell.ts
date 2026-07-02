@@ -158,8 +158,7 @@ export class ESPHomeApp extends LitElement {
   @state()
   _buildServerIdentityRotationCounter = 0;
   @provide({ context: buildServerPeersContext }) @state() _buildServerPeers:
-    | PeerSummary[]
-    | null = null;
+    PeerSummary[] | null = null;
   @provide({ context: buildServerPairingWindowStateContext })
   @state()
   _buildServerPairingWindowState: PairingWindowState | null = null;

@@ -31,9 +31,9 @@ export function renderTermButton(opts: TermButtonOpts): TemplateResult {
   const title = opts.title ?? opts.label;
   return html`<button
     type="button"
-    class="term-btn term-btn--${variant} ${opts.icon
-      ? "term-btn--with-icon"
-      : ""} ${opts.active ? "is-active" : ""}"
+    class="term-btn term-btn--${variant} ${
+      opts.icon ? "term-btn--with-icon" : ""
+    } ${opts.active ? "is-active" : ""}"
     ?disabled=${opts.disabled ?? false}
     title=${title ?? nothing}
     aria-label=${opts.label ? nothing : (title ?? nothing)}

@@ -57,20 +57,24 @@ export function renderDiscoveredSection(
         >
           ${host._localize(expanded ? "dashboard.hide" : "dashboard.show")}
         </button>
-        ${ignoredCount > 0
-          ? html`<button
-              class="discovered-section-toggle discovered-section-toggle--ignored"
-              type="button"
-              aria-pressed=${host._showIgnored}
-              @click=${host._toggleShowIgnored}
-            >
-              ${host._showIgnored
-                ? host._localize("dashboard.hide_ignored")
-                : host._localize("dashboard.show_ignored", {
-                    count: ignoredCount,
-                  })}
-            </button>`
-          : ""}
+        ${
+          ignoredCount > 0
+            ? html`<button
+                class="discovered-section-toggle discovered-section-toggle--ignored"
+                type="button"
+                aria-pressed=${host._showIgnored}
+                @click=${host._toggleShowIgnored}
+              >
+                ${
+                  host._showIgnored
+                    ? host._localize("dashboard.hide_ignored")
+                    : host._localize("dashboard.show_ignored", {
+                        count: ignoredCount,
+                      })
+                }
+              </button>`
+            : ""
+        }
       </header>
       <div id="discovered-grid" class="discovered-section-grid" ?hidden=${!expanded}>
         ${visible.map(
@@ -196,16 +200,18 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       <div slot="below-controls" class="table-device-count-row">
         ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
       </div>
-      ${host._hideDeviceCreation
-        ? ""
-        : html`<button
-            slot="actions"
-            class="table-create-btn"
-            @click=${() => host._createDialog.open()}
-          >
-            <wa-icon library="mdi" name="plus"></wa-icon>
-            <span class="label">${host._localize("dashboard.create_device")}</span>
-          </button>`}
+      ${
+        host._hideDeviceCreation
+          ? ""
+          : html`<button
+              slot="actions"
+              class="table-create-btn"
+              @click=${() => host._createDialog.open()}
+            >
+              <wa-icon library="mdi" name="plus"></wa-icon>
+              <span class="label">${host._localize("dashboard.create_device")}</span>
+            </button>`
+      }
       <div slot="no-results-extra" class="yaml-preview-banner">
         ${renderNoResultsExtras(host)}
       </div>
@@ -218,9 +224,11 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
     <esphome-device-drawer
       ?open=${host._drawerOpen}
       .device=${host._drawerDevice}
-      ?busy=${host._drawerDevice
-        ? host._activeJobs.has(host._drawerDevice.configuration)
-        : false}
+      ?busy=${
+        host._drawerDevice
+          ? host._activeJobs.has(host._drawerDevice.configuration)
+          : false
+      }
       @drawer-close=${() => {
         host._drawerOpen = false;
       }}
@@ -254,9 +262,11 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
       .device=${host._cardContextDevice}
       .position=${host._cardContextPosition}
       card-mode
-      ?busy=${host._cardContextDevice
-        ? host._activeJobs.has(host._cardContextDevice.configuration)
-        : false}
+      ?busy=${
+        host._cardContextDevice
+          ? host._activeJobs.has(host._cardContextDevice.configuration)
+          : false
+      }
       @menu-close=${() => {
         host._cardContextDevice = null;
         host._cardContextPosition = null;

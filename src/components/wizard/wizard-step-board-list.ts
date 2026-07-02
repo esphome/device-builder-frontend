@@ -75,42 +75,55 @@ export class ESPHomeWizardStepBoardList extends LitElement {
     const { featured, regular } = this._splitBoards(this.boards);
     return html`
       <div class="boards-scroll">
-        ${this.loading
-          ? html`<p class="loading">${this.localize("wizard.loading_boards")}</p>`
-          : this.boards.length === 0
-            ? html`<p class="loading">
-                ${this.localize(
-                  this.error ? "wizard.boards_load_error" : "wizard.no_boards_found"
-                )}
-              </p>`
-            : html`
-                ${featured
-                  ? html`
-                      <p class="section-label">${this.localize("wizard.starter_kit")}</p>
-                      ${this._renderFeatured(featured)}
-                    `
-                  : nothing}
-                ${regular.length
-                  ? html`
-                      <p class="section-label">${this.localize("wizard.other_boards")}</p>
-                      <div class="boards-grid">
-                        ${regular.map((board) =>
-                          this._renderBoardCard(board, board.id === this._expandedBoardId)
-                        )}
-                      </div>
-                    `
-                  : nothing}
-                ${renderLoadMoreFooter({
-                  loadingMore: this.loadingMore,
-                  error: this.error,
-                  hasMore: this.hasMore,
-                  localize: this.localize,
-                  loadingLabelKey: "wizard.loading_boards",
-                  errorLabelKey: "wizard.boards_load_more_error",
-                  onRetry: this._onRetry,
-                  loadingClass: "loading",
-                })}
-              `}
+        ${
+          this.loading
+            ? html`<p class="loading">${this.localize("wizard.loading_boards")}</p>`
+            : this.boards.length === 0
+              ? html`<p class="loading">
+                  ${this.localize(
+                    this.error ? "wizard.boards_load_error" : "wizard.no_boards_found"
+                  )}
+                </p>`
+              : html`
+                  ${
+                    featured
+                      ? html`
+                          <p class="section-label">
+                            ${this.localize("wizard.starter_kit")}
+                          </p>
+                          ${this._renderFeatured(featured)}
+                        `
+                      : nothing
+                  }
+                  ${
+                    regular.length
+                      ? html`
+                          <p class="section-label">
+                            ${this.localize("wizard.other_boards")}
+                          </p>
+                          <div class="boards-grid">
+                            ${regular.map((board) =>
+                              this._renderBoardCard(
+                                board,
+                                board.id === this._expandedBoardId
+                              )
+                            )}
+                          </div>
+                        `
+                      : nothing
+                  }
+                  ${renderLoadMoreFooter({
+                    loadingMore: this.loadingMore,
+                    error: this.error,
+                    hasMore: this.hasMore,
+                    localize: this.localize,
+                    loadingLabelKey: "wizard.loading_boards",
+                    errorLabelKey: "wizard.boards_load_more_error",
+                    onRetry: this._onRetry,
+                    loadingClass: "loading",
+                  })}
+                `
+        }
       </div>
     `;
   }

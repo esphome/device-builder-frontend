@@ -25,46 +25,50 @@ export interface EditorToolbarProps {
  */
 export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
   return html`<div class="header-actions">
-    ${p.effectiveLayout !== "left"
-      ? (() => {
-          const sensitiveLabel = p.localize(
-            p.revealSensitive
-              ? "device.yaml_mask_sensitive"
-              : "device.yaml_reveal_sensitive"
-          );
-          return html`<button
-            type="button"
-            class="ghost-icon-btn diff-toggle"
-            aria-pressed=${p.revealSensitive}
-            aria-label=${sensitiveLabel}
-            @click=${p.onToggleRevealSensitive}
-            title=${sensitiveLabel}
-          >
-            <wa-icon
-              library="mdi"
-              name=${p.revealSensitive ? "eye-off" : "eye"}
-            ></wa-icon>
-          </button>`;
-        })()
-      : nothing}
-    ${p.showDiffButton
-      ? (() => {
-          const diffLabel = p.showDiff
-            ? p.localize("device.diff_view_editor")
-            : p.localize("device.diff_view_diff");
-          return html`<button
-            type="button"
-            class="ghost-icon-btn diff-toggle"
-            aria-pressed=${p.showDiff}
-            ?disabled=${p.yaml === p.savedYaml && !p.showDiff}
-            aria-label=${diffLabel}
-            @click=${p.onToggleDiff}
-            title=${diffLabel}
-          >
-            <wa-icon library="mdi" name="file-compare"></wa-icon>
-          </button>`;
-        })()
-      : nothing}
+    ${
+      p.effectiveLayout !== "left"
+        ? (() => {
+            const sensitiveLabel = p.localize(
+              p.revealSensitive
+                ? "device.yaml_mask_sensitive"
+                : "device.yaml_reveal_sensitive"
+            );
+            return html`<button
+              type="button"
+              class="ghost-icon-btn diff-toggle"
+              aria-pressed=${p.revealSensitive}
+              aria-label=${sensitiveLabel}
+              @click=${p.onToggleRevealSensitive}
+              title=${sensitiveLabel}
+            >
+              <wa-icon
+                library="mdi"
+                name=${p.revealSensitive ? "eye-off" : "eye"}
+              ></wa-icon>
+            </button>`;
+          })()
+        : nothing
+    }
+    ${
+      p.showDiffButton
+        ? (() => {
+            const diffLabel = p.showDiff
+              ? p.localize("device.diff_view_editor")
+              : p.localize("device.diff_view_diff");
+            return html`<button
+              type="button"
+              class="ghost-icon-btn diff-toggle"
+              aria-pressed=${p.showDiff}
+              ?disabled=${p.yaml === p.savedYaml && !p.showDiff}
+              aria-label=${diffLabel}
+              @click=${p.onToggleDiff}
+              title=${diffLabel}
+            >
+              <wa-icon library="mdi" name="file-compare"></wa-icon>
+            </button>`;
+          })()
+        : nothing
+    }
     <div
       class="layout-toggle"
       role="group"

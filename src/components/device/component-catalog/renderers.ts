@@ -30,19 +30,21 @@ export function renderBundleCard(
       }}
     >
       <div class="component-card-header">
-        ${hasImage
-          ? html`<div class="component-image">
-              <img
-                src=${bundle.image_url}
-                alt=${bundle.name}
-                referrerpolicy="no-referrer"
-                loading="lazy"
-                @error=${() => host._onImageError(bundle.id)}
-              />
-            </div>`
-          : html`<div class="component-image--placeholder">
-              <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
-            </div>`}
+        ${
+          hasImage
+            ? html`<div class="component-image">
+                <img
+                  src=${bundle.image_url}
+                  alt=${bundle.name}
+                  referrerpolicy="no-referrer"
+                  loading="lazy"
+                  @error=${() => host._onImageError(bundle.id)}
+                />
+              </div>`
+            : html`<div class="component-image--placeholder">
+                <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+              </div>`
+        }
         <div class="component-card-header-text">
           <h3 class="component-title">${bundle.name}</h3>
         </div>
@@ -51,11 +53,13 @@ export function renderBundleCard(
           ${host._localize("device.featured_bundle_badge")}
         </span>
       </div>
-      ${bundle.description
-        ? html`<p class="component-description component-description--clamp">
-            ${renderMarkdown(bundle.description)}
-          </p>`
-        : nothing}
+      ${
+        bundle.description
+          ? html`<p class="component-description component-description--clamp">
+              ${renderMarkdown(bundle.description)}
+            </p>`
+          : nothing
+      }
       <div class="card-footer">
         <span></span>
         <button
@@ -91,35 +95,41 @@ export function renderCard(
   const platform = showPlatform ? platformLabel(component.id) : "";
   return html`
     <article
-      class="component-card ${expanded ? "component-card--expanded" : ""} ${featured
-        ? "component-card--featured"
-        : ""}"
+      class="component-card ${expanded ? "component-card--expanded" : ""} ${
+        featured ? "component-card--featured" : ""
+      }"
       @click=${(ev: MouseEvent) => {
         if (shouldHandleCardClick(ev)) host._onAdd(component);
       }}
     >
       <div class="component-card-header">
-        ${hasImage
-          ? html`<div class="component-image">
-              <img
-                src=${component.image_url}
-                alt=${component.name}
-                referrerpolicy="no-referrer"
-                loading="lazy"
-                @error=${() => host._onImageError(component.id)}
-              />
-            </div>`
-          : html`<div class="component-image--placeholder">
-              <wa-icon library="mdi" name="memory"></wa-icon>
-            </div>`}
+        ${
+          hasImage
+            ? html`<div class="component-image">
+                <img
+                  src=${component.image_url}
+                  alt=${component.name}
+                  referrerpolicy="no-referrer"
+                  loading="lazy"
+                  @error=${() => host._onImageError(component.id)}
+                />
+              </div>`
+            : html`<div class="component-image--placeholder">
+                <wa-icon library="mdi" name="memory"></wa-icon>
+              </div>`
+        }
         <div class="component-card-header-text">
           <h3 class="component-title">${component.name}</h3>
-          ${categoryLabel
-            ? html`<span class="component-category-chip">${categoryLabel}</span>`
-            : nothing}
-          ${platform
-            ? html`<span class="component-category-chip">${platform}</span>`
-            : nothing}
+          ${
+            categoryLabel
+              ? html`<span class="component-category-chip">${categoryLabel}</span>`
+              : nothing
+          }
+          ${
+            platform
+              ? html`<span class="component-category-chip">${platform}</span>`
+              : nothing
+          }
         </div>
         <button
           class="expand-button"

@@ -297,17 +297,23 @@ export class ESPHomeAddComponentForm extends LitElement {
             this._showYaml = !this._showYaml;
           }}
         >
-          ${this._showYaml
-            ? this._localize("device.yaml_preview_toggle")
-            : this._localize("device.yaml_preview")}
+          ${
+            this._showYaml
+              ? this._localize("device.yaml_preview_toggle")
+              : this._localize("device.yaml_preview")
+          }
         </button>
-        ${this._showYaml
-          ? html`<pre class="yaml-preview">${this._generateYamlPreview()}</pre>`
-          : nothing}
+        ${
+          this._showYaml
+            ? html`<pre class="yaml-preview">${this._generateYamlPreview()}</pre>`
+            : nothing
+        }
         ${this.submitError ? html`<p class="error">${this.submitError}</p>` : nothing}
-        ${this._localBlockMessage
-          ? html`<p class="error">${this._localBlockMessage}</p>`
-          : nothing}
+        ${
+          this._localBlockMessage
+            ? html`<p class="error">${this._localBlockMessage}</p>`
+            : nothing
+        }
         <div class="actions">
           <button
             class="btn btn-secondary"
@@ -321,9 +327,11 @@ export class ESPHomeAddComponentForm extends LitElement {
             ?disabled=${disabled || !isComplete || missingDeps.length > 0}
             @click=${this._onSubmit}
           >
-            ${this.submitting
-              ? this._localize("device.adding")
-              : this._localize("device.add_component_action")}
+            ${
+              this.submitting
+                ? this._localize("device.adding")
+                : this._localize("device.add_component_action")
+            }
           </button>
         </div>
       </div>

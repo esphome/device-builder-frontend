@@ -207,9 +207,11 @@ export class ESPHomeAddApiActionDialog extends LitElement {
           ?disabled=${this._saving || !this._canContinue()}
           @click=${this._onContinue}
         >
-          ${this._saving
-            ? this._localize("device.adding")
-            : this._localize("device.add_automation_continue")}
+          ${
+            this._saving
+              ? this._localize("device.adding")
+              : this._localize("device.add_automation_continue")
+          }
         </button>
       </div>
     </esphome-base-dialog>`;

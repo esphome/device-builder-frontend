@@ -104,18 +104,22 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
             >`
         )}
       </wa-select>
-      ${present.length > 1
-        ? html`<p class="field-description exclusive-group-conflict">
-            ${ctx.localize("device.exclusive_group_conflict")}
-          </p>`
-        : nothing}
-      ${selected
-        ? html`<div class="nested-fields">
-            ${renderChildEntries(selected, [selected.key], ctx, {
-              includeAdvanced: true,
-            })}
-          </div>`
-        : nothing}
+      ${
+        present.length > 1
+          ? html`<p class="field-description exclusive-group-conflict">
+              ${ctx.localize("device.exclusive_group_conflict")}
+            </p>`
+          : nothing
+      }
+      ${
+        selected
+          ? html`<div class="nested-fields">
+              ${renderChildEntries(selected, [selected.key], ctx, {
+                includeAdvanced: true,
+              })}
+            </div>`
+          : nothing
+      }
     </div>
   `;
 }

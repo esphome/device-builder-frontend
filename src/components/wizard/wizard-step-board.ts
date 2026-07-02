@@ -167,56 +167,66 @@ export class ESPHomeWizardStepBoard extends LitElement {
         placeholder=${this._localize("wizard.search_boards_placeholder")}
       />
 
-      ${this._filterFromDetection
-        ? html`
-            <div class="detection-banner" role="status">
-              <span>
-                ${this._localize("wizard.detected_chip_family", {
-                  family: this._selectedFilter,
-                })}
-              </span>
-              <button class="helper-link" type="button" @click=${this._exitDetectionMode}>
-                ${this._localize("wizard.show_all_boards")}
-              </button>
-            </div>
-          `
-        : html`
-            <div class="platform-filters">
-              ${ESPHomeWizardStepBoard.PLATFORMS.map(
-                (p) =>
-                  html`<button
-                    class="platform-chip ${this._selectedFilter === p.label
-                      ? "platform-chip--active"
-                      : ""}"
-                    @click=${() => this._onPlatformFilter(p.label)}
-                  >
-                    ${p.label}
-                  </button>`
-              )}
-            </div>
+      ${
+        this._filterFromDetection
+          ? html`
+              <div class="detection-banner" role="status">
+                <span>
+                  ${this._localize("wizard.detected_chip_family", {
+                    family: this._selectedFilter,
+                  })}
+                </span>
+                <button
+                  class="helper-link"
+                  type="button"
+                  @click=${this._exitDetectionMode}
+                >
+                  ${this._localize("wizard.show_all_boards")}
+                </button>
+              </div>
+            `
+          : html`
+              <div class="platform-filters">
+                ${ESPHomeWizardStepBoard.PLATFORMS.map(
+                  (p) =>
+                    html`<button
+                      class="platform-chip ${
+                        this._selectedFilter === p.label ? "platform-chip--active" : ""
+                      }"
+                      @click=${() => this._onPlatformFilter(p.label)}
+                    >
+                      ${p.label}
+                    </button>`
+                )}
+              </div>
 
-            <div class="helper-row">
-              <button
-                class="connect-board-btn"
-                type="button"
-                @click=${this._connectBoard}
-              >
-                <wa-icon library="mdi" name="usb-port"></wa-icon>
-                ${this._localize("wizard.connect_your_board")}
-              </button>
-              <a
-                class="helper-link"
-                href=${UNDERSTANDING_BOARDS_DOCS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                ${this._localize("wizard.dont_know_board")}
-              </a>
-            </div>
-            ${this._detectError
-              ? html`<div class="detect-error" role="alert">${this._detectError}</div>`
-              : nothing}
-          `}
+              <div class="helper-row">
+                <button
+                  class="connect-board-btn"
+                  type="button"
+                  @click=${this._connectBoard}
+                >
+                  <wa-icon library="mdi" name="usb-port"></wa-icon>
+                  ${this._localize("wizard.connect_your_board")}
+                </button>
+                <a
+                  class="helper-link"
+                  href=${UNDERSTANDING_BOARDS_DOCS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  ${this._localize("wizard.dont_know_board")}
+                </a>
+              </div>
+              ${
+                this._detectError
+                  ? html`<div class="detect-error" role="alert">
+                      ${this._detectError}
+                    </div>`
+                  : nothing
+              }
+            `
+      }
 
       <esphome-wizard-step-board-list
         .boards=${this._list.items}

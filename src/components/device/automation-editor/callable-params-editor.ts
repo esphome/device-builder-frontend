@@ -98,17 +98,23 @@ export class ESPHomeCallableParamsEditor extends LitElement {
 
   protected render() {
     return html`<div class="field">
-      ${this.fieldLabel
-        ? html`<label class="field-label">${this.fieldLabel}</label>`
-        : nothing}
-      ${this.description
-        ? html`<p class="field-description">${renderMarkdown(this.description)}</p>`
-        : nothing}
-      ${this._params.length === 0
-        ? nothing
-        : html`<div class="script-params-list">
-            ${this._params.map((p, idx) => this._renderRow(p, idx))}
-          </div>`}
+      ${
+        this.fieldLabel
+          ? html`<label class="field-label">${this.fieldLabel}</label>`
+          : nothing
+      }
+      ${
+        this.description
+          ? html`<p class="field-description">${renderMarkdown(this.description)}</p>`
+          : nothing
+      }
+      ${
+        this._params.length === 0
+          ? nothing
+          : html`<div class="script-params-list">
+              ${this._params.map((p, idx) => this._renderRow(p, idx))}
+            </div>`
+      }
       <button
         type="button"
         class="script-param-add"

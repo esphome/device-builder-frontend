@@ -227,11 +227,13 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
                 <span class="title">${p.port}</span>
                 ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
               </div>
-              ${this.newPorts.has(p.port)
-                ? html`<span class="new-badge"
-                    >${this._localize("dashboard.serial_port_new")}</span
-                  >`
-                : nothing}
+              ${
+                this.newPorts.has(p.port)
+                  ? html`<span class="new-badge"
+                      >${this._localize("dashboard.serial_port_new")}</span
+                    >`
+                  : nothing
+              }
             </button>
           `
         )}

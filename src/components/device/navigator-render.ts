@@ -72,9 +72,9 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
   const domain = item.parentKey ?? item.key;
   return html`
     <div
-      class="nav-item ${v.selectedLine === item.fromLine
-        ? "nav-item--selected"
-        : ""} ${v.hoveredLine === item.fromLine ? "nav-item--hovered" : ""}"
+      class="nav-item ${
+        v.selectedLine === item.fromLine ? "nav-item--selected" : ""
+      } ${v.hoveredLine === item.fromLine ? "nav-item--hovered" : ""}"
       @mouseenter=${() => v.onItemEnter(item)}
       @mouseleave=${() => v.onItemLeave()}
       @click=${() => v.onItemClick(item)}
@@ -121,19 +121,23 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
       ></wa-icon>
       <span class="nav-subgroup-title">${prettyDomain(group.key)}</span>
       <span class="nav-subgroup-count">${group.rows.length}</span>
-      ${interactive
-        ? html`<wa-icon
-            class="nav-subgroup-chevron"
-            library="mdi"
-            name=${open ? "chevron-up" : "chevron-down"}
-          ></wa-icon>`
-        : nothing}
+      ${
+        interactive
+          ? html`<wa-icon
+              class="nav-subgroup-chevron"
+              library="mdi"
+              name=${open ? "chevron-up" : "chevron-down"}
+            ></wa-icon>`
+          : nothing
+      }
     </div>
-    ${open
-      ? html`<div id=${rowsId} class="nav-items nav-items--grouped">
-          ${group.rows.map((row) => renderNavRow(row, v, false))}
-        </div>`
-      : nothing}
+    ${
+      open
+        ? html`<div id=${rowsId} class="nav-items nav-items--grouped">
+            ${group.rows.map((row) => renderNavRow(row, v, false))}
+          </div>`
+        : nothing
+    }
   `;
 }
 
@@ -169,39 +173,47 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
         <wa-icon library="mdi" name=${v.icon}></wa-icon>
         <p>${v.label}</p>
       </div>
-      ${v.filtering
-        ? nothing
-        : html`<wa-icon
-            class="nav-content-chevron"
-            library="mdi"
-            name=${v.open ? "chevron-up" : "chevron-down"}
-          ></wa-icon>`}
+      ${
+        v.filtering
+          ? nothing
+          : html`<wa-icon
+              class="nav-content-chevron"
+              library="mdi"
+              name=${v.open ? "chevron-up" : "chevron-down"}
+            ></wa-icon>`
+      }
     </div>
-    ${v.open
-      ? html`
-          <div class="separator"></div>
-          ${v.filtering ? nothing : html`<p class="italic">${v.desc}</p>`}
-          ${v.groups
-            ? v.groups.map((group) =>
-                // Collapse a lone config-block domain (e.g. bluetooth_proxy,
-                // i2c) to a flat row in both views; a platform component
-                // ("- platform:" list) keeps its domain header even with one.
-                group.rows.length === 1 && !group.rows[0].item.platform
-                  ? renderNavSingleGroup(group, v)
-                  : renderNavGroup(group, v)
-              )
-            : v.rows.length > 0
-              ? html`<div class="nav-items">
-                  ${v.rows.map((row) => renderNavRow(row, v, true))}
-                </div>`
-              : nothing}
-          ${v.filtering
-            ? nothing
-            : html`<div class="nav-items">
-                ${v.actions.map((action) => renderNavAction(action))}
-              </div>`}
-        `
-      : nothing}
+    ${
+      v.open
+        ? html`
+            <div class="separator"></div>
+            ${v.filtering ? nothing : html`<p class="italic">${v.desc}</p>`}
+            ${
+              v.groups
+                ? v.groups.map((group) =>
+                    // Collapse a lone config-block domain (e.g. bluetooth_proxy,
+                    // i2c) to a flat row in both views; a platform component
+                    // ("- platform:" list) keeps its domain header even with one.
+                    group.rows.length === 1 && !group.rows[0].item.platform
+                      ? renderNavSingleGroup(group, v)
+                      : renderNavGroup(group, v)
+                  )
+                : v.rows.length > 0
+                  ? html`<div class="nav-items">
+                      ${v.rows.map((row) => renderNavRow(row, v, true))}
+                    </div>`
+                  : nothing
+            }
+            ${
+              v.filtering
+                ? nothing
+                : html`<div class="nav-items">
+                    ${v.actions.map((action) => renderNavAction(action))}
+                  </div>`
+            }
+          `
+        : nothing
+    }
     <div class="separator"></div>
   `;
 }

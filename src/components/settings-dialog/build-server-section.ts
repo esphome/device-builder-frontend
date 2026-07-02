@@ -148,11 +148,19 @@ export class ESPHomeSettingsBuildServer extends LitElement {
       <div class="section-intro">
         ${this._localize("settings.build_server_paired_senders_desc")}
       </div>
-      ${peers === null
-        ? renderStatusRow(this._localize, "settings.build_server_paired_senders_loading")
-        : approved.length === 0
-          ? renderStatusRow(this._localize, "settings.build_server_paired_senders_empty")
-          : approved.map((p) => this._renderApprovedPeerRow(p))}
+      ${
+        peers === null
+          ? renderStatusRow(
+              this._localize,
+              "settings.build_server_paired_senders_loading"
+            )
+          : approved.length === 0
+            ? renderStatusRow(
+                this._localize,
+                "settings.build_server_paired_senders_empty"
+              )
+            : approved.map((p) => this._renderApprovedPeerRow(p))
+      }
     `;
   }
 
@@ -198,20 +206,24 @@ export class ESPHomeSettingsBuildServer extends LitElement {
               ${this._localize("settings.build_server_peer_details_summary")}
             </summary>
             <dl class="peer-details-list">
-              ${pairedAgoSeconds !== null
-                ? html`
-                    <dt>
-                      ${this._localize("settings.build_server_peer_paired_at_label")}
-                    </dt>
-                    <dd>${formatSecondsAgo(pairedAgoSeconds, activeLocale())}</dd>
-                  `
-                : nothing}
-              ${peer.peer_ip
-                ? html`
-                    <dt>${this._localize("settings.build_server_peer_ip_label")}</dt>
-                    <dd><code>${peer.peer_ip}</code></dd>
-                  `
-                : nothing}
+              ${
+                pairedAgoSeconds !== null
+                  ? html`
+                      <dt>
+                        ${this._localize("settings.build_server_peer_paired_at_label")}
+                      </dt>
+                      <dd>${formatSecondsAgo(pairedAgoSeconds, activeLocale())}</dd>
+                    `
+                  : nothing
+              }
+              ${
+                peer.peer_ip
+                  ? html`
+                      <dt>${this._localize("settings.build_server_peer_ip_label")}</dt>
+                      <dd><code>${peer.peer_ip}</code></dd>
+                    `
+                  : nothing
+              }
               <dt>${this._localize("settings.build_server_peer_dashboard_id_label")}</dt>
               <dd>
                 <code class="peer-dashboard-id">${peer.dashboard_id}</code>
@@ -290,9 +302,11 @@ export class ESPHomeSettingsBuildServer extends LitElement {
             }`}
             role="status"
           >
-            ${identity.listener_bound
-              ? this._localize("settings.remote_build_listener_up")
-              : this._localize("settings.remote_build_listener_down")}
+            ${
+              identity.listener_bound
+                ? this._localize("settings.remote_build_listener_up")
+                : this._localize("settings.remote_build_listener_down")
+            }
           </span>
         </div>
         <div class="build-server-row">
@@ -318,9 +332,11 @@ export class ESPHomeSettingsBuildServer extends LitElement {
             ?disabled=${this._rotateInFlight}
             @click=${this._onRotateRequest}
           >
-            ${this._rotateInFlight
-              ? this._localize("settings.remote_build_rotate_in_progress")
-              : this._localize("settings.remote_build_rotate")}
+            ${
+              this._rotateInFlight
+                ? this._localize("settings.remote_build_rotate_in_progress")
+                : this._localize("settings.remote_build_rotate")
+            }
           </button>
         </div>
       </div>

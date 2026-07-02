@@ -13,9 +13,7 @@ import {
  * gate's classification can be unit-tested without a DOM or live API.
  */
 export type ShortcutTarget =
-  | null
-  | { kind: "device_on" }
-  | { kind: "component_on"; componentId: string };
+  null | { kind: "device_on" } | { kind: "component_on"; componentId: string };
 
 /**
  * Top-level keys that never host an inline trigger shortcut: ``api`` keeps

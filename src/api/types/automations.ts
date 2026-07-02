@@ -124,19 +124,11 @@ export type Filter = RegistryCatalogEntry;
  *  narrowing happens at the call site against the type the caller
  *  asked for, not via structural inspection. */
 export type AutomationCatalogBody =
-  | AutomationTrigger
-  | AutomationAction
-  | AutomationCondition
-  | LightEffect
-  | Filter;
+  AutomationTrigger | AutomationAction | AutomationCondition | LightEffect | Filter;
 
 /** Wire ``type`` field on an ``automations/get_bodies`` ref. */
 export type AutomationCatalogBodyType =
-  | "triggers"
-  | "actions"
-  | "conditions"
-  | "light_effects"
-  | "filters";
+  "triggers" | "actions" | "conditions" | "light_effects" | "filters";
 
 /** Tagged-union locator for an automation inside a device YAML.
  *  Mirrors the backend's ``AutomationLocation`` Python dataclass.

@@ -111,14 +111,18 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   protected render() {
     return html`
       <div class=${this.noHeader ? "" : "ae-section"}>
-        ${this.noHeader
-          ? nothing
-          : html`<label class="ae-section-label"
-              >${this._localize("device.automation_only_when")}</label
-            >`}
-        ${this.conditions.length === 0
-          ? html`<p class="ae-empty">${this._localize("device.add_condition")}</p>`
-          : this.conditions.map((node, idx) => this._renderNode(node, idx))}
+        ${
+          this.noHeader
+            ? nothing
+            : html`<label class="ae-section-label"
+                >${this._localize("device.automation_only_when")}</label
+              >`
+        }
+        ${
+          this.conditions.length === 0
+            ? html`<p class="ae-empty">${this._localize("device.add_condition")}</p>`
+            : this.conditions.map((node, idx) => this._renderNode(node, idx))
+        }
         <button
           type="button"
           class="ae-add"
@@ -182,39 +186,45 @@ export class ESPHomeAutomationConditionTree extends LitElement {
           </div>
         </div>
         <div class="ae-row-body">
-          ${def?.description
-            ? html`<p class="ae-row-desc">${renderMarkdown(def.description)}</p>`
-            : nothing}
-          ${def && def.config_entries.length > 0
-            ? html`<esphome-config-entry-form
-                .entries=${def.config_entries}
-                .values=${node.params}
-                .board=${this.board}
-                .yaml=${this.yaml}
-                ?disabled=${this.disabled}
-                @value-change=${(e: CustomEvent<ConfigEntryValueChange>) =>
-                  this._onParamChange(idx, e)}
-              ></esphome-config-entry-form>`
-            : nothing}
-          ${def?.accepts_condition_list
-            ? html`<div class="ae-nested">
-                <p class="ae-nested-label">
-                  ${this._localize("device.automation_condition")}
-                </p>
-                <esphome-automation-condition-tree
-                  no-header
-                  .conditions=${node.children ?? []}
-                  .catalog=${this.catalog}
-                  .devices=${this.devices}
+          ${
+            def?.description
+              ? html`<p class="ae-row-desc">${renderMarkdown(def.description)}</p>`
+              : nothing
+          }
+          ${
+            def && def.config_entries.length > 0
+              ? html`<esphome-config-entry-form
+                  .entries=${def.config_entries}
+                  .values=${node.params}
                   .board=${this.board}
                   .yaml=${this.yaml}
                   ?disabled=${this.disabled}
-                  @conditions-change=${(
-                    e: CustomEvent<{ conditions: ConditionNode[] }>
-                  ) => this._onChildrenChange(idx, e)}
-                ></esphome-automation-condition-tree>
-              </div>`
-            : nothing}
+                  @value-change=${(e: CustomEvent<ConfigEntryValueChange>) =>
+                    this._onParamChange(idx, e)}
+                ></esphome-config-entry-form>`
+              : nothing
+          }
+          ${
+            def?.accepts_condition_list
+              ? html`<div class="ae-nested">
+                  <p class="ae-nested-label">
+                    ${this._localize("device.automation_condition")}
+                  </p>
+                  <esphome-automation-condition-tree
+                    no-header
+                    .conditions=${node.children ?? []}
+                    .catalog=${this.catalog}
+                    .devices=${this.devices}
+                    .board=${this.board}
+                    .yaml=${this.yaml}
+                    ?disabled=${this.disabled}
+                    @conditions-change=${(
+                      e: CustomEvent<{ conditions: ConditionNode[] }>
+                    ) => this._onChildrenChange(idx, e)}
+                  ></esphome-automation-condition-tree>
+                </div>`
+              : nothing
+          }
         </div>
       </div>
     `;

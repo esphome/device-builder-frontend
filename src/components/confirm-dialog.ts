@@ -136,11 +136,13 @@ export class ESPHomeConfirmDialog extends LitElement {
         @after-hide=${this._onAfterHide}
       >
         <div class="body">
-          ${this.destructive
-            ? html`<div class="icon-wrap destructive">
-                <wa-icon library="mdi" name=${this.icon}></wa-icon>
-              </div>`
-            : nothing}
+          ${
+            this.destructive
+              ? html`<div class="icon-wrap destructive">
+                  <wa-icon library="mdi" name=${this.icon}></wa-icon>
+                </div>`
+              : nothing
+          }
           <div class="text">
             <slot name="body">${this.message}</slot>
           </div>
@@ -149,13 +151,15 @@ export class ESPHomeConfirmDialog extends LitElement {
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
-          ${this.secondaryLabel
-            ? html`
-                <button class="btn btn--secondary" @click=${this._secondary}>
-                  ${this.secondaryLabel}
-                </button>
-              `
-            : nothing}
+          ${
+            this.secondaryLabel
+              ? html`
+                  <button class="btn btn--secondary" @click=${this._secondary}>
+                    ${this.secondaryLabel}
+                  </button>
+                `
+              : nothing
+          }
           <button
             class="btn btn--confirm ${this.destructive ? "destructive" : ""}"
             @click=${this._confirm}

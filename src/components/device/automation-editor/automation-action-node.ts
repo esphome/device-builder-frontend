@@ -185,9 +185,11 @@ export class ESPHomeAutomationActionNode extends LitElement {
           <div class="ae-row-controls">
             <button
               type="button"
-              aria-label=${collapsed
-                ? this._localize("device.automation_action_expand")
-                : this._localize("device.automation_action_collapse")}
+              aria-label=${
+                collapsed
+                  ? this._localize("device.automation_action_expand")
+                  : this._localize("device.automation_action_collapse")
+              }
               aria-expanded=${collapsed ? "false" : "true"}
               @click=${() => {
                 this._collapsed = !this._collapsed;
@@ -231,15 +233,19 @@ export class ESPHomeAutomationActionNode extends LitElement {
           .devices=${this.devices}
           @catalog-picked=${this._onActionPicked}
         ></esphome-catalog-picker-dialog>
-        ${collapsed
-          ? nothing
-          : html`<div class="ae-row-body">
-              ${def?.description
-                ? html`<p class="ae-row-desc">${renderMarkdown(def.description)}</p>`
-                : nothing}
-              ${this._renderActionParams(def)} ${this._renderScriptParams(def)}
-              ${this._renderConditionGate(def)} ${this._renderNestedLists(def)}
-            </div>`}
+        ${
+          collapsed
+            ? nothing
+            : html`<div class="ae-row-body">
+                ${
+                  def?.description
+                    ? html`<p class="ae-row-desc">${renderMarkdown(def.description)}</p>`
+                    : nothing
+                }
+                ${this._renderActionParams(def)} ${this._renderScriptParams(def)}
+                ${this._renderConditionGate(def)} ${this._renderNestedLists(def)}
+              </div>`
+        }
       </div>
     `;
   }

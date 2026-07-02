@@ -92,42 +92,48 @@ export class ESPHomeFiltersPopover extends LitElement {
         type="button"
         aria-haspopup="dialog"
         aria-expanded=${this._open ? "true" : "false"}
-        aria-label=${this.activeCount > 0 && this.countLabel
-          ? this.countLabel
-          : this.buttonLabel}
+        aria-label=${
+          this.activeCount > 0 && this.countLabel ? this.countLabel : this.buttonLabel
+        }
         @click=${this._toggle}
       >
         <span class="facet-trigger-icon" aria-hidden="true">
           <wa-icon library="mdi" name="filter-variant"></wa-icon>
         </span>
         <span class="facet-trigger-name">${this.buttonLabel}</span>
-        ${this.activeCount > 0
-          ? html`<span class="filters-badge" aria-hidden="true"
-              >${this.activeCount}</span
-            >`
-          : nothing}
+        ${
+          this.activeCount > 0
+            ? html`<span class="filters-badge" aria-hidden="true"
+                >${this.activeCount}</span
+              >`
+            : nothing
+        }
       </button>
-      ${this._open
-        ? html`<div
-            class="filters-popover ${this._anchorRight ? "anchor-right" : ""}"
-            role="dialog"
-            aria-label=${this.buttonLabel}
-          >
-            <div class="filters-header">
-              <span class="filters-title">${this.buttonLabel}</span>
-              ${this.activeCount > 0
-                ? html`<button
-                    class="filters-clear-link"
-                    type="button"
-                    @click=${this._onClearAll}
-                  >
-                    ${this.clearLabel}
-                  </button>`
-                : nothing}
-            </div>
-            <div class="filters-sections"><slot></slot></div>
-          </div>`
-        : nothing}
+      ${
+        this._open
+          ? html`<div
+              class="filters-popover ${this._anchorRight ? "anchor-right" : ""}"
+              role="dialog"
+              aria-label=${this.buttonLabel}
+            >
+              <div class="filters-header">
+                <span class="filters-title">${this.buttonLabel}</span>
+                ${
+                  this.activeCount > 0
+                    ? html`<button
+                        class="filters-clear-link"
+                        type="button"
+                        @click=${this._onClearAll}
+                      >
+                        ${this.clearLabel}
+                      </button>`
+                    : nothing
+                }
+              </div>
+              <div class="filters-sections"><slot></slot></div>
+            </div>`
+          : nothing
+      }
     `;
   }
 

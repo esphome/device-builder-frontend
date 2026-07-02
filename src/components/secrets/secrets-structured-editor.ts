@@ -97,15 +97,19 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     // a flat shared file stays a plain list.
     const grouped = groups.some((group) => group.device !== null);
     return html`
-      ${entries.length === 0
-        ? html`<div class="empty" role="status">${this._localize("secrets.empty")}</div>`
-        : grouped
-          ? html`<div class="groups">
-              ${groups.map((group) => this._renderGroup(group, entries))}
+      ${
+        entries.length === 0
+          ? html`<div class="empty" role="status">
+              ${this._localize("secrets.empty")}
             </div>`
-          : html`<div class="rows">
-              ${entries.map((entry) => this._renderRow(entry, entries))}
-            </div>`}
+          : grouped
+            ? html`<div class="groups">
+                ${groups.map((group) => this._renderGroup(group, entries))}
+              </div>`
+            : html`<div class="rows">
+                ${entries.map((entry) => this._renderRow(entry, entries))}
+              </div>`
+      }
       <div class="add-row">
         <button type="button" class="btn btn--add" @click=${this._openAdd}>
           <wa-icon library="mdi" name="plus"></wa-icon>
@@ -223,9 +227,11 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
               (this._addValue = e.detail.value)}
           ></esphome-password-input>
         </label>
-        ${this._addError
-          ? html`<div class="key-error" role="alert">${this._addError}</div>`
-          : nothing}
+        ${
+          this._addError
+            ? html`<div class="key-error" role="alert">${this._addError}</div>`
+            : nothing
+        }
       </div>
       <div class="actions">
         <button class="btn btn--cancel" @click=${this._closeAdd}>
@@ -287,9 +293,11 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
           <wa-icon library="mdi" name="close"></wa-icon>
         </button>
       </div>
-      ${keyInvalid
-        ? html`<div class="key-error">${this._keyError?.message}</div>`
-        : nothing}`;
+      ${
+        keyInvalid
+          ? html`<div class="key-error">${this._keyError?.message}</div>`
+          : nothing
+      }`;
   }
 
   private _onKeyChange(

@@ -477,19 +477,21 @@ export class ESPHomeAutomationEditor extends LitElement {
       : null;
     return html`
       ${this._renderHeader(activeTrigger)}
-      ${this.addMode
-        ? this._renderAddModePickers(
-            target,
-            triggers,
-            devices,
-            scripts,
-            effectiveTriggerId,
-            automation,
-            disabled
-          )
-        : html`${this._renderIdentityFields(
-            activeTrigger
-          )}${this._renderTriggerParamsForm(activeTrigger, automation, disabled)}`}
+      ${
+        this.addMode
+          ? this._renderAddModePickers(
+              target,
+              triggers,
+              devices,
+              scripts,
+              effectiveTriggerId,
+              automation,
+              disabled
+            )
+          : html`${this._renderIdentityFields(
+              activeTrigger
+            )}${this._renderTriggerParamsForm(activeTrigger, automation, disabled)}`
+      }
       <div class="field">
         <div class="ae-actions-header">
           <label class="field-label">
@@ -523,19 +525,21 @@ export class ESPHomeAutomationEditor extends LitElement {
         ></esphome-automation-action-list>
       </div>
       ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
-      ${this.location && this.value && !this.addMode
-        ? html`<div class="ae-actions">
-            <button
-              type="button"
-              class="ae-danger"
-              ?disabled=${disabled}
-              @click=${this._onDelete}
-            >
-              <wa-icon library="mdi" name="delete"></wa-icon>
-              ${this._localize("device.delete_automation")}
-            </button>
-          </div>`
-        : nothing}
+      ${
+        this.location && this.value && !this.addMode
+          ? html`<div class="ae-actions">
+              <button
+                type="button"
+                class="ae-danger"
+                ?disabled=${disabled}
+                @click=${this._onDelete}
+              >
+                <wa-icon library="mdi" name="delete"></wa-icon>
+                ${this._localize("device.delete_automation")}
+              </button>
+            </div>`
+          : nothing
+      }
     `;
   }
 
@@ -673,23 +677,27 @@ export class ESPHomeAutomationEditor extends LitElement {
     return html`<div class="ae-header">
       <div class="ae-header-text">
         <h2 class="ae-header-title">${title}</h2>
-        ${docsUrl
-          ? html`<a
-              class="ae-header-docs"
-              href=${docsUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              ${this._localize("device.docs")}
-              <wa-icon library="mdi" name="open-in-new"></wa-icon>
-            </a>`
-          : nothing}
+        ${
+          docsUrl
+            ? html`<a
+                class="ae-header-docs"
+                href=${docsUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                ${this._localize("device.docs")}
+                <wa-icon library="mdi" name="open-in-new"></wa-icon>
+              </a>`
+            : nothing
+        }
         <p class="ae-header-desc">${renderMarkdown(descText)}</p>
       </div>
       <div class="ae-header-icon">
-        ${imageUrl
-          ? html`<img alt="" src=${imageUrl} />`
-          : html`<wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>`}
+        ${
+          imageUrl
+            ? html`<img alt="" src=${imageUrl} />`
+            : html`<wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>`
+        }
       </div>
     </div>`;
   }

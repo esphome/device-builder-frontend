@@ -167,23 +167,29 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const showAnyBadge = showModified || showUpdate || apiEnabled;
 
     return html`
-      ${showAnyBadge
-        ? html`<div class="status-badges">
-            ${showModified
-              ? html`<span class="status-badge status-badge--modified">
-                  <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
-                  ${this._localize("dashboard.status_modified")}
-                </span>`
-              : nothing}
-            ${showUpdate
-              ? html`<span class="status-badge status-badge--update">
-                  <wa-icon library="mdi" name="update"></wa-icon>
-                  ${this._localize("dashboard.status_update_available")}
-                </span>`
-              : nothing}
-            ${apiEnabled ? renderEncryptionBadge(this._localize, encState) : nothing}
-          </div>`
-        : nothing}
+      ${
+        showAnyBadge
+          ? html`<div class="status-badges">
+              ${
+                showModified
+                  ? html`<span class="status-badge status-badge--modified">
+                      <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
+                      ${this._localize("dashboard.status_modified")}
+                    </span>`
+                  : nothing
+              }
+              ${
+                showUpdate
+                  ? html`<span class="status-badge status-badge--update">
+                      <wa-icon library="mdi" name="update"></wa-icon>
+                      ${this._localize("dashboard.status_update_available")}
+                    </span>`
+                  : nothing
+              }
+              ${apiEnabled ? renderEncryptionBadge(this._localize, encState) : nothing}
+            </div>`
+          : nothing
+      }
       <div class="section">
         <h4 class="section-title">${this._localize("dashboard.drawer_device_info")}</h4>
         ${renderRow(
@@ -201,13 +207,15 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           d.target_platform
         )}
         ${renderBuildSizeRow(this, d)}
-        ${d.area
-          ? renderRow(
-              "map-marker-outline",
-              this._localize("dashboard.drawer_area"),
-              d.area
-            )
-          : nothing}
+        ${
+          d.area
+            ? renderRow(
+                "map-marker-outline",
+                this._localize("dashboard.drawer_area"),
+                d.area
+              )
+            : nothing
+        }
       </div>
 
       ${renderLabelsSection(d, this._localize)} ${renderReachabilitySection(this)}

@@ -250,9 +250,11 @@ export class ESPHomeSelectBar extends LitElement {
             class="toggle"
             @click=${() => this._emit(allSelected ? "deselect-all" : "select-all")}
           >
-            ${allSelected
-              ? this._localize("dashboard.deselect_all")
-              : this._localize("dashboard.select_all")}
+            ${
+              allSelected
+                ? this._localize("dashboard.deselect_all")
+                : this._localize("dashboard.select_all")
+            }
           </button>
           <span class="count">
             ${this._localize("dashboard.selected_count", { count })}

@@ -164,26 +164,32 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         });
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
-          ${row.showModified
-            ? html`<span
-                class="cell-indicator cell-indicator--modified"
-                title=${localize("dashboard.status_modified")}
-              ></span>`
-            : nothing}
-          ${row.showUpdate
-            ? html`<span
-                class="cell-indicator cell-indicator--update"
-                title=${localize("dashboard.status_update_available")}
-              ></span>`
-            : nothing}
-          ${encVisual
-            ? html`<wa-icon
-                class="cell-encryption ${encVisual.cssClass}"
-                library="mdi"
-                name=${encVisual.iconName}
-                title=${localize(encVisual.tooltipKey)}
-              ></wa-icon>`
-            : nothing}
+          ${
+            row.showModified
+              ? html`<span
+                  class="cell-indicator cell-indicator--modified"
+                  title=${localize("dashboard.status_modified")}
+                ></span>`
+              : nothing
+          }
+          ${
+            row.showUpdate
+              ? html`<span
+                  class="cell-indicator cell-indicator--update"
+                  title=${localize("dashboard.status_update_available")}
+                ></span>`
+              : nothing
+          }
+          ${
+            encVisual
+              ? html`<wa-icon
+                  class="cell-encryption ${encVisual.cssClass}"
+                  library="mdi"
+                  name=${encVisual.iconName}
+                  title=${localize(encVisual.tooltipKey)}
+                ></wa-icon>`
+              : nothing
+          }
         </span>`;
       },
       sortingFn: (rowA, rowB) =>
@@ -318,33 +324,37 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           >
             <wa-icon library="mdi" name="pencil"></wa-icon>
           </button>
-          ${showInstall
-            ? html`<button
-                class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
-                aria-label=${localize("dashboard.table_action_install")}
-                title=${localize("dashboard.table_action_install")}
-                ?disabled=${row.busy}
-                @click=${(e: Event) => dispatchRowEvent(e, "install-device", device)}
-              >
-                <wa-icon library="mdi" name="upload"></wa-icon>
-              </button>`
-            : nothing}
-          ${showUpdate
-            ? html`<button
-                class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
-                aria-label=${localize("dashboard.table_action_update")}
-                title=${updateButtonTitle(
-                  localize,
-                  device.deployed_version,
-                  device.current_version,
-                  "dashboard.table_action_update"
-                )}
-                ?disabled=${row.busy}
-                @click=${(e: Event) => dispatchRowEvent(e, "update-device", device)}
-              >
-                <wa-icon library="mdi" name="upload"></wa-icon>
-              </button>`
-            : nothing}
+          ${
+            showInstall
+              ? html`<button
+                  class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
+                  aria-label=${localize("dashboard.table_action_install")}
+                  title=${localize("dashboard.table_action_install")}
+                  ?disabled=${row.busy}
+                  @click=${(e: Event) => dispatchRowEvent(e, "install-device", device)}
+                >
+                  <wa-icon library="mdi" name="upload"></wa-icon>
+                </button>`
+              : nothing
+          }
+          ${
+            showUpdate
+              ? html`<button
+                  class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
+                  aria-label=${localize("dashboard.table_action_update")}
+                  title=${updateButtonTitle(
+                    localize,
+                    device.deployed_version,
+                    device.current_version,
+                    "dashboard.table_action_update"
+                  )}
+                  ?disabled=${row.busy}
+                  @click=${(e: Event) => dispatchRowEvent(e, "update-device", device)}
+                >
+                  <wa-icon library="mdi" name="upload"></wa-icon>
+                </button>`
+              : nothing
+          }
           <button
             class="cell-action-btn cell-action-btn--logs"
             aria-label=${localize("dashboard.table_action_logs")}
@@ -353,12 +363,14 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           >
             <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           </button>
-          ${showVisit
-            ? renderVisitWebUiLink(visitUrl, localize, {
-                className: "cell-action-btn cell-action-btn--visit-web",
-                onClick: (e) => e.stopPropagation(),
-              })
-            : nothing}
+          ${
+            showVisit
+              ? renderVisitWebUiLink(visitUrl, localize, {
+                  className: "cell-action-btn cell-action-btn--visit-web",
+                  onClick: (e) => e.stopPropagation(),
+                })
+              : nothing
+          }
         </span>`;
       },
       size: 160,

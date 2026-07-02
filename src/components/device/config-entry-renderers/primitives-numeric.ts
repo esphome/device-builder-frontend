@@ -310,31 +310,33 @@ export function renderFloatWithUnitField(
           }}
           @blur=${() => ctx.clearEditingMagnitude(path)}
         />
-        ${pickerUnitOptions.length > 1
-          ? html`
-              <wa-select
-                data-no-value-sync
-                ?disabled=${disabled}
-                @change=${(e: Event) => {
-                  const nextUnit = (e.target as HTMLSelectElement).value;
-                  if (parsed.value === null) {
-                    // Stash the unit — serializing {value:null, unit} emits ""
-                    // and the next render's default would snap back to canonical.
-                    ctx.setPendingUnit(path, nextUnit);
-                  } else {
-                    emit({ value: parsed.value, unit: nextUnit });
-                  }
-                }}
-              >
-                ${pickerUnitOptions.map(
-                  (option) =>
-                    html`<wa-option value=${option} ?selected=${option === unit}
-                      >${option}</wa-option
-                    >`
-                )}
-              </wa-select>
-            `
-          : html`<span class="float-with-unit-suffix">${unit}</span>`}
+        ${
+          pickerUnitOptions.length > 1
+            ? html`
+                <wa-select
+                  data-no-value-sync
+                  ?disabled=${disabled}
+                  @change=${(e: Event) => {
+                    const nextUnit = (e.target as HTMLSelectElement).value;
+                    if (parsed.value === null) {
+                      // Stash the unit — serializing {value:null, unit} emits ""
+                      // and the next render's default would snap back to canonical.
+                      ctx.setPendingUnit(path, nextUnit);
+                    } else {
+                      emit({ value: parsed.value, unit: nextUnit });
+                    }
+                  }}
+                >
+                  ${pickerUnitOptions.map(
+                    (option) =>
+                      html`<wa-option value=${option} ?selected=${option === unit}
+                        >${option}</wa-option
+                      >`
+                  )}
+                </wa-select>
+              `
+            : html`<span class="float-with-unit-suffix">${unit}</span>`
+        }
       </div>
       ${renderFieldError(path, ctx)}
     </div>

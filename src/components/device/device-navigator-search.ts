@@ -55,21 +55,25 @@ export class ESPHomeNavigatorSearch extends LitElement {
           @input=${this._onInput}
           @keydown=${this._onKeydown}
         />
-        ${this.value
-          ? html`<button
-              type="button"
-              class="search-clear"
-              @click=${this._clear}
-              title=${this._localize("device.navigator_search_clear")}
-              aria-label=${this._localize("device.navigator_search_clear")}
-            >
-              <wa-icon library="mdi" name="close"></wa-icon>
-            </button>`
-          : nothing}
+        ${
+          this.value
+            ? html`<button
+                type="button"
+                class="search-clear"
+                @click=${this._clear}
+                title=${this._localize("device.navigator_search_clear")}
+                aria-label=${this._localize("device.navigator_search_clear")}
+              >
+                <wa-icon library="mdi" name="close"></wa-icon>
+              </button>`
+            : nothing
+        }
       </div>
-      ${this.value && this.resultLabel
-        ? html`<p class="search-result" role="status">${this.resultLabel}</p>`
-        : nothing}
+      ${
+        this.value && this.resultLabel
+          ? html`<p class="search-result" role="status">${this.resultLabel}</p>`
+          : nothing
+      }
     `;
   }
 

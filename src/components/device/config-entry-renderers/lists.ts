@@ -139,11 +139,9 @@ export function renderMultiValueField(
           <div class="multi-row">
             <input
               type=${numeric ? "number" : "text"}
-              step=${numeric
-                ? entry.type === ConfigEntryType.FLOAT
-                  ? "any"
-                  : "1"
-                : nothing}
+              step=${
+                numeric ? (entry.type === ConfigEntryType.FLOAT ? "any" : "1") : nothing
+              }
               class="multi-input ${invalid ? "invalid" : ""}"
               .value=${item}
               ?disabled=${disabled}
@@ -238,13 +236,15 @@ export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCt
           @change=${(e: Event) => renameKey(rowKey, (e.target as HTMLInputElement).value)}
         />
         <div class="map-value">
-          ${complex
-            ? html`<p class="map-value-yaml-only">
-                ${ctx.localize("device.map_value_edit_in_yaml")}
-              </p>`
-            : valueTemplate
-              ? ctx.renderEntry(valueTemplate, valuePath)
-              : nothing}
+          ${
+            complex
+              ? html`<p class="map-value-yaml-only">
+                  ${ctx.localize("device.map_value_edit_in_yaml")}
+                </p>`
+              : valueTemplate
+                ? ctx.renderEntry(valueTemplate, valuePath)
+                : nothing
+          }
         </div>
         <button
           type="button"
@@ -262,9 +262,11 @@ export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCt
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
-      ${keys.length === 0
-        ? html`<p class="field-description">${ctx.localize("device.map_empty")}</p>`
-        : nothing}
+      ${
+        keys.length === 0
+          ? html`<p class="field-description">${ctx.localize("device.map_empty")}</p>`
+          : nothing
+      }
       ${keys.map((k) => renderRow(k))}
       <button
         type="button"

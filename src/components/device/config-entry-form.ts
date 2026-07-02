@@ -399,9 +399,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const count = advanced.length + this.advancedExtraCount;
     return html`${this._renderConstraintBanners(ctx, plan.memberKeys)}${basic.map(
       renderItem
-    )}${showControl ? this._renderAdvancedControl(open, count, forceOpen) : nothing}${open
-      ? advanced.map(renderItem)
-      : nothing}`;
+    )}${showControl ? this._renderAdvancedControl(open, count, forceOpen) : nothing}${
+      open ? advanced.map(renderItem) : nothing
+    }`;
   }
 
   /** Per-item renderer shared by both paint paths. An empty key means "this

@@ -86,11 +86,13 @@ export class ESPHomeFilterSection extends LitElement {
         @click=${this._onHeaderClick}
       >
         <span class="section-name">${this.name}</span>
-        ${this.selected.length > 0
-          ? html`<span class="section-count" aria-hidden="true"
-              >${this.selected.length}</span
-            >`
-          : nothing}
+        ${
+          this.selected.length > 0
+            ? html`<span class="section-count" aria-hidden="true"
+                >${this.selected.length}</span
+              >`
+            : nothing
+        }
         <span class="section-chevron" aria-hidden="true">
           <wa-icon library="mdi" name="chevron-down"></wa-icon>
         </span>
@@ -107,55 +109,63 @@ export class ESPHomeFilterSection extends LitElement {
       : this.options;
     return html`
       <div class="section-body">
-        ${this.searchable
-          ? html`<div class="facet-search">
-              <wa-icon
-                class="facet-search-icon"
-                library="mdi"
-                name="magnify"
-                aria-hidden="true"
-              ></wa-icon>
-              <input
-                class="facet-search-input"
-                type="search"
-                autocomplete="off"
-                placeholder=${this.searchPlaceholder || this.name}
-                aria-label=${this.searchPlaceholder || this.name}
-                .value=${this._query}
-                @input=${(e: Event) => {
-                  this._query = (e.currentTarget as HTMLInputElement).value;
-                }}
-              />
-            </div>`
-          : nothing}
-        ${visible.length === 0
-          ? html`<div class="facet-empty" role="status">
-              ${query ? this.noMatchesLabel : this.emptyLabel}
-            </div>`
-          : html`<div class="facet-list" role="group" aria-label=${this.name}>
-              ${visible.map((option) => {
-                const checked = selectedSet.has(option.id);
-                return html`<button
-                  class="facet-row"
-                  type="button"
-                  role="checkbox"
-                  aria-checked=${checked ? "true" : "false"}
-                  @click=${() => this._toggleOption(option.id, !checked)}
-                >
-                  <span class="facet-row-check" aria-hidden="true">
-                    ${checked
-                      ? html`<wa-icon library="mdi" name="check"></wa-icon>`
-                      : nothing}
-                  </span>
-                  <span class="facet-row-name">${option.name}</span>
-                  ${option.count >= 0
-                    ? html`<span class="facet-row-count" aria-hidden="true"
-                        >${option.count}</span
-                      >`
-                    : nothing}
-                </button>`;
-              })}
-            </div>`}
+        ${
+          this.searchable
+            ? html`<div class="facet-search">
+                <wa-icon
+                  class="facet-search-icon"
+                  library="mdi"
+                  name="magnify"
+                  aria-hidden="true"
+                ></wa-icon>
+                <input
+                  class="facet-search-input"
+                  type="search"
+                  autocomplete="off"
+                  placeholder=${this.searchPlaceholder || this.name}
+                  aria-label=${this.searchPlaceholder || this.name}
+                  .value=${this._query}
+                  @input=${(e: Event) => {
+                    this._query = (e.currentTarget as HTMLInputElement).value;
+                  }}
+                />
+              </div>`
+            : nothing
+        }
+        ${
+          visible.length === 0
+            ? html`<div class="facet-empty" role="status">
+                ${query ? this.noMatchesLabel : this.emptyLabel}
+              </div>`
+            : html`<div class="facet-list" role="group" aria-label=${this.name}>
+                ${visible.map((option) => {
+                  const checked = selectedSet.has(option.id);
+                  return html`<button
+                    class="facet-row"
+                    type="button"
+                    role="checkbox"
+                    aria-checked=${checked ? "true" : "false"}
+                    @click=${() => this._toggleOption(option.id, !checked)}
+                  >
+                    <span class="facet-row-check" aria-hidden="true">
+                      ${
+                        checked
+                          ? html`<wa-icon library="mdi" name="check"></wa-icon>`
+                          : nothing
+                      }
+                    </span>
+                    <span class="facet-row-name">${option.name}</span>
+                    ${
+                      option.count >= 0
+                        ? html`<span class="facet-row-count" aria-hidden="true"
+                            >${option.count}</span
+                          >`
+                        : nothing
+                    }
+                  </button>`;
+                })}
+              </div>`
+        }
       </div>
     `;
   }

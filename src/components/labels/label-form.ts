@@ -331,17 +331,21 @@ export class ESPHomeLabelForm extends LitElement {
           if (canSubmit) void this._submit();
         }}
       >
-        ${this.compact
-          ? nothing
-          : html`<span class="form-header">${this._localize(headerKey)}</span>`}
+        ${
+          this.compact
+            ? nothing
+            : html`<span class="form-header">${this._localize(headerKey)}</span>`
+        }
         <div class="preview-stage" aria-hidden="true">
-          ${previewIsPlaceholder
-            ? html`<span class="label-chip" style=${labelChipStyleString(this._color)}
-                ><span class="preview-placeholder">${previewName}</span></span
-              >`
-            : html`<span class="label-chip" style=${labelChipStyleString(this._color)}
-                >${previewName}</span
-              >`}
+          ${
+            previewIsPlaceholder
+              ? html`<span class="label-chip" style=${labelChipStyleString(this._color)}
+                  ><span class="preview-placeholder">${previewName}</span></span
+                >`
+              : html`<span class="label-chip" style=${labelChipStyleString(this._color)}
+                  >${previewName}</span
+                >`
+          }
         </div>
         <input
           type="text"
@@ -374,9 +378,11 @@ export class ESPHomeLabelForm extends LitElement {
                 title=${this._localize("dashboard.labels_color_none")}
                 @click=${() => this._onSwatchClick(null)}
               >
-                ${selected
-                  ? html`<wa-icon library="mdi" name="check"></wa-icon>`
-                  : nothing}
+                ${
+                  selected
+                    ? html`<wa-icon library="mdi" name="check"></wa-icon>`
+                    : nothing
+                }
               </button>`;
             }
             // Compute the contrasting foreground so the inset check

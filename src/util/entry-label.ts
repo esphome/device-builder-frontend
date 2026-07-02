@@ -19,8 +19,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 export function resolveEntryLabel(entry: ConfigEntry, localize: LocalizeFunc): string {
   if (entry.translation_key) {
     const params = (entry.translation_params || undefined) as
-      | Record<string, string | number>
-      | undefined;
+      Record<string, string | number> | undefined;
     const translated = localize(entry.translation_key, params);
     if (translated && translated !== entry.translation_key) return translated;
   }

@@ -282,18 +282,20 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         @overwrite-device=${this._onConfirmOverwrite}
         @open-device=${this._onOpenImportedDevice}
       >
-        ${this._step !== "method" && this._step !== "import-partial"
-          ? html`<button
-              slot="header-prefix"
-              class="back-button"
-              title=${this._localize("layout.back")}
-              aria-label=${this._localize("layout.back")}
-              ?disabled=${this._submitting}
-              @click=${this._onBack}
-            >
-              <wa-icon library="mdi" name="arrow-left"></wa-icon>
-            </button>`
-          : nothing}
+        ${
+          this._step !== "method" && this._step !== "import-partial"
+            ? html`<button
+                slot="header-prefix"
+                class="back-button"
+                title=${this._localize("layout.back")}
+                aria-label=${this._localize("layout.back")}
+                ?disabled=${this._submitting}
+                @click=${this._onBack}
+              >
+                <wa-icon library="mdi" name="arrow-left"></wa-icon>
+              </button>`
+            : nothing
+        }
         ${this._renderStep()}
         ${this._importError ? html`<p class="error">${this._importError}</p>` : nothing}
         ${this._createError ? html`<p class="error">${this._createError}</p>` : nothing}

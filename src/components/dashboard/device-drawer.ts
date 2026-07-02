@@ -360,31 +360,33 @@ export class ESPHomeDeviceDrawer extends LitElement {
             <wa-icon library="mdi" name="pencil"></wa-icon>
             ${this._localize("dashboard.drawer_edit")}
           </button>
-          ${showUpdateAvailable(device)
-            ? html`<button
-                class="action action--accent"
-                ?disabled=${this.busy}
-                @click=${() => this._emitAction("update-device")}
-                title=${updateButtonTitle(
-                  this._localize,
-                  device.deployed_version,
-                  device.current_version,
-                  "dashboard.drawer_update"
-                )}
-              >
-                <wa-icon library="mdi" name="upload"></wa-icon>
-                ${this._localize("dashboard.drawer_update")}
-              </button>`
-            : showPendingChanges(device)
+          ${
+            showUpdateAvailable(device)
               ? html`<button
                   class="action action--accent"
                   ?disabled=${this.busy}
-                  @click=${() => this._emitAction("install-device")}
+                  @click=${() => this._emitAction("update-device")}
+                  title=${updateButtonTitle(
+                    this._localize,
+                    device.deployed_version,
+                    device.current_version,
+                    "dashboard.drawer_update"
+                  )}
                 >
                   <wa-icon library="mdi" name="upload"></wa-icon>
-                  ${this._localize("dashboard.install")}
+                  ${this._localize("dashboard.drawer_update")}
                 </button>`
-              : nothing}
+              : showPendingChanges(device)
+                ? html`<button
+                    class="action action--accent"
+                    ?disabled=${this.busy}
+                    @click=${() => this._emitAction("install-device")}
+                  >
+                    <wa-icon library="mdi" name="upload"></wa-icon>
+                    ${this._localize("dashboard.install")}
+                  </button>`
+                : nothing
+          }
           <button
             class="action action--ghost"
             @click=${() => this._emitAction("open-logs")}

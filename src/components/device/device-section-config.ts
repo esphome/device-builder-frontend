@@ -352,104 +352,122 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         <div class="section-header-info">
           <div class="section-header-title-row">
             <h3 class="section-title">
-              ${this._isUnknown
-                ? this._localize("device.external_component_title")
-                : this._config.title}
+              ${
+                this._isUnknown
+                  ? this._localize("device.external_component_title")
+                  : this._config.title
+              }
             </h3>
-            ${this._config.docs_url
-              ? html`<a
-                  class="docs-link"
-                  href=${this._config.docs_url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  ${this._localize("device.docs")}
-                  <wa-icon library="mdi" name="open-in-new"></wa-icon>
-                </a>`
-              : nothing}
+            ${
+              this._config.docs_url
+                ? html`<a
+                    class="docs-link"
+                    href=${this._config.docs_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    ${this._localize("device.docs")}
+                    <wa-icon library="mdi" name="open-in-new"></wa-icon>
+                  </a>`
+                : nothing
+            }
           </div>
-          ${this._isUnknown
-            ? html`<p class="section-subtitle">${this.sectionKey}</p>`
-            : nothing}
-          ${this._config.description
-            ? html`<p class="section-desc">
-                ${renderMarkdown(this._config.description)}
-              </p>`
-            : nothing}
+          ${
+            this._isUnknown
+              ? html`<p class="section-subtitle">${this.sectionKey}</p>`
+              : nothing
+          }
+          ${
+            this._config.description
+              ? html`<p class="section-desc">
+                  ${renderMarkdown(this._config.description)}
+                </p>`
+              : nothing
+          }
         </div>
-        ${this._isUnknown
-          ? nothing
-          : html`<div class="section-image">
-              <img
-                src=${this._config.image_url || defaultBoardImageUrl()}
-                alt=${this._config.title}
-                referrerpolicy="no-referrer"
-                @error=${onBoardImageError}
-              />
-            </div>`}
+        ${
+          this._isUnknown
+            ? nothing
+            : html`<div class="section-image">
+                <img
+                  src=${this._config.image_url || defaultBoardImageUrl()}
+                  alt=${this._config.title}
+                  referrerpolicy="no-referrer"
+                  @error=${onBoardImageError}
+                />
+              </div>`
+        }
       </div>
-      ${yamlOnly
-        ? html`<div class="yaml-only-notice" role="note">
-              <wa-icon library="mdi" name="information-outline"></wa-icon>
-              <div class="yaml-only-notice-body">
-                <p>${this._localize("device.yaml_only_section")}</p>
-                ${this.yamlPaneVisible
-                  ? nothing
-                  : html`<button
-                      type="button"
-                      class="yaml-only-notice-cta"
-                      @click=${this._onShowYamlEditor}
-                    >
-                      ${this._localize("device.show_yaml_editor")}
-                    </button>`}
+      ${
+        yamlOnly
+          ? html`<div class="yaml-only-notice" role="note">
+                <wa-icon library="mdi" name="information-outline"></wa-icon>
+                <div class="yaml-only-notice-body">
+                  <p>${this._localize("device.yaml_only_section")}</p>
+                  ${
+                    this.yamlPaneVisible
+                      ? nothing
+                      : html`<button
+                          type="button"
+                          class="yaml-only-notice-cta"
+                          @click=${this._onShowYamlEditor}
+                        >
+                          ${this._localize("device.show_yaml_editor")}
+                        </button>`
+                  }
+                </div>
               </div>
-            </div>
-            ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
-            ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
-        : html`
-            ${isSecuritySection(this.sectionKey)
-              ? html`<esphome-security-notice
-                  .sectionKey=${this.sectionKey}
-                  .yaml=${this.yaml}
-                  .configuration=${this.configuration}
-                  .fromLine=${this._resolvedFromLine}
-                  @apply-security-secrets=${this._onApplySecuritySecrets}
-                ></esphome-security-notice>`
-              : nothing}
-            <esphome-config-entry-form
-              .entries=${renderEntries}
-              .requiredGroups=${this._config.required_groups}
-              .values=${this._values}
-              .errors=${this._fieldErrors}
-              .board=${this.board}
-              .yaml=${this.yaml}
-              .fromLine=${this._resolvedFromLine}
-              .sectionKey=${this.sectionKey}
-              .configuration=${this.configuration}
-              .focusFieldPath=${this.focusFieldPath}
-              .presentComponents=${this._presentComponents}
-              advanced-section
-              ?show-advanced=${showAdvanced}
-              @value-change=${this._onValueChange}
-              @advanced-toggle=${this._onAdvancedToggle}
-              @edit-action-field=${this._onEditActionField}
-            ></esphome-config-entry-form>
-            ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
-            ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
-            ${this._renderActionsRow(canDelete)}
-          `}
+              ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
+              ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
+          : html`
+              ${
+                isSecuritySection(this.sectionKey)
+                  ? html`<esphome-security-notice
+                      .sectionKey=${this.sectionKey}
+                      .yaml=${this.yaml}
+                      .configuration=${this.configuration}
+                      .fromLine=${this._resolvedFromLine}
+                      @apply-security-secrets=${this._onApplySecuritySecrets}
+                    ></esphome-security-notice>`
+                  : nothing
+              }
+              <esphome-config-entry-form
+                .entries=${renderEntries}
+                .requiredGroups=${this._config.required_groups}
+                .values=${this._values}
+                .errors=${this._fieldErrors}
+                .board=${this.board}
+                .yaml=${this.yaml}
+                .fromLine=${this._resolvedFromLine}
+                .sectionKey=${this.sectionKey}
+                .configuration=${this.configuration}
+                .focusFieldPath=${this.focusFieldPath}
+                .presentComponents=${this._presentComponents}
+                advanced-section
+                ?show-advanced=${showAdvanced}
+                @value-change=${this._onValueChange}
+                @advanced-toggle=${this._onAdvancedToggle}
+                @edit-action-field=${this._onEditActionField}
+              ></esphome-config-entry-form>
+              ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
+              ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
+              ${this._renderActionsRow(canDelete)}
+            `
+      }
       ${this._renderApiActionDialog()} ${this._renderAddAutomationDialog()}
-      ${canDelete
-        ? html`<esphome-confirm-dialog
-            heading=${this._localize("device.delete_section")}
-            confirm-label=${this._localize("device.delete_section")}
-            message=${this._localize("device.confirm_delete_section", {
-              name: this._config.title,
-            })}
-            destructive
-            @confirm=${this._onDeleteConfirmed}
-          ></esphome-confirm-dialog>`
-        : nothing}
+      ${
+        canDelete
+          ? html`<esphome-confirm-dialog
+              heading=${this._localize("device.delete_section")}
+              confirm-label=${this._localize("device.delete_section")}
+              message=${this._localize("device.confirm_delete_section", {
+                name: this._config.title,
+              })}
+              destructive
+              @confirm=${this._onDeleteConfirmed}
+            ></esphome-confirm-dialog>`
+          : nothing
+      }
     `;
   }
 

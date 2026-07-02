@@ -58,11 +58,13 @@ export function renderWifiFields(props: WifiFieldsProps): TemplateResult {
         @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) =>
           props.onPasswordInput(e.detail.value)}
       ></esphome-password-input>
-      ${tooShort
-        ? html`<p id="onboarding-password-error" class="error" role="alert">
-            ${localize("onboarding.wifi.password_too_short")}
-          </p>`
-        : nothing}
+      ${
+        tooShort
+          ? html`<p id="onboarding-password-error" class="error" role="alert">
+              ${localize("onboarding.wifi.password_too_short")}
+            </p>`
+          : nothing
+      }
     </div>
   `;
 }

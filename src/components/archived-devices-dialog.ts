@@ -312,9 +312,11 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
             <div class="row-info">
               <div class="row-name">${device.friendly_name || device.name}</div>
               <div class="row-config">${device.configuration}</div>
-              ${device.comment
-                ? html`<div class="row-comment">${device.comment}</div>`
-                : nothing}
+              ${
+                device.comment
+                  ? html`<div class="row-comment">${device.comment}</div>`
+                  : nothing
+              }
             </div>
             <div class="row-actions">
               <button

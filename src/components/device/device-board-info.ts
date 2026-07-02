@@ -255,74 +255,80 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     const board = this.board;
 
     return html`
-      ${!this.selectedSection && board
-        ? html`
-            <div class="board-header">
-              <div class="board-info">
-                <h3 class="board-name">${board.name}</h3>
-                <div class="board-tags">
-                  ${board.tags.map(
-                    (tag) => html`<wa-badge variant="brand" pill>${tag}</wa-badge>`
-                  )}
-                  <a
-                    class="board-info-link"
-                    href=${board.docs_url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    ${this._localize("device.more_info")}
-                    <wa-icon library="mdi" name="open-in-new"></wa-icon>
-                  </a>
-                  ${this._alternateBoards.length > 0
-                    ? html`<button
-                        type="button"
-                        class="board-change-link"
-                        @click=${this._openChangeBoard}
-                      >
-                        ${this._localize("device.change_board_link")}
-                      </button>`
-                    : nothing}
+      ${
+        !this.selectedSection && board
+          ? html`
+              <div class="board-header">
+                <div class="board-info">
+                  <h3 class="board-name">${board.name}</h3>
+                  <div class="board-tags">
+                    ${board.tags.map(
+                      (tag) => html`<wa-badge variant="brand" pill>${tag}</wa-badge>`
+                    )}
+                    <a
+                      class="board-info-link"
+                      href=${board.docs_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      ${this._localize("device.more_info")}
+                      <wa-icon library="mdi" name="open-in-new"></wa-icon>
+                    </a>
+                    ${
+                      this._alternateBoards.length > 0
+                        ? html`<button
+                            type="button"
+                            class="board-change-link"
+                            @click=${this._openChangeBoard}
+                          >
+                            ${this._localize("device.change_board_link")}
+                          </button>`
+                        : nothing
+                    }
+                  </div>
+                  <p class="board-description">${renderMarkdown(board.description)}</p>
                 </div>
-                <p class="board-description">${renderMarkdown(board.description)}</p>
+                <div class="board-image">
+                  <img
+                    src=${boardImageUrl(board)}
+                    alt=${board.name}
+                    referrerpolicy="no-referrer"
+                    @error=${onBoardImageError}
+                  />
+                </div>
               </div>
-              <div class="board-image">
-                <img
-                  src=${boardImageUrl(board)}
-                  alt=${board.name}
-                  referrerpolicy="no-referrer"
-                  @error=${onBoardImageError}
-                />
-              </div>
-            </div>
-            <div class="board-separator"></div>
-          `
-        : nothing}
-      ${this.selectedSection
-        ? this._renderSelectedSection()
-        : html`
-            ${this.justCreated ? this._renderWelcomeBanner() : nothing}
-            ${this._renderStepSection({
-              title: this._localize("device.step_core"),
-              desc: this._localize("device.step_core_desc"),
-              icon: SECTION_ICON.core,
-              action: this._localize("device.show_core_configuration"),
-              section: "core",
-            })}
-            ${this._renderStepSection({
-              title: this._localize("device.step_components"),
-              desc: this._localize("device.step_components_desc"),
-              icon: SECTION_ICON.components,
-              action: this._localize("device.show_components"),
-              section: "components",
-            })}
-            ${this._renderStepSection({
-              title: this._localize("device.step_automations"),
-              desc: this._localize("device.step_automations_desc"),
-              icon: SECTION_ICON.automations,
-              action: this._localize("device.show_automations"),
-              section: "automations",
-            })}
-          `}
+              <div class="board-separator"></div>
+            `
+          : nothing
+      }
+      ${
+        this.selectedSection
+          ? this._renderSelectedSection()
+          : html`
+              ${this.justCreated ? this._renderWelcomeBanner() : nothing}
+              ${this._renderStepSection({
+                title: this._localize("device.step_core"),
+                desc: this._localize("device.step_core_desc"),
+                icon: SECTION_ICON.core,
+                action: this._localize("device.show_core_configuration"),
+                section: "core",
+              })}
+              ${this._renderStepSection({
+                title: this._localize("device.step_components"),
+                desc: this._localize("device.step_components_desc"),
+                icon: SECTION_ICON.components,
+                action: this._localize("device.show_components"),
+                section: "components",
+              })}
+              ${this._renderStepSection({
+                title: this._localize("device.step_automations"),
+                desc: this._localize("device.step_automations_desc"),
+                icon: SECTION_ICON.automations,
+                action: this._localize("device.show_automations"),
+                section: "automations",
+              })}
+            `
+      }
 
       <esphome-add-config-dialog
         .boardName=${board?.name ?? ""}

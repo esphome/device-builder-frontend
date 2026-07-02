@@ -134,9 +134,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               this._password = v;
             },
           })}
-          ${this._error
-            ? html`<p class="error" role="alert">${this._error}</p>`
-            : nothing}
+          ${
+            this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing
+          }
         </div>
         <div slot="footer" class="actions">
           <button
@@ -153,9 +153,11 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             ?disabled=${this._saving || !this._ssid.trim() || this._passwordTooShort}
             @click=${this._save}
           >
-            ${this._saving
-              ? this._localize("onboarding.wifi.saving")
-              : this._localize("onboarding.wifi.save")}
+            ${
+              this._saving
+                ? this._localize("onboarding.wifi.saving")
+                : this._localize("onboarding.wifi.save")
+            }
           </button>
         </div>
       </esphome-base-dialog>

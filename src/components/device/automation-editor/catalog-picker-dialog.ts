@@ -509,11 +509,13 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     >
       <div class="picker-row-body">
         <span class="picker-row-title">${item.name}</span>
-        ${item.description
-          ? html`<span class="picker-row-desc">
-              ${renderMarkdown(item.description)}
-            </span>`
-          : nothing}
+        ${
+          item.description
+            ? html`<span class="picker-row-desc">
+                ${renderMarkdown(item.description)}
+              </span>`
+            : nothing
+        }
       </div>
       <span class="picker-row-add" aria-hidden="true">
         <wa-icon library="mdi" name="plus"></wa-icon>

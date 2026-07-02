@@ -99,44 +99,52 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
         <label class="ae-section-label" id="trigger-label"
           >${this._localize("device.automation_trigger")}</label
         >
-        ${boundDevice
-          ? html`<p class="ae-section-desc">
-              ${this._localize("device.automation_trigger_on_component", {
-                component: instanceName(boundDevice),
-                domain: boundDevice.component_id,
-              })}
-            </p>`
-          : nothing}
-        ${filtered.length === 0
-          ? html`<p class="ae-empty" role="status">
-              ${this._localize("device.automation_trigger_none_available")}
-            </p>`
-          : html`<wa-select
-              aria-labelledby="trigger-label"
-              value=${this.triggerId ?? ""}
-              ?disabled=${this.disabled}
-              @change=${this._onTriggerChange}
-            >
-              ${filtered.map(
-                (t) =>
-                  html`<wa-option value=${t.id} ?selected=${t.id === this.triggerId}
-                    >${t.name}</wa-option
-                  >`
-              )}
-            </wa-select>`}
-        ${active?.description
-          ? html`<p class="ae-section-desc">${renderMarkdown(active.description)}</p>`
-          : nothing}
-        ${active && active.config_entries.length > 0
-          ? html`<esphome-config-entry-form
-              .entries=${active.config_entries}
-              .values=${this.triggerParams}
-              .board=${this.board}
-              .yaml=${this.yaml}
-              ?disabled=${this.disabled}
-              @value-change=${this._onParamChange}
-            ></esphome-config-entry-form>`
-          : nothing}
+        ${
+          boundDevice
+            ? html`<p class="ae-section-desc">
+                ${this._localize("device.automation_trigger_on_component", {
+                  component: instanceName(boundDevice),
+                  domain: boundDevice.component_id,
+                })}
+              </p>`
+            : nothing
+        }
+        ${
+          filtered.length === 0
+            ? html`<p class="ae-empty" role="status">
+                ${this._localize("device.automation_trigger_none_available")}
+              </p>`
+            : html`<wa-select
+                aria-labelledby="trigger-label"
+                value=${this.triggerId ?? ""}
+                ?disabled=${this.disabled}
+                @change=${this._onTriggerChange}
+              >
+                ${filtered.map(
+                  (t) =>
+                    html`<wa-option value=${t.id} ?selected=${t.id === this.triggerId}
+                      >${t.name}</wa-option
+                    >`
+                )}
+              </wa-select>`
+        }
+        ${
+          active?.description
+            ? html`<p class="ae-section-desc">${renderMarkdown(active.description)}</p>`
+            : nothing
+        }
+        ${
+          active && active.config_entries.length > 0
+            ? html`<esphome-config-entry-form
+                .entries=${active.config_entries}
+                .values=${this.triggerParams}
+                .board=${this.board}
+                .yaml=${this.yaml}
+                ?disabled=${this.disabled}
+                @value-change=${this._onParamChange}
+              ></esphome-config-entry-form>`
+            : nothing
+        }
       </div>
     `;
   }

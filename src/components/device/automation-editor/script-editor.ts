@@ -364,19 +364,21 @@ export class ESPHomeScriptEditor extends LitElement {
         ></esphome-automation-action-list>
       </div>
       ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
-      ${this.location && this.value && !this.addMode
-        ? html`<div class="ae-actions">
-            <button
-              type="button"
-              class="ae-danger"
-              ?disabled=${disabled}
-              @click=${this._onDelete}
-            >
-              <wa-icon library="mdi" name="delete"></wa-icon>
-              ${this._localize("device.delete_script")}
-            </button>
-          </div>`
-        : nothing}
+      ${
+        this.location && this.value && !this.addMode
+          ? html`<div class="ae-actions">
+              <button
+                type="button"
+                class="ae-danger"
+                ?disabled=${disabled}
+                @click=${this._onDelete}
+              >
+                <wa-icon library="mdi" name="delete"></wa-icon>
+                ${this._localize("device.delete_script")}
+              </button>
+            </div>`
+          : nothing
+      }
     `;
   }
 
@@ -404,9 +406,11 @@ export class ESPHomeScriptEditor extends LitElement {
         <p class="ae-header-desc">${renderMarkdown(descText)}</p>
       </div>
       <div class="ae-header-icon">
-        ${imageUrl
-          ? html`<img alt="" src=${imageUrl} />`
-          : html`<wa-icon library="mdi" name="script-text-outline"></wa-icon>`}
+        ${
+          imageUrl
+            ? html`<img alt="" src=${imageUrl} />`
+            : html`<wa-icon library="mdi" name="script-text-outline"></wa-icon>`
+        }
       </div>
     </div>`;
   }

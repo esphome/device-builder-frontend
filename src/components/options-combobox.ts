@@ -133,34 +133,40 @@ export class ESPHomeOptionsCombobox extends LitElement {
             <wa-icon library="mdi" name="chevron-down"></wa-icon>
           </button>
         </div>
-        ${expanded
-          ? html`<div
-              id="listbox"
-              class="listbox"
-              role="listbox"
-              @mousedown=${this._preventBlur}
-            >
-              ${filtered.map(
-                (opt, i) =>
-                  html`<div
-                    id="option-${i}"
-                    class="option ${i === this._active ? "option--active" : ""}"
-                    role="option"
-                    aria-selected=${opt.value === this.value ? "true" : "false"}
-                    @mousedown=${this._preventBlur}
-                    @click=${() => this._select(opt)}
-                    @mouseenter=${() => (this._active = i)}
-                  >
-                    ${this._isDefault(opt)
-                      ? html`<span class="option-default-stack">
-                          <span class="option-label">${opt.label}</span>
-                          <small class="option-default-note">${this.defaultNote}</small>
-                        </span>`
-                      : html`<span class="option-label">${opt.label}</span>`}
-                  </div>`
-              )}
-            </div>`
-          : nothing}
+        ${
+          expanded
+            ? html`<div
+                id="listbox"
+                class="listbox"
+                role="listbox"
+                @mousedown=${this._preventBlur}
+              >
+                ${filtered.map(
+                  (opt, i) =>
+                    html`<div
+                      id="option-${i}"
+                      class="option ${i === this._active ? "option--active" : ""}"
+                      role="option"
+                      aria-selected=${opt.value === this.value ? "true" : "false"}
+                      @mousedown=${this._preventBlur}
+                      @click=${() => this._select(opt)}
+                      @mouseenter=${() => (this._active = i)}
+                    >
+                      ${
+                        this._isDefault(opt)
+                          ? html`<span class="option-default-stack">
+                              <span class="option-label">${opt.label}</span>
+                              <small class="option-default-note"
+                                >${this.defaultNote}</small
+                              >
+                            </span>`
+                          : html`<span class="option-label">${opt.label}</span>`
+                      }
+                    </div>`
+                )}
+              </div>`
+            : nothing
+        }
       </wa-popup>
     `;
   }

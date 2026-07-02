@@ -259,11 +259,13 @@ export class ESPHomeRegistryList extends LitElement {
     const statusHint: unknown = this._fetchError
       ? html`<p class="registry-list-fallback">
           ${this.ctx.localize("device.registry_list_error")}
-          ${this._api
-            ? html`<button type="button" class="multi-btn" @click=${this._retryFetch}>
-                ${this.ctx.localize("device.registry_list_retry")}
-              </button>`
-            : nothing}
+          ${
+            this._api
+              ? html`<button type="button" class="multi-btn" @click=${this._retryFetch}>
+                  ${this.ctx.localize("device.registry_list_retry")}
+                </button>`
+              : nothing
+          }
         </p>`
       : this._catalog === null
         ? html`<p class="registry-list-fallback">
@@ -377,11 +379,13 @@ export class ESPHomeRegistryList extends LitElement {
               this._renameRow(index, next);
             }}
           >
-            ${!knownInCatalog && currentId
-              ? html`<wa-option value=${currentId} selected
-                  >${formatRegistryId(currentId)}</wa-option
-                >`
-              : nothing}
+            ${
+              !knownInCatalog && currentId
+                ? html`<wa-option value=${currentId} selected
+                    >${formatRegistryId(currentId)}</wa-option
+                  >`
+                : nothing
+            }
             ${sortedCatalog
               .filter((effect) => effect.id === currentId || !takenIds.has(effect.id))
               .map(

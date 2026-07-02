@@ -299,35 +299,41 @@ export class ESPHomePageSecrets extends LitElement {
           </button>
         </div>
         <div class="editor-card">
-          ${this._loaded
-            ? html`
-                <button
-                  type="button"
-                  class="save-button"
-                  ?disabled=${this._saving || this._yaml === this._savedYaml}
-                  @click=${this._save}
-                >
-                  <wa-icon library="mdi" name="content-save"></wa-icon>
-                  ${this._saving
-                    ? this._localize("secrets.saving")
-                    : this._localize("secrets.save")}
-                </button>
-                <div class="editor-pane">
-                  ${this._layout === "form"
-                    ? html`<esphome-secrets-structured-editor
-                        .value=${this._yaml}
-                        .revealSensitive=${this._revealSensitive}
-                        @yaml-change=${this._onYamlChange}
-                      ></esphome-secrets-structured-editor>`
-                    : html`<esphome-yaml-editor
-                        .value=${this._yaml}
-                        .maskAllValues=${true}
-                        .revealSensitive=${this._revealSensitive}
-                        @yaml-change=${this._onYamlChange}
-                      ></esphome-yaml-editor>`}
-                </div>
-              `
-            : html`<div class="loading"><wa-spinner></wa-spinner></div>`}
+          ${
+            this._loaded
+              ? html`
+                  <button
+                    type="button"
+                    class="save-button"
+                    ?disabled=${this._saving || this._yaml === this._savedYaml}
+                    @click=${this._save}
+                  >
+                    <wa-icon library="mdi" name="content-save"></wa-icon>
+                    ${
+                      this._saving
+                        ? this._localize("secrets.saving")
+                        : this._localize("secrets.save")
+                    }
+                  </button>
+                  <div class="editor-pane">
+                    ${
+                      this._layout === "form"
+                        ? html`<esphome-secrets-structured-editor
+                            .value=${this._yaml}
+                            .revealSensitive=${this._revealSensitive}
+                            @yaml-change=${this._onYamlChange}
+                          ></esphome-secrets-structured-editor>`
+                        : html`<esphome-yaml-editor
+                            .value=${this._yaml}
+                            .maskAllValues=${true}
+                            .revealSensitive=${this._revealSensitive}
+                            @yaml-change=${this._onYamlChange}
+                          ></esphome-yaml-editor>`
+                    }
+                  </div>
+                `
+              : html`<div class="loading"><wa-spinner></wa-spinner></div>`
+          }
         </div>
       </div>
       <esphome-unsaved-changes-dialog

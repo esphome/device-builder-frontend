@@ -658,13 +658,17 @@ export class ESPHomePageDashboard extends LitElement {
 
     return html`
       ${renderDiscoveredSection(this)}
-      ${this._devices.length > 0 && this._view === DashboardView.CARDS
-        ? renderToolbar(this, filtered.length, this._devices.length)
-        : ""}
+      ${
+        this._devices.length > 0 && this._view === DashboardView.CARDS
+          ? renderToolbar(this, filtered.length, this._devices.length)
+          : ""
+      }
       ${showCardEmptyState ? renderEmptySearch(this) : ""}
-      ${this._view === DashboardView.CARDS
-        ? renderCardGrid(this, filtered)
-        : renderTable(this)}
+      ${
+        this._view === DashboardView.CARDS
+          ? renderCardGrid(this, filtered)
+          : renderTable(this)
+      }
       ${renderDrawer(this)} ${renderSelectBarOrFab(this)} ${renderDialogs(this)}
     `;
   }

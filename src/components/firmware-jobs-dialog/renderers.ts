@@ -36,20 +36,26 @@ export function renderGroups(
 ): TemplateResult {
   return html`
     <div class="jobs">
-      ${active.length > 0
-        ? html`
-            <div class="group-label">${host._localize("firmware_jobs.group_active")}</div>
-            ${active.map((j) => renderJob(host, j))}
-          `
-        : nothing}
-      ${terminal.length > 0
-        ? html`
-            <div class="group-label">
-              ${host._localize("firmware_jobs.group_history")}
-            </div>
-            ${terminal.map((j) => renderJob(host, j))}
-          `
-        : nothing}
+      ${
+        active.length > 0
+          ? html`
+              <div class="group-label">
+                ${host._localize("firmware_jobs.group_active")}
+              </div>
+              ${active.map((j) => renderJob(host, j))}
+            `
+          : nothing
+      }
+      ${
+        terminal.length > 0
+          ? html`
+              <div class="group-label">
+                ${host._localize("firmware_jobs.group_history")}
+              </div>
+              ${terminal.map((j) => renderJob(host, j))}
+            `
+          : nothing
+      }
     </div>
   `;
 }
@@ -75,13 +81,15 @@ function renderJob(host: ESPHomeFirmwareJobsDialog, job: FirmwareJob): TemplateR
           ${renderStatus(host, job)} ${renderTimestamp(host, job)}
         </div>
         ${renderSourceLine(host, job)}
-        ${showProgress
-          ? html`
-              <div class="progress">
-                <div class="progress-fill" style="width:${job.progress}%"></div>
-              </div>
-            `
-          : nothing}
+        ${
+          showProgress
+            ? html`
+                <div class="progress">
+                  <div class="progress-fill" style="width:${job.progress}%"></div>
+                </div>
+              `
+            : nothing
+        }
       </div>
       ${renderRowAction(host, job)}
     </button>
@@ -183,9 +191,11 @@ function renderStatus(
     return html`
       <span class="job-status">
         <wa-spinner></wa-spinner>
-        ${typeof job.progress === "number"
-          ? `${job.progress}%`
-          : host._localize("firmware_jobs.status_running")}
+        ${
+          typeof job.progress === "number"
+            ? `${job.progress}%`
+            : host._localize("firmware_jobs.status_running")
+        }
       </span>
     `;
   }

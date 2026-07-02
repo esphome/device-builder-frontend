@@ -163,18 +163,20 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
             ${this._localize("firmware_jobs.reset_build_env")}
           </button>
           <span class="spacer"></span>
-          ${terminal.length > 0
-            ? html`
-                <button
-                  class="tool-btn tool-btn--ghost"
-                  title=${this._localize("firmware_jobs.clear_history")}
-                  @click=${this._onClearHistory}
-                >
-                  <wa-icon library="mdi" name="delete-sweep"></wa-icon>
-                  ${this._localize("firmware_jobs.clear_history")}
-                </button>
-              `
-            : nothing}
+          ${
+            terminal.length > 0
+              ? html`
+                  <button
+                    class="tool-btn tool-btn--ghost"
+                    title=${this._localize("firmware_jobs.clear_history")}
+                    @click=${this._onClearHistory}
+                  >
+                    <wa-icon library="mdi" name="delete-sweep"></wa-icon>
+                    ${this._localize("firmware_jobs.clear_history")}
+                  </button>
+                `
+              : nothing
+          }
         </div>
         ${hasJobs ? renderGroups(this, active, terminal) : renderEmpty(this._localize)}
       </esphome-base-dialog>

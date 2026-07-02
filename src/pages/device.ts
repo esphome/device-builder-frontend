@@ -1031,31 +1031,37 @@ export class ESPHomePageDevice extends LitElement {
             .availableVersion=${this._device?.current_version ?? ""}
             ?busy=${this._activeJobs.has(this.id)}
           >
-            ${showEdgeTab || this._selectedSection
-              ? html`<div slot="header-start" class="header-start-group">
-                  ${showEdgeTab
-                    ? html`<button
-                        type="button"
-                        class="ghost-icon-btn nav-toggle-btn"
-                        @click=${this._onNavExpand}
-                        title=${this._localize("device.show_navigator")}
-                        aria-label=${this._localize("device.show_navigator")}
-                      >
-                        <wa-icon library="mdi" name="menu"></wa-icon>
-                      </button>`
-                    : nothing}
-                  ${this._selectedSection
-                    ? html`<button
-                        class="ghost-icon-btn back-btn"
-                        @click=${this._onBack}
-                        title=${backLabel}
-                        aria-label=${backLabel}
-                      >
-                        <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                      </button>`
-                    : nothing}
-                </div>`
-              : nothing}
+            ${
+              showEdgeTab || this._selectedSection
+                ? html`<div slot="header-start" class="header-start-group">
+                    ${
+                      showEdgeTab
+                        ? html`<button
+                            type="button"
+                            class="ghost-icon-btn nav-toggle-btn"
+                            @click=${this._onNavExpand}
+                            title=${this._localize("device.show_navigator")}
+                            aria-label=${this._localize("device.show_navigator")}
+                          >
+                            <wa-icon library="mdi" name="menu"></wa-icon>
+                          </button>`
+                        : nothing
+                    }
+                    ${
+                      this._selectedSection
+                        ? html`<button
+                            class="ghost-icon-btn back-btn"
+                            @click=${this._onBack}
+                            title=${backLabel}
+                            aria-label=${backLabel}
+                          >
+                            <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                          </button>`
+                        : nothing
+                    }
+                  </div>`
+                : nothing
+            }
           </esphome-device-editor>
         </div>
         <esphome-unsaved-changes-dialog

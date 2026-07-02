@@ -169,19 +169,25 @@ function renderPinOptions(
   // option still conveys its own state (reserved → ``disabled``, in-use /
   // conflict → ``title``), so no per-option context is lost.
   const header = (key: string, withDivider: boolean) =>
-    html`${withDivider
-        ? html`<wa-divider class="pin-group-divider" aria-hidden="true"></wa-divider>`
-        : nothing} <small class="pin-group-label" aria-hidden="true">${key}</small>`;
+    html`${
+        withDivider
+          ? html`<wa-divider class="pin-group-divider" aria-hidden="true"></wa-divider>`
+          : nothing
+      } <small class="pin-group-label" aria-hidden="true">${key}</small>`;
   return html`
-    ${splitByCapability && features
-      ? header(ctx.localize("device.pin_group_supports", { features }), false)
-      : nothing}
+    ${
+      splitByCapability && features
+        ? header(ctx.localize("device.pin_group_supports", { features }), false)
+        : nothing
+    }
     ${supported.map((v) => renderPinOption(v, value))}
     ${splitByCapability ? header(ctx.localize("device.pin_group_other"), true) : nothing}
     ${other.map((v) => renderPinOption(v, value))}
-    ${reserved.length > 0
-      ? header(ctx.localize("device.pin_group_reserved"), true)
-      : nothing}
+    ${
+      reserved.length > 0
+        ? header(ctx.localize("device.pin_group_reserved"), true)
+        : nothing
+    }
     ${reserved.map((v) => renderPinOption(v, value))}
   `;
 }
@@ -198,17 +204,21 @@ function renderPinOption(v: PinOptionView, value: string): TemplateResult {
     <span class="pin-option-stack">
       <span class="pin-option-primary">
         ${v.primary}
-        ${v.warn
-          ? html`<wa-icon
-              class="pin-warn-icon"
-              library="mdi"
-              name="alert-circle-outline"
-            ></wa-icon>`
-          : nothing}
+        ${
+          v.warn
+            ? html`<wa-icon
+                class="pin-warn-icon"
+                library="mdi"
+                name="alert-circle-outline"
+              ></wa-icon>`
+            : nothing
+        }
       </span>
-      ${v.secondary
-        ? html`<span class="pin-option-secondary">${v.secondary}</span>`
-        : nothing}
+      ${
+        v.secondary
+          ? html`<span class="pin-option-secondary">${v.secondary}</span>`
+          : nothing
+      }
     </span>
   </wa-option>`;
 }

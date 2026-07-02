@@ -278,39 +278,47 @@ export class ESPHomeAddComponentDialog extends LitElement {
         @navigate-to-dep=${this._onNavigateToDep}
         @request-add-component=${this._onNavigateToDep}
       >
-        ${isForm
-          ? html`<button
-              slot="header-prefix"
-              class="back-button"
-              title=${this._localize("layout.back")}
-              aria-label=${this._localize("layout.back")}
-              @click=${this._onBack}
-            >
-              <wa-icon library="mdi" name="arrow-left"></wa-icon>
-            </button>`
-          : nothing}
-        ${this._returnTo
-          ? html`<div class="return-banner">
-              ${this._localize("device.return_to_after_dep_prefix")}
-              <strong>${this._returnTo.name}</strong>
-              ${this._localize("device.return_to_after_dep_suffix")}
-            </div>`
-          : nothing}
-        ${isForm && this._bundleProgress
-          ? html`<div class="bundle-banner">
-              <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
-              <span
-                >${this._localize("device.bundle_step_progress", {
-                  current: this._bundleProgress.current,
-                  total: this._bundleProgress.total,
-                  name: this._bundleProgress.bundleName,
-                })}</span
+        ${
+          isForm
+            ? html`<button
+                slot="header-prefix"
+                class="back-button"
+                title=${this._localize("layout.back")}
+                aria-label=${this._localize("layout.back")}
+                @click=${this._onBack}
               >
-            </div>`
-          : nothing}
-        ${!isForm && this._submitError
-          ? html`<div class="catalog-error" role="alert">${this._submitError}</div>`
-          : nothing}
+                <wa-icon library="mdi" name="arrow-left"></wa-icon>
+              </button>`
+            : nothing
+        }
+        ${
+          this._returnTo
+            ? html`<div class="return-banner">
+                ${this._localize("device.return_to_after_dep_prefix")}
+                <strong>${this._returnTo.name}</strong>
+                ${this._localize("device.return_to_after_dep_suffix")}
+              </div>`
+            : nothing
+        }
+        ${
+          isForm && this._bundleProgress
+            ? html`<div class="bundle-banner">
+                <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+                <span
+                  >${this._localize("device.bundle_step_progress", {
+                    current: this._bundleProgress.current,
+                    total: this._bundleProgress.total,
+                    name: this._bundleProgress.bundleName,
+                  })}</span
+                >
+              </div>`
+            : nothing
+        }
+        ${
+          !isForm && this._submitError
+            ? html`<div class="catalog-error" role="alert">${this._submitError}</div>`
+            : nothing
+        }
         <esphome-component-catalog
           ?hidden=${isForm}
           .platform=${this.platform}
@@ -323,20 +331,22 @@ export class ESPHomeAddComponentDialog extends LitElement {
             isInDepDetour: this._returnTo !== null,
           })}
         ></esphome-component-catalog>
-        ${isForm
-          ? html`<esphome-add-component-form
-              .component=${this._selected!}
-              .board=${this.board}
-              .yaml=${this.yaml}
-              .prefillReference=${this._prefillReference}
-              .prefillFields=${this._depPrefill?.fields ?? null}
-              .restoredValues=${this._restoredValuesForMount}
-              .extraRequired=${this._depPrefill?.required ?? null}
-              .optionOverrides=${this._depPrefill?.optionOverrides ?? null}
-              .submitting=${this._submitting}
-              .submitError=${this._submitError}
-            ></esphome-add-component-form>`
-          : nothing}
+        ${
+          isForm
+            ? html`<esphome-add-component-form
+                .component=${this._selected!}
+                .board=${this.board}
+                .yaml=${this.yaml}
+                .prefillReference=${this._prefillReference}
+                .prefillFields=${this._depPrefill?.fields ?? null}
+                .restoredValues=${this._restoredValuesForMount}
+                .extraRequired=${this._depPrefill?.required ?? null}
+                .optionOverrides=${this._depPrefill?.optionOverrides ?? null}
+                .submitting=${this._submitting}
+                .submitError=${this._submitError}
+              ></esphome-add-component-form>`
+            : nothing
+        }
       </esphome-base-dialog>
     `;
   }

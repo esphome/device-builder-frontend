@@ -94,15 +94,19 @@ export class ESPHomeChangeBoardDialog extends LitElement {
         />
         <div class="board-meta">
           <span class="board-name">${board.name}</span>
-          ${board.manufacturer
-            ? html`<span class="board-mfr">${board.manufacturer}</span>`
-            : nothing}
+          ${
+            board.manufacturer
+              ? html`<span class="board-mfr">${board.manufacturer}</span>`
+              : nothing
+          }
         </div>
-        ${board.is_generic
-          ? html`<wa-badge variant="neutral" pill
-              >${this._localize("device.change_board_generic_tag")}</wa-badge
-            >`
-          : nothing}
+        ${
+          board.is_generic
+            ? html`<wa-badge variant="neutral" pill
+                >${this._localize("device.change_board_generic_tag")}</wa-badge
+              >`
+            : nothing
+        }
       </button>
     `;
   }

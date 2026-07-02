@@ -489,44 +489,48 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           </span>
           <span class="chevron" aria-hidden="true"> ${expanded ? "▾" : "▸"} </span>
         </button>
-        ${expanded
-          ? html`
-              <div class="job-body">
-                ${renderErrorBanner(job.error_message)}
-                ${renderErrorBanner(row.errorMessage)}
-                <div class="logs-container">
-                  <esphome-ansi-log
-                    .lines=${job.output}
-                    ?light=${!this._darkMode}
-                  ></esphome-ansi-log>
+        ${
+          expanded
+            ? html`
+                <div class="job-body">
+                  ${renderErrorBanner(job.error_message)}
+                  ${renderErrorBanner(row.errorMessage)}
+                  <div class="logs-container">
+                    <esphome-ansi-log
+                      .lines=${job.output}
+                      ?light=${!this._darkMode}
+                    ></esphome-ansi-log>
+                  </div>
+                  <div class="row-actions">
+                    ${
+                      terminal
+                        ? html`<button
+                            class="btn btn--cancel"
+                            type="button"
+                            @click=${() => this._onDismissRow(job.job_id)}
+                          >
+                            ${this._localize("settings.remote_build_dismiss_row")}
+                          </button>`
+                        : html`<button
+                            class="btn btn--danger"
+                            type="button"
+                            ?disabled=${row.cancelInFlight || row.cancelRequested}
+                            @click=${() => this._onCancel(job)}
+                          >
+                            ${this._localize(
+                              row.cancelRequested
+                                ? "settings.remote_build_cancel_pending"
+                                : row.cancelInFlight
+                                  ? "settings.remote_build_cancel_in_flight"
+                                  : "settings.remote_build_cancel_action"
+                            )}
+                          </button>`
+                    }
+                  </div>
                 </div>
-                <div class="row-actions">
-                  ${terminal
-                    ? html`<button
-                        class="btn btn--cancel"
-                        type="button"
-                        @click=${() => this._onDismissRow(job.job_id)}
-                      >
-                        ${this._localize("settings.remote_build_dismiss_row")}
-                      </button>`
-                    : html`<button
-                        class="btn btn--danger"
-                        type="button"
-                        ?disabled=${row.cancelInFlight || row.cancelRequested}
-                        @click=${() => this._onCancel(job)}
-                      >
-                        ${this._localize(
-                          row.cancelRequested
-                            ? "settings.remote_build_cancel_pending"
-                            : row.cancelInFlight
-                              ? "settings.remote_build_cancel_in_flight"
-                              : "settings.remote_build_cancel_action"
-                        )}
-                      </button>`}
-                </div>
-              </div>
-            `
-          : nothing}
+              `
+            : nothing
+        }
       </li>
     `;
   }

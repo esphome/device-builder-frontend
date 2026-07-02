@@ -124,10 +124,12 @@ export function renderIdReferenceField(
       <wa-select
         class=${invalid ? "invalid" : ""}
         ?disabled=${effectiveDisabled(entry, ctx)}
-        placeholder=${defaultCandidate
-          ? resolveSubstitutions(defaultCandidate.name, ctx.substitutions) ||
-            defaultCandidate.id
-          : nothing}
+        placeholder=${
+          defaultCandidate
+            ? resolveSubstitutions(defaultCandidate.name, ctx.substitutions) ||
+              defaultCandidate.id
+            : nothing
+        }
         @change=${onChange}
       >
         ${orphanOption}

@@ -361,9 +361,11 @@ export class ESPHomeAnsiLog extends LitElement {
     const state = newAnsiState();
     return html`
       <div class="log-container" @scroll=${this._handleScroll}>
-        ${visual.length === 0 && this.placeholder
-          ? html`<div class="log-line placeholder">${this.placeholder}</div>`
-          : visual.map((line) => this._renderLine(line, state))}
+        ${
+          visual.length === 0 && this.placeholder
+            ? html`<div class="log-line placeholder">${this.placeholder}</div>`
+            : visual.map((line) => this._renderLine(line, state))
+        }
       </div>
     `;
   }
