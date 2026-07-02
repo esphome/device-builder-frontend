@@ -19,6 +19,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
+import { isFeaturedId } from "../../util/featured-id.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -106,6 +107,25 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   private _debouncedSearch = debounce(() => this._fetchComponents(), 300);
 
+  // The board has addable recommendations and we're not locked to a category
+  // set — the state where "Recommended" is the sensible landing/search scope.
+  // Query-independent: availableFeaturedCount ignores the search box.
+  private _prefersFeatured(): boolean {
+    return (
+      this.lockedCategories.length === 0 &&
+      !!this.boardId &&
+      availableFeaturedCount(this, { applyQuery: false }) > 0
+    );
+  }
+
+  // "Recommended" and "All" both surface the board's recommendations (featured
+  // cards + bundles); a specific category (Sensor, …) does not. Drives the
+  // search auto-switch and bundle visibility off the *current* view, so
+  // returning to All always re-shows them.
+  private _recommendationInclusive(): boolean {
+    return this._category === ComponentCategory.FEATURED || this._category === "all";
+  }
+
   // Not in connectedCallback or prop-reactive: the catalog stays mounted
   // (hidden) inside its dialog whose parents mount on page load. Eager
   // fetching there would (a) burn calls per page load even without dialog
@@ -115,11 +135,7 @@ export class ESPHomeComponentCatalog extends LitElement {
     this._provides = "";
     // Auto-select "Featured" when the board has recommendations still addable;
     // reset away from it when every recommendation is already configured.
-    const hasFeatured =
-      this.lockedCategories.length === 0 &&
-      !!this.boardId &&
-      availableFeaturedCount(this) > 0;
-    if (hasFeatured) {
+    if (this._prefersFeatured()) {
       this._category = ComponentCategory.FEATURED;
     } else if (this._category === ComponentCategory.FEATURED) {
       this._category = "all";
@@ -205,10 +221,9 @@ export class ESPHomeComponentCatalog extends LitElement {
     // at different times) they can briefly disagree and strand the view on an
     // empty "Recommended" category. Once a featured fetch has settled, if its
     // grid is empty fall back to "all" so we never sit on "0 of N / No
-    // components found". A search is server-scoped to the board's recommendations
-    // (getComponents(category=featured, query)), so a term that matches a
-    // recommendation stays here and shows it; a term matching none empties the
-    // grid and falls through to the full catalog (device-builder-frontend#1040).
+    // components found". A search never reaches here: _onSearchInput moves to
+    // "all" (where featured lead) the moment a term is typed, so this guards
+    // only the no-search cold-open race and the all-configured board.
     // ``_provides`` stays excluded — that probe path never runs in Featured.
     if (
       !this._list.loading &&
@@ -246,9 +261,10 @@ export class ESPHomeComponentCatalog extends LitElement {
     // options are noise — the relevant categories are already pinned.
     const showSidebar = this.lockedCategories.length === 0;
 
-    // Bundles only surface in the dedicated "Featured" view.
-    const bundles =
-      this._category === ComponentCategory.FEATURED ? filteredBundles(this) : [];
+    // Bundles (a board concept, like featured cards) surface wherever
+    // recommendations belong: "Recommended" and "All". A specific category
+    // (Sensor, …) stays clean.
+    const bundles = this._recommendationInclusive() ? filteredBundles(this) : [];
     const visible = visibleComponents(this);
     const ambiguous = ambiguousNameIds(visible);
 
@@ -315,7 +331,9 @@ export class ESPHomeComponentCatalog extends LitElement {
                           this,
                           c,
                           c.id === this._expandedId,
-                          this._category === ComponentCategory.FEATURED,
+                          // A featured card keeps its badge/preset styling
+                          // wherever it lands (it now leads "All" too).
+                          isFeaturedId(c.id),
                           this._localize,
                           ambiguous.has(c.id)
                         )
@@ -359,10 +377,15 @@ export class ESPHomeComponentCatalog extends LitElement {
   private _onSearchInput = (ev: Event) => {
     this._search = (ev.target as HTMLInputElement).value;
     this._provides = "";
-    // Stay on the current category. A search inside "Featured" is server-scoped
-    // to the board's recommendations, so a matching term surfaces the featured
-    // card; a term matching none empties the grid and the ``updated`` fallback
-    // drops to "all" (device-builder-frontend#1040).
+    // "Recommended" is the no-search curated shortlist; a search moves to "all",
+    // where the board's featured cards are ranked first (server-side), so every
+    // match is visible with the most relevant on top and no term can strand the
+    // grid (device-builder-frontend#1040, device-builder#1793). Clearing the
+    // search returns to "Recommended". Only from these two recommendation views:
+    // a search inside a specific category (Sensor, …) filters within it.
+    if (this._recommendationInclusive() && this._prefersFeatured()) {
+      this._category = this._search.trim() ? "all" : ComponentCategory.FEATURED;
+    }
     this._debouncedSearch();
   };
 
