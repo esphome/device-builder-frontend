@@ -114,7 +114,7 @@ export const remoteComputeOnlyContext = createContext<boolean>(
 );
 
 /**
- * Context for whether git version-history auto-commit is enabled.
+ * Context for whether Git version-history auto-commit is enabled.
  *
  * Default ``true``. Set from the ``subscribe_events`` ``initial_state``
  * snapshot and toggled via the expert-only Settings → Appearance switch;

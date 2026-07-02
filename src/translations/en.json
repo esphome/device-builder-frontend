@@ -1079,7 +1079,7 @@
     "remote_compute_only": "Only use this for remote compute",
     "remote_compute_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards.",
     "version_history": "Save version history",
-    "version_history_desc": "Keep a local git history of your config changes so you can view and restore earlier versions. Turn this off to stop the automatic commits.",
+    "version_history_desc": "Keep a local Git history of your config changes so you can view and restore earlier versions. Turn this off to stop the automatic commits.",
     "language": "Language",
     "language_desc": "Choose the language used across the interface.",
     "language_system": "System",

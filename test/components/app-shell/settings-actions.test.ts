@@ -9,6 +9,7 @@ import {
   onSetRemoteBuildEnabled,
   onSetRemoteComputeOnly,
   onSetTheme,
+  onSetVersionHistoryEnabled,
 } from "../../../src/components/app-shell/settings-actions.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
@@ -23,7 +24,11 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 type PrefsHost = Pick<
   ESPHomeApp,
-  "_experienceLevel" | "_remoteComputeOnly" | "_localize" | "_prefsWritesInFlight"
+  | "_experienceLevel"
+  | "_remoteComputeOnly"
+  | "_versionHistoryEnabled"
+  | "_localize"
+  | "_prefsWritesInFlight"
 > & { _api: { updatePreferences: (p: Record<string, unknown>) => Promise<unknown> } };
 
 function makePrefsHost(
@@ -32,6 +37,7 @@ function makePrefsHost(
   return {
     _experienceLevel: null,
     _remoteComputeOnly: false,
+    _versionHistoryEnabled: true,
     _localize: ((key: string) => key) as ESPHomeApp["_localize"],
     _prefsWritesInFlight: 0,
     _api: { updatePreferences },
@@ -229,6 +235,43 @@ describe("onSetRemoteComputeOnly", () => {
     expect(host._remoteComputeOnly).toBe(true);
     await flush();
     expect(host._remoteComputeOnly).toBe(false);
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe("onSetVersionHistoryEnabled", () => {
+  beforeEach(() => toastError.mockClear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("optimistically flips and persists the preference on success", async () => {
+    const update = vi.fn(async () => ({}));
+    const host = makePrefsHost(update);
+    onSetVersionHistoryEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: false })
+    );
+    expect(host._versionHistoryEnabled).toBe(false);
+    await flush();
+    expect(host._versionHistoryEnabled).toBe(false);
+    expect(update).toHaveBeenCalledWith({ version_history_enabled: false });
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("reverts, logs, and toasts on backend rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = makePrefsHost(
+      vi.fn(async () => {
+        throw new Error("no");
+      })
+    );
+    onSetVersionHistoryEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: false })
+    );
+    expect(host._versionHistoryEnabled).toBe(false);
+    await flush();
+    expect(host._versionHistoryEnabled).toBe(true);
     expect(toastError).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalled();
   });
