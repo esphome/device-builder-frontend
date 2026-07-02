@@ -80,9 +80,11 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
 
-  /** Board id whose full body has already been fetched into `_selectedBoard`,
-   *  so re-entering the setup step doesn't refetch (getBoard is uncached). */
-  private _upgradedBoardId: string | null = null;
+  /** Full board bodies already fetched, keyed by id, so re-entering the setup
+   *  step reuses the full body (getBoard is uncached) rather than the slim
+   *  picker entry — whose `requires_wifi` hydrates to false and would drop the
+   *  Wi-Fi step on a back-then-re-pick of the same board. */
+  private _fullBoardById = new Map<string, BoardCatalogEntry>();
 
   /** Initial platform-filter label for the board step. Set by
    *  ``openAtBoardStep`` when the caller knows the chip family
@@ -164,7 +166,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._selectedBoard = board;
     this._initialBoardFilter = null;
     this._resetTransientState();
-    this._upgradedBoardId = board.id; // already a full body; no upgrade fetch
+    this._fullBoardById.set(board.id, board); // already a full body; no upgrade fetch
   }
 
   /** Open directly at the board-picker step with an optional
@@ -189,7 +191,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._advancedOpen = false;
     this._import.reset();
     this._submitting = false;
-    this._upgradedBoardId = null;
+    this._fullBoardById.clear();
     this._resetCreateErrors();
     this._open = true;
   }
@@ -383,21 +385,25 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    *  empty fetch we stay on the picker with an error rather than advance on the
    *  slim entry (whose ``requires_wifi`` hydrates to ``false``). */
   private async _enterSetupStep(board: BoardCatalogEntry): Promise<void> {
-    if (this._upgradedBoardId !== board.id) {
-      let full: BoardCatalogEntry | null = null;
-      try {
-        full = await this._api.getBoard(board.id);
-      } catch (err) {
-        console.warn("Failed to load full board body:", err);
-      }
-      if (this._selectedBoard?.id !== board.id) return; // selection moved on
-      if (!full) {
-        this._createError = this._localize("wizard.board_load_failed");
-        return; // keep the user on the picker to retry
-      }
-      this._selectedBoard = full;
-      this._upgradedBoardId = board.id;
+    const cached = this._fullBoardById.get(board.id);
+    if (cached) {
+      this._selectedBoard = cached; // never enter setup on the slim entry
+      this._step = "setup";
+      return;
     }
+    let full: BoardCatalogEntry | null = null;
+    try {
+      full = await this._api.getBoard(board.id);
+    } catch (err) {
+      console.warn("Failed to load full board body:", err);
+    }
+    if (this._selectedBoard?.id !== board.id) return; // selection moved on
+    if (!full) {
+      this._createError = this._localize("wizard.board_load_failed");
+      return; // keep the user on the picker to retry
+    }
+    this._fullBoardById.set(full.id, full);
+    this._selectedBoard = full;
     this._step = "setup";
   }
 

@@ -512,6 +512,27 @@ describe("create-config-dialog stale error on navigation", () => {
     expect((el as any)._step).not.toBe("setup");
     expect(errorText(el)).not.toBeNull();
   });
+
+  // #1798: backing out of setup and re-picking the SAME board must re-enter on
+  // the full body, not the slim picker entry (whose requires_wifi is undefined),
+  // or the Wi-Fi step silently disappears the second time through.
+  it("re-enters setup on the full board body after back then re-pick", async () => {
+    const getBoard = vi.fn().mockResolvedValue({ id: "esp32dev", requires_wifi: true });
+    const el = await mount({ getBoard });
+
+    await goToSetup(el, "esp32dev");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._selectedBoard.requires_wifi).toBe(true);
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button")!.click();
+    await el.updateComplete;
+
+    await goToSetup(el, "esp32dev");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._selectedBoard.requires_wifi).toBe(true);
+    // The full body is cached from the first visit, so no redundant refetch.
+    expect(getBoard).toHaveBeenCalledTimes(1);
+  });
 });
 
 // The migration onto esphome-base-dialog swapped the imperative
