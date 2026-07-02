@@ -1,12 +1,12 @@
 /**
  * @vitest-environment happy-dom
  *
- * The "Recommended" category must never strand the view on an empty grid:
- * when a featured fetch settles with nothing addable (every recommendation is
- * already configured, or a search matches no recommendation), the catalog falls
- * back to "all" instead of rendering "0 of N / No components found". A search
- * that DOES match a recommendation stays on Featured and shows it, rather than
- * discarding the match by switching to All (device-builder-frontend#1040).
+ * "Recommended" is the no-search curated shortlist. A search moves to "all",
+ * where the board's featured cards rank first (server-side), so every match is
+ * visible with the recommendations on top and no term strands the grid
+ * (device-builder-frontend#1040). Clearing the search returns to Recommended;
+ * an explicitly pinned category opts out. Featured cards keep their styling
+ * wherever they render.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -93,25 +93,16 @@ describe("component-catalog featured-empty fallback", () => {
     expect(getComponents).not.toHaveBeenCalled();
   });
 
-  // The scenario reported in #1040: a search whose term matches no
-  // recommendation must not strand the grid on "No components found".
-  it("falls back to all when a search matches no recommendation", async () => {
-    const { el, getComponents } = await mountFeatured({ search: "zzz", components: [] });
+  // #1040: a Recommended fetch that settles empty (all recommendations
+  // configured) must not strand the grid on "No components found".
+  it("falls back to all when the featured grid settles empty", async () => {
+    const { el, getComponents } = await mountFeatured({ components: [] });
     expect(el._category).toBe("all");
     expect(getComponents).toHaveBeenCalled();
   });
-
-  it("stays on featured when a search matches a recommendation", async () => {
-    const { el, getComponents } = await mountFeatured({
-      search: "ethernet",
-      components: [ETHERNET_CARD],
-    });
-    expect(el._category).toBe("featured");
-    expect(getComponents).not.toHaveBeenCalled();
-  });
 });
 
-describe("component-catalog _onSearchInput keeps the category", () => {
+describe("component-catalog search moves to All (featured leads there)", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
@@ -123,13 +114,21 @@ describe("component-catalog _onSearchInput keeps the category", () => {
     } as unknown as Event);
   };
 
-  it("stays on Featured when a search term is typed", async () => {
+  it("switches to All when a search term is typed", async () => {
     const { el } = await mountFeatured();
     expect(el._category).toBe("featured");
     typeSearch(el, "relay");
-    // No eager switch: the search is server-scoped to the recommendations, and
-    // the updated() fallback drops to All only once an empty featured fetch
-    // settles.
+    // The board's featured cards rank first under "all" (server-side), so a
+    // search surfaces every match with the recommendations on top and can
+    // never strand the grid (#1040, device-builder#1793).
+    expect(el._category).toBe("all");
+  });
+
+  it("returns to Recommended when the search is cleared", async () => {
+    const { el } = await mountFeatured();
+    typeSearch(el, "relay");
+    expect(el._category).toBe("all");
+    typeSearch(el, "");
     expect(el._category).toBe("featured");
   });
 
@@ -137,5 +136,31 @@ describe("component-catalog _onSearchInput keeps the category", () => {
     const { el } = await mountFeatured();
     typeSearch(el, "   ");
     expect(el._category).toBe("featured");
+  });
+
+  it("keeps a specific category on search (only Recommended/All auto-switch)", async () => {
+    const { el } = await mountFeatured();
+    el._category = "sensor";
+    typeSearch(el, "relay");
+    expect(el._category).toBe("sensor");
+  });
+});
+
+describe("component-catalog featured styling under All", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("renders a featured.* card with featured styling under All", async () => {
+    const FEATURED_CARD = {
+      id: "featured.esp32-poe-iso.onboard_ethernet",
+      dependencies: [],
+      supported_platforms: [],
+      multi_conf: true,
+    } as unknown as ComponentCatalogEntry;
+    const { el } = await mountFeatured({ components: [FEATURED_CARD] });
+    el._category = "all";
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector(".component-card--featured")).not.toBeNull();
   });
 });
