@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiCodeBraces, mdiFileCompare, mdiMagnify } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -8,6 +8,7 @@ import {
   expertModeContext,
   localizeContext,
   remoteComputeOnlyContext,
+  versionHistoryEnabledContext,
 } from "../../context/index.js";
 import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
@@ -58,6 +59,10 @@ export class ESPHomeSettingsAppearance extends LitElement {
   @consume({ context: remoteComputeOnlyContext, subscribe: true })
   @state()
   private _remoteComputeOnly = false;
+
+  @consume({ context: versionHistoryEnabledContext, subscribe: true })
+  @state()
+  private _versionHistoryEnabled = true;
 
   @state()
   private _theme: string = localStorage.getItem("esphome-theme") ?? "system";
@@ -141,7 +146,20 @@ export class ESPHomeSettingsAppearance extends LitElement {
         </wa-select>
       </div>
       ${this._renderExpertMode()} ${this._renderRemoteCompute()}
+      ${this._expertMode ? this._renderVersionHistory() : nothing}
     `;
+  }
+
+  // Expert-only: a beginner keeps version history on as a safety net, so the
+  // off switch is hidden unless Expert Mode is enabled.
+  private _renderVersionHistory() {
+    return renderToggleRow(this._localize, {
+      titleId: "version-history-title",
+      titleKey: "settings.version_history",
+      descKey: "settings.version_history_desc",
+      checked: this._versionHistoryEnabled,
+      onToggle: this._onToggleVersionHistory,
+    });
   }
 
   private _renderRemoteCompute() {
@@ -225,6 +243,16 @@ export class ESPHomeSettingsAppearance extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-remote-compute-only", {
         detail: !this._remoteComputeOnly,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onToggleVersionHistory() {
+    this.dispatchEvent(
+      new CustomEvent("set-version-history-enabled", {
+        detail: !this._versionHistoryEnabled,
         bubbles: true,
         composed: true,
       })

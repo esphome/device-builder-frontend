@@ -109,6 +109,26 @@ export function onSetExpertMode(host: ESPHomeApp, e: CustomEvent<boolean>): void
   setExperienceLevel(host, e.detail ? ExperienceLevel.EXPERT : ExperienceLevel.BEGINNER);
 }
 
+// Turning version history off stops the backend's git auto-commit.
+export function onSetVersionHistoryEnabled(
+  host: ESPHomeApp,
+  e: CustomEvent<boolean>
+): void {
+  void optimisticSetting(host, {
+    get: () => host._versionHistoryEnabled,
+    set: (v) => {
+      host._versionHistoryEnabled = v;
+    },
+    write: () => host._api.updatePreferences({ version_history_enabled: e.detail }),
+    value: e.detail,
+    toastKey: "settings.experience_save_failed",
+    warn: "Failed to save version-history-enabled:",
+    inFlight: (active) => {
+      host._prefsWritesInFlight += active ? 1 : -1;
+    },
+  });
+}
+
 // Optimistic flip with revert-on-failure for security-sensitive toggles.
 // _remoteBuildSetInFlight gates loadRemoteBuildSettings so a reconnect
 // racing the write can't clobber the optimistic value.

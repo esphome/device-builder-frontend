@@ -31,5 +31,6 @@ export {
   serverVersionContext,
   stubRemoteBuildJobState,
   versionContext,
+  versionHistoryEnabledContext,
 } from "./contexts.js";
 export type { RemoteBuildJobState } from "./contexts.js";

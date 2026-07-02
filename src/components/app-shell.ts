@@ -51,6 +51,7 @@ import {
   remoteComputeOnlyContext,
   serverVersionContext,
   versionContext,
+  versionHistoryEnabledContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { isExpert } from "../util/experience.js";
@@ -85,6 +86,7 @@ import {
   onSetRemoteBuildEnabled,
   onSetRemoteComputeOnly,
   onSetTheme,
+  onSetVersionHistoryEnabled,
 } from "./app-shell/settings-actions.js";
 
 import "../pages/dashboard.js";
@@ -136,6 +138,11 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: remoteComputeOnlyContext })
   @state()
   _remoteComputeOnly = false;
+  // Default true until the subscribe snapshot delivers preferences, matching
+  // the backend default so the expert toggle paints as on before first load.
+  @provide({ context: versionHistoryEnabledContext })
+  @state()
+  _versionHistoryEnabled = true;
   // False until the subscribe snapshot delivers preferences; the dashboard
   // fails device creation closed while it's false so a remote-compute install
   // can't flash creation UI before its prefs are known.
@@ -576,6 +583,8 @@ export class ESPHomeApp extends LitElement {
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
           onSetRemoteComputeOnly(this, e)}
+        @set-version-history-enabled=${(e: CustomEvent<boolean>) =>
+          onSetVersionHistoryEnabled(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>
           onSetRemoteBuildEnabled(this, e)}
         @set-remote-build-cleanup-ttl=${(e: CustomEvent<number>) =>
