@@ -385,25 +385,21 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    *  empty fetch we stay on the picker with an error rather than advance on the
    *  slim entry (whose ``requires_wifi`` hydrates to ``false``). */
   private async _enterSetupStep(board: BoardCatalogEntry): Promise<void> {
-    const cached = this._fullBoardById.get(board.id);
-    if (cached) {
-      this._selectedBoard = cached; // never enter setup on the slim entry
-      this._step = "setup";
-      return;
-    }
-    let full: BoardCatalogEntry | null = null;
-    try {
-      full = await this._api.getBoard(board.id);
-    } catch (err) {
-      console.warn("Failed to load full board body:", err);
-    }
-    if (this._selectedBoard?.id !== board.id) return; // selection moved on
+    let full = this._fullBoardById.get(board.id) ?? null;
     if (!full) {
-      this._createError = this._localize("wizard.board_load_failed");
-      return; // keep the user on the picker to retry
+      try {
+        full = await this._api.getBoard(board.id);
+      } catch (err) {
+        console.warn("Failed to load full board body:", err);
+      }
+      if (this._selectedBoard?.id !== board.id) return; // selection moved on
+      if (!full) {
+        this._createError = this._localize("wizard.board_load_failed");
+        return; // keep the user on the picker to retry
+      }
+      this._fullBoardById.set(full.id, full);
     }
-    this._fullBoardById.set(full.id, full);
-    this._selectedBoard = full;
+    this._selectedBoard = full; // never enter setup on the slim entry
     this._step = "setup";
   }
 
