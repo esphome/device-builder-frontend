@@ -3,8 +3,10 @@
  *
  * The "Recommended" category must never strand the view on an empty grid:
  * when a featured fetch settles with nothing addable (every recommendation is
- * already configured), the catalog falls back to "all" instead of rendering
- * "0 of N / No components found".
+ * already configured, or a search matches no recommendation), the catalog falls
+ * back to "all" instead of rendering "0 of N / No components found". A search
+ * that DOES match a recommendation stays on Featured and shows it, rather than
+ * discarding the match by switching to All (device-builder-frontend#1040).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -91,14 +93,25 @@ describe("component-catalog featured-empty fallback", () => {
     expect(getComponents).not.toHaveBeenCalled();
   });
 
-  it("stays on featured when the grid is empty only due to an active search", async () => {
+  // The scenario reported in #1040: a search whose term matches no
+  // recommendation must not strand the grid on "No components found".
+  it("falls back to all when a search matches no recommendation", async () => {
     const { el, getComponents } = await mountFeatured({ search: "zzz", components: [] });
+    expect(el._category).toBe("all");
+    expect(getComponents).toHaveBeenCalled();
+  });
+
+  it("stays on featured when a search matches a recommendation", async () => {
+    const { el, getComponents } = await mountFeatured({
+      search: "ethernet",
+      components: [ETHERNET_CARD],
+    });
     expect(el._category).toBe("featured");
     expect(getComponents).not.toHaveBeenCalled();
   });
 });
 
-describe("component-catalog search switches away from featured", () => {
+describe("component-catalog _onSearchInput keeps the category", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
@@ -110,11 +123,14 @@ describe("component-catalog search switches away from featured", () => {
     } as unknown as Event);
   };
 
-  it("drops Featured to All when a search term is typed", async () => {
+  it("stays on Featured when a search term is typed", async () => {
     const { el } = await mountFeatured();
     expect(el._category).toBe("featured");
     typeSearch(el, "relay");
-    expect(el._category).toBe("all");
+    // No eager switch: the search is server-scoped to the recommendations, and
+    // the updated() fallback drops to All only once an empty featured fetch
+    // settles.
+    expect(el._category).toBe("featured");
   });
 
   it("leaves Featured intact when the search is only whitespace", async () => {

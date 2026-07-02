@@ -205,15 +205,15 @@ export class ESPHomeComponentCatalog extends LitElement {
     // at different times) they can briefly disagree and strand the view on an
     // empty "Recommended" category. Once a featured fetch has settled, if its
     // grid is empty fall back to "all" so we never sit on "0 of N / No
-    // components found". Scoped to the unfiltered Featured view: search/provides
-    // are applied server-side, so an active filter that matches no
-    // recommendation empties the grid legitimately and must render "No
-    // components found", not bounce to All.
+    // components found". A search is server-scoped to the board's recommendations
+    // (getComponents(category=featured, query)), so a term that matches a
+    // recommendation stays here and shows it; a term matching none empties the
+    // grid and falls through to the full catalog (device-builder-frontend#1040).
+    // ``_provides`` stays excluded — that probe path never runs in Featured.
     if (
       !this._list.loading &&
       this.lockedCategories.length === 0 &&
       this._category === ComponentCategory.FEATURED &&
-      !this._search.trim() &&
       !this._provides &&
       visibleComponents(this).length + filteredBundles(this).length === 0
     ) {
@@ -359,14 +359,10 @@ export class ESPHomeComponentCatalog extends LitElement {
   private _onSearchInput = (ev: Event) => {
     this._search = (ev.target as HTMLInputElement).value;
     this._provides = "";
-    // A search inside "Featured" is server-scoped to the board's
-    // recommendations, so a term that matches nothing recommended strands the
-    // grid on "No components found" even when the catalog has matches. Drop to
-    // "all" the moment a search is typed so it spans the whole catalog
-    // (device-builder-frontend#1040).
-    if (this._category === ComponentCategory.FEATURED && this._search.trim()) {
-      this._category = "all";
-    }
+    // Stay on the current category. A search inside "Featured" is server-scoped
+    // to the board's recommendations, so a matching term surfaces the featured
+    // card; a term matching none empties the grid and the ``updated`` fallback
+    // drops to "all" (device-builder-frontend#1040).
     this._debouncedSearch();
   };
 
