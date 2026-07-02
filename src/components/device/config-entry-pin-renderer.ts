@@ -42,9 +42,10 @@ interface PinOptionView {
   warn: boolean;
   /** Board-unavailable (occupied / tied to flash) — grouped under "Reserved". */
   reserved: boolean;
-  /** Non-selectable. A reserved pin is disabled *except* when it's locked to the
-   *  component being edited (ethernet RMII pins under ``ethernet:``), where it's
-   *  still grouped under "Reserved" but stays pickable so its value renders. */
+  /** Non-selectable. A reserved pin is disabled *except* when it's locked to
+   *  the component being edited (ethernet RMII pins under ``ethernet:``) or is
+   *  the field's current value, where it's still grouped under "Reserved" but
+   *  stays pickable so its value renders. */
   disabled: boolean;
   /** Positively carries the field's required features and has no direction
    *  conflict — grouped under "Supports …". */
@@ -331,6 +332,13 @@ export function renderPinField(
     sectionEndLine(ctx.yaml, ctx.fromLine)
   );
   const ownLockedGpios = lockedGpiosForSection(ctx);
+  // The field's current value must stay pickable even on a reserved pin the
+  // board didn't lock to this section (a hand-edited YAML, or a manifest
+  // preset missing its lock) — a disabled selected option blanks the
+  // wa-select head, hiding the real config value.
+  if (valueGpio !== null) {
+    ownLockedGpios.add(valueGpio);
+  }
   const fieldDisabled = effectiveDisabled(entry, ctx);
   const isLongForm = isPlainObject(rawValue);
 
