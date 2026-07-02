@@ -235,6 +235,10 @@ export async function onSetOffloaderPairingEnabled(
   const { pin_sha256, enabled } = e.detail;
   const previous = host._buildOffloadPairings?.get(pin_sha256)?.enabled;
   patchOffloadPairing(host, pin_sha256, { enabled });
+  // Gate the reconnect reseed (events.ts INITIAL_STATE) so a mid-write snapshot
+  // can't clobber this optimistic, security-sensitive value — same guard the
+  // other offloader setters use via optimisticSetting's `inFlight`.
+  host._offloaderWritesInFlight += 1;
   try {
     await host._api.setOffloaderPairingEnabled({ pin_sha256, enabled });
   } catch {
@@ -244,6 +248,8 @@ export async function onSetOffloaderPairingEnabled(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
+  } finally {
+    host._offloaderWritesInFlight -= 1;
   }
 }
 
