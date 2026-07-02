@@ -397,7 +397,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         this._createError = this._localize("wizard.board_load_failed");
         return; // keep the user on the picker to retry
       }
-      this._fullBoardById.set(full.id, full);
+      // Key on the slim entry's id (what the lookup and openWithBoard use), not
+      // full.id, so an id the backend canonicalizes still hits the cache.
+      this._fullBoardById.set(board.id, full);
     }
     this._selectedBoard = full; // never enter setup on the slim entry
     this._step = "setup";
