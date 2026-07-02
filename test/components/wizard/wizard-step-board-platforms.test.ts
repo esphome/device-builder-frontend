@@ -64,6 +64,7 @@ describe("wizard step-board platform chips", () => {
 
     const labels = WIZARD_BOARD_PLATFORMS.map((p) => p.label);
     const first = labels.indexOf("BK7231");
+    expect(first).toBeGreaterThanOrEqual(0);
     const chain = ["BK7231", "BK7238", "BK7251", "RTL8710B", "RTL8720C", "LN882H"];
     expect(labels.slice(first, first + chain.length)).toEqual(chain);
   });
