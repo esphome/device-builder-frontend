@@ -514,8 +514,9 @@ describe("create-config-dialog stale error on navigation", () => {
   });
 
   // #1798: backing out of setup and re-picking the SAME board must re-enter on
-  // the full body, not the slim picker entry (whose requires_wifi is undefined),
-  // or the Wi-Fi step silently disappears the second time through.
+  // the full body, not the slim picker entry (whose requires_wifi is falsy —
+  // undefined on this raw fixture, false once hydrated in the app), or the
+  // Wi-Fi step silently disappears the second time through.
   it("re-enters setup on the full board body after back then re-pick", async () => {
     const getBoard = vi.fn().mockResolvedValue({ id: "esp32dev", requires_wifi: true });
     const el = await mount({ getBoard });
