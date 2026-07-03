@@ -6,7 +6,10 @@ import {
   JobStatus,
   JobType,
 } from "../../src/api/types/firmware-jobs.js";
-import { followJob } from "../../src/components/command-dialog/commands.js";
+import {
+  deriveFollowCommandType,
+  followJob,
+} from "../../src/components/command-dialog/commands.js";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { makeCommandDialogHost } from "./_command-dialog-host.js";
 
@@ -107,5 +110,61 @@ describe("command-dialog rename chain follow", () => {
 
     expect(host._state).toBe("error");
     expect(host._statusMessage).toBe("command.rename_failed");
+  });
+});
+
+describe("deriveFollowCommandType (reattach)", () => {
+  it("derives the chain mode for a live compile head with a held dependent", () => {
+    const { host } = renameChainHost();
+    const jobs = (host as unknown as { _jobs: Map<string, FirmwareJob> })._jobs;
+
+    expect(deriveFollowCommandType(jobs, jobs.get("c1")!)).toBe("rename");
+
+    const upload = makeJob({
+      job_id: "u1",
+      job_type: JobType.UPLOAD,
+      status: JobStatus.QUEUED,
+      depends_on: "c2",
+    });
+    const compile = makeJob({ job_id: "c2", job_type: JobType.COMPILE });
+    const installJobs = new Map([
+      ["c2", compile],
+      ["u1", upload],
+    ]);
+    expect(deriveFollowCommandType(installJobs, compile)).toBe("install");
+  });
+
+  it("keeps plain compile mode for terminal reattach and chainless compiles", () => {
+    // Terminal reattach is a log-review path; it must not chain into the flash log.
+    const done = makeJob({
+      job_id: "c1",
+      job_type: JobType.COMPILE,
+      status: JobStatus.COMPLETED,
+    });
+    const tail = makeJob({
+      job_id: "r1",
+      job_type: JobType.RENAME,
+      status: JobStatus.COMPLETED,
+      new_name: "livingroom",
+      depends_on: "c1",
+    });
+    const jobs = new Map([
+      ["c1", done],
+      ["r1", tail],
+    ]);
+    expect(deriveFollowCommandType(jobs, done)).toBe("compile");
+
+    const lone = makeJob({ job_id: "c3", job_type: JobType.COMPILE });
+    expect(deriveFollowCommandType(new Map([["c3", lone]]), lone)).toBe("compile");
+  });
+
+  it("maps non-compile jobs by type", () => {
+    const tail = makeJob({
+      job_id: "r1",
+      job_type: JobType.RENAME,
+      new_name: "livingroom",
+      depends_on: "c1",
+    });
+    expect(deriveFollowCommandType(new Map(), tail)).toBe("rename");
   });
 });

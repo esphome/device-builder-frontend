@@ -3,7 +3,32 @@ import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-j
 import { ErrorCode } from "../../api/types/protocol.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
-import type { ESPHomeCommandDialog } from "../command-dialog.js";
+import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
+
+const JOB_TYPE_TO_COMMAND: Record<string, CommandType> = {
+  [JobType.COMPILE]: "compile",
+  [JobType.INSTALL]: "install",
+  [JobType.UPLOAD]: "install",
+  [JobType.CLEAN]: "clean",
+  [JobType.RESET_BUILD_ENV]: "reset",
+  [JobType.RENAME]: "rename",
+};
+
+// A live COMPILE with a held dependent is a chain head — attach in the
+// chain's command mode so success reflects the flash, not just the build.
+// Terminal reattach keeps plain compile mode: it's a log-review path and
+// must show the log the user clicked, not chain into the flash log.
+export function deriveFollowCommandType(
+  jobs: Map<string, FirmwareJob>,
+  job: FirmwareJob
+): CommandType {
+  if (job.job_type === JobType.COMPILE && !isTerminalJobStatus(job.status)) {
+    const dependent = [...jobs.values()].find((j) => j.depends_on === job.job_id);
+    if (dependent?.job_type === JobType.RENAME) return "rename";
+    if (dependent?.job_type === JobType.UPLOAD) return "install";
+  }
+  return JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
+}
 
 // Dashboard mode pins escaped form (\033[…m); raw form (\x1b[…m) is defensive.
 const ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;

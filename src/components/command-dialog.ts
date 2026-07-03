@@ -16,7 +16,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
-import { JobSource, JobStatus, JobType } from "../api/types/firmware-jobs.js";
+import { JobSource, JobStatus } from "../api/types/firmware-jobs.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
@@ -36,6 +36,7 @@ import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
+  deriveFollowCommandType,
   detachStream,
   followJob,
   onForceLocalClick,
@@ -80,15 +81,6 @@ export type CommandType =
   "install" | "compile" | "validate" | "clean" | "reset" | "rename";
 
 export type CommandState = "running" | "success" | "error";
-
-const JOB_TYPE_TO_COMMAND: Record<string, CommandType> = {
-  [JobType.COMPILE]: "compile",
-  [JobType.INSTALL]: "install",
-  [JobType.UPLOAD]: "install",
-  [JobType.CLEAN]: "clean",
-  [JobType.RESET_BUILD_ENV]: "reset",
-  [JobType.RENAME]: "rename",
-};
 
 @customElement("esphome-command-dialog")
 export class ESPHomeCommandDialog extends LitElement {
@@ -248,12 +240,13 @@ export class ESPHomeCommandDialog extends LitElement {
 
   // Attach to a firmware job's stream. Handles any state — terminal jobs
   // replay buffered output and resolve to the final success/error banner.
-  // ``commandType`` overrides the job-type derivation for chain heads whose
-  // type doesn't name the user's command (a rename's COMPILE head).
+  // ``commandType`` overrides the derivation when the caller knows the
+  // command before the jobs context does (a just-queued rename's COMPILE
+  // head); reattach paths omit it and derive from the chain shape.
   public followJob(job: FirmwareJob, displayName: string, commandType?: CommandType) {
     this.configuration = job.configuration;
     this.name = displayName;
-    this._commandType = commandType ?? JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
+    this._commandType = commandType ?? deriveFollowCommandType(this._jobs, job);
     this._port = job.port || "OTA";
     resetRunState(this);
     // Fresh attach is a fresh session — reset toggle defaults so a prior
