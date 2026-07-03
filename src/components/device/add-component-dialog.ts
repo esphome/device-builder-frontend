@@ -14,6 +14,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
 import { collectExistingIds } from "../../util/default-component-id.js";
 import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
+import { formatApiError } from "../../util/format-api-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
@@ -662,8 +663,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
       // the already-added members (the draft is otherwise only published on the
       // success or hand-off paths, not on a throw).
       if (addedAny) this._dispatchDraft(this.yaml);
-      this._submitError =
-        err instanceof Error ? err.message : this._localize("device.add_component_error");
+      this._submitError = formatApiError(
+        err,
+        this._localize,
+        "device.add_component_error"
+      );
       toast.error(this._submitError, { richColors: true });
     } finally {
       this._submitting = false;
@@ -880,8 +884,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
         }
       }
     } catch (err) {
-      this._submitError =
-        err instanceof Error ? err.message : this._localize("device.add_component_error");
+      this._submitError = formatApiError(
+        err,
+        this._localize,
+        "device.add_component_error"
+      );
       // The configless path (notify) has no form fields, so `_submitError`
       // would land in an otherwise-empty form view where it's easy to
       // miss — toast it too so the failure can't read as a silent no-op.

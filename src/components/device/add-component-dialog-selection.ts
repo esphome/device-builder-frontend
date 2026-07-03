@@ -2,6 +2,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
+import { formatApiError } from "../../util/format-api-error.js";
 
 /**
  * Slice of ``ESPHomeAddComponentDialog`` state ``hydrateForSelection`` reads.
@@ -68,15 +69,21 @@ export async function hydrateForSelection(
     );
     if (seq !== host._selectionSeq) return { kind: "stale" };
     if (!entry) {
-      return { kind: "error", message: host._localize("device.add_component_error") };
+      // A null body isn't a thrown error — ``fetchComponent`` swallows a
+      // transient miss (dropped WS, backend restart) and returns null, so
+      // there's no detail to surface. Say what actually went wrong (couldn't
+      // load) rather than the misleading "failed to add".
+      return {
+        kind: "error",
+        message: host._localize("device.add_component_load_failed"),
+      };
     }
     return { kind: "ok", entry };
   } catch (err) {
     if (seq !== host._selectionSeq) return { kind: "stale" };
     return {
       kind: "error",
-      message:
-        err instanceof Error ? err.message : host._localize("device.add_component_error"),
+      message: formatApiError(err, host._localize, "device.add_component_error"),
     };
   }
 }

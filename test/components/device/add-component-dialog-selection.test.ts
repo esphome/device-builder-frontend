@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import type { ESPHomeAPI } from "../../../src/api/index.js";
+import { APIError, type ESPHomeAPI } from "../../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import {
   hydrateForSelection,
@@ -45,7 +45,10 @@ describe("hydrateForSelection", () => {
     expect(result).toEqual({ kind: "ok", entry: wifi });
   });
 
-  test("returns error when the catalog has no entry for the id", async () => {
+  test("returns a load-failed message when the body fetch yields no entry", async () => {
+    // A null body is a swallowed transient miss (dropped WS / backend restart),
+    // not a thrown error — so the copy names the load failure rather than the
+    // misleading "failed to add".
     const getComponentBodies = vi.fn().mockResolvedValue({});
     const host = makeHost(getComponentBodies);
 
@@ -53,7 +56,7 @@ describe("hydrateForSelection", () => {
 
     expect(result).toEqual({
       kind: "error",
-      message: "device.add_component_error",
+      message: "device.add_component_load_failed",
     });
   });
 
@@ -64,6 +67,19 @@ describe("hydrateForSelection", () => {
     const result = await hydrateForSelection(host, "wifi");
 
     expect(result).toEqual({ kind: "error", message: "network down" });
+  });
+
+  test("surfaces an APIError's structured details, not the wire-form message", async () => {
+    // formatApiError prefers APIError.details over the "<code>: <details>"
+    // Error.message, so the banner shows the human reason, not the internal code.
+    const getComponentBodies = vi
+      .fn()
+      .mockRejectedValue(new APIError("invalid_args", "GPIO 14 is already in use"));
+    const host = makeHost(getComponentBodies);
+
+    const result = await hydrateForSelection(host, "wifi");
+
+    expect(result).toEqual({ kind: "error", message: "GPIO 14 is already in use" });
   });
 
   test("returns stale when the seq bumps before the response lands", async () => {
