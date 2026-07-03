@@ -5,7 +5,7 @@ import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 
-const JOB_TYPE_TO_COMMAND: Record<string, CommandType> = {
+const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
   [JobType.COMPILE]: "compile",
   [JobType.INSTALL]: "install",
   [JobType.UPLOAD]: "install",
