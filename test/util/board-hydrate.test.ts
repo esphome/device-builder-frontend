@@ -223,6 +223,24 @@ describe("hydratePagedBoardsResponse", () => {
     expect(hydrated.limit).toBe(50);
   });
 
+  it("leaves body-only fields off slim index entries", () => {
+    // The slim path must not attach featured_components / requires_wifi etc.
+    // Reading one off a SlimBoard is a type error, and at runtime the field
+    // stays absent rather than hydrating to a misleading default (the #1798
+    // trap that motivated the SlimBoard / BoardCatalogEntry split).
+    const response = {
+      total: 1,
+      offset: 0,
+      limit: 50,
+      boards: [strippedEntry()],
+    } as unknown as PagedBoardsResponse;
+    const [board] = hydratePagedBoardsResponse(response).boards;
+    expect(board).not.toHaveProperty("featured_components");
+    expect(board).not.toHaveProperty("featured_bundles");
+    expect(board).not.toHaveProperty("requires_wifi");
+    expect(board).not.toHaveProperty("full_config");
+  });
+
   it("re-defaults a wholly-stripped wrapper (forward-compat against omit_default on PagedResponse)", () => {
     // If the backend ever applies omit_default to PagedResponse,
     // a zero-result query strips boards/total/offset/limit — the

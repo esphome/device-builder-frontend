@@ -5,7 +5,7 @@ import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { apiErrorDetails } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
@@ -48,7 +48,7 @@ type WizardStepDetail =
   | WizardStep
   | {
       step: WizardStep;
-      board?: BoardCatalogEntry | null;
+      board?: SlimBoard | null;
       method?: CreationMethod;
       file?: File;
     };
@@ -77,8 +77,15 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   @state()
   private _open = false;
 
+  /** Always a full body (only ever assigned in ``_enterSetupStep`` /
+   *  ``openWithBoard``), so the setup step reads a real ``requires_wifi``. */
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
+
+  /** Id of the board whose upgrade is currently in flight — lets the async
+   *  ``getBoard`` in ``_enterSetupStep`` detect that the selection moved on
+   *  without parking a slim entry in ``_selectedBoard``. */
+  private _pickedBoardId: string | null = null;
 
   /** Full board bodies already fetched, keyed by id, so re-entering the setup
    *  step reuses the full body (getBoard is uncached) rather than the slim
@@ -166,6 +173,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._selectedBoard = board;
     this._initialBoardFilter = null;
     this._resetTransientState();
+    this._pickedBoardId = board.id;
     this._fullBoardById.set(board.id, board); // already a full body; no upgrade fetch
   }
 
@@ -191,6 +199,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._advancedOpen = false;
     this._import.reset();
     this._submitting = false;
+    this._pickedBoardId = null;
     this._fullBoardById.clear();
     this._resetCreateErrors();
     this._open = true;
@@ -367,12 +376,8 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       this._creationMethod = detail.method;
     }
 
-    if (detail.board !== undefined) {
-      this._selectedBoard = detail.board;
-    }
-
-    if (detail.step === "setup" && this._selectedBoard) {
-      void this._enterSetupStep(this._selectedBoard);
+    if (detail.step === "setup" && detail.board) {
+      void this._enterSetupStep(detail.board);
       return;
     }
     this._step = detail.step;
@@ -384,7 +389,8 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    *  stays up during the (uncached) fetch; a cached id skips it. On a failed /
    *  empty fetch we stay on the picker with an error rather than advance on the
    *  slim entry (whose ``requires_wifi`` hydrates to ``false``). */
-  private async _enterSetupStep(board: BoardCatalogEntry): Promise<void> {
+  private async _enterSetupStep(board: SlimBoard): Promise<void> {
+    this._pickedBoardId = board.id;
     let full = this._fullBoardById.get(board.id) ?? null;
     if (!full) {
       try {
@@ -392,7 +398,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       } catch (err) {
         console.warn("Failed to load full board body:", err);
       }
-      if (this._selectedBoard?.id !== board.id) return; // selection moved on
+      if (this._pickedBoardId !== board.id) return; // selection moved on
       if (!full) {
         this._createError = this._localize("wizard.board_load_failed");
         return; // keep the user on the picker to retry

@@ -24,7 +24,11 @@ import type {
   ParsedAutomation,
   YamlDiff,
 } from "./types/automations.js";
-import type { BoardCatalogEntry, PagedBoardsResponse } from "./types/boards.js";
+import type {
+  BoardCatalogEntry,
+  PagedBoardsResponse,
+  SlimBoard,
+} from "./types/boards.js";
 import type {
   ComponentCatalogEntry,
   PagedComponentsResponse,
@@ -1315,7 +1319,7 @@ export class ESPHomeAPI {
    * Boards interchangeable with this one (same PlatformIO target);
    * includes `boardId` itself.
    */
-  async getCompatibleBoards(boardId: string): Promise<BoardCatalogEntry[]> {
+  async getCompatibleBoards(boardId: string): Promise<SlimBoard[]> {
     const response = await this.sendCommand<PagedBoardsResponse>(
       "boards/get_compatible_boards",
       { board_id: boardId }

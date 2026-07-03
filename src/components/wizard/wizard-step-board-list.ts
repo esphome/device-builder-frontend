@@ -2,7 +2,7 @@ import { mdiArrowCollapseAll, mdiArrowExpandAll, mdiOpenInNew, mdiPlus } from "@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -34,7 +34,7 @@ registerMdiIcons({
 @customElement("esphome-wizard-step-board-list")
 export class ESPHomeWizardStepBoardList extends LitElement {
   @property({ attribute: false })
-  boards: BoardCatalogEntry[] = [];
+  boards: SlimBoard[] = [];
 
   @property({ type: Boolean })
   loading = false;
@@ -64,7 +64,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   // Split the catalog into the single featured tile + the rest. Memoised on
   // the ``boards`` reference so the find + filter pair shares one walk per
   // page append.
-  private _splitBoards = memoizeOne((boards: BoardCatalogEntry[]) => ({
+  private _splitBoards = memoizeOne((boards: SlimBoard[]) => ({
     featured: boards.find((b) => b.featured),
     regular: boards.filter((b) => !b.featured),
   }));
@@ -145,7 +145,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
     this._intersection.observeIfPresent(this._sentinel, null, "200px");
   }
 
-  private _renderFeatured(board: BoardCatalogEntry) {
+  private _renderFeatured(board: SlimBoard) {
     const imageUrl = boardImageUrl(board);
     return html`
       <div class="featured-card">
@@ -184,7 +184,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
     `;
   }
 
-  private _renderBoardCard(board: BoardCatalogEntry, expanded: boolean) {
+  private _renderBoardCard(board: SlimBoard, expanded: boolean) {
     const imageUrl = boardImageUrl(board);
     return html`
       <article class="board-card ${expanded ? "board-card--expanded" : ""}">
@@ -242,7 +242,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
     `;
   }
 
-  private _onToggleExpand(board: BoardCatalogEntry) {
+  private _onToggleExpand(board: SlimBoard) {
     this._expandedBoardId = this._expandedBoardId === board.id ? null : board.id;
   }
 
@@ -258,7 +258,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
     return translated === key ? tag : translated;
   }
 
-  private _onAdd(board: BoardCatalogEntry) {
+  private _onAdd(board: SlimBoard) {
     this.dispatchEvent(
       new CustomEvent("add-board", {
         detail: { board },

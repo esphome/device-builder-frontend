@@ -9,7 +9,7 @@ import {
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -67,7 +67,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   /** Interchangeable boards (same PlatformIO target), current board
    *  excluded; empty keeps the "Change board" link hidden. */
   @state()
-  private _alternateBoards: BoardCatalogEntry[] = [];
+  private _alternateBoards: SlimBoard[] = [];
 
   /** Board id `_alternateBoards` was fetched for; guards a stale response. */
   private _alternatesForBoardId: string | null = null;

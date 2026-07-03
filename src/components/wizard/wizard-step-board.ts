@@ -4,7 +4,7 @@ import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { SlimBoard } from "../../api/types/boards.js";
 import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -56,7 +56,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @property({ attribute: false })
   presetFilterLabel: string | null = null;
 
-  private _list = new PagedListController<BoardCatalogEntry>(this);
+  private _list = new PagedListController<SlimBoard>(this);
 
   @state()
   private _search = "";
@@ -245,7 +245,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     this._list.loadMore();
   };
 
-  private _onAddBoard = (e: CustomEvent<{ board: BoardCatalogEntry }>) => {
+  private _onAddBoard = (e: CustomEvent<{ board: SlimBoard }>) => {
     this._onAdd(e.detail.board);
   };
 
@@ -263,7 +263,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     this._fetchBoards();
   }
 
-  private _onAdd(board: BoardCatalogEntry) {
+  private _onAdd(board: SlimBoard) {
     this.dispatchEvent(
       new CustomEvent("next-step", {
         detail: { step: "setup", board },

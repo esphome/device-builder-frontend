@@ -7,6 +7,7 @@ import type {
   FeaturedComponent,
   FieldPreset,
   PagedBoardsResponse,
+  SlimBoard,
 } from "../api/types/boards.js";
 
 /**
@@ -25,7 +26,8 @@ import type {
  * a forward-compat field added to the wire shape carries through
  * the hydrator instead of being silently dropped.
  */
-export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
+/** Hydrate the slim index fields shared by every board shape. */
+export function hydrateSlimBoard(entry: SlimBoard): SlimBoard {
   return {
     ...entry,
     esphome: _hydrateEsphome(entry.esphome),
@@ -37,6 +39,13 @@ export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
     product_url: entry.product_url ?? "",
     featured: entry.featured ?? false,
     is_generic: entry.is_generic ?? false,
+  };
+}
+
+export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
+  return {
+    ...entry,
+    ...hydrateSlimBoard(entry),
     full_config: entry.full_config ?? false,
     featured_components: (entry.featured_components ?? []).map(_hydrateFeaturedComponent),
     featured_bundles: (entry.featured_bundles ?? []).map(_hydrateFeaturedBundle),
@@ -56,7 +65,7 @@ export function hydratePagedBoardsResponse(
     total: response.total ?? 0,
     offset: response.offset ?? 0,
     limit: response.limit ?? 50,
-    boards: (response.boards ?? []).map(hydrateBoard),
+    boards: (response.boards ?? []).map(hydrateSlimBoard),
   };
 }
 

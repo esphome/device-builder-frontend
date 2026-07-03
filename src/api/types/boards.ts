@@ -107,7 +107,15 @@ export interface FeaturedBundle {
   image_url?: string;
 }
 
-export interface BoardCatalogEntry {
+/**
+ * Slim board index entry from ``boards/get_boards`` /
+ * ``boards/get_compatible_boards``. The picker, change-board dialog, and
+ * compatible-board lists get this shape; it deliberately omits the body-only
+ * fields on :class:`BoardCatalogEntry` so reading e.g. ``requires_wifi`` off a
+ * slim entry (where it would silently hydrate to ``false``) is a type error —
+ * callers must upgrade via ``boards/get_board`` first.
+ */
+export interface SlimBoard {
   id: string;
   name: string;
   description: string;
@@ -121,6 +129,13 @@ export interface BoardCatalogEntry {
   product_url: string;
   featured: boolean;
   is_generic: boolean;
+}
+
+/**
+ * Full board body from ``boards/get_board`` — the slim index plus the fields
+ * the backend derives or carries only on the full body.
+ */
+export interface BoardCatalogEntry extends SlimBoard {
   /**
    * The featured components are a complete onboard config (a devices.esphome.io
    * import or a hand-curated product opting in), not optional add-ons. Drives
@@ -139,5 +154,5 @@ export interface BoardCatalogEntry {
 }
 
 export interface PagedBoardsResponse extends PagedResponse {
-  boards: BoardCatalogEntry[];
+  boards: SlimBoard[];
 }
