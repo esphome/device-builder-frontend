@@ -33,6 +33,7 @@ import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
+import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
 
 const board = (overrides: Partial<BoardCatalogEntry> = {}): BoardCatalogEntry =>
   ({
@@ -107,6 +108,9 @@ describe("device page _platformReady lifecycle", () => {
   afterEach(() => {
     document.body.innerHTML = "";
     vi.restoreAllMocks();
+    // Shared board-body cache is a module singleton; clear it so a
+    // board fetched in one case can't satisfy the next case's fetch.
+    _clearBoardBodyCache();
   });
 
   it("flips true after a successful board fetch", async () => {

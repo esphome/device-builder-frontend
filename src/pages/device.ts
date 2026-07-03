@@ -30,6 +30,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
+import { fetchBoard } from "../util/board-body-cache.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { consumeJustCreated } from "../util/just-created.js";
@@ -600,7 +601,7 @@ export class ESPHomePageDevice extends LitElement {
       // board on the device editor. The BE handles deriving board_id
       // from YAML on its side (see `_resolve_board_id`), so we don't
       // need a YAML-regex fallback here.
-      const board = await this._api.getBoard(boardId);
+      const board = await fetchBoard(this._api, boardId);
       // Guard against late responses overwriting a newer fetch — if
       // the user navigated to another device while this was in flight,
       // `_loadedBoardId` will already point at the new id.

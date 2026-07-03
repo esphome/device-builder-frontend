@@ -27,6 +27,7 @@ vi.mock("../../src/util/post-install-logs.js", () => ({
 import { JobSource, JobStatus } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { startWebSerialInstall } from "../../src/components/firmware-install-dialog/install-flow.js";
+import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
 
 function makeHost() {
   const api = {
@@ -80,7 +81,10 @@ function makeHost() {
 
 const CHIP = { chipName: "ESP32", transport: {}, port: {}, loader: {} };
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  _clearBoardBodyCache();
+});
 
 describe("Web Serial install — HTTP byte download", () => {
   it("fetches firmware bytes over HTTP and flashes them", async () => {

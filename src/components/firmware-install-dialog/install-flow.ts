@@ -3,6 +3,7 @@ import {
   JobStatus,
   type FirmwareBinary,
 } from "../../api/types/firmware-jobs.js";
+import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -108,7 +109,7 @@ export async function startWebSerialInstall(
   let hasAuthoritativeVariant = false;
   if (device.board_id) {
     try {
-      const board = await host._api.getBoard(device.board_id);
+      const board = await fetchBoard(host._api, device.board_id);
       const variant = board?.esphome.variant ?? board?.esphome.platform;
       if (variant) {
         expected = variant;

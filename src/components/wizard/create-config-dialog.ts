@@ -12,6 +12,7 @@ import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
+import { fetchBoard, getCachedBoard } from "../../util/board-body-cache.js";
 import { buildFeaturedId } from "../../util/featured-id.js";
 import { featuredComponentName, fullSetupComponentIds } from "../../util/full-setup.js";
 import { markJustCreated } from "../../util/just-created.js";
@@ -83,15 +84,9 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   private _selectedBoard: BoardCatalogEntry | null = null;
 
   /** Id of the board whose upgrade is currently in flight — lets the async
-   *  ``getBoard`` in ``_enterSetupStep`` detect that the selection moved on
-   *  without parking a slim entry in ``_selectedBoard``. */
+   *  fetch in ``_enterSetupStep`` detect that the selection moved on without
+   *  parking a slim entry in ``_selectedBoard``. */
   private _pickedBoardId: string | null = null;
-
-  /** Full board bodies already fetched, keyed by id, so re-entering the setup
-   *  step reuses the full body (getBoard is uncached) rather than the slim
-   *  picker entry — whose `requires_wifi` hydrates to false and would drop the
-   *  Wi-Fi step on a back-then-re-pick of the same board. */
-  private _fullBoardById = new Map<string, BoardCatalogEntry>();
 
   /** Initial platform-filter label for the board step. Set by
    *  ``openAtBoardStep`` when the caller knows the chip family
@@ -166,14 +161,15 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   /** Open directly at the setup step with a pre-selected **full** board body
-   *  (callers resolve it via ``getBoard``), so ``requires_wifi`` is already
-   *  known and the Wi-Fi decision is correct on first render. */
+   *  (callers resolve it via the shared ``board-body-cache``), so
+   *  ``requires_wifi`` is already known and the Wi-Fi decision is correct on
+   *  first render. A back-then-re-pick of the same board re-enters through
+   *  ``_enterSetupStep``, which hits the same session cache. */
   public openWithBoard(board: BoardCatalogEntry) {
     this._step = "setup";
     this._selectedBoard = board;
     this._initialBoardFilter = null;
     this._resetTransientState();
-    this._fullBoardById.set(board.id, board); // already a full body; no upgrade fetch
   }
 
   /** Open directly at the board-picker step with an optional
@@ -199,7 +195,6 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._import.reset();
     this._submitting = false;
     this._pickedBoardId = null;
-    this._fullBoardById.clear();
     this._resetCreateErrors();
     this._open = true;
   }
@@ -390,10 +385,12 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    *  slim entry (whose ``requires_wifi`` hydrates to ``false``). */
   private async _enterSetupStep(board: SlimBoard): Promise<void> {
     this._pickedBoardId = board.id;
-    let full = this._fullBoardById.get(board.id) ?? null;
+    // Key on the slim entry's id (what the picker and openWithBoard use) so an
+    // id the backend canonicalizes still hits the shared session cache.
+    let full = getCachedBoard(board.id) ?? null;
     if (!full) {
       try {
-        full = await this._api.getBoard(board.id);
+        full = await fetchBoard(this._api, board.id);
       } catch (err) {
         console.warn("Failed to load full board body:", err);
       }
@@ -402,9 +399,6 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         this._createError = this._localize("wizard.board_load_failed");
         return; // keep the user on the picker to retry
       }
-      // Key on the slim entry's id (what the lookup and openWithBoard use), not
-      // full.id, so an id the backend canonicalizes still hits the cache.
-      this._fullBoardById.set(board.id, full);
     }
     this._selectedBoard = full; // never enter setup on the slim entry
     this._step = "setup";

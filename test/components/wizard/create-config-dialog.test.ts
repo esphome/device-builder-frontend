@@ -28,6 +28,7 @@ import { APIError } from "../../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeCreateConfigDialog } from "../../../src/components/wizard/create-config-dialog.js";
 import enMessages from "../../../src/translations/en.json";
+import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
 
 function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
   let resolve!: (v: T) => void;
@@ -36,7 +37,11 @@ function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
 }
 
 const flush = async (): Promise<void> => {
-  for (let i = 0; i < 6; i++) await Promise.resolve();
+  // Drain enough microtasks for the setup-step board upgrade to settle: it
+  // now hops through the shared ``board-body-cache`` (queueMicrotask batch +
+  // a getBoard round trip), a deeper async chain than the former direct
+  // ``await getBoard`` call.
+  for (let i = 0; i < 12; i++) await Promise.resolve();
 };
 
 // Render an en.json key with real ICU MessageFormat so the full-setup tests
@@ -139,6 +144,14 @@ function emitNextStep(el: ESPHomeCreateConfigDialog, step: string): void {
     new CustomEvent("next-step", { detail: step, bubbles: true, composed: true })
   );
 }
+
+// The setup step now upgrades slim boards through the shared
+// ``board-body-cache`` (a module singleton), so clear it between tests
+// to keep ``getBoard`` call counts and stale bodies from bleeding across
+// cases.
+afterEach(() => {
+  _clearBoardBodyCache();
+});
 
 describe("create-config-dialog create de-dupe + retry", () => {
   afterEach(() => {

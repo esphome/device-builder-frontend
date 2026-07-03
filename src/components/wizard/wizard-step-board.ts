@@ -9,6 +9,7 @@ import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
@@ -311,7 +312,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       await disconnect(detected.transport);
 
       if (manifest?.board_id) {
-        const knownBoard = await this._api.getBoard(manifest.board_id);
+        const knownBoard = await fetchBoard(this._api, manifest.board_id);
         if (knownBoard) {
           this._onAdd(knownBoard);
           return;
@@ -358,7 +359,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
       if (result.board_id) {
         try {
-          const knownBoard = await this._api.getBoard(result.board_id);
+          const knownBoard = await fetchBoard(this._api, result.board_id);
           if (knownBoard) {
             this._view = "boards";
             this._onAdd(knownBoard);

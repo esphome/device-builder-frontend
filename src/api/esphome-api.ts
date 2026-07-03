@@ -1307,7 +1307,10 @@ export class ESPHomeAPI {
 
   // ─── Board Commands ───────────────────────────────────────
 
-  /** Get a single board by ID. */
+  /** Get a single board by ID. Callers should go through
+   *  ``board-body-cache.ts`` rather than calling this directly, so full
+   *  bodies are coalesced and cached for the session instead of being
+   *  refetched per call site. */
   async getBoard(boardId: string): Promise<BoardCatalogEntry | null> {
     const board = await this.sendCommand<BoardCatalogEntry | null>("boards/get_board", {
       board_id: boardId,
