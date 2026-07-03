@@ -69,10 +69,11 @@ export async function hydrateForSelection(
     );
     if (seq !== host._selectionSeq) return { kind: "stale" };
     if (!entry) {
-      // A null body isn't a thrown error — ``fetchComponent`` swallows a
-      // transient miss (dropped WS, backend restart) and returns null, so
-      // there's no detail to surface. Say what actually went wrong (couldn't
-      // load) rather than the misleading "failed to add".
+      // A null body isn't a thrown error — the fetch resolved but the backend
+      // omitted this id (a stale or wrong backend). ``fetchComponent`` caches
+      // that miss for the session, so a same-session retry won't recover; a
+      // reload re-fetches. Say what went wrong (couldn't load, reload) rather
+      // than the misleading "failed to add".
       return {
         kind: "error",
         message: host._localize("device.add_component_load_failed"),
