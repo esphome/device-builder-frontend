@@ -92,8 +92,8 @@ describe("renderResetSuggestion — local build", () => {
     expectFallbackToLocal(render(host), host);
   });
 
-  it("renders nothing when the install compile succeeded but had no upload", () => {
-    // The compile was fine; clean/reset wouldn't help a missing upload step.
+  it("renders nothing when a compile succeeded but had no dependent flash", () => {
+    // The compile was fine; clean/reset wouldn't help a missing dependent flash.
     const host = baseHost({ _compileMissingDependent: true });
     expectNoSuggestion(render(host));
   });

@@ -18,9 +18,9 @@ describe("command-dialog public followJob state reset", () => {
       _compileMissingDependent: boolean;
       _streamId: string;
       _api: { firmwareFollowJob: () => string };
-      followJob: (job: FirmwareJob, displayName: string) => void;
+      followJob: (job: FirmwareJob, displayName: string, commandType?: string) => void;
     };
-    // Left over from a prior install whose compile succeeded but found no upload.
+    // Left over from a prior install whose compile succeeded but found no dependent flash.
     el._compileMissingDependent = true;
     el._streamId = "";
     el._api = { firmwareFollowJob: () => "stream-1" } as never;
