@@ -802,10 +802,11 @@ export class ESPHomeAPI {
 
   /** Rename a device (renames YAML file + ``esphome.name``).
    *
-   *  Default kicks off a queued firmware ``RENAME`` job that compiles,
-   *  OTA-installs, and swaps the YAML; the returned ``job`` is what the
-   *  caller follows in the command-dialog so the user sees streaming
-   *  output. Only succeeds against a reachable device.
+   *  Default queues a rename chain: ``job`` is the COMPILE of the renamed
+   *  YAML (the follow target) and ``tail_job`` the dependent RENAME that
+   *  flashes the old address and swaps the files. Older backends return a
+   *  fused ``RENAME`` as ``job`` with no ``tail_job``. Only succeeds
+   *  against a reachable device.
    *
    *  ``configOnly`` renames the YAML + ``esphome.name`` with no compile
    *  or flash and returns ``job: null``, used after the user confirms
@@ -815,8 +816,16 @@ export class ESPHomeAPI {
     configuration: string,
     newName: string,
     configOnly = false
-  ): Promise<{ configuration: string; job: FirmwareJob | null }> {
-    return this.sendCommand<{ configuration: string; job: FirmwareJob | null }>(
+  ): Promise<{
+    configuration: string;
+    job: FirmwareJob | null;
+    tail_job?: FirmwareJob | null;
+  }> {
+    return this.sendCommand<{
+      configuration: string;
+      job: FirmwareJob | null;
+      tail_job?: FirmwareJob | null;
+    }>(
       "devices/rename",
       { configuration, new_name: newName, ...(configOnly ? { config_only: true } : {}) },
       60000

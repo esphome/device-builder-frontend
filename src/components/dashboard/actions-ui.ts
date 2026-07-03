@@ -130,9 +130,16 @@ export async function performRename(
   }
   clearJustCreated();
   if (response.job) {
+    // The chain head is a COMPILE of the new YAML; the tail carries the
+    // "old → new" naming. Older backends return the fused RENAME, no tail.
     host._commandDialog.followJob(
       response.job,
-      firmwareJobDisplayName(response.job, host._devices, host._localize)
+      firmwareJobDisplayName(
+        response.tail_job ?? response.job,
+        host._devices,
+        host._localize
+      ),
+      "rename"
     );
     return;
   }

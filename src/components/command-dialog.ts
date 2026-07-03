@@ -248,10 +248,12 @@ export class ESPHomeCommandDialog extends LitElement {
 
   // Attach to a firmware job's stream. Handles any state — terminal jobs
   // replay buffered output and resolve to the final success/error banner.
-  public followJob(job: FirmwareJob, displayName: string) {
+  // ``commandType`` overrides the job-type derivation for chain heads whose
+  // type doesn't name the user's command (a rename's COMPILE head).
+  public followJob(job: FirmwareJob, displayName: string, commandType?: CommandType) {
     this.configuration = job.configuration;
     this.name = displayName;
-    this._commandType = JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
+    this._commandType = commandType ?? JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
     this._port = job.port || "OTA";
     resetRunState(this);
     // Fresh attach is a fresh session — reset toggle defaults so a prior

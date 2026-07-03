@@ -174,33 +174,35 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       const result = data as unknown as { status: string; exit_code: number | null };
       const success = result.status === JobStatus.COMPLETED;
 
-      // On a successful install COMPILE, follow its dependent UPLOAD so success
-      // reflects the flash (#1131). Gate on the finished job being the COMPILE
-      // so the upload's own completion falls straight through to success.
+      // On a successful install/rename COMPILE, follow the dependent flash —
+      // the install's UPLOAD or the rename's flash-and-swap tail — so success
+      // reflects the device, not just the build (#1131). Gate on the finished
+      // job being the COMPILE so the flash's own completion falls through.
       const finished = host._jobs.get(jobId);
       if (
         success &&
-        host._commandType === "install" &&
+        (host._commandType === "install" || host._commandType === "rename") &&
         finished?.job_type === JobType.COMPILE
       ) {
-        // The held UPLOAD is created at install time (#1131); its job_queued is
+        // The held dependent is created with the chain; its job_queued is
         // ordered ahead of this compile's job_completed on the shared WS, so it
-        // is normally already in _jobs. A miss is therefore a real backend gap,
-        // not a still-arriving event for a legitimately-running install.
-        const upload = [...host._jobs.values()].find(
-          (j) => j.job_type === JobType.UPLOAD && j.depends_on === jobId
+        // is normally already in _jobs. A miss is therefore a real backend gap.
+        const flash = [...host._jobs.values()].find(
+          (j) =>
+            j.depends_on === jobId &&
+            (j.job_type === JobType.UPLOAD || j.job_type === JobType.RENAME)
         );
-        if (upload) {
-          // primeAndFollow re-primes the source snapshot from the upload (the
-          // local flash) so the remote-builder sub-line doesn't linger on the
-          // compile's receiver while the upload runs.
-          primeAndFollow(host, upload);
+        if (flash) {
+          // primeAndFollow re-primes the source snapshot from the flash (local)
+          // so the remote-builder sub-line doesn't linger on the compile's
+          // receiver.
+          primeAndFollow(host, flash);
           return;
         }
-        // No upload step — the device was never flashed, so don't report success.
-        console.warn("install compile succeeded but no dependent upload for job", jobId);
+        // No flash step — the device was never flashed, so don't report success.
+        console.warn("compile succeeded but no dependent flash for job", jobId);
         host._state = "error";
-        host._statusMessage = host._localize("command.install_failed");
+        host._statusMessage = host._localize(`command.${host._commandType}_failed`);
         // The compile succeeded, so the clean/reset build-failure hint is
         // misleading here — suppress it.
         host._installMissingUpload = true;
