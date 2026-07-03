@@ -46,7 +46,7 @@ export function resetRunState(host: ESPHomeCommandDialog): void {
   host._statusMessage = "";
   host._userStopped = false;
   host._failedDuringValidate = false;
-  host._installMissingUpload = false;
+  host._compileMissingDependent = false;
 }
 
 export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
@@ -205,7 +205,7 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
         host._statusMessage = host._localize(`command.${host._commandType}_failed`);
         // The compile succeeded, so the clean/reset build-failure hint is
         // misleading here — suppress it.
-        host._installMissingUpload = true;
+        host._compileMissingDependent = true;
         host._jobId = "";
         return;
       }

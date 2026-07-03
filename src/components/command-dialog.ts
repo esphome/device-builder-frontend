@@ -161,9 +161,9 @@ export class ESPHomeCommandDialog extends LitElement {
   // to "open in editor" (YAML help). Reset per open().
   @state() _failedDuringValidate = false;
 
-  // Flips true when an install COMPILE succeeded but its dependent UPLOAD is
+  // Flips true when a chain COMPILE succeeded but its dependent flash is
   // missing — the build itself was fine, so the clean/reset hint is suppressed.
-  @state() _installMissingUpload = false;
+  @state() _compileMissingDependent = false;
 
   // Locally-primed status / source so the queued overlay + remote-builder
   // sub-line paint on the first frame instead of waiting for the next jobs

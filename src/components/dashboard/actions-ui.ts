@@ -4,6 +4,7 @@ import type {
   AdoptableDevice,
   ConfiguredDevice,
   Label,
+  RenameDeviceResponse,
 } from "../../api/types/devices.js";
 import { DeviceState } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
@@ -114,7 +115,7 @@ export async function performRename(
   newName: string,
   configOnly: boolean
 ): Promise<void> {
-  let response: Awaited<ReturnType<ESPHomeAPI["renameDevice"]>>;
+  let response: RenameDeviceResponse;
   try {
     response = await host._api.renameDevice(device.configuration, newName, configOnly);
   } catch (err) {

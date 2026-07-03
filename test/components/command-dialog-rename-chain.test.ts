@@ -6,55 +6,20 @@ import {
   JobStatus,
   JobType,
 } from "../../src/api/types/firmware-jobs.js";
-import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import { followJob } from "../../src/components/command-dialog/commands.js";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
-
-interface StreamCbs {
-  onOutput: (line: string) => void;
-  onResult: (data: unknown) => void;
-  onError: (error: string) => void;
-}
+import { makeCommandDialogHost } from "./_command-dialog-host.js";
 
 function makeHost(jobs: Map<string, FirmwareJob>) {
-  const follows: Record<string, StreamCbs> = {};
-  let flipped = false;
-  let streamSeq = 0;
-  const host = {
-    _api: {
-      firmwareFollowJob: (jobId: string, cbs: StreamCbs): string => {
-        follows[jobId] = cbs;
-        return `stream-${++streamSeq}`;
-      },
-    },
-    _jobs: jobs,
-    _commandType: "rename",
-    _jobId: "",
-    _jobStatus: JobStatus.RUNNING,
-    _state: "running",
-    _statusMessage: "",
-    _streamId: "",
-    configuration: "livingroom.yaml",
-    name: "kitchen → livingroom",
-    _port: "OTA",
-    _lines: [] as string[],
-    _showLogsAfterInstall: true,
-    _userStopped: false,
-    _failedDuringValidate: false,
-    _installMissingUpload: false,
-    _localize: (key: string) => key,
-    _flipToLogs: () => {
-      flipped = true;
-    },
-    _flushPendingLines: () => {},
-    _resetPendingLines: () => {},
-    _enqueueLine: () => {},
-  };
-  return {
-    host: host as unknown as ESPHomeCommandDialog,
-    follows,
-    flipped: () => flipped,
-  };
+  return makeCommandDialogHost(
+    jobs,
+    {},
+    {
+      _commandType: "rename",
+      configuration: "livingroom.yaml",
+      name: "kitchen → livingroom",
+    }
+  );
 }
 
 // A COMPILE head "c1" of the renamed YAML plus its held RENAME tail "r1".

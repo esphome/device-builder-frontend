@@ -39,6 +39,7 @@ import type {
   DevicesResponse,
   ImportBundleResponse,
   Label,
+  RenameDeviceResponse,
   UpdateDeviceResponse,
   WizardResponse,
   YamlSearchHit,
@@ -816,16 +817,8 @@ export class ESPHomeAPI {
     configuration: string,
     newName: string,
     configOnly = false
-  ): Promise<{
-    configuration: string;
-    job: FirmwareJob | null;
-    tail_job?: FirmwareJob | null;
-  }> {
-    return this.sendCommand<{
-      configuration: string;
-      job: FirmwareJob | null;
-      tail_job?: FirmwareJob | null;
-    }>(
+  ): Promise<RenameDeviceResponse> {
+    return this.sendCommand<RenameDeviceResponse>(
       "devices/rename",
       { configuration, new_name: newName, ...(configOnly ? { config_only: true } : {}) },
       60000

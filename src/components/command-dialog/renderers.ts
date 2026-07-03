@@ -110,9 +110,9 @@ export function renderResetSuggestion(
 ): TemplateResult | typeof nothing {
   if (host._state !== "error") return nothing;
   if (host._userStopped) return nothing;
-  // A compile that succeeded but found no upload step isn't a build failure —
-  // clean/reset wouldn't help.
-  if (host._installMissingUpload) return nothing;
+  // A compile that succeeded but found no dependent flash isn't a build
+  // failure — clean/reset wouldn't help.
+  if (host._compileMissingDependent) return nothing;
   if (host._commandType === "validate" || host._failedDuringValidate) {
     return renderValidationFailureSuggestion(host);
   }

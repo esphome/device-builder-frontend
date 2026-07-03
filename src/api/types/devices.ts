@@ -6,6 +6,7 @@
 // Type-only: ``reachability.ts`` imports ``DeviceState`` from here, so a
 // value import would cycle. ``ReachabilitySource`` is a string-literal union,
 // erased at runtime, so the type-only edge is free.
+import type { FirmwareJob } from "./firmware-jobs.js";
 import type { ReachabilitySource } from "./reachability.js";
 
 // ─── Devices ─────────────────────────────────────────────────
@@ -274,6 +275,13 @@ export interface ImportBundleResponse {
   kept: string[];
   has_secrets: boolean;
   esphome_version: string;
+}
+
+/** Response from devices/rename. ``tail_job`` is absent on pre-chain backends. */
+export interface RenameDeviceResponse {
+  configuration: string;
+  job: FirmwareJob | null;
+  tail_job?: FirmwareJob | null;
 }
 
 /** Response from devices/update. */
