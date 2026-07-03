@@ -173,7 +173,6 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._selectedBoard = board;
     this._initialBoardFilter = null;
     this._resetTransientState();
-    this._pickedBoardId = board.id;
     this._fullBoardById.set(board.id, board); // already a full body; no upgrade fetch
   }
 

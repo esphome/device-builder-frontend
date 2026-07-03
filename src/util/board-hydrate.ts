@@ -44,7 +44,6 @@ export function hydrateSlimBoard(entry: SlimBoard): SlimBoard {
 
 export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
   return {
-    ...entry,
     ...hydrateSlimBoard(entry),
     full_config: entry.full_config ?? false,
     featured_components: (entry.featured_components ?? []).map(_hydrateFeaturedComponent),
