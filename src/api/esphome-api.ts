@@ -1258,7 +1258,7 @@ export class ESPHomeAPI {
     await this.sendCommand("firmware/cancel", { job_id: jobId });
   }
 
-  /** Clear aqueued update for an offline device. */
+  /** Clear a queued update for an offline device. */
   async firmwareClearQueuedUpdate(configuration: string): Promise<void> {
     await this.sendCommand("firmware/clear_queued_update", { configuration });
   }

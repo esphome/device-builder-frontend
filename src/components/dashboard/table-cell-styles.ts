@@ -143,6 +143,13 @@ export const tableCellStyles = css`
     box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-primary), transparent 50%);
   }
 
+  .cell-indicator-queued {
+    font-size: 14px;
+    flex-shrink: 0;
+    vertical-align: middle;
+    color: var(--esphome-warning, #f59e0b);
+  }
+
   .cell-mono {
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     font-size: var(--wa-font-size-2xs);

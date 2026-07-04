@@ -214,8 +214,10 @@ export const deviceCardStyles = [
       animation: completed-pulse 1s ease-in-out infinite;
     }
 
-    .device-status.queued {
-      color: var(--wa-color-warning);
+    .indicator-queued {
+      font-size: 14px;
+      flex-shrink: 0;
+      color: var(--esphome-warning, #f59e0b);
     }
 
     /* RECENT_JOB_TTL_MS_COMPLETED is short; throb signals "transient". */

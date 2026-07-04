@@ -116,9 +116,7 @@ export function renderCardGrid(
             ?api-enabled=${device.api_enabled === true}
             ?api-encrypted=${device.api_encrypted === true}
             .apiEncryptionActive=${device.api_encryption_active ?? null}
-            .queuedUpdate=${device.queued_update === true}
-            @clear-queued-update=${() =>
-              host._api.firmwareClearQueuedUpdate(device.configuration)}
+            ?queued-update=${device.queued_update === true}
             ?busy=${host._activeJobs.has(device.configuration)}
             .activeJob=${host._activeJobs.get(device.configuration) ?? null}
             ?highlight=${host._recentlyAdopted === device.configuration}
@@ -189,6 +187,8 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
       @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
+      @clear-queued-update=${(e: CustomEvent<ConfiguredDevice>) =>
+        host._confirmClearQueuedUpdate(e.detail)}
       @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmArchive(e.detail)}
       @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -292,6 +292,8 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
       @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
+      @clear-queued-update=${(e: CustomEvent<ConfiguredDevice>) =>
+        host._confirmClearQueuedUpdate(e.detail)}
       @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmArchive(e.detail)}
       @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>

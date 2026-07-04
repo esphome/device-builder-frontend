@@ -6,7 +6,12 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { computeLabelUsage } from "../../util/label-usage.js";
 import { performRename } from "./actions-ui.js";
-import { archiveBulkDevices, deleteBulkDevices, deleteDevice } from "./actions.js";
+import {
+  archiveBulkDevices,
+  clearQueuedUpdate,
+  deleteBulkDevices,
+  deleteDevice,
+} from "./actions.js";
 
 export type PendingConfirm =
   | { kind: "delete-single"; device: ConfiguredDevice }
@@ -15,6 +20,7 @@ export type PendingConfirm =
   | { kind: "archive-single"; device: ConfiguredDevice }
   | { kind: "archive-bulk" }
   | { kind: "rename-config-only"; device: ConfiguredDevice; newName: string }
+  | { kind: "clear-queued-update"; device: ConfiguredDevice }
   | { kind: "delete-label"; label: Label };
 
 interface ConfirmCopy {
@@ -95,6 +101,15 @@ export function confirmDialogCopy(
         destructive: true,
       };
     }
+    case "clear-queued-update": {
+      const name = pending.device.friendly_name || pending.device.name;
+      return {
+        heading: t("dashboard.queued_update_confirm_title"),
+        message: t("dashboard.queued_update_confirm_desc", { name }),
+        confirm: t("dashboard.action_clear_queued"),
+        destructive: false,
+      };
+    }
     case "delete-label": {
       const usage = labelUsage()[pending.label.id] ?? 0;
       return {
@@ -153,6 +168,9 @@ export function executeConfirm(
     case "rename-config-only":
       void performRename(host, pending.device, pending.newName, true);
       return;
+    case "clear-queued-update":
+      void clearQueuedUpdate(pending.device, host._api, host._localize);
+      return;
     case "delete-label":
       void host._deleteLabel(pending.label);
       return;
@@ -208,9 +226,6 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       }}
     ></esphome-label-dialog>
     <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
-    <esphome-confirm-queued-update-dialog
-      @confirm=${host._onQueuedUpdateConfirmed}
-    ></esphome-confirm-queued-update-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
     <esphome-create-config-dialog></esphome-create-config-dialog>
     <esphome-command-dialog

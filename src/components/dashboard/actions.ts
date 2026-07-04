@@ -60,6 +60,27 @@ export async function archiveDevice(
   return true;
 }
 
+/** Drop a staged offline update; the clock indicator clears via DEVICE_UPDATED. */
+export async function clearQueuedUpdate(
+  device: ConfiguredDevice,
+  api: ESPHomeAPI,
+  localize: LocalizeFunc
+): Promise<void> {
+  const name = device.friendly_name || device.name;
+  try {
+    await api.firmwareClearQueuedUpdate(device.configuration);
+  } catch (err) {
+    const error = getErrorMessage(err);
+    toast.error(localize("dashboard.queued_update_clear_failed", { name, error }), {
+      richColors: true,
+    });
+    return;
+  }
+  toast.success(localize("dashboard.queued_update_cleared", { name }), {
+    richColors: true,
+  });
+}
+
 /**
  * Restore an archived YAML back into the active config dir.
  *

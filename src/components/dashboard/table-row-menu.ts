@@ -4,6 +4,7 @@ import {
   mdiBroom,
   mdiCheckboxMultipleBlankOutline,
   mdiCheckDecagram,
+  mdiClockRemoveOutline,
   mdiContentDuplicate,
   mdiDelete,
   mdiDownload,
@@ -34,6 +35,7 @@ registerMdiIcons({
   broom: mdiBroom,
   "checkbox-multiple-blank-outline": mdiCheckboxMultipleBlankOutline,
   "check-decagram": mdiCheckDecagram,
+  "clock-remove-outline": mdiClockRemoveOutline,
   "text-box-outline": mdiTextBoxOutline,
   "content-duplicate": mdiContentDuplicate,
   delete: mdiDelete,
@@ -244,6 +246,17 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="upload"></wa-icon>
           ${this._localize("dashboard.action_install")}
         </div>
+        ${
+          this.device?.queued_update
+            ? html`<div
+                class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+                @click=${this.busy ? undefined : () => this._emit("clear-queued-update")}
+              >
+                <wa-icon library="mdi" name="clock-remove-outline"></wa-icon>
+                ${this._localize("dashboard.action_clear_queued")}
+              </div>`
+            : nothing
+        }
         <div class="menu-item menu-item--logs" @click=${() => this._emit("open-logs")}>
           <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
