@@ -207,7 +207,9 @@ export async function startWebSerialInstall(
   try {
     await resetAndDisconnect(detected.loader, detected.transport, detected.port);
   } catch {
-    /* ignore reset errors */
+    // resetAndDisconnect disconnects in its own finally; if that threw through
+    // and left the port held, release it so it doesn't leak into a retry.
+    await releaseSerial(detected);
   }
 
   host._statusMessage = host._localize("firmware.status_done");

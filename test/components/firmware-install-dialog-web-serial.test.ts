@@ -129,6 +129,21 @@ describe("Web Serial install — HTTP byte download", () => {
     expect(host._logLines).toContain("Writing at 0x00010000...");
   });
 
+  it("releases the port when the post-flash reset throws", async () => {
+    const { host } = makeHost();
+    wsSerial.detectChip.mockResolvedValue(CHIP);
+    wsSerial.flashFirmware.mockResolvedValue(undefined);
+    wsSerial.disconnect.mockResolvedValue(undefined);
+    wsSerial.resetAndDisconnect.mockRejectedValueOnce(new Error("reset boom"));
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    // Flash succeeded, so the install still completes; the failed reset must not
+    // leak the held port.
+    expect(host._step).toBe("done");
+    expect(wsSerial.disconnect).toHaveBeenCalledWith(CHIP.transport);
+  });
+
   it("closes silently when the user cancels the port picker", async () => {
     const { host } = makeHost();
     wsSerial.detectChip.mockRejectedValueOnce(
