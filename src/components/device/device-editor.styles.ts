@@ -362,8 +362,10 @@ export const deviceEditorStyles = css`
   /* The code editor brings its own line-number gutter, so the full
      var(--wa-space-m) inset the config form needs reads as wasted padding that
      shrinks the text area. Trim the editor pane to a tighter, even inset on the
-     top + sides; the bottom keeps the action-row reserve above. */
+     top + sides; the bottom keeps the action-row reserve above. Also the
+     positioning context for the floating invalid banner. */
   .editor-pane--right {
+    position: relative;
     padding-top: var(--wa-space-xs);
     padding-inline: var(--wa-space-xs);
   }
@@ -374,11 +376,16 @@ export const deviceEditorStyles = css`
     font-weight: var(--wa-font-weight-bold);
   }
 
-  /* Document-level "configuration invalid" banner above the editor.
-     A flex child of .editor-pane (column + gap), so it sits above the
-     editor body and the body's flex:1 reclaims the rest. */
+  /* Document-level "configuration invalid" banner. Floats over the
+     bottom of the code pane (just above the action-row reserve) instead
+     of sitting in flow above the editor — a lint pass adding or clearing
+     it must not reflow the code under the user's cursor. */
   .invalid-banner {
-    flex: 0 0 auto;
+    position: absolute;
+    left: var(--wa-space-xs);
+    right: var(--wa-space-xs);
+    bottom: calc(2.25rem + var(--wa-space-xs) * 2);
+    z-index: 9;
     display: flex;
     align-items: flex-start;
     gap: var(--wa-space-s);
@@ -387,6 +394,7 @@ export const deviceEditorStyles = css`
     background: var(--wa-color-danger-fill-quiet);
     border: var(--wa-border-width-s) solid var(--wa-color-danger-60);
     color: var(--wa-color-danger-text-normal);
+    box-shadow: var(--wa-elevation-02);
   }
 
   .invalid-banner-icon {
