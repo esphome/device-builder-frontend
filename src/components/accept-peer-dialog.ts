@@ -186,49 +186,53 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
               )}
             </li>
           </ul>
-          ${peer
-            ? html`
-                <div class="peer-card">
-                  <div class="peer-name">${peer.label}</div>
-                  <div class="peer-row">
-                    <span class="label">
-                      ${this._localize(
-                        "settings.build_server_peer_accept_confirm_dashboard_id"
-                      )}
-                    </span>
-                    <code class="value">${peer.dashboard_id}</code>
-                  </div>
-                  ${peer.peer_ip
-                    ? html`
-                        <div class="peer-row">
-                          <span class="label">
-                            ${this._localize("settings.build_server_peer_ip_label")}
-                          </span>
-                          <code class="value">${peer.peer_ip}</code>
-                        </div>
-                      `
-                    : nothing}
-                  <div class="pin-block">
-                    <span class="label">
-                      ${this._localize(
-                        "settings.build_server_peer_accept_confirm_pin_label"
-                      )}
-                    </span>
-                    <esphome-pin-emoji-grid
-                      .pin=${peer.pin_sha256}
-                    ></esphome-pin-emoji-grid>
-                    <details class="pin-hex">
-                      <summary>
+          ${
+            peer
+              ? html`
+                  <div class="peer-card">
+                    <div class="peer-name">${peer.label}</div>
+                    <div class="peer-row">
+                      <span class="label">
                         ${this._localize(
-                          "settings.build_server_peer_accept_confirm_pin_hex_summary"
+                          "settings.build_server_peer_accept_confirm_dashboard_id"
                         )}
-                      </summary>
-                      <code class="peer-pin">${formattedPin}</code>
-                    </details>
+                      </span>
+                      <code class="value">${peer.dashboard_id}</code>
+                    </div>
+                    ${
+                      peer.peer_ip
+                        ? html`
+                            <div class="peer-row">
+                              <span class="label">
+                                ${this._localize("settings.build_server_peer_ip_label")}
+                              </span>
+                              <code class="value">${peer.peer_ip}</code>
+                            </div>
+                          `
+                        : nothing
+                    }
+                    <div class="pin-block">
+                      <span class="label">
+                        ${this._localize(
+                          "settings.build_server_peer_accept_confirm_pin_label"
+                        )}
+                      </span>
+                      <esphome-pin-emoji-grid
+                        .pin=${peer.pin_sha256}
+                      ></esphome-pin-emoji-grid>
+                      <details class="pin-hex">
+                        <summary>
+                          ${this._localize(
+                            "settings.build_server_peer_accept_confirm_pin_hex_summary"
+                          )}
+                        </summary>
+                        <code class="peer-pin">${formattedPin}</code>
+                      </details>
+                    </div>
                   </div>
-                </div>
-              `
-            : nothing}
+                `
+              : nothing
+          }
         </div>
       </esphome-confirm-dialog>
     `;

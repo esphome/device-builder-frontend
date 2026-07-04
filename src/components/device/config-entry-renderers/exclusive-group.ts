@@ -46,7 +46,6 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
   const present = members.filter((m) => ctx.getAt([m.key]) !== undefined);
   const selectedKey = present[0]?.key ?? "";
   const selected = members.find((m) => m.key === selectedKey);
-  const disabled = ctx.disabled;
 
   // Gate options through isEntryVisible so a board-incompatible / hidden /
   // depends_on member can't be picked; keep an already-set one selectable.
@@ -57,6 +56,12 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
       ctx.getAt([m.key]) !== undefined ||
       isEntryVisible(m, rootValues, ctx.presentComponents, targetPlatform)
   );
+
+  // Every *rendered* option board-locked → the choice is fixed; render the
+  // dropdown read-only so it matches `planNeedsUserInput` treating it as
+  // non-actionable. Use options, not all members: a hidden unlocked member
+  // (e.g. platform-incompatible) isn't selectable and shouldn't keep it live.
+  const disabled = ctx.disabled || options.every((m) => m.locked);
 
   // Clear only the members actually present (avoids ~N redundant events and
   // stray key: undefined state); scaffold {} only for an absent choice, so
@@ -99,18 +104,22 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
             >`
         )}
       </wa-select>
-      ${present.length > 1
-        ? html`<p class="field-description exclusive-group-conflict">
-            ${ctx.localize("device.exclusive_group_conflict")}
-          </p>`
-        : nothing}
-      ${selected
-        ? html`<div class="nested-fields">
-            ${renderChildEntries(selected, [selected.key], ctx, {
-              includeAdvanced: true,
-            })}
-          </div>`
-        : nothing}
+      ${
+        present.length > 1
+          ? html`<p class="field-description exclusive-group-conflict">
+              ${ctx.localize("device.exclusive_group_conflict")}
+            </p>`
+          : nothing
+      }
+      ${
+        selected
+          ? html`<div class="nested-fields">
+              ${renderChildEntries(selected, [selected.key], ctx, {
+                includeAdvanced: true,
+              })}
+            </div>`
+          : nothing
+      }
     </div>
   `;
 }

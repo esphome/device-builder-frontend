@@ -39,18 +39,20 @@ export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
       >
         <wa-icon library="mdi" name="table"></wa-icon>
       </button>
-      ${host._expertMode
-        ? html`<button
-            class="view-toggle-btn ${yaml ? "active" : ""}"
-            type="button"
-            title=${yamlLabel}
-            aria-label=${yamlLabel}
-            aria-pressed=${yaml ? "true" : "false"}
-            @click=${() => host._setSearchMode(true)}
-          >
-            <wa-icon library="mdi" name="code-braces"></wa-icon>
-          </button>`
-        : nothing}
+      ${
+        host._expertMode
+          ? html`<button
+              class="view-toggle-btn ${yaml ? "active" : ""}"
+              type="button"
+              title=${yamlLabel}
+              aria-label=${yamlLabel}
+              aria-pressed=${yaml ? "true" : "false"}
+              @click=${() => host._setSearchMode(true)}
+            >
+              <wa-icon library="mdi" name="code-braces"></wa-icon>
+            </button>`
+          : nothing
+      }
     </div>
   `;
 }
@@ -111,16 +113,18 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
         @keydown=${host._onSearchKeyDown}
       />
     </form>
-    ${hasQuery
-      ? html`<button
-          class="search-clear"
-          type="button"
-          aria-label=${host._localize("dashboard.search_clear")}
-          @click=${host._clearSearch}
-        >
-          <wa-icon library="mdi" name="close-circle" aria-hidden="true"></wa-icon>
-        </button>`
-      : nothing}
+    ${
+      hasQuery
+        ? html`<button
+            class="search-clear"
+            type="button"
+            aria-label=${host._localize("dashboard.search_clear")}
+            @click=${host._clearSearch}
+          >
+            <wa-icon library="mdi" name="close-circle" aria-hidden="true"></wa-icon>
+          </button>`
+        : nothing
+    }
   </div>`;
 }
 
@@ -173,9 +177,11 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   return html`
     <div class="toolbar">
       <div class="toolbar-row">${renderSearchInput(host)} ${renderViewToggle(host)}</div>
-      ${matchCount !== null
-        ? html`<span class="device-count"><strong>${matchCount}</strong> ${unit}</span>`
-        : ""}
+      ${
+        matchCount !== null
+          ? html`<span class="device-count"><strong>${matchCount}</strong> ${unit}</span>`
+          : ""
+      }
     </div>
   `;
 }
@@ -184,11 +190,13 @@ export function renderNoResultsExtras(host: ESPHomePageDashboard): TemplateResul
   const hasSearch = host._search.trim().length > 0;
 
   return html`
-    ${hasSearch && host._expertMode
-      ? renderYamlPreviewPivot(host._localize, host._yamlPreviewCount, () =>
-          host._setSearchMode(true)
-        )
-      : ""}
+    ${
+      hasSearch && host._expertMode
+        ? renderYamlPreviewPivot(host._localize, host._yamlPreviewCount, () =>
+            host._setSearchMode(true)
+          )
+        : ""
+    }
     <button class="empty-search-clear" @click=${host._clearAllFilters}>
       ${host._localize("dashboard.no_results_clear")}
     </button>

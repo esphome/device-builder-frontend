@@ -40,9 +40,13 @@ interface PinOptionView {
    *  on an output field. A missing capability is NOT warned (a board manifest
    *  that doesn't tag the feature isn't proof the pin lacks it). */
   warn: boolean;
-  /** Board-unavailable (occupied / tied to flash) — disabled + grouped under
-   *  "Reserved". */
+  /** Board-unavailable (occupied / tied to flash) — grouped under "Reserved". */
   reserved: boolean;
+  /** Non-selectable. A reserved pin is disabled *except* when it's locked to
+   *  the component being edited (ethernet RMII pins under ``ethernet:``) or is
+   *  the field's current value, where it's still grouped under "Reserved" but
+   *  stays pickable so its value renders. */
+  disabled: boolean;
   /** Positively carries the field's required features and has no direction
    *  conflict — grouped under "Supports …". */
   supported: boolean;
@@ -66,10 +70,28 @@ function gpioFromAlias(rawValue: unknown, pins: BoardPin[]): number | null {
   return match ? match.gpio : null;
 }
 
+/** GPIOs the board reserves for the component currently being edited. A board
+ *  marks its onboard-function pins ``available: false`` (ethernet RMII, SPI
+ *  flash, …); only the ones locked to *this* section's component
+ *  (``featured_components[].locked_pins`` keyed by ``component_id``) should stay
+ *  selectable here — flash/PSRAM pins, and ethernet pins under a sensor field,
+ *  remain disabled. */
+function lockedGpiosForSection(ctx: RenderCtx): Set<number> {
+  const gpios = new Set<number>();
+  for (const fc of ctx.board?.featured_components ?? []) {
+    if (fc.component_id !== ctx.sectionKey) continue;
+    for (const pin of Object.values(fc.locked_pins ?? {})) {
+      if (typeof pin === "number") gpios.add(pin);
+    }
+  }
+  return gpios;
+}
+
 function buildPinOption(
   pin: BoardPin,
   entry: ConfigEntry,
   usedPins: Map<number | string, string>,
+  ownLockedGpios: Set<number>,
   ctx: RenderCtx
 ): PinOptionView {
   const optValue = formatPinValue(pin.gpio, ctx.board?.esphome.platform);
@@ -83,6 +105,10 @@ function buildPinOption(
     pin.features.includes(f)
   );
   const reserved = pin.available === false;
+  // A reserved pin locked to the component being edited stays selectable — the
+  // ethernet RMII pins are reserved precisely *for* ethernet, so the user must
+  // be able to keep/re-pick them while editing ``ethernet:``.
+  const disabled = reserved && !ownLockedGpios.has(pin.gpio);
   const inUse = !!(occupiedBy || usedBy);
 
   const inUseText = occupiedBy
@@ -107,6 +133,7 @@ function buildPinOption(
     titleText: [inUseText, conflictText, baseSupporting].filter(Boolean).join(" — "),
     warn: inUse || inputOnlyConflict,
     reserved,
+    disabled,
     supported: hasAllFeatures && !inputOnlyConflict,
   };
 }
@@ -121,6 +148,7 @@ function renderPinOptions(
   pins: BoardPin[],
   entry: ConfigEntry,
   usedPins: Map<number | string, string>,
+  ownLockedGpios: Set<number>,
   value: string,
   ctx: RenderCtx
 ): TemplateResult {
@@ -128,7 +156,7 @@ function renderPinOptions(
   const other: PinOptionView[] = [];
   const reserved: PinOptionView[] = [];
   for (const pin of pins) {
-    const view = buildPinOption(pin, entry, usedPins, ctx);
+    const view = buildPinOption(pin, entry, usedPins, ownLockedGpios, ctx);
     (view.reserved ? reserved : view.supported ? supported : other).push(view);
   }
   // Only contrast supported-vs-other when both groups are non-empty; otherwise
@@ -142,19 +170,25 @@ function renderPinOptions(
   // option still conveys its own state (reserved → ``disabled``, in-use /
   // conflict → ``title``), so no per-option context is lost.
   const header = (key: string, withDivider: boolean) =>
-    html`${withDivider
-        ? html`<wa-divider class="pin-group-divider" aria-hidden="true"></wa-divider>`
-        : nothing} <small class="pin-group-label" aria-hidden="true">${key}</small>`;
+    html`${
+        withDivider
+          ? html`<wa-divider class="pin-group-divider" aria-hidden="true"></wa-divider>`
+          : nothing
+      } <small class="pin-group-label" aria-hidden="true">${key}</small>`;
   return html`
-    ${splitByCapability && features
-      ? header(ctx.localize("device.pin_group_supports", { features }), false)
-      : nothing}
+    ${
+      splitByCapability && features
+        ? header(ctx.localize("device.pin_group_supports", { features }), false)
+        : nothing
+    }
     ${supported.map((v) => renderPinOption(v, value))}
     ${splitByCapability ? header(ctx.localize("device.pin_group_other"), true) : nothing}
     ${other.map((v) => renderPinOption(v, value))}
-    ${reserved.length > 0
-      ? header(ctx.localize("device.pin_group_reserved"), true)
-      : nothing}
+    ${
+      reserved.length > 0
+        ? header(ctx.localize("device.pin_group_reserved"), true)
+        : nothing
+    }
     ${reserved.map((v) => renderPinOption(v, value))}
   `;
 }
@@ -165,23 +199,27 @@ function renderPinOption(v: PinOptionView, value: string): TemplateResult {
     value=${v.optValue}
     .label=${v.primary}
     ?selected=${v.optValue === value}
-    ?disabled=${v.reserved}
+    ?disabled=${v.disabled}
     title=${v.titleText}
   >
     <span class="pin-option-stack">
       <span class="pin-option-primary">
         ${v.primary}
-        ${v.warn
-          ? html`<wa-icon
-              class="pin-warn-icon"
-              library="mdi"
-              name="alert-circle-outline"
-            ></wa-icon>`
-          : nothing}
+        ${
+          v.warn
+            ? html`<wa-icon
+                class="pin-warn-icon"
+                library="mdi"
+                name="alert-circle-outline"
+              ></wa-icon>`
+            : nothing
+        }
       </span>
-      ${v.secondary
-        ? html`<span class="pin-option-secondary">${v.secondary}</span>`
-        : nothing}
+      ${
+        v.secondary
+          ? html`<span class="pin-option-secondary">${v.secondary}</span>`
+          : nothing
+      }
     </span>
   </wa-option>`;
 }
@@ -293,6 +331,14 @@ export function renderPinField(
     ctx.fromLine,
     sectionEndLine(ctx.yaml, ctx.fromLine)
   );
+  const ownLockedGpios = lockedGpiosForSection(ctx);
+  // The field's current value must stay pickable even on a reserved pin the
+  // board didn't lock to this section (a hand-edited YAML, or a manifest
+  // preset missing its lock) — a disabled selected option blanks the
+  // wa-select head, hiding the real config value.
+  if (valueGpio !== null) {
+    ownLockedGpios.add(valueGpio);
+  }
   const fieldDisabled = effectiveDisabled(entry, ctx);
   const isLongForm = isPlainObject(rawValue);
 
@@ -322,7 +368,7 @@ export function renderPinField(
         ?disabled=${fieldDisabled}
         @change=${onPinChange}
       >
-        ${renderPinOptions(visible, entry, usedPins, value, ctx)}
+        ${renderPinOptions(visible, entry, usedPins, ownLockedGpios, value, ctx)}
       </wa-select>
       ${renderFieldError(path, ctx)}
       ${renderPinAdvanced(entry, path, ctx, rawValue, isLongForm, fieldDisabled)}

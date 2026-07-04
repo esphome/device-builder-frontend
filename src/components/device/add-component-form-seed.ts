@@ -14,7 +14,7 @@ import {
 } from "../../util/default-component-id.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { isFeaturedId } from "../../util/featured-id.js";
-import { setIn } from "../../util/nested-values.js";
+import { getIn, setIn } from "../../util/nested-values.js";
 
 /** Inputs the seeding pipeline reads off the host component. */
 export interface SeedContext {
@@ -34,46 +34,40 @@ export interface SeedContext {
 }
 
 /**
- * Walk the schema recursively to find the path of the first entry
- * with `references_component === domain`. Returns null if the
- * schema doesn't reference the domain — defensive against the
- * dialog passing a prefill that doesn't apply to this form.
+ * Walk the schema recursively for the path of the first
+ * `references_component === domain` entry that `seeded` has not already
+ * filled. Returns null when the schema references no such unfilled field —
+ * defensive against a prefill that doesn't apply, and so a chained prefill
+ * lands on a still-empty reference instead of overwriting a seeded one.
  */
 export function findReferencePath(
   entries: ConfigEntry[],
   domain: string,
-  prefix: string[]
+  prefix: string[],
+  seeded: Record<string, unknown> = {}
 ): string[] | null {
   for (const entry of entries) {
     if (entry.type === ConfigEntryType.NESTED) {
-      const found = findReferencePath(entry.config_entries ?? [], domain, [
-        ...prefix,
-        entry.key,
-      ]);
+      const found = findReferencePath(
+        entry.config_entries ?? [],
+        domain,
+        [...prefix, entry.key],
+        seeded
+      );
       if (found) return found;
       continue;
     }
     if (entry.references_component === domain) {
-      return [...prefix, entry.key];
+      const path = [...prefix, entry.key];
+      // Skip a field seedDefaults already filled (from its preset or the sole
+      // candidate) so the chained prefill can't overwrite it; a reference
+      // seedDefaults left empty (a stale or ambiguous preset) still takes the
+      // prefill rather than being stranded.
+      if (getIn(seeded, path) !== undefined) continue;
+      return path;
     }
   }
   return null;
-}
-
-/**
- * Seed an unlocked id-reference field with the matching component already in
- * the config, so a stale featured preset can't write an id that doesn't
- * exist. Ambiguous cases — none, several, or a `packages:`/`<<:` merge that
- * could hide one — stay unset, deferring to the dep detour or the picker.
- */
-export function seedReference(yaml: string, domain: string): string | undefined {
-  // Resolve against same-domain candidates only (i2c/spi/uart buses); the
-  // picker also folds in async interface providers. A cross-domain ref finds
-  // nothing here and defers to the picker; for a domain that is both a block
-  // and a provided interface, seeding may fill a value the picker would call
-  // ambiguous — harmless, since it's a real id the user can still change.
-  const candidates = findReferenceCandidates(yaml, domain, []);
-  return resolveSoleCandidate(candidates, yaml)?.id;
 }
 
 /**
@@ -120,7 +114,20 @@ export function seedDefaults(
     // preset (`i2c_bus`) can't outlive the bus it names. Locked refs are
     // deliberate pins — keep their literal.
     if (entry.references_component && !entry.locked) {
-      const ref = seedReference(yaml, entry.references_component);
+      const candidates = findReferenceCandidates(yaml, entry.references_component, []);
+      // A featured preset that names a component actually present in the live
+      // config (a sibling just added in the same bundle, e.g. `output_blue`)
+      // wins — `resolveSoleCandidate` can't pick among several same-domain
+      // candidates, but the per-field preset already says which one. Check
+      // membership so a stale preset that outlived its target still defers.
+      const presetId =
+        seedPresets &&
+        entry.from_preset &&
+        typeof entry.default_value === "string" &&
+        candidates.some((c) => c.id === entry.default_value)
+          ? entry.default_value
+          : undefined;
+      const ref = presetId ?? resolveSoleCandidate(candidates, yaml)?.id;
       if (ref !== undefined) {
         out[entry.key] = entry.multi_value ? [ref] : ref;
       } else if (entry.multi_value && entry.required) {
@@ -129,8 +136,13 @@ export function seedDefaults(
       continue;
     }
     if (entry.default_value != null) {
+      // A multi_value default can already be a list (octal SPI `data_pins`,
+      // `[6, 7, 15, ...]`); spread it element-wise so each value seeds its own
+      // row with its original type. Only wrap a scalar default into a list.
       out[entry.key] = entry.multi_value
-        ? [String(entry.default_value)]
+        ? Array.isArray(entry.default_value)
+          ? [...entry.default_value]
+          : [String(entry.default_value)]
         : entry.default_value;
     } else if (entry.multi_value && entry.required) {
       out[entry.key] = [];
@@ -169,7 +181,10 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   // locked-validation would reject the empty payload. Plain catalog
   // defaults stay unseeded so the add matches the create-time auto-add.
   const seedPresets = isFeaturedId(component.id);
-  let next = seedDefaults(entries, yaml, localize, seedPresets);
+  // Snapshot what seeding owns so a later prefill skips exactly those refs
+  // (not every preset-flagged one), without treating a restored value as seeded.
+  const seededDefaults = seedDefaults(entries, yaml, localize, seedPresets);
+  let next = seededDefaults;
 
   const idEntry = entries.find((e) => e.key === "id" && e.type === ConfigEntryType.ID);
   if (idEntry && next["id"] === undefined) {
@@ -198,7 +213,12 @@ export function buildInitialValues(ctx: SeedContext): Record<string, unknown> {
   }
 
   if (prefillReference) {
-    const targetPath = findReferencePath(entries, prefillReference.domain, []);
+    const targetPath = findReferencePath(
+      entries,
+      prefillReference.domain,
+      [],
+      seededDefaults
+    );
     if (targetPath) {
       next = setIn(next, targetPath, prefillReference.id);
     }

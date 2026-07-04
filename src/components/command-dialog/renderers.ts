@@ -44,20 +44,24 @@ export function renderRemoteBuilderSubLine(
           receiver: display,
         })}</span
       >
-      ${canOverride
-        ? html`
-            <span class="spacer"></span>
-            <button
-              class="force-local-link"
-              ?disabled=${host._switchingToLocal}
-              @click=${host._onForceLocalClick}
-            >
-              ${host._switchingToLocal
-                ? host._localize("command.force_local_switching")
-                : host._localize("command.force_local_action")}
-            </button>
-          `
-        : nothing}
+      ${
+        canOverride
+          ? html`
+              <span class="spacer"></span>
+              <button
+                class="force-local-link"
+                ?disabled=${host._switchingToLocal}
+                @click=${host._onForceLocalClick}
+              >
+                ${
+                  host._switchingToLocal
+                    ? host._localize("command.force_local_switching")
+                    : host._localize("command.force_local_action")
+                }
+              </button>
+            `
+          : nothing
+      }
     </div>
   `;
 }
@@ -106,9 +110,9 @@ export function renderResetSuggestion(
 ): TemplateResult | typeof nothing {
   if (host._state !== "error") return nothing;
   if (host._userStopped) return nothing;
-  // A compile that succeeded but found no upload step isn't a build failure —
-  // clean/reset wouldn't help.
-  if (host._installMissingUpload) return nothing;
+  // A compile that succeeded but found no dependent flash isn't a build
+  // failure — clean/reset wouldn't help.
+  if (host._compileMissingDependent) return nothing;
   if (host._commandType === "validate" || host._failedDuringValidate) {
     return renderValidationFailureSuggestion(host);
   }
@@ -170,13 +174,15 @@ function renderShowLogsAfterInstallToggle(
 export function renderToolbar(host: ESPHomeCommandDialog): TemplateResult {
   return html`
     ${renderShowSecretsToggle(host)} ${renderShowLogsAfterInstallToggle(host)}
-    ${host._lines.length > 0
-      ? renderTermButton({
-          icon: "download",
-          title: host._localize("command.download"),
-          onClick: host._downloadOutput,
-        })
-      : nothing}
+    ${
+      host._lines.length > 0
+        ? renderTermButton({
+            icon: "download",
+            title: host._localize("command.download"),
+            onClick: host._downloadOutput,
+          })
+        : nothing
+    }
     ${renderActions(host)}
   `;
 }

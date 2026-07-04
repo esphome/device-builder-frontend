@@ -86,7 +86,9 @@ describe("renderFacets", () => {
     sectionByName(root, "dashboard.filter_update_status");
 
   it("renders the Updates section when a device needs an update", () => {
-    const host = makeHost({ _devices: [{ update_available: true }] });
+    const host = makeHost({
+      _devices: [{ update_available: true, active_source: "mdns" }],
+    });
     expect(updatesSection(renderInto(host))).not.toBeUndefined();
   });
 
@@ -102,7 +104,7 @@ describe("renderFacets", () => {
 
   it("suppresses the Updates section in YAML-search mode", () => {
     const host = makeHost({
-      _devices: [{ has_pending_changes: true }],
+      _devices: [{ has_pending_changes: true, active_source: "mdns" }],
       _yamlMode: true,
     });
     expect(updatesSection(renderInto(host))).toBeUndefined();

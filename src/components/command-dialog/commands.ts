@@ -3,7 +3,32 @@ import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-j
 import { ErrorCode } from "../../api/types/protocol.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
-import type { ESPHomeCommandDialog } from "../command-dialog.js";
+import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
+
+const JOB_TYPE_TO_COMMAND: Record<JobType, CommandType> = {
+  [JobType.COMPILE]: "compile",
+  [JobType.INSTALL]: "install",
+  [JobType.UPLOAD]: "install",
+  [JobType.CLEAN]: "clean",
+  [JobType.RESET_BUILD_ENV]: "reset",
+  [JobType.RENAME]: "rename",
+};
+
+// A live COMPILE with a held dependent is a chain head — attach in the
+// chain's command mode so success reflects the flash, not just the build.
+// Terminal reattach keeps plain compile mode: it's a log-review path and
+// must show the log the user clicked, not chain into the flash log.
+export function deriveFollowCommandType(
+  jobs: Map<string, FirmwareJob>,
+  job: FirmwareJob
+): CommandType {
+  if (job.job_type === JobType.COMPILE && !isTerminalJobStatus(job.status)) {
+    const dependent = [...jobs.values()].find((j) => j.depends_on === job.job_id);
+    if (dependent?.job_type === JobType.RENAME) return "rename";
+    if (dependent?.job_type === JobType.UPLOAD) return "install";
+  }
+  return JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
+}
 
 // Dashboard mode pins escaped form (\033[…m); raw form (\x1b[…m) is defensive.
 const ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
@@ -46,7 +71,7 @@ export function resetRunState(host: ESPHomeCommandDialog): void {
   host._statusMessage = "";
   host._userStopped = false;
   host._failedDuringValidate = false;
-  host._installMissingUpload = false;
+  host._compileMissingDependent = false;
 }
 
 export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
@@ -178,50 +203,46 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       };
       const success = result.status === JobStatus.COMPLETED;
 
-      // On a successful install COMPILE, follow its dependent UPLOAD so success
-      // reflects the flash (#1131). Gate on the finished job being the COMPILE
-      // so the upload's own completion falls straight through to success.
+      // On a successful install/rename COMPILE, follow the dependent flash —
+      // the install's UPLOAD or the rename's flash-and-swap tail — so success
+      // reflects the device, not just the build (#1131). Gate on the finished
+      // job being the COMPILE so the flash's own completion falls through.
       const finished = host._jobs.get(jobId);
-      // Temp debug
-      console.log("[DEBUG onResult]", {
-        jobId,
-        success,
-        result,
-        finishedJobType: finished?.job_type,
-        commandType: host._commandType,
-      });
-      // End temp debug
       if (
         success &&
-        host._commandType === "install" &&
+        (host._commandType === "install" || host._commandType === "rename") &&
         finished?.job_type === JobType.COMPILE
       ) {
-        // The held UPLOAD is created at install time (#1131); its job_queued is
+        // The held dependent is created with the chain; its job_queued is
         // ordered ahead of this compile's job_completed on the shared WS, so it
-        // is normally already in _jobs. A miss is therefore a real backend gap,
-        // not a still-arriving event for a legitimately-running install.
-        const upload = [...host._jobs.values()].find(
-          (j) => j.job_type === JobType.UPLOAD && j.depends_on === jobId
+        // is normally already in _jobs. A miss is therefore a real backend gap.
+        const flash = [...host._jobs.values()].find(
+          (j) =>
+            j.depends_on === jobId &&
+            (j.job_type === JobType.UPLOAD || j.job_type === JobType.RENAME)
         );
-        if (upload) {
-          // primeAndFollow re-primes the source snapshot from the upload (the
-          // local flash) so the remote-builder sub-line doesn't linger on the
-          // compile's receiver while the upload runs.
-          primeAndFollow(host, upload);
+        if (flash) {
+          // primeAndFollow re-primes the source snapshot from the flash (local)
+          // so the remote-builder sub-line doesn't linger on the compile's
+          // receiver.
+          primeAndFollow(host, flash);
           return;
         }
+        // A deferred install compiles now and flashes when the device wakes,
+        // so no dependent flash exists — queued is the success state.
         if (result.is_deferred_install) {
           host._state = "success";
-          host._statusMessage =
-            host._localize("dashboard.queued_successfully") ||
-            "Update Queued Successfully!";
+          host._statusMessage = host._localize("dashboard.queued_successfully");
           host._jobId = "";
           return;
         }
-        console.warn("install compile succeeded but no dependent upload for job", jobId);
+        // No flash step — the device was never flashed, so don't report success.
+        console.warn("compile succeeded but no dependent flash for job", jobId);
         host._state = "error";
-        host._statusMessage = host._localize("command.install_failed");
-        host._installMissingUpload = true;
+        host._statusMessage = host._localize(`command.${host._commandType}_failed`);
+        // The compile succeeded, so the clean/reset build-failure hint is
+        // misleading here — suppress it.
+        host._compileMissingDependent = true;
         host._jobId = "";
         return;
       }

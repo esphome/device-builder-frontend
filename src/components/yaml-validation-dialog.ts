@@ -159,12 +159,16 @@ export class ESPHomeYamlValidationDialog extends LitElement {
           </div>
           <div class="text">
             ${message}
-            ${includedFileNote
-              ? html`<div class="included-file">${includedFileNote}</div>`
-              : nothing}
-            ${this.firstErrorMessage
-              ? html`<div class="first-error">${this.firstErrorMessage}</div>`
-              : nothing}
+            ${
+              includedFileNote
+                ? html`<div class="included-file">${includedFileNote}</div>`
+                : nothing
+            }
+            ${
+              this.firstErrorMessage
+                ? html`<div class="first-error">${this.firstErrorMessage}</div>`
+                : nothing
+            }
           </div>
         </div>
         <div class="actions">

@@ -113,17 +113,19 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
       <div class="section-intro">
         ${this._localize("settings.build_server_pairing_requests_desc")}
       </div>
-      ${peers === null
-        ? renderStatusRow(
-            this._localize,
-            "settings.build_server_pairing_requests_loading"
-          )
-        : pending.length === 0
+      ${
+        peers === null
           ? renderStatusRow(
               this._localize,
-              "settings.build_server_pairing_requests_empty"
+              "settings.build_server_pairing_requests_loading"
             )
-          : pending.map((p) => this._renderPendingRow(p))}
+          : pending.length === 0
+            ? renderStatusRow(
+                this._localize,
+                "settings.build_server_pairing_requests_empty"
+              )
+            : pending.map((p) => this._renderPendingRow(p))
+      }
       <esphome-accept-peer-dialog
         @confirm=${this._onAcceptConfirm}
         @reject=${this._onRejectFromDialog}
@@ -146,19 +148,21 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
       <span class="pairing-window-pill pairing-window-open">
         ${this._localize("settings.build_server_pairing_window_open")}
       </span>
-      ${remaining !== null
-        ? html`
-            <span
-              class="pairing-window-countdown"
-              aria-label=${this._localize(
-                "settings.build_server_pairing_window_remaining_aria",
-                { duration: this._formatDuration(remaining) }
-              )}
-            >
-              ${this._formatDuration(remaining)}
-            </span>
-          `
-        : nothing}
+      ${
+        remaining !== null
+          ? html`
+              <span
+                class="pairing-window-countdown"
+                aria-label=${this._localize(
+                  "settings.build_server_pairing_window_remaining_aria",
+                  { duration: this._formatDuration(remaining) }
+                )}
+              >
+                ${this._formatDuration(remaining)}
+              </span>
+            `
+          : nothing
+      }
       <button type="button" class="pairing-window-extend" @click=${this._onExtend}>
         ${this._localize("settings.build_server_pairing_window_extend")}
       </button>
@@ -170,14 +174,16 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
       <div class="row peer-row peer-row-pending">
         <div class="row-label">
           <span class="row-title">${peer.label}</span>
-          ${peer.peer_ip
-            ? html`
-                <span class="row-desc">
-                  ${this._localize("settings.build_server_peer_ip_label")}
-                  <code class="peer-ip">${peer.peer_ip}</code>
-                </span>
-              `
-            : nothing}
+          ${
+            peer.peer_ip
+              ? html`
+                  <span class="row-desc">
+                    ${this._localize("settings.build_server_peer_ip_label")}
+                    <code class="peer-ip">${peer.peer_ip}</code>
+                  </span>
+                `
+              : nothing
+          }
         </div>
         <div class="peer-actions">
           <button

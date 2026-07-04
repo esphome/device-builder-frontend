@@ -123,20 +123,6 @@ const automationEditorFrameStyles = css`
     object-fit: contain;
   }
 
-  /* "Show advanced settings" toggle row — mirrors the device
-     section-config layout so the eye reads the two surfaces as
-     the same kind of form. */
-  .advanced-toggle-row {
-    display: flex;
-    justify-content: flex-start;
-    margin-top: var(--wa-space-s);
-    font-size: var(--wa-font-size-s);
-  }
-  .advanced-toggle-row wa-switch {
-    font-weight: var(--wa-font-weight-semibold);
-    color: var(--wa-color-text-quiet);
-  }
-
   /* One titled panel — used for target, trigger, conditions, actions,
      and for any nested sub-panels inside a control-flow action. */
   .ae-section {

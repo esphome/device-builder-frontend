@@ -114,6 +114,17 @@ export const remoteComputeOnlyContext = createContext<boolean>(
 );
 
 /**
+ * Context for whether Git version-history auto-commit is enabled.
+ *
+ * Default ``true``. Set from the ``subscribe_events`` ``initial_state``
+ * snapshot and toggled via the expert-only Settings → Appearance switch;
+ * when ``false`` the backend stops committing config edits.
+ */
+export const versionHistoryEnabledContext = createContext<boolean>(
+  Symbol("esphome-version-history-enabled")
+);
+
+/**
  * Context for whether preferences have arrived at least once this session.
  *
  * ``false`` until the first ``subscribe_events`` ``initial_state`` snapshot sets

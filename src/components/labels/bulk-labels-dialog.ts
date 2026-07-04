@@ -352,21 +352,23 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         .confirmOnEnter=${this._canApply ? this._apply : undefined}
         @after-hide=${this._onAfterHide}
       >
-        ${this._catalog.length === 0
-          ? html`<div class="option-empty" role="status">
-              ${this._localize("dashboard.labels_bulk_dialog_empty")}
-            </div>`
-          : html`<div
-              class="options"
-              role="group"
-              aria-label=${this._localize("dashboard.labels_bulk_group_aria")}
-            >
-              ${repeat(
-                this._catalog,
-                (label) => label.id,
-                (label) => this._renderOption(label)
-              )}
-            </div>`}
+        ${
+          this._catalog.length === 0
+            ? html`<div class="option-empty" role="status">
+                ${this._localize("dashboard.labels_bulk_dialog_empty")}
+              </div>`
+            : html`<div
+                class="options"
+                role="group"
+                aria-label=${this._localize("dashboard.labels_bulk_group_aria")}
+              >
+                ${repeat(
+                  this._catalog,
+                  (label) => label.id,
+                  (label) => this._renderOption(label)
+                )}
+              </div>`
+        }
         <div class="actions">
           <button
             class="btn btn--cancel"
@@ -405,25 +407,27 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       type="button"
       role="checkbox"
       aria-checked=${ariaChecked}
-      title=${mixed
-        ? this._localize("dashboard.labels_bulk_mixed_title", {
-            name: label.name,
-          })
-        : label.name}
+      title=${
+        mixed
+          ? this._localize("dashboard.labels_bulk_mixed_title", {
+              name: label.name,
+            })
+          : label.name
+      }
       @click=${() => this._onToggle(label.id)}
     >
       <span
-        class="option-check ${checked
-          ? "option-check--checked"
-          : mixed
-            ? "option-check--mixed"
-            : ""}"
+        class="option-check ${
+          checked ? "option-check--checked" : mixed ? "option-check--mixed" : ""
+        }"
       >
-        ${checked
-          ? html`<wa-icon library="mdi" name="check"></wa-icon>`
-          : mixed
-            ? html`<wa-icon library="mdi" name="minus"></wa-icon>`
-            : nothing}
+        ${
+          checked
+            ? html`<wa-icon library="mdi" name="check"></wa-icon>`
+            : mixed
+              ? html`<wa-icon library="mdi" name="minus"></wa-icon>`
+              : nothing
+        }
       </span>
       ${renderLabelChip(label, { suppressTitle: true })}
     </button>`;

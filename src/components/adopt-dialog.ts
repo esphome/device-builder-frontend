@@ -13,6 +13,9 @@ import { EnterController } from "../util/enter-controller.js";
 import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { renderInlineError } from "../util/render-error.js";
+import { fetchSecretKeys, hasSharedWifiSecret } from "../util/secrets-cache.js";
+import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
+import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 
 import "./base-dialog.js";
 
@@ -38,12 +41,20 @@ export class ESPHomeAdoptDialog extends LitElement {
   @state() private _busy = false;
   @state() private _error: string | null = null;
   @state() private _open = false;
+  @state() private _ssid = "";
+  @state() private _password = "";
+  // undefined until config/get_secrets resolves; only fetched for a
+  // network=wifi device, so a non-wifi adopt never blocks on it.
+  @state() private _hasWifiSecrets?: boolean;
 
   static styles = [
     espHomeStyles,
     inputStyles,
     // Neutral header + title + footer (shared) — dialog-chrome.ts.
     dialogChromeStyles,
+    // Before the local block so this dialog's own `.field` / `label`
+    // spacing wins; only `.field-label` / `.error` (unique here) apply.
+    wifiFieldsStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -239,7 +250,47 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._encryption = true;
     this._busy = false;
     this._error = null;
+    this._ssid = "";
+    this._password = "";
+    this._hasWifiSecrets = undefined;
     this._open = true;
+    // A Wi-Fi device whose install has no shared wifi_ssid/wifi_password
+    // would import a config referencing an undefined !secret and fail to
+    // validate (esphome/device-builder#1742). Probe the shared secrets so
+    // the Wi-Fi step can prompt + store them before importing.
+    if (this._needsWifi && this._api) {
+      fetchSecretKeys(this._api).then((keys) => {
+        this._hasWifiSecrets = hasSharedWifiSecret(keys);
+      });
+    }
+  }
+
+  // Strictly "wifi" to match the legacy dashboard's adopt gate. A device
+  // that advertised no network (older firmware, network === "") isn't
+  // prompted; closing that hole belongs in the backend import generator,
+  // not a frontend heuristic that would wrongly prompt Ethernet devices.
+  private get _needsWifi(): boolean {
+    return this._device?.network === "wifi";
+  }
+
+  // Show the Wi-Fi step only for a Wi-Fi device with no shared secret yet;
+  // a device with its own network or an install that already has the secret
+  // skips it, mirroring the create wizard and the legacy adopt dialog.
+  private get _collectWifi(): boolean {
+    return this._needsWifi && this._hasWifiSecrets === false;
+  }
+
+  // Block submit while a wifi device's secrets are still loading
+  // (_hasWifiSecrets undefined) so a fast Enter can't skip the store, and
+  // once the Wi-Fi step shows require an SSID + a valid-length password.
+  // Read by both canSubmit and _submit so the Enter path (which bypasses
+  // the disabled button) is guarded too.
+  private get _wifiBlocking(): boolean {
+    return (
+      (this._needsWifi && this._hasWifiSecrets === undefined) ||
+      (this._collectWifi &&
+        (!this._ssid.trim() || isWifiPasswordTooShort(this._password)))
+    );
   }
 
   close = () => {
@@ -271,7 +322,8 @@ export class ESPHomeAdoptDialog extends LitElement {
     const device = this._device;
     const nameTrimmed = this._name.trim();
     const nameErr = nameTrimmed ? validateDeviceName(nameTrimmed) : null;
-    const canSubmit = !!device && !!nameTrimmed && !nameErr && !this._busy;
+    const canSubmit =
+      !!device && !!nameTrimmed && !nameErr && !this._busy && !this._wifiBlocking;
     const displayName = device ? device.friendly_name || device.name : "";
 
     return html`
@@ -281,93 +333,121 @@ export class ESPHomeAdoptDialog extends LitElement {
         .label=${this._localize("dashboard.adopt_title")}
         @after-hide=${this._onAfterHide}
       >
-        ${device
-          ? html`
-              <p class="description">
-                ${this._localize("dashboard.adopt_description", {
-                  name: displayName,
-                })}
-              </p>
+        ${
+          device
+            ? html`
+                <p class="description">
+                  ${this._localize("dashboard.adopt_description", {
+                    name: displayName,
+                  })}
+                </p>
 
-              ${this._renderSource(device.package_import_url)}
+                ${this._renderSource(device.package_import_url)}
 
-              <div class="field">
-                <label for="adopt-name">
-                  ${this._localize("dashboard.adopt_field_name")}
+                <div class="field">
+                  <label for="adopt-name">
+                    ${this._localize("dashboard.adopt_field_name")}
+                  </label>
+                  <input
+                    id="adopt-name"
+                    type="text"
+                    class=${nameErr ? "invalid" : ""}
+                    .value=${this._name}
+                    ?disabled=${this._busy}
+                    @input=${(e: Event) => {
+                      this._name = (e.target as HTMLInputElement).value;
+                    }}
+                  />
+                  ${renderInlineError(
+                    nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
+                  )}
+                </div>
+
+                <div class="field">
+                  <label for="adopt-friendly-name">
+                    ${this._localize("dashboard.adopt_field_friendly_name")}
+                  </label>
+                  <input
+                    id="adopt-friendly-name"
+                    type="text"
+                    .value=${this._friendlyName}
+                    ?disabled=${this._busy}
+                    @input=${(e: Event) => {
+                      this._friendlyName = (e.target as HTMLInputElement).value;
+                    }}
+                  />
+                </div>
+
+                ${
+                  this._collectWifi
+                    ? html`
+                        <p class="description">
+                          ${this._localize("onboarding.wifi.intro")}
+                        </p>
+                        ${renderWifiFields({
+                          localize: this._localize,
+                          ssid: this._ssid,
+                          password: this._password,
+                          disabled: this._busy,
+                          onSsidInput: (value) => {
+                            this._ssid = value;
+                          },
+                          onPasswordInput: (value) => {
+                            this._password = value;
+                          },
+                        })}
+                      `
+                    : nothing
+                }
+
+                <label class="checkbox-row">
+                  <input
+                    type="checkbox"
+                    .checked=${this._encryption}
+                    ?disabled=${this._busy}
+                    @change=${(e: Event) => {
+                      this._encryption = (e.target as HTMLInputElement).checked;
+                    }}
+                  />
+                  <span class="checkbox-text">
+                    <span class="checkbox-title"
+                      >${this._localize("dashboard.adopt_encryption_title")}</span
+                    >
+                    <span class="checkbox-hint"
+                      >${this._localize("dashboard.adopt_encryption_hint")}</span
+                    >
+                  </span>
                 </label>
-                <input
-                  id="adopt-name"
-                  type="text"
-                  class=${nameErr ? "invalid" : ""}
-                  .value=${this._name}
-                  ?disabled=${this._busy}
-                  @input=${(e: Event) => {
-                    this._name = (e.target as HTMLInputElement).value;
-                  }}
-                />
-                ${renderInlineError(
-                  nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
-                )}
-              </div>
 
-              <div class="field">
-                <label for="adopt-friendly-name">
-                  ${this._localize("dashboard.adopt_field_friendly_name")}
-                </label>
-                <input
-                  id="adopt-friendly-name"
-                  type="text"
-                  .value=${this._friendlyName}
-                  ?disabled=${this._busy}
-                  @input=${(e: Event) => {
-                    this._friendlyName = (e.target as HTMLInputElement).value;
-                  }}
-                />
-              </div>
+                ${
+                  this._error
+                    ? html`<div class="submit-error">${this._error}</div>`
+                    : nothing
+                }
 
-              <label class="checkbox-row">
-                <input
-                  type="checkbox"
-                  .checked=${this._encryption}
-                  ?disabled=${this._busy}
-                  @change=${(e: Event) => {
-                    this._encryption = (e.target as HTMLInputElement).checked;
-                  }}
-                />
-                <span class="checkbox-text">
-                  <span class="checkbox-title"
-                    >${this._localize("dashboard.adopt_encryption_title")}</span
+                <div class="actions">
+                  <button
+                    class="btn btn--cancel"
+                    ?disabled=${this._busy}
+                    @click=${this.close}
                   >
-                  <span class="checkbox-hint"
-                    >${this._localize("dashboard.adopt_encryption_hint")}</span
+                    ${this._localize("layout.cancel")}
+                  </button>
+                  <button
+                    class="btn btn--primary"
+                    ?disabled=${!canSubmit}
+                    @click=${this._submit}
                   >
-                </span>
-              </label>
-
-              ${this._error
-                ? html`<div class="submit-error">${this._error}</div>`
-                : nothing}
-
-              <div class="actions">
-                <button
-                  class="btn btn--cancel"
-                  ?disabled=${this._busy}
-                  @click=${this.close}
-                >
-                  ${this._localize("layout.cancel")}
-                </button>
-                <button
-                  class="btn btn--primary"
-                  ?disabled=${!canSubmit}
-                  @click=${this._submit}
-                >
-                  ${this._busy
-                    ? this._localize("dashboard.adopt_submit_busy")
-                    : this._localize("dashboard.adopt_submit")}
-                </button>
-              </div>
-            `
-          : nothing}
+                    ${
+                      this._busy
+                        ? this._localize("dashboard.adopt_submit_busy")
+                        : this._localize("dashboard.adopt_submit")
+                    }
+                  </button>
+                </div>
+              `
+            : nothing
+        }
       </esphome-base-dialog>
     `;
   }
@@ -406,10 +486,24 @@ export class ESPHomeAdoptDialog extends LitElement {
     const name = this._name.trim();
     const friendlyName = this._friendlyName.trim();
     if (!name || validateDeviceName(name)) return;
+    // Enter bypasses the disabled button; re-check the Wi-Fi gate so a
+    // held Enter can't import before the secret store (or with bad creds).
+    if (this._wifiBlocking) return;
 
     this._busy = true;
     this._error = null;
     try {
+      // Persist the shared Wi-Fi secret first so the imported config's
+      // ``!secret wifi_ssid`` resolves; a failure here surfaces in the same
+      // catch and leaves the dialog open. ``secrets-saved`` refreshes the
+      // editor's secret pickers and the kebab wording. Store the raw SSID
+      // (whitespace is significant); the trim is only the non-empty gate.
+      if (this._collectWifi) {
+        await this._api.setWifiCredentials(this._ssid, this._password);
+        window.dispatchEvent(
+          new CustomEvent("secrets-saved", { detail: { source: this } })
+        );
+      }
       // ``encryption`` is sent only when the user opted in. Backend
       // signature is ``encryption: str | None = None``; omitting it
       // when False keeps the call site clean and avoids relying on

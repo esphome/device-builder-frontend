@@ -39,6 +39,10 @@ const _BASE = {
   deployed_version: "",
   loaded_integrations: [],
   state: DeviceState.UNKNOWN,
+  // Default to a live mDNS source so the happy-path fixture shows its
+  // out-of-sync / update indicators as before; tests covering the mDNS-dark
+  // "hide indicators" behaviour override this to "ping" / "unknown".
+  active_source: "mdns",
   expected_config_hash: "",
   deployed_config_hash: "",
   has_pending_changes: false,

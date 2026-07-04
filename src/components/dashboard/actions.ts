@@ -5,6 +5,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
+import { fetchBoard } from "../../util/board-body-cache.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { ESPHomeLogParser, isLikelyGarbageLine } from "../../util/esphome-log-parser.js";
 import {
@@ -340,7 +341,7 @@ export async function detectAndOpenWizard(
     }
 
     if (manifest?.board_id) {
-      const board = await api.getBoard(manifest.board_id);
+      const board = await fetchBoard(api, manifest.board_id);
       if (board) {
         if (options.localize) {
           toast.success(

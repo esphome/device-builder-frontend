@@ -373,10 +373,26 @@ export const componentCatalogStyles = css`
     font-size: var(--wa-font-size-s);
   }
 
-  /* Featured cards get a subtle primary border so they read as the
-     curated set, distinct from the regular catalog. */
+  /* Featured cards read as the curated set via a thicker edge in the same
+     neutral border color — distinguished by weight, not hue, so it stays
+     subtle. Drawn as an inset ring (box-shadow), not a wider border, so the
+     box model — and thus the card size — matches the regular cards beside it. */
   .component-card--featured {
-    border-color: var(--esphome-tint-border);
+    --featured-ring: var(--wa-color-surface-border);
+    box-shadow: inset 0 0 0 var(--wa-border-width-s) var(--featured-ring);
+    /* transition doesn't accumulate across rules, so restate the base card's
+       animated properties alongside the ring. */
+    transition:
+      border-color var(--wa-transition-normal) var(--wa-transition-easing),
+      box-shadow var(--wa-transition-normal) var(--wa-transition-easing),
+      background var(--wa-transition-normal) var(--wa-transition-easing);
+  }
+
+  /* Track the border's primary highlight on hover / focus so the ring doesn't
+     stay a stale neutral while the border lights up. */
+  .component-card--featured:hover,
+  .component-card--featured:focus-within {
+    --featured-ring: var(--esphome-primary);
   }
 
   .bundle-badge {

@@ -72,24 +72,26 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   return html`
     <div class="nested-group" data-field-key=${fieldKeyAttr(path)}>
       <div class="nested-header">
-        ${isOptionalEntity
-          ? html`<wa-switch
-              class="nested-enable"
-              .checked=${enabled}
-              ?disabled=${effectiveDisabled(entry, ctx)}
-              aria-label=${enableLabel}
-              title=${enableLabel}
-              @change=${(e: Event) =>
-                onEnableToggle(
-                  path,
-                  key,
-                  isOpen,
-                  (e.target as unknown as { checked: boolean }).checked,
-                  label,
-                  ctx
-                )}
-            ></wa-switch>`
-          : nothing}
+        ${
+          isOptionalEntity
+            ? html`<wa-switch
+                class="nested-enable"
+                .checked=${enabled}
+                ?disabled=${effectiveDisabled(entry, ctx)}
+                aria-label=${enableLabel}
+                title=${enableLabel}
+                @change=${(e: Event) =>
+                  onEnableToggle(
+                    path,
+                    key,
+                    isOpen,
+                    (e.target as unknown as { checked: boolean }).checked,
+                    label,
+                    ctx
+                  )}
+              ></wa-switch>`
+            : nothing
+        }
         <button
           type="button"
           class="nested-toggle"
@@ -98,18 +100,24 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
         >
           <wa-icon library="mdi" name=${isOpen ? "chevron-up" : "chevron-down"}></wa-icon>
           <span class="nested-title">${label}</span>
-          ${entry.platform_type
-            ? html`<span class="nested-platform">${entry.platform_type}</span>`
-            : nothing}
+          ${
+            entry.platform_type
+              ? html`<span class="nested-platform">${entry.platform_type}</span>`
+              : nothing
+          }
         </button>
         ${renderHelpLink(entry, ctx)}
       </div>
-      ${entry.description
-        ? html`<p class="nested-desc">${renderMarkdown(entry.description)}</p>`
-        : nothing}
-      ${isOpen
-        ? html`<div class="nested-fields">${renderChildEntries(entry, path, ctx)}</div>`
-        : nothing}
+      ${
+        entry.description
+          ? html`<p class="nested-desc">${renderMarkdown(entry.description)}</p>`
+          : nothing
+      }
+      ${
+        isOpen
+          ? html`<div class="nested-fields">${renderChildEntries(entry, path, ctx)}</div>`
+          : nothing
+      }
     </div>
   `;
 }

@@ -36,7 +36,7 @@ describe("device-editor footer install action", () => {
   });
 
   it("renders a split button (Update + picker caret) when an update is available", async () => {
-    const el = await mount({ hasUpdateAvailable: true });
+    const el = await mount({ showUpdate: true });
     const update = vi.fn();
     const install = vi.fn();
     el.addEventListener("update-device", update);
@@ -58,7 +58,7 @@ describe("device-editor footer install action", () => {
     // versions threaded through to the title (the helper's branch logic and
     // fallback are unit-tested in update-tooltip.test.ts).
     const el = await mount({
-      hasUpdateAvailable: true,
+      showUpdate: true,
       installedVersion: "2024.6.0",
       availableVersion: "2024.12.0",
     });
@@ -68,7 +68,7 @@ describe("device-editor footer install action", () => {
   });
 
   it("renders a highlighted plain Install (-> picker) when there are pending changes", async () => {
-    const el = await mount({ hasPendingChanges: true });
+    const el = await mount({ showModified: true });
     const install = vi.fn();
     el.addEventListener("install-device", install);
     expect(q(el, ".install-split")).toBeNull();
@@ -79,7 +79,7 @@ describe("device-editor footer install action", () => {
   });
 
   it("shows a muted-but-usable Install when the config is in sync", async () => {
-    const el = await mount({ hasUpdateAvailable: false, hasPendingChanges: false });
+    const el = await mount({ showUpdate: false, showModified: false });
     const install = vi.fn();
     el.addEventListener("install-device", install);
     const btn = q(el, ".install-fab");

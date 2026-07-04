@@ -105,6 +105,9 @@ export interface UserPreferences {
   /** This install is only a remote build node: onboarding skips the
    *  Wi-Fi step and device-creation entry points are hidden. */
   remote_compute_only: boolean;
+  /** Auto-commit config edits to a Git history. Default ``true``; the
+   *  off switch is an expert-only Appearance toggle. */
+  version_history_enabled: boolean;
   /** Highest onboarding-flow version the user has acknowledged.
    *  ``0`` ⇒ never gone through onboarding. The dashboard surfaces
    *  the wizard whenever this is below the server's

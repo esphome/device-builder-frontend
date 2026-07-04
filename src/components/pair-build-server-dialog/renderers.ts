@@ -31,9 +31,11 @@ function renderFooter(
 ): TemplateResult {
   return html`
     <div slot="footer" class="dialog-footer">
-      ${host._error
-        ? html`<div class="step-error" role="alert">${host._error}</div>`
-        : nothing}
+      ${
+        host._error
+          ? html`<div class="step-error" role="alert">${host._error}</div>`
+          : nothing
+      }
       <div class="actions">${actions}</div>
     </div>
   `;
@@ -102,9 +104,11 @@ export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateRes
           ?disabled=${!canSubmit}
           @click=${host._onPreviewSubmit}
         >
-          ${host._busy
-            ? host._localize("settings.pair_build_server_previewing")
-            : host._localize("settings.pair_build_server_preview_action")}
+          ${
+            host._busy
+              ? host._localize("settings.pair_build_server_previewing")
+              : host._localize("settings.pair_build_server_preview_action")
+          }
         </button>
       `
     )}
@@ -130,30 +134,32 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
          polite live region cover both states, so a screen reader hears
          "connecting…" and then the fingerprint when the auto-preview lands. -->
     <div class="pin-card" role="status">
-      ${connecting
-        ? html`
-            <div class="pin-connecting">
-              <wa-spinner></wa-spinner>
-              <span>
-                ${host._localize("settings.pair_build_server_connecting", {
+      ${
+        connecting
+          ? html`
+              <div class="pin-connecting">
+                <wa-spinner></wa-spinner>
+                <span>
+                  ${host._localize("settings.pair_build_server_connecting", {
+                    hostname: trimTrailingDot(host._hostname),
+                    port: host._port,
+                  })}
+                </span>
+              </div>
+            `
+          : html`
+              <span class="pin-card-label">
+                ${host._localize("settings.pair_build_server_pin_label")}
+              </span>
+              ${renderFingerprint(host, host._previewedPin)}
+              <span class="pin-card-target">
+                ${host._localize("settings.pair_build_server_target", {
                   hostname: trimTrailingDot(host._hostname),
                   port: host._port,
                 })}
               </span>
-            </div>
-          `
-        : html`
-            <span class="pin-card-label">
-              ${host._localize("settings.pair_build_server_pin_label")}
-            </span>
-            ${renderFingerprint(host, host._previewedPin)}
-            <span class="pin-card-target">
-              ${host._localize("settings.pair_build_server_target", {
-                hostname: trimTrailingDot(host._hostname),
-                port: host._port,
-              })}
-            </span>
-          `}
+            `
+      }
     </div>
     <div class="trust-warning" role="alert">
       ${host._localize("settings.pair_build_server_trust_warning")}
@@ -211,18 +217,22 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
           ?disabled=${host._sending}
           @click=${host._onConfirmBack}
         >
-          ${host._skippedInput
-            ? host._localize("layout.cancel")
-            : host._localize("layout.back")}
+          ${
+            host._skippedInput
+              ? host._localize("layout.cancel")
+              : host._localize("layout.back")
+          }
         </button>
         <button
           class="btn btn--primary"
           ?disabled=${!canSubmit}
           @click=${host._onConfirmSubmit}
         >
-          ${host._busy && !connecting
-            ? host._localize("settings.pair_build_server_sending")
-            : host._localize("settings.pair_build_server_request_action")}
+          ${
+            host._busy && !connecting
+              ? host._localize("settings.pair_build_server_sending")
+              : host._localize("settings.pair_build_server_request_action")
+          }
         </button>
       `
     )}
@@ -238,20 +248,22 @@ export function renderSentStep(host: ESPHomePairBuildServerDialog): TemplateResu
         port: host._port,
       })}
     </div>
-    ${identity
-      ? html`
-          <div class="pin-card">
-            <span class="pin-card-label">
-              ${host._localize("settings.pair_build_server_sent_dashboard_id_label")}
-            </span>
-            <code>${identity.dashboard_id}</code>
-            <span class="pin-card-label">
-              ${host._localize("settings.pair_build_server_sent_pin_label")}
-            </span>
-            ${renderFingerprint(host, identity.pin_sha256)}
-          </div>
-        `
-      : nothing}
+    ${
+      identity
+        ? html`
+            <div class="pin-card">
+              <span class="pin-card-label">
+                ${host._localize("settings.pair_build_server_sent_dashboard_id_label")}
+              </span>
+              <code>${identity.dashboard_id}</code>
+              <span class="pin-card-label">
+                ${host._localize("settings.pair_build_server_sent_pin_label")}
+              </span>
+              ${renderFingerprint(host, identity.pin_sha256)}
+            </div>
+          `
+        : nothing
+    }
     <div slot="footer" class="actions">
       <button class="btn btn--primary" @click=${host.close}>
         ${host._localize("layout.close")}

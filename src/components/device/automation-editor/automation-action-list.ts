@@ -89,29 +89,35 @@ export class ESPHomeAutomationActionList extends LitElement {
   protected render() {
     return html`
       <div class=${this.noHeader ? "" : "ae-section"}>
-        ${this.noHeader
-          ? nothing
-          : html`<label class="ae-section-label"
-              >${this._localize("device.automation_action")}</label
-            >`}
-        ${this.actions.length === 0
-          ? html`<p class="ae-empty-block" role="status">
-              ${this._localize("device.automation_actions_empty")}
-            </p>`
-          : this.actions.map((node, idx) =>
-              this._renderRow(node, idx, idx === this.actions.length - 1)
-            )}
-        ${this.hideAdd
-          ? nothing
-          : html`<button
-              type="button"
-              class="ae-add"
-              ?disabled=${this.disabled || this.catalog.length === 0}
-              @click=${this.openPicker}
-            >
-              <wa-icon library="mdi" name="plus"></wa-icon>
-              ${this._localize("device.add_action")}
-            </button>`}
+        ${
+          this.noHeader
+            ? nothing
+            : html`<label class="ae-section-label"
+                >${this._localize("device.automation_action")}</label
+              >`
+        }
+        ${
+          this.actions.length === 0
+            ? html`<p class="ae-empty-block" role="status">
+                ${this._localize("device.automation_actions_empty")}
+              </p>`
+            : this.actions.map((node, idx) =>
+                this._renderRow(node, idx, idx === this.actions.length - 1)
+              )
+        }
+        ${
+          this.hideAdd
+            ? nothing
+            : html`<button
+                type="button"
+                class="ae-add"
+                ?disabled=${this.disabled || this.catalog.length === 0}
+                @click=${this.openPicker}
+              >
+                <wa-icon library="mdi" name="plus"></wa-icon>
+                ${this._localize("device.add_action")}
+              </button>`
+        }
         <esphome-catalog-picker-dialog
           kind="action"
           .items=${this.catalog}

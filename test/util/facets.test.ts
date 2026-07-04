@@ -10,9 +10,12 @@ import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facets.js";
 
-// computeUpdateFacet only reads update_available / has_pending_changes.
+// computeUpdateFacet reads update_available / has_pending_changes, gated on
+// active_source via showUpdateAvailable / showPendingChanges.
 function device(over: Partial<ConfiguredDevice>): ConfiguredDevice {
-  return over as ConfiguredDevice;
+  // Default to a live mDNS source so update/modified buckets surface; the
+  // mDNS-dark cases pass active_source explicitly.
+  return { active_source: "mdns", ...over } as ConfiguredDevice;
 }
 
 // Echo the key so assertions key off the i18n id, not display copy.

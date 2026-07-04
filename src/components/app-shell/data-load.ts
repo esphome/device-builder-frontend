@@ -11,6 +11,7 @@ export function applyPreferences(host: ESPHomeApp, prefs: UserPreferences): void
   host.applyTheme(prefs.theme);
   host._experienceLevel = prefs.experience_level;
   host._remoteComputeOnly = prefs.remote_compute_only;
+  host._versionHistoryEnabled = prefs.version_history_enabled;
 }
 
 export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {

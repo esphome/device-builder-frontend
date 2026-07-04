@@ -1,30 +1,17 @@
 /**
- * Recursive walkers over a `ConfigEntry[]` tree. Used by the section
- * editor to (a) decide whether to show the "advanced" toggle, and
- * (b) locate the first entry referenced by a validation-error map.
+ * Recursive walkers over a `ConfigEntry[]` tree: reveal advanced fields
+ * under the caret and locate the first entry referenced by a
+ * validation-error map.
  */
 
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import type { ValidationError } from "./config-validation.js";
 
-/**
- * Show-advanced state for the action params form. An all-advanced
- * action (e.g. `delay`) force-opens the form with no toggle; otherwise
- * the toggle shows and follows the user's choice.
- */
-export function actionAdvancedState(
-  entries: ConfigEntry[],
-  userShowAdvanced: boolean
-): { showAdvanced: boolean; showToggle: boolean } {
-  const allAdvanced = entries.length > 0 && entries.every((e) => e.advanced);
-  return {
-    showAdvanced: allAdvanced || userShowAdvanced,
-    showToggle: anyAdvancedEntry(entries) && !allAdvanced,
-  };
-}
-
-/** True when `entries` contains any advanced entry, recursively. */
+/** True when `entries` contains any advanced entry, recursively. Drives whether
+ *  the advanced-settings control shows at all: a nested advanced field reveals
+ *  in place (it can't move to the bottom section), so the control must surface
+ *  even when no *top-level* unit is advanced, or the field is unreachable. */
 export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
   for (const entry of entries) {
     if (entry.advanced) return true;

@@ -192,15 +192,17 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       <div class="list">
         ${this._renderOtaOption(isOnline)}
         ${showUsbRow ? this._renderUsbOption(availability) : nothing}
-        ${showServerSerialRow
-          ? html`<div class="option" @click=${this._onServerSerial}>
-              <wa-icon library="mdi" name="serial-port"></wa-icon>
-              <div class="info">
-                <span class="title">${this._localize(serverSerialKeys.title)}</span>
-                <span class="desc">${this._localize(serverSerialKeys.desc)}</span>
-              </div>
-            </div>`
-          : nothing}
+        ${
+          showServerSerialRow
+            ? html`<div class="option" @click=${this._onServerSerial}>
+                <wa-icon library="mdi" name="serial-port"></wa-icon>
+                <div class="info">
+                  <span class="title">${this._localize(serverSerialKeys.title)}</span>
+                  <span class="desc">${this._localize(serverSerialKeys.desc)}</span>
+                </div>
+              </div>`
+            : nothing
+        }
       </div>
       ${this._renderAdvancedSection()}
     `;
@@ -361,36 +363,40 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         <wa-icon library="mdi" name="arrow-left"></wa-icon>
         ${this._localize("dashboard.install_method_back")}
       </button>
-      ${this._portsPoll.ports.length === 0
-        ? html`<div class="empty">
-            ${this._localize("dashboard.install_method_no_ports")}
-          </div>`
-        : html`
-            <div class="list">
-              ${this._portsPoll.ports.map(
-                (p) => html`
-                  <div
-                    class=${classMap({
-                      option: true,
-                      "is-new": this._portsPoll.newPorts.has(p.port),
-                    })}
-                    @click=${() => this._selectPort(p.port)}
-                  >
-                    <wa-icon library="mdi" name="serial-port"></wa-icon>
-                    <div class="info">
-                      <span class="title">${p.port}</span>
-                      ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
+      ${
+        this._portsPoll.ports.length === 0
+          ? html`<div class="empty">
+              ${this._localize("dashboard.install_method_no_ports")}
+            </div>`
+          : html`
+              <div class="list">
+                ${this._portsPoll.ports.map(
+                  (p) => html`
+                    <div
+                      class=${classMap({
+                        option: true,
+                        "is-new": this._portsPoll.newPorts.has(p.port),
+                      })}
+                      @click=${() => this._selectPort(p.port)}
+                    >
+                      <wa-icon library="mdi" name="serial-port"></wa-icon>
+                      <div class="info">
+                        <span class="title">${p.port}</span>
+                        ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
+                      </div>
+                      ${
+                        this._portsPoll.newPorts.has(p.port)
+                          ? html`<span class="new-badge"
+                              >${this._localize("dashboard.serial_port_new")}</span
+                            >`
+                          : nothing
+                      }
                     </div>
-                    ${this._portsPoll.newPorts.has(p.port)
-                      ? html`<span class="new-badge"
-                          >${this._localize("dashboard.serial_port_new")}</span
-                        >`
-                      : nothing}
-                  </div>
-                `
-              )}
-            </div>
-          `}
+                  `
+                )}
+              </div>
+            `
+      }
     `;
   }
 
@@ -486,42 +492,44 @@ export class ESPHomeInstallMethodDialog extends LitElement {
             name=${expanded ? "chevron-up" : "chevron-down"}
           ></wa-icon>
         </button>
-        ${expanded
-          ? html`
-              <div id="ota-address-form" class="option-collapsible__body">
-                <input
-                  class="ota-form-input"
-                  type="text"
-                  autocomplete="off"
-                  spellcheck="false"
-                  placeholder="192.168.1.42"
-                  aria-labelledby="ota-address-title"
-                  .value=${this._otaAddressValue}
-                  @input=${(e: Event) => {
-                    this._otaAddressValue = (e.target as HTMLInputElement).value;
-                  }}
-                  @keydown=${(e: KeyboardEvent) => {
-                    if (e.key === "Enter" && canSubmit) {
-                      this._submitOtaAddress();
-                    }
-                  }}
-                />
-                <div class="ota-form-actions">
-                  <button
-                    class="btn btn--primary"
-                    ?disabled=${!canSubmit}
-                    @click=${this._submitOtaAddress}
-                  >
-                    ${this._localize(
-                      this.mode === "logs"
-                        ? "dashboard.logs_method_network_address_submit"
-                        : "dashboard.install_method_network_address_submit"
-                    )}
-                  </button>
+        ${
+          expanded
+            ? html`
+                <div id="ota-address-form" class="option-collapsible__body">
+                  <input
+                    class="ota-form-input"
+                    type="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="192.168.1.42"
+                    aria-labelledby="ota-address-title"
+                    .value=${this._otaAddressValue}
+                    @input=${(e: Event) => {
+                      this._otaAddressValue = (e.target as HTMLInputElement).value;
+                    }}
+                    @keydown=${(e: KeyboardEvent) => {
+                      if (e.key === "Enter" && canSubmit) {
+                        this._submitOtaAddress();
+                      }
+                    }}
+                  />
+                  <div class="ota-form-actions">
+                    <button
+                      class="btn btn--primary"
+                      ?disabled=${!canSubmit}
+                      @click=${this._submitOtaAddress}
+                    >
+                      ${this._localize(
+                        this.mode === "logs"
+                          ? "dashboard.logs_method_network_address_submit"
+                          : "dashboard.install_method_network_address_submit"
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            `
-          : nothing}
+              `
+            : nothing
+        }
       </div>
     `;
   }

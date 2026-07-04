@@ -1,6 +1,7 @@
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.js";
-import { buildFormRenderPlan, planRendersContent } from "./config-entry-form-plan.js";
+import { isEntryVisible } from "../../util/config-validation.js";
+import { buildFormRenderPlan, planNeedsUserInput } from "./config-entry-form-plan.js";
 import {
   collectRenderablePaths,
   renderFilterOptions,
@@ -47,12 +48,14 @@ export function addFormRenderablePaths(
 
 /**
  * Whether the add-component form would paint anything the user must engage
- * with: a plain field, an exclusive-group dropdown, a constraint-cluster box,
- * or an unsatisfied-constraint banner. Built on the same `buildFormRenderPlan`
- * the form's `render()` uses, so the dialog's empty-form gate can't drift from
- * the actual paint. `false` means the form body would be blank.
+ * with: an unlocked plain field, an exclusive-group dropdown, a
+ * constraint-cluster box, or an unsatisfied-constraint banner. Built on the
+ * same `buildFormRenderPlan` the form's `render()` uses, so the dialog's
+ * skip-the-form gate can't drift from the actual paint. `false` means the form
+ * would be a dead-end (blank, or only board-locked read-only fields) and the
+ * caller should add the component without showing it.
  */
-export function addFormPaintsAnything(
+export function addFormNeedsUserInput(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   requiredGroups: RequiredGroup[],
@@ -61,7 +64,12 @@ export function addFormPaintsAnything(
 ): boolean {
   const opts = addFormFilterOptions(board, presentComponents);
   const plan = buildFormRenderPlan(entries, values, requiredGroups, opts);
-  if (planRendersContent(plan)) return true;
+  // Group/cluster members are unfiltered in the plan; gate them on the same
+  // visibility the form uses so a hidden unlocked member can't keep the form
+  // open when every rendered field is board-locked.
+  const isVisible = (entry: ConfigEntry): boolean =>
+    isEntryVisible(entry, values, opts.presentComponents, opts.targetPlatform ?? null);
+  if (planNeedsUserInput(plan, isVisible)) return true;
   // Pure-cardinality groups with no cluster box surface a banner only when
   // unsatisfied; keys are irrelevant to presence, so format to "".
   return (

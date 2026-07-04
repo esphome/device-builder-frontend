@@ -130,28 +130,30 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
       >
         <div class="body">
           ${this._renderSteps()} ${this._renderScreen()}
-          ${this._error
-            ? html`<p class="error" role="alert">${this._error}</p>`
-            : nothing}
+          ${
+            this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing
+          }
         </div>
         <div slot="footer" class="actions">
-          ${this._index > 0
-            ? html`<button
-                type="button"
-                class="btn btn--cancel"
-                ?disabled=${this._saving}
-                @click=${this._onBack}
-              >
-                ${this._localize("onboarding.wizard.back")}
-              </button>`
-            : html`<button
-                type="button"
-                class="btn btn--cancel"
-                ?disabled=${this._saving}
-                @click=${this._dismissForSession}
-              >
-                ${this._localize("onboarding.wizard.dismiss")}
-              </button>`}
+          ${
+            this._index > 0
+              ? html`<button
+                  type="button"
+                  class="btn btn--cancel"
+                  ?disabled=${this._saving}
+                  @click=${this._onBack}
+                >
+                  ${this._localize("onboarding.wizard.back")}
+                </button>`
+              : html`<button
+                  type="button"
+                  class="btn btn--cancel"
+                  ?disabled=${this._saving}
+                  @click=${this._dismissForSession}
+                >
+                  ${this._localize("onboarding.wizard.dismiss")}
+                </button>`
+          }
           <span class="spacer"></span>
           <button
             type="button"
@@ -159,11 +161,13 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
             ?disabled=${!this._canContinue}
             @click=${this._onContinue}
           >
-            ${this._saving
-              ? this._localize("onboarding.wizard.saving")
-              : this._isLast
-                ? this._localize("onboarding.wizard.finish")
-                : this._localize("onboarding.wizard.continue")}
+            ${
+              this._saving
+                ? this._localize("onboarding.wizard.saving")
+                : this._isLast
+                  ? this._localize("onboarding.wizard.finish")
+                  : this._localize("onboarding.wizard.continue")
+            }
           </button>
         </div>
       </esphome-base-dialog>

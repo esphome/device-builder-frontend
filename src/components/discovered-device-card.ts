@@ -262,36 +262,46 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
     return html`
       <div class="card" ?data-ignored=${this.device.ignored}>
         <span class="status">
-          ${this.device.ignored
-            ? this._localize("dashboard.discovered_ignored")
-            : this._localize("dashboard.discovered_status")}
+          ${
+            this.device.ignored
+              ? this._localize("dashboard.discovered_ignored")
+              : this._localize("dashboard.discovered_status")
+          }
         </span>
         <div class="header">
           <h3 class="title">${title}</h3>
           <div class="subtitle">
-            ${showHostname
-              ? html`<span class="hostname">${this.device.name}</span> · `
-              : nothing}
-            ${this.device.project_name}${this.device.project_version
-              ? html` <span>${this.device.project_version}</span>`
-              : nothing}
+            ${
+              showHostname
+                ? html`<span class="hostname">${this.device.name}</span> · `
+                : nothing
+            }
+            ${this.device.project_name}${
+              this.device.project_version
+                ? html` <span>${this.device.project_version}</span>`
+                : nothing
+            }
           </div>
         </div>
         <div class="actions">
-          ${this.device.ignored
-            ? nothing
-            : html`
-                <button class="btn btn--primary" @click=${() => this._emit("adopt")}>
-                  <wa-icon library="mdi" name="download"></wa-icon>
-                  ${this._localize("dashboard.action_take_control")}
-                </button>
-              `}
-          ${safeWebUrl && !this.compact
-            ? renderVisitWebUiLink(safeWebUrl, this._localize, {
-                className: "btn btn--ghost btn--icon",
-                onClick: (e) => e.stopPropagation(),
-              })
-            : nothing}
+          ${
+            this.device.ignored
+              ? nothing
+              : html`
+                  <button class="btn btn--primary" @click=${() => this._emit("adopt")}>
+                    <wa-icon library="mdi" name="download"></wa-icon>
+                    ${this._localize("dashboard.action_take_control")}
+                  </button>
+                `
+          }
+          ${
+            safeWebUrl && !this.compact
+              ? renderVisitWebUiLink(safeWebUrl, this._localize, {
+                  className: "btn btn--ghost btn--icon",
+                  onClick: (e) => e.stopPropagation(),
+                })
+              : nothing
+          }
           <button
             class="btn btn--ghost"
             title=${this._localize(

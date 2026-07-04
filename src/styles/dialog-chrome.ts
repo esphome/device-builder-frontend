@@ -113,7 +113,12 @@ export const primaryHeaderDialogStyles = css`
     opacity: 0.85;
   }
 
-  .back-button:hover {
+  .back-button:hover:not(:disabled) {
     opacity: 1;
+  }
+
+  .back-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 `;

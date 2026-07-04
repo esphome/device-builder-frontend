@@ -216,34 +216,36 @@ export class ESPHomeTableColumnToggle extends LitElement {
         <wa-icon library="mdi" name="cog-outline"></wa-icon>
         <span class="label">${this._localize("dashboard.table_columns")}</span>
       </button>
-      ${this._open
-        ? html`
-            <div class="backdrop" @click=${this._close}></div>
-            <div class="menu">
-              <div class="menu-label">
-                ${this._localize("dashboard.table_toggle_columns")}
+      ${
+        this._open
+          ? html`
+              <div class="backdrop" @click=${this._close}></div>
+              <div class="menu">
+                <div class="menu-label">
+                  ${this._localize("dashboard.table_toggle_columns")}
+                </div>
+                <div class="menu-divider"></div>
+                ${this.columns.map(
+                  (col) => html`
+                    <div
+                      class="menu-item"
+                      role="menuitemcheckbox"
+                      aria-checked=${col.visible}
+                      tabindex="0"
+                      @click=${() => this._onToggle(col.id, !col.visible)}
+                      @keydown=${this._onItemKeydown}
+                    >
+                      <span class="checkbox ${col.visible ? "checked" : ""}">
+                        <wa-icon library="mdi" name="check"></wa-icon>
+                      </span>
+                      ${col.header}
+                    </div>
+                  `
+                )}
               </div>
-              <div class="menu-divider"></div>
-              ${this.columns.map(
-                (col) => html`
-                  <div
-                    class="menu-item"
-                    role="menuitemcheckbox"
-                    aria-checked=${col.visible}
-                    tabindex="0"
-                    @click=${() => this._onToggle(col.id, !col.visible)}
-                    @keydown=${this._onItemKeydown}
-                  >
-                    <span class="checkbox ${col.visible ? "checked" : ""}">
-                      <wa-icon library="mdi" name="check"></wa-icon>
-                    </span>
-                    ${col.header}
-                  </div>
-                `
-              )}
-            </div>
-          `
-        : nothing}
+            `
+          : nothing
+      }
     `;
   }
 

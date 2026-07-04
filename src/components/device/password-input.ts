@@ -170,21 +170,23 @@ export class ESPHomePasswordInput extends LitElement {
           aria-describedby=${this.describedby || nothing}
           @input=${this._onInput}
         />
-        ${this.revealed
-          ? // A parent-forced reveal wins, so the per-field eye would be a
-            // dead toggle — hide it rather than show a no-op control.
-            nothing
-          : html`<button
-              type="button"
-              class="toggle"
-              ?disabled=${this.disabled}
-              aria-label=${label}
-              title=${label}
-              aria-pressed=${revealed}
-              @click=${this._onToggle}
-            >
-              <wa-icon library="mdi" name=${revealed ? "eye-off" : "eye"}></wa-icon>
-            </button>`}
+        ${
+          this.revealed
+            ? // A parent-forced reveal wins, so the per-field eye would be a
+              // dead toggle — hide it rather than show a no-op control.
+              nothing
+            : html`<button
+                type="button"
+                class="toggle"
+                ?disabled=${this.disabled}
+                aria-label=${label}
+                title=${label}
+                aria-pressed=${revealed}
+                @click=${this._onToggle}
+              >
+                <wa-icon library="mdi" name=${revealed ? "eye-off" : "eye"}></wa-icon>
+              </button>`
+        }
       </div>
     `;
   }

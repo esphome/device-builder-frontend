@@ -24,7 +24,11 @@ import type {
   ParsedAutomation,
   YamlDiff,
 } from "./types/automations.js";
-import type { BoardCatalogEntry, PagedBoardsResponse } from "./types/boards.js";
+import type {
+  BoardCatalogEntry,
+  PagedBoardsResponse,
+  SlimBoard,
+} from "./types/boards.js";
 import type {
   ComponentCatalogEntry,
   PagedComponentsResponse,
@@ -35,6 +39,7 @@ import type {
   DevicesResponse,
   ImportBundleResponse,
   Label,
+  RenameDeviceResponse,
   UpdateDeviceResponse,
   WizardResponse,
   YamlSearchHit,
@@ -798,10 +803,11 @@ export class ESPHomeAPI {
 
   /** Rename a device (renames YAML file + ``esphome.name``).
    *
-   *  Default kicks off a queued firmware ``RENAME`` job that compiles,
-   *  OTA-installs, and swaps the YAML; the returned ``job`` is what the
-   *  caller follows in the command-dialog so the user sees streaming
-   *  output. Only succeeds against a reachable device.
+   *  Default queues a rename chain: ``job`` is the COMPILE of the renamed
+   *  YAML (the follow target) and ``tail_job`` the dependent RENAME that
+   *  flashes the old address and swaps the files. Older backends return a
+   *  fused ``RENAME`` as ``job`` with no ``tail_job``. Only succeeds
+   *  against a reachable device.
    *
    *  ``configOnly`` renames the YAML + ``esphome.name`` with no compile
    *  or flash and returns ``job: null``, used after the user confirms
@@ -811,8 +817,8 @@ export class ESPHomeAPI {
     configuration: string,
     newName: string,
     configOnly = false
-  ): Promise<{ configuration: string; job: FirmwareJob | null }> {
-    return this.sendCommand<{ configuration: string; job: FirmwareJob | null }>(
+  ): Promise<RenameDeviceResponse> {
+    return this.sendCommand<RenameDeviceResponse>(
       "devices/rename",
       { configuration, new_name: newName, ...(configOnly ? { config_only: true } : {}) },
       60000
@@ -1308,7 +1314,10 @@ export class ESPHomeAPI {
 
   // ─── Board Commands ───────────────────────────────────────
 
-  /** Get a single board by ID. */
+  /** Get a single board by ID. Callers should go through
+   *  ``board-body-cache.ts`` rather than calling this directly, so full
+   *  bodies are coalesced and cached for the session instead of being
+   *  refetched per call site. */
   async getBoard(boardId: string): Promise<BoardCatalogEntry | null> {
     const board = await this.sendCommand<BoardCatalogEntry | null>("boards/get_board", {
       board_id: boardId,
@@ -1320,7 +1329,7 @@ export class ESPHomeAPI {
    * Boards interchangeable with this one (same PlatformIO target);
    * includes `boardId` itself.
    */
-  async getCompatibleBoards(boardId: string): Promise<BoardCatalogEntry[]> {
+  async getCompatibleBoards(boardId: string): Promise<SlimBoard[]> {
     const response = await this.sendCommand<PagedBoardsResponse>(
       "boards/get_compatible_boards",
       { board_id: boardId }

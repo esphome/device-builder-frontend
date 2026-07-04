@@ -5,15 +5,15 @@ import {
 } from "../../../src/components/wizard/wizard-step-board-platforms.js";
 
 describe("wizard step-board platform chips", () => {
-  it("includes an LN882x chip backed by the ln882x platform", () => {
+  it("includes an LN882H chip backed by the ln882x platform", () => {
     // Without this chip, users with LightLink LN882x hardware
     // had to scroll the OTHER BOARDS list to find their board.
-    // The backend's `_PLATFORM_KEYS` already advertises
-    // `ln882x`, so the FE chip just resolves to a real query.
-    const ln882x = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "LN882x");
-    expect(ln882x).toBeDefined();
-    expect(ln882x?.platform).toBe("ln882x");
-    expect(ln882x?.variant).toBe("");
+    // The backend's `_PLATFORM_KEYS` already advertises `ln882x`;
+    // the single LN882H chip family resolves the platform by `mcu`.
+    const ln882h = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "LN882H");
+    expect(ln882h).toBeDefined();
+    expect(ln882h?.platform).toBe("ln882x");
+    expect(ln882h?.mcu).toBe("ln882h");
   });
 
   it("includes an nRF52 chip backed by the nrf52 platform", () => {
@@ -44,19 +44,29 @@ describe("wizard step-board platform chips", () => {
     expect(rp2350?.mcu).toBe("rp2350");
   });
 
-  it("groups the libretiny-family chips (BK72xx / RTL87xx / LN882x) adjacent", () => {
-    // The three libretiny-based platforms sit next to each
-    // other so the user scanning the chip row sees them as a
-    // family. A regression that re-orders them into different
-    // positions wouldn't break functionality but would hurt
-    // discoverability — pin the ordering.
+  it("splits the libretiny platforms into per-chip filters, kept adjacent", () => {
+    // The libretiny platforms bundle genuinely different silicon, so each
+    // is split into per-chip filters (BK7231/BK7238/BK7251, RTL8710B/
+    // RTL8720C, LN882H) told apart by `mcu`, the same way rp2040 splits.
+    // They stay contiguous so the user scanning the chip row sees them as
+    // one family; pin both the mapping and the ordering.
+    const bk72xx = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === "bk72xx");
+    expect(bk72xx.map((p) => [p.label, p.mcu])).toEqual([
+      ["BK7231", "bk7231"],
+      ["BK7238", "bk7238"],
+      ["BK7251", "bk7251"],
+    ]);
+    const rtl = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === "rtl87xx");
+    expect(rtl.map((p) => [p.label, p.mcu])).toEqual([
+      ["RTL8710B", "rtl8710b"],
+      ["RTL8720C", "rtl8720c"],
+    ]);
+
     const labels = WIZARD_BOARD_PLATFORMS.map((p) => p.label);
-    const bk = labels.indexOf("BK72xx");
-    const rtl = labels.indexOf("RTL87xx");
-    const ln = labels.indexOf("LN882x");
-    expect(bk).toBeGreaterThanOrEqual(0);
-    expect(rtl).toBe(bk + 1);
-    expect(ln).toBe(rtl + 1);
+    const first = labels.indexOf("BK7231");
+    expect(first).toBeGreaterThanOrEqual(0);
+    const chain = ["BK7231", "BK7238", "BK7251", "RTL8710B", "RTL8720C", "LN882H"];
+    expect(labels.slice(first, first + chain.length)).toEqual(chain);
   });
 
   describe("chipNameToFilterLabel", () => {

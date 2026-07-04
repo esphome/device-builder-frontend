@@ -105,20 +105,6 @@ export const deviceSectionConfigStyles = css`
     gap: var(--wa-space-m);
   }
 
-  /* "Show advanced settings" toggle row, shown below the form when
-     the section has any advanced entries (at any depth). */
-  .advanced-toggle-row {
-    display: flex;
-    justify-content: flex-start;
-    margin-top: var(--wa-space-s);
-    font-size: var(--wa-font-size-s);
-  }
-
-  .advanced-toggle-row wa-switch {
-    font-weight: var(--wa-font-weight-semibold);
-    color: var(--wa-color-text-quiet);
-  }
-
   .actions {
     display: flex;
     align-items: center;

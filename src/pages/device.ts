@@ -30,6 +30,8 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
+import { fetchBoard } from "../util/board-body-cache.js";
+import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
@@ -599,7 +601,7 @@ export class ESPHomePageDevice extends LitElement {
       // board on the device editor. The BE handles deriving board_id
       // from YAML on its side (see `_resolve_board_id`), so we don't
       // need a YAML-regex fallback here.
-      const board = await this._api.getBoard(boardId);
+      const board = await fetchBoard(this._api, boardId);
       // Guard against late responses overwriting a newer fetch — if
       // the user navigated to another device while this was in flight,
       // `_loadedBoardId` will already point at the new id.
@@ -1024,37 +1026,43 @@ export class ESPHomePageDevice extends LitElement {
             @change-board=${this._onChangeBoard}
             ?hasUnsavedEdits=${this._isDirty}
             ?saving=${this._saving}
-            ?hasPendingChanges=${this._device?.has_pending_changes === true}
-            ?hasUpdateAvailable=${this._device?.update_available === true}
+            ?showModified=${this._device ? showPendingChanges(this._device) : false}
+            ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
             .installedVersion=${this._device?.deployed_version ?? ""}
             .availableVersion=${this._device?.current_version ?? ""}
             ?busy=${this._activeJobs.has(this.id)}
           >
-            ${showEdgeTab || this._selectedSection
-              ? html`<div slot="header-start" class="header-start-group">
-                  ${showEdgeTab
-                    ? html`<button
-                        type="button"
-                        class="ghost-icon-btn nav-toggle-btn"
-                        @click=${this._onNavExpand}
-                        title=${this._localize("device.show_navigator")}
-                        aria-label=${this._localize("device.show_navigator")}
-                      >
-                        <wa-icon library="mdi" name="menu"></wa-icon>
-                      </button>`
-                    : nothing}
-                  ${this._selectedSection
-                    ? html`<button
-                        class="ghost-icon-btn back-btn"
-                        @click=${this._onBack}
-                        title=${backLabel}
-                        aria-label=${backLabel}
-                      >
-                        <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                      </button>`
-                    : nothing}
-                </div>`
-              : nothing}
+            ${
+              showEdgeTab || this._selectedSection
+                ? html`<div slot="header-start" class="header-start-group">
+                    ${
+                      showEdgeTab
+                        ? html`<button
+                            type="button"
+                            class="ghost-icon-btn nav-toggle-btn"
+                            @click=${this._onNavExpand}
+                            title=${this._localize("device.show_navigator")}
+                            aria-label=${this._localize("device.show_navigator")}
+                          >
+                            <wa-icon library="mdi" name="menu"></wa-icon>
+                          </button>`
+                        : nothing
+                    }
+                    ${
+                      this._selectedSection
+                        ? html`<button
+                            class="ghost-icon-btn back-btn"
+                            @click=${this._onBack}
+                            title=${backLabel}
+                            aria-label=${backLabel}
+                          >
+                            <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                          </button>`
+                        : nothing
+                    }
+                  </div>`
+                : nothing
+            }
           </esphome-device-editor>
         </div>
         <esphome-unsaved-changes-dialog

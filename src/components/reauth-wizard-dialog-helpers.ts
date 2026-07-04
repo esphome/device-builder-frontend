@@ -92,8 +92,7 @@ export function buildReauthPairRequest(
  * above.)
  */
 export type ReauthErrorOutcome =
-  | { kind: "terminal_pin_changed" }
-  | { kind: "retryable"; errorKey: string };
+  { kind: "terminal_pin_changed" } | { kind: "retryable"; errorKey: string };
 
 export function classifyReauthError(err: unknown): ReauthErrorOutcome {
   if (err instanceof APIError) {

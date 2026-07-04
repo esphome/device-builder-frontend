@@ -417,8 +417,7 @@ export interface OffloaderPeerRevokedAlert {
  * narrows field access at the consumer.
  */
 export type OffloaderAlertSnapshotEntry =
-  | OffloaderPinMismatchAlert
-  | OffloaderPeerRevokedAlert;
+  OffloaderPinMismatchAlert | OffloaderPeerRevokedAlert;
 
 /**
  * Data payload for the ``remote_build_identity_rotated`` event.

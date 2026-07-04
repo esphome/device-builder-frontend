@@ -6,6 +6,7 @@ import {
   mdiCheckboxMarked,
   mdiChevronDown,
   mdiChevronUp,
+  mdiClockOutline,
   mdiCloseCircle,
   mdiDotsVertical,
   mdiLock,
@@ -38,6 +39,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { matchesDeviceRow } from "../../util/device-search.js";
+import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderDeviceTableBody, renderDeviceTableHead } from "./device-table-grid.js";
@@ -60,6 +62,7 @@ registerMdiIcons({
   "checkbox-marked": mdiCheckboxMarked,
   "chevron-up": mdiChevronUp,
   "chevron-down": mdiChevronDown,
+  "clock-outline": mdiClockOutline,
   "close-circle": mdiCloseCircle,
   "text-box-outline": mdiTextBoxOutline,
   "dots-vertical": mdiDotsVertical,
@@ -282,7 +285,8 @@ export class ESPHomeDeviceTable extends LitElement {
         labels: resolveLabelIds(d.labels, this._labelCatalog),
         config: d.configuration,
         hasPendingChanges: d.has_pending_changes === true,
-        hasUpdateAvailable: d.update_available,
+        showModified: showPendingChanges(d),
+        showUpdate: showUpdateAvailable(d),
         hasQueuedUpdate: d.queued_update === true,
         api_enabled: d.api_enabled === true,
         api_encrypted: d.api_encrypted === true,
@@ -392,9 +396,11 @@ export class ESPHomeDeviceTable extends LitElement {
         .device=${this._contextMenuDevice}
         .position=${this._contextMenuPos}
         ?anchor-right=${this._contextMenuAnchorRight}
-        ?busy=${this._contextMenuDevice
-          ? this.activeJobs.has(this._contextMenuDevice.configuration)
-          : false}
+        ?busy=${
+          this._contextMenuDevice
+            ? this.activeJobs.has(this._contextMenuDevice.configuration)
+            : false
+        }
         @menu-close=${this._closeContextMenu}
         @edit-device=${(e: CustomEvent) => {
           e.stopPropagation();

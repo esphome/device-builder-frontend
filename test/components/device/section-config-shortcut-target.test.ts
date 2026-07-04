@@ -27,9 +27,7 @@ import {
 } from "../../../src/util/yaml-sections.js";
 
 type Target =
-  | null
-  | { kind: "device_on" }
-  | { kind: "component_on"; componentId: string };
+  null | { kind: "device_on" } | { kind: "component_on"; componentId: string };
 
 /** Drive `_shortcutTarget` in isolation — it reads only `yaml`,
  *  `sectionKey`, and `_resolvedFromLine`, no DOM / API. */

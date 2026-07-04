@@ -70,49 +70,53 @@ export class ESPHomeSectionAutomationList extends LitElement {
     return html`<div class="list">
       <div class="header">
         <h4 class="title">${this.heading}</h4>
-        ${this.addLabel !== undefined
-          ? html`<button type="button" class="add" @click=${this._onAdd}>
-              <wa-icon library="mdi" name="plus"></wa-icon>
-              ${this.addLabel}
-            </button>`
-          : nothing}
+        ${
+          this.addLabel !== undefined
+            ? html`<button type="button" class="add" @click=${this._onAdd}>
+                <wa-icon library="mdi" name="plus"></wa-icon>
+                ${this.addLabel}
+              </button>`
+            : nothing
+        }
       </div>
-      ${this.rows.length === 0
-        ? // Only paint the placeholder when there's copy for it — a blank
-          // dashed box + empty ARIA status would just be noise otherwise.
-          this.emptyText !== undefined
-          ? html`<p class="empty" role="status">${this.emptyText}</p>`
-          : nothing
-        : html`<ul class="rows">
-            ${this.rows.map(
-              (row) =>
-                html`<li class="row">
-                  <span class="name">${row.label}</span>
-                  <div class="row-buttons">
-                    <button
-                      type="button"
-                      class="row-edit"
-                      aria-label=${this.editLabel}
-                      title=${this.editLabel}
-                      ?disabled=${locked}
-                      @click=${() => this._emit("edit", row.key)}
-                    >
-                      <wa-icon library="mdi" name="pencil"></wa-icon>
-                    </button>
-                    <button
-                      type="button"
-                      class="row-delete"
-                      aria-label=${this.deleteLabel}
-                      title=${this.deleteLabel}
-                      ?disabled=${locked}
-                      @click=${() => this._emit("delete", row.key)}
-                    >
-                      <wa-icon library="mdi" name="delete"></wa-icon>
-                    </button>
-                  </div>
-                </li>`
-            )}
-          </ul>`}
+      ${
+        this.rows.length === 0
+          ? // Only paint the placeholder when there's copy for it — a blank
+            // dashed box + empty ARIA status would just be noise otherwise.
+            this.emptyText !== undefined
+            ? html`<p class="empty" role="status">${this.emptyText}</p>`
+            : nothing
+          : html`<ul class="rows">
+              ${this.rows.map(
+                (row) =>
+                  html`<li class="row">
+                    <span class="name">${row.label}</span>
+                    <div class="row-buttons">
+                      <button
+                        type="button"
+                        class="row-edit"
+                        aria-label=${this.editLabel}
+                        title=${this.editLabel}
+                        ?disabled=${locked}
+                        @click=${() => this._emit("edit", row.key)}
+                      >
+                        <wa-icon library="mdi" name="pencil"></wa-icon>
+                      </button>
+                      <button
+                        type="button"
+                        class="row-delete"
+                        aria-label=${this.deleteLabel}
+                        title=${this.deleteLabel}
+                        ?disabled=${locked}
+                        @click=${() => this._emit("delete", row.key)}
+                      >
+                        <wa-icon library="mdi" name="delete"></wa-icon>
+                      </button>
+                    </div>
+                  </li>`
+              )}
+            </ul>`
+      }
     </div>`;
   }
 

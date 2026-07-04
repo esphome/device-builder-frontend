@@ -320,36 +320,40 @@ export class ESPHomeLogsDialog extends LitElement {
           ?light=${!this._darkMode}
           ?streaming=${streaming}
         >
-          ${this._backToInstall
-            ? html`<div class="toolbar-slot" slot="toolbar-left">
-                ${renderTermButton({
-                  icon: "arrow-left",
-                  label: this._localize("dashboard.logs_back_to_install"),
-                  title: this._localize("dashboard.logs_back_to_install_tooltip"),
-                  onClick: this._onBackToInstall,
-                })}
-              </div>`
-            : ""}
+          ${
+            this._backToInstall
+              ? html`<div class="toolbar-slot" slot="toolbar-left">
+                  ${renderTermButton({
+                    icon: "arrow-left",
+                    label: this._localize("dashboard.logs_back_to_install"),
+                    title: this._localize("dashboard.logs_back_to_install_tooltip"),
+                    onClick: this._onBackToInstall,
+                  })}
+                </div>`
+              : ""
+          }
           <div class="toolbar-slot" slot="toolbar-right">
-            ${passive
-              ? // Web Serial only; disabled until a port is attached.
-                renderTermButton({
-                  icon: "restart",
-                  label: this._localize("dashboard.logs_reset_device"),
-                  disabled: !hasSerialPort(s),
-                  onClick: this._onResetDevice,
-                })
-              : isOtaNetwork(s)
-                ? // States arrive only over the network/API connection, so the
-                  // toggle is hidden for a server serial source (#539).
-                  renderTermToggle({
-                    active: this._showStates,
-                    onClick: this._toggleShowStates,
-                    icon: "pulse",
-                    label: this._localize("dashboard.logs_states"),
-                    title: toggleLabel,
+            ${
+              passive
+                ? // Web Serial only; disabled until a port is attached.
+                  renderTermButton({
+                    icon: "restart",
+                    label: this._localize("dashboard.logs_reset_device"),
+                    disabled: !hasSerialPort(s),
+                    onClick: this._onResetDevice,
                   })
-                : ""}
+                : isOtaNetwork(s)
+                  ? // States arrive only over the network/API connection, so the
+                    // toggle is hidden for a server serial source (#539).
+                    renderTermToggle({
+                      active: this._showStates,
+                      onClick: this._toggleShowStates,
+                      icon: "pulse",
+                      label: this._localize("dashboard.logs_states"),
+                      title: toggleLabel,
+                    })
+                  : ""
+            }
             <!-- Kept inline: the expand-btn class drives the mobile hide rule. -->
             <button
               type="button"
@@ -373,19 +377,21 @@ export class ESPHomeLogsDialog extends LitElement {
               label: this._localize("dashboard.logs_clear"),
               onClick: this._clearLogs,
             })}
-            ${streaming
-              ? renderTermButton({
-                  icon: "stop",
-                  label: this._localize("dashboard.logs_stop"),
-                  variant: "stop",
-                  onClick: this._onStop,
-                })
-              : renderTermButton({
-                  icon: "play",
-                  label: this._localize("dashboard.logs_start"),
-                  variant: "start",
-                  onClick: this._onStart,
-                })}
+            ${
+              streaming
+                ? renderTermButton({
+                    icon: "stop",
+                    label: this._localize("dashboard.logs_stop"),
+                    variant: "stop",
+                    onClick: this._onStop,
+                  })
+                : renderTermButton({
+                    icon: "play",
+                    label: this._localize("dashboard.logs_start"),
+                    variant: "start",
+                    onClick: this._onStart,
+                  })
+            }
           </div>
         </esphome-process-terminal>
       </esphome-base-dialog>

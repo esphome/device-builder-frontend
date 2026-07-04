@@ -249,9 +249,9 @@ function buildHoverDom(target: HoverTarget, seeAlsoLabel: string): HTMLElement {
         </div>`
       : nothing;
   render(
-    html`${target.description
-      ? html`<p>${renderMarkdown(target.description)}</p>`
-      : nothing}${seeAlso}`,
+    html`${
+      target.description ? html`<p>${renderMarkdown(target.description)}</p>` : nothing
+    }${seeAlso}`,
     dom
   );
   return dom;

@@ -273,41 +273,53 @@ export class ESPHomeMdiIconPicker extends LitElement {
           />
         </div>
         <div class="grid-wrap">
-          ${results.length === 0
-            ? html`<div class="empty">
-                <wa-icon library="mdi" name="magnify" style="font-size: 24px;"></wa-icon>
-                No icons match “${this._query}”
-              </div>`
-            : html`<div class="grid">
-                ${results.map(
-                  (entry) => html`
-                    <button
-                      type="button"
-                      class=${entry.name === selectedName
-                        ? "icon-cell icon-cell--selected"
-                        : "icon-cell"}
-                      title=${`mdi:${entry.name}`}
-                      @click=${() => this._select(entry.name)}
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path fill="currentColor" d=${entry.path}></path>
-                      </svg>
-                    </button>
-                  `
-                )}
-              </div>`}
+          ${
+            results.length === 0
+              ? html`<div class="empty">
+                  <wa-icon
+                    library="mdi"
+                    name="magnify"
+                    style="font-size: 24px;"
+                  ></wa-icon>
+                  No icons match “${this._query}”
+                </div>`
+              : html`<div class="grid">
+                  ${results.map(
+                    (entry) => html`
+                      <button
+                        type="button"
+                        class=${
+                          entry.name === selectedName
+                            ? "icon-cell icon-cell--selected"
+                            : "icon-cell"
+                        }
+                        title=${`mdi:${entry.name}`}
+                        @click=${() => this._select(entry.name)}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path fill="currentColor" d=${entry.path}></path>
+                        </svg>
+                      </button>
+                    `
+                  )}
+                </div>`
+          }
         </div>
         <div class="footer">
           <span>
-            ${results.length === 0
-              ? "No matches"
-              : results.length >= MAX_RESULTS
-                ? `${MAX_RESULTS}+ of ${this._catalog.length.toLocaleString()}`
-                : `${results.length} of ${this._catalog.length.toLocaleString()}`}
+            ${
+              results.length === 0
+                ? "No matches"
+                : results.length >= MAX_RESULTS
+                  ? `${MAX_RESULTS}+ of ${this._catalog.length.toLocaleString()}`
+                  : `${results.length} of ${this._catalog.length.toLocaleString()}`
+            }
           </span>
-          ${selectedName
-            ? html`<span class="footer-name">mdi:${selectedName}</span>`
-            : nothing}
+          ${
+            selectedName
+              ? html`<span class="footer-name">mdi:${selectedName}</span>`
+              : nothing
+          }
         </div>
       </div>
     `;
@@ -327,19 +339,21 @@ export class ESPHomeMdiIconPicker extends LitElement {
         <span class=${name ? "trigger-label" : "trigger-label placeholder"}>
           ${name ? `mdi:${name}` : this.placeholder}
         </span>
-        ${name && !this.disabled
-          ? html`<span
-              class="trigger-clear"
-              role="button"
-              tabindex="-1"
-              title="Clear"
-              @click=${this._clear}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="currentColor" d=${mdiClose}></path>
-              </svg>
-            </span>`
-          : nothing}
+        ${
+          name && !this.disabled
+            ? html`<span
+                class="trigger-clear"
+                role="button"
+                tabindex="-1"
+                title="Clear"
+                @click=${this._clear}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d=${mdiClose}></path>
+                </svg>
+              </span>`
+            : nothing
+        }
         <svg class="trigger-chevron" viewBox="0 0 24 24" aria-hidden="true">
           <path fill="currentColor" d="M7,10L12,15L17,10H7Z"></path>
         </svg>

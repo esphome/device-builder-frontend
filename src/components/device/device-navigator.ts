@@ -410,18 +410,20 @@ export class ESPHomeDeviceNavigator extends LitElement {
         <header class="card-header">
           <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
           <div class="header-actions">
-            ${showSearchToggle
-              ? html`<button
-                  type="button"
-                  class="ghost-icon-btn search-btn"
-                  aria-pressed=${showSearch}
-                  @click=${this._toggleSearch}
-                  title=${this._localize("device.navigator_search_toggle")}
-                  aria-label=${this._localize("device.navigator_search_toggle")}
-                >
-                  <wa-icon library="mdi" name="magnify"></wa-icon>
-                </button>`
-              : nothing}
+            ${
+              showSearchToggle
+                ? html`<button
+                    type="button"
+                    class="ghost-icon-btn search-btn"
+                    aria-pressed=${showSearch}
+                    @click=${this._toggleSearch}
+                    title=${this._localize("device.navigator_search_toggle")}
+                    aria-label=${this._localize("device.navigator_search_toggle")}
+                  >
+                    <wa-icon library="mdi" name="magnify"></wa-icon>
+                  </button>`
+                : nothing
+            }
             <button
               type="button"
               class="ghost-icon-btn collapse-btn"
@@ -440,40 +442,44 @@ export class ESPHomeDeviceNavigator extends LitElement {
             .resultLabel=${resultLabel}
             @navigator-search=${this._onSearchChange}
           ></esphome-navigator-search>
-          ${filtering
-            ? nothing
-            : html`<p class="italic">${this._localize("device.navigator_desc")}</p>`}
+          ${
+            filtering
+              ? nothing
+              : html`<p class="italic">${this._localize("device.navigator_desc")}</p>`
+          }
           <div class="separator"></div>
-          ${filtering && matchCount === 0
-            ? html`<p class="nav-empty" role="status">
-                ${this._localize("device.navigator_search_none")}
-              </p>`
-            : sections.map(({ label, desc, icon, category, actions }, i) => {
-                const rows = matches?.[i] ?? resolved[i];
-                return renderNavSection({
-                  label,
-                  desc,
-                  icon,
-                  actions,
-                  rows,
-                  // Components group by domain; other sections stay flat.
-                  groups:
-                    category === "component" ? this._groupComponents(rows) : undefined,
-                  collapsedGroups: this._collapsedGroups,
-                  onToggleGroup: (key) => this._toggleGroup(key),
-                  open: filtering ? true : this.openSections.has(i),
-                  filtering,
-                  selectedLine: this._selectedLine,
-                  hoveredLine: this._hoveredLine,
-                  onToggle: () => {
-                    if (!filtering) this._toggleSection(i);
-                  },
-                  onItemEnter: (item) =>
-                    this._onItemHover(item.fromLine, item.fromLine, item.toLine),
-                  onItemLeave: () => this._onItemLeave(),
-                  onItemClick: (item) => this._onItemClick(item),
-                });
-              })}
+          ${
+            filtering && matchCount === 0
+              ? html`<p class="nav-empty" role="status">
+                  ${this._localize("device.navigator_search_none")}
+                </p>`
+              : sections.map(({ label, desc, icon, category, actions }, i) => {
+                  const rows = matches?.[i] ?? resolved[i];
+                  return renderNavSection({
+                    label,
+                    desc,
+                    icon,
+                    actions,
+                    rows,
+                    // Components group by domain; other sections stay flat.
+                    groups:
+                      category === "component" ? this._groupComponents(rows) : undefined,
+                    collapsedGroups: this._collapsedGroups,
+                    onToggleGroup: (key) => this._toggleGroup(key),
+                    open: filtering ? true : this.openSections.has(i),
+                    filtering,
+                    selectedLine: this._selectedLine,
+                    hoveredLine: this._hoveredLine,
+                    onToggle: () => {
+                      if (!filtering) this._toggleSection(i);
+                    },
+                    onItemEnter: (item) =>
+                      this._onItemHover(item.fromLine, item.fromLine, item.toLine),
+                    onItemLeave: () => this._onItemLeave(),
+                    onItemClick: (item) => this._onItemClick(item),
+                  });
+                })
+          }
         </div>
       </section>
     `;

@@ -94,13 +94,16 @@ function paramsForm(el: ESPHomeAutomationActionNode): Element {
   return el.shadowRoot!.querySelector("esphome-config-entry-form")!;
 }
 
-/** Drive the real "Show advanced" switch on. */
+/** Drive advanced on via the form's advanced-toggle event (the contract the
+ *  host wires to its _showAdvanced state). */
 function enableAdvanced(el: ESPHomeAutomationActionNode): void {
-  const sw = el.shadowRoot!.querySelector("wa-switch") as HTMLElement & {
-    checked: boolean;
-  };
-  sw.checked = true;
-  sw.dispatchEvent(new Event("change"));
+  paramsForm(el).dispatchEvent(
+    new CustomEvent("advanced-toggle", {
+      detail: { show: true },
+      bubbles: true,
+      composed: true,
+    })
+  );
 }
 
 describe("automation-action-node view-state reset on rebind", () => {

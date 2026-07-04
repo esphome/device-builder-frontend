@@ -231,23 +231,27 @@ export function renderLogs(
           library="mdi"
           name=${host._logsExpanded ? "chevron-up" : "chevron-down"}
         ></wa-icon>
-        ${host._logsExpanded
-          ? host._localize("firmware.hide_details")
-          : host._localize("firmware.show_details")}
+        ${
+          host._logsExpanded
+            ? host._localize("firmware.hide_details")
+            : host._localize("firmware.show_details")
+        }
       </button>
       <button class="logs-toggle" @click=${() => downloadInstallLogs(host)}>
         <wa-icon library="mdi" name="download"></wa-icon>
         ${host._localize("dashboard.logs_download")}
       </button>
     </div>
-    ${host._logsExpanded
-      ? html`<div class="logs-container">
-          <esphome-ansi-log
-            .lines=${host._logLines}
-            ?light=${!host._darkMode}
-          ></esphome-ansi-log>
-        </div>`
-      : nothing}
+    ${
+      host._logsExpanded
+        ? html`<div class="logs-container">
+            <esphome-ansi-log
+              .lines=${host._logLines}
+              ?light=${!host._darkMode}
+            ></esphome-ansi-log>
+          </div>`
+        : nothing
+    }
   `;
 }
 
@@ -270,17 +274,19 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
     const showToggle = host._installer === "web-serial";
     return html`
       <div class="footer">
-        ${showToggle
-          ? html`<button
-              class="btn btn--ghost ${host._showLogsAfterInstall ? "is-active" : ""}"
-              @click=${host._toggleShowLogsAfterInstall}
-              aria-pressed=${host._showLogsAfterInstall ? "true" : "false"}
-              title=${host._localize("command.show_logs_after_install_tooltip")}
-            >
-              <wa-icon library="mdi" name="text-box-outline"></wa-icon>
-              ${host._localize("command.show_logs_after_install")}
-            </button>`
-          : nothing}
+        ${
+          showToggle
+            ? html`<button
+                class="btn btn--ghost ${host._showLogsAfterInstall ? "is-active" : ""}"
+                @click=${host._toggleShowLogsAfterInstall}
+                aria-pressed=${host._showLogsAfterInstall ? "true" : "false"}
+                title=${host._localize("command.show_logs_after_install_tooltip")}
+              >
+                <wa-icon library="mdi" name="text-box-outline"></wa-icon>
+                ${host._localize("command.show_logs_after_install")}
+              </button>`
+            : nothing
+        }
         <button class="btn btn--ghost" @click=${host._cancel}>
           ${host._localize("command.stop")}
         </button>
@@ -354,17 +360,19 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
     host._installer === "web-serial" && host._step === "done" && host._detected !== null;
   return html`
     <div class="footer">
-      ${canShowLogs
-        ? html`<button class="btn btn--primary" @click=${host._showLogsAgain}>
-              <wa-icon library="mdi" name="text-box-outline"></wa-icon>
-              ${host._localize("command.show_logs")}
-            </button>
-            <button class="btn btn--ghost" @click=${host._close}>
+      ${
+        canShowLogs
+          ? html`<button class="btn btn--primary" @click=${host._showLogsAgain}>
+                <wa-icon library="mdi" name="text-box-outline"></wa-icon>
+                ${host._localize("command.show_logs")}
+              </button>
+              <button class="btn btn--ghost" @click=${host._close}>
+                ${host._localize("command.close")}
+              </button>`
+          : html`<button class="btn btn--primary" @click=${host._close}>
               ${host._localize("command.close")}
             </button>`
-        : html`<button class="btn btn--primary" @click=${host._close}>
-            ${host._localize("command.close")}
-          </button>`}
+      }
     </div>
   `;
 }

@@ -35,8 +35,8 @@ export function renderVisitWebUiLink(
     title=${a11yLabel}
     @click=${options.onClick}
   >
-    <wa-icon library="mdi" name="open-in-new"></wa-icon>${options.withLabel
-      ? html` ${label}`
-      : nothing}
+    <wa-icon library="mdi" name="open-in-new"></wa-icon>${
+      options.withLabel ? html` ${label}` : nothing
+    }
   </a>`;
 }

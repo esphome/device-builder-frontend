@@ -500,6 +500,13 @@ describe("categorizeSections", () => {
     expect(components.map((s) => s.key)).toEqual(["sensor", "switch"]);
   });
 
+  it("puts the renamed rp2 platform block into core", () => {
+    // esphome#17145 renames the rp2040 platform key to rp2; both
+    // belong under Core, not Components.
+    const { core } = categorizeSections([mk("rp2"), mk("rp2040")]);
+    expect(core.map((s) => s.key)).toEqual(["rp2", "rp2040"]);
+  });
+
   it("splits a mixed list across all three buckets", () => {
     const result = categorizeSections([mk("esphome"), mk("sensor"), mk("script")]);
     expect(result.core.map((s) => s.key)).toEqual(["esphome"]);

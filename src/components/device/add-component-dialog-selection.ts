@@ -2,6 +2,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
+import { formatApiError } from "../../util/format-api-error.js";
 
 /**
  * Slice of ``ESPHomeAddComponentDialog`` state ``hydrateForSelection`` reads.
@@ -68,15 +69,22 @@ export async function hydrateForSelection(
     );
     if (seq !== host._selectionSeq) return { kind: "stale" };
     if (!entry) {
-      return { kind: "error", message: host._localize("device.add_component_error") };
+      // A null body isn't a thrown error — the fetch resolved but the backend
+      // omitted this id (a stale or wrong backend). ``fetchComponent`` caches
+      // that miss for the session, so a same-session retry won't recover; a
+      // reload re-fetches. Say what went wrong (couldn't load, reload) rather
+      // than the misleading "failed to add".
+      return {
+        kind: "error",
+        message: host._localize("device.add_component_load_failed"),
+      };
     }
     return { kind: "ok", entry };
   } catch (err) {
     if (seq !== host._selectionSeq) return { kind: "stale" };
     return {
       kind: "error",
-      message:
-        err instanceof Error ? err.message : host._localize("device.add_component_error"),
+      message: formatApiError(err, host._localize, "device.add_component_error"),
     };
   }
 }

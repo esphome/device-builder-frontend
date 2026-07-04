@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import {
@@ -28,11 +28,11 @@ export class ESPHomeChangeBoardDialog extends LitElement {
 
   /** The device's current board — shown for context, never in the list. */
   @property({ attribute: false })
-  currentBoard: BoardCatalogEntry | null = null;
+  currentBoard: SlimBoard | null = null;
 
   /** Alternate boards to choose from (current board already excluded). */
   @property({ attribute: false })
-  boards: BoardCatalogEntry[] = [];
+  boards: SlimBoard[] = [];
 
   @state()
   private _open = false;
@@ -82,7 +82,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
     `;
   }
 
-  private _renderBoard(board: BoardCatalogEntry) {
+  private _renderBoard(board: SlimBoard) {
     return html`
       <button type="button" class="board-row" @click=${() => this._select(board)}>
         <img
@@ -94,20 +94,24 @@ export class ESPHomeChangeBoardDialog extends LitElement {
         />
         <div class="board-meta">
           <span class="board-name">${board.name}</span>
-          ${board.manufacturer
-            ? html`<span class="board-mfr">${board.manufacturer}</span>`
-            : nothing}
+          ${
+            board.manufacturer
+              ? html`<span class="board-mfr">${board.manufacturer}</span>`
+              : nothing
+          }
         </div>
-        ${board.is_generic
-          ? html`<wa-badge variant="neutral" pill
-              >${this._localize("device.change_board_generic_tag")}</wa-badge
-            >`
-          : nothing}
+        ${
+          board.is_generic
+            ? html`<wa-badge variant="neutral" pill
+                >${this._localize("device.change_board_generic_tag")}</wa-badge
+              >`
+            : nothing
+        }
       </button>
     `;
   }
 
-  private _select(board: BoardCatalogEntry) {
+  private _select(board: SlimBoard) {
     this.close();
     this.dispatchEvent(
       new CustomEvent<{ boardId: string }>("select-board", {

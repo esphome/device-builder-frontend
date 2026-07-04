@@ -20,7 +20,7 @@ import {
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { Label } from "../api/types/devices.js";
 import { DeviceState } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
@@ -31,8 +31,6 @@ import { labelChipStyles } from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { updateButtonTitle } from "../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
-import "./confirm-queued-update-dialog.js";
-import type { ConfirmQueuedUpdateDialog } from "./confirm-queued-update-dialog.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
   renderEncryptionIcon,
@@ -80,11 +78,16 @@ export class ESPHomeDeviceCard extends LitElement {
   @property({ attribute: false }) name = "";
   @property() configuration = "";
   @property() state: DeviceState = DeviceState.UNKNOWN;
+  // Raw device truth (``has_pending_changes``). Drives the 4-state encryption
+  // lock indicator only — a local YAML edit not yet flashed, independent of
+  // mDNS — so it stays in sync with the drawer's raw-flag badge.
   @property({ type: Boolean, attribute: "has-pending-changes" }) hasPendingChanges =
     false;
-  @property({ type: Boolean, attribute: "has-update-available" }) hasUpdateAvailable =
-    false;
-  @property({ type: Boolean, attribute: "queued-update" }) public queuedUpdate = false;
+  // mDNS-gated display flags (see util/device-sync.ts): whether to surface the
+  // modified / update affordances (dot + install / update button).
+  @property({ type: Boolean, attribute: "show-modified" }) showModified = false;
+  @property({ type: Boolean, attribute: "show-update" }) showUpdate = false;
+  @property({ type: Boolean, attribute: "queued-update" }) queuedUpdate = false;
 
   // Installed + target ESPHome versions for the Update hover.
   @property({ attribute: false }) installedVersion = "";
@@ -92,12 +95,8 @@ export class ESPHomeDeviceCard extends LitElement {
   @property({ type: Boolean, attribute: "api-enabled" }) apiEnabled = false;
   @property({ type: Boolean, attribute: "api-encrypted" }) apiEncrypted = false;
 
-  // Dialog reference for queued update confirmation
-  @query("esphome-confirm-queued-update-dialog")
-  _queuedUpdateConfirmDialog!: ConfirmQueuedUpdateDialog;
-
-  // api_encryption TXT observed via mDNS. Combined with apiEncrypted and
-  // hasPendingChanges to drive the 4-state lock indicator.
+  // api_encryption TXT observed via mDNS. Combined with apiEncrypted and the
+  // raw hasPendingChanges to drive the 4-state lock indicator.
   @property({ attribute: false }) apiEncryptionActive: string | null = null;
 
   @property({ type: Boolean }) busy = false;
@@ -137,10 +136,6 @@ export class ESPHomeDeviceCard extends LitElement {
     // + actions row already stopPropagation so this only fires on body.
     this.addEventListener("click", this._onClick);
     this.addEventListener("contextmenu", this._onHostContextMenu);
-    this.addEventListener(
-      "show-queued-update-confirm",
-      this._onShowQueuedUpdateConfirm as EventListener
-    );
   }
 
   disconnectedCallback() {
@@ -148,10 +143,6 @@ export class ESPHomeDeviceCard extends LitElement {
     this.removeEventListener("keyup", this._onKeyup);
     this.removeEventListener("click", this._onClick);
     this.removeEventListener("contextmenu", this._onHostContextMenu);
-    this.removeEventListener(
-      "show-queued-update-confirm",
-      this._onShowQueuedUpdateConfirm as EventListener
-    );
     super.disconnectedCallback();
   }
 
@@ -173,131 +164,109 @@ export class ESPHomeDeviceCard extends LitElement {
   protected render() {
     return html`
       <div
-        class="device-card ${this.selectMode
-          ? "device-card--selectable"
-          : "device-card--clickable"} ${this.selectMode && this.selected
-          ? "device-card--selected"
-          : ""}"
+        class="device-card ${
+          this.selectMode ? "device-card--selectable" : "device-card--clickable"
+        } ${this.selectMode && this.selected ? "device-card--selected" : ""}"
       >
         <div class="device-card-header">
-          ${this.selectMode
-            ? html`
-                <wa-icon
-                  class="device-checkbox ${this.selected
-                    ? "device-checkbox--checked"
-                    : ""}"
-                  library="mdi"
-                  name=${this.selected ? "checkbox-marked" : "checkbox-blank-outline"}
-                ></wa-icon>
-              `
-            : nothing}
+          ${
+            this.selectMode
+              ? html`
+                  <wa-icon
+                    class="device-checkbox ${
+                      this.selected ? "device-checkbox--checked" : ""
+                    }"
+                    library="mdi"
+                    name=${this.selected ? "checkbox-marked" : "checkbox-blank-outline"}
+                  ></wa-icon>
+                `
+              : nothing
+          }
           <div class="device-card-header-left">
             <div class="device-name-wrap">
               <h3 class="device-name">${this.name}</h3>
-              ${this.hasPendingChanges
-                ? html`<span
-                    class="indicator-dot indicator-dot--modified"
-                    title=${this._localize("dashboard.status_modified")}
-                  ></span>`
-                : nothing}
-              ${this.hasUpdateAvailable
-                ? html`<span
-                    class="indicator-dot indicator-dot--update"
-                    title=${this._localize("dashboard.status_update_available")}
-                  ></span>`
-                : nothing}
+              ${
+                this.showModified
+                  ? html`<span
+                      class="indicator-dot indicator-dot--modified"
+                      title=${this._localize("dashboard.status_modified")}
+                    ></span>`
+                  : nothing
+              }
+              ${
+                this.showUpdate
+                  ? html`<span
+                      class="indicator-dot indicator-dot--update"
+                      title=${this._localize("dashboard.status_update_available")}
+                    ></span>`
+                  : nothing
+              }
+              ${
+                this.queuedUpdate
+                  ? html`<wa-icon
+                      class="indicator-queued"
+                      library="mdi"
+                      name="clock-outline"
+                      title=${this._localize("dashboard.status_queued_update")}
+                    ></wa-icon>`
+                  : nothing
+              }
               ${renderEncryptionIcon(this)}
             </div>
             <p class="device-config">${this.configuration}</p>
           </div>
           ${renderStatusBadge(this)}
         </div>
-        <esphome-confirm-queued-update-dialog
-          .configuration=${this.configuration}
-          @confirm=${this._onConfirmClearQueue}
-        ></esphome-confirm-queued-update-dialog>
         ${renderLabels(this)}
-        ${!this.selectMode
-          ? html`
-              <div class="device-actions" @click=${(e: Event) => e.stopPropagation()}>
-                <button
-                  class="action-btn action-btn--primary"
-                  ?disabled=${this.busy}
-                  @click=${() => this._emit("edit-device")}
-                >
-                  <wa-icon library="mdi" name="pencil"></wa-icon>
-                  ${this._localize("dashboard.edit")}
-                </button>
-                ${this._renderAccentAction()}
-                <button
-                  class="action-btn action-btn--ghost action-btn--tile"
-                  @click=${() => this._emit("open-logs")}
-                  aria-label=${this._localize("dashboard.drawer_logs")}
-                  title=${this._localize("dashboard.drawer_logs")}
-                >
-                  <wa-icon library="mdi" name="text-box-outline"></wa-icon>
-                </button>
-                ${this.webUrl
-                  ? renderVisitWebUiLink(this.webUrl, this._localize, {
-                      className: "action-btn action-btn--ghost action-btn--tile",
-                      onClick: (e) => e.stopPropagation(),
-                    })
-                  : nothing}
-                <button
-                  class="action-btn action-btn--ghost action-btn--icon-only"
-                  aria-label=${this._localize("dashboard.more_options")}
-                  @click=${this._onDotsClick}
-                >
-                  <wa-icon library="mdi" name="dots-vertical"></wa-icon>
-                </button>
-              </div>
-            `
-          : nothing}
+        ${
+          !this.selectMode
+            ? html`
+                <div class="device-actions" @click=${(e: Event) => e.stopPropagation()}>
+                  <button
+                    class="action-btn action-btn--primary"
+                    ?disabled=${this.busy}
+                    @click=${() => this._emit("edit-device")}
+                  >
+                    <wa-icon library="mdi" name="pencil"></wa-icon>
+                    ${this._localize("dashboard.edit")}
+                  </button>
+                  ${this._renderAccentAction()}
+                  <button
+                    class="action-btn action-btn--ghost action-btn--tile"
+                    @click=${() => this._emit("open-logs")}
+                    aria-label=${this._localize("dashboard.drawer_logs")}
+                    title=${this._localize("dashboard.drawer_logs")}
+                  >
+                    <wa-icon library="mdi" name="text-box-outline"></wa-icon>
+                  </button>
+                  ${
+                    this.webUrl
+                      ? renderVisitWebUiLink(this.webUrl, this._localize, {
+                          className: "action-btn action-btn--ghost action-btn--tile",
+                          onClick: (e) => e.stopPropagation(),
+                        })
+                      : nothing
+                  }
+                  <button
+                    class="action-btn action-btn--ghost action-btn--icon-only"
+                    aria-label=${this._localize("dashboard.more_options")}
+                    @click=${this._onDotsClick}
+                  >
+                    <wa-icon library="mdi" name="dots-vertical"></wa-icon>
+                  </button>
+                </div>
+              `
+            : nothing
+        }
       </div>
     `;
   }
-
-  private _onClearQueue(e: Event) {
-    e.stopPropagation(); // Prevent the card from being clicked
-    this.dispatchEvent(
-      new CustomEvent("show-queued-update-confirm", {
-        detail: { configuration: this.configuration },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  _onShowQueuedUpdateConfirm = (e: CustomEvent<{ configuration: string }>) => {
-    if (e.detail.configuration === this.configuration) {
-      this._queuedUpdateConfirmDialog.open = true;
-    }
-  };
-
-  private _onConfirmClearQueue = (e: CustomEvent<{ configuration: string }>) => {
-    this.dispatchEvent(
-      new CustomEvent("clear-queued-update", {
-        detail: e.detail,
-        bubbles: true,
-        composed: true,
-      })
-    );
-  };
 
   // Update / Install accent: icon-only so only Edit keeps a label.
   // Long-language locales (French / Dutch) overflow a 300px-min card if
   // every action is labelled; upload icon reads clearly without one.
   private _renderAccentAction() {
-    if (this.state === DeviceState.OFFLINE && this.queuedUpdate) {
-      return html`<button
-        class="action-btn action-btn--ghost action-btn--tile"
-        title=${this._localize("dashboard.clear_queued") || "Clear Queue"}
-        @click=${this._onClearQueue}
-      >
-        <wa-icon library="mdi" name="cancel"></wa-icon>
-      </button>`;
-    }
-    if (this.hasUpdateAvailable) {
+    if (this.showUpdate) {
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
         ?disabled=${this.busy}
@@ -313,7 +282,7 @@ export class ESPHomeDeviceCard extends LitElement {
         <wa-icon library="mdi" name="upload"></wa-icon>
       </button>`;
     }
-    if (this.hasPendingChanges) {
+    if (this.showModified) {
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
         ?disabled=${this.busy}

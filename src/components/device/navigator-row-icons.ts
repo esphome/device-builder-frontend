@@ -131,6 +131,8 @@ const DOMAIN_ICON: Record<string, readonly [string, string]> = {
   esp32: ["cpu-32-bit", mdiCpu32Bit],
   esp8266: ["cpu-32-bit", mdiCpu32Bit],
   rp2040: ["cpu-32-bit", mdiCpu32Bit],
+  // esphome#17145 renames the rp2040 platform key to rp2
+  rp2: ["cpu-32-bit", mdiCpu32Bit],
   bk72xx: ["cpu-32-bit", mdiCpu32Bit],
   rtl87xx: ["cpu-32-bit", mdiCpu32Bit],
   ln882x: ["cpu-32-bit", mdiCpu32Bit],

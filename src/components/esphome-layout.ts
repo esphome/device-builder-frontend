@@ -357,18 +357,20 @@ export class ESPHomeLayout extends LitElement {
     return html`
       <div class="app-header">
         <div class="header-logos">
-          ${this._showBack
-            ? html`
-                <button
-                  class="header-back"
-                  @click=${this._goHome}
-                  title=${this._localize("layout.back")}
-                  aria-label=${this._localize("layout.back")}
-                >
-                  <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                </button>
-              `
-            : nothing}
+          ${
+            this._showBack
+              ? html`
+                  <button
+                    class="header-back"
+                    @click=${this._goHome}
+                    title=${this._localize("layout.back")}
+                    aria-label=${this._localize("layout.back")}
+                  >
+                    <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                  </button>
+                `
+              : nothing
+          }
           <button class="header-logo" @click=${this._goHome}>
             <img src=${withBase("/assets/logo/esphome.svg")} alt="ESPHome" />
           </button>
@@ -376,9 +378,11 @@ export class ESPHomeLayout extends LitElement {
         <div class="header-text">
           <h1>
             <span class="header-title-text">${this._localize("dashboard.title")}</span>
-            ${this._versionBadge
-              ? html`<span class="preview-badge">${this._versionBadge}</span>`
-              : nothing}
+            ${
+              this._versionBadge
+                ? html`<span class="preview-badge">${this._versionBadge}</span>`
+                : nothing
+            }
           </h1>
           <p>${this._localize("dashboard.subtitle")}</p>
         </div>
@@ -389,22 +393,26 @@ export class ESPHomeLayout extends LitElement {
       </div>
       <slot></slot>
       <div class="app-footer">
-        ${this._serverVersion
-          ? html`<span
-              >${this._footerVersion(
-                `ESPHome Device Builder v${this._serverVersion}`,
-                deviceBuilderReleaseUrl(this._serverVersion)
-              )}</span
-            >`
-          : nothing}
-        ${this._esphomeVersion
-          ? html`<span
-              >${this._footerVersion(
-                `ESPHome ${this._esphomeVersion}`,
-                esphomeChangelogUrl(this._esphomeVersion)
-              )}</span
-            >`
-          : nothing}
+        ${
+          this._serverVersion
+            ? html`<span
+                >${this._footerVersion(
+                  `ESPHome Device Builder v${this._serverVersion}`,
+                  deviceBuilderReleaseUrl(this._serverVersion)
+                )}</span
+              >`
+            : nothing
+        }
+        ${
+          this._esphomeVersion
+            ? html`<span
+                >${this._footerVersion(
+                  `ESPHome ${this._esphomeVersion}`,
+                  esphomeChangelogUrl(this._esphomeVersion)
+                )}</span
+              >`
+            : nothing
+        }
       </div>
     `;
   }

@@ -25,6 +25,7 @@ function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
     table_sort_direction: null,
     experience_level: ExperienceLevel.EXPERT,
     remote_compute_only: true,
+    version_history_enabled: true,
     onboarding_completed_version: 2,
     ...over,
   };
@@ -77,6 +78,19 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     expect(host._experienceLevel).toBe(ExperienceLevel.EXPERT);
     expect(host._remoteComputeOnly).toBe(true);
     expect(host.applyTheme).toHaveBeenCalledWith("dark");
+  });
+
+  it("does not throw or drop the rest of the snapshot when preferences is absent", () => {
+    const host = makeHost();
+    // A faulted snapshot with no `preferences` must still apply the rest.
+    const data = {
+      devices: [],
+      importable: [],
+    } as unknown as InitialStateEventData;
+    expect(() => dispatch(host, data)).not.toThrow();
+    expect(host._prefsLoaded).toBe(true);
+    expect(host.applyTheme).not.toHaveBeenCalled();
+    expect(host._devicesLoaded).toBe(true);
   });
 
   it("marks loaded but keeps optimistic values while a write is in flight", () => {

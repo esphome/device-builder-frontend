@@ -17,10 +17,18 @@ vi.mock("../../../src/components/wizard/wizard-step-method.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-overwrite-device.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-resolve-conflicts.js", () => ({}));
 vi.mock("../../../src/components/wizard/wizard-step-setup.js", () => ({}));
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
+
+import { IntlMessageFormat } from "intl-messageformat";
+import toast from "sonner-js";
 
 import { APIError } from "../../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeCreateConfigDialog } from "../../../src/components/wizard/create-config-dialog.js";
+import enMessages from "../../../src/translations/en.json";
+import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
 
 function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
   let resolve!: (v: T) => void;
@@ -29,8 +37,25 @@ function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
 }
 
 const flush = async (): Promise<void> => {
-  for (let i = 0; i < 6; i++) await Promise.resolve();
+  // Drain enough microtasks for the setup-step board upgrade to settle: it
+  // now hops through the shared ``board-body-cache`` (queueMicrotask batch +
+  // a getBoard round trip), a deeper async chain than the former direct
+  // ``await getBoard`` call.
+  for (let i = 0; i < 12; i++) await Promise.resolve();
 };
+
+// Render an en.json key with real ICU MessageFormat so the full-setup tests
+// exercise the actual template (the name cap and =0/other plural branches
+// regress silently under the identity localize default).
+function icuLocalize(key: string, values?: Record<string, string | number>): string {
+  const message = key
+    .split(".")
+    .reduce<unknown>(
+      (node, part) => (node as Record<string, unknown> | undefined)?.[part],
+      enMessages
+    );
+  return new IntlMessageFormat(String(message ?? key), "en").format(values) as string;
+}
 
 async function mount(api: Partial<ESPHomeAPI>): Promise<ESPHomeCreateConfigDialog> {
   const el = new ESPHomeCreateConfigDialog();
@@ -120,6 +145,14 @@ function emitNextStep(el: ESPHomeCreateConfigDialog, step: string): void {
   );
 }
 
+// The setup step now upgrades slim boards through the shared
+// ``board-body-cache`` (a module singleton), so clear it between tests
+// to keep ``getBoard`` call counts and stale bodies from bleeding across
+// cases.
+afterEach(() => {
+  _clearBoardBodyCache();
+});
+
 describe("create-config-dialog create de-dupe + retry", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -149,6 +182,42 @@ describe("create-config-dialog create de-dupe + retry", () => {
     await flush();
 
     expect(createDevice).toHaveBeenCalledTimes(2);
+  });
+
+  it("locks the header back arrow while a create is in flight", async () => {
+    // A never-resolving create keeps _submitting true; going back mid-add would
+    // desync the wizard from the device being written.
+    const createDevice = vi.fn(() => deferred<{ configuration: string }>().promise);
+    const el = await mount({ createDevice });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._step = "setup"; // the step whose header shows the back arrow
+    await el.updateComplete;
+
+    emitFinish(el, "kitchen");
+    await el.updateComplete;
+
+    const back = el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button")!;
+    expect(back.disabled).toBe(true);
+    // The handler is guarded too, so no back path escapes the busy gate.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._onBack();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._step).toBe("setup");
+  });
+
+  it("clears submitting and surfaces an error after a failed finish-setup", async () => {
+    // The setup step's spinner follows this flag, so it must clear on failure;
+    // the error is what tells the user the create failed and to retry.
+    const createDevice = vi.fn().mockRejectedValueOnce(new Error("boom"));
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "kitchen");
+    await flush();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._submitting).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._createError).toBeTruthy();
   });
 
   it("forwards the raw display name so the backend keeps it as friendly_name", async () => {
@@ -186,6 +255,179 @@ describe("create-config-dialog create de-dupe + retry", () => {
         config_type: "basic",
       })
     );
+  });
+
+  it("applies the full setup after create when the wizard checkbox is on", async () => {
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "relays.yaml" });
+    const addComponent = vi.fn().mockResolvedValue({ yaml: "merged" });
+    const el = await mount({ createDevice, addComponent });
+    const board = {
+      id: "esp32_relay_x4",
+      full_config: true,
+      featured_components: [{ id: "relay_1" }, { id: "relay_2" }],
+      featured_bundles: [
+        { id: "all_recommended", name: "x", component_ids: ["relay_1", "relay_2"] },
+      ],
+    };
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("finish-setup", {
+        detail: {
+          board,
+          name: "Relays",
+          wifiSsid: "",
+          wifiPassword: "",
+          fullSetup: true,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await flush();
+
+    expect(addComponent.mock.calls.map((c) => c[1].component_id)).toEqual([
+      "featured.esp32_relay_x4.relay_1",
+      "featured.esp32_relay_x4.relay_2",
+    ]);
+  });
+
+  it("warns when a full-setup member can't be added so a partial device isn't silent", async () => {
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "relays.yaml" });
+    // Second member fails to add; the first succeeds.
+    const addComponent = vi
+      .fn()
+      .mockResolvedValueOnce({ yaml: "merged" })
+      .mockRejectedValueOnce(new Error("boom"));
+    const el = await mount({ createDevice, addComponent });
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("finish-setup", {
+        detail: {
+          board: {
+            id: "esp32_relay_x4",
+            full_config: true,
+            featured_components: [{ id: "relay_1" }, { id: "relay_2" }],
+            featured_bundles: [
+              { id: "all_recommended", name: "x", component_ids: ["relay_1", "relay_2"] },
+            ],
+          },
+          name: "Relays",
+          wifiSsid: "",
+          wifiPassword: "",
+          fullSetup: true,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await flush();
+
+    expect(addComponent).toHaveBeenCalledTimes(2);
+    expect(toast.warning).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the skipped component in the warning", async () => {
+    vi.mocked(toast.warning).mockClear();
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "relays.yaml" });
+    // relay_1 adds; relay_2 fails and is the one named.
+    const addComponent = vi
+      .fn()
+      .mockResolvedValueOnce({ yaml: "merged" })
+      .mockRejectedValueOnce(new Error("boom"));
+    const el = await mount({ createDevice, addComponent });
+    (el as unknown as { _localize: typeof icuLocalize })._localize = icuLocalize;
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("finish-setup", {
+        detail: {
+          board: {
+            id: "esp32_relay_x4",
+            full_config: true,
+            featured_components: [{ id: "relay_1" }, { id: "relay_2", name: "Relay 2" }],
+            featured_bundles: [
+              { id: "all_recommended", name: "x", component_ids: ["relay_1", "relay_2"] },
+            ],
+          },
+          name: "Relays",
+          wifiSsid: "",
+          wifiPassword: "",
+          fullSetup: true,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await flush();
+    await flush();
+
+    const message = vi.mocked(toast.warning).mock.calls[0]?.[0];
+    expect(message).toContain("Relay 2");
+    // extra=0 branch: a single skip has no "and N more" tail.
+    expect(message).not.toContain("more");
+  });
+
+  it("caps the named list at three and appends 'and N more'", async () => {
+    vi.mocked(toast.warning).mockClear();
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "relays.yaml" });
+    const addComponent = vi.fn().mockRejectedValue(new Error("boom"));
+    const el = await mount({ createDevice, addComponent });
+    (el as unknown as { _localize: typeof icuLocalize })._localize = icuLocalize;
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("finish-setup", {
+        detail: {
+          board: {
+            id: "esp32_relay_x4",
+            full_config: true,
+            featured_components: [
+              { id: "a", name: "Alpha" },
+              { id: "b", name: "Bravo" },
+              { id: "c", name: "Charlie" },
+              { id: "d", name: "Delta" },
+            ],
+            featured_bundles: [
+              { id: "all_recommended", name: "x", component_ids: ["a", "b", "c", "d"] },
+            ],
+          },
+          name: "Relays",
+          wifiSsid: "",
+          wifiPassword: "",
+          fullSetup: true,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await flush();
+    await flush();
+
+    const message = vi.mocked(toast.warning).mock.calls[0]?.[0];
+    // Only the first three names show, then the remainder is summarised.
+    expect(message).toContain("Alpha, Bravo, Charlie");
+    expect(message).toContain("and 1 more");
+    expect(message).not.toContain("Delta");
+  });
+
+  it("skips the full setup when the checkbox is off", async () => {
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "relays.yaml" });
+    const addComponent = vi.fn().mockResolvedValue({ yaml: "merged" });
+    const el = await mount({ createDevice, addComponent });
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("finish-setup", {
+        detail: {
+          board: {
+            id: "esp32_relay_x4",
+            full_config: true,
+            featured_components: [{ id: "relay_1" }],
+          },
+          name: "Relays",
+          wifiSsid: "",
+          wifiPassword: "",
+          fullSetup: false,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
+    await flush();
+
+    expect(addComponent).not.toHaveBeenCalled();
   });
 
   it("fires secrets-saved after a Wi-Fi create so secret pickers refresh", async () => {
@@ -282,6 +524,28 @@ describe("create-config-dialog stale error on navigation", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._step).not.toBe("setup");
     expect(errorText(el)).not.toBeNull();
+  });
+
+  // #1798: backing out of setup and re-picking the SAME board must re-enter on
+  // the full body, not the slim picker entry (whose requires_wifi is falsy —
+  // undefined on this raw fixture, false once hydrated in the app), or the
+  // Wi-Fi step silently disappears the second time through.
+  it("re-enters setup on the full board body after back then re-pick", async () => {
+    const getBoard = vi.fn().mockResolvedValue({ id: "esp32dev", requires_wifi: true });
+    const el = await mount({ getBoard });
+
+    await goToSetup(el, "esp32dev");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._selectedBoard.requires_wifi).toBe(true);
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button")!.click();
+    await el.updateComplete;
+
+    await goToSetup(el, "esp32dev");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._selectedBoard.requires_wifi).toBe(true);
+    // The full body is cached from the first visit, so no redundant refetch.
+    expect(getBoard).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -356,15 +356,17 @@ export class ESPHomeReauthWizardDialog extends LitElement {
         />
         <span> ${this._localize("settings.reauth_wizard_verified_checkbox")} </span>
       </label>
-      ${this._errorKey !== null
-        ? html`
-            <div class="step-error" role="alert">
-              ${this._localize(this._errorKey, {
-                label: alert.receiver_label,
-              })}
-            </div>
-          `
-        : nothing}
+      ${
+        this._errorKey !== null
+          ? html`
+              <div class="step-error" role="alert">
+                ${this._localize(this._errorKey, {
+                  label: alert.receiver_label,
+                })}
+              </div>
+            `
+          : nothing
+      }
     `;
   }
 
@@ -411,36 +413,42 @@ export class ESPHomeReauthWizardDialog extends LitElement {
           >
             ${this._localize("layout.cancel")}
           </button>
-          ${this._step > 1
-            ? html`<button
-                class="btn btn--back"
-                type="button"
-                @click=${this._onBack}
-                ?disabled=${this._busy}
-              >
-                ${this._localize("settings.reauth_wizard_back")}
-              </button>`
-            : nothing}
-          ${this._step < 3
-            ? html`<button
-                class="btn btn--primary"
-                type="button"
-                @click=${this._onContinue}
-              >
-                ${this._localize("settings.reauth_wizard_continue")}
-              </button>`
-            : html`<button
-                class="btn btn--primary"
-                type="button"
-                ?disabled=${!this._verified || this._busy}
-                @click=${this._onConfirm}
-              >
-                ${this._busy
-                  ? this._localize("settings.reauth_wizard_repair_in_progress")
-                  : this._errorKey !== null
-                    ? this._localize("settings.reauth_wizard_repair_retry")
-                    : this._localize("settings.reauth_wizard_repair_action")}
-              </button>`}
+          ${
+            this._step > 1
+              ? html`<button
+                  class="btn btn--back"
+                  type="button"
+                  @click=${this._onBack}
+                  ?disabled=${this._busy}
+                >
+                  ${this._localize("settings.reauth_wizard_back")}
+                </button>`
+              : nothing
+          }
+          ${
+            this._step < 3
+              ? html`<button
+                  class="btn btn--primary"
+                  type="button"
+                  @click=${this._onContinue}
+                >
+                  ${this._localize("settings.reauth_wizard_continue")}
+                </button>`
+              : html`<button
+                  class="btn btn--primary"
+                  type="button"
+                  ?disabled=${!this._verified || this._busy}
+                  @click=${this._onConfirm}
+                >
+                  ${
+                    this._busy
+                      ? this._localize("settings.reauth_wizard_repair_in_progress")
+                      : this._errorKey !== null
+                        ? this._localize("settings.reauth_wizard_repair_retry")
+                        : this._localize("settings.reauth_wizard_repair_action")
+                  }
+                </button>`
+          }
         </div>
       </esphome-base-dialog>
     `;

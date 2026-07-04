@@ -3,6 +3,11 @@
  *
  * Part of the src/api/types.ts barrel split.
  */
+// Type-only: ``reachability.ts`` imports ``DeviceState`` from here, so a
+// value import would cycle. ``ReachabilitySource`` is a string-literal union,
+// erased at runtime, so the type-only edge is free.
+import type { FirmwareJob } from "./firmware-jobs.js";
+import type { ReachabilitySource } from "./reachability.js";
 
 // ─── Devices ─────────────────────────────────────────────────
 
@@ -86,8 +91,22 @@ export interface ConfiguredDevice {
    * mtime-based change detection.
    */
   deployed_config_hash: string;
+  /** Reachability channel currently driving the device's online state
+   *  (``mdns`` > ``mqtt`` > ``ping``). The deployed version / config
+   *  hash come only from the mDNS broadcast, so the out-of-sync /
+   *  update indicators are gated on ``active_source === "mdns"`` (see
+   *  ``src/util/device-sync.ts``): when mDNS is dark those values are
+   *  stale. Optional on the wire — absent / ``"unknown"`` means no
+   *  source has claimed the device yet, which reads as "not mDNS". */
+  active_source?: ReachabilitySource;
   /** True until successfully compiled + deployed */
   has_pending_changes: boolean;
+  /** True when ``has_pending_changes`` came from the mDNS-sourced
+   *  config-hash compare (vs the local mtime fallback). The UI gates
+   *  only this case on a live mDNS, so a local YAML edit still cues
+   *  "install" when mDNS is dark. Optional / absent reads as a local
+   *  (non-mDNS-dependent) pending. */
+  pending_changes_via_hash?: boolean;
   /** True if compiled with older ESPHome version */
   update_available: boolean;
   /**
@@ -258,6 +277,13 @@ export interface ImportBundleResponse {
   kept: string[];
   has_secrets: boolean;
   esphome_version: string;
+}
+
+/** Response from devices/rename. ``tail_job`` is absent on pre-chain backends. */
+export interface RenameDeviceResponse {
+  configuration: string;
+  job: FirmwareJob | null;
+  tail_job?: FirmwareJob | null;
 }
 
 /** Response from devices/update. */

@@ -111,6 +111,7 @@ describe("loadPreferences (post-wizard context refresh)", () => {
     table_sort_direction: null,
     experience_level: ExperienceLevel.EXPERT,
     remote_compute_only: true,
+    version_history_enabled: true,
     onboarding_completed_version: 2,
   };
 

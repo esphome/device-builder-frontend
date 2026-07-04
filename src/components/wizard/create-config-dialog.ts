@@ -2,15 +2,19 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import toast from "sonner-js";
 import { apiErrorDetails } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { primaryHeaderDialogStyles } from "../../styles/dialog-chrome.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
+import { fetchBoard, getCachedBoard } from "../../util/board-body-cache.js";
+import { buildFeaturedId } from "../../util/featured-id.js";
+import { featuredComponentName, fullSetupComponentIds } from "../../util/full-setup.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -45,7 +49,7 @@ type WizardStepDetail =
   | WizardStep
   | {
       step: WizardStep;
-      board?: BoardCatalogEntry | null;
+      board?: SlimBoard | null;
       method?: CreationMethod;
       file?: File;
     };
@@ -74,12 +78,15 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   @state()
   private _open = false;
 
+  /** Always a full body (only ever assigned in ``_enterSetupStep`` /
+   *  ``openWithBoard``), so the setup step reads a real ``requires_wifi``. */
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
 
-  /** Board id whose full body has already been fetched into `_selectedBoard`,
-   *  so re-entering the setup step doesn't refetch (getBoard is uncached). */
-  private _upgradedBoardId: string | null = null;
+  /** Id of the board whose upgrade is currently in flight — lets the async
+   *  fetch in ``_enterSetupStep`` detect that the selection moved on without
+   *  parking a slim entry in ``_selectedBoard``. */
+  private _pickedBoardId: string | null = null;
 
   /** Initial platform-filter label for the board step. Set by
    *  ``openAtBoardStep`` when the caller knows the chip family
@@ -154,14 +161,15 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   /** Open directly at the setup step with a pre-selected **full** board body
-   *  (callers resolve it via ``getBoard``), so ``requires_wifi`` is already
-   *  known and the Wi-Fi decision is correct on first render. */
+   *  (callers resolve it via the shared ``board-body-cache``), so
+   *  ``requires_wifi`` is already known and the Wi-Fi decision is correct on
+   *  first render. A back-then-re-pick of the same board re-enters through
+   *  ``_enterSetupStep``, which hits the same session cache. */
   public openWithBoard(board: BoardCatalogEntry) {
     this._step = "setup";
     this._selectedBoard = board;
     this._initialBoardFilter = null;
     this._resetTransientState();
-    this._upgradedBoardId = board.id; // already a full body; no upgrade fetch
   }
 
   /** Open directly at the board-picker step with an optional
@@ -186,7 +194,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._advancedOpen = false;
     this._import.reset();
     this._submitting = false;
-    this._upgradedBoardId = null;
+    this._pickedBoardId = null;
     this._resetCreateErrors();
     this._open = true;
   }
@@ -279,17 +287,20 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         @overwrite-device=${this._onConfirmOverwrite}
         @open-device=${this._onOpenImportedDevice}
       >
-        ${this._step !== "method" && this._step !== "import-partial"
-          ? html`<button
-              slot="header-prefix"
-              class="back-button"
-              title=${this._localize("layout.back")}
-              aria-label=${this._localize("layout.back")}
-              @click=${this._onBack}
-            >
-              <wa-icon library="mdi" name="arrow-left"></wa-icon>
-            </button>`
-          : nothing}
+        ${
+          this._step !== "method" && this._step !== "import-partial"
+            ? html`<button
+                slot="header-prefix"
+                class="back-button"
+                title=${this._localize("layout.back")}
+                aria-label=${this._localize("layout.back")}
+                ?disabled=${this._submitting}
+                @click=${this._onBack}
+              >
+                <wa-icon library="mdi" name="arrow-left"></wa-icon>
+              </button>`
+            : nothing
+        }
         ${this._renderStep()}
         ${this._importError ? html`<p class="error">${this._importError}</p>` : nothing}
         ${this._createError ? html`<p class="error">${this._createError}</p>` : nothing}
@@ -320,6 +331,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         return html`<esphome-wizard-step-setup
           .board=${this._selectedBoard}
           ?active=${this._open}
+          ?submitting=${this._submitting}
         ></esphome-wizard-step-setup>`;
       case "empty-config":
         return html`<esphome-wizard-step-empty-config
@@ -358,12 +370,8 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       this._creationMethod = detail.method;
     }
 
-    if (detail.board !== undefined) {
-      this._selectedBoard = detail.board;
-    }
-
-    if (detail.step === "setup" && this._selectedBoard) {
-      void this._enterSetupStep(this._selectedBoard);
+    if (detail.step === "setup" && detail.board) {
+      void this._enterSetupStep(detail.board);
       return;
     }
     this._step = detail.step;
@@ -375,22 +383,24 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    *  stays up during the (uncached) fetch; a cached id skips it. On a failed /
    *  empty fetch we stay on the picker with an error rather than advance on the
    *  slim entry (whose ``requires_wifi`` hydrates to ``false``). */
-  private async _enterSetupStep(board: BoardCatalogEntry): Promise<void> {
-    if (this._upgradedBoardId !== board.id) {
-      let full: BoardCatalogEntry | null = null;
+  private async _enterSetupStep(board: SlimBoard): Promise<void> {
+    this._pickedBoardId = board.id;
+    // Key on the slim entry's id (what the picker and openWithBoard use) so an
+    // id the backend canonicalizes still hits the shared session cache.
+    let full = getCachedBoard(board.id) ?? null;
+    if (!full) {
       try {
-        full = await this._api.getBoard(board.id);
+        full = await fetchBoard(this._api, board.id);
       } catch (err) {
         console.warn("Failed to load full board body:", err);
       }
-      if (this._selectedBoard?.id !== board.id) return; // selection moved on
+      if (this._pickedBoardId !== board.id) return; // selection moved on
       if (!full) {
         this._createError = this._localize("wizard.board_load_failed");
         return; // keep the user on the picker to retry
       }
-      this._selectedBoard = full;
-      this._upgradedBoardId = board.id;
     }
+    this._selectedBoard = full; // never enter setup on the slim entry
     this._step = "setup";
   }
 
@@ -418,6 +428,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   private _onBack() {
+    // A create is in flight (createDevice + the full-setup component adds);
+    // navigating back mid-add would desync the wizard from the device being
+    // written, so ignore every back path while submitting.
+    if (this._submitting) return;
     this._resetCreateErrors();
     switch (this._step) {
       case "board":
@@ -488,9 +502,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       name: string;
       wifiSsid: string;
       wifiPassword: string;
+      fullSetup?: boolean;
     }>
   ) {
-    const { board, name, wifiSsid, wifiPassword } = e.detail;
+    const { board, name, wifiSsid, wifiPassword, fullSetup } = e.detail;
     if (!board) return;
     await this._runCreate(
       {
@@ -505,7 +520,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
         ssid: wifiSsid,
         psk: wifiPassword,
       },
-      { board }
+      { board, fullSetup }
     );
   }
 
@@ -531,7 +546,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       psk?: string;
       file_content?: string;
     },
-    options: { board?: BoardCatalogEntry | null } = {}
+    options: {
+      board?: BoardCatalogEntry | null;
+      fullSetup?: boolean;
+    } = {}
   ): Promise<void> {
     if (this._submitting) return;
     this._resetCreateErrors();
@@ -542,12 +560,56 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       // the shared secret-keys cache so the new device's editor doesn't show
       // the just-written `!secret wifi_*` refs as missing until a reload.
       if (args.ssid) window.dispatchEvent(new CustomEvent("secrets-saved"));
+      if (options.fullSetup && options.board) {
+        await this._applyFullSetup(configuration, options.board);
+      }
       this.navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
       this._createError = this._extractCreateErrorMessage(err, options.board ?? null);
     } finally {
       this._submitting = false;
+    }
+  }
+
+  /**
+   * Add the board's recommended components to a just-created device.
+   *
+   * Each featured member is merged with its board presets and persisted in
+   * turn (the backend applies the presets from an empty payload). Best-effort:
+   * a member the presets can't fill on their own is skipped so the device
+   * still opens; the user finishes it in the editor.
+   */
+  private async _applyFullSetup(
+    configuration: string,
+    board: BoardCatalogEntry
+  ): Promise<void> {
+    const skipped: string[] = [];
+    for (const localId of fullSetupComponentIds(board)) {
+      try {
+        await this._api.addComponent(configuration, {
+          component_id: buildFeaturedId(board.id, localId),
+        });
+      } catch (err) {
+        console.error(`Full setup: failed to add ${localId} to ${configuration}:`, err);
+        skipped.push(featuredComponentName(board, localId));
+      }
+    }
+    // A partially-applied device would otherwise look complete; name which
+    // recommended components need finishing, capped so the toast stays short.
+    if (skipped.length > 0) {
+      const shown = 3;
+      toast.warning(
+        this._localize("wizard.full_setup_partial", {
+          // count drives the singular/plural wording; names/extra list the
+          // skipped components, capped. Older count-only Lokalise strings
+          // still render off count alone until re-translated.
+          count: skipped.length,
+          names: skipped.slice(0, shown).join(", "),
+          extra: Math.max(0, skipped.length - shown),
+        }),
+        { richColors: true }
+      );
     }
   }
 

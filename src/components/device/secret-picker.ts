@@ -331,57 +331,71 @@ export class ESPHomeSecretPicker extends LitElement {
             library="mdi"
             name=${missing ? "alert" : "key-variant"}
           ></wa-icon>
-          ${selected
-            ? html`<span class="label">${this.selectedKey}</span>`
-            : html`<span class="placeholder"
-                >${this._localize("device.secret_picker_label")}</span
-              >`}
+          ${
+            selected
+              ? html`<span class="label">${this.selectedKey}</span>`
+              : html`<span class="placeholder"
+                  >${this._localize("device.secret_picker_label")}</span
+                >`
+          }
           <wa-icon class="chevron" library="mdi" name="chevron-down"></wa-icon>
         </button>
-        ${this._canMigrate
-          ? html`<wa-dropdown-item class="migrate" value=${MIGRATE_SENTINEL}>
-                <wa-icon slot="icon" library="mdi" name="shield-key-outline"></wa-icon>
-                ${this._localize("device.secret_picker_migrate", {
-                  key: this._migrateTarget,
-                })}
-              </wa-dropdown-item>
-              <wa-divider role="separator"></wa-divider>`
-          : nothing}
-        ${recommended.length
-          ? html`<small class="group-label" aria-hidden="true"
-                >${this._localize("device.secret_picker_related")}</small
-              >
-              ${recommended.map((k) => this._renderKeyItem(k))}
-              ${others.length
-                ? html`<small class="group-label" aria-hidden="true"
-                    >${this._localize("device.secret_picker_shared")}</small
-                  >`
-                : nothing}`
-          : nothing}
+        ${
+          this._canMigrate
+            ? html`<wa-dropdown-item class="migrate" value=${MIGRATE_SENTINEL}>
+                  <wa-icon slot="icon" library="mdi" name="shield-key-outline"></wa-icon>
+                  ${this._localize("device.secret_picker_migrate", {
+                    key: this._migrateTarget,
+                  })}
+                </wa-dropdown-item>
+                <wa-divider role="separator"></wa-divider>`
+            : nothing
+        }
+        ${
+          recommended.length
+            ? html`<small class="group-label" aria-hidden="true"
+                  >${this._localize("device.secret_picker_related")}</small
+                >
+                ${recommended.map((k) => this._renderKeyItem(k))}
+                ${
+                  others.length
+                    ? html`<small class="group-label" aria-hidden="true"
+                        >${this._localize("device.secret_picker_shared")}</small
+                      >`
+                    : nothing
+                }`
+            : nothing
+        }
         ${others.map((k) => this._renderKeyItem(k))}
-        ${keys.length
-          ? nothing
-          : html`<wa-dropdown-item class="empty" disabled role="status"
-              >${this._localize("device.secret_picker_empty")}</wa-dropdown-item
-            >`}
+        ${
+          keys.length
+            ? nothing
+            : html`<wa-dropdown-item class="empty" disabled role="status"
+                >${this._localize("device.secret_picker_empty")}</wa-dropdown-item
+              >`
+        }
         <wa-divider role="separator"></wa-divider>
         <wa-dropdown-item class="create" value=${CREATE_SENTINEL}>
           <wa-icon slot="icon" library="mdi" name="plus"></wa-icon>
           ${this._localize("device.secret_picker_create")}
         </wa-dropdown-item>
-        ${selected
-          ? html`<wa-dropdown-item class="manual" value=${MANUAL_SENTINEL}>
-              ${this._localize("device.secret_picker_manual")}
-            </wa-dropdown-item>`
-          : nothing}
+        ${
+          selected
+            ? html`<wa-dropdown-item class="manual" value=${MANUAL_SENTINEL}>
+                ${this._localize("device.secret_picker_manual")}
+              </wa-dropdown-item>`
+            : nothing
+        }
       </wa-dropdown>
-      ${selected
-        ? html`<esphome-secret-value
-            secret-key=${this.selectedKey}
-            ?present=${!missing}
-            device-name=${this.deviceName}
-          ></esphome-secret-value>`
-        : nothing}
+      ${
+        selected
+          ? html`<esphome-secret-value
+              secret-key=${this.selectedKey}
+              ?present=${!missing}
+              device-name=${this.deviceName}
+            ></esphome-secret-value>`
+          : nothing
+      }
     `;
   }
 
@@ -390,9 +404,11 @@ export class ESPHomeSecretPicker extends LitElement {
       value=${key}
       aria-selected=${key === this.selectedKey ? "true" : "false"}
     >
-      ${key === this.selectedKey
-        ? html`<wa-icon slot="icon" class="check" library="mdi" name="check"></wa-icon>`
-        : nothing}
+      ${
+        key === this.selectedKey
+          ? html`<wa-icon slot="icon" class="check" library="mdi" name="check"></wa-icon>`
+          : nothing
+      }
       ${key}
     </wa-dropdown-item>`;
   }

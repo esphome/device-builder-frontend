@@ -160,9 +160,11 @@ export class ESPHomeSettingsDialog extends LitElement {
         >
           <wa-icon library="mdi" name=${iconName}></wa-icon>
           <span>${label}</span>
-          ${sectionAlerted(s.id)
-            ? html`<span class="nav-item-dot" aria-hidden="true"></span>`
-            : nothing}
+          ${
+            sectionAlerted(s.id)
+              ? html`<span class="nav-item-dot" aria-hidden="true"></span>`
+              : nothing
+          }
         </button>
       `;
     };

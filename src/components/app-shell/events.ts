@@ -76,7 +76,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       // Settings write is in flight, so a reconnect's snapshot can't revert the
       // optimistic change.
       host._prefsLoaded = true;
-      if (host._prefsWritesInFlight === 0) {
+      if (preferences && host._prefsWritesInFlight === 0) {
         applyPreferences(host, preferences);
       }
       host._devices = devices;
@@ -84,7 +84,14 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       host._devicesLoaded = true;
       host._buildServerPeers = peers ?? null;
       host._buildOffloadDiscoveredHosts = seededMap(hosts, (h) => h.name);
-      host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
+      // Skip re-seeding pairings while an offloader write is in flight, so a
+      // reconnect snapshot can't revert the optimistic `enabled` of a
+      // security-sensitive pairing toggle mid-write. Incremental
+      // ADDED/REMOVED/CHANGED events keep the map live in the meantime. Always
+      // seed on the first snapshot (null = not yet seeded) so the UI can paint.
+      if (host._buildOffloadPairings === null || host._offloaderWritesInFlight === 0) {
+        host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
+      }
       host._buildOffloadAlerts = seededMap(offloader_alerts, (a) => a.pin_sha256);
       // remote_jobs: backend snapshot is authoritative for which jobs exist,
       // but merge onto local entries so a reconnect doesn't wipe display fields

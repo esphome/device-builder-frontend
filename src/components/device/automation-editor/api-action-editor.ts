@@ -252,19 +252,21 @@ export class ESPHomeApiActionEditor extends LitElement {
         ></esphome-automation-action-list>
       </div>
       ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
-      ${this.location && this.value && !this.addMode
-        ? html`<div class="ae-actions">
-            <button
-              type="button"
-              class="ae-danger"
-              ?disabled=${disabled}
-              @click=${this._onDelete}
-            >
-              <wa-icon library="mdi" name="delete"></wa-icon>
-              ${this._localize("dashboard.delete")}
-            </button>
-          </div>`
-        : nothing}
+      ${
+        this.location && this.value && !this.addMode
+          ? html`<div class="ae-actions">
+              <button
+                type="button"
+                class="ae-danger"
+                ?disabled=${disabled}
+                @click=${this._onDelete}
+              >
+                <wa-icon library="mdi" name="delete"></wa-icon>
+                ${this._localize("dashboard.delete")}
+              </button>
+            </div>`
+          : nothing
+      }
     `;
   }
 

@@ -229,14 +229,16 @@ export function renderLabel(
     <label class="field-label">
       ${labelFor(entry, ctx)}
       ${entry.required ? html`<span class="required">*</span>` : nothing}
-      ${entry.locked
-        ? html`<wa-icon
-            class="lock-icon"
-            library="mdi"
-            name="lock-outline"
-            title=${ctx.localize("device.field_locked_by_board")}
-          ></wa-icon>`
-        : nothing}
+      ${
+        entry.locked
+          ? html`<wa-icon
+              class="lock-icon"
+              library="mdi"
+              name="lock-outline"
+              title=${ctx.localize("device.field_locked_by_board")}
+            ></wa-icon>`
+          : nothing
+      }
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
     ${_fieldDescription(entry, ctx)}

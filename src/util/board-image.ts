@@ -1,4 +1,4 @@
-import type { BoardCatalogEntry } from "../api/types/boards.js";
+import type { SlimBoard } from "../api/types/boards.js";
 import { withBase } from "./base-path.js";
 
 const DEFAULT_BOARD_IMAGE = "/assets/board/default.svg";
@@ -13,7 +13,7 @@ export function defaultBoardImageUrl(): string {
  *  paths the backend serves; `withBase` adds the deployment prefix so they
  *  resolve under HA ingress / a reverse-proxy subpath. External `https://`
  *  URLs (curated boards) pass through unchanged. */
-export function boardImageUrl(board: BoardCatalogEntry): string {
+export function boardImageUrl(board: SlimBoard): string {
   if (board.images.length > 0) return withBase(board.images[0]);
   return defaultBoardImageUrl();
 }

@@ -160,142 +160,160 @@ export class ESPHomeHeaderActions extends LitElement {
         aria-label=${kebabLabel}
       >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
-        ${activeCount > 0 || hasAlerts
-          ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
-          : nothing}
+        ${
+          activeCount > 0 || hasAlerts
+            ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
+            : nothing
+        }
       </button>
-      ${this._open
-        ? html`
-            <div class="backdrop" @click=${this._close}></div>
-            <div
-              class="menu"
-              role="menu"
-              style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);"
-            >
+      ${
+        this._open
+          ? html`
+              <div class="backdrop" @click=${this._close}></div>
               <div
-                class="menu-item"
-                role="menuitem"
-                tabindex="0"
-                @click=${this._openFirmwareJobs}
-                @keydown=${this._onMenuItemKeydown}
+                class="menu"
+                role="menu"
+                style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);"
               >
-                <wa-icon library="mdi" name="playlist-check"></wa-icon>
-                <span class="menu-item-label"
-                  >${this._localize("firmware_jobs.menu_item")}</span
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openFirmwareJobs}
+                  @keydown=${this._onMenuItemKeydown}
                 >
-                ${activeCount > 0
-                  ? html`<span class="menu-item-count">${activeCount}</span>`
-                  : nothing}
-              </div>
-              <div
-                class="menu-item"
-                role="menuitem"
-                tabindex="0"
-                @click=${this._openSecrets}
-                @keydown=${this._onMenuItemKeydown}
-              >
-                <wa-icon library="mdi" name="key-variant"></wa-icon>
-                <span class="menu-item-label">${this._localize("layout.secrets")}</span>
-              </div>
-              <div
-                class="menu-item"
-                role="menuitem"
-                tabindex="0"
-                @click=${this._openOnboarding}
-                @keydown=${this._onMenuItemKeydown}
-              >
-                <wa-icon library="mdi" name="wifi-cog"></wa-icon>
-                <span class="menu-item-label"
-                  >${this._onboardingPending
-                    ? this._localize("onboarding.menu_item_setup_wifi")
-                    : this._localize("onboarding.menu_item_change_wifi")}</span
+                  <wa-icon library="mdi" name="playlist-check"></wa-icon>
+                  <span class="menu-item-label"
+                    >${this._localize("firmware_jobs.menu_item")}</span
+                  >
+                  ${
+                    activeCount > 0
+                      ? html`<span class="menu-item-count">${activeCount}</span>`
+                      : nothing
+                  }
+                </div>
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openSecrets}
+                  @keydown=${this._onMenuItemKeydown}
                 >
-              </div>
-              ${this.dashboardRoute
-                ? html`<div
-                    class="menu-item"
-                    role="menuitem"
-                    tabindex="0"
-                    @click=${this._openArchivedDevices}
-                    @keydown=${this._onMenuItemKeydown}
+                  <wa-icon library="mdi" name="key-variant"></wa-icon>
+                  <span class="menu-item-label">${this._localize("layout.secrets")}</span>
+                </div>
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openOnboarding}
+                  @keydown=${this._onMenuItemKeydown}
+                >
+                  <wa-icon library="mdi" name="wifi-cog"></wa-icon>
+                  <span class="menu-item-label"
+                    >${
+                      this._onboardingPending
+                        ? this._localize("onboarding.menu_item_setup_wifi")
+                        : this._localize("onboarding.menu_item_change_wifi")
+                    }</span
                   >
-                    <wa-icon library="mdi" name="archive-outline"></wa-icon>
-                    ${this._localize("layout.archived_devices")}
-                  </div>`
-                : nothing}
-              ${ignoredCount > 0
-                ? html`<div
-                    class="menu-item"
-                    role="menuitemcheckbox"
-                    tabindex="0"
-                    aria-checked=${this._showIgnored ? "true" : "false"}
-                    @click=${this._toggleShowIgnoredDiscoveries}
-                    @keydown=${this._onMenuItemKeydown}
+                </div>
+                ${
+                  this.dashboardRoute
+                    ? html`<div
+                        class="menu-item"
+                        role="menuitem"
+                        tabindex="0"
+                        @click=${this._openArchivedDevices}
+                        @keydown=${this._onMenuItemKeydown}
+                      >
+                        <wa-icon library="mdi" name="archive-outline"></wa-icon>
+                        ${this._localize("layout.archived_devices")}
+                      </div>`
+                    : nothing
+                }
+                ${
+                  ignoredCount > 0
+                    ? html`<div
+                        class="menu-item"
+                        role="menuitemcheckbox"
+                        tabindex="0"
+                        aria-checked=${this._showIgnored ? "true" : "false"}
+                        @click=${this._toggleShowIgnoredDiscoveries}
+                        @keydown=${this._onMenuItemKeydown}
+                      >
+                        <wa-icon
+                          library="mdi"
+                          name=${this._showIgnored ? "eye-off-outline" : "eye-outline"}
+                        ></wa-icon>
+                        <span class="menu-item-label"
+                          >${
+                            this._showIgnored
+                              ? this._localize("layout.hide_ignored_discoveries")
+                              : this._localize("layout.show_ignored_discoveries", {
+                                  count: ignoredCount,
+                                })
+                          }</span
+                        >
+                      </div>`
+                    : nothing
+                }
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openResetBuildEnv}
+                  @keydown=${this._onMenuItemKeydown}
+                >
+                  <wa-icon library="mdi" name="cog-refresh"></wa-icon>
+                  ${this._localize("layout.reset_build_env")}
+                </div>
+                <div class="menu-divider" role="separator"></div>
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openSettings}
+                  @keydown=${this._onMenuItemKeydown}
+                >
+                  <wa-icon library="mdi" name="cog"></wa-icon>
+                  <span class="menu-item-label"
+                    >${this._localize("layout.settings")}</span
                   >
-                    <wa-icon
-                      library="mdi"
-                      name=${this._showIgnored ? "eye-off-outline" : "eye-outline"}
-                    ></wa-icon>
-                    <span class="menu-item-label"
-                      >${this._showIgnored
-                        ? this._localize("layout.hide_ignored_discoveries")
-                        : this._localize("layout.show_ignored_discoveries", {
-                            count: ignoredCount,
-                          })}</span
-                    >
-                  </div>`
-                : nothing}
-              <div
-                class="menu-item"
-                role="menuitem"
-                tabindex="0"
-                @click=${this._openResetBuildEnv}
-                @keydown=${this._onMenuItemKeydown}
-              >
-                <wa-icon library="mdi" name="cog-refresh"></wa-icon>
-                ${this._localize("layout.reset_build_env")}
+                  ${
+                    hasAlerts
+                      ? html`<span class="menu-item-count"
+                          >${this._offloaderAlertsCount()}</span
+                        >`
+                      : nothing
+                  }
+                </div>
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openSearch}
+                  @keydown=${this._onMenuItemKeydown}
+                >
+                  <wa-icon library="mdi" name="magnify"></wa-icon>
+                  <span class="menu-item-label">${this._localize("layout.search")}</span>
+                  <kbd class="menu-item-shortcut">${SEARCH_SHORTCUT}</kbd>
+                </div>
+                <div class="menu-divider" role="separator"></div>
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openFeedback}
+                  @keydown=${this._onMenuItemKeydown}
+                >
+                  <wa-icon library="mdi" name="comment-question-outline"></wa-icon>
+                  ${this._localize("layout.feedback_menu")}
+                </div>
               </div>
-              <div class="menu-divider" role="separator"></div>
-              <div
-                class="menu-item"
-                role="menuitem"
-                tabindex="0"
-                @click=${this._openSettings}
-                @keydown=${this._onMenuItemKeydown}
-              >
-                <wa-icon library="mdi" name="cog"></wa-icon>
-                <span class="menu-item-label">${this._localize("layout.settings")}</span>
-                ${hasAlerts
-                  ? html`<span class="menu-item-count"
-                      >${this._offloaderAlertsCount()}</span
-                    >`
-                  : nothing}
-              </div>
-              <div
-                class="menu-item"
-                role="menuitem"
-                tabindex="0"
-                @click=${this._openSearch}
-                @keydown=${this._onMenuItemKeydown}
-              >
-                <wa-icon library="mdi" name="magnify"></wa-icon>
-                <span class="menu-item-label">${this._localize("layout.search")}</span>
-                <kbd class="menu-item-shortcut">${SEARCH_SHORTCUT}</kbd>
-              </div>
-              <div class="menu-divider" role="separator"></div>
-              <div
-                class="menu-item"
-                role="menuitem"
-                tabindex="0"
-                @click=${this._openFeedback}
-                @keydown=${this._onMenuItemKeydown}
-              >
-                <wa-icon library="mdi" name="comment-question-outline"></wa-icon>
-                ${this._localize("layout.feedback_menu")}
-              </div>
-            </div>
-          `
-        : nothing}
+            `
+          : nothing
+      }
     `;
   }
 

@@ -76,60 +76,68 @@ export function renderFacetSections(ctx: FacetSectionsContext): TemplateResult {
 
   return html`
     ${yamlMode ? nothing : renderLabelsFilter(ctx)}
-    ${areaOptions.length > 0
-      ? html`<esphome-filter-section
-          data-facet-key="area"
-          name=${localize("dashboard.filter_area")}
-          search-placeholder=${localize("dashboard.filter_area")}
-          empty-label=${emptyLabel}
-          no-matches-label=${noMatchesLabel}
-          ?searchable=${areaOptions.length > 8}
-          .options=${areaOptions}
-          .selected=${selection.selectedAreas}
-          @facet-change=${(e: CustomEvent<string[]>) => {
-            ctx.onChange({ selectedAreas: e.detail });
-          }}
-        ></esphome-filter-section>`
-      : nothing}
-    ${platformOptions.length > 1
-      ? html`<esphome-filter-section
-          data-facet-key="platform"
-          name=${localize("dashboard.filter_platform")}
-          search-placeholder=${localize("dashboard.filter_platform")}
-          empty-label=${emptyLabel}
-          no-matches-label=${noMatchesLabel}
-          .options=${platformOptions}
-          .selected=${selection.selectedPlatforms}
-          @facet-change=${(e: CustomEvent<string[]>) => {
-            ctx.onChange({ selectedPlatforms: e.detail });
-          }}
-        ></esphome-filter-section>`
-      : nothing}
-    ${yamlMode
-      ? nothing
-      : html`<esphome-filter-section
-          data-facet-key="status"
-          name=${localize("dashboard.filter_status")}
-          empty-label=${emptyLabel}
-          no-matches-label=${noMatchesLabel}
-          .options=${stateOptions}
-          .selected=${selection.selectedStates}
-          @facet-change=${(e: CustomEvent<string[]>) => {
-            ctx.onChange({ selectedStates: e.detail });
-          }}
-        ></esphome-filter-section>`}
-    ${!yamlMode && updateOptions.length > 0
-      ? html`<esphome-filter-section
-          data-facet-key="updates"
-          name=${localize("dashboard.filter_update_status")}
-          empty-label=${emptyLabel}
-          no-matches-label=${noMatchesLabel}
-          .options=${updateOptions}
-          .selected=${selection.selectedUpdateStatus}
-          @facet-change=${(e: CustomEvent<string[]>) => {
-            ctx.onChange({ selectedUpdateStatus: e.detail });
-          }}
-        ></esphome-filter-section>`
-      : nothing}
+    ${
+      areaOptions.length > 0
+        ? html`<esphome-filter-section
+            data-facet-key="area"
+            name=${localize("dashboard.filter_area")}
+            search-placeholder=${localize("dashboard.filter_area")}
+            empty-label=${emptyLabel}
+            no-matches-label=${noMatchesLabel}
+            ?searchable=${areaOptions.length > 8}
+            .options=${areaOptions}
+            .selected=${selection.selectedAreas}
+            @facet-change=${(e: CustomEvent<string[]>) => {
+              ctx.onChange({ selectedAreas: e.detail });
+            }}
+          ></esphome-filter-section>`
+        : nothing
+    }
+    ${
+      platformOptions.length > 1
+        ? html`<esphome-filter-section
+            data-facet-key="platform"
+            name=${localize("dashboard.filter_platform")}
+            search-placeholder=${localize("dashboard.filter_platform")}
+            empty-label=${emptyLabel}
+            no-matches-label=${noMatchesLabel}
+            .options=${platformOptions}
+            .selected=${selection.selectedPlatforms}
+            @facet-change=${(e: CustomEvent<string[]>) => {
+              ctx.onChange({ selectedPlatforms: e.detail });
+            }}
+          ></esphome-filter-section>`
+        : nothing
+    }
+    ${
+      yamlMode
+        ? nothing
+        : html`<esphome-filter-section
+            data-facet-key="status"
+            name=${localize("dashboard.filter_status")}
+            empty-label=${emptyLabel}
+            no-matches-label=${noMatchesLabel}
+            .options=${stateOptions}
+            .selected=${selection.selectedStates}
+            @facet-change=${(e: CustomEvent<string[]>) => {
+              ctx.onChange({ selectedStates: e.detail });
+            }}
+          ></esphome-filter-section>`
+    }
+    ${
+      !yamlMode && updateOptions.length > 0
+        ? html`<esphome-filter-section
+            data-facet-key="updates"
+            name=${localize("dashboard.filter_update_status")}
+            empty-label=${emptyLabel}
+            no-matches-label=${noMatchesLabel}
+            .options=${updateOptions}
+            .selected=${selection.selectedUpdateStatus}
+            @facet-change=${(e: CustomEvent<string[]>) => {
+              ctx.onChange({ selectedUpdateStatus: e.detail });
+            }}
+          ></esphome-filter-section>`
+        : nothing
+    }
   `;
 }

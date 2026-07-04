@@ -129,6 +129,45 @@ describe("add-component-form resolves featured id references to the live config"
     } as unknown as ComponentCatalogEntry;
     expect(seededValues(component, "").buses).toEqual([]);
   });
+
+  // A bundle adds 5 bp5758d outputs, then the rgbww light whose 5 output
+  // references each name a specific sibling; sole-candidate can't pick among
+  // 5 same-domain outputs, so each field fills from its own preset id.
+  it("fills each featured reference from its own preset id among many same-domain outputs", () => {
+    const ref = (key: string, id: string) =>
+      makeConfigEntry({
+        key,
+        type: ConfigEntryType.ID,
+        required: true,
+        references_component: "output",
+        from_preset: true,
+        default_value: id,
+      });
+    const light = {
+      id: "featured.arlec.id_name",
+      config_entries: [
+        ref("red", "output_red"),
+        ref("green", "output_green"),
+        ref("blue", "output_blue"),
+        ref("cold_white", "output_cold"),
+        ref("warm_white", "output_warm"),
+      ],
+    } as unknown as ComponentCatalogEntry;
+    const yaml =
+      "output:\n" +
+      "  - platform: bp5758d\n    id: output_red\n" +
+      "  - platform: bp5758d\n    id: output_green\n" +
+      "  - platform: bp5758d\n    id: output_blue\n" +
+      "  - platform: bp5758d\n    id: output_cold\n" +
+      "  - platform: bp5758d\n    id: output_warm\n";
+    expect(seededValues(light, yaml)).toMatchObject({
+      red: "output_red",
+      green: "output_green",
+      blue: "output_blue",
+      cold_white: "output_cold",
+      warm_white: "output_warm",
+    });
+  });
 });
 
 describe("add-component-form dep-add bus prefill (#1425)", () => {

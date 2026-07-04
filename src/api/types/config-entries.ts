@@ -51,10 +51,7 @@ export enum PinMode {
 
 /** Cardinality of a cross-field `required_groups` constraint. */
 export type RequiredGroupKind =
-  | "exactly_one"
-  | "at_least_one"
-  | "at_most_one"
-  | "none_or_all";
+  "exactly_one" | "at_least_one" | "at_most_one" | "none_or_all";
 
 /**
  * A cross-field constraint over sibling keys in one scope (from ESPHome's

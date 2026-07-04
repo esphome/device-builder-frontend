@@ -34,7 +34,7 @@
     "@tanstack/lit-table": "^8.21.3",
     "codemirror": "^6.0.2",
     "esptool-js": "^0.6.0",
-    "intl-messageformat": "^11.2.8",
+    "intl-messageformat": "^11.2.9",
     "lit": "3.3.3",
     "lit-html": "3.3.3",
     "memoize-one": "^6.0.0",
@@ -42,15 +42,15 @@
     "urlpattern-polyfill": "10.1.0"
   },
   "devDependencies": {
-    "@rspack/core": "2.0.8",
+    "@rspack/core": "2.1.2",
     "@rspack/dev-server": "2.1.0",
     "@swc/helpers": "0.5.23",
-    "@types/node": "26.0.1",
+    "@types/node": "26.1.0",
     "@types/w3c-web-serial": "^1.0.8",
     "fflate": "^0.8.3",
     "happy-dom": "^20.10.6",
     "husky": "^9.1.7",
-    "prettier": "3.8.4",
+    "prettier": "3.9.4",
     "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "6.0.3",
     "vitest": "^4.1.9"

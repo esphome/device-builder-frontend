@@ -48,8 +48,8 @@ function renderActionsCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResul
   }
   const row = {
     busy: false,
-    hasUpdateAvailable: false,
-    hasPendingChanges: false,
+    showUpdate: false,
+    showModified: false,
     _device: { web_port: null },
     ...rowOverrides,
   } as unknown as DeviceRow;
@@ -91,5 +91,47 @@ describe("device table actions", () => {
     const edit = container.querySelector(".cell-action-btn--edit");
     expect(edit).not.toBeNull();
     expect(edit?.classList.contains("cell-action-btn--accent")).toBe(true);
+  });
+});
+
+function renderNameCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResult {
+  const col = columns.find((c) => "accessorKey" in c && c.accessorKey === "name");
+  if (!col?.cell || typeof col.cell !== "function") {
+    throw new Error("no cell renderer for name column");
+  }
+  const row = {
+    name: "kitchen",
+    friendly_name: "Kitchen",
+    showModified: false,
+    showUpdate: false,
+    hasPendingChanges: false,
+    api_enabled: false,
+    api_encrypted: false,
+    api_encryption_active: null,
+    _device: { web_port: null },
+    ...rowOverrides,
+  } as unknown as DeviceRow;
+  const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;
+  return col.cell(info) as TemplateResult;
+}
+
+// The encryption lock reads the raw has_pending_changes, the modified dot reads
+// the mDNS-gated flag — so for an mDNS-dark, hash-pending, encrypted device the
+// table agrees with the drawer's raw-flag badge instead of diverging (#1037).
+describe("name-cell encryption indicator uses the raw pending flag", () => {
+  it("shows encryption-pending but hides the modified dot when the gate is off", () => {
+    const container = document.createElement("div");
+    render(
+      renderNameCell({
+        hasPendingChanges: true, // raw: local edit not yet flashed
+        showModified: false, // gated off: mDNS dark + hash-driven pending
+        api_enabled: true,
+        api_encrypted: true,
+        api_encryption_active: null,
+      }),
+      container
+    );
+    expect(container.querySelector(".cell-encryption")).not.toBeNull();
+    expect(container.querySelector(".cell-indicator--modified")).toBeNull();
   });
 });

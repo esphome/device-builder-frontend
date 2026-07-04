@@ -7,64 +7,12 @@ import {
   JobStatus,
   JobType,
 } from "../../src/api/types/firmware-jobs.js";
-import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import {
   followJob,
   onForceLocalClick,
 } from "../../src/components/command-dialog/commands.js";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
-
-interface StreamCbs {
-  onOutput: (line: string) => void;
-  onResult: (data: unknown) => void;
-  onError: (error: string) => void;
-}
-
-function makeHost(
-  jobs: Map<string, FirmwareJob>,
-  apiExtra: Record<string, unknown> = {}
-) {
-  const follows: Record<string, StreamCbs> = {};
-  let flipped = false;
-  let streamSeq = 0;
-  const host = {
-    _api: {
-      firmwareFollowJob: (jobId: string, cbs: StreamCbs): string => {
-        follows[jobId] = cbs;
-        return `stream-${++streamSeq}`;
-      },
-      ...apiExtra,
-    },
-    _jobs: jobs,
-    _commandType: "install",
-    _jobId: "",
-    _jobStatus: JobStatus.RUNNING,
-    _state: "running",
-    _statusMessage: "",
-    _streamId: "",
-    _switchingToLocal: false,
-    configuration: "kitchen.yaml",
-    name: "kitchen",
-    _port: "OTA",
-    _lines: [] as string[],
-    _showLogsAfterInstall: true,
-    _userStopped: false,
-    _failedDuringValidate: false,
-    _installMissingUpload: false,
-    _localize: (key: string) => key,
-    _flipToLogs: () => {
-      flipped = true;
-    },
-    _flushPendingLines: () => {},
-    _resetPendingLines: () => {},
-    _enqueueLine: () => {},
-  };
-  return {
-    host: host as unknown as ESPHomeCommandDialog,
-    follows,
-    flipped: () => flipped,
-  };
-}
+import { makeCommandDialogHost as makeHost } from "./_command-dialog-host.js";
 
 // A host pre-loaded with an install chain: a COMPILE "c1" and its held UPLOAD
 // "u1" (depends_on "c1"). Overrides tweak either job (e.g. a REMOTE compile).
@@ -137,7 +85,7 @@ describe("command-dialog install chain follow", () => {
     expect(host._state).toBe("error");
     expect(host._statusMessage).toBe("command.install_failed");
     // Flagged so the clean/reset build-failure hint is suppressed (compile was fine).
-    expect(host._installMissingUpload).toBe(true);
+    expect(host._compileMissingDependent).toBe(true);
     expect(flipped()).toBe(false);
     warn.mockRestore();
   });
@@ -206,7 +154,7 @@ describe("command-dialog install chain follow", () => {
     // Stale per-session flags from the cancelled remote attempt.
     host._userStopped = true;
     host._failedDuringValidate = true;
-    host._installMissingUpload = true;
+    host._compileMissingDependent = true;
 
     await onForceLocalClick(host);
 
@@ -216,7 +164,7 @@ describe("command-dialog install chain follow", () => {
     // The new local run starts clean — stale flags can't mis-route its hint.
     expect(host._userStopped).toBe(false);
     expect(host._failedDuringValidate).toBe(false);
-    expect(host._installMissingUpload).toBe(false);
+    expect(host._compileMissingDependent).toBe(false);
 
     follows.c2.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
     expect(host._jobId).toBe("u2");

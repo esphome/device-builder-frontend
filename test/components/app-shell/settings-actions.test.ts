@@ -1,14 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VersionMatchPolicy } from "../../../src/api/types/event-subscription.js";
+import type { PairingSummary } from "../../../src/api/types/remote-build.js";
 import { ExperienceLevel } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
   onSetExpertMode,
   onSetOffloaderIncludeLocal,
+  onSetOffloaderPairingEnabled,
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildEnabled,
   onSetRemoteComputeOnly,
   onSetTheme,
+  onSetVersionHistoryEnabled,
 } from "../../../src/components/app-shell/settings-actions.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
@@ -23,7 +26,11 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 type PrefsHost = Pick<
   ESPHomeApp,
-  "_experienceLevel" | "_remoteComputeOnly" | "_localize" | "_prefsWritesInFlight"
+  | "_experienceLevel"
+  | "_remoteComputeOnly"
+  | "_versionHistoryEnabled"
+  | "_localize"
+  | "_prefsWritesInFlight"
 > & { _api: { updatePreferences: (p: Record<string, unknown>) => Promise<unknown> } };
 
 function makePrefsHost(
@@ -32,6 +39,7 @@ function makePrefsHost(
   return {
     _experienceLevel: null,
     _remoteComputeOnly: false,
+    _versionHistoryEnabled: true,
     _localize: ((key: string) => key) as ESPHomeApp["_localize"],
     _prefsWritesInFlight: 0,
     _api: { updatePreferences },
@@ -168,6 +176,99 @@ describe("offloader-write in-flight counter", () => {
   });
 });
 
+type PairingHost = Pick<
+  ESPHomeApp,
+  "_buildOffloadPairings" | "_offloaderWritesInFlight" | "_localize"
+> & {
+  _api: {
+    setOffloaderPairingEnabled: (args: {
+      pin_sha256: string;
+      enabled: boolean;
+    }) => Promise<unknown>;
+  };
+};
+
+const PAIRING_PIN = "a".repeat(64);
+
+function makePairing(enabled: boolean): PairingSummary {
+  return {
+    receiver_hostname: "192.168.1.50",
+    receiver_port: 6052,
+    pin_sha256: PAIRING_PIN,
+    label: "lab-receiver",
+    paired_at: 1,
+    status: "approved",
+    connected: true,
+    connecting: false,
+    last_connect_error: "",
+    esphome_version: "",
+    enabled,
+  };
+}
+
+function makePairingHost(
+  api: PairingHost["_api"]
+): PairingHost & { _buildOffloadPairings: Map<string, PairingSummary> } {
+  return {
+    _buildOffloadPairings: new Map([[PAIRING_PIN, makePairing(true)]]),
+    _offloaderWritesInFlight: 0,
+    _localize: ((key: string) => key) as ESPHomeApp["_localize"],
+    _api: api,
+  };
+}
+
+describe("onSetOffloaderPairingEnabled", () => {
+  beforeEach(() => toastError.mockClear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("optimistically flips the row and sends the API call", async () => {
+    const setApi = vi.fn(async () => ({}));
+    const host = makePairingHost({ setOffloaderPairingEnabled: setApi });
+
+    await onSetOffloaderPairingEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: { pin_sha256: PAIRING_PIN, enabled: false } })
+    );
+
+    expect(setApi).toHaveBeenCalledWith({ pin_sha256: PAIRING_PIN, enabled: false });
+    expect(host._buildOffloadPairings.get(PAIRING_PIN)?.enabled).toBe(false);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("reverts the row and toasts on backend rejection", async () => {
+    const setApi = vi.fn(async () => {
+      throw new Error("backend said no");
+    });
+    const host = makePairingHost({ setOffloaderPairingEnabled: setApi });
+
+    await onSetOffloaderPairingEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: { pin_sha256: PAIRING_PIN, enabled: false } })
+    );
+
+    expect(host._buildOffloadPairings.get(PAIRING_PIN)?.enabled).toBe(true);
+    expect(toastError).toHaveBeenCalledOnce();
+  });
+
+  it("holds the in-flight guard until the write settles", async () => {
+    let resolve: (v?: unknown) => void = () => {};
+    const setApi = vi.fn(() => new Promise((r) => (resolve = r)));
+    const host = makePairingHost({ setOffloaderPairingEnabled: setApi });
+
+    const done = onSetOffloaderPairingEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: { pin_sha256: PAIRING_PIN, enabled: false } })
+    );
+    // The gate is closed for the whole reconnect-race window, not just before
+    // the first await, so a mid-write snapshot reseed is skipped.
+    expect(host._offloaderWritesInFlight).toBe(1);
+
+    resolve();
+    await done;
+    expect(host._offloaderWritesInFlight).toBe(0);
+  });
+});
+
 describe("onSetExpertMode", () => {
   beforeEach(() => toastError.mockClear());
   afterEach(() => vi.restoreAllMocks());
@@ -229,6 +330,43 @@ describe("onSetRemoteComputeOnly", () => {
     expect(host._remoteComputeOnly).toBe(true);
     await flush();
     expect(host._remoteComputeOnly).toBe(false);
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe("onSetVersionHistoryEnabled", () => {
+  beforeEach(() => toastError.mockClear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("optimistically flips and persists the preference on success", async () => {
+    const update = vi.fn(async () => ({}));
+    const host = makePrefsHost(update);
+    onSetVersionHistoryEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: false })
+    );
+    expect(host._versionHistoryEnabled).toBe(false);
+    await flush();
+    expect(host._versionHistoryEnabled).toBe(false);
+    expect(update).toHaveBeenCalledWith({ version_history_enabled: false });
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("reverts, logs, and toasts on backend rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = makePrefsHost(
+      vi.fn(async () => {
+        throw new Error("no");
+      })
+    );
+    onSetVersionHistoryEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: false })
+    );
+    expect(host._versionHistoryEnabled).toBe(false);
+    await flush();
+    expect(host._versionHistoryEnabled).toBe(true);
     expect(toastError).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalled();
   });

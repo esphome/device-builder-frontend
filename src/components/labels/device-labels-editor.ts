@@ -269,9 +269,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
     return html`
       <div class="row">
-        ${assigned.length === 0
-          ? html`<span class="empty">${this._localize("dashboard.labels_none")}</span>`
-          : nothing}
+        ${
+          assigned.length === 0
+            ? html`<span class="empty">${this._localize("dashboard.labels_none")}</span>`
+            : nothing
+        }
         ${assigned.map(
           (label) =>
             html`<span
@@ -313,27 +315,31 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
           role="group"
           aria-label=${this._localize("dashboard.drawer_labels")}
         >
-          ${this._catalog.length === 0
-            ? html`<div class="option-empty">
-                ${this._localize("dashboard.labels_dialog_empty")}
-              </div>`
-            : this._catalog.map((label) => {
-                const checked = assignedSet.has(label.id);
-                return html`<button
-                  class="option"
-                  type="button"
-                  role="checkbox"
-                  aria-checked=${checked ? "true" : "false"}
-                  @click=${() => this._toggleAssignment(label.id, !checked)}
-                >
-                  <span class="option-check ${checked ? "option-check--checked" : ""}">
-                    ${checked
-                      ? html`<wa-icon library="mdi" name="check"></wa-icon>`
-                      : nothing}
-                  </span>
-                  ${renderLabelChip(label)}
-                </button>`;
-              })}
+          ${
+            this._catalog.length === 0
+              ? html`<div class="option-empty">
+                  ${this._localize("dashboard.labels_dialog_empty")}
+                </div>`
+              : this._catalog.map((label) => {
+                  const checked = assignedSet.has(label.id);
+                  return html`<button
+                    class="option"
+                    type="button"
+                    role="checkbox"
+                    aria-checked=${checked ? "true" : "false"}
+                    @click=${() => this._toggleAssignment(label.id, !checked)}
+                  >
+                    <span class="option-check ${checked ? "option-check--checked" : ""}">
+                      ${
+                        checked
+                          ? html`<wa-icon library="mdi" name="check"></wa-icon>`
+                          : nothing
+                      }
+                    </span>
+                    ${renderLabelChip(label)}
+                  </button>`;
+                })
+          }
         </div>
         <div class="create-section">
           <esphome-label-form

@@ -11,8 +11,11 @@
  *   this value verbatim.
  * - ``variant`` narrows ESP32 chips into their families (S2 / S3 /
  *   C3 / C6 / H2). Empty for non-ESP32 platforms.
- * - ``mcu`` narrows ESPHome's single ``rp2040`` platform into its
- *   two chip series (RP2040 / RP2350). Absent for other platforms.
+ * - ``mcu`` narrows a platform that lumps several chips under one
+ *   key into its chip series: ``rp2040`` into RP2040 / RP2350, and
+ *   the LibreTiny platforms (bk72xx / rtl87xx / ln882x) into their
+ *   chips (BK7231 / BK7238 / BK7251, RTL8710B / RTL8720C, LN882H).
+ *   Absent for platforms split by ``variant`` instead.
  * - ``label`` is the user-facing chip text.
  */
 import { chipPlatformFamily } from "../../util/chip-variant.js";
@@ -42,9 +45,15 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
   // filters the shared platform by 'mcu'.
   { platform: "rp2040", variant: "", mcu: "rp2040", label: "RP2040" },
   { platform: "rp2040", variant: "", mcu: "rp2350", label: "RP2350" },
-  { platform: "bk72xx", variant: "", label: "BK72xx" },
-  { platform: "rtl87xx", variant: "", label: "RTL87xx" },
-  { platform: "ln882x", variant: "", label: "LN882x" },
+  // LibreTiny platforms bundle genuinely different silicon; split each
+  // by 'mcu' (the chip series the backend stamps on every board) the
+  // same way rp2040 is. BK7231N/T/Q share the one 'bk7231' filter.
+  { platform: "bk72xx", variant: "", mcu: "bk7231", label: "BK7231" },
+  { platform: "bk72xx", variant: "", mcu: "bk7238", label: "BK7238" },
+  { platform: "bk72xx", variant: "", mcu: "bk7251", label: "BK7251" },
+  { platform: "rtl87xx", variant: "", mcu: "rtl8710b", label: "RTL8710B" },
+  { platform: "rtl87xx", variant: "", mcu: "rtl8720c", label: "RTL8720C" },
+  { platform: "ln882x", variant: "", mcu: "ln882h", label: "LN882H" },
   { platform: "nrf52", variant: "", label: "nRF52" },
 ];
 

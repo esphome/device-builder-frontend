@@ -168,40 +168,42 @@ export class ESPHomeUpdateAllDialog extends LitElement {
         .label=${this._localize("update_all_dialog.title")}
         @after-hide=${this._onAfterHide}
       >
-        ${this._open
-          ? html`
-              <div class="sections" @filter-section-toggle=${this._onSectionToggle}>
-                ${renderFacetSections({
-                  devices: this._devices,
-                  localize: this._localize,
-                  selection: this._selection,
-                  labelUsage: this._labelUsageMemo(this._devices),
-                  yamlMode: false,
-                  manageLabels: false,
-                  onChange: (patch) => {
-                    this._selection = { ...this._selection, ...patch };
-                  },
-                })}
-              </div>
-              <div class="summary" role="status">
-                ${this._localize("update_all_dialog.count", {
-                  count: matched.length,
-                })}
-              </div>
-              <div class="actions">
-                <button class="btn btn--cancel" @click=${this.close}>
-                  ${this._localize("layout.cancel")}
-                </button>
-                <button
-                  class="btn btn--primary"
-                  ?disabled=${matched.length === 0}
-                  @click=${this._confirm}
-                >
-                  ${this._localize("update_all_dialog.confirm")}
-                </button>
-              </div>
-            `
-          : nothing}
+        ${
+          this._open
+            ? html`
+                <div class="sections" @filter-section-toggle=${this._onSectionToggle}>
+                  ${renderFacetSections({
+                    devices: this._devices,
+                    localize: this._localize,
+                    selection: this._selection,
+                    labelUsage: this._labelUsageMemo(this._devices),
+                    yamlMode: false,
+                    manageLabels: false,
+                    onChange: (patch) => {
+                      this._selection = { ...this._selection, ...patch };
+                    },
+                  })}
+                </div>
+                <div class="summary" role="status">
+                  ${this._localize("update_all_dialog.count", {
+                    count: matched.length,
+                  })}
+                </div>
+                <div class="actions">
+                  <button class="btn btn--cancel" @click=${this.close}>
+                    ${this._localize("layout.cancel")}
+                  </button>
+                  <button
+                    class="btn btn--primary"
+                    ?disabled=${matched.length === 0}
+                    @click=${this._confirm}
+                  >
+                    ${this._localize("update_all_dialog.confirm")}
+                  </button>
+                </div>
+              `
+            : nothing
+        }
       </esphome-base-dialog>
     `;
   }

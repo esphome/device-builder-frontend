@@ -52,6 +52,8 @@ export const CORE_KEYS = new Set([
   "esp32",
   "esp8266",
   "rp2040",
+  // esphome#17145 renames the rp2040 platform key to rp2; keep both
+  "rp2",
   "bk72xx",
   "rtl87xx",
   "ln882x",

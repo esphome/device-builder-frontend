@@ -174,13 +174,15 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
               this._value = (e.target as HTMLInputElement).value;
             }}
           />
-          ${err
-            ? renderInlineError(this._localize(err.code, err.params))
-            : warning
-              ? html`<span class="field-warning"
-                  >${this._localize(warning.code, warning.params)}</span
-                >`
-              : nothing}
+          ${
+            err
+              ? renderInlineError(this._localize(err.code, err.params))
+              : warning
+                ? html`<span class="field-warning"
+                    >${this._localize(warning.code, warning.params)}</span
+                  >`
+                : nothing
+          }
         </div>
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>

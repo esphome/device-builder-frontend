@@ -227,11 +227,13 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
       >
         ${alternatives.map((a) => html`<wa-radio value=${a.id}>${a.label}</wa-radio>`)}
       </wa-radio-group>
-      ${visibleMembers.length
-        ? html`<div class="nested-fields">
-            ${visibleMembers.map((m) => ctx.renderEntry(m, [m.key]))}
-          </div>`
-        : nothing}
+      ${
+        visibleMembers.length
+          ? html`<div class="nested-fields">
+              ${visibleMembers.map((m) => ctx.renderEntry(m, [m.key]))}
+            </div>`
+          : nothing
+      }
     </div>
   `;
 }
@@ -282,9 +284,11 @@ export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: Re
       data-field-key=${fieldKeyAttr([cluster.members[0].key])}
     >
       <div class="constraint-cluster-header ${prompt.satisfied ? "" : "unsatisfied"}">
-        ${prompt.satisfied
-          ? nothing
-          : html`<wa-icon library="mdi" name="alert-circle-outline"></wa-icon>`}
+        ${
+          prompt.satisfied
+            ? nothing
+            : html`<wa-icon library="mdi" name="alert-circle-outline"></wa-icon>`
+        }
         <span>${message}</span>
       </div>
       <div class="nested-fields">

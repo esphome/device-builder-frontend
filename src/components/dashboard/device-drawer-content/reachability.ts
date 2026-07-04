@@ -92,13 +92,15 @@ export function renderReachabilitySection(
   return html`
     <div class="section">
       <h4 class="section-title">${host._localize("dashboard.drawer_reachability")}</h4>
-      ${!anySignal
-        ? html`<div class="value muted">
-            ${host._localize("dashboard.drawer_waiting_for_signal")}
-          </div>`
-        : rows.map((row) =>
-            renderReachabilityRow(row, r.active_source, lang, host._localize)
-          )}
+      ${
+        !anySignal
+          ? html`<div class="value muted">
+              ${host._localize("dashboard.drawer_waiting_for_signal")}
+            </div>`
+          : rows.map((row) =>
+              renderReachabilityRow(row, r.active_source, lang, host._localize)
+            )
+      }
       ${renderMdnsStaleWarning(r, host._localize)}
     </div>
   `;
@@ -129,25 +131,31 @@ function renderReachabilityRow(
       <div class="content">
         <div class="label">
           ${localize(row.labelKey)}
-          ${isActive
-            ? html`<span class="reachability-badge"
-                >${localize("dashboard.drawer_source_active")}</span
-              >`
-            : nothing}
+          ${
+            isActive
+              ? html`<span class="reachability-badge"
+                  >${localize("dashboard.drawer_source_active")}</span
+                >`
+              : nothing
+          }
         </div>
         <div class="value">
-          ${ageText}${rttText
-            ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
-            : nothing}
+          ${ageText}${
+            rttText
+              ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
+              : nothing
+          }
         </div>
-        ${row.source === "mdns" && isActive
-          ? renderMdnsExpiry(
-              row.ttlRemaining ?? null,
-              row.ttlLifetime ?? null,
-              localize,
-              lang
-            )
-          : nothing}
+        ${
+          row.source === "mdns" && isActive
+            ? renderMdnsExpiry(
+                row.ttlRemaining ?? null,
+                row.ttlLifetime ?? null,
+                localize,
+                lang
+              )
+            : nothing
+        }
         ${renderMdnsTxtRecords(row.txtRecords, localize)}
       </div>
     </div>
