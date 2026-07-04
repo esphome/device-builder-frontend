@@ -2,7 +2,11 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
-import { getKeyPath, isInsideBlockScalar } from "../../src/util/yaml-ast.js";
+import {
+  getKeyPath,
+  getKeyPathWithListIndices,
+  isInsideBlockScalar,
+} from "../../src/util/yaml-ast.js";
 
 function pathAt(doc: string, token: string): string[] {
   const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
@@ -50,6 +54,36 @@ describe("getKeyPath", () => {
 
   it("returns [] outside any mapping pair", () => {
     expect(pathAt("# comment\n", "comment")).toEqual([]);
+  });
+});
+
+describe("getKeyPathWithListIndices", () => {
+  const indexedPathAt = (doc: string, token: string): (string | number)[] => {
+    const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
+    ensureSyntaxTree(state, state.doc.length);
+    return getKeyPathWithListIndices(state, doc.indexOf(token) + 1);
+  };
+
+  it("adds the item index for a field nested in a list entry", () => {
+    const doc =
+      "esphome:\n  name: test\n  areas:\n    - name: Kitchen\n      id: kitchen\n    - name: Attic\n      id: $$\n";
+    expect(indexedPathAt(doc, "id: kitchen")).toEqual(["esphome", "areas", 0, "id"]);
+    expect(indexedPathAt(doc, "id: $$")).toEqual(["esphome", "areas", 1, "id"]);
+  });
+
+  it("indexes top-level platform list items too", () => {
+    const doc =
+      "sensor:\n  - platform: gpio\n    name: a\n  - platform: dht\n    pin: GPIO4\n";
+    expect(indexedPathAt(doc, "pin")).toEqual(["sensor", 1, "pin"]);
+  });
+
+  it("matches getKeyPath on a plain mapping chain", () => {
+    const doc = "esp32_ble_tracker:\n  scan_parameters:\n    active: false\n";
+    expect(indexedPathAt(doc, "active")).toEqual([
+      "esp32_ble_tracker",
+      "scan_parameters",
+      "active",
+    ]);
   });
 });
 

@@ -25,7 +25,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { EditorValidateResponse } from "../api/types/editor.js";
 import { formRelativePath } from "./backend-field-errors.js";
 import { splitTextLinks } from "./markdown.js";
-import { getKeyPath } from "./yaml-ast.js";
+import { getKeyPathWithListIndices } from "./yaml-ast.js";
 import { isOpenConfigFile } from "./yaml-validation-summary.js";
 
 /** A validation error resolved to a key chain in the open document. */
@@ -33,8 +33,9 @@ export interface MappedValidationError {
   message: string;
   /** 1-indexed line of the (retargeted) error location. */
   line: number;
-  /** Key chain from the top-level section key down to the errored field. */
-  keyPath: string[];
+  /** Key chain from the top-level section key down to the errored field;
+   *  block-sequence items contribute their numeric index. */
+  keyPath: (string | number)[];
 }
 
 /** Detail payload of the yaml-diagnostics event the editor re-emits. */
@@ -370,7 +371,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // Anchor inside the first token (side -1 at the exact start would
         // resolve to the preceding node) and collect the enclosing key
         // chain for the form/navigator routing.
-        const keyPath = getKeyPath(view.state, Math.min(from + 1, to));
+        const keyPath = getKeyPathWithListIndices(view.state, Math.min(from + 1, to));
         if (keyPath.length > 0) {
           mapped.push({ message, line: view.state.doc.lineAt(from).number, keyPath });
         }

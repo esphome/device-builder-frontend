@@ -256,12 +256,12 @@ export function sectionAtLine(yaml: string, line: number): YamlSection | null {
 export function sectionForCursor(
   yaml: string,
   line: number,
-  path: readonly string[]
+  path: readonly (string | number)[]
 ): YamlSection | null {
   const hit = sectionAtLine(yaml, line);
   if (hit) return hit;
   const topKey = path[0];
-  if (!topKey) return null;
+  if (typeof topKey !== "string" || !topKey) return null;
   return _topLevelBlockByKey(parseYamlTopLevelSections(yaml), topKey);
 }
 

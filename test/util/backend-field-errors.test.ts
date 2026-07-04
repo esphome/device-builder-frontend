@@ -47,6 +47,16 @@ describe("formRelativePath", () => {
     expect(formRelativePath(["globals"])).toEqual([]);
     expect(formRelativePath([])).toEqual([]);
   });
+
+  it("keeps nested list indices when the path ends in a key", () => {
+    expect(formRelativePath(["esphome", "areas", 0, "id"])).toEqual(["areas", 0, "id"]);
+  });
+
+  it("reduces a path ending in a list index to an empty path", () => {
+    expect(formRelativePath(["sensor", 1])).toEqual([]);
+    expect(formRelativePath(["esphome", "areas", 0])).toEqual([]);
+    expect(formRelativePath(["globals", 0])).toEqual([]);
+  });
 });
 
 describe("resolveBackendErrors", () => {
@@ -97,6 +107,50 @@ describe("resolveBackendErrors", () => {
       resolveBackendErrors(YAML, [{ message: "x", line: 999, keyPath: [] }])
     ).toEqual([]);
   });
+
+  it("keeps nested list indices in the field path", () => {
+    const yaml = `esphome:
+  name: test
+  areas:
+    - name: Kitchen
+      id: $$
+`;
+    const errors = resolveBackendErrors(yaml, [
+      { message: "bad id", line: 5, keyPath: ["esphome", "areas", 0, "id"] },
+    ]);
+    expect(errors).toEqual([
+      { sectionKey: "esphome", fromLine: 1, relPath: "areas.0.id", message: "bad id" },
+    ]);
+  });
+
+  it("strips the redundant domain-list index for expanded platform instances", () => {
+    const errors = resolveBackendErrors(YAML, [
+      { message: "x", line: 14, keyPath: ["sensor", 1, "update_interval"] },
+    ]);
+    expect(errors).toEqual([
+      {
+        sectionKey: "sensor.dht",
+        fromLine: 12,
+        relPath: "update_interval",
+        message: "x",
+      },
+    ]);
+  });
+
+  it("dedupes to the visible set: one per field path, one per section message", () => {
+    const errors = resolveBackendErrors(YAML, [
+      { message: "first", line: 14, keyPath: ["sensor", "update_interval"] },
+      { message: "second", line: 14, keyPath: ["sensor", "update_interval"] },
+      { message: "component broken", line: 4, keyPath: ["wifi"] },
+      { message: "component broken", line: 5, keyPath: ["wifi"] },
+      { message: "another problem", line: 4, keyPath: ["wifi"] },
+    ]);
+    expect(errors.map((e) => `${e.sectionKey}:${e.relPath}:${e.message}`)).toEqual([
+      "sensor.dht:update_interval:first",
+      "wifi::component broken",
+      "wifi::another problem",
+    ]);
+  });
 });
 
 describe("backendErrorCounts", () => {
@@ -122,12 +176,6 @@ describe("backendErrorCounts", () => {
 describe("backendErrorsForSection", () => {
   const errors: BackendFieldError[] = [
     { sectionKey: "sensor.dht", fromLine: 16, relPath: "update_interval", message: "a" },
-    {
-      sectionKey: "sensor.dht",
-      fromLine: 16,
-      relPath: "update_interval",
-      message: "dup",
-    },
     { sectionKey: "sensor.dht", fromLine: 13, relPath: "pin", message: "b" },
     { sectionKey: "wifi", fromLine: 4, relPath: "", message: "section only" },
   ];

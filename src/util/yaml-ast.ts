@@ -189,23 +189,45 @@ export function getTopLevelKey(state: EditorState, pos: number): string | null {
  * fields directly under the component.
  */
 export function getKeyPath(state: EditorState, pos: number): string[] {
-  const keys: string[] = [];
+  return getKeyPathWithListIndices(state, pos).filter(
+    (s): s is string => typeof s === "string"
+  );
+}
+
+/**
+ * Like ``getKeyPath``, but block-sequence items contribute their
+ * numeric index, so a field inside ``esphome: areas: - id:`` yields
+ * ``["esphome", "areas", 0, "id"]`` — the shape value paths use for
+ * fields nested in list entries.
+ */
+export function getKeyPathWithListIndices(
+  state: EditorState,
+  pos: number
+): (string | number)[] {
+  const segs: (string | number)[] = [];
   const tree = syntaxTree(state);
-  let cur = findEnclosingPair(tree.resolveInner(pos, -1));
-  if (!cur) {
+  let node: SyntaxNode | null = tree.resolveInner(pos, -1);
+  if (!findEnclosingPair(node)) {
     // A cursor in an empty value / trailing whitespace (``key: ``) resolves to
     // the document root, not the pair. Re-anchor on the line's last non-space
     // char (the ``:`` or key) so a nested ``key: `` still yields its path.
     const line = state.doc.lineAt(pos);
     const upto = line.text.slice(0, pos - line.from).trimEnd();
-    if (upto) cur = findEnclosingPair(tree.resolveInner(line.from + upto.length - 1, -1));
+    if (upto) node = tree.resolveInner(line.from + upto.length - 1, -1);
   }
-  while (cur) {
-    const k = getPairKey(state, cur);
-    if (k) keys.push(k);
-    cur = findEnclosingPair(cur.parent?.parent ?? null);
+  for (; node; node = node.parent) {
+    if (node.name === "Pair") {
+      const k = getPairKey(state, node);
+      if (k) segs.push(k);
+    } else if (node.name === "Item" && node.parent?.name === "BlockSequence") {
+      let idx = 0;
+      for (let s = node.prevSibling; s; s = s.prevSibling) {
+        if (s.name === "Item") idx++;
+      }
+      segs.push(idx);
+    }
   }
-  return keys.reverse();
+  return segs.reverse();
 }
 
 /**

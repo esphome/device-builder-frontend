@@ -23,28 +23,60 @@ export interface BackendFieldError {
 }
 
 /**
- * Drop the top-level key to get the form-relative path. LIST_SECTIONS
- * (globals) are the exception: their form keys fields under the section
- * key, so keep it — but only with a child segment; a bare section header
- * reduces to [] (a non-field location), not a whole-section field path.
+ * The form-field path for a document key path, or [] when the location
+ * has no form field to carry a message.
+ *
+ * Drops the top-level key (LIST_SECTIONS like globals keep it — their
+ * form keys fields under the section key). A remainder that doesn't end
+ * in a key names a section header, instance, or list item rather than a
+ * field, so it reduces to [].
  */
-export function formRelativePath(full: readonly string[]): string[] {
-  return full.length > 1 && LIST_SECTIONS.has(full[0]) ? [...full] : full.slice(1);
+export function formRelativePath<T extends string | number>(full: readonly T[]): T[] {
+  const top = full[0];
+  const rel =
+    full.length > 1 && typeof top === "string" && LIST_SECTIONS.has(top)
+      ? [...full]
+      : full.slice(1);
+  return typeof rel[rel.length - 1] === "string" ? rel : [];
 }
 
-/** Pin each mapped error on a section instance in the current buffer. */
+/**
+ * Pin each mapped error on a section instance in the current buffer.
+ *
+ * The result is the deduped set of user-visible errors: one per field
+ * path (the form renders a single message per field) and one per message
+ * for section-level errors (the banner shows each distinct message
+ * once), so every consumer — badge counts, form maps, jump affordances —
+ * agrees on what exists.
+ */
 export function resolveBackendErrors(
   yaml: string,
   mapped: readonly MappedValidationError[]
 ): BackendFieldError[] {
   const out: BackendFieldError[] = [];
+  const seen = new Set<string>();
   for (const err of mapped) {
     const section = sectionForCursor(yaml, err.line, err.keyPath);
     if (!section) continue;
+    let rel = formRelativePath(err.keyPath);
+    // An expanded list instance (- platform: dht) IS the form's root: the
+    // navigator already picked the item by fromLine, so the domain-list
+    // index the key path carries is redundant — drop it. Nested list
+    // indices (esphome.areas.0.id) stay; the form paths carry them.
+    if (section.parentKey !== undefined && typeof rel[0] === "number") {
+      rel = rel.slice(1);
+    }
+    const sectionKey = sectionKeyOf(section);
+    const relPath = rel.join(".");
+    const visibleKey = `${instanceKey(sectionKey, section.fromLine)}:${
+      relPath || `message:${err.message}`
+    }`;
+    if (seen.has(visibleKey)) continue;
+    seen.add(visibleKey);
     out.push({
-      sectionKey: sectionKeyOf(section),
+      sectionKey,
       fromLine: section.fromLine,
-      relPath: formRelativePath(err.keyPath).join("."),
+      relPath,
       message: err.message,
     });
   }
@@ -56,7 +88,9 @@ export function instanceKey(sectionKey: string, fromLine: number): string {
   return `${sectionKey}@${fromLine}`;
 }
 
-/** Error count per section instance, keyed by instanceKey. */
+/** Error count per section instance, keyed by instanceKey. The resolve
+ *  step already deduped to the visible set, so the badge matches what the
+ *  form and banner render. */
 export function backendErrorCounts(
   errors: readonly BackendFieldError[]
 ): Map<string, number> {
@@ -70,9 +104,9 @@ export function backendErrorCounts(
 
 /**
  * The selected section instance's errors as the path-keyed map the config
- * form renders. First error per path wins; section-level errors (empty
- * relPath) are navigator/banner material, not field errors. An undefined
- * fromLine matches any instance of the section key.
+ * form renders. Section-level errors (empty relPath) are navigator/banner
+ * material, not field errors. An undefined fromLine matches any instance
+ * of the section key.
  */
 export function backendErrorsForSection(
   errors: readonly BackendFieldError[],
@@ -84,7 +118,7 @@ export function backendErrorsForSection(
   for (const e of errors) {
     if (e.sectionKey !== sectionKey) continue;
     if (fromLine !== undefined && e.fromLine !== fromLine) continue;
-    if (!e.relPath || out.has(e.relPath)) continue;
+    if (!e.relPath) continue;
     out.set(e.relPath, {
       key: e.relPath,
       code: "validation.backend",
