@@ -10,7 +10,6 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import { openFlasher } from "../../util/usb-flasher.js";
 import {
-  connectToPort,
   detectChip,
   disconnect,
   flashFirmware,
@@ -145,17 +144,21 @@ export async function startWebSerialInstall(
     return;
   }
 
-  // Disconnect during compile — we'll reconnect to flash.
-  try {
-    await disconnect(detected.transport);
-  } catch {
-    /* ignore */
-  }
+  // Keep this esploader session open through the compile and flash on it
+  // directly. Closing the port here and reopening it to flash left the stub
+  // loader running on the chip while the OS handle was torn down; on boards
+  // where DTR/RTS reset doesn't land (ESP32-C3 behind a CH340) the reopened
+  // port then reused that stale stub and FLASH_DEFL_BEGIN was rejected with
+  // "Failed to enter compressed flash mode" (#1833). The external flasher and
+  // the legacy dashboard both flash on one continuous session for this reason.
 
   // 3. Compile
   host._step = "queued";
   host._statusMessage = host._localize("firmware.status_queued");
-  if (!(await compileOrFail(host, device.configuration))) return;
+  if (!(await compileOrFail(host, device.configuration))) {
+    await releaseSerial(detected);
+    return;
+  }
 
   // 4. Download binary
   host._statusMessage = host._localize("firmware.status_downloading");
@@ -165,6 +168,7 @@ export async function startWebSerialInstall(
     const binaries = await host._api.firmwareGetBinaries(device.configuration);
     const target = pickFlashTarget(detected.chipName, binaries);
     if (!target) {
+      await releaseSerial(detected);
       host._fail(host._localize("serial.no_firmware"));
       return;
     }
@@ -173,36 +177,24 @@ export async function startWebSerialInstall(
       await host._api.firmwareDownloadBytes(device.configuration, target.binary.file)
     );
   } catch {
+    await releaseSerial(detected);
     host._fail(host._localize("firmware.download_failed"));
     return;
   }
 
-  // 5. Reconnect (no browser picker) and flash.
+  // 5. Flash on the still-open session.
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
-  let flashDetected: DetectedChip;
   try {
-    flashDetected = await connectToPort(detected.port, onLog);
-  } catch (err) {
-    console.error("[Web Serial] Reconnect failed:", err);
-    host._fail(host._localize("firmware.flash_failed"));
-    return;
-  }
-
-  try {
-    await flashFirmware(flashDetected.loader, firmwareBytes, flashAddress, (p) => {
+    await flashFirmware(detected.loader, firmwareBytes, flashAddress, (p) => {
       host._flashPercent = p.percent;
     });
   } catch (err) {
     console.error("[Web Serial] Flash error:", err);
     // 100% reached: treat as success — device may have reset during verification.
     if (host._flashPercent < 100) {
-      try {
-        await disconnect(flashDetected.transport);
-      } catch {
-        /* ignore */
-      }
+      await releaseSerial(detected);
       host._fail(
         err instanceof Error ? err.message : host._localize("firmware.flash_failed")
       );
@@ -213,11 +205,7 @@ export async function startWebSerialInstall(
   // 6. Reset
   host._statusMessage = host._localize("firmware.status_resetting");
   try {
-    await resetAndDisconnect(
-      flashDetected.loader,
-      flashDetected.transport,
-      flashDetected.port
-    );
+    await resetAndDisconnect(detected.loader, detected.transport, detected.port);
   } catch {
     /* ignore reset errors */
   }
@@ -228,7 +216,17 @@ export async function startWebSerialInstall(
   // install can still reach here, so gate the auto-flip on the dialog still
   // being open. Otherwise the logs viewer pops up on a user who walked away.
   if (host._open && host._showLogsAfterInstall) {
-    flipToLogs(host, flashDetected.port);
+    flipToLogs(host, detected.port);
+  }
+}
+
+// Best-effort release of the held serial port on an early return, so a failed
+// compile / download / flash doesn't leak an open port into the next attempt.
+async function releaseSerial(detected: DetectedChip): Promise<void> {
+  try {
+    await disconnect(detected.transport);
+  } catch {
+    /* ignore */
   }
 }
 

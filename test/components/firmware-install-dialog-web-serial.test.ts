@@ -7,7 +7,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const wsSerial = vi.hoisted(() => ({
-  connectToPort: vi.fn(),
   detectChip: vi.fn(),
   disconnect: vi.fn(),
   flashFirmware: vi.fn(),
@@ -90,7 +89,6 @@ describe("Web Serial install — HTTP byte download", () => {
   it("fetches firmware bytes over HTTP and flashes them", async () => {
     const { host, api } = makeHost();
     wsSerial.detectChip.mockResolvedValue(CHIP);
-    wsSerial.connectToPort.mockResolvedValue(CHIP);
     wsSerial.disconnect.mockResolvedValue(undefined);
     wsSerial.flashFirmware.mockResolvedValue(undefined);
     wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
@@ -111,24 +109,22 @@ describe("Web Serial install — HTTP byte download", () => {
 
   it("streams esptool detect + flash output into the log (#346)", async () => {
     const { host } = makeHost();
+    let captured: ((l: string) => void) | undefined;
     wsSerial.detectChip.mockImplementation(async (onLog?: (l: string) => void) => {
+      captured = onLog;
       onLog?.("Detecting chip type... ESP32");
       return CHIP;
     });
-    wsSerial.connectToPort.mockImplementation(
-      async (_port: unknown, onLog?: (l: string) => void) => {
-        onLog?.("Writing at 0x00010000...");
-        return CHIP;
-      }
-    );
+    // Flash output reaches the log through the terminal wired at detect: the
+    // session stays open across compile and flash, so no reconnect is needed.
+    wsSerial.flashFirmware.mockImplementation(async () => {
+      captured?.("Writing at 0x00010000...");
+    });
     wsSerial.disconnect.mockResolvedValue(undefined);
-    wsSerial.flashFirmware.mockResolvedValue(undefined);
     wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
-    // Before the fix detectChip/connectToPort were called with no onLog, so
-    // esptool output never reached the log buffer.
     expect(host._logLines).toContain("Detecting chip type... ESP32");
     expect(host._logLines).toContain("Writing at 0x00010000...");
   });
@@ -183,7 +179,6 @@ describe("Web Serial install — HTTP byte download", () => {
       { title: "Firmware", file: "firmware.bin" },
     ]);
     wsSerial.detectChip.mockResolvedValue({ ...CHIP, chipName: "ESP8285" });
-    wsSerial.connectToPort.mockResolvedValue({ ...CHIP, chipName: "ESP8285" });
     wsSerial.disconnect.mockResolvedValue(undefined);
     wsSerial.flashFirmware.mockResolvedValue(undefined);
     wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
