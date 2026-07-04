@@ -95,12 +95,15 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
   `;
 }
 
-/** Small error-count pill; the section's fields carry the details. */
+/** Small error-count pill; the section's fields carry the details. Without
+ *  a label it stays a plain text span — a bare role="img" with no
+ *  accessible name reads as an unnamed image. */
 function renderErrorBadge(count: number, v: NavSectionView): TemplateResult {
+  const label = v.errorLabel?.(count);
   return html`<span
     class="nav-item-error-badge"
-    role="img"
-    aria-label=${ifDefined(v.errorLabel?.(count))}
+    role=${ifDefined(label ? "img" : undefined)}
+    aria-label=${ifDefined(label)}
     >${count}</span
   >`;
 }
