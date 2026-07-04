@@ -67,6 +67,9 @@ export interface FirmwareJob {
   /** Prerequisite job id, or ``""``. An install's UPLOAD carries its
    *  COMPILE's ``job_id`` (held until the compile succeeds). */
   depends_on: string;
+  /** Set on an install COMPILE for an offline device: no dependent
+   *  UPLOAD exists; the backend flashes when the device reconnects. */
+  is_deferred_install?: boolean;
   /** 0–100 progress, monotonically non-decreasing while the job runs.
    *  `null` until the underlying tooling (PlatformIO/esptool) emits a
    *  percentage we can latch onto. */

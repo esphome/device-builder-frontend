@@ -873,6 +873,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._actionDevice = device;
     this._friendlyNameDialog.open(device.name, device.friendly_name || device.name);
   };
+
   _executeRename = (e: CustomEvent<string>) => void executeRename(this, e);
   _executeClone = (e: CustomEvent<{ newName: string; newFriendlyName: string }>) =>
     void executeClone(this, e);

@@ -196,11 +196,10 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
     onResult: (data) => {
       host._streamId = "";
       host._flushPendingLines();
-      const result = data as unknown as {
-        status: string;
-        exit_code: number | null;
-        is_deferred_install?: boolean;
-      };
+      const result = data as unknown as Pick<
+        FirmwareJob,
+        "status" | "exit_code" | "is_deferred_install"
+      >;
       const success = result.status === JobStatus.COMPLETED;
 
       // On a successful install/rename COMPILE, follow the dependent flash —
