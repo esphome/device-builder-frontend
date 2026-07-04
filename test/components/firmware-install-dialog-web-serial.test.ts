@@ -181,6 +181,8 @@ describe("Web Serial install — HTTP byte download", () => {
 
     expect(host._fail).toHaveBeenCalledWith("firmware.download_failed");
     expect(wsSerial.flashFirmware).not.toHaveBeenCalled();
+    // The held session must be released on the bail-out, not leaked into a retry.
+    expect(wsSerial.disconnect).toHaveBeenCalledTimes(1);
   });
 
   // ESP8285 is an ESP8266 with embedded flash; `board: esp8285` resolves to the
