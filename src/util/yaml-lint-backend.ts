@@ -23,7 +23,28 @@ import {
 import { gutterLineClass, GutterMarker, type EditorView } from "@codemirror/view";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { EditorValidateResponse } from "../api/types/editor.js";
+import { formRelativePath } from "./backend-field-errors.js";
 import { splitTextLinks } from "./markdown.js";
+import { getKeyPath } from "./yaml-ast.js";
+import { isOpenConfigFile } from "./yaml-validation-summary.js";
+
+/** A validation error resolved to a key chain in the open document. */
+export interface MappedValidationError {
+  message: string;
+  /** 1-indexed line of the (retargeted) error location. */
+  line: number;
+  /** Key chain from the top-level section key down to the errored field. */
+  keyPath: string[];
+}
+
+/** Detail payload of the yaml-diagnostics event the editor re-emits. */
+export interface YamlDiagnosticsDetail {
+  /** Banner material: errors with no form field to carry their message. */
+  errors: string[];
+  /** Errors resolved to a key path, for form fields and navigator badges. */
+  mapped: MappedValidationError[];
+  configuration: string;
+}
 
 interface BackendLinterOptions {
   api: ESPHomeAPI;
@@ -33,10 +54,17 @@ interface BackendLinterOptions {
    * Called after every lint pass with the resulting error messages and the
    * configuration they were computed for, so the host can surface a
    * document-level "configuration invalid" indicator that names the actual
-   * errors and ignore a late result from a since-switched device. Fires with
-   * `[]` for an empty/un-configured buffer or a failed round-trip.
+   * errors and ignore a late result from a since-switched device. The
+   * mapped list carries the validation errors that resolved to a key path
+   * in the open document, so the host can route them onto form fields.
+   * Fires with empty lists for an empty/un-configured buffer or a failed
+   * round-trip.
    */
-  onResult?: (errors: string[], configuration: string) => void;
+  onResult?: (
+    errors: string[],
+    mapped: MappedValidationError[],
+    configuration: string
+  ) => void;
 }
 
 /**
@@ -260,12 +288,12 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
     async (view) => {
       const configuration = opts.getConfiguration();
       if (!configuration) {
-        opts.onResult?.([], configuration);
+        opts.onResult?.([], [], configuration);
         return [];
       }
       const content = view.state.doc.toString();
       if (!content.trim()) {
-        opts.onResult?.([], configuration);
+        opts.onResult?.([], [], configuration);
         return [];
       }
 
@@ -276,16 +304,19 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // Surface backend errors quietly in the console — we don't want a
         // network blip to flood the editor with spurious diagnostics.
         console.debug("[yaml-lint] validate_yaml failed:", err);
-        opts.onResult?.([], configuration);
+        opts.onResult?.([], [], configuration);
         return [];
       }
       _lastValidated.set(configuration, { content, result: res, at: performance.now() });
 
       const diagnostics: Diagnostic[] = [];
       // Whole-config errors (a structural error esphome pins on the root
-      // `esphome:` block, or an unplaceable parse error) go in the banner
-      // instead of a squiggle; localized errors keep their squiggle.
+      // esphome block, an included-file error, or an unplaceable parse
+      // error) go in the banner instead of a squiggle; localized errors
+      // keep their squiggle and are also resolved to a key path so the
+      // host can pin them on the matching form field.
       const bannerErrors: string[] = [];
+      const mapped: MappedValidationError[] = [];
 
       // YAML parse errors — usually one, no range, message contains
       // "line N, column M".
@@ -312,6 +343,13 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
       for (const err of res.validation_errors ?? []) {
         const message =
           sanitizeMessage((err.message ?? "").trim()) || "Invalid configuration";
+        // The upstream validator emits a null range when it can't place the
+        // error, and a foreign document when the error lives in an included
+        // file — neither has a location in this buffer.
+        if (!err.range || !isOpenConfigFile(err.range.document ?? "", configuration)) {
+          bannerErrors.push(message);
+          continue;
+        }
         const { from, to } = retargetBlockDiagnostic(
           view.state.doc,
           rangeToOffsets(view, err.range)
@@ -329,9 +367,22 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           message,
           renderMessage: () => renderMessageNode(message),
         });
+        // Anchor inside the first token (side -1 at the exact start would
+        // resolve to the preceding node) and collect the enclosing key
+        // chain for the form/navigator routing.
+        const keyPath = getKeyPath(view.state, Math.min(from + 1, to));
+        if (keyPath.length > 0) {
+          mapped.push({ message, line: view.state.doc.lineAt(from).number, keyPath });
+        }
+        // No form field to carry the message (a bare section header, or the
+        // AST couldn't place it) — keep it in the banner; a section-level
+        // error still badges the navigator through the mapped entry.
+        if (formRelativePath(keyPath).length === 0) {
+          bannerErrors.push(message);
+        }
       }
 
-      opts.onResult?.(bannerErrors, configuration);
+      opts.onResult?.(bannerErrors, mapped, configuration);
       return diagnostics;
     },
     {

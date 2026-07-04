@@ -8,6 +8,7 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
@@ -97,6 +98,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   // Instance-relative field path to scroll into view, from the YAML cursor.
   @property({ attribute: false }) focusFieldPath?: string[];
 
+  // Backend validation errors for this section, keyed by dotted field path.
+  // Refreshed per lint pass; merged under the client-side _fieldErrors.
+  @property({ attribute: false }) backendErrors: Map<string, ValidationError> = new Map();
+
   // Same string the YAML pane shows including unsaved edits. Save and delete
   // operate on this rather than re-fetching: the navigator emits fromLine
   // relative to live YAML, so an out-of-sync version would point the splice
@@ -133,6 +138,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state() _isUnknown = false;
 
   @state() _fieldErrors: Map<string, ValidationError> = new Map();
+
+  // Backend-error paths the user has edited since the last lint pass —
+  // suppressed until the next backendErrors refresh re-evaluates them, so
+  // a fixed value doesn't keep its stale error for the lint round-trip.
+  @state() _clearedBackendPaths: Set<string> = new Set();
 
   // Per-section so switching components doesn't bleed state.
   @state() _advancedShownSections = new Set<string>();
@@ -174,6 +184,27 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   // between fields, long enough to coalesce typing into one splice.
   private static readonly DRAFT_DEBOUNCE_MS = 200;
 
+  /** Backend errors under client-side ones — the client map is live per
+   *  keystroke while the backend map lags a lint round-trip, so on a path
+   *  collision the client's message wins. Memoised so per-keystroke renders
+   *  keep the form's errors prop identity stable. */
+  private _mergeErrors = memoizeOne(
+    (
+      backend: Map<string, ValidationError>,
+      cleared: Set<string>,
+      field: Map<string, ValidationError>
+    ): Map<string, ValidationError> => {
+      if (backend.size === 0) return field;
+      const merged = new Map<string, ValidationError>();
+      for (const [path, err] of backend) {
+        if (!cleared.has(path)) merged.set(path, err);
+      }
+      if (merged.size === 0) return field;
+      for (const [path, err] of field) merged.set(path, err);
+      return merged;
+    }
+  );
+
   private get _showAdvanced(): boolean {
     return this._advancedShownSections.has(this.sectionKey);
   }
@@ -192,6 +223,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   static styles = [espHomeStyles, inputStyles, deviceSectionConfigStyles];
 
   willUpdate(changedProperties: Map<string, unknown>) {
+    // A fresh lint pass re-evaluated every path; drop the local
+    // suppressions so still-broken fields regain their error.
+    if (changedProperties.has("backendErrors") && this._clearedBackendPaths.size) {
+      this._clearedBackendPaths = new Set();
+    }
     // loadConfig synchronously flips _loading/_config/_error; running it in
     // willUpdate folds those into the in-progress render rather than
     // scheduling a second one.
@@ -435,7 +471,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                 .entries=${renderEntries}
                 .requiredGroups=${this._config.required_groups}
                 .values=${this._values}
-                .errors=${this._fieldErrors}
+                .errors=${this._mergeErrors(
+                  this.backendErrors,
+                  this._clearedBackendPaths,
+                  this._fieldErrors
+                )}
                 .board=${this.board}
                 .yaml=${this.yaml}
                 .fromLine=${this._resolvedFromLine}

@@ -57,7 +57,9 @@ function editYaml(page: ESPHomePageDevice, value = YAML + "    pin: GPIO11\n") {
 
 function lintCompleted(page: ESPHomePageDevice, configuration = "kitchen.yaml") {
   internals(page)._onYamlDiagnostics(
-    new CustomEvent("yaml-diagnostics", { detail: { errors: [], configuration } })
+    new CustomEvent("yaml-diagnostics", {
+      detail: { errors: [], mapped: [], configuration },
+    })
   );
 }
 

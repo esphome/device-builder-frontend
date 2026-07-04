@@ -18,6 +18,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { subscribeAutomationCatalogCache } from "../../util/automation-catalog-cache.js";
+import { instanceKey } from "../../util/backend-field-errors.js";
 import {
   fetchComponent,
   getCachedComponent,
@@ -192,6 +193,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   @property({ attribute: false })
   selectedFromLine?: number;
+
+  /** Backend validation error count per section instance, keyed by
+   *  instanceKey(sectionKey, fromLine). Drives the row error badges. */
+  @property({ attribute: false })
+  errorCounts: Map<string, number> = new Map();
 
   @state()
   private _selectedLine: number | null = null;
@@ -470,6 +476,16 @@ export class ESPHomeDeviceNavigator extends LitElement {
                     filtering,
                     selectedLine: this._selectedLine,
                     hoveredLine: this._hoveredLine,
+                    // Omitted when empty (the steady state) so rows skip
+                    // the per-render key construction entirely.
+                    errorCount: this.errorCounts.size
+                      ? (item) =>
+                          this.errorCounts.get(
+                            instanceKey(sectionKeyOf(item), item.fromLine)
+                          ) ?? 0
+                      : undefined,
+                    errorLabel: (count) =>
+                      this._localize("device.navigator_error_count", { count }),
                     onToggle: () => {
                       if (!filtering) this._toggleSection(i);
                     },

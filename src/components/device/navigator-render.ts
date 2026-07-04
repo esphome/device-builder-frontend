@@ -24,6 +24,10 @@ export interface NavSectionView {
   filtering: boolean;
   selectedLine: number | null;
   hoveredLine: number | null;
+  /** Backend validation errors attributed to a row's section instance. */
+  errorCount?: (item: YamlSection) => number;
+  /** Localized accessible label for an error badge carrying count errors. */
+  errorLabel?: (count: number) => string;
   onToggle: () => void;
   onItemEnter: (item: YamlSection) => void;
   onItemLeave: () => void;
@@ -70,6 +74,7 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
   // targets); also the icon's hover tooltip, since the glyph is the only
   // domain cue on a flat row.
   const domain = item.parentKey ?? item.key;
+  const errors = v.errorCount?.(item) ?? 0;
   return html`
     <div
       class="nav-item ${
@@ -84,9 +89,20 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
         <p>${primary}</p>
         ${secondary ? html`<span class="nav-item-subtitle">${secondary}</span>` : nothing}
       </div>
+      ${errors > 0 ? renderErrorBadge(errors, v) : nothing}
       <wa-icon class="nav-item-chevron" library="mdi" name="chevron-right"></wa-icon>
     </div>
   `;
+}
+
+/** Small error-count pill; the section's fields carry the details. */
+function renderErrorBadge(count: number, v: NavSectionView): TemplateResult {
+  return html`<span
+    class="nav-item-error-badge"
+    role="img"
+    aria-label=${ifDefined(v.errorLabel?.(count))}
+    >${count}</span
+  >`;
 }
 
 /** One collapsible domain subgroup: header (name + count) then its rows. */
@@ -95,6 +111,11 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
   // the header is a static label there (no toggle, no focus, no chevron).
   const open = v.filtering || !v.collapsedGroups?.has(group.key);
   const interactive = !v.filtering;
+  // Only a collapsed group renders the header badge, so only then pay
+  // for the per-row sum.
+  const count = v.errorCount;
+  const groupErrors =
+    !open && count ? group.rows.reduce((sum, row) => sum + count(row.item), 0) : 0;
   const toggle = () => {
     if (interactive) v.onToggleGroup?.(group.key);
   };
@@ -121,6 +142,11 @@ function renderNavGroup(group: NavGroup, v: NavSectionView): TemplateResult {
       ></wa-icon>
       <span class="nav-subgroup-title">${prettyDomain(group.key)}</span>
       <span class="nav-subgroup-count">${group.rows.length}</span>
+      ${
+        // A collapsed group hides its rows' badges — surface the sum on the
+        // header so an errored component is findable without expanding.
+        groupErrors > 0 ? renderErrorBadge(groupErrors, v) : nothing
+      }
       ${
         interactive
           ? html`<wa-icon

@@ -78,6 +78,11 @@ export function onValueChange(
     next.delete(errKey);
     host._fieldErrors = next;
   }
+  // Same optimistic clear for the backend error on the edited path — it
+  // reappears on the next lint pass if the value is still invalid.
+  if (host.backendErrors.has(errKey) && !host._clearedBackendPaths.has(errKey)) {
+    host._clearedBackendPaths = new Set(host._clearedBackendPaths).add(errKey);
+  }
   host._scheduleDraftFlush();
 }
 

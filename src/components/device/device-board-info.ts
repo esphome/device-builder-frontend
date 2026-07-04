@@ -14,6 +14,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
+import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
@@ -99,6 +100,11 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   /** Instance-relative field path to scroll into view, from the YAML cursor. */
   @property({ attribute: false })
   focusFieldPath?: string[];
+
+  /** Backend validation errors for the selected section, keyed by dotted
+   *  field path; forwarded to the section form for inline display. */
+  @property({ attribute: false })
+  backendErrors: Map<string, ValidationError> = new Map();
 
   @query("esphome-device-section-config")
   private _sectionConfig!: ESPHomeDeviceSectionConfig;
@@ -423,6 +429,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
       .sectionKey=${key}
       .fromLine=${this.selectedFromLine}
       .focusFieldPath=${this.focusFieldPath}
+      .backendErrors=${this.backendErrors}
       .yaml=${this.yaml}
       .board=${this.board}
       .boardName=${this.board?.name ?? ""}

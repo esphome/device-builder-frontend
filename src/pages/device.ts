@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiChevronRight, mdiMenu } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
@@ -29,6 +30,13 @@ import {
   localizeContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import {
+  backendErrorCounts,
+  backendErrorsForSection,
+  formRelativePath,
+  resolveBackendErrors,
+  type BackendFieldError,
+} from "../util/backend-field-errors.js";
 import { withBase } from "../util/base-path.js";
 import { fetchBoard } from "../util/board-body-cache.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
@@ -37,10 +45,12 @@ import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { LIST_SECTIONS } from "../util/section-entry-overrides.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
-import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
+import {
+  getLastValidatedResult,
+  type YamlDiagnosticsDetail,
+} from "../util/yaml-lint-backend.js";
 import {
   findFieldLine,
   parseYamlTopLevelSections,
@@ -164,6 +174,18 @@ export class ESPHomePageDevice extends LitElement {
    *  scroll into view; empty on a section header / non-field line. */
   @state()
   private _focusFieldPath?: string[];
+
+  /** Backend validation errors resolved onto section instances, refreshed
+   *  on every lint pass. Feeds the navigator badges and the selected
+   *  section's inline form errors. */
+  @state()
+  private _backendErrors: BackendFieldError[] = [];
+
+  // Memoised so idle re-renders keep the Map identities stable — the
+  // section editor keys its per-edit error suppression on the prop
+  // changing, and a fresh Map every render would wipe it immediately.
+  private _sectionBackendErrors = memoizeOne(backendErrorsForSection);
+  private _navErrorCounts = memoizeOne(backendErrorCounts);
 
   /** Form-relative path of the last focused field, and whether its YAML
    *  line wasn't found yet (a just-added value whose debounced write is
@@ -1021,6 +1043,11 @@ export class ESPHomePageDevice extends LitElement {
             .selectedSection=${this._selectedSection}
             .selectedFromLine=${this._selectedFromLine}
             .focusFieldPath=${this._focusFieldPath}
+            .backendErrors=${this._sectionBackendErrors(
+              this._backendErrors,
+              this._selectedSection,
+              this._selectedFromLine
+            )}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
             @change-board=${this._onChangeBoard}
@@ -1240,6 +1267,7 @@ export class ESPHomePageDevice extends LitElement {
       .platformReady=${this._platformReady}
       .selectedKey=${this._selectedSection}
       .selectedFromLine=${this._selectedFromLine}
+      .errorCounts=${this._navErrorCounts(this._backendErrors)}
     ></esphome-device-navigator>`;
   }
 
@@ -1260,12 +1288,16 @@ export class ESPHomePageDevice extends LitElement {
    *  to the error, the highlight has served its purpose; clear it
    *  rather than leave a stale blue line the user can't dismiss
    *  (esphome/device-builder#1404). */
-  private _onYamlDiagnostics(
-    e: CustomEvent<{ errors: string[]; configuration: string }>
-  ) {
+  private _onYamlDiagnostics(e: CustomEvent<YamlDiagnosticsDetail>) {
     if (e.detail.configuration !== this.id) return;
     if (this._errorHighlight === "edited") {
       this._setHighlight(null, false);
+    }
+    const next = resolveBackendErrors(this._yaml, e.detail.mapped);
+    // Skip the steady state (valid config staying valid) so a lint pass
+    // doesn't mint fresh identities and re-render the navigator for nothing.
+    if (next.length || this._backendErrors.length) {
+      this._backendErrors = next;
     }
   }
 
@@ -1309,13 +1341,9 @@ export class ESPHomePageDevice extends LitElement {
     // indented child line under a just-typed top-level block.
     const match = sectionForCursor(this._yaml, e.detail.line, full);
     if (!match) return;
-    // Drop the top-level key to get the form-relative path. LIST_SECTIONS
-    // (globals) are the exception: their form keys fields under the section
-    // key, so keep it — but only with a child segment; a bare
-    // ``["globals"]`` header reduces to [] (a non-field line), not a
-    // whole-section field highlight. MAP sections like substitutions render
-    // at an empty path, so their fields are section-relative — slice as usual.
-    const rel = full.length > 1 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
+    // MAP sections like substitutions render at an empty path, so their
+    // fields are section-relative — the shared slice rule covers them.
+    const rel = formRelativePath(full);
     const sectionKey = sectionKeyOf(match);
     if (
       sectionKey === this._selectedSection &&

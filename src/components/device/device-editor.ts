@@ -18,6 +18,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import type { ValidationError } from "../../util/config-validation.js";
 import { renderTextLinks } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
@@ -29,6 +30,7 @@ import {
   nextSplitRatioForKey,
   saveSplitRatio,
 } from "../../util/split-ratio.js";
+import type { YamlDiagnosticsDetail } from "../../util/yaml-lint-backend.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
@@ -135,6 +137,11 @@ export class ESPHomeDeviceEditor extends LitElement {
   /** Instance-relative field path to scroll into view, from the YAML cursor. */
   @property({ attribute: false })
   focusFieldPath?: string[];
+
+  /** Backend validation errors for the selected section, keyed by dotted
+   *  field path; forwarded to the section form for inline display. */
+  @property({ attribute: false })
+  backendErrors: Map<string, ValidationError> = new Map();
 
   /** Yaml content at last save/load — compared against current yaml to detect changes. */
   @property({ attribute: false })
@@ -320,6 +327,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 .selectedSection=${this.selectedSection}
                 .selectedFromLine=${this.selectedFromLine}
                 .focusFieldPath=${this.focusFieldPath}
+                .backendErrors=${this.backendErrors}
                 .justCreated=${this.justCreated}
                 ?yamlPaneVisible=${effectiveLayout !== "left"}
                 @show-yaml-editor=${this._onShowYamlEditor}
@@ -473,9 +481,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     }
   }
 
-  private _onYamlDiagnostics(
-    e: CustomEvent<{ errors: string[]; configuration: string }>
-  ) {
+  private _onYamlDiagnostics(e: CustomEvent<YamlDiagnosticsDetail>) {
     // Ignore a late lint result for a since-switched device, so a stale
     // "invalid" banner can't flash over the freshly-opened config.
     if (e.detail.configuration !== this.configuration) return;

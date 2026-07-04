@@ -40,6 +40,7 @@ import {
   createBackendYamlLinter,
   lintErrorLineGutter,
   relintEffect,
+  type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
 import type { YamlSection } from "../util/yaml-sections.js";
 import {
@@ -503,10 +504,10 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         createBackendYamlLinter({
           api: this._api,
           getConfiguration: () => this.configuration,
-          onResult: (errors, configuration) =>
+          onResult: (errors, mapped, configuration) =>
             this.dispatchEvent(
-              new CustomEvent("yaml-diagnostics", {
-                detail: { errors, configuration },
+              new CustomEvent<YamlDiagnosticsDetail>("yaml-diagnostics", {
+                detail: { errors, mapped, configuration },
                 bubbles: true,
                 composed: true,
               })

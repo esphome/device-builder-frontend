@@ -197,7 +197,8 @@ export const deviceNavigatorStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  .nav-subgroup-count {
+  .nav-subgroup-count,
+  .nav-item-error-badge {
     font-size: var(--wa-font-size-2xs);
     color: var(--wa-color-text-quiet);
     background: var(--wa-color-surface-raised);
@@ -300,11 +301,31 @@ export const deviceNavigatorStyles = css`
     text-overflow: ellipsis;
   }
 
+  /* Error-count pill on a row (or a collapsed subgroup header) whose
+     section carries backend validation errors. Shares the count pill's
+     geometry above; only the color treatment differs. */
+  .nav-item-error-badge {
+    margin-left: auto;
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--esphome-error);
+    background: color-mix(in srgb, var(--esphome-error), transparent 88%);
+    flex-shrink: 0;
+  }
+
+  .nav-subgroup-header .nav-item-error-badge {
+    margin-left: 0;
+  }
+
   .nav-item-chevron {
     margin-left: auto;
     font-size: var(--wa-font-size-l);
     color: var(--esphome-primary);
     flex-shrink: 0;
+  }
+
+  /* The chevron yields the right edge when an error badge holds it. */
+  .nav-item-error-badge ~ .nav-item-chevron {
+    margin-left: 0;
   }
 
   /* Declutter the chevron only where hover exists; on touch (no hover)
