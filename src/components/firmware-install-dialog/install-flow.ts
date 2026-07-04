@@ -220,11 +220,17 @@ export async function startWebSerialInstall(
 
 // Best-effort release of the held serial port on an early return, so a failed
 // compile / download / flash doesn't leak an open port into the next attempt.
+// Falls back to closing the port directly when transport.disconnect throws,
+// mirroring connectToPort — a still-open port breaks the next port.open.
 async function releaseSerial(detected: DetectedChip): Promise<void> {
   try {
     await disconnect(detected.transport);
   } catch {
-    /* ignore */
+    try {
+      await detected.port.close();
+    } catch {
+      /* best-effort */
+    }
   }
 }
 

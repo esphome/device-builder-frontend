@@ -144,6 +144,20 @@ describe("Web Serial install — HTTP byte download", () => {
     expect(wsSerial.disconnect).toHaveBeenCalledWith(CHIP.transport);
   });
 
+  it("closes the port directly when disconnect throws on an early return", async () => {
+    const { host, api } = makeHost();
+    const port = { close: vi.fn().mockResolvedValue(undefined) };
+    wsSerial.detectChip.mockResolvedValue({ ...CHIP, port });
+    wsSerial.disconnect.mockRejectedValue(new Error("disconnect boom"));
+    api.firmwareDownloadBytes.mockRejectedValueOnce(new Error("boom"));
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._fail).toHaveBeenCalledWith("firmware.download_failed");
+    // disconnect failed, so the OS handle must still be released via port.close.
+    expect(port.close).toHaveBeenCalledTimes(1);
+  });
+
   it("closes silently when the user cancels the port picker", async () => {
     const { host } = makeHost();
     wsSerial.detectChip.mockRejectedValueOnce(
