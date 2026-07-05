@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { YamlDiff } from "../../../src/api/types/automations.js";
+import { applyYamlDiff } from "../../../src/components/device/automation-editor/serialise.js";
 import { dispatchAutomationAdded } from "../../../src/components/device/dispatch-automation-added.js";
 
 const YAML = "esphome:\n  name: test";
@@ -41,7 +42,7 @@ describe("dispatchAutomationAdded", () => {
       // Listen on the parent so the assertion also proves bubbling.
       parent.addEventListener(type, (e) => {
         seen.push({
-          type,
+          type: e.type,
           detail: (e as CustomEvent).detail,
           composed: e.composed,
         });
@@ -51,9 +52,15 @@ describe("dispatchAutomationAdded", () => {
     dispatchAutomationAdded(host, YAML, { kind: "script", id: "my_script" }, DIFF);
 
     expect(seen.map((s) => s.type)).toEqual(["yaml-draft", "automation-added"]);
-    expect(seen[0].detail).toEqual({
-      yaml: "esphome:\n  name: test\nscript:\n  - id: my_script",
-    });
+    // The dispatch contract is "the diff-applied YAML", not a
+    // particular splice formatting, so compare against
+    // applyYamlDiff (which has its own unit tests) ...
+    expect(seen[0].detail).toEqual({ yaml: applyYamlDiff(YAML, DIFF) });
+    // ... and pin that the new block actually made it into the
+    // draft, so a wrong-yaml dispatch still fails loudly here.
+    expect((seen[0].detail as { yaml: string }).yaml).toContain(
+      "script:\n  - id: my_script"
+    );
     expect(seen[1].detail).toEqual({ sectionKey: "automation:script:my_script" });
     // Both events must cross shadow boundaries to reach the page.
     expect(seen.every((s) => s.composed)).toBe(true);
