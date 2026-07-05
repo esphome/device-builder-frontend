@@ -25,7 +25,6 @@ import { consume } from "@lit/context";
 import { mdiDelete, mdiOpenInNew, mdiWebhook } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -43,12 +42,13 @@ import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
-import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
+import { emptyAutomationTree } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -103,35 +103,36 @@ export class ESPHomeApiActionEditor extends LitElement {
   @state() private _available: AvailableAutomations | null = null;
 
   @state() private _loading = true;
-  @state() private _deleting = false;
   @state() private _error = "";
   /** Renders read-only + blocks auto-apply for a parse-errored
    *  action so its empty tree can't overwrite the real YAML. */
   private readonly _parseError = new ParseErrorController(this);
 
-  /** Debounce + in-flight machinery for the auto-apply path. Same
-   *  shape as ``<esphome-script-editor>`` so the page-level save
-   *  guard can treat both editors uniformly. */
-  private _applyTimer: ReturnType<typeof setTimeout> | null = null;
-  private _applyInFlight = false;
-  private _applyDirty = false;
-  private _lastSelfWrittenYaml: string | null = null;
+  /** Shared auto-apply / delete / dirty-tracking engine — same
+   *  instance shape as the automation and script editors so the
+   *  page-level save guard can treat all three uniformly. */
+  private readonly _engine = new AutoApplyController(this, {
+    getApi: () => this._api,
+    getLocalize: () => this._localize,
+    isReadOnly: () => this._parseError.active,
+    // Can't upsert an api action with no name.
+    canApply: (location) => location.kind === "api_action" && !!location.action_name,
+    setError: (message) => {
+      this._error = message;
+    },
+  });
 
   /** Catalog loader; owns the concurrency guard so overlapping loads
    *  (connectedCallback + updated both reaching ``_loadAvailable``)
    *  can't clobber ``_available`` or double-fire the toast. */
   private readonly _catalogLoad = new CatalogLoadController(this);
 
-  /** Brief-window dirty flag covering the 200ms debounce gap so the
-   *  global save button activates as soon as the user types. */
-  @state() private _dirty = false;
-
   public get dirty(): boolean {
-    return this._dirty;
+    return this._engine.dirty;
   }
 
   public get inFlightWrite(): boolean {
-    return this._deleting || this._applyInFlight;
+    return this._engine.inFlightWrite;
   }
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
@@ -139,28 +140,6 @@ export class ESPHomeApiActionEditor extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     void this._load();
-    this.dispatchEvent(
-      new CustomEvent("section-mount", {
-        detail: { node: this },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    if (this._applyTimer) {
-      clearTimeout(this._applyTimer);
-      this._applyTimer = null;
-    }
-    this.dispatchEvent(
-      new CustomEvent("section-unmount", {
-        detail: { node: this },
-        bubbles: true,
-        composed: true,
-      })
-    );
   }
 
   protected updated(changed: Map<string, unknown>) {
@@ -194,16 +173,8 @@ export class ESPHomeApiActionEditor extends LitElement {
    * The device page calls this on the active section before its
    * global save so the YAML buffer is fully caught up.
    */
-  public async flushPending(): Promise<void> {
-    if (this._applyTimer) {
-      clearTimeout(this._applyTimer);
-      this._applyTimer = null;
-      await this._autoApply();
-    } else if (this._applyInFlight) {
-      while (this._applyInFlight) {
-        await new Promise((r) => setTimeout(r, 20));
-      }
-    }
+  public flushPending(): Promise<void> {
+    return this._engine.flushPending();
   }
 
   protected render() {
@@ -221,7 +192,7 @@ export class ESPHomeApiActionEditor extends LitElement {
     const scripts = this._available?.scripts ?? [];
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
-    const disabled = this._deleting;
+    const disabled = this._engine.deleting;
     return html`
       ${this._renderHeader()} ${this._renderActionNameField(disabled)}
       <esphome-callable-params-editor
@@ -377,21 +348,8 @@ export class ESPHomeApiActionEditor extends LitElement {
    */
   public reload(): void {
     if (this.addMode || !this.location) return;
-    if (this._applyInFlight) return;
-    if (this.yaml === this._lastSelfWrittenYaml) return;
+    if (this._engine.shouldSkipReload()) return;
     void this._hydrateFromBackend();
-  }
-
-  private _setDirty(value: boolean): void {
-    if (this._dirty === value) return;
-    this._dirty = value;
-    this.dispatchEvent(
-      new CustomEvent("dirty-change", {
-        detail: { dirty: value },
-        bubbles: true,
-        composed: true,
-      })
-    );
   }
 
   private _onActionNameChange(name: string) {
@@ -401,13 +359,13 @@ export class ESPHomeApiActionEditor extends LitElement {
     const normalized = normalizeEspHomeId(name);
     if (!normalized) return;
     this.location = { kind: "api_action", action_name: normalized };
-    this._scheduleAutoApply();
+    this._engine.scheduleAutoApply();
   }
 
   private _onVariablesChange = (e: CustomEvent<{ value: Record<string, string> }>) => {
     e.stopPropagation();
     const automation = this.value ?? emptyAutomationTree();
-    this._withValue({
+    this._engine.withValue({
       trigger_params: {
         ...automation.trigger_params,
         variables: e.detail.value,
@@ -417,132 +375,11 @@ export class ESPHomeApiActionEditor extends LitElement {
 
   private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
     e.stopPropagation();
-    this._withValue({ actions: e.detail.actions });
+    this._engine.withValue({ actions: e.detail.actions });
   };
 
-  private _withValue(patch: Partial<AutomationTree>) {
-    const value: AutomationTree = {
-      ...(this.value ?? emptyAutomationTree()),
-      ...patch,
-    };
-    this.value = value;
-    this.dispatchEvent(
-      new CustomEvent("automation-change", {
-        detail: { value, location: this.location },
-        bubbles: true,
-        composed: true,
-      })
-    );
-    this._scheduleAutoApply();
-  }
-
-  private _scheduleAutoApply() {
-    if (this.addMode) return;
-    if (this._parseError.active) return;
-    this._setDirty(true);
-    if (this._applyTimer) clearTimeout(this._applyTimer);
-    this._applyTimer = setTimeout(() => {
-      this._applyTimer = null;
-      void this._autoApply();
-    }, 200);
-  }
-
-  private async _autoApply(): Promise<void> {
-    if (!this._api || !this.location || !this.value) return;
-    // Read-only: nothing to write, and drop any dirty a pre-error edit
-    // left so the section can't stay stuck dirty with an empty tree.
-    if (this._parseError.active) {
-      this._setDirty(false);
-      return;
-    }
-    if (!this.location.action_name) return;
-    if (this._applyInFlight) {
-      this._applyDirty = true;
-      return;
-    }
-    this._applyInFlight = true;
-    this._applyDirty = false;
-    try {
-      const { yaml_diff } = await this._api.upsertAutomation(
-        this.configuration,
-        this.value,
-        this.location,
-        this.yaml
-      );
-      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
-
-      this._lastSelfWrittenYaml = newYaml;
-      this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-draft", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_save_error");
-      this._error = msg;
-      toast.error(this._localize("device.automation_save_error"), {
-        description: msg,
-        richColors: true,
-      });
-    } finally {
-      this._applyInFlight = false;
-      if (this._applyDirty) {
-        this._applyDirty = false;
-        void this._autoApply();
-      } else {
-        this._setDirty(false);
-      }
-    }
-  }
-
-  private _onDelete = async () => {
-    if (!this._api || !this.location || this._deleting) return;
-    if (this._applyTimer) {
-      clearTimeout(this._applyTimer);
-      this._applyTimer = null;
-    }
-    this._deleting = true;
-    this._error = "";
-    try {
-      const { yaml_diff } = await this._api.deleteAutomation(
-        this.configuration,
-        this.location,
-        this.yaml
-      );
-      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
-      await this._api.updateConfig(this.configuration, newYaml);
-      this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-updated", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      this.dispatchEvent(
-        new CustomEvent<{ sectionKey: string | null }>("section-select", {
-          detail: { sectionKey: null },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_save_error");
-      this._error = msg;
-      toast.error(this._localize("device.automation_save_error"), {
-        description: msg,
-        richColors: true,
-      });
-    } finally {
-      this._deleting = false;
-    }
+  private _onDelete = () => {
+    void this._engine.delete();
   };
 }
 

@@ -31,7 +31,6 @@ import { mdiArrowDecisionOutline, mdiDelete, mdiOpenInNew } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -59,6 +58,7 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
 import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
 import "../config-entry-form.js";
+import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -70,7 +70,6 @@ import { ParseErrorController } from "./parse-error-controller.js";
 import { renderTargetField } from "./render-target-field.js";
 import {
   applyParamChange,
-  applyYamlDiff,
   emptyAutomationTree,
   sectionKeyFromLocation,
 } from "./serialise.js";
@@ -141,7 +140,6 @@ export class ESPHomeAutomationEditor extends LitElement {
   @state() private _intervalComponent: ComponentCatalogEntry | null = null;
 
   @state() private _loading = true;
-  @state() private _deleting = false;
   @state() private _error = "";
   /** Renders read-only + blocks auto-apply for a parse-errored
    *  automation so its empty tree can't overwrite the real YAML. */
@@ -160,49 +158,20 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  resets to collapsed, matching the component-editor UX. */
   @state() private _showAdvanced = false;
 
-  /**
-   * Debounce timer for auto-apply. Each value change schedules a
-   * round-trip to ``automations/upsert``; the timer coalesces
-   * bursts (typing into a templatable string param, dragging an
-   * action up/down repeatedly) into one call.
-   */
-  private _applyTimer: ReturnType<typeof setTimeout> | null = null;
-
-  /**
-   * In-flight guard for the auto-apply path. Multiple value
-   * changes can land while a previous upsert is still resolving;
-   * we drop the in-flight ones and re-schedule on resolve so the
-   * latest value wins.
-   */
-  private _applyInFlight = false;
-  private _applyDirty = false;
-  private _lastSelfWrittenYaml: string | null = null;
-
-  /**
-   * Brief-window dirty flag covering the 200ms debounce gap
-   * between the user's keystroke and the auto-apply committing
-   * the change into the page's YAML buffer. The page reads
-   * ``dirty`` from the mounted section so the unsaved-changes
-   * guard and the save button activate the moment the user
-   * starts typing, not when the debounced upsert finally
-   * returns.
-   */
-  @state() private _dirty = false;
+  /** Shared auto-apply / delete / dirty-tracking engine — same
+   *  instance shape as the script and api-action editors so the
+   *  page-level save guard can treat all three uniformly. */
+  private readonly _engine = new AutoApplyController(this, {
+    getApi: () => this._api,
+    getLocalize: () => this._localize,
+    isReadOnly: () => this._parseError.active,
+    setError: (message) => {
+      this._error = message;
+    },
+  });
 
   public get dirty(): boolean {
-    return this._dirty;
-  }
-
-  private _setDirty(value: boolean): void {
-    if (this._dirty === value) return;
-    this._dirty = value;
-    this.dispatchEvent(
-      new CustomEvent("dirty-change", {
-        detail: { dirty: value },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    return this._engine.dirty;
   }
 
   /**
@@ -214,7 +183,7 @@ export class ESPHomeAutomationEditor extends LitElement {
   /** In-flight write guard — parents that re-fetch on reconnect
    *  should consult this to skip clobbering an optimistic update. */
   public get inFlightWrite(): boolean {
-    return this._deleting || this._applyInFlight;
+    return this._engine.inFlightWrite;
   }
 
   /** Parse ``substitutions:`` from the current YAML once per edit so the
@@ -233,32 +202,10 @@ export class ESPHomeAutomationEditor extends LitElement {
     // ``_loadAvailable`` fires from ``updated()`` on the first
     // render once ``configuration`` lands — no separate kickoff
     // here, otherwise we'd send two ``automations/get_available``
-    // calls per mount.
-    // Announce so the page-level save guard (device.ts) can hold a
-    // direct ref and call flushPending() before its global save.
-    // Mirrors device-section-config's section-mount event.
-    this.dispatchEvent(
-      new CustomEvent("section-mount", {
-        detail: { node: this },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    if (this._applyTimer) {
-      clearTimeout(this._applyTimer);
-      this._applyTimer = null;
-    }
-    this.dispatchEvent(
-      new CustomEvent("section-unmount", {
-        detail: { node: this },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    // calls per mount. The section-mount announcement (which lets
+    // the page-level save guard hold a direct ref and call
+    // flushPending() before its global save) is dispatched by the
+    // shared engine's hostConnected.
   }
 
   protected updated(changed: Map<string, unknown>) {
@@ -389,8 +336,7 @@ export class ESPHomeAutomationEditor extends LitElement {
    */
   public reload(): void {
     if (this.addMode || !this.location) return;
-    if (this._applyInFlight) return;
-    if (this.yaml === this._lastSelfWrittenYaml) return;
+    if (this._engine.shouldSkipReload()) return;
     void this._hydrateFromBackend();
   }
 
@@ -454,7 +400,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     const triggers = this._available?.triggers ?? [];
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
-    const disabled = this._deleting;
+    const disabled = this._engine.deleting;
     // For ``device_on`` and ``component_on`` the trigger lives in the
     // location alongside the YAML splice destination. Mirror it into
     // the editor's effective trigger id so the picker shows the right
@@ -646,7 +592,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     const { path, value } = e.detail;
     const automation = this.value ?? emptyAutomationTree();
     const next = applyParamChange(automation.trigger_params, path, value);
-    this._withValue({ trigger_params: next });
+    this._engine.withValue({ trigger_params: next });
   };
 
   /**
@@ -773,133 +719,14 @@ export class ESPHomeAutomationEditor extends LitElement {
 
   // ─── State mutations ─────────────────────────────────────────
 
-  private _withValue(patch: Partial<AutomationTree>) {
-    const value: AutomationTree = { ...(this.value ?? emptyAutomationTree()), ...patch };
-    this.value = value;
-    this.dispatchEvent(
-      new CustomEvent("automation-change", {
-        detail: { value, location: this.location },
-        bubbles: true,
-        composed: true,
-      })
-    );
-    this._scheduleAutoApply();
-  }
-
-  /**
-   * Schedule a debounced upsert. The global save button is the
-   * only place that actually writes to disk; this auto-apply
-   * keeps the page's YAML buffer in sync with the editor state
-   * so the YAML pane updates live and the save button activates.
-   */
-  private _scheduleAutoApply() {
-    // Don't auto-apply in add-mode — the editor's add-mode
-    // surface isn't currently reached from the navigator (wizard
-    // owns the add flow); leaving this off avoids accidentally
-    // upserting partially-filled trees if someone instantiates
-    // the editor in add-mode directly.
-    if (this.addMode) return;
-    if (this._parseError.active) return;
-    this._setDirty(true);
-    if (this._applyTimer) clearTimeout(this._applyTimer);
-    this._applyTimer = setTimeout(() => {
-      this._applyTimer = null;
-      void this._autoApply();
-    }, 200);
-  }
-
-  /**
-   * Push the current ``value`` through ``automations/upsert``,
-   * apply the returned diff to the page's YAML buffer, and
-   * dispatch ``yaml-draft`` so the page picks it up. Only one
-   * upsert runs at a time; if a value-change lands while we're
-   * in flight, the dirty flag re-runs us on resolve.
-   */
-  private async _autoApply(): Promise<void> {
-    if (!this._api || !this.location || !this.value) return;
-    // Read-only: nothing to write, and drop any dirty a pre-error edit
-    // left so the section can't stay stuck dirty with an empty tree.
-    if (this._parseError.active) {
-      this._setDirty(false);
-      return;
-    }
-    if (this._applyInFlight) {
-      this._applyDirty = true;
-      return;
-    }
-    this._applyInFlight = true;
-    this._applyDirty = false;
-    try {
-      // Pass ``this.yaml`` so the backend computes the diff against
-      // the current draft buffer rather than the on-disk YAML —
-      // otherwise repeated auto-applies (the user typing into the
-      // same field) would each re-insert the automation on top of
-      // the previous draft's insertion. See backend's
-      // ``automations/upsert`` for the matching parameter.
-      const { yaml_diff } = await this._api.upsertAutomation(
-        this.configuration,
-        this.value,
-        this.location,
-        this.yaml
-      );
-      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
-      // Track our own write so the parent's YAML-driven reload skips
-      // the prop echo. Set before dispatch — the event handler is
-      // synchronous and may already trigger ``updated()`` on the way
-      // back, which is where the skip check runs.
-      this._lastSelfWrittenYaml = newYaml;
-      this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-draft", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_save_error");
-      this._error = msg;
-      toast.error(this._localize("device.automation_save_error"), {
-        description: msg,
-        richColors: true,
-      });
-    } finally {
-      this._applyInFlight = false;
-      if (this._applyDirty) {
-        // A value-change landed while we were running. Re-run
-        // with the latest value so we don't drop the user's last
-        // edit on the floor.
-        this._applyDirty = false;
-        void this._autoApply();
-      } else {
-        // No further pending change — the page's YAML is now in
-        // sync with our state. Clear the section-dirty flag; the
-        // page still tracks _isYamlDirty separately (_yaml vs
-        // _savedYaml) so the global save button stays armed.
-        this._setDirty(false);
-      }
-    }
-  }
-
   /**
    * Force a pending debounced auto-apply to flush immediately.
    * The device page calls this on the active section before its
    * global save so the YAML buffer is fully caught up with the
    * editor state.
    */
-  public async flushPending(): Promise<void> {
-    if (this._applyTimer) {
-      clearTimeout(this._applyTimer);
-      this._applyTimer = null;
-      await this._autoApply();
-    } else if (this._applyInFlight) {
-      // Wait for the in-flight call to settle.
-      while (this._applyInFlight) {
-        await new Promise((r) => setTimeout(r, 20));
-      }
-    }
+  public flushPending(): Promise<void> {
+    return this._engine.flushPending();
   }
 
   private _onTargetChange = (e: CustomEvent<{ target: AutomationLocation | null }>) => {
@@ -907,14 +734,14 @@ export class ESPHomeAutomationEditor extends LitElement {
     this.location = e.detail.target;
     // Reset trigger when switching target kinds — the previous
     // trigger id wouldn't apply to the new target's domain.
-    this._withValue({ trigger_id: null, trigger_params: {} });
+    this._engine.withValue({ trigger_id: null, trigger_params: {} });
   };
 
   private _onTriggerChange = (
     e: CustomEvent<{ triggerId: string; params: Record<string, unknown> }>
   ) => {
     e.stopPropagation();
-    this._withValue({
+    this._engine.withValue({
       trigger_id: e.detail.triggerId,
       trigger_params: e.detail.params,
     });
@@ -969,69 +796,18 @@ export class ESPHomeAutomationEditor extends LitElement {
     e: CustomEvent<{ params: Record<string, unknown> }>
   ) => {
     e.stopPropagation();
-    this._withValue({ trigger_params: e.detail.params });
+    this._engine.withValue({ trigger_params: e.detail.params });
   };
 
   private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
     e.stopPropagation();
-    this._withValue({ actions: e.detail.actions });
+    this._engine.withValue({ actions: e.detail.actions });
   };
 
   // ─── Delete ──────────────────────────────────────────────────
 
-  /**
-   * Delete writes to disk directly (matches the component-editor
-   * delete pattern in ``device-section-config/draft-and-delete``):
-   * compute the new YAML via the backend's delete diff, write it
-   * via ``api.updateConfig``, then dispatch ``yaml-updated``
-   * (which advances both ``_yaml`` AND ``_savedYaml`` on the
-   * page — a clean state). Navigate away from the deleted
-   * section after.
-   */
-  private _onDelete = async () => {
-    if (!this._api || !this.location || this._deleting) return;
-    // Cancel any pending auto-apply — we're about to delete.
-    if (this._applyTimer) {
-      clearTimeout(this._applyTimer);
-      this._applyTimer = null;
-    }
-    this._deleting = true;
-    this._error = "";
-    try {
-      const { yaml_diff } = await this._api.deleteAutomation(
-        this.configuration,
-        this.location,
-        this.yaml
-      );
-      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
-      await this._api.updateConfig(this.configuration, newYaml);
-      this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-updated", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      this.dispatchEvent(
-        new CustomEvent<{ sectionKey: string | null }>("section-select", {
-          detail: { sectionKey: null },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_save_error");
-      this._error = msg;
-      toast.error(this._localize("device.automation_save_error"), {
-        description: msg,
-        richColors: true,
-      });
-    } finally {
-      this._deleting = false;
-    }
+  private _onDelete = () => {
+    void this._engine.delete();
   };
 
   /** Filter declaration for the action buttons (referenced from

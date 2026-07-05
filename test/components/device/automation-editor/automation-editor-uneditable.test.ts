@@ -107,7 +107,7 @@ describe("automation-editor uneditable (errored parse)", () => {
     expect(upsertAutomation).not.toHaveBeenCalled();
   });
 
-  it("_autoApply is a no-op while uneditable even with a value present", async () => {
+  it("the engine's autoApply is a no-op while uneditable even with a value present", async () => {
     const upsertAutomation = vi.fn();
     const api = {
       getAvailableAutomations: vi.fn().mockResolvedValue(slimAvailable()),
@@ -133,7 +133,7 @@ describe("automation-editor uneditable (errored parse)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (editor as any)._parseError.resolve(erroredParse(), ON_BOOT);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (editor as any)._autoApply();
+    await (editor as any)._engine.autoApply();
     expect(upsertAutomation).not.toHaveBeenCalled();
   });
 });
