@@ -7,7 +7,7 @@ import { withBase } from "../../util/base-path.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { ESPHomeLogParser, isLikelyGarbageLine } from "../../util/esphome-log-parser.js";
-import { notifyError, notifySuccess } from "../../util/notify.js";
+import { notifyError, notifySuccess, type NotifyOptions } from "../../util/notify.js";
 import {
   connectToPort,
   detectChip,
@@ -164,7 +164,7 @@ async function runBulkAction(
     catchAllKey: string;
     successKey: string;
     failureKey: string;
-    successOptions?: Parameters<typeof notifySuccess>[1];
+    successOptions?: NotifyOptions;
   }
 ) {
   let results: BulkActionResult[];

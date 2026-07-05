@@ -2,7 +2,9 @@ import toast from "sonner-js";
 
 // sonner-js doesn't export its options type; derive it from the
 // method signature so the wrappers stay in lockstep with the lib.
-type NotifyOptions = NonNullable<Parameters<typeof toast.error>[1]>;
+// Exported so callers can name the passthrough-options type
+// directly instead of reaching through a wrapper's signature.
+export type NotifyOptions = NonNullable<Parameters<typeof toast.error>[1]>;
 
 /**
  * Thin wrappers over sonner's toast helpers that default
