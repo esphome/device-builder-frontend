@@ -11,6 +11,7 @@ import {
   mdiKeyVariant,
   mdiMagnify,
   mdiPlaylistCheck,
+  mdiUpdate,
   mdiWifiCog,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
@@ -22,6 +23,7 @@ import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-even
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   buildOffloadAlertsContext,
+  desktopUpdateCapableContext,
   firmwareJobsContext,
   importableDevicesContext,
   localizeContext,
@@ -48,6 +50,7 @@ registerMdiIcons({
   "key-variant": mdiKeyVariant,
   magnify: mdiMagnify,
   "playlist-check": mdiPlaylistCheck,
+  update: mdiUpdate,
   "wifi-cog": mdiWifiCog,
 });
 
@@ -117,6 +120,13 @@ export class ESPHomeHeaderActions extends LitElement {
    *  so the menu label flips in real time. */
   @state()
   private _showIgnored = false;
+
+  /** True only under an ESPHome Desktop app (0.14.0+) that exposes its update
+   *  `api`; gates the "Check for updates" entry. Provided by the app shell
+   *  from the server handshake. */
+  @consume({ context: desktopUpdateCapableContext, subscribe: true })
+  @state()
+  private _desktopUpdateCapable = false;
 
   static styles = [espHomeStyles, headerActionsStyles];
 
@@ -288,6 +298,22 @@ export class ESPHomeHeaderActions extends LitElement {
                       : nothing
                   }
                 </div>
+                ${
+                  this._desktopUpdateCapable
+                    ? html`<div
+                        class="menu-item"
+                        role="menuitem"
+                        tabindex="0"
+                        @click=${this._openCheckForUpdates}
+                        @keydown=${this._onMenuItemKeydown}
+                      >
+                        <wa-icon library="mdi" name="update"></wa-icon>
+                        <span class="menu-item-label"
+                          >${this._localize("layout.check_for_updates")}</span
+                        >
+                      </div>`
+                    : nothing
+                }
                 <div
                   class="menu-item"
                   role="menuitem"
@@ -427,6 +453,16 @@ export class ESPHomeHeaderActions extends LitElement {
     this._close();
     this.dispatchEvent(
       new CustomEvent("open-feedback", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _openCheckForUpdates() {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-check-updates", {
         bubbles: true,
         composed: true,
       })

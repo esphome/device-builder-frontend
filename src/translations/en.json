@@ -999,6 +999,7 @@
     "show_ignored_discoveries": "Show ignored discoveries ({count})",
     "hide_ignored_discoveries": "Hide ignored discoveries",
     "reset_build_env": "Reset build environment",
+    "check_for_updates": "Check for updates",
     "feedback_menu": "Found a bug? Have an idea?",
     "back": "Back",
     "close": "Close",
@@ -1049,6 +1050,22 @@
     "switch_to_yaml": "Switch to YAML content search",
     "switch_to_commands": "Switch to command search",
     "update_all": "Update All"
+  },
+  "desktop_update_dialog": {
+    "title": "Check for updates",
+    "checking": "Checking for updates…",
+    "updating": "Updating; the app will restart when it finishes.",
+    "all_up_to_date": "Everything is up to date.",
+    "up_to_date": "Up to date",
+    "not_installed": "Not installed",
+    "check_failed": "Check failed",
+    "check_error": "Could not check for updates.",
+    "update_error": "Could not start the update.",
+    "retry": "Try again",
+    "update_now": "Update now",
+    "component_app": "ESPHome Desktop",
+    "component_esphome": "ESPHome",
+    "component_device_builder": "Device builder"
   },
   "update_all_dialog": {
     "title": "Update All",

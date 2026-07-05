@@ -30,6 +30,7 @@ import {
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
   darkModeContext,
+  desktopUpdateCapableContext,
   desktopVersionContext,
   devicesContext,
   devicesLoadedContext,
@@ -92,6 +93,8 @@ import {
 
 import "../pages/dashboard.js";
 import "./command-palette.js";
+import "./desktop-update-dialog.js";
+import type { ESPHomeDesktopUpdateDialog } from "./desktop-update-dialog.js";
 import "./esphome-layout.js";
 import "./esphome-login.js";
 import "./feedback-dialog.js";
@@ -118,6 +121,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: versionContext }) @state() _version = "";
   @provide({ context: serverVersionContext }) @state() _serverVersion = "";
   @provide({ context: desktopVersionContext }) @state() _desktopVersion = "";
+  @provide({ context: desktopUpdateCapableContext })
+  @state()
+  _desktopUpdateCapable = false;
   @provide({ context: darkModeContext }) @state() _darkMode = false;
   @provide({ context: isHaIngressContext }) @state() _isHaIngress = false;
   @provide({ context: activeJobsContext }) @state() _activeJobs: Map<
@@ -232,6 +238,8 @@ export class ESPHomeApp extends LitElement {
   @query("esphome-feedback-dialog") private _feedbackDialog!: ESPHomeFeedbackDialog;
   @query("esphome-update-all-dialog")
   private _updateAllDialog!: ESPHomeUpdateAllDialog;
+  @query("esphome-desktop-update-dialog")
+  private _desktopUpdateDialog?: ESPHomeDesktopUpdateDialog;
   @query("esphome-onboarding-wifi-dialog")
   private _onboardingDialog?: HTMLElement & { open(): void };
   @query("esphome-onboarding-wizard-dialog")
@@ -433,6 +441,7 @@ export class ESPHomeApp extends LitElement {
       this._version = info.esphome_version;
       this._serverVersion = info.server_version;
       this._desktopVersion = info.desktop_version ?? "";
+      this._desktopUpdateCapable = info.desktop_update_capable ?? false;
       this._isHaIngress = info.ha_ingress;
       this._apiConnected = true;
       void this._api.ready.then(() => this._afterAuthenticated());
@@ -569,6 +578,7 @@ export class ESPHomeApp extends LitElement {
         @open-firmware-jobs=${() => this._firmwareJobsDialog?.open()}
         @open-reset-build-env=${() => this._firmwareJobsDialog?.openResetBuildEnv()}
         @open-feedback=${() => this._feedbackDialog?.open()}
+        @open-check-updates=${() => this._desktopUpdateDialog?.open()}
         @open-onboarding-wifi=${this._onOpenOnboarding}
       >
         ${this._router.outlet()}
@@ -581,6 +591,7 @@ export class ESPHomeApp extends LitElement {
         @open-update-all=${() => this._updateAllDialog?.open()}
       ></esphome-command-palette>
       <esphome-update-all-dialog></esphome-update-all-dialog>
+      <esphome-desktop-update-dialog></esphome-desktop-update-dialog>
       <esphome-settings-dialog
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}

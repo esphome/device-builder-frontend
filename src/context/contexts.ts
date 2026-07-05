@@ -50,6 +50,11 @@ export const desktopVersionContext = createContext<string>(
   Symbol("esphome-desktop-version")
 );
 
+/** Context for whether the desktop app can self-update (0.14.0+ CLI present). */
+export const desktopUpdateCapableContext = createContext<boolean>(
+  Symbol("esphome-desktop-update-capable")
+);
+
 /** Context for dark mode state. */
 export const darkModeContext = createContext<boolean>(Symbol("esphome-dark-mode"));
 

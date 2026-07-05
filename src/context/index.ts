@@ -9,6 +9,7 @@ export {
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
   darkModeContext,
+  desktopUpdateCapableContext,
   desktopVersionContext,
   devicesContext,
   devicesLoadedContext,
