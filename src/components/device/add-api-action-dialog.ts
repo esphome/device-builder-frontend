@@ -25,6 +25,7 @@ import { formFieldStyles } from "../../styles/form-fields.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeEspHomeId } from "../../util/esphome-id.js";
+import { formatApiError } from "../../util/format-api-error.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
@@ -248,10 +249,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
       );
       this._open = false;
     } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_save_error");
+      const msg = formatApiError(err, this._localize, "device.automation_save_error");
       this._error = msg;
       notifyError(this._localize("device.automation_save_error"), {
         description: msg,

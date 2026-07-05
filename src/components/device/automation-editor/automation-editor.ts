@@ -45,6 +45,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { formatApiError } from "../../../util/format-api-error.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
@@ -290,10 +291,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         this.value = m.tree;
       }
     } catch (err) {
-      this._error =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_parse_error");
+      this._error = formatApiError(err, this._localize, "device.automation_parse_error");
     }
   }
 

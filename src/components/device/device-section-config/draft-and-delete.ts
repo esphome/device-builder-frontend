@@ -1,4 +1,5 @@
 import { validateEntries } from "../../../util/config-validation.js";
+import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
 import { notifySuccess } from "../../../util/notify.js";
 import {
@@ -139,8 +140,7 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     );
     notifySuccess(host._localize("device.section_deleted", { name: title }));
   } catch (e) {
-    host._error =
-      e instanceof Error ? e.message : host._localize("device.section_delete_error");
+    host._error = formatApiError(e, host._localize, "device.section_delete_error");
   } finally {
     host._deleting = false;
   }

@@ -6,6 +6,7 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
+import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
 
@@ -313,8 +314,7 @@ export class AutoApplyController implements ReactiveController {
    *  revert-on-failure rule for optimistic updates). */
   private _surfaceSaveError(err: unknown): void {
     const localize = this._options.getLocalize();
-    const msg =
-      err instanceof Error ? err.message : localize("device.automation_save_error");
+    const msg = formatApiError(err, localize, "device.automation_save_error");
     this._options.setError(msg);
     notifyError(localize("device.automation_save_error"), {
       description: msg,

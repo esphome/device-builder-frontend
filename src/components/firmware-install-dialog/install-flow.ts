@@ -7,6 +7,7 @@ import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { formatApiError } from "../../util/format-api-error.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import { openFlasher } from "../../util/usb-flasher.js";
 import {
@@ -191,9 +192,7 @@ export async function startWebSerialInstall(
     // 100% reached: treat as success — device may have reset during verification.
     if (host._flashPercent < 100) {
       await releaseSerial(detected);
-      host._fail(
-        err instanceof Error ? err.message : host._localize("firmware.flash_failed")
-      );
+      host._fail(formatApiError(err, host._localize, "firmware.flash_failed"));
       return;
     }
   }

@@ -14,6 +14,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
 import { EnterController } from "../util/enter-controller.js";
+import { formatApiError } from "../util/format-api-error.js";
 import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { renderInlineError } from "../util/render-error.js";
@@ -512,10 +513,7 @@ export class ESPHomeAdoptDialog extends LitElement {
         })
       );
     } catch (err) {
-      this._error =
-        err instanceof Error
-          ? err.message
-          : this._localize("dashboard.adopt_error_generic");
+      this._error = formatApiError(err, this._localize, "dashboard.adopt_error_generic");
     } finally {
       /* Always clear the busy state. On success the dialog closes
          and the user never sees this — but if anything downstream

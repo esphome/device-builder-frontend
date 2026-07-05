@@ -44,6 +44,7 @@ import {
 } from "../../../util/component-name-cache.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
+import { formatApiError } from "../../../util/format-api-error.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
@@ -254,10 +255,7 @@ export class ESPHomeScriptEditor extends LitElement {
         this.value = m.tree;
       }
     } catch (err) {
-      this._error =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_parse_error");
+      this._error = formatApiError(err, this._localize, "device.automation_parse_error");
     }
   }
 

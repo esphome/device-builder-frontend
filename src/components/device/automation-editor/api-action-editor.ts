@@ -40,6 +40,7 @@ import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
+import { formatApiError } from "../../../util/format-api-error.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
@@ -332,10 +333,7 @@ export class ESPHomeApiActionEditor extends LitElement {
         this.value = m.tree;
       }
     } catch (err) {
-      this._error =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_parse_error");
+      this._error = formatApiError(err, this._localize, "device.automation_parse_error");
     }
   }
 

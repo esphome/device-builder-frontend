@@ -25,6 +25,7 @@ import {
 import { defaultBoardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import { formatApiError } from "../../util/format-api-error.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -681,10 +682,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         })
       );
     } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.automation_save_error");
+      const msg = formatApiError(
+        err,
+        this._localize,
+        "device.automation_save_error"
+      );
       notifyError(this._localize("device.automation_save_error"), {
         description: msg,
       });
