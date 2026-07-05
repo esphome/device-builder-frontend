@@ -245,6 +245,26 @@ describe("findUsedPins", () => {
     expect(map.has(2)).toBe(false);
   });
 
+  it("keeps the block-scalar boundary spaces-only when the key line has a tab", () => {
+    // Malformed mid-edit input can put a tab in the block-scalar key line's
+    // indentation. The skip threshold must use the same spaces-only
+    // ``indentOf`` as the per-line comparison; a threshold that counted the
+    // tab (width 3 here vs spaces-only 0) would sit above the prose line's
+    // indent, end the block one line early, and register the prose token
+    // P0.5 as a phantom used pin.
+    const config = [
+      "switch:",
+      "  - platform: gpio",
+      "    pin: GPIO7",
+      "\t  comment: |", // tab inside the key line's indentation
+      "   wired to P0.5 originally", // P0.5 -> would be pin 5
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.get(7)).toBe("switch");
+    expect(map.has(5)).toBe(false);
+  });
+
   it("returns an empty map for empty yaml", () => {
     expect(findUsedPins("").size).toBe(0);
   });

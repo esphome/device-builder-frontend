@@ -253,7 +253,10 @@ export function findUsedPins(
     }
     const keyMatch = line.match(LINE_KEY_RE);
     if (keyMatch && FREETEXT_PIN_KEYS.has(keyMatch[2].toLowerCase())) {
-      if (BLOCK_SCALAR_RE.test(line)) blockScalarIndent = keyMatch[1].length;
+      // Measure the threshold with the same spaces-only ``indentOf`` used in
+      // the skip comparison above, so a tab in malformed indentation cannot
+      // end the block scalar one line early.
+      if (BLOCK_SCALAR_RE.test(line)) blockScalarIndent = indentOf(line);
       continue;
     }
     const stripped = stripInlineComment(line);
