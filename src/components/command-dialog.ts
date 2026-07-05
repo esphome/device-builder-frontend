@@ -38,6 +38,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import {
   deriveFollowCommandType,
   detachStream,
+  findDependentUpload,
   followJob,
   onForceLocalClick,
   resetRunState,
@@ -261,9 +262,12 @@ export class ESPHomeCommandDialog extends LitElement {
     this.configuration = job.configuration;
     this.name = displayName;
     this._commandType = commandType ?? deriveFollowCommandType(this._jobs, job);
-    this._port = job.port || "OTA";
-    // Restore so a "Build locally instead" retry keeps flashing the bootloader.
-    this._bootloader = job.flash_bootloader === true;
+    // Restore off the chain's UPLOAD when following a COMPILE head, so a
+    // "Build locally instead" retry keeps the target address and keeps
+    // flashing the bootloader.
+    const dependent = findDependentUpload(this._jobs, job);
+    this._port = dependent?.port || job.port || "OTA";
+    this._bootloader = (dependent ?? job).flash_bootloader === true;
     resetRunState(this);
     // Fresh attach is a fresh session — reset toggle defaults so a prior
     // opt-out doesn't silently inherit.

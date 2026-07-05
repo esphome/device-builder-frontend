@@ -30,6 +30,20 @@ export function deriveFollowCommandType(
   return JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
 }
 
+// An install chain is followed via its COMPILE head, but the flash target
+// lives on the dependent UPLOAD — restoring port/bootloader off the head
+// reads empty/false and a later "Build locally instead" resubmit flashes
+// the app at the default address.
+export function findDependentUpload(
+  jobs: Map<string, FirmwareJob>,
+  job: FirmwareJob
+): FirmwareJob | undefined {
+  if (job.job_type !== JobType.COMPILE) return undefined;
+  return [...jobs.values()].find(
+    (j) => j.depends_on === job.job_id && j.job_type === JobType.UPLOAD
+  );
+}
+
 // Dashboard mode pins escaped form (\033[…m); raw form (\x1b[…m) is defensive.
 const ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
 // Anchored ERROR prefix so a debug line that quotes the phrase can't match.
