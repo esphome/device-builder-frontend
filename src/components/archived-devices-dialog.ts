@@ -295,7 +295,7 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
     return renderAsyncState({
       loading: this._loading && this._devices.length === 0,
       loadingMessage: this._localize("dashboard.archived_dialog_loading"),
-      error: this._error ?? "",
+      error: this._error,
       content: () => this._renderList(),
     });
   }

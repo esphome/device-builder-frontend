@@ -11,16 +11,18 @@ import { html, nothing, type TemplateResult } from "lit";
  * (e.g. a retry row). ``content()`` owns everything past the two leading
  * branches, including a dialog's own empty state.
  */
-export interface AsyncStateOptions {
+export interface RenderAsyncStateOptions {
   loading: boolean;
   loadingMessage: string;
-  error: string;
+  // Any falsy value (``""`` / ``null`` / ``undefined``) means "no error", so a
+  // ``string | null`` field can be passed straight through without coercion.
+  error: string | null | undefined;
   content: () => TemplateResult | typeof nothing;
-  errorActions?: () => TemplateResult;
+  errorActions?: () => TemplateResult | typeof nothing;
 }
 
 export function renderAsyncState(
-  opts: AsyncStateOptions
+  opts: RenderAsyncStateOptions
 ): TemplateResult | typeof nothing {
   if (opts.loading) {
     return html`<div class="message" role="status">${opts.loadingMessage}</div>`;
