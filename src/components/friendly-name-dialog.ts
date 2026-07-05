@@ -3,6 +3,7 @@ import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
+import { dialogActionsRowStyles } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -58,6 +59,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
     inputStyles,
     // Neutral header + title + footer (shared) — dialog-chrome.ts.
     dialogChromeStyles,
+    dialogActionsRowStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -96,13 +98,6 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
       .install-row .helper {
         margin-top: 0;
         flex: 1;
-      }
-
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-m) 0 var(--wa-space-l);
       }
 
       .btn {

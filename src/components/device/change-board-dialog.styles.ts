@@ -78,13 +78,6 @@ export const changeBoardDialogStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--wa-space-s);
-    padding: var(--wa-space-m) 0 var(--wa-space-l);
-  }
-
   .btn {
     padding: var(--esphome-button-padding);
     border-radius: var(--wa-border-radius-m);
