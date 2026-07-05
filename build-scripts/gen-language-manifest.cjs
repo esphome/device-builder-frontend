@@ -31,11 +31,20 @@ const path = require("path");
 // synchronously, the same mechanism `node build-scripts/translations.ts`
 // already relies on. `BASE_LANGUAGE` names the in-repo source-of-truth
 // English file; completeness is measured against its key set.
-const {
-  BASE_LANGUAGE,
-  localeCompleteness,
-  toBcp47,
-} = require("./translations-lib.ts");
+let translationsLib;
+try {
+  translationsLib = require("./translations-lib.ts");
+} catch (err) {
+  // `engines` is only an install-time warning, so an unsupported Node still
+  // reaches this require and dies with an opaque loader error (unknown `.ts`
+  // extension or an ESM require failure). Name the actual floor instead.
+  throw new Error(
+    `Loading build-scripts/translations-lib.ts failed on Node ${process.version}; ` +
+      "this script needs Node >= 22.18 (native TypeScript type stripping and require(esm)).",
+    { cause: err }
+  );
+}
+const { BASE_LANGUAGE, localeCompleteness, toBcp47 } = translationsLib;
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const TRANSLATIONS_DIR = path.join(ROOT_DIR, "src", "translations");
