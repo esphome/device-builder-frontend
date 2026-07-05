@@ -39,9 +39,10 @@ export function findDependentUpload(
   job: FirmwareJob
 ): FirmwareJob | undefined {
   if (job.job_type !== JobType.COMPILE) return undefined;
-  return [...jobs.values()].find(
-    (j) => j.depends_on === job.job_id && j.job_type === JobType.UPLOAD
-  );
+  for (const j of jobs.values()) {
+    if (j.depends_on === job.job_id && j.job_type === JobType.UPLOAD) return j;
+  }
+  return undefined;
 }
 
 // Dashboard mode pins escaped form (\033[…m); raw form (\x1b[…m) is defensive.
