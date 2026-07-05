@@ -43,16 +43,12 @@ export function isIndexSegment(segment: string): boolean {
 
 /**
  * Parse a path segment as a non-negative integer index into an
- * array. Returns ``null`` for non-numeric, negative, or fractional
- * segments — callers translate that to "skip this access" (read
- * paths return ``undefined``, write paths leave the array
- * unchanged). Centralised so the read and write sides agree on
- * what counts as a valid array index — an inconsistency between
- * them would let writes land at indices reads can't reach.
+ * array. Returns ``null`` for anything ``isIndexSegment`` rejects —
+ * callers translate that to "skip this access" (read paths return
+ * ``undefined``, write paths leave the array unchanged).
  */
 function _parseArrayIndex(segment: string): number | null {
-  const idx = Number(segment);
-  return Number.isInteger(idx) && idx >= 0 ? idx : null;
+  return isIndexSegment(segment) ? Number(segment) : null;
 }
 
 /**

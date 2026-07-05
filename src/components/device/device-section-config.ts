@@ -264,42 +264,41 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   /**
    * When a backend error lands on an advanced field that's currently
    * hidden, reveal the advanced fields so the inline message is visible.
-   * At most once per section so a later deliberate collapse sticks.
    */
   private _revealAdvancedForErrors(changedProperties: Map<string, unknown>): void {
     if (!changedProperties.has("backendErrors") && !changedProperties.has("_config")) {
       return;
     }
-    if (!this.backendErrors.fields.size || this._showAdvanced || !this._config) return;
-    if (this._autoRevealedSections.has(this.sectionKey)) return;
-    const entries = resolveSectionEntries(this.sectionKey, this._config.entries);
-    for (const path of this.backendErrors.fields.keys()) {
-      if (pathIsAdvanced(entries, path.split("."))) {
-        this._autoRevealedSections.add(this.sectionKey);
-        this._setShowAdvanced(true);
-        return;
-      }
-    }
+    if (!this.backendErrors.fields.size) return;
+    this._autoRevealAdvanced(
+      [...this.backendErrors.fields.keys()].map((path) => path.split("."))
+    );
   }
 
   /**
    * When the caret follows to an advanced field that's currently hidden (Show
    * advanced off and the field has no value yet, so it isn't rendered), reveal
    * the section's advanced fields here in willUpdate so the field renders this
-   * pass and the form's scroll-to-field can reach it. Revealed at most once per
-   * section so a later deliberate collapse sticks (mirrors config-entry-form's
-   * seed-once nested-disclosure behaviour — caret-follow shouldn't fight the
-   * user's choice).
+   * pass and the form's scroll-to-field can reach it.
    */
   private _revealAdvancedForFocus(changedProperties: Map<string, unknown>): void {
     if (!changedProperties.has("focusFieldPath") && !changedProperties.has("_config")) {
       return;
     }
-    const path = this.focusFieldPath;
-    if (!path?.length || this._showAdvanced || !this._config) return;
+    if (this.focusFieldPath?.length) this._autoRevealAdvanced([this.focusFieldPath]);
+  }
+
+  /**
+   * Reveal the section's hidden advanced fields when any of *paths* is
+   * advanced. At most once per section so a later deliberate collapse
+   * sticks (mirrors config-entry-form's seed-once nested-disclosure
+   * behaviour — auto-reveal shouldn't fight the user's choice).
+   */
+  private _autoRevealAdvanced(paths: readonly string[][]): void {
+    if (this._showAdvanced || !this._config) return;
     if (this._autoRevealedSections.has(this.sectionKey)) return;
     const entries = resolveSectionEntries(this.sectionKey, this._config.entries);
-    if (!pathIsAdvanced(entries, path)) return;
+    if (!paths.some((path) => pathIsAdvanced(entries, path))) return;
     this._autoRevealedSections.add(this.sectionKey);
     this._setShowAdvanced(true);
   }
