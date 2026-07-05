@@ -31,7 +31,9 @@ import { isOpenConfigFile } from "./yaml-validation-summary.js";
 /** A validation error resolved to a key chain in the open document. */
 export interface MappedValidationError {
   message: string;
-  /** 1-indexed line of the (retargeted) error location. */
+  /** 1-indexed line where the error's own range starts — inside the
+   *  errored node, not the retargeted squiggle position, so list-item
+   *  errors resolve to the right instance. */
   line: number;
   /** Key chain from the top-level section key down to the errored field;
    *  block-sequence items contribute their numeric index. */
