@@ -30,6 +30,7 @@ import { generatePassphrase } from "../../util/passphrase.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { recommendedSecretKeys } from "../../util/secret-eligibility.js";
 import { ensureSecretInYaml } from "../../util/secrets-write.js";
+import { indentOf } from "../../util/yaml-line-walker.js";
 import { TOP_LEVEL_KEY_START_RE } from "../../util/yaml-section-lexer.js";
 import { findSectionStart } from "../../util/yaml-section-reader.js";
 
@@ -202,7 +203,7 @@ export class ESPHomeSecurityNotice extends LitElement {
       const l = lines[i];
       if (l.trim() === "" || l.trimStart().startsWith("#")) continue;
       if (TOP_LEVEL_KEY_START_RE.test(l)) break; // next top-level section
-      const indent = l.length - l.trimStart().length;
+      const indent = indentOf(l);
       if (childIndent === null) childIndent = indent;
       if (indent < childIndent) break; // dedent — left this block (e.g. next list item)
       if (indent !== childIndent) continue; // deeper-nested key, not a direct child

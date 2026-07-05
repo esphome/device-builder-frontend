@@ -236,6 +236,12 @@ export function findSensitiveValueRanges(
           next++;
           continue;
         }
+        // Deliberately whitespace-generic, NOT `indentOf` (spaces-only):
+        // `contIndent` doubles as the mask's start column, and the
+        // header indent it's compared against comes from KEY_LINE's
+        // `(\s*)` capture. Mid-edit input may be invalid YAML; a
+        // spaces-only count would end the block at a tab-led line and
+        // leave the credential on it unmasked.
         const contIndent = (cont.match(/^(\s*)/)?.[1] ?? "").length;
         if (contIndent <= headerIndent) break;
         let valEnd = cont.length;

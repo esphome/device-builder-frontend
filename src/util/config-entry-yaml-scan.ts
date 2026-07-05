@@ -20,6 +20,7 @@ import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { isValidEspHomeId } from "./esphome-id.js";
 import { isPinFieldKey, parsePinGpio, scanPinGpios } from "./pin-gpio.js";
 import { hasSubstitutionReference } from "./substitutions.js";
+import { indentOf } from "./yaml-line-walker.js";
 import {
   collectIdsAtPath,
   findFieldLine,
@@ -128,9 +129,6 @@ const LINE_KEY_RE = /^(\s*)(?:-\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
 // Its continuation lines are more-indented prose, scanned via indentation.
 const BLOCK_SCALAR_RE = /:\s*[|>][+-]?\d*\s*(?:#.*)?$/;
 
-// Leading-whitespace width of a line (block-scalar indentation threshold).
-const indentWidth = (line: string): number => line.length - line.trimStart().length;
-
 /**
  * Strip a YAML inline comment. A `#` begins a comment only at line start
  * or when preceded by whitespace (so `http://x#y` keeps its `#`). Pin
@@ -165,7 +163,7 @@ function readLongFormPin(
   lines: string[],
   openerIdx: number
 ): { pin: number | string | null; end: number } {
-  const openIndent = indentWidth(lines[openerIdx]);
+  const openIndent = indentOf(lines[openerIdx]);
   let childIndent = -1;
   const block: Record<string, string> = {};
   let end = openerIdx;
@@ -175,12 +173,12 @@ function readLongFormPin(
       end = j;
       continue;
     }
-    if (indentWidth(line) <= openIndent) break;
+    if (indentOf(line) <= openIndent) break;
     end = j;
     const m = line.match(LINE_KEY_RE);
     if (m === null) continue; // comment / non-key line — don't anchor childIndent on it
-    if (childIndent === -1) childIndent = indentWidth(line);
-    if (indentWidth(line) !== childIndent) continue; // skip grandchildren (mode flags)
+    if (childIndent === -1) childIndent = indentOf(line);
+    if (indentOf(line) !== childIndent) continue; // skip grandchildren (mode flags)
     // Record the key even when it has no inline scalar (an empty, mid-edit
     // `pcf8574:`), so parsePinGpio sees the provider and returns null rather
     // than letting the bare `number:` alias a board GPIO.
@@ -249,7 +247,7 @@ export function findUsedPins(
     // indented deeper than the key. A non-blank line at/under the key indent
     // ends the block.
     if (blockScalarIndent >= 0) {
-      if (line.trim() === "" || indentWidth(line) > blockScalarIndent) continue;
+      if (line.trim() === "" || indentOf(line) > blockScalarIndent) continue;
       blockScalarIndent = -1;
     }
     const keyMatch = line.match(LINE_KEY_RE);

@@ -26,6 +26,7 @@ import type { EditorValidateResponse } from "../api/types/editor.js";
 import { formRelativePath } from "./backend-field-errors.js";
 import { splitTextLinks } from "./markdown.js";
 import { getKeyPathWithListIndices } from "./yaml-ast.js";
+import { indentOf } from "./yaml-line-walker.js";
 import { isOpenConfigFile } from "./yaml-validation-summary.js";
 
 /** A validation error resolved to a key chain in the open document. */
@@ -174,11 +175,6 @@ export function parseYamlErrorPosition(
   return null;
 }
 
-/** Leading-whitespace width of a line. */
-function indentOf(text: string): number {
-  return text.length - text.trimStart().length;
-}
-
 /** Match a `key:` declaration, capturing its indent and the key token. */
 const KEY_LINE_RE = /^(\s*)([^\s:#][^:]*?)\s*:(?:\s|$)/;
 
@@ -298,8 +294,7 @@ function lineToOffsets(
   // No column → underline the whole line content (skip leading whitespace
   // for a tighter visual).
   const text = info.text;
-  const leading = text.length - text.trimStart().length;
-  const from = info.from + leading;
+  const from = info.from + indentOf(text);
   return { from, to: info.to };
 }
 
