@@ -143,6 +143,11 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ attribute: false })
   backendErrors: Map<string, ValidationError> = new Map();
 
+  /** Section-level error messages for the selected section; the section
+   *  editor shows them when the banner's pane is hidden. */
+  @property({ attribute: false })
+  backendSectionMessages: string[] = [];
+
   /** Yaml content at last save/load — compared against current yaml to detect changes. */
   @property({ attribute: false })
   savedYaml = "";
@@ -328,6 +333,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 .selectedFromLine=${this.selectedFromLine}
                 .focusFieldPath=${this.focusFieldPath}
                 .backendErrors=${this.backendErrors}
+                .backendSectionMessages=${this.backendSectionMessages}
                 .justCreated=${this.justCreated}
                 ?yamlPaneVisible=${effectiveLayout !== "left"}
                 @show-yaml-editor=${this._onShowYamlEditor}

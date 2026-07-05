@@ -103,6 +103,27 @@ export function backendErrorCounts(
 }
 
 /**
+ * The selected instance's section-level messages (empty relPath). These
+ * normally live in the document banner, which the visual-only layout
+ * hides — the section editor surfaces them instead so a badge always
+ * leads to a readable message.
+ */
+export function backendSectionMessages(
+  errors: readonly BackendFieldError[],
+  sectionKey: string | null,
+  fromLine: number | undefined
+): string[] {
+  if (!sectionKey) return [];
+  const out: string[] = [];
+  for (const e of errors) {
+    if (e.sectionKey !== sectionKey) continue;
+    if (fromLine !== undefined && e.fromLine !== fromLine) continue;
+    if (!e.relPath) out.push(e.message);
+  }
+  return out;
+}
+
+/**
  * The selected section instance's errors as the path-keyed map the config
  * form renders. Section-level errors (empty relPath) are navigator/banner
  * material, not field errors. An undefined fromLine matches any instance

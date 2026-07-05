@@ -156,6 +156,41 @@ export const deviceSectionConfigStyles = css`
     padding: var(--wa-space-xl);
   }
 
+  /* Section-level backend errors, shown when the YAML pane (and the
+     document banner it hosts) is hidden by the current layout. */
+  .section-error-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-s) var(--wa-space-m);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-danger-fill-quiet);
+    border: var(--wa-border-width-s) solid var(--wa-color-danger-60);
+    color: var(--wa-color-danger-text-normal);
+  }
+
+  .section-error-banner wa-icon {
+    flex: 0 0 auto;
+    font-size: 1.25rem;
+    margin-top: 0.05rem;
+    color: var(--wa-color-danger-60);
+  }
+
+  .section-error-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .section-error-banner-text p {
+    margin: 0;
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
   /* Stand-in shown when a section has no editable form fields
      (substitutions, globals, packages) — tells the user to edit
      this part via the YAML pane instead of presenting an empty

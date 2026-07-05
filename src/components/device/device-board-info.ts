@@ -106,6 +106,11 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   @property({ attribute: false })
   backendErrors: Map<string, ValidationError> = new Map();
 
+  /** Section-level error messages for the selected section; the section
+   *  editor shows them when the banner's pane is hidden. */
+  @property({ attribute: false })
+  backendSectionMessages: string[] = [];
+
   @query("esphome-device-section-config")
   private _sectionConfig!: ESPHomeDeviceSectionConfig;
 
@@ -430,6 +435,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
       .fromLine=${this.selectedFromLine}
       .focusFieldPath=${this.focusFieldPath}
       .backendErrors=${this.backendErrors}
+      .backendSectionMessages=${this.backendSectionMessages}
       .yaml=${this.yaml}
       .board=${this.board}
       .boardName=${this.board?.name ?? ""}

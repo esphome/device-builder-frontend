@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   backendErrorCounts,
   backendErrorsForSection,
+  backendSectionMessages,
   formRelativePath,
   instanceKey,
   resolveBackendErrors,
@@ -203,5 +204,22 @@ describe("backendErrorsForSection", () => {
   it("skips section-level errors and unselected sections", () => {
     expect(backendErrorsForSection(errors, "wifi", 4).size).toBe(0);
     expect(backendErrorsForSection(errors, null, undefined).size).toBe(0);
+  });
+});
+
+describe("backendSectionMessages", () => {
+  const errors: BackendFieldError[] = [
+    { sectionKey: "wifi", fromLine: 4, relPath: "", message: "section broken" },
+    { sectionKey: "wifi", fromLine: 4, relPath: "ssid", message: "field error" },
+    { sectionKey: "mdns", fromLine: 9, relPath: "", message: "expected a dictionary" },
+  ];
+
+  it("returns only the selected instance's section-level messages", () => {
+    expect(backendSectionMessages(errors, "wifi", 4)).toEqual(["section broken"]);
+    expect(backendSectionMessages(errors, "mdns", undefined)).toEqual([
+      "expected a dictionary",
+    ]);
+    expect(backendSectionMessages(errors, "wifi", 99)).toEqual([]);
+    expect(backendSectionMessages(errors, null, undefined)).toEqual([]);
   });
 });

@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiAlertCircleOutline,
   mdiDelete,
   mdiInformationOutline,
   mdiOpenInNew,
@@ -68,6 +69,7 @@ import {
 import { isSecuritySection, type ApplySecuritySecretsDetail } from "./security-notice.js";
 
 registerMdiIcons({
+  "alert-circle-outline": mdiAlertCircleOutline,
   delete: mdiDelete,
   "information-outline": mdiInformationOutline,
   "open-in-new": mdiOpenInNew,
@@ -101,6 +103,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   // Backend validation errors for this section, keyed by dotted field path.
   // Refreshed per lint pass; merged under the client-side _fieldErrors.
   @property({ attribute: false }) backendErrors: Map<string, ValidationError> = new Map();
+
+  // Section-level error messages (no field to carry them). Normally banner
+  // material; shown here when the YAML pane hides the banner, so a
+  // navigator badge always leads to a readable message.
+  @property({ attribute: false }) backendSectionMessages: string[] = [];
 
   // Same string the YAML pane shows including unsaved edits. Save and delete
   // operate on this rather than re-fetching: the navigator emits fromLine
@@ -434,6 +441,16 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               </div>`
         }
       </div>
+      ${
+        !this.yamlPaneVisible && this.backendSectionMessages.length > 0
+          ? html`<div class="section-error-banner" role="alert">
+              <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
+              <div class="section-error-banner-text">
+                ${this.backendSectionMessages.map((msg) => html`<p>${msg}</p>`)}
+              </div>
+            </div>`
+          : nothing
+      }
       ${
         yamlOnly
           ? html`<div class="yaml-only-notice" role="note">
