@@ -1,6 +1,7 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type {
   DesktopComponentUpdate,
@@ -103,9 +104,7 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
       this._check = await this._api.desktopCheckUpdate();
     } catch (err) {
       this._error =
-        err instanceof Error
-          ? err.message
-          : this._localize("desktop_update_dialog.check_error");
+        apiErrorDetails(err) || this._localize("desktop_update_dialog.check_error");
     } finally {
       this._loading = false;
     }
@@ -115,13 +114,18 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
     this._updating = true;
     this._error = "";
     try {
-      await this._api.desktopInstallUpdate();
+      const { started } = await this._api.desktopInstallUpdate();
+      if (!started) {
+        // The updater couldn't spawn; clear the busy state so the user isn't
+        // stranded on an un-closable "Updating" dialog (the busy gate blocks
+        // every dismiss path).
+        this._updating = false;
+        this._error = this._localize("desktop_update_dialog.update_error");
+      }
     } catch (err) {
       this._updating = false;
       this._error =
-        err instanceof Error
-          ? err.message
-          : this._localize("desktop_update_dialog.update_error");
+        apiErrorDetails(err) || this._localize("desktop_update_dialog.update_error");
     }
   };
 
