@@ -173,6 +173,11 @@ const cache = new Map<string, Promise<SchemaBundle | null>>();
  *  behaviour). */
 const versionCache = new KeyedPromiseCache<string>();
 
+/** The single entry in ``versionCache`` — one schema version per
+ *  session, so the cache is keyed by a fixed name rather than a
+ *  magic empty string. */
+const VERSION_KEY = "version";
+
 /** Memoise resolved config-var key lists by ``<bundle>|<componentKey>``.
  *  The result is a Promise so concurrent callers dedupe on the same
  *  network round-trip. Cleared by ``_resetSchemaCacheForTests``. No
@@ -211,7 +216,7 @@ async function resolveVersion(api: ESPHomeAPI): Promise<string> {
   // A successful resolution stays cached for the session — the
   // dashboard's ``esphome_version`` doesn't change without a page
   // reload. A failure is evicted so subsequent calls retry.
-  return versionCache.fetch("", async () => {
+  return versionCache.fetch(VERSION_KEY, async () => {
     const { esphome_version } = await api.getVersion();
     if (esphome_version.endsWith("dev")) return "dev";
     // Probe with GET, not HEAD: the schema CDN serves HEAD responses

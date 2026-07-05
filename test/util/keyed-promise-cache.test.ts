@@ -66,8 +66,11 @@ describe("KeyedPromiseCache", () => {
     await expect(b).rejects.toThrow("boom");
     // Both callers replayed one attempt; the eviction happened after.
     expect(create).toHaveBeenCalledTimes(1);
-    cache.fetch("k", create);
+    const retry = cache.fetch("k", create);
     expect(create).toHaveBeenCalledTimes(2);
+    // Settle the retry too so no in-flight promise dangles past the test.
+    reject(new Error("boom again"));
+    await expect(retry).rejects.toThrow("boom again");
   });
 
   it("with evictOnReject: false, a rejection is memoised and replayed", async () => {

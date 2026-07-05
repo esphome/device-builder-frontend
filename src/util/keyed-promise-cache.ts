@@ -44,15 +44,22 @@ export class KeyedPromiseCache<T> {
   fetch(key: string, create: () => Promise<T>): Promise<T> {
     const cached = this._cache.get(key);
     if (cached) return cached;
-    const promise = create();
+    let promise: Promise<T>;
     if (this._evictOnReject) {
-      // Side-listener, not a ``.catch`` chain: callers get the original
-      // promise (and its rejection reason) unchanged. The identity guard
-      // keeps a stale rejection from evicting a fresh entry written
-      // after a ``clear()``.
-      promise.catch(() => {
+      // Store and return the rethrowing ``.catch`` chain, not the
+      // original promise with a side-listener. A side-listener would
+      // mark the rejection handled and silence ``unhandledRejection``
+      // diagnostics for callers that drop the returned promise; the
+      // chain rethrows, so an ignored rejection still surfaces (the
+      // behaviour of the hand-rolled caches this replaces). The
+      // identity guard keeps a stale rejection from evicting a fresh
+      // entry written after a ``clear()``.
+      promise = create().catch((err: unknown) => {
         if (this._cache.get(key) === promise) this._cache.delete(key);
+        throw err;
       });
+    } else {
+      promise = create();
     }
     this._cache.set(key, promise);
     return promise;
