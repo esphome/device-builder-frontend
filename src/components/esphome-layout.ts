@@ -403,7 +403,7 @@ export class ESPHomeLayout extends LitElement {
           this._desktopVersion
             ? html`<span
                 >${this._footerVersion(
-                  `ESPHome Desktop v${this._desktopVersion}`,
+                  `Desktop ${this._desktopVersion}`,
                   desktopDocsUrl()
                 )}</span
               >`
@@ -413,7 +413,7 @@ export class ESPHomeLayout extends LitElement {
           this._serverVersion
             ? html`<span
                 >${this._footerVersion(
-                  `ESPHome Device Builder v${this._serverVersion}`,
+                  `Device Builder ${this._serverVersion}`,
                   deviceBuilderReleaseUrl(this._serverVersion)
                 )}</span
               >`

@@ -43,7 +43,7 @@ describe("esphome-layout footer version links", () => {
     expect(links[0].getAttribute("href")).toBe(
       "https://github.com/esphome/device-builder/releases/tag/1.0.3"
     );
-    expect(links[0].textContent?.trim()).toBe("ESPHome Device Builder v1.0.3");
+    expect(links[0].textContent?.trim()).toBe("Device Builder 1.0.3");
     expect(links[1].getAttribute("href")).toBe("https://esphome.io/changelog/2026.5.0/");
     expect(links[1].textContent?.trim()).toBe("ESPHome 2026.5.3");
     for (const link of links) {
@@ -56,7 +56,7 @@ describe("esphome-layout footer version links", () => {
     el = await renderFooter("1.0.3", "2026.5.3", "1.4.2");
     const links = footerLinks(el);
     expect(links).toHaveLength(3);
-    expect(links[0].textContent?.trim()).toBe("ESPHome Desktop v1.4.2");
+    expect(links[0].textContent?.trim()).toBe("Desktop 1.4.2");
     expect(links[0].getAttribute("href")).toBe("https://desktop.esphome.io/");
   });
 
@@ -74,6 +74,6 @@ describe("esphome-layout footer version links", () => {
     expect(links[0].getAttribute("href")).toBe("https://next.esphome.io/");
     expect(links[0].textContent?.trim()).toBe("ESPHome 2026.7.0-dev");
     const footer = el.shadowRoot!.querySelector(".app-footer")?.textContent;
-    expect(footer).toContain("ESPHome Device Builder v0.0.0");
+    expect(footer).toContain("Device Builder 0.0.0");
   });
 });
