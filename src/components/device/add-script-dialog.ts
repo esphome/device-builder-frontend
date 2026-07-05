@@ -35,7 +35,7 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { normalizeEspHomeId } from "../../util/esphome-id.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
+import { dispatchAutomationAdded } from "./dispatch-automation-added.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
@@ -266,23 +266,7 @@ export class ESPHomeAddScriptDialog extends LitElement {
         location,
         this.yaml
       );
-      // Apply the diff to the page's YAML so the new script
-      // lands in ``_yaml`` and the global save button activates.
-      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
-      this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-draft", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      this.dispatchEvent(
-        new CustomEvent<{ sectionKey: string }>("automation-added", {
-          detail: { sectionKey: sectionKeyFromLocation(location) },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      dispatchAutomationAdded(this, this.yaml, location, yaml_diff);
       this._open = false;
     } catch (err) {
       const msg =

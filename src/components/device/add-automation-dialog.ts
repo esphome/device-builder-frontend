@@ -29,7 +29,6 @@ import type {
   AutomationTrigger,
   AvailableAutomations,
   AvailableComponentInstance,
-  YamlDiff,
 } from "../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -45,7 +44,7 @@ import {
   scopeToContainer,
   triggersForComponent,
 } from "./automation-editor/component-targets.js";
-import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
+import { dispatchAutomationAdded } from "./dispatch-automation-added.js";
 
 /** Kinds the wizard can produce. Mirrors a subset of
  *  ``AutomationLocation``'s discriminator. The callable shapes
@@ -469,7 +468,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         location,
         this.yaml
       );
-      this._dispatchAdded(location, yaml_diff);
+      dispatchAutomationAdded(this, this.yaml, location, yaml_diff);
       this._open = false;
     } catch (err) {
       const msg =
@@ -552,30 +551,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   private _catalogTriggerId(location: AutomationLocation): string | null {
     if (location.kind === "interval") return null;
     return this._triggerId;
-  }
-
-  private _dispatchAdded(location: AutomationLocation, yamlDiff: YamlDiff) {
-    // Apply the backend-emitted splice to the device's YAML
-    // buffer so the new automation lands in the page's YAML state
-    // (and thus the YAML pane + the global save button see the
-    // change). The page listens to ``yaml-draft`` and advances
-    // ``_yaml`` without touching ``_savedYaml`` — that's the
-    // existing "dirty buffer, click Save to write" path.
-    const newYaml = applyYamlDiff(this.yaml, yamlDiff);
-    this.dispatchEvent(
-      new CustomEvent<{ yaml: string }>("yaml-draft", {
-        detail: { yaml: newYaml },
-        bubbles: true,
-        composed: true,
-      })
-    );
-    this.dispatchEvent(
-      new CustomEvent<{ sectionKey: string }>("automation-added", {
-        detail: { sectionKey: sectionKeyFromLocation(location) },
-        bubbles: true,
-        composed: true,
-      })
-    );
   }
 }
 
