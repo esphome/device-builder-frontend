@@ -9,12 +9,22 @@
 import { ESPHomeHeaderActions } from "../../src/components/esphome-header-actions.js";
 
 /**
+ * Gating flags the kebab-menu suites toggle before opening the menu — the
+ * public ``dashboardRoute`` prop and the private ``_desktopUpdateCapable``
+ * state. Narrowly typed (rather than ``Record<string, unknown>``) so a typo
+ * in a gate name is a compile error; extend it as new suites need more gates.
+ */
+export interface HeaderMenuOverrides {
+  dashboardRoute?: boolean;
+  _desktopUpdateCapable?: boolean;
+}
+
+/**
  * Construct an open header-actions kebab menu with optional gating-prop
- * overrides applied, appended and settled. Pass public props by name
- * (``dashboardRoute``) or private state directly (``_desktopUpdateCapable``).
+ * overrides applied, appended and settled.
  */
 export async function renderOpenHeaderMenu(
-  overrides: Record<string, unknown> = {}
+  overrides: HeaderMenuOverrides = {}
 ): Promise<ESPHomeHeaderActions> {
   const el = new ESPHomeHeaderActions();
   Object.assign(el, overrides);
