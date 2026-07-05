@@ -4,6 +4,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
+  desktopVersionContext,
   isHaIngressContext,
   localizeContext,
   serverVersionContext,
@@ -16,6 +17,7 @@ import { deviceBuilderChannel } from "../util/device-builder-channel.js";
 import { navigate, runLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
+  desktopDocsUrl,
   deviceBuilderReleaseUrl,
   esphomeChangelogUrl,
 } from "../util/release-notes-url.js";
@@ -45,6 +47,10 @@ export class ESPHomeLayout extends LitElement {
   @consume({ context: serverVersionContext, subscribe: true })
   @state()
   private _serverVersion = "";
+
+  @consume({ context: desktopVersionContext, subscribe: true })
+  @state()
+  private _desktopVersion = "";
 
   @state()
   private _path = stripBase(window.location.pathname);
@@ -393,6 +399,16 @@ export class ESPHomeLayout extends LitElement {
       </div>
       <slot></slot>
       <div class="app-footer">
+        ${
+          this._desktopVersion
+            ? html`<span
+                >${this._footerVersion(
+                  `ESPHome Desktop v${this._desktopVersion}`,
+                  desktopDocsUrl()
+                )}</span
+              >`
+            : nothing
+        }
         ${
           this._serverVersion
             ? html`<span

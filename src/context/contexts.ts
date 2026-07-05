@@ -45,6 +45,11 @@ export const serverVersionContext = createContext<string>(
   Symbol("esphome-server-version")
 );
 
+/** Context for the ESPHome Desktop wrapper version string. */
+export const desktopVersionContext = createContext<string>(
+  Symbol("esphome-desktop-version")
+);
+
 /** Context for dark mode state. */
 export const darkModeContext = createContext<boolean>(Symbol("esphome-dark-mode"));
 

@@ -44,6 +44,9 @@ export interface ServerInfoMessage {
    * is reached directly on its exposed port. Drives the slim header. */
   ha_ingress: boolean;
   requires_auth: boolean;
+  /** ESPHome Desktop wrapper version, from ESPHOME_DESKTOP_VERSION on the
+   * backend; absent or "" when not running under the desktop app. */
+  desktop_version?: string;
 }
 
 export type ServerMessage = ResultMessage | ErrorMessage | EventMessage;

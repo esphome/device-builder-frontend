@@ -30,6 +30,7 @@ import {
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
   darkModeContext,
+  desktopVersionContext,
   devicesContext,
   devicesLoadedContext,
   experienceLevelContext,
@@ -116,6 +117,7 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: devicesLoadedContext }) @state() _devicesLoaded = false;
   @provide({ context: versionContext }) @state() _version = "";
   @provide({ context: serverVersionContext }) @state() _serverVersion = "";
+  @provide({ context: desktopVersionContext }) @state() _desktopVersion = "";
   @provide({ context: darkModeContext }) @state() _darkMode = false;
   @provide({ context: isHaIngressContext }) @state() _isHaIngress = false;
   @provide({ context: activeJobsContext }) @state() _activeJobs: Map<
@@ -430,6 +432,7 @@ export class ESPHomeApp extends LitElement {
     this._api.onConnected = (info: ServerInfoMessage) => {
       this._version = info.esphome_version;
       this._serverVersion = info.server_version;
+      this._desktopVersion = info.desktop_version ?? "";
       this._isHaIngress = info.ha_ingress;
       this._apiConnected = true;
       void this._api.ready.then(() => this._afterAuthenticated());

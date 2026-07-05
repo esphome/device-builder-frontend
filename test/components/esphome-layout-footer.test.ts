@@ -6,16 +6,19 @@ import { ESPHomeLayout } from "../../src/components/esphome-layout.js";
 interface FooterVersions {
   _serverVersion: string;
   _esphomeVersion: string;
+  _desktopVersion: string;
 }
 
 async function renderFooter(
   serverVersion: string,
-  esphomeVersion: string
+  esphomeVersion: string,
+  desktopVersion = ""
 ): Promise<ESPHomeLayout> {
   const el = new ESPHomeLayout();
   const view = el as unknown as FooterVersions;
   view._serverVersion = serverVersion;
   view._esphomeVersion = esphomeVersion;
+  view._desktopVersion = desktopVersion;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -47,6 +50,21 @@ describe("esphome-layout footer version links", () => {
       expect(link.getAttribute("target")).toBe("_blank");
       expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     }
+  });
+
+  test("shows the desktop version first, linked to the desktop docs", async () => {
+    el = await renderFooter("1.0.3", "2026.5.3", "1.4.2");
+    const links = footerLinks(el);
+    expect(links).toHaveLength(3);
+    expect(links[0].textContent?.trim()).toBe("ESPHome Desktop v1.4.2");
+    expect(links[0].getAttribute("href")).toBe("https://desktop.esphome.io/");
+  });
+
+  test("omits the desktop line when no desktop version is set", async () => {
+    el = await renderFooter("1.0.3", "2026.5.3");
+    const footer = el.shadowRoot!.querySelector(".app-footer")?.textContent;
+    expect(footer).not.toContain("Desktop");
+    expect(footerLinks(el)).toHaveLength(2);
   });
 
   test("dev Device Builder stays plain text; dev ESPHome links to the next docs root", async () => {

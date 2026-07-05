@@ -11,6 +11,11 @@ export function deviceBuilderReleaseUrl(version: string): string | null {
   return `https://github.com/esphome/device-builder/releases/tag/${v}`;
 }
 
+/** Docs URL for the ESPHome Desktop app (fixed; not per-version). */
+export function desktopDocsUrl(): string {
+  return "https://desktop.esphome.io/";
+}
+
 /**
  * Docs URL for an ESPHome version, routed by channel. Stable links to the
  * per-minor changelog on esphome.io; patch and pre-release versions normalize
