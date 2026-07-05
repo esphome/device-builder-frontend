@@ -63,11 +63,11 @@ export const dropdownMenuStyles = css`
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-normal);
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background-color 0.1s;
     user-select: none;
   }
 
   .menu-item:hover {
-    background: var(--esphome-tint);
+    background-color: var(--esphome-tint);
   }
 `;
