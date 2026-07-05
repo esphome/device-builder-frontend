@@ -73,6 +73,13 @@ describe("unquote", () => {
   it("strips only the outer layer of nested quotes", () => {
     expect(unquote("'\"gpio\"'")).toBe('"gpio"');
   });
+
+  it("does not decode the YAML '' single-quote escape (unlike stripQuotes)", () => {
+    // Pins the invariant that keeps this helper separate from
+    // yaml-scalar's stripQuotes: swapping in scalar-style parsing
+    // would silently change hover/walker behavior.
+    expect(unquote("'it''s'")).toBe("it''s");
+  });
 });
 
 describe("findParentKey", () => {
