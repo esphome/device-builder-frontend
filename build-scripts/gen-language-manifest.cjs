@@ -26,10 +26,11 @@ const path = require("path");
 // The locale helpers (`toBcp47`, `localeCompleteness`, the base-language
 // constant) live once in translations-lib.ts, under the unit tests in
 // test/build-scripts/translations-lib.test.ts. Node's native TypeScript type
-// stripping together with `require(esm)` — both available on the `engines`
-// floor (>= 22.18) — lets this CommonJS script require that ESM module
-// synchronously, the same mechanism `node build-scripts/translations.ts`
-// already relies on. `BASE_LANGUAGE` names the in-repo source-of-truth
+// stripping (which `node build-scripts/translations.ts` already relies on)
+// together with `require(esm)` — both available on the `engines` floor
+// (>= 22.18) — lets this CommonJS script require that ESM module
+// synchronously; this is the first script here that leans on `require(esm)`
+// specifically. `BASE_LANGUAGE` names the in-repo source-of-truth
 // English file; completeness is measured against its key set.
 let translationsLib;
 try {
