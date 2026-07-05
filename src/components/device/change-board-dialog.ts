@@ -4,6 +4,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { dialogActionsRowStyles } from "../../styles/dialog-action-buttons.js";
 import {
   dialogChromeStyles,
   quietCloseButtonStyles,
@@ -41,6 +42,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
     espHomeStyles,
     dialogChromeStyles,
     quietCloseButtonStyles,
+    dialogActionsRowStyles,
     changeBoardDialogStyles,
   ];
 

@@ -5,6 +5,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { dialogActionsRowStyles } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -55,6 +56,7 @@ export class ESPHomeAdoptDialog extends LitElement {
     // Before the local block so this dialog's own `.field` / `label`
     // spacing wins; only `.field-label` / `.error` (unique here) apply.
     wifiFieldsStyles,
+    dialogActionsRowStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -172,13 +174,6 @@ export class ESPHomeAdoptDialog extends LitElement {
       .checkbox-hint {
         font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
-      }
-
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-m) 0 var(--wa-space-l);
       }
 
       .btn {

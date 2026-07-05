@@ -13,7 +13,10 @@ import {
   localizeContext,
   versionContext,
 } from "../context/index.js";
-import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
+import {
+  dialogActionButtonStyles,
+  dialogActionsRowStyles,
+} from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { runBulkUpdate } from "../util/bulk-update.js";
@@ -83,6 +86,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
     espHomeStyles,
     dialogChromeStyles,
     dialogActionButtonStyles,
+    dialogActionsRowStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -104,13 +108,6 @@ export class ESPHomeUpdateAllDialog extends LitElement {
         padding: var(--wa-space-m) 0 0;
         font-size: var(--wa-font-size-s);
         color: var(--wa-color-text-quiet);
-      }
-
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-m) 0 var(--wa-space-l);
       }
     `,
   ];

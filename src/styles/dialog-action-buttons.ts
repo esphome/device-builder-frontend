@@ -66,3 +66,18 @@ export const dialogActionButtonStyles = css`
     cursor: not-allowed;
   }
 `;
+
+/**
+ * Standalone footer action-row wrapper: a right-aligned button row with
+ * the standard dialog-body padding. Sibling to ``dialogActionButtonStyles``
+ * so a dialog can adopt the shared ``.actions`` row without pulling in the
+ * ``.btn`` chrome (dialogs that self-style their buttons keep those local).
+ */
+export const dialogActionsRowStyles = css`
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-m) 0 var(--wa-space-l);
+  }
+`;

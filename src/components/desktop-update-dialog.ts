@@ -6,7 +6,10 @@ import type { ESPHomeAPI } from "../api/index.js";
 import type { DesktopComponentUpdate, DesktopUpdateCheck } from "../api/types/desktop.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
-import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
+import {
+  dialogActionButtonStyles,
+  dialogActionsRowStyles,
+} from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
 
@@ -40,6 +43,7 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
     espHomeStyles,
     dialogChromeStyles,
     dialogActionButtonStyles,
+    dialogActionsRowStyles,
     css`
       esphome-base-dialog {
         --width: 420px;
@@ -69,12 +73,6 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
       }
       .message.error {
         color: var(--wa-color-danger-fill-loud);
-      }
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-m) 0 var(--wa-space-l);
       }
     `,
   ];
