@@ -29,6 +29,7 @@ import {
   localizeContext,
   onboardingPendingContext,
 } from "../context/index.js";
+import { dropdownMenuStyles } from "../styles/dropdown-menu.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
@@ -128,7 +129,7 @@ export class ESPHomeHeaderActions extends LitElement {
   @state()
   private _desktopUpdateCapable = false;
 
-  static styles = [espHomeStyles, headerActionsStyles];
+  static styles = [espHomeStyles, dropdownMenuStyles, headerActionsStyles];
 
   connectedCallback(): void {
     super.connectedCallback();

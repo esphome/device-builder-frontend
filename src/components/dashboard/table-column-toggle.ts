@@ -4,6 +4,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -31,6 +32,7 @@ export class ESPHomeTableColumnToggle extends LitElement {
 
   static styles = [
     espHomeStyles,
+    dropdownMenuStyles,
     css`
       :host {
         display: block;
@@ -93,23 +95,22 @@ export class ESPHomeTableColumnToggle extends LitElement {
         }
       }
 
+      /* Base popover chrome comes from the shared dropdownMenuStyles
+         fragment; the rules below are this component's deltas and win
+         because this block sits after the shared one in the styles
+         array. This toggle's popover sits below the app dialogs, so
+         its layers use lower z-indexes than the shared 100/101. */
       .backdrop {
-        position: fixed;
-        inset: 0;
         z-index: 40;
       }
 
       .menu {
+        /* Anchored to the toggle button rather than the viewport. */
         position: absolute;
         right: 0;
         top: calc(100% + 4px);
         z-index: 50;
         min-width: 180px;
-        background: var(--wa-color-surface-raised);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-l);
-        box-shadow: var(--wa-shadow-l);
-        padding: var(--wa-space-xs) 0;
         animation: menu-in 0.15s ease-out;
       }
 
@@ -127,6 +128,10 @@ export class ESPHomeTableColumnToggle extends LitElement {
         }
       }
 
+      /* Redefines the shared menu-in on purpose: this menu slides down
+         from its anchor instead of scaling in. The last @keyframes
+         definition with a given name wins, and this block comes after
+         dropdownMenuStyles in the styles array. */
       @keyframes menu-in {
         from {
           opacity: 0;
@@ -153,20 +158,11 @@ export class ESPHomeTableColumnToggle extends LitElement {
         margin: var(--wa-space-2xs) 0;
       }
 
+      /* Tighter rows than the shared .menu-item: these are compact
+         checkbox rows, not icon-labelled actions. */
       .menu-item {
-        display: flex;
-        align-items: center;
         gap: var(--wa-space-xs);
         padding: 6px var(--wa-space-m);
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-normal);
-        cursor: pointer;
-        transition: background 0.1s;
-        user-select: none;
-      }
-
-      .menu-item:hover {
-        background: var(--esphome-tint);
       }
 
       .checkbox {
