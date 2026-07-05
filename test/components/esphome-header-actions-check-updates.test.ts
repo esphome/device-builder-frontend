@@ -36,4 +36,19 @@ describe("header-actions Check for updates visibility", () => {
     const el = await renderOpenMenu(false);
     expect(el.shadowRoot!.querySelector('wa-icon[name="update"]')).toBeNull();
   });
+
+  it("dispatches open-check-updates and closes the menu on click", async () => {
+    const el = await renderOpenMenu(true);
+    let fired = false;
+    el.addEventListener("open-check-updates", () => {
+      fired = true;
+    });
+    const item = el
+      .shadowRoot!.querySelector('wa-icon[name="update"]')!
+      .closest<HTMLElement>(".menu-item");
+    item!.click();
+    expect(fired).toBe(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._open).toBe(false);
+  });
 });
