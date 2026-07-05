@@ -291,8 +291,11 @@ function lineToOffsets(
     const end = Math.min(start + 1, info.to);
     return { from: start, to: end > start ? end : info.to };
   }
-  // No column → underline the whole line content (skip leading whitespace
-  // for a tighter visual).
+  // No column → underline the whole line content, skipping the leading
+  // space indent for a tighter visual. Spaces-only on purpose: a leading
+  // tab is invalid YAML, and yamllint reports it with its own precise
+  // column, so this fallback rarely sees one; when it does, the underline
+  // simply starts at the offending tab instead of after it.
   const text = info.text;
   const from = info.from + indentOf(text);
   return { from, to: info.to };
