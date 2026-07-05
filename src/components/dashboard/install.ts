@@ -40,9 +40,7 @@ export function openCommand(
   port?: string,
   options?: { bootloader?: boolean }
 ): void {
-  host._commandDialog.configuration = device.configuration;
-  host._commandDialog.name = device.friendly_name || device.name;
-  host._commandDialog.open(type, port ? { port, ...options } : options);
+  host._commandDialog.openForDevice(device, type, { port, ...options });
 }
 
 export function showJobProgress(

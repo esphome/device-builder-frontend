@@ -73,7 +73,7 @@ export interface ConfiguredDevice {
   queued_update?: boolean;
   /** esp32 whose `ota: platform: esphome` sets `allow_partition_access` —
    *  the YAML half of the OTA bootloader-update gate (see
-   *  `canFlashBootloader` for the deployed-firmware half). */
+   *  `util/bootloader-flash.ts` for the deployed-firmware half). */
   ota_partition_access?: boolean;
   /**
    * 8-char hex hash of the YAML as last successfully compiled,

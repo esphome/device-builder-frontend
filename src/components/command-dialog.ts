@@ -214,6 +214,17 @@ export class ESPHomeCommandDialog extends LitElement {
     }
   }
 
+  /** Point the dialog at *device* and open — the shared host entry point. */
+  public openForDevice(
+    device: ConfiguredDevice,
+    type: CommandType,
+    options?: { port?: string; bootloader?: boolean }
+  ) {
+    this.configuration = device.configuration;
+    this.name = device.friendly_name || device.name;
+    this.open(type, options);
+  }
+
   public open(type: CommandType, options?: { port?: string; bootloader?: boolean }) {
     this._commandType = type;
     this._port = options?.port ?? "OTA";

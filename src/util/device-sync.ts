@@ -24,13 +24,3 @@ export const showPendingChanges = (d: ConfiguredDevice): boolean =>
 
 export const showUpdateAvailable = (d: ConfiguredDevice): boolean =>
   d.update_available === true && mdnsOnline(d);
-
-// Whether the install dialog offers the OTA bootloader-update action. Two
-// halves: the YAML enables partition access (``ota_partition_access``), and
-// the running firmware was built from that config (hash match) — the
-// device-side OTA handler only exists when the flag was compiled in, so a
-// device still running a pre-flag build would reject the flash.
-export const canFlashBootloader = (d: ConfiguredDevice): boolean =>
-  d.ota_partition_access === true &&
-  !!d.deployed_config_hash &&
-  d.deployed_config_hash === d.expected_config_hash;

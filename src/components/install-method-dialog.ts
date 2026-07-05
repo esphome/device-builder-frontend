@@ -462,7 +462,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         <div class="advanced-panel-content">
           ${this._renderOtaAddressCard()}
           ${
-            this.mode === "install" && this.canFlashBootloader
+            this.mode === "install" &&
+            this.canFlashBootloader &&
+            this.deviceState === DeviceState.ONLINE
               ? this._renderBootloaderOption()
               : nothing
           }
@@ -476,26 +478,18 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * OTA bootloader update — flashes the second-stage bootloader instead
    * of the app (the "Bootloader too old for OTA rollback" warning's fix
    * without a USB cable). Rendered only when the host says the device
-   * can accept it; the device must be online for the flash to land.
+   * can accept it and it's online for the flash to land.
    */
   private _renderBootloaderOption() {
-    const enabled = this.deviceState === DeviceState.ONLINE;
     return html`
-      <div
-        class="option ${!enabled ? "option--disabled" : ""}"
-        @click=${enabled ? () => this._selectMethod("bootloader") : undefined}
-      >
+      <div class="option" @click=${() => this._selectMethod("bootloader")}>
         <wa-icon library="mdi" name="chip"></wa-icon>
         <div class="info">
           <span class="title"
             >${this._localize("dashboard.install_method_bootloader")}</span
           >
           <span class="desc"
-            >${this._localize(
-              enabled
-                ? "dashboard.install_method_bootloader_desc"
-                : "dashboard.install_method_bootloader_desc_offline"
-            )}</span
+            >${this._localize("dashboard.install_method_bootloader_desc")}</span
           >
         </div>
       </div>

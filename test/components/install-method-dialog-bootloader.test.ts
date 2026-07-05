@@ -64,18 +64,11 @@ describe("install-method dialog bootloader option", () => {
     expect(bootloaderRow(dialog)).toBeNull();
   });
 
-  it("is disabled while the device is offline", async () => {
+  it("is hidden while the device is offline", async () => {
     const dialog = await mount({
       canFlashBootloader: true,
       deviceState: DeviceState.OFFLINE,
     });
-    const row = bootloaderRow(dialog);
-    expect(row).not.toBeNull();
-    expect(row!.classList.contains("option--disabled")).toBe(true);
-
-    const selected = vi.fn();
-    dialog.addEventListener("select-method", selected);
-    row!.click();
-    expect(selected).not.toHaveBeenCalled();
+    expect(bootloaderRow(dialog)).toBeNull();
   });
 });
