@@ -7,17 +7,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ESPHomeHeaderActions } from "../../src/components/esphome-header-actions.js";
-
-async function renderOpenMenu(dashboardRoute: boolean): Promise<ESPHomeHeaderActions> {
-  const el = new ESPHomeHeaderActions();
-  el.dashboardRoute = dashboardRoute;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._open = true;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { renderOpenHeaderMenu } from "./_esphome-header-actions-helpers.js";
 
 describe("header-actions Archived Devices visibility", () => {
   afterEach(() => {
@@ -25,14 +15,14 @@ describe("header-actions Archived Devices visibility", () => {
   });
 
   it("renders the Archived Devices entry on the dashboard route", async () => {
-    const el = await renderOpenMenu(true);
+    const el = await renderOpenHeaderMenu({ dashboardRoute: true });
     expect(
       el.shadowRoot!.querySelector('wa-icon[name="archive-outline"]')
     ).not.toBeNull();
   });
 
   it("hides the Archived Devices entry off the dashboard route", async () => {
-    const el = await renderOpenMenu(false);
+    const el = await renderOpenHeaderMenu({ dashboardRoute: false });
     expect(el.shadowRoot!.querySelector('wa-icon[name="archive-outline"]')).toBeNull();
   });
 });

@@ -9,15 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OPEN_COMMAND_PALETTE_EVENT } from "../../src/components/command-palette-actions.js";
 import { ESPHomeHeaderActions } from "../../src/components/esphome-header-actions.js";
-
-async function renderOpenMenu(): Promise<ESPHomeHeaderActions> {
-  const el = new ESPHomeHeaderActions();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._open = true;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { renderOpenHeaderMenu } from "./_esphome-header-actions-helpers.js";
 
 function searchItem(el: ESPHomeHeaderActions): HTMLElement {
   return el.shadowRoot!.querySelector('wa-icon[name="magnify"]')!
@@ -30,13 +22,13 @@ describe("header-actions Search item", () => {
   });
 
   it("renders the Search item with a shortcut hint", async () => {
-    const el = await renderOpenMenu();
+    const el = await renderOpenHeaderMenu();
     expect(el.shadowRoot!.querySelector('wa-icon[name="magnify"]')).not.toBeNull();
     expect(el.shadowRoot!.querySelector(".menu-item-shortcut")).not.toBeNull();
   });
 
   it("fires the open-palette event and closes the menu on click", async () => {
-    const el = await renderOpenMenu();
+    const el = await renderOpenHeaderMenu();
     const listener = vi.fn();
     window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, listener);
 

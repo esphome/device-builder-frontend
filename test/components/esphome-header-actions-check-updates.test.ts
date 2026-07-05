@@ -7,20 +7,10 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ESPHomeHeaderActions } from "../../src/components/esphome-header-actions.js";
+import { renderOpenHeaderMenu } from "./_esphome-header-actions-helpers.js";
 
-async function renderOpenMenu(
-  desktopUpdateCapable: boolean
-): Promise<ESPHomeHeaderActions> {
-  const el = new ESPHomeHeaderActions();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._desktopUpdateCapable = desktopUpdateCapable;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._open = true;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const renderOpenMenu = (desktopUpdateCapable: boolean) =>
+  renderOpenHeaderMenu({ _desktopUpdateCapable: desktopUpdateCapable });
 
 describe("header-actions Check for updates visibility", () => {
   afterEach(() => {
