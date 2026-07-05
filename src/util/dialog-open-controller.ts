@@ -31,6 +31,10 @@ export class DialogOpenController implements ReactiveController {
     _host.addController(this);
   }
 
+  // Intentionally empty. ``ReactiveController``'s hooks are all optional,
+  // which makes it a weak type: TypeScript rejects a class sharing no
+  // members with it (TS2559 at ``implements``, TS2345 at
+  // ``addController(this)``), so one no-op hook must stay.
   hostConnected(): void {}
 
   get open(): boolean {
