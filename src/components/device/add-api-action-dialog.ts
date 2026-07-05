@@ -21,6 +21,7 @@ import type { AutomationLocation, AutomationTree } from "../../api/types/automat
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { formFieldStyles } from "../../styles/form-fields.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeEspHomeId } from "../../util/esphome-id.js";
@@ -60,18 +61,13 @@ export class ESPHomeAddApiActionDialog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    formFieldStyles,
     css`
       esphome-base-dialog {
         --width: 480px;
       }
       esphome-base-dialog::part(body) {
         padding: var(--wa-space-l);
-      }
-      .intro {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        margin: 0 0 var(--wa-space-m) 0;
-        line-height: 1.5;
       }
       .intro code {
         font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -84,14 +80,6 @@ export class ESPHomeAddApiActionDialog extends LitElement {
         display: flex;
         flex-direction: column;
         gap: var(--wa-space-2xs);
-      }
-      .field-label {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
-        color: var(--wa-color-text-normal);
-      }
-      .required {
-        color: var(--esphome-error, #d92d20);
       }
       .actions {
         display: flex;
@@ -142,11 +130,6 @@ export class ESPHomeAddApiActionDialog extends LitElement {
         cursor: not-allowed;
         box-shadow: none;
         transform: none;
-      }
-      .error {
-        color: var(--esphome-error, #d92d20);
-        font-size: var(--wa-font-size-2xs);
-        margin-top: var(--wa-space-2xs);
       }
     `,
   ];

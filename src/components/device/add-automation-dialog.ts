@@ -34,6 +34,7 @@ import type {
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { formFieldStyles } from "../../styles/form-fields.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -107,7 +108,12 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   @state() private _saving = false;
   @state() private _error = "";
 
-  static styles = [espHomeStyles, inputStyles, addAutomationDialogStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    formFieldStyles,
+    addAutomationDialogStyles,
+  ];
 
   /**
    * Open the dialog. With no argument, behaves as the navigator's

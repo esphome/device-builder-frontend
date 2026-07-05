@@ -4,8 +4,9 @@ import { css } from "lit";
  * Styles for <esphome-add-automation-dialog>. Extracted from the
  * component file to keep it under the repo's file-size cap (see
  * README → "Code structure policies"). The component pulls these
- * in via its ``static styles`` array alongside ``espHomeStyles`` and
- * ``inputStyles``.
+ * in via its ``static styles`` array alongside ``espHomeStyles``,
+ * ``inputStyles`` and ``formFieldStyles`` (which supplies the shared
+ * .intro / .field-label / .required / .error rules).
  */
 export const addAutomationDialogStyles = css`
   esphome-base-dialog {
@@ -19,11 +20,6 @@ export const addAutomationDialogStyles = css`
     flex-direction: column;
     gap: var(--wa-space-2xs);
     margin-bottom: var(--wa-space-m);
-  }
-  .field-label {
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-semibold);
-    color: var(--wa-color-text-normal);
   }
   .field-desc {
     font-size: var(--wa-font-size-2xs);
@@ -83,17 +79,6 @@ export const addAutomationDialogStyles = css`
     cursor: not-allowed;
     box-shadow: none;
     transform: none;
-  }
-  .error {
-    color: var(--esphome-error, #d92d20);
-    font-size: var(--wa-font-size-2xs);
-    margin-top: var(--wa-space-2xs);
-  }
-  .intro {
-    font-size: var(--wa-font-size-s);
-    color: var(--wa-color-text-quiet);
-    margin: 0 0 var(--wa-space-m) 0;
-    line-height: 1.5;
   }
   /* Interval-row pairing: matches the editor's inline
      TIME_PERIOD layout so the dialog reads as the same
