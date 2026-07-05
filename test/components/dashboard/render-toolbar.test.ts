@@ -37,7 +37,7 @@ describe("renderSearchInput", () => {
   });
 
   it("hides the clear button for a whitespace-only query", () => {
-    const container = renderInto(renderSearchInput(makeHost({ _search: " " })));
+    const container = renderInto(renderSearchInput(makeHost({ _search: "   " })));
     expect(container.querySelector(".search-clear")).toBeNull();
   });
 
