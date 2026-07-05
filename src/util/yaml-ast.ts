@@ -189,9 +189,14 @@ export function getTopLevelKey(state: EditorState, pos: number): string | null {
  * fields directly under the component.
  */
 export function getKeyPath(state: EditorState, pos: number): string[] {
-  return getKeyPathWithListIndices(state, pos).filter(
-    (s): s is string => typeof s === "string"
-  );
+  const keys: string[] = [];
+  let cur = findEnclosingPair(resolveAnchoredNode(state, pos));
+  while (cur) {
+    const k = getPairKey(state, cur);
+    if (k) keys.push(k);
+    cur = findEnclosingPair(cur.parent?.parent ?? null);
+  }
+  return keys.reverse();
 }
 
 /**
@@ -205,17 +210,7 @@ export function getKeyPathWithListIndices(
   pos: number
 ): (string | number)[] {
   const segs: (string | number)[] = [];
-  const tree = syntaxTree(state);
-  let node: SyntaxNode | null = tree.resolveInner(pos, -1);
-  if (!findEnclosingPair(node)) {
-    // A cursor in an empty value / trailing whitespace (``key: ``) resolves to
-    // the document root, not the pair. Re-anchor on the line's last non-space
-    // char (the ``:`` or key) so a nested ``key: `` still yields its path.
-    const line = state.doc.lineAt(pos);
-    const upto = line.text.slice(0, pos - line.from).trimEnd();
-    if (upto) node = tree.resolveInner(line.from + upto.length - 1, -1);
-  }
-  for (; node; node = node.parent) {
+  for (let node = resolveAnchoredNode(state, pos); node; node = node.parent) {
     if (node.name === "Pair") {
       const k = getPairKey(state, node);
       if (k) segs.push(k);
@@ -228,6 +223,22 @@ export function getKeyPathWithListIndices(
     }
   }
   return segs.reverse();
+}
+
+/**
+ * The deepest node at *pos*, re-anchored for the empty-value case: a
+ * cursor in an empty value / trailing whitespace (``key: ``) resolves to
+ * the document root, not the pair, so re-resolve on the line's last
+ * non-space char (the ``:`` or key) when *pos* has no enclosing pair.
+ */
+function resolveAnchoredNode(state: EditorState, pos: number): SyntaxNode | null {
+  const tree = syntaxTree(state);
+  const node: SyntaxNode | null = tree.resolveInner(pos, -1);
+  if (findEnclosingPair(node)) return node;
+  const line = state.doc.lineAt(pos);
+  const upto = line.text.slice(0, pos - line.from).trimEnd();
+  if (!upto) return node;
+  return tree.resolveInner(line.from + upto.length - 1, -1);
 }
 
 /**
