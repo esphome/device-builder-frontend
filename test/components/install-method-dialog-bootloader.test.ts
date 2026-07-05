@@ -2,8 +2,8 @@
  * @vitest-environment happy-dom
  *
  * The "Update bootloader" advanced option renders only when the host says the
- * device can accept it (canFlashBootloader), only in install mode, and is
- * disabled while the device isn't online.
+ * device can accept it (canFlashBootloader), only in install mode, and only
+ * while the device is online.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
