@@ -37,8 +37,19 @@ try {
   translationsLib = require("./translations-lib.ts");
 } catch (err) {
   // `engines` is only an install-time warning, so an unsupported Node still
-  // reaches this require and dies with an opaque loader error (unknown `.ts`
-  // extension or an ESM require failure). Name the actual floor instead.
+  // reaches this require and dies with an opaque loader error. Rephrase only
+  // the known loader/version failures: unknown `.ts` extension, require(esm)
+  // unavailable, or the CJS loader parsing unstripped TypeScript syntax as
+  // JavaScript (a bare SyntaxError; translations-lib.ts itself is
+  // syntax-checked by tsc and its unit tests, so a SyntaxError here means
+  // the loader). Anything else is a real bug and rethrows untouched.
+  const isLoaderFailure =
+    (err && err.code === "ERR_UNKNOWN_FILE_EXTENSION") ||
+    (err && err.code === "ERR_REQUIRE_ESM") ||
+    err instanceof SyntaxError;
+  if (!isLoaderFailure) {
+    throw err;
+  }
   throw new Error(
     `Loading build-scripts/translations-lib.ts failed on Node ${process.version}; ` +
       "this script needs Node >= 22.18 (native TypeScript type stripping and require(esm)).",
@@ -49,14 +60,16 @@ const { BASE_LANGUAGE, localeCompleteness, toBcp47 } = translationsLib;
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const TRANSLATIONS_DIR = path.join(ROOT_DIR, "src", "translations");
-const OUTPUT_DIR = path.join(ROOT_DIR, "src", "generated");
-const OUTPUT_FILE = path.join(OUTPUT_DIR, "language-manifest.json");
+const OUTPUT_FILE = path.join(ROOT_DIR, "src", "generated", "language-manifest.json");
 
 // Placeholder shown when a locale file lacks a translated `flag` key (the
 // runtime picker uses the same white-flag fallback).
 const FLAG_FALLBACK = "🏳️";
 
-function generate() {
+// `outputFile` is overridable (CLI arg below) so tests can write to a temp
+// directory instead of the real src/generated file; every repo entry point
+// (build/dev/lint/test setup) uses the default.
+function generate(outputFile = OUTPUT_FILE) {
   const entries = fs
     .readdirSync(TRANSLATIONS_DIR)
     .filter((name) => name.endsWith(".json"))
@@ -78,16 +91,19 @@ function generate() {
     };
   }
 
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  fs.writeFileSync(OUTPUT_FILE, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+  fs.writeFileSync(outputFile, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
   return manifest;
 }
 
 module.exports = { generate };
 
 if (require.main === module) {
-  const manifest = generate();
+  const outputFile = process.argv[2]
+    ? path.resolve(process.argv[2])
+    : OUTPUT_FILE;
+  const manifest = generate(outputFile);
   console.log(
-    `Wrote ${path.relative(ROOT_DIR, OUTPUT_FILE)} (${Object.keys(manifest).join(", ")})`
+    `Wrote ${path.relative(ROOT_DIR, outputFile)} (${Object.keys(manifest).join(", ")})`
   );
 }
