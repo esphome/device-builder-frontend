@@ -25,15 +25,21 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
   return false;
 }
 
+/** Matches a list-index segment in a value path (areas.0.id). */
+const INDEX_SEGMENT_RE = /^\d+$/;
+
 /**
  * Whether the entry at *path* — or any NESTED ancestor along it — is
  * `advanced`. Used to reveal a section's hidden advanced fields when the
- * caret follows to one. Returns false if the path doesn't resolve.
+ * caret or a backend error lands on one. List-index segments are skipped:
+ * the schema nests an item's fields directly under the list entry, with
+ * no index level. Returns false if the path doesn't resolve.
  */
 export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean {
   let level = entries;
   let advanced = false;
   for (const key of path) {
+    if (INDEX_SEGMENT_RE.test(key)) continue;
     const entry = level.find((e) => e.key === key);
     if (!entry) return false;
     if (entry.advanced) advanced = true;

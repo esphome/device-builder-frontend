@@ -216,14 +216,13 @@ export function trimRangeToContent(
  * ESPHome marks "Component not found" / "Platform missing" on the block's
  * value mapping, so a multi-line range spans the children. Walk it up to
  * the first less-indented `key:` line (clamp to the first line if none).
- * Single-line content (after blank-spill trimming) passes through
- * untouched — it's already precise.
+ * Expects a range already trimmed with trimRangeToContent, so single-line
+ * content passes through untouched — it's already precise.
  */
 export function retargetBlockDiagnostic(
   doc: Text,
   fallback: { from: number; to: number }
 ): { from: number; to: number } {
-  fallback = trimRangeToContent(doc, fallback);
   const startLine = doc.lineAt(fallback.from);
   if (doc.lineAt(fallback.to).number === startLine.number) return fallback;
 

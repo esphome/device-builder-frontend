@@ -104,6 +104,25 @@ describe("device-section-config — backend field errors", () => {
     expect(inner._showAdvanced).toBe(true);
   });
 
+  it("reveals advanced settings across nested list indices in the error path", () => {
+    const inner = makeHost(instanceErrors({ "pin.0.id": "bad id" }));
+    // Schema nests an item's fields directly under the list entry, so the
+    // numeric segment must not break the advanced walk.
+    inner._config = {
+      entries: [
+        {
+          key: "pin",
+          type: ConfigEntryType.NESTED,
+          label: "pin",
+          advanced: true,
+          config_entries: [entry("id")],
+        } as ConfigEntry,
+      ],
+    };
+    inner._revealAdvancedForErrors(new Map([["backendErrors", undefined]]));
+    expect(inner._showAdvanced).toBe(true);
+  });
+
   it("does not reveal advanced settings for a plain-field error", () => {
     const inner = makeHost(instanceErrors({ update_interval: "x" }));
     inner._revealAdvancedForErrors(new Map([["backendErrors", undefined]]));
