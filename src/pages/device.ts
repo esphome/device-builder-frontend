@@ -520,6 +520,10 @@ export class ESPHomePageDevice extends LitElement {
       this._loadedBoardId = null;
       this._board = null;
       this._platformReady = false;
+      // Don't carry the prior device's error badges: the diagnostics
+      // handler ignores results for other configurations, so these
+      // would linger until the new device's first lint pass.
+      this._backendErrors = [];
       this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board
