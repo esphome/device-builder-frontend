@@ -14,6 +14,7 @@ import type {
   ConditionNode,
   YamlDiff,
 } from "../../../api/types/automations.js";
+import { isIndexSegment } from "../../../util/nested-values.js";
 
 /** Build a fresh empty automation tree (add-mode initial state). */
 export function emptyAutomationTree(): AutomationTree {
@@ -107,7 +108,7 @@ export function swap<T>(arr: T[], i: number, j: number): T[] {
  * the wrong entry.
  */
 function parseListIndex(part: string): number | null {
-  return /^\d+$/.test(part) ? Number(part) : null;
+  return isIndexSegment(part) ? Number(part) : null;
 }
 
 /**

@@ -32,6 +32,15 @@ export function setIn(
   return { ...obj, [head]: _newChild(obj[head], rest, value) };
 }
 
+const INDEX_SEGMENT_RE = /^\d+$/;
+
+/** Whether a dotted-path segment is a list index (``areas.0.id``'s ``0``).
+ *  The one definition every path walker shares, so "what counts as an
+ *  index segment" can't drift between them. */
+export function isIndexSegment(segment: string): boolean {
+  return INDEX_SEGMENT_RE.test(segment);
+}
+
 /**
  * Parse a path segment as a non-negative integer index into an
  * array. Returns ``null`` for non-numeric, negative, or fractional

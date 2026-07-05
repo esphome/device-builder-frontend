@@ -11,6 +11,7 @@
  */
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { isIndexSegment } from "./nested-values.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 import { splitInlineComment, stripQuotes } from "./yaml-scalar.js";
@@ -20,9 +21,6 @@ import {
   LIST_ITEM_START_RE,
   TOP_LEVEL_KEY_RE,
 } from "./yaml-section-lexer.js";
-
-/** A field-path segment that addresses a list index (``["areas","0",…]``). */
-const RE_PATH_INDEX = /^\d+$/;
 
 export interface YamlSection {
   key: string;
@@ -420,7 +418,7 @@ export function findFieldLine(
     // list (first content line a dash); otherwise it's a literal numeric
     // mapping key (a ``0:`` substitution) and falls through to the key match.
     // A compact block-sequence value deeper in a mapping must not flip this.
-    if (RE_PATH_INDEX.test(seg) && _levelIsList(lines, lo, hi, baseIndent)) {
+    if (isIndexSegment(seg) && _levelIsList(lines, lo, hi, baseIndent)) {
       const dashes = _dashesAtIndent(lines, lo, hi, baseIndent);
       const itemLo = dashes[Number(seg)];
       if (itemLo === undefined) return null;

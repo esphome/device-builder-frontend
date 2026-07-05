@@ -12,42 +12,48 @@ vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
-import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
 import { onValueChange } from "../../../src/components/device/device-section-config/draft-and-delete.js";
-import type { InstanceBackendErrors } from "../../../src/util/backend-field-errors.js";
-import type { ValidationError } from "../../../src/util/config-validation.js";
+import {
+  backendErrorsForInstance,
+  type InstanceBackendErrors,
+} from "../../../src/util/backend-field-errors.js";
+import { makeEntry } from "./_renderer-fixtures.js";
 
-const entry = (key: string, advanced = false): ConfigEntry =>
-  ({ key, type: ConfigEntryType.STRING, label: key, advanced }) as ConfigEntry;
+const SECTION = "sensor.dht";
 
-const backendError = (path: string, message: string): ValidationError => ({
-  key: path,
-  code: "validation.backend",
-  params: { message },
-});
-
+/** Build the prop the page would derive, through the production selector. */
 function instanceErrors(fields: Record<string, string>): InstanceBackendErrors {
-  return {
-    fields: new Map(
-      Object.entries(fields).map(([path, msg]) => [path, backendError(path, msg)])
-    ),
-    fieldMessages: Object.values(fields),
-    sectionMessages: [],
-  };
+  return backendErrorsForInstance(
+    Object.entries(fields).map(([relPath, message]) => ({
+      sectionKey: SECTION,
+      fromLine: 1,
+      relPath,
+      message,
+    })),
+    SECTION,
+    1
+  );
 }
 
 function makeHost(backendErrors: InstanceBackendErrors) {
   const c = new ESPHomeDeviceSectionConfig();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inner = c as any;
-  inner.sectionKey = "sensor.dht";
-  inner._config = { entries: [entry("update_interval"), entry("pin", true)] };
+  inner.sectionKey = SECTION;
+  inner._config = {
+    entries: [
+      makeEntry(ConfigEntryType.STRING, { key: "update_interval" }),
+      makeEntry(ConfigEntryType.STRING, { key: "pin", advanced: true }),
+    ],
+  };
   inner.backendErrors = backendErrors;
   inner._scheduleDraftFlush = vi.fn();
   return inner;
 }
+
+const backendErrorsChanged = () => new Map([["backendErrors", undefined]]);
 
 describe("device-section-config — backend field errors", () => {
   it("merges backend errors into the form's error map", () => {
@@ -57,8 +63,8 @@ describe("device-section-config — backend field errors", () => {
       inner._clearedBackendPaths,
       inner._fieldErrors
     );
-    expect(merged.get("update_interval")).toEqual(
-      backendError("update_interval", "bad interval")
+    expect(merged.get("update_interval")).toBe(
+      inner.backendErrors.fields.get("update_interval")
     );
   });
 
@@ -93,14 +99,14 @@ describe("device-section-config — backend field errors", () => {
 
     // A fresh lint pass replaces the prop; willUpdate drops the
     // suppression so a still-broken value regains its error.
-    inner.willUpdate(new Map([["backendErrors", undefined]]));
+    inner.willUpdate(backendErrorsChanged());
     expect(inner._clearedBackendPaths.size).toBe(0);
   });
 
   it("reveals hidden advanced settings when a backend error lands there", () => {
     const inner = makeHost(instanceErrors({ pin: "pin broken" }));
     expect(inner._showAdvanced).toBe(false);
-    inner._revealAdvancedForErrors(new Map([["backendErrors", undefined]]));
+    inner._revealAdvancedForErrors(backendErrorsChanged());
     expect(inner._showAdvanced).toBe(true);
   });
 
@@ -110,31 +116,29 @@ describe("device-section-config — backend field errors", () => {
     // numeric segment must not break the advanced walk.
     inner._config = {
       entries: [
-        {
+        makeEntry(ConfigEntryType.NESTED, {
           key: "pin",
-          type: ConfigEntryType.NESTED,
-          label: "pin",
           advanced: true,
-          config_entries: [entry("id")],
-        } as ConfigEntry,
+          config_entries: [makeEntry(ConfigEntryType.STRING, { key: "id" })],
+        }),
       ],
     };
-    inner._revealAdvancedForErrors(new Map([["backendErrors", undefined]]));
+    inner._revealAdvancedForErrors(backendErrorsChanged());
     expect(inner._showAdvanced).toBe(true);
   });
 
   it("does not reveal advanced settings for a plain-field error", () => {
     const inner = makeHost(instanceErrors({ update_interval: "x" }));
-    inner._revealAdvancedForErrors(new Map([["backendErrors", undefined]]));
+    inner._revealAdvancedForErrors(backendErrorsChanged());
     expect(inner._showAdvanced).toBe(false);
   });
 
   it("does not reopen advanced settings after a deliberate collapse", () => {
     const inner = makeHost(instanceErrors({ pin: "pin broken" }));
-    inner._revealAdvancedForErrors(new Map([["backendErrors", undefined]]));
+    inner._revealAdvancedForErrors(backendErrorsChanged());
     expect(inner._showAdvanced).toBe(true);
     inner._setShowAdvanced(false);
-    inner._revealAdvancedForErrors(new Map([["backendErrors", undefined]]));
+    inner._revealAdvancedForErrors(backendErrorsChanged());
     expect(inner._showAdvanced).toBe(false);
   });
 });

@@ -523,7 +523,7 @@ export class ESPHomePageDevice extends LitElement {
       // Don't carry the prior device's error badges: the diagnostics
       // handler ignores results for other configurations, so these
       // would linger until the new device's first lint pass.
-      this._backendErrors = [];
+      if (this._backendErrors.length) this._backendErrors = [];
       this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board

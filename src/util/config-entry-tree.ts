@@ -7,6 +7,7 @@
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import type { ValidationError } from "./config-validation.js";
+import { isIndexSegment } from "./nested-values.js";
 
 /** True when `entries` contains any advanced entry, recursively. Drives whether
  *  the advanced-settings control shows at all: a nested advanced field reveals
@@ -25,9 +26,6 @@ export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
   return false;
 }
 
-/** Matches a list-index segment in a value path (areas.0.id). */
-const INDEX_SEGMENT_RE = /^\d+$/;
-
 /**
  * Whether the entry at *path* — or any NESTED ancestor along it — is
  * `advanced`. Used to reveal a section's hidden advanced fields when the
@@ -39,7 +37,7 @@ export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean 
   let level = entries;
   let advanced = false;
   for (const key of path) {
-    if (INDEX_SEGMENT_RE.test(key)) continue;
+    if (isIndexSegment(key)) continue;
     const entry = level.find((e) => e.key === key);
     if (!entry) return false;
     if (entry.advanced) advanced = true;

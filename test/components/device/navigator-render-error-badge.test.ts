@@ -15,14 +15,8 @@ import {
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
 
-function section(key: string, fromLine: number, platform?: string): YamlSection {
-  return {
-    key,
-    fromLine,
-    toLine: fromLine + 2,
-    parentKey: platform ? key : undefined,
-    platform,
-  } as unknown as YamlSection;
+function section(key: string, fromLine: number): YamlSection {
+  return { key, fromLine, toLine: fromLine + 2 };
 }
 
 const row = (item: YamlSection): NavRow => ({ item, labels: { primary: item.key } });
@@ -58,7 +52,7 @@ function badges(view: NavSectionView) {
 
 describe("navigator error badge", () => {
   it("renders a labeled count pill on an errored row", () => {
-    const errored = section("sensor", 9, "dht");
+    const errored = section("sensor", 9);
     const clean = section("wifi", 4);
     const view = makeView({
       rows: [row(errored), row(clean)],
@@ -76,8 +70,8 @@ describe("navigator error badge", () => {
   });
 
   it("sums the rows onto a collapsed subgroup header", () => {
-    const a = section("sensor", 9, "dht");
-    const b = section("sensor", 12, "dht");
+    const a = section("sensor", 9);
+    const b = section("sensor", 12);
     const view = makeView({
       rows: [row(a), row(b)],
       groups: [{ key: "sensor", rows: [row(a), row(b)] }],
@@ -90,10 +84,10 @@ describe("navigator error badge", () => {
   });
 
   it("leaves an expanded subgroup header unbadged; rows carry their own", () => {
-    const a = section("sensor", 9, "dht");
+    const a = section("sensor", 9);
     const view = makeView({
       rows: [row(a)],
-      groups: [{ key: "sensor", rows: [row(a), row(section("sensor", 12, "dht"))] }],
+      groups: [{ key: "sensor", rows: [row(a), row(section("sensor", 12))] }],
       collapsedGroups: new Set(),
       errorCount: (item) => (item.fromLine === 9 ? 1 : 0),
     });
