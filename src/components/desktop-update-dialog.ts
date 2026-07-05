@@ -188,6 +188,10 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
     if (!check) {
       return nothing;
     }
+    const anyError =
+      check.app.error !== null ||
+      check.esphome.error !== null ||
+      check.device_builder.error !== null;
     return html`
       ${this._componentRow("desktop_update_dialog.component_app", check.app)}
       ${this._componentRow("desktop_update_dialog.component_esphome", check.esphome)}
@@ -196,7 +200,9 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
         check.device_builder
       )}
       ${
-        !check.any_available
+        // Only claim "everything is up to date" when nothing is available AND
+        // no component's check failed (a failed row must not read as up to date).
+        !check.any_available && !anyError
           ? html`<div class="message" role="status">
               ${this._localize("desktop_update_dialog.all_up_to_date")}
             </div>`

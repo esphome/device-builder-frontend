@@ -1065,7 +1065,7 @@
     "update_now": "Update now",
     "component_app": "ESPHome Desktop",
     "component_esphome": "ESPHome",
-    "component_device_builder": "Device builder"
+    "component_device_builder": "Device Builder"
   },
   "update_all_dialog": {
     "title": "Update All",
