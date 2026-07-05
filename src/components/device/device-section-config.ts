@@ -388,17 +388,16 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // regression). Zero-entries sections also fall back here.
     const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
 
-    // Backend messages the left pane must carry when the banner's pane is
-    // hidden: section-level ones always, and field-level ones too when
-    // there is no form to render them inline (yaml-only sections).
-    const sectionAlerts = this.yamlPaneVisible
-      ? []
-      : [
-          ...this.backendSectionMessages,
-          ...(yamlOnly
-            ? [...this.backendErrors.values()].map((e) => String(e.params?.message ?? ""))
-            : []),
-        ].filter(Boolean);
+    // Backend messages this pane must carry: section-level ones when the
+    // banner's pane is hidden, and field-mapped ones for yaml-only
+    // sections in every layout — with no form to render them inline,
+    // their only other surface is the squiggle hover.
+    const sectionAlerts = [
+      ...(this.yamlPaneVisible ? [] : this.backendSectionMessages),
+      ...(yamlOnly
+        ? [...this.backendErrors.values()].map((e) => String(e.params?.message ?? ""))
+        : []),
+    ].filter(Boolean);
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
 

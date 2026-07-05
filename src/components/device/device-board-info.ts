@@ -439,7 +439,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
       .yaml=${this.yaml}
       .board=${this.board}
       .boardName=${this.board?.name ?? ""}
-      ?yamlPaneVisible=${this.yamlPaneVisible}
+      .yamlPaneVisible=${this.yamlPaneVisible}
     ></esphome-device-section-config>`;
   }
 

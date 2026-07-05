@@ -335,7 +335,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 .backendErrors=${this.backendErrors}
                 .backendSectionMessages=${this.backendSectionMessages}
                 .justCreated=${this.justCreated}
-                ?yamlPaneVisible=${effectiveLayout !== "left"}
+                .yamlPaneVisible=${effectiveLayout !== "left"}
                 @show-yaml-editor=${this._onShowYamlEditor}
               ></esphome-device-board-info>
             </div>
