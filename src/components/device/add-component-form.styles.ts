@@ -128,18 +128,16 @@ export const addComponentFormStyles = css`
     padding-top: var(--wa-space-m);
   }
 
+  /* Deltas over the shared .btn chrome (dialogActionButtonStyles,
+     layered before this module in the host's static styles): icon +
+     label sit inline-centred, disabled applies to every variant (this
+     form's variants are .btn-primary / .btn-secondary, not the shared
+     modifier classes), and the opacity change is animated. */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: var(--esphome-button-padding);
-    border-radius: var(--wa-border-radius-m);
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
-    font-family: inherit;
-    cursor: pointer;
-    border: none;
     transition:
       background 0.12s,
       opacity 0.12s;

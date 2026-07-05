@@ -10,6 +10,7 @@ import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
+import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -41,6 +42,9 @@ export class ESPHomeSelectBar extends LitElement {
 
   static styles = [
     espHomeStyles,
+    // Shared .btn / .btn--cancel / .btn--primary chrome; the local
+    // block below layers the bar-specific deltas on top.
+    dialogActionButtonStyles,
     css`
       @keyframes slide-in {
         from {
@@ -114,17 +118,13 @@ export class ESPHomeSelectBar extends LitElement {
         gap: var(--wa-space-s);
       }
 
+      /* Deltas over the shared .btn chrome: icon + label sit inline,
+         and every variant (not just --primary) greys out while a bulk
+         action is in flight, with the opacity change animated. */
       .btn {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: var(--esphome-button-padding);
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
         transition:
           background 0.12s,
           opacity 0.12s;
@@ -133,25 +133,6 @@ export class ESPHomeSelectBar extends LitElement {
       .btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-      }
-
-      .btn--cancel {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .btn--cancel:hover {
-        background: var(--wa-color-surface-border);
-      }
-
-      .btn--primary {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .btn--primary:hover:not(:disabled) {
-        background: var(--esphome-primary-hover);
       }
 
       .btn--danger {

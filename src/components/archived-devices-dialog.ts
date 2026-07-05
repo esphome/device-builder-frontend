@@ -6,6 +6,7 @@ import type { ESPHomeAPI } from "../api/index.js";
 import type { ArchivedDevice } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getErrorMessage } from "../util/error-message.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -60,6 +61,8 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    // Shared .btn / .btn--cancel chrome for the footer Close button.
+    dialogActionButtonStyles,
     css`
       esphome-base-dialog {
         --width: 560px;
@@ -212,26 +215,6 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
         justify-content: flex-end;
         gap: var(--wa-space-s);
         padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
-      }
-
-      .btn {
-        padding: var(--esphome-button-padding);
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-      }
-
-      .btn--cancel {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .btn--cancel:hover {
-        background: var(--wa-color-surface-border);
       }
     `,
   ];

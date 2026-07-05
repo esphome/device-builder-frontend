@@ -10,6 +10,7 @@ import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
@@ -140,7 +141,14 @@ export class ESPHomeAddComponentForm extends LitElement {
     () => this.board?.esphome.platform || undefined
   );
 
-  static styles = [espHomeStyles, inputStyles, addComponentFormStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    // Shared .btn base chrome; addComponentFormStyles layers this
+    // form's deltas (inline-flex layout, all-variant :disabled) on top.
+    dialogActionButtonStyles,
+    addComponentFormStyles,
+  ];
 
   // Memoized so the shared form's `.entries` identity is render-stable.
   private _overlayRequired = memoizeOne(overlayRequired);

@@ -77,25 +77,4 @@ export const changeBoardDialogStyles = css`
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
   }
-
-  .btn {
-    padding: var(--esphome-button-padding);
-    border-radius: var(--wa-border-radius-m);
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
-    font-family: inherit;
-    cursor: pointer;
-    border: none;
-    transition: background 0.12s;
-  }
-
-  .btn--cancel {
-    background: var(--wa-color-surface-lowered);
-    color: var(--wa-color-text-normal);
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-  }
-
-  .btn--cancel:hover {
-    background: var(--wa-color-surface-border);
-  }
 `;

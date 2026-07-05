@@ -3,7 +3,10 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
-import { dialogActionsRowStyles } from "../styles/dialog-action-buttons.js";
+import {
+  dialogActionButtonStyles,
+  dialogActionsRowStyles,
+} from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles, quietCloseButtonStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -56,6 +59,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     dialogChromeStyles,
     quietCloseButtonStyles,
     dialogActionsRowStyles,
+    dialogActionButtonStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -82,41 +86,6 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
         font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
         margin-top: var(--wa-space-2xs);
-      }
-
-      .btn {
-        padding: var(--esphome-button-padding);
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-        transition: background 0.12s;
-      }
-
-      .btn--cancel {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .btn--cancel:hover {
-        background: var(--wa-color-surface-border);
-      }
-
-      .btn--primary {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .btn--primary:hover:not(:disabled) {
-        background: var(--esphome-primary-hover);
-      }
-
-      .btn--primary:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
       }
 
       .field-error {

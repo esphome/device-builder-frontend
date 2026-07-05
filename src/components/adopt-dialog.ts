@@ -5,7 +5,10 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
-import { dialogActionsRowStyles } from "../styles/dialog-action-buttons.js";
+import {
+  dialogActionButtonStyles,
+  dialogActionsRowStyles,
+} from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -57,6 +60,7 @@ export class ESPHomeAdoptDialog extends LitElement {
     // spacing wins; only `.field-label` / `.error` (unique here) apply.
     wifiFieldsStyles,
     dialogActionsRowStyles,
+    dialogActionButtonStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -176,39 +180,16 @@ export class ESPHomeAdoptDialog extends LitElement {
         color: var(--wa-color-text-quiet);
       }
 
-      .btn {
-        padding: var(--esphome-button-padding);
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-        transition: background 0.12s;
-      }
-
-      .btn--cancel {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .btn--cancel:hover {
-        background: var(--wa-color-surface-border);
-      }
-
+      /* Adoption's commit affordance is success-green rather than the
+         standard primary tint (dialogActionButtonStyles); per that
+         module's guidance, divergent colour intents stay local. This
+         block sits after the shared fragment so it wins the cascade. */
       .btn--primary {
         background: var(--esphome-success);
-        color: var(--esphome-on-primary);
       }
 
       .btn--primary:hover:not(:disabled) {
         background: color-mix(in srgb, var(--esphome-success), black 10%);
-      }
-
-      .btn--primary:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
       }
 
       .field-error {
