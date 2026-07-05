@@ -2,7 +2,6 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose, mdiPackageVariantClosed } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
@@ -15,6 +14,7 @@ import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
 import { collectExistingIds } from "../../util/default-component-id.js";
 import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
@@ -657,7 +657,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       const message = addedAny
         ? this._localize("device.bundle_added", { name: bundle.name })
         : this._localize("device.bundle_already_present", { name: bundle.name });
-      toast.success(message, { richColors: true });
+      notifySuccess(message);
     } catch (err) {
       // A member failed mid-batch: publish what merged so far so the host keeps
       // the already-added members (the draft is otherwise only published on the
@@ -668,7 +668,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this._localize,
         "device.add_component_error"
       );
-      toast.error(this._submitError, { richColors: true });
+      notifyError(this._submitError);
     } finally {
       this._submitting = false;
     }
@@ -877,9 +877,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // Configless add skipped the form, so the close is the only
         // signal the add happened — toast to confirm.
         if (notify) {
-          toast.success(
-            this._localize("device.component_added", { name: componentName }),
-            { richColors: true }
+          notifySuccess(
+            this._localize("device.component_added", { name: componentName })
           );
         }
       }
@@ -893,7 +892,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       // would land in an otherwise-empty form view where it's easy to
       // miss — toast it too so the failure can't read as a silent no-op.
       if (notify) {
-        toast.error(this._submitError, { richColors: true });
+        notifyError(this._submitError);
       }
     } finally {
       this._submitting = false;

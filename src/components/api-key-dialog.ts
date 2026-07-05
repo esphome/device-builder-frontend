@@ -2,12 +2,12 @@ import { consume } from "@lit/context";
 import { mdiContentCopy, mdiEye, mdiEyeOff } from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
+import { notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -181,9 +181,7 @@ export class ESPHomeApiKeyDialog extends LitElement {
     // throws (HA-addon direct port, container-on-LAN deploys
     // reaching the dashboard via ``http://192.168.x.x:6052``).
     if (await copyToClipboard(this.apiKey)) {
-      toast.success(this._localize("dashboard.action_api_key_copied"), {
-        richColors: true,
-      });
+      notifySuccess(this._localize("dashboard.action_api_key_copied"));
     }
     // No failure toast here — the api-key dialog already
     // displays the key in plain text inside the dialog body,

@@ -10,7 +10,6 @@ import { consume } from "@lit/context";
 import { mdiAlert, mdiContentCopy } from "@mdi/js";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -19,6 +18,7 @@ import {
   ensureSecretWithToast,
   setSecretWithToast,
 } from "../../util/ensure-secret-with-toast.js";
+import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { isSharedSecret, secretValueFromYaml } from "../../util/secret-eligibility.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
@@ -332,9 +332,7 @@ export class ESPHomeSecretValue extends LitElement {
       value = secretValueFromYaml(yaml, this.secretKey);
     } catch {
       failed = true;
-      toast.error(this._localize("device.secret_picker_reveal_error"), {
-        richColors: true,
-      });
+      notifyError(this._localize("device.secret_picker_reveal_error"));
     }
     // A newer load (or target change) superseded this one — it now owns
     // `_loading`, so don't clear it or apply this stale result.
@@ -358,7 +356,7 @@ export class ESPHomeSecretValue extends LitElement {
 
   private _copy = async (): Promise<void> => {
     if (await copyToClipboard(this._draftValue)) {
-      toast.success(this._localize("device.secret_reveal_copied"), { richColors: true });
+      notifySuccess(this._localize("device.secret_reveal_copied"));
     }
   };
 

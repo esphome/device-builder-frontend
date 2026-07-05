@@ -1,5 +1,4 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -7,6 +6,7 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
+import { notifyError } from "../../../util/notify.js";
 import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
 
 /** Debounce window between a value change and the auto-apply upsert.
@@ -316,9 +316,8 @@ export class AutoApplyController implements ReactiveController {
     const msg =
       err instanceof Error ? err.message : localize("device.automation_save_error");
     this._options.setError(msg);
-    toast.error(localize("device.automation_save_error"), {
+    notifyError(localize("device.automation_save_error"), {
       description: msg,
-      richColors: true,
     });
   }
 

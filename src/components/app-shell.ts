@@ -57,6 +57,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { isExpert } from "../util/experience.js";
+import { notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
@@ -356,12 +357,11 @@ export class ESPHomeApp extends LitElement {
       }
       this._portToastMs.set(port, now);
     }
-    toast.info(this._localize("layout.usb_device_connected"), {
+    notifyInfo(this._localize("layout.usb_device_connected"), {
       // Stable id so multiple connect events collapse onto the same
       // toast instead of stacking — defence in depth on top of the
       // time-window suppression above.
       id: "esphome-usb-device-connected",
-      richColors: true,
       duration: 8000,
       action: {
         label: this._localize("layout.usb_device_setup"),

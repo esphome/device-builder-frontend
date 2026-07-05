@@ -8,7 +8,6 @@ import { mdiAlertCircleOutline, mdiClose, mdiPlus } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { live } from "lit/directives/live.js";
-import toast from "sonner-js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { devicesContext, localizeContext } from "../../context/index.js";
@@ -17,6 +16,7 @@ import { modalDialogStyles } from "../../styles/modal-dialog.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { navigate } from "../../util/navigation.js";
+import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { secretHostSlug } from "../../util/secret-eligibility.js";
 import {
@@ -387,7 +387,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
   // edit is visible rather than a silent no-op.
   private _emit(value: string | null) {
     if (value === null) {
-      toast.error(this._localize("secrets.edit_out_of_sync"), { richColors: true });
+      notifyError(this._localize("secrets.edit_out_of_sync"));
       this.requestUpdate();
       return;
     }

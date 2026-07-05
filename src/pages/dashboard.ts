@@ -15,7 +15,6 @@ import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
@@ -115,6 +114,7 @@ import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
 import { normalizeUpdateBuckets } from "../util/facets.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
+import { notifyInfo } from "../util/notify.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { consumePendingSerialSetup } from "../util/pending-serial-setup.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -938,7 +938,7 @@ export class ESPHomePageDashboard extends LitElement {
 
   _deleteSelected = () => {
     if (this._selectedDevices.size === 0) {
-      toast.info(this._localize("dashboard.delete_all_none"), { richColors: true });
+      notifyInfo(this._localize("dashboard.delete_all_none"));
       return;
     }
     this._openConfirm({ kind: "delete-bulk" });
@@ -946,7 +946,7 @@ export class ESPHomePageDashboard extends LitElement {
 
   _archiveSelected = () => {
     if (this._selectedDevices.size === 0) {
-      toast.info(this._localize("dashboard.archive_all_none"), { richColors: true });
+      notifyInfo(this._localize("dashboard.archive_all_none"));
       return;
     }
     this._openConfirm({ kind: "archive-bulk" });

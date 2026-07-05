@@ -1,4 +1,4 @@
-import toast from "sonner-js";
+import { notifyError, notifyInfo } from "./notify.js";
 
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -26,13 +26,10 @@ export async function runBulkUpdate(
   ctx: BulkUpdateContext
 ): Promise<void> {
   if (configurations.length === 0) {
-    toast.info(ctx.localize("layout.update_all_none"), { richColors: true });
+    notifyInfo(ctx.localize("layout.update_all_none"));
     return;
   }
-  toast.info(
-    ctx.localize("layout.update_all_started", { count: configurations.length }),
-    { richColors: true }
-  );
+  notifyInfo(ctx.localize("layout.update_all_started", { count: configurations.length }));
   try {
     await ctx.api.firmwareInstallBulk(configurations);
   } catch (err) {
@@ -45,14 +42,13 @@ export async function runBulkUpdate(
       // ``{local}`` placeholder and misattribute the bucket; fall through
       // to the generic toast.
       const reason = classifyNoCompatiblePeerReason(ctx.pairings, ctx.appVersion);
-      toast.error(
+      notifyError(
         ctx.localize(`layout.update_all_no_compatible_peer_${reason}`, {
           local: ctx.appVersion,
-        }),
-        { richColors: true }
+        })
       );
     } else {
-      toast.error(ctx.localize("layout.update_all_error"), { richColors: true });
+      notifyError(ctx.localize("layout.update_all_error"));
     }
   }
 }

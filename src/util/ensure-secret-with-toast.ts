@@ -1,6 +1,6 @@
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { notify, notifyError, notifySuccess } from "./notify.js";
 import { refreshSecretKeys } from "./secrets-cache.js";
 import { ensureSecretInYaml, setSecretInYaml } from "./secrets-write.js";
 
@@ -25,7 +25,7 @@ async function writeWithToast(
     return true;
   } catch (err) {
     console.error(logLabel, err);
-    toast.error(localize(errorKey), { richColors: true });
+    notifyError(localize(errorKey));
     return false;
   }
 }
@@ -41,9 +41,8 @@ export function ensureSecretWithToast(
 ): Promise<boolean> {
   return writeWithToast(api, messages.errorKey, messages.logLabel, localize, async () => {
     const { created } = await ensureSecretInYaml(api, key, value);
-    toast[created ? "success" : "info"](
-      localize(created ? messages.createdKey : "device.secret_picker_linked", { key }),
-      { richColors: true }
+    notify[created ? "success" : "info"](
+      localize(created ? messages.createdKey : "device.secret_picker_linked", { key })
     );
   });
 }
@@ -58,6 +57,6 @@ export function setSecretWithToast(
 ): Promise<boolean> {
   return writeWithToast(api, messages.errorKey, messages.logLabel, localize, async () => {
     await setSecretInYaml(api, key, value);
-    toast.success(localize(messages.savedKey, { key }), { richColors: true });
+    notifySuccess(localize(messages.savedKey, { key }));
   });
 }

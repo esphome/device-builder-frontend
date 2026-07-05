@@ -24,7 +24,6 @@ import { consume } from "@lit/context";
 import { mdiCheck, mdiPlus } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -38,6 +37,7 @@ import {
   labelChipStyleString,
 } from "../../util/label-style.js";
 import { isLabelNameDuplicate } from "../../util/label-usage.js";
+import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { labelFormStyles } from "./label-form.styles.js";
 
@@ -521,11 +521,10 @@ export class ESPHomeLabelForm extends LitElement {
       }
     } catch (err) {
       console.warn(editing ? "label update failed" : "label create failed", err);
-      toast.error(
+      notifyError(
         this._localize(
           editing ? "dashboard.labels_update_failed" : "dashboard.labels_create_failed"
-        ),
-        { richColors: true }
+        )
       );
     } finally {
       this._saving = false;

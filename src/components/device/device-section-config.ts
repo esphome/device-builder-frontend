@@ -10,7 +10,6 @@ import {
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -27,6 +26,7 @@ import { defaultBoardImageUrl, onBoardImageError } from "../../util/board-image.
 import { pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import { parseYamlAutomations, type YamlSection } from "../../util/yaml-sections.js";
@@ -685,9 +685,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         err instanceof Error
           ? err.message
           : this._localize("device.automation_save_error");
-      toast.error(this._localize("device.automation_save_error"), {
+      notifyError(this._localize("device.automation_save_error"), {
         description: msg,
-        richColors: true,
       });
     } finally {
       this._deletingRow = "";

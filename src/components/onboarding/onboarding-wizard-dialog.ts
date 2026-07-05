@@ -8,7 +8,6 @@ import {
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import { ExperienceLevel } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -18,6 +17,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { onChoiceGroupKeydown, renderChoiceCard, rovingTabbable } from "./choice-card.js";
@@ -321,7 +321,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     } catch (err) {
       // Prefs already landed; a failed ack only re-pops the wizard next load.
       console.warn("Failed to mark onboarding acknowledged:", err);
-      toast.warning(this._localize("onboarding.wizard.ack_failed"), { richColors: true });
+      notifyWarning(this._localize("onboarding.wizard.ack_failed"));
     }
     this._exitedExplicitly = true;
     this._emitAcknowledged();

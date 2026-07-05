@@ -24,7 +24,6 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import memoizeOne from "memoize-one";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -38,6 +37,7 @@ import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js"
 import { dialogChromeStyles } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { labelChipStyles, renderLabelChip } from "../../util/label-chip-template.js";
+import { notifyError, notifyInfo, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import "../base-dialog.js";
 import { labelsListStyles } from "./labels-list-styles.js";
@@ -488,9 +488,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       // reconcile dropped the last remaining entry). Acknowledge
       // the click with an info toast so the dialog vanishing
       // doesn't read as a failed action, then clear pending state.
-      toast.info(this._localize("dashboard.labels_bulk_no_changes"), {
-        richColors: true,
-      });
+      notifyInfo(this._localize("dashboard.labels_bulk_no_changes"));
       this._pendingChanges = new Map();
       this._failedConfigurations = null;
       this.close();
@@ -513,9 +511,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       if (gen !== this._applyGeneration) return;
       const failures = results.filter((r) => !r.success);
       if (failures.length === 0) {
-        toast.success(this._localize("dashboard.labels_bulk_saved", { count }), {
-          richColors: true,
-        });
+        notifySuccess(this._localize("dashboard.labels_bulk_saved", { count }));
         // Full success clears the retry-narrow filter so a future
         // re-open via the bulk button would target the whole new
         // selection rather than the previous failure subset.
@@ -546,24 +542,20 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         // the user is seeing.
         const succeeded = count - failures.length;
         if (succeeded > 0) {
-          toast.success(
-            this._localize("dashboard.labels_bulk_saved", { count: succeeded }),
-            { richColors: true }
+          notifySuccess(
+            this._localize("dashboard.labels_bulk_saved", { count: succeeded })
           );
         }
-        toast.error(
+        notifyError(
           this._localize("dashboard.labels_bulk_save_failed", {
             count: failures.length,
-          }),
-          { richColors: true }
+          })
         );
       }
     } catch (err) {
       if (gen !== this._applyGeneration) return;
       console.warn("set_labels_bulk failed", err);
-      toast.error(this._localize("dashboard.labels_bulk_save_failed", { count }), {
-        richColors: true,
-      });
+      notifyError(this._localize("dashboard.labels_bulk_save_failed", { count }));
     } finally {
       // Only clear ``_saving`` if we're still the active session —
       // a generation bump means a new ``open()`` call already reset

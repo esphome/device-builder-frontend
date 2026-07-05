@@ -18,7 +18,6 @@ import { consume } from "@lit/context";
 import { mdiLockAlert } from "@mdi/js";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -26,6 +25,7 @@ import { apiContext, devicesContext, localizeContext } from "../../context/index
 import { espHomeStyles } from "../../styles/shared.js";
 import { generateApiEncryptionKey } from "../../util/api-encryption-key.js";
 import { resolveDeviceName } from "../../util/device-name.js";
+import { notifyError, notifySuccess } from "../../util/notify.js";
 import { generatePassphrase } from "../../util/passphrase.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { recommendedSecretKeys } from "../../util/secret-eligibility.js";
@@ -239,14 +239,12 @@ export class ESPHomeSecurityNotice extends LitElement {
           composed: true,
         })
       );
-      toast.success(this._localize("device.security_applied"), { richColors: true });
+      notifySuccess(this._localize("device.security_applied"));
     } catch (err) {
       // ensureSecretInYaml aborts (throws) on a read failure rather than
       // clobbering secrets.yaml; log the cause and leave the config untouched.
       console.error("Security secret generation failed", err);
-      toast.error(this._localize(`device.${setting.copyPrefix}_error`), {
-        richColors: true,
-      });
+      notifyError(this._localize(`device.${setting.copyPrefix}_error`));
     } finally {
       this._generating = false;
     }

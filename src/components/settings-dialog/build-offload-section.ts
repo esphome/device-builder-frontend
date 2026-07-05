@@ -2,7 +2,7 @@ import { consume } from "@lit/context";
 import { mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
+import { notify, notifyError, notifySuccess } from "../../util/notify.js";
 
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
@@ -441,19 +441,17 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     // preview_pair and re-opens the wizard with the new
     // observed pin).
     if (e.detail.outcome === "success") {
-      toast.success(
+      notifySuccess(
         this._localize("settings.reauth_repair_success", {
           label: e.detail.receiver_label,
-        }),
-        { richColors: true }
+        })
       );
       return;
     }
-    toast.error(
+    notifyError(
       this._localize("settings.reauth_repair_pin_changed", {
         label: e.detail.receiver_label,
-      }),
-      { richColors: true }
+      })
     );
   };
 
@@ -534,7 +532,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     key: string,
     values?: Record<string, string | number>
   ) {
-    toast[level](this._localize(key, values), { richColors: true });
+    notify[level](this._localize(key, values));
   }
 }
 

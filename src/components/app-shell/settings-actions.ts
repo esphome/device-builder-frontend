@@ -1,4 +1,3 @@
-import toast from "sonner-js";
 import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
 import type { RemoteBuildSubmitTarget } from "../../api/types/firmware-jobs.js";
 import {
@@ -13,6 +12,7 @@ import {
   type SupportedLocale,
   writeStoredLocale,
 } from "../../common/localize.js";
+import { notifyError } from "../../util/notify.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { patchOffloadPairing } from "./events.js";
 
@@ -44,7 +44,7 @@ async function optimisticSetting<T>(
     set(previous);
     if (warn) console.warn(warn, err);
     if (toastKey) {
-      toast.error(host._localize(toastKey), { richColors: true });
+      notifyError(host._localize(toastKey));
     }
   } finally {
     inFlight?.(false);
@@ -166,9 +166,7 @@ export async function onSetRemoteBuildCleanupTtl(
     requested < CLEANUP_TTL_MIN_SECONDS ||
     requested > CLEANUP_TTL_MAX_SECONDS
   ) {
-    toast.error(host._localize("settings.remote_build_save_failed"), {
-      richColors: true,
-    });
+    notifyError(host._localize("settings.remote_build_save_failed"));
     return;
   }
   const previous = host._remoteBuildCleanupTtl;
@@ -182,9 +180,7 @@ export async function onSetRemoteBuildCleanupTtl(
     });
   } catch {
     host._remoteBuildCleanupTtl = previous;
-    toast.error(host._localize("settings.remote_build_save_failed"), {
-      richColors: true,
-    });
+    notifyError(host._localize("settings.remote_build_save_failed"));
   } finally {
     host._remoteBuildSetInFlight = false;
   }
@@ -245,9 +241,7 @@ export async function onSetOffloaderPairingEnabled(
     if (previous !== undefined) {
       patchOffloadPairing(host, pin_sha256, { enabled: previous });
     }
-    toast.error(host._localize("settings.remote_build_save_failed"), {
-      richColors: true,
-    });
+    notifyError(host._localize("settings.remote_build_save_failed"));
   } finally {
     host._offloaderWritesInFlight -= 1;
   }

@@ -2,7 +2,6 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import { apiErrorDetails } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
@@ -16,6 +15,7 @@ import { fetchBoard, getCachedBoard } from "../../util/board-body-cache.js";
 import { buildFeaturedId } from "../../util/featured-id.js";
 import { featuredComponentName, fullSetupComponentIds } from "../../util/full-setup.js";
 import { markJustCreated } from "../../util/just-created.js";
+import { notifyWarning } from "../../util/notify.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -599,7 +599,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     // recommended components need finishing, capped so the toast stays short.
     if (skipped.length > 0) {
       const shown = 3;
-      toast.warning(
+      notifyWarning(
         this._localize("wizard.full_setup_partial", {
           // count drives the singular/plural wording; names/extra list the
           // skipped components, capped. Older count-only Lokalise strings
@@ -607,8 +607,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
           count: skipped.length,
           names: skipped.slice(0, shown).join(", "),
           extra: Math.max(0, skipped.length - shown),
-        }),
-        { richColors: true }
+        })
       );
     }
   }

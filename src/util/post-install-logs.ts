@@ -1,9 +1,9 @@
-import toast from "sonner-js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { OTA_PORT } from "../components/logs-session.js";
 import { resolveLogBaudRate } from "./log-baud-rate.js";
+import { notifyError } from "./notify.js";
 import { isPortPickerCancel, SERIAL_ACTIVITY_WINDOW_MS } from "./web-serial.js";
 
 // Reopen budget for a port closed by the post-install reset: covers the
@@ -68,7 +68,7 @@ export async function reconnectWebSerialLogs(
   } catch {
     const message = localize("dashboard.logs_web_serial_open_failed");
     logsDialog.setSerialOpenFailed(message);
-    toast.error(message, { richColors: true });
+    notifyError(message);
     return;
   }
   if (!port) {
@@ -256,7 +256,7 @@ export async function attachSerialLogStream(
         port: formatSerialPortLabel(port),
       });
       logsDialog.setSerialOpenFailed(message);
-      toast.error(message, { richColors: true });
+      notifyError(message);
       return;
     }
     port = live;
@@ -285,7 +285,7 @@ export async function handlePostInstallShowLogs(
     const baudRate = resolveLogBaudRate(loggerBaudRate);
     if (baudRate === null) {
       // logger: baud_rate: 0 — UART logging disabled; the port would be silent.
-      toast.error(localize("dashboard.logs_serial_disabled"), { richColors: true });
+      notifyError(localize("dashboard.logs_serial_disabled"));
       return;
     }
     logsDialog.openPassive({

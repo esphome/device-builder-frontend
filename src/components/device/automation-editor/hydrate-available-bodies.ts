@@ -1,4 +1,4 @@
-import toast from "sonner-js";
+import { notifyError } from "../../../util/notify.js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -151,9 +151,7 @@ export function resolveLoadedAvailable(
   const { missingBody, missingField, rejected } = outcome.hydration;
   const failures = missingBody + missingField + rejected;
   if (failures > 0) {
-    toast.error(localize("device.automation_partial_hydration", { count: failures }), {
-      richColors: true,
-    });
+    notifyError(localize("device.automation_partial_hydration", { count: failures }));
   }
   return { available: outcome.available };
 }

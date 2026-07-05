@@ -1,4 +1,3 @@
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type {
   AdoptableDevice,
@@ -12,6 +11,7 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
 import { resolveLogBaudRate } from "../../util/log-baud-rate.js";
+import { notifyError, notifySuccess } from "../../util/notify.js";
 import {
   attachSerialLogStream,
   reconnectWebSerialLogs,
@@ -30,35 +30,30 @@ export async function executeFriendlyName(
     result = await host._api.editFriendlyName(device.configuration, newFriendlyName);
   } catch (err) {
     const reason = getErrorMessage(err);
-    toast.error(
+    notifyError(
       host._localize("dashboard.action_friendly_name_failed", {
         name: device.name,
         reason,
-      }),
-      { richColors: true }
+      })
     );
     return;
   }
   if (!result.rewritten) {
-    toast.success(host._localize("dashboard.action_friendly_name_unchanged"), {
-      richColors: true,
-    });
+    notifySuccess(host._localize("dashboard.action_friendly_name_unchanged"));
     return;
   }
   if (!install) {
-    toast.success(
+    notifySuccess(
       host._localize("dashboard.action_friendly_name_success", {
         name: newFriendlyName,
-      }),
-      { richColors: true }
+      })
     );
     return;
   }
-  toast.success(
+  notifySuccess(
     host._localize("dashboard.action_friendly_name_success", {
       name: newFriendlyName,
-    }),
-    { richColors: true }
+    })
   );
   host._openInstallMethod(device);
 }
@@ -75,18 +70,15 @@ export async function executeClone(
     await host._api.cloneDevice(device.configuration, newName, friendly);
   } catch (err) {
     const reason = getErrorMessage(err);
-    toast.error(
+    notifyError(
       host._localize("dashboard.action_clone_failed", {
         name: device.name,
         reason,
-      }),
-      { richColors: true }
+      })
     );
     return;
   }
-  toast.success(host._localize("dashboard.action_clone_success", { name: newName }), {
-    richColors: true,
-  });
+  notifySuccess(host._localize("dashboard.action_clone_success", { name: newName }));
 }
 
 export async function executeRename(
@@ -120,12 +112,11 @@ export async function performRename(
     response = await host._api.renameDevice(device.configuration, newName, configOnly);
   } catch (err) {
     const reason = getErrorMessage(err);
-    toast.error(
+    notifyError(
       host._localize("dashboard.action_rename_failed", {
         name: device.name,
         reason,
-      }),
-      { richColors: true }
+      })
     );
     return;
   }
@@ -144,9 +135,7 @@ export async function performRename(
     );
     return;
   }
-  toast.success(host._localize("dashboard.action_rename_success", { name: newName }), {
-    richColors: true,
-  });
+  notifySuccess(host._localize("dashboard.action_rename_success", { name: newName }));
 }
 
 export async function toggleIgnore(
@@ -157,14 +146,13 @@ export async function toggleIgnore(
     await host._api.ignoreDevice(device.name, !device.ignored);
   } catch {
     const name = device.friendly_name || device.name;
-    toast.error(
+    notifyError(
       host._localize(
         device.ignored
           ? "dashboard.action_unignore_failed"
           : "dashboard.action_ignore_failed",
         { name }
-      ),
-      { richColors: true }
+      )
     );
   }
 }
@@ -181,9 +169,7 @@ export async function deleteLabel(
     }
   } catch (err) {
     console.warn("label delete failed", err);
-    toast.error(host._localize("dashboard.labels_delete_failed"), {
-      richColors: true,
-    });
+    notifyError(host._localize("dashboard.labels_delete_failed"));
   }
 }
 
@@ -203,17 +189,13 @@ export async function openLogsWithMethod(
     host._logsDialog.open(port);
   } else if (method === "web-serial") {
     if (!("serial" in navigator)) {
-      toast.error(host._localize("dashboard.logs_web_serial_unsupported"), {
-        richColors: true,
-      });
+      notifyError(host._localize("dashboard.logs_web_serial_unsupported"));
       return;
     }
     const baudRate = resolveLogBaudRate(device.logger_baud_rate);
     if (baudRate === null) {
       // logger: baud_rate: 0 — UART logging is disabled; serial would be silent.
-      toast.error(host._localize("dashboard.logs_serial_disabled"), {
-        richColors: true,
-      });
+      notifyError(host._localize("dashboard.logs_serial_disabled"));
       return;
     }
     let serialPort: SerialPort | null;
@@ -222,9 +204,7 @@ export async function openLogsWithMethod(
     } catch {
       // The user picked a port but it couldn't open (claimed by another tab,
       // driver error); unlike a picker dismissal this needs feedback.
-      toast.error(host._localize("dashboard.logs_web_serial_open_failed"), {
-        richColors: true,
-      });
+      notifyError(host._localize("dashboard.logs_web_serial_open_failed"));
       return;
     }
     if (!serialPort) return; // User dismissed the port picker.
@@ -241,9 +221,7 @@ export async function openLogsWithMethod(
     try {
       await attachSerialLogStream(serialPort, host._logsDialog, host._localize, baudRate);
     } catch {
-      toast.error(host._localize("dashboard.logs_web_serial_open_failed"), {
-        richColors: true,
-      });
+      notifyError(host._localize("dashboard.logs_web_serial_open_failed"));
     }
   }
 }

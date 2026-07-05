@@ -8,7 +8,6 @@ import {
 } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -23,6 +22,7 @@ import {
   type SecretsLayout,
 } from "../util/editor-layout.js";
 import { setLeaveGuard } from "../util/navigation.js";
+import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SaveShortcutController } from "../util/save-shortcut-controller.js";
 import { parseSecretsEntries } from "../util/secrets-entries.js";
@@ -452,13 +452,11 @@ export class ESPHomePageSecrets extends LitElement {
       );
     }
     if (saved) {
-      toast.success(this._localize("secrets.saved"), { richColors: true });
+      notifySuccess(this._localize("secrets.saved"));
       return true;
     }
     const base = this._localize("secrets.save_error");
-    toast.error(errorDetail ? `${base}: ${errorDetail}` : base, {
-      richColors: true,
-    });
+    notifyError(errorDetail ? `${base}: ${errorDetail}` : base);
     return false;
   }
 }

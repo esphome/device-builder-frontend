@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
+import { notify } from "../../util/notify.js";
 
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
@@ -286,7 +286,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
     key: string,
     values?: Record<string, string | number>
   ) {
-    toast[level](this._localize(key, values), { richColors: true });
+    notify[level](this._localize(key, values));
   }
 }
 

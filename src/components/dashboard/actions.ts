@@ -1,4 +1,3 @@
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
@@ -8,6 +7,7 @@ import { withBase } from "../../util/base-path.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { ESPHomeLogParser, isLikelyGarbageLine } from "../../util/esphome-log-parser.js";
+import { notifyError, notifySuccess } from "../../util/notify.js";
 import {
   connectToPort,
   detectChip,
@@ -41,9 +41,7 @@ export async function archiveDevice(
     await api.archiveDevice(device.configuration);
   } catch (err) {
     const error = getErrorMessage(err);
-    toast.error(localize("dashboard.action_archive_failed", { name, error }), {
-      richColors: true,
-    });
+    notifyError(localize("dashboard.action_archive_failed", { name, error }));
     return false;
   }
   /* The toast carries the discoverability hint for unarchive —
@@ -52,9 +50,8 @@ export async function archiveDevice(
      devices entry lives in the header kebab; spelling it out
      in the success toast saves a "where did my device go?"
      support thread. */
-  toast.success(localize("dashboard.action_archive_success", { name }), {
+  notifySuccess(localize("dashboard.action_archive_success", { name }), {
     description: localize("dashboard.action_archive_success_hint"),
-    richColors: true,
     duration: 8000,
   });
   return true;
@@ -71,14 +68,10 @@ export async function clearQueuedUpdate(
     await api.firmwareClearQueuedUpdate(device.configuration);
   } catch (err) {
     const error = getErrorMessage(err);
-    toast.error(localize("dashboard.queued_update_clear_failed", { name, error }), {
-      richColors: true,
-    });
+    notifyError(localize("dashboard.queued_update_clear_failed", { name, error }));
     return;
   }
-  toast.success(localize("dashboard.queued_update_cleared", { name }), {
-    richColors: true,
-  });
+  notifySuccess(localize("dashboard.queued_update_cleared", { name }));
 }
 
 /**
@@ -104,14 +97,10 @@ export async function unarchiveDevice(
     await api.unarchiveDevice(device.configuration);
   } catch (err) {
     const error = getErrorMessage(err);
-    toast.error(localize("dashboard.action_unarchive_failed", { name, error }), {
-      richColors: true,
-    });
+    notifyError(localize("dashboard.action_unarchive_failed", { name, error }));
     return false;
   }
-  toast.success(localize("dashboard.action_unarchive_success", { name }), {
-    richColors: true,
-  });
+  notifySuccess(localize("dashboard.action_unarchive_success", { name }));
   return true;
 }
 
@@ -131,14 +120,10 @@ export async function deleteArchivedDevice(
     await api.deleteArchivedDevice(device.configuration);
   } catch (err) {
     const error = getErrorMessage(err);
-    toast.error(localize("dashboard.action_delete_archived_failed", { name, error }), {
-      richColors: true,
-    });
+    notifyError(localize("dashboard.action_delete_archived_failed", { name, error }));
     return false;
   }
-  toast.success(localize("dashboard.action_delete_archived_success", { name }), {
-    richColors: true,
-  });
+  notifySuccess(localize("dashboard.action_delete_archived_success", { name }));
   return true;
 }
 
@@ -151,10 +136,10 @@ export async function deleteDevice(
   try {
     await api.deleteDevice(device.configuration);
   } catch {
-    toast.error(localize("dashboard.delete_failed", { name }), { richColors: true });
+    notifyError(localize("dashboard.delete_failed", { name }));
     return false;
   }
-  toast.success(localize("dashboard.deleted", { name }), { richColors: true });
+  notifySuccess(localize("dashboard.deleted", { name }));
   return true;
 }
 
@@ -179,14 +164,14 @@ async function runBulkAction(
     catchAllKey: string;
     successKey: string;
     failureKey: string;
-    successOptions?: Parameters<typeof toast.success>[1];
+    successOptions?: Parameters<typeof notifySuccess>[1];
   }
 ) {
   let results: BulkActionResult[];
   try {
     results = await call(configurations);
   } catch {
-    toast.error(localize(copy.catchAllKey), { richColors: true });
+    notifyError(localize(copy.catchAllKey));
     return;
   }
 
@@ -194,10 +179,7 @@ async function runBulkAction(
   const failed = results.filter((r) => !r.success);
 
   if (succeeded > 0) {
-    toast.success(localize(copy.successKey, { count: succeeded }), {
-      richColors: true,
-      ...copy.successOptions,
-    });
+    notifySuccess(localize(copy.successKey, { count: succeeded }), copy.successOptions);
   }
   // Index by configuration up front so failure-toast naming is
   // O(failures) instead of O(failures × devices) on big selections.
@@ -213,9 +195,8 @@ async function runBulkAction(
     // the failure toasts read like ``Failed to archive "kitchen": ``
     // (dangling colon) because ``action_archive_failed`` /
     // ``action_unarchive_failed`` interpolate ``{error}`` directly.
-    toast.error(
-      localize(copy.failureKey, { name, error: result.error || fallbackError }),
-      { richColors: true }
+    notifyError(
+      localize(copy.failureKey, { name, error: result.error || fallbackError })
     );
   }
 }
@@ -285,9 +266,7 @@ export async function downloadYaml(
       : `${device.configuration}.yaml`;
     a.click();
   } catch {
-    toast.error(localize("dashboard.action_download_yaml_failed", { name }), {
-      richColors: true,
-    });
+    notifyError(localize("dashboard.action_download_yaml_failed", { name }));
   } finally {
     if (url) {
       URL.revokeObjectURL(url);
@@ -350,11 +329,10 @@ export async function detectAndOpenWizard(
 
     if (recognized && options.onRecognized) {
       if (options.localize) {
-        toast.success(
+        notifySuccess(
           options.localize("dashboard.serial_recognized", {
             name: recognized.friendly_name || recognized.name,
-          }),
-          { richColors: true }
+          })
         );
       }
       options.onRecognized(recognized);
@@ -365,11 +343,10 @@ export async function detectAndOpenWizard(
       const board = await fetchBoard(api, manifest.board_id);
       if (board) {
         if (options.localize) {
-          toast.success(
+          notifySuccess(
             options.localize("dashboard.serial_starterkit_detected", {
               name: board.name,
-            }),
-            { richColors: true }
+            })
           );
         }
         createDialog.openWithBoard(board);
@@ -387,11 +364,10 @@ export async function detectAndOpenWizard(
     // opens so the user can pick a board by hand, but a real connect
     // failure gets named instead of vanishing (#1414).
     if (!isPortPickerCancel(err) && options.localize) {
-      toast.error(
+      notifyError(
         options.localize("dashboard.serial_connect_failed", {
           error: getErrorMessage(err),
-        }),
-        { richColors: true }
+        })
       );
     }
     createDialog.open("board");

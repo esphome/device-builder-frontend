@@ -13,7 +13,6 @@ import {
 } from "@mdi/js";
 import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
@@ -21,6 +20,7 @@ import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
+import { notifyError } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
@@ -483,9 +483,7 @@ export class ESPHomeLogsDialog extends LitElement {
       // don't double-toast.
       if (this._session.kind !== "reconnecting") return;
       this._session = { kind: "dead" };
-      toast.error(this._localize("dashboard.logs_web_serial_open_failed"), {
-        richColors: true,
-      });
+      notifyError(this._localize("dashboard.logs_web_serial_open_failed"));
     });
   }
 
@@ -577,7 +575,7 @@ export class ESPHomeLogsDialog extends LitElement {
     } catch {
       // setSignals fails if the cable was pulled; tell the user the reset didn't
       // land rather than letting them assume the device rebooted.
-      toast.error(this._localize("dashboard.logs_reset_failed"), { richColors: true });
+      notifyError(this._localize("dashboard.logs_reset_failed"));
     }
   };
 

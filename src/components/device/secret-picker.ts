@@ -18,13 +18,13 @@ import {
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { ensureSecretWithToast } from "../../util/ensure-secret-with-toast.js";
 import { navigate } from "../../util/navigation.js";
+import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { secretValueFromYaml, visibleSecretKeys } from "../../util/secret-eligibility.js";
 import {
@@ -452,9 +452,7 @@ export class ESPHomeSecretPicker extends LitElement {
     } catch {
       // Keep the `!secret` reference rather than replacing it with a blank
       // literal a save would persist as an empty credential; surface the error.
-      toast.error(this._localize("device.secret_picker_manual_error"), {
-        richColors: true,
-      });
+      notifyError(this._localize("device.secret_picker_manual_error"));
     }
   }
 

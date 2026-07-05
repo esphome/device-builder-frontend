@@ -14,7 +14,7 @@ import { consume } from "@lit/context";
 import { mdiClose } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import toast from "sonner-js";
+import { notifyError } from "../../util/notify.js";
 
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { AutomationLocation, AutomationTree } from "../../api/types/automations.js";
@@ -270,9 +270,8 @@ export class ESPHomeAddApiActionDialog extends LitElement {
           ? err.message
           : this._localize("device.automation_save_error");
       this._error = msg;
-      toast.error(this._localize("device.automation_save_error"), {
+      notifyError(this._localize("device.automation_save_error"), {
         description: msg,
-        richColors: true,
       });
     } finally {
       this._saving = false;

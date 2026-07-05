@@ -27,7 +27,6 @@ import { consume } from "@lit/context";
 import { mdiCheck, mdiClose, mdiPencil, mdiTagMultiple } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -43,6 +42,7 @@ import {
   resolveLabelIds,
 } from "../../util/label-chip-template.js";
 import { labelChipStyleString } from "../../util/label-style.js";
+import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import "./label-form.js";
 import type { ESPHomeLabelForm } from "./label-form.js";
@@ -398,9 +398,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         await api.setDeviceLabels(config, nextIds);
       } catch (err) {
         console.warn("set_labels failed", err);
-        toast.error(this._localize("dashboard.labels_save_failed"), {
-          richColors: true,
-        });
+        notifyError(this._localize("dashboard.labels_save_failed"));
       }
     });
     this._saveChain = task;

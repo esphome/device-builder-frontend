@@ -3,7 +3,6 @@ import { mdiArrowLeft, mdiChevronRight, mdiMenu } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
-import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -12,6 +11,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { NavSectionName } from "../components/device/device-board-info.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
+import { notifyError, notifySuccess } from "../util/notify.js";
 // `NavSectionName` is consumed by the section-show event handler; the
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
@@ -573,7 +573,7 @@ export class ESPHomePageDevice extends LitElement {
     if (!boardId || !device || boardId === device.board_id) return;
     // Reloading YAML after the swap would discard unsaved edits.
     if (this._isDirty) {
-      toast.error(this._localize("device.change_board_unsaved"), { richColors: true });
+      notifyError(this._localize("device.change_board_unsaved"));
       return;
     }
     try {
@@ -582,10 +582,10 @@ export class ESPHomePageDevice extends LitElement {
         board_id: boardId,
       });
       await this._loadYaml();
-      toast.success(this._localize("device.change_board_success"), { richColors: true });
+      notifySuccess(this._localize("device.change_board_success"));
     } catch (err) {
       console.error("Failed to change board:", err);
-      toast.error(this._localize("device.change_board_error"), { richColors: true });
+      notifyError(this._localize("device.change_board_error"));
     }
   };
 
@@ -870,8 +870,8 @@ export class ESPHomePageDevice extends LitElement {
       this._setHighlight(null, false);
     }
     const message = saved ? "device.yaml_saved" : "device.yaml_save_error";
-    const variant = saved ? toast.success : toast.error;
-    variant(this._localize(message), { richColors: true });
+    const variant = saved ? notifySuccess : notifyError;
+    variant(this._localize(message));
     return saved;
   };
 
@@ -940,7 +940,7 @@ export class ESPHomePageDevice extends LitElement {
       // _saveYaml rejects when a section editor's flushPending upsert fails;
       // surface it and abort rather than leak an unhandled rejection.
       console.error("Failed to save before install:", e);
-      toast.error(this._localize("device.yaml_save_error"), { richColors: true });
+      notifyError(this._localize("device.yaml_save_error"));
       return;
     }
     if (saved) run();
