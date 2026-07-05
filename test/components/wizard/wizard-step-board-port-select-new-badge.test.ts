@@ -4,7 +4,7 @@
  * Ports flagged in ``newPorts`` render highlighted with a "New" badge
  * so a just-plugged-in device is findable mid-wizard (#1381).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
@@ -24,10 +24,6 @@ async function mount(
   return el;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("wizard-step-board-port-select new-port badge", () => {
   it("highlights only the ports flagged as new", async () => {

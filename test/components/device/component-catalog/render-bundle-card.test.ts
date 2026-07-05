@@ -4,18 +4,18 @@
 // image_url shows the module photo; without one (or once it has failed to
 // load) it falls back to the box-icon placeholder.
 
-import { render } from "lit";
 import { describe, expect, it } from "vitest";
 
 import type { FeaturedBundle } from "../../../../src/api/types/boards.js";
 import { renderBundleCard } from "../../../../src/components/device/component-catalog/renderers.js";
+import { identityLocalize, renderInto } from "../../../_dom.js";
 
 function host(failed: string[] = []): unknown {
   return {
     _imageFailed: new Set(failed),
     _onAddBundle: () => {},
     _onImageError: () => {},
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
   };
 }
 
@@ -27,12 +27,6 @@ function bundle(overrides: Partial<FeaturedBundle> = {}): FeaturedBundle {
     component_ids: ["rgb_leds", "buzzer_output"],
     ...overrides,
   };
-}
-
-function renderInto(value: unknown): HTMLElement {
-  const container = document.createElement("div");
-  render(value, container);
-  return container;
 }
 
 describe("renderBundleCard image", () => {
@@ -64,7 +58,7 @@ describe("renderBundleCard image", () => {
       _imageFailed: new Set<string>(),
       _onAddBundle: () => {},
       _onImageError: (id: string) => failedIds.push(id),
-      _localize: (key: string) => key,
+      _localize: identityLocalize,
     };
     const b = bundle({ image_url: "https://example.com/module.jpg" });
     const el = renderInto(renderBundleCard(spyHost as never, b));

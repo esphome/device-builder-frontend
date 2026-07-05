@@ -3,28 +3,18 @@
  *
  * Pins that Enter confirms a non-destructive confirm-dialog, never a destructive one.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeConfirmDialog } from "../../src/components/confirm-dialog.js";
+import { mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 
-async function mount(): Promise<ESPHomeConfirmDialog> {
-  const el = new ESPHomeConfirmDialog();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
-
 describe("confirm-dialog ENTER", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("confirms a non-destructive dialog on Enter", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeConfirmDialog());
     const onConfirm = vi.fn();
     el.addEventListener("confirm", onConfirm);
     el.open();
@@ -33,7 +23,7 @@ describe("confirm-dialog ENTER", () => {
   });
 
   it("does not confirm a destructive dialog on Enter", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeConfirmDialog());
     el.destructive = true;
     await el.updateComplete;
     const onConfirm = vi.fn();
@@ -44,7 +34,7 @@ describe("confirm-dialog ENTER", () => {
   });
 
   it("fires confirm only once on a repeated Enter", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeConfirmDialog());
     const onConfirm = vi.fn();
     el.addEventListener("confirm", onConfirm);
     el.open();
@@ -54,7 +44,7 @@ describe("confirm-dialog ENTER", () => {
   });
 
   it("does not confirm before the dialog is opened", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeConfirmDialog());
     const onConfirm = vi.fn();
     el.addEventListener("confirm", onConfirm);
     pressEnter();
@@ -66,15 +56,11 @@ describe("confirm-dialog ENTER", () => {
 // the request-close handler, and the after-hide -> cancel path. Pin them so the
 // dismiss-cancels contract can't silently regress.
 describe("confirm-dialog dismiss / request-close", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const baseDialog = (el: ESPHomeConfirmDialog): HTMLElement =>
     el.shadowRoot!.querySelector("esphome-base-dialog")!;
 
   it("fires a single cancel when dismissed without a decision", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeConfirmDialog());
     el.open();
     await el.updateComplete;
     const onCancel = vi.fn();
@@ -84,7 +70,7 @@ describe("confirm-dialog dismiss / request-close", () => {
   });
 
   it("does not fire cancel when the dialog was confirmed", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeConfirmDialog());
     el.open();
     await el.updateComplete;
     const onConfirm = vi.fn();
@@ -98,7 +84,7 @@ describe("confirm-dialog dismiss / request-close", () => {
   });
 
   it("flips the reactive open flag to false on request-close", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeConfirmDialog());
     el.open();
     await el.updateComplete;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

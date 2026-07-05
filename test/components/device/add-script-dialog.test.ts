@@ -10,27 +10,17 @@
  * ``_open`` itself in ``_onRequestClose`` — otherwise a re-render would
  * re-assert ``?open`` and the dialog could never dismiss.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeAddScriptDialog } from "../../../src/components/device/add-script-dialog.js";
-
-async function mount(): Promise<ESPHomeAddScriptDialog> {
-  const el = new ESPHomeAddScriptDialog();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { mount } from "../../_dom.js";
 
 describe("add-script-dialog base-dialog open contract", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("open() drives the reactive _open flag", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeAddScriptDialog());
     const view = el as unknown as { _open: boolean };
     expect(view._open).toBe(false);
     el.open();
@@ -38,7 +28,7 @@ describe("add-script-dialog base-dialog open contract", () => {
   });
 
   it("_onRequestClose flips the reactive open flag", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeAddScriptDialog());
     const view = el as unknown as { _open: boolean; _onRequestClose: () => void };
     el.open();
     expect(view._open).toBe(true);

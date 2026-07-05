@@ -5,7 +5,7 @@
  * Escape with focus handback, outside-click, request-popover-close),
  * the header Clear all, and exclusive-open accordion coordination.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -52,10 +52,6 @@ const badge = (el: ESPHomeFiltersPopover) =>
   el.shadowRoot!.querySelector(".filters-badge");
 
 describe("esphome-filters-popover", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("hides the badge when no facets are active", async () => {
     const { el } = await mount(0);
     expect(badge(el)).toBeNull();

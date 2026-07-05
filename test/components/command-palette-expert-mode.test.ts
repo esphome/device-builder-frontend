@@ -1,13 +1,12 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Stub the real wa-dialog: happy-dom can't run its form-associated internals.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
 import { buildCommands } from "../../src/components/command-palette-actions.js";
 import { ESPHomeCommandPalette } from "../../src/components/command-palette.js";
-
-const t = (key: string) => key;
+import { identityLocalize as t } from "../_dom.js";
 
 describe("buildCommands Expert Mode entry", () => {
   it("labels the entry by state and wires the toggle", () => {
@@ -35,10 +34,6 @@ describe("buildCommands Expert Mode entry", () => {
 });
 
 describe("command palette YAML search gating", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   async function openWith(expertMode: boolean): Promise<ESPHomeCommandPalette> {
     const palette = new ESPHomeCommandPalette();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

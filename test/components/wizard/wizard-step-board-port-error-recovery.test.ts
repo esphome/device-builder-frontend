@@ -44,7 +44,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
   vi.useRealTimers();
   vi.restoreAllMocks();
 });

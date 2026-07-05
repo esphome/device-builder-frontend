@@ -7,7 +7,7 @@
  * CodeMirror, the action list) are no-op mocked so the editor itself
  * can construct in a happy-dom window.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -68,9 +68,6 @@ describe("script-editor action-catalog hydration (#1286)", () => {
   beforeEach(() => {
     _clearAutomationBodyCache();
     vi.mocked(toast.error).mockClear();
-  });
-  afterEach(() => {
-    document.body.innerHTML = "";
   });
 
   it("hydrates action config_entries so the form renders", async () => {

@@ -52,7 +52,6 @@ const submitLabel = (d: ESPHomeInstallMethodDialog): string =>
 
 describe("install-method-dialog OTA submit label", () => {
   afterEach(() => {
-    document.body.innerHTML = "";
     vi.restoreAllMocks();
   });
 

@@ -19,6 +19,7 @@ import {
   resolveLoadedAvailable,
   type LoadAndHydrateOutcome,
 } from "../../../../src/components/device/automation-editor/hydrate-available-bodies.js";
+import { identityLocalize } from "../../../_dom.js";
 
 const configEntry = (key: string): ConfigEntry => ({ key }) as ConfigEntry;
 
@@ -287,7 +288,7 @@ describe("loadAndHydrateAvailable", () => {
 });
 
 describe("resolveLoadedAvailable", () => {
-  const localize = ((key: string) => key) as never;
+  const localize = identityLocalize as never;
   const okOutcome = (failures = 0): LoadAndHydrateOutcome => ({
     status: "ok",
     available: slimAvailable(),

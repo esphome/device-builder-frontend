@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 import { renderConfirmStep } from "../../../src/components/pair-build-server-dialog/renderers.js";
+import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor, visitTemplates } from "../../_lit-template-walker.js";
 
 function makeHost(
@@ -22,7 +23,7 @@ function makeHost(
   } = {}
 ): ESPHomePairBuildServerDialog {
   return {
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
     _busy: opts.busy ?? false,
     _sending: opts.sending ?? false,
     _previewedPin: opts.pin ?? "",

@@ -5,7 +5,7 @@
  * ``labels-filter-change``, the empty-catalog state, and the
  * close-before-action ordering of the management request events.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -43,10 +43,6 @@ function record(el: ESPHomeLabelsFilterSection, types: string[]): string[] {
 }
 
 describe("esphome-labels-filter-section", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders one row per catalog label with usage counts and chip styling", async () => {
     const el = await mount({ usageCounts: { l1: 3 } });
     const [first, second] = rows(el);

@@ -9,7 +9,7 @@
  * has landed the form must stay mounted across reopens, so the same
  * ``wa-select`` element survives instead of being recreated.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -21,6 +21,7 @@ vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../src/api/types/automations.js";
 import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-automation-dialog.js";
+import { identityLocalize } from "../../_dom.js";
 
 async function flushPending(times = 5): Promise<void> {
   for (let i = 0; i < times; i++) await Promise.resolve();
@@ -47,7 +48,7 @@ async function mountDialog(api: ESPHomeAPI): Promise<ESPHomeAddAutomationDialog>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (dialog as any)._api = api;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (dialog as any)._localize = (key: string) => key; // no context provider in the test tree
+  (dialog as any)._localize = identityLocalize; // no context provider in the test tree
   dialog.configuration = "device.yaml";
   document.body.appendChild(dialog);
   await dialog.updateComplete;
@@ -59,10 +60,6 @@ const kindSelect = (d: ESPHomeAddAutomationDialog) =>
   d.shadowRoot?.querySelector('wa-select[aria-labelledby="kind-label"]') ?? null;
 
 describe("add-automation-dialog render gate (behavioral)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("shows only the spinner before the first load, then the form", async () => {
     const first = deferred<AvailableAutomations>();
     const getAvailableAutomations = vi.fn(() => first.promise);
@@ -171,10 +168,6 @@ const timeAvailable = (): AvailableAutomations =>
   }) as unknown as AvailableAutomations;
 
 describe("add-automation-dialog list-shaped triggers (#1080)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   async function mountForComponent(): Promise<ESPHomeAddAutomationDialog> {
     const api = {
       getAvailableAutomations: vi.fn(() => Promise.resolve(timeAvailable())),
@@ -262,10 +255,6 @@ const deviceAvailable = (): AvailableAutomations =>
   }) as unknown as AvailableAutomations;
 
 describe("add-automation-dialog device-level list triggers (#1283)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   async function mountForDevice(): Promise<ESPHomeAddAutomationDialog> {
     const api = {
       getAvailableAutomations: vi.fn(() => Promise.resolve(deviceAvailable())),
@@ -337,10 +326,6 @@ const ahtAvailable = (): AvailableAutomations =>
   }) as unknown as AvailableAutomations;
 
 describe("add-automation-dialog sub-entity targets (#1263)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   async function mountForComponentStep(): Promise<ESPHomeAddAutomationDialog> {
     const api = {
       getAvailableAutomations: vi.fn(() => Promise.resolve(ahtAvailable())),
@@ -452,10 +437,6 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
 // contract — request-close flipping _open is what makes a user-driven close
 // (Escape / X / outside-click) actually dismiss.
 describe("add-automation-dialog open/close contract", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const baseDialog = (d: ESPHomeAddAutomationDialog): HTMLElement =>
     d.shadowRoot!.querySelector("esphome-base-dialog")!;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

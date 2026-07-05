@@ -6,7 +6,7 @@
  * encrypted device shows the lock-clock and hides the dot, matching the drawer's
  * raw-flag badge instead of diverging (#1037).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
@@ -24,10 +24,6 @@ async function mount(props: Partial<ESPHomeDeviceCard>): Promise<ESPHomeDeviceCa
 }
 
 describe("device-card encryption indicator uses the raw pending flag", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("shows encryption-pending but hides the modified dot when the gate is off", async () => {
     const el = await mount({
       hasPendingChanges: true, // raw: local edit not yet flashed

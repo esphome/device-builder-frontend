@@ -10,7 +10,7 @@
 import { forceParsing } from "@codemirror/language";
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
 
@@ -46,10 +46,6 @@ const caretToLineEnd = (view: EditorView, line: number) =>
   view.dispatch({ selection: EditorSelection.single(view.state.doc.line(line).to) });
 
 describe("yaml-editor cursor-line emission (#946)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("re-emits on a same-line top-level-key change (typing a new block)", async () => {
     // Line 3 starts blank; typing `http_request:` into it keeps line 3 but
     // changes the top-level key from none to http_request.

@@ -6,11 +6,11 @@
  * being edited — a disabled selected option blanks the ``wa-select`` head,
  * hiding the real config value.
  */
-import { render } from "lit";
 import { describe, expect, it } from "vitest";
 
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
+import { renderInto } from "../../_dom.js";
 import {
   makeBoardPin,
   makeEntry,
@@ -29,10 +29,8 @@ const board = () =>
 
 function renderedOptions(value: unknown): Map<string, Element> {
   const entry = makeEntry(ConfigEntryType.PIN, { key: "pin", required: true });
-  const container = document.createElement("div");
-  render(
-    renderPinField(entry, ["pin"], makeRenderCtx({ pin: value }, { board: board() })),
-    container
+  const container = renderInto(
+    renderPinField(entry, ["pin"], makeRenderCtx({ pin: value }, { board: board() }))
   );
   return new Map(
     [...container.querySelectorAll("wa-option")].map((o) => [

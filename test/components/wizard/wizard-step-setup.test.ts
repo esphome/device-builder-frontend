@@ -6,7 +6,7 @@
  * the SSID mandatory there; every other board finishes straight from the name
  * stage. Typed credentials pass through for the backend to persist.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
@@ -82,10 +82,6 @@ function setSsid(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
 const stage = (el: ESPHomeWizardStepSetup) => (el as any)._stage;
 
 describe("wizard-step-setup", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("advances to the Wi-Fi stage for a Wi-Fi-only board with no secret", async () => {
     const el = await mount(wifiBoard());
     await setName(el, "kitchen");

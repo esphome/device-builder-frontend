@@ -10,13 +10,14 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/library.js", () => ({
 
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import { renderDisclosure } from "../../../src/components/shared/disclosure.js";
+import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
   visitTemplates,
 } from "../../_lit-template-walker.js";
 
-const localize: LocalizeFunc = ((key: string) => key) as LocalizeFunc;
+const localize: LocalizeFunc = identityLocalize as LocalizeFunc;
 
 const button = (result: unknown) => findTemplatesByAnchor(result, "<button")[0];
 

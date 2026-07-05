@@ -6,7 +6,7 @@
  * deduped while in flight, and — crucially — NOT poisoned with ``[]`` on a
  * failed fetch so a later render can retry.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
@@ -50,10 +50,6 @@ function response(ids: string[]) {
 }
 
 describe("config-entry-form _resolveInterfaceProviders", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("returns null on the first miss, then the fetched providers, fetching once", async () => {
     const getComponents = vi
       .fn()

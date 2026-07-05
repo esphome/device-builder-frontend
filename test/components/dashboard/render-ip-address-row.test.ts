@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import type { ESPHomeDeviceDrawerContent } from "../../../src/components/dashboard/device-drawer-content.js";
 import { renderIpAddressRow } from "../../../src/components/dashboard/device-drawer-content/render-sections.js";
+import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
@@ -13,7 +14,7 @@ import {
 import { makeConfiguredDevice as _device } from "../../_make-configured-device.js";
 
 const _host = {
-  _localize: (key: string) => key,
+  _localize: identityLocalize,
   _ipExpanded: false,
 } as unknown as ESPHomeDeviceDrawerContent;
 

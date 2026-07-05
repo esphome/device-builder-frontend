@@ -7,7 +7,7 @@
  * trigger-picker children. ``vi.mock`` no-ops them so the editor
  * itself can construct in a happy-dom window.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -63,10 +63,6 @@ async function mountEditor(
 }
 
 describe("automation-editor mount-time load (behavioral)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("editor mounted with configuration preset issues exactly one getAvailableAutomations call", async () => {
     const getAvailableAutomations = vi.fn().mockResolvedValue(slimAvailable());
     const getAutomationBodies = vi.fn().mockResolvedValue({});

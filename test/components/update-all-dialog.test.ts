@@ -5,7 +5,7 @@
  * live matched-device count, disables Update at zero, and bulk-installs exactly
  * the matched configurations on confirm.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // The confirm path runs runBulkUpdate, which fires sonner-js toasts; mock it
 // so the suite doesn't need a live toaster container.
@@ -77,10 +77,6 @@ const offlineUpdatable = makeConfiguredDevice({
 });
 
 describe("update-all-dialog", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("counts only online + update-available devices by default", async () => {
     const { api } = fakeApi();
     const el = await mount([onlineUpdatable, onlineCurrent, offlineUpdatable], api);

@@ -5,7 +5,7 @@
  * device can accept it (canFlashBootloader), only in install mode, and only
  * while the device is online.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -34,10 +34,6 @@ async function mount(
 
 const bootloaderRow = (d: ESPHomeInstallMethodDialog): HTMLElement | null =>
   d.shadowRoot!.querySelector('wa-icon[name="chip"]')?.closest(".option") ?? null;
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("install-method dialog bootloader option", () => {
   it("renders in the advanced section and emits select-method bootloader", async () => {

@@ -7,7 +7,7 @@
  * Dialog children are no-oped so the element constructs in happy-dom;
  * see ``device-navigator-coalesce.test.ts``.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-component-dialog.js", () => ({}));
@@ -25,10 +25,6 @@ async function mountNavigator(): Promise<ESPHomeDeviceNavigator> {
   await nav.updateComplete;
   return nav;
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("device-navigator section header icons", () => {
   it("renders the shared section icons in header order", async () => {

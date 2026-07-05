@@ -6,7 +6,7 @@
  * toggle signals intent via a ``toggle-advanced`` event rather than flipping
  * local state.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -24,10 +24,6 @@ async function mount(advancedOpen = false): Promise<ESPHomeWizardStepMethod> {
   return el;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("wizard-step-method advanced disclosure", () => {
   it("renders advanced options only when advancedOpen is set", async () => {

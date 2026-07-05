@@ -5,7 +5,7 @@
  * and surface the result as a draft (so unsaved edits survive and the
  * user saves explicitly), not as a saved update. Regression for #1146.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -16,10 +16,6 @@ vi.mock("../../../src/components/device/component-catalog.js", () => ({}));
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 
 describe("add-component-dialog preserves the editor draft (#1146)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("merges into this.yaml and dispatches yaml-draft, not yaml-updated", async () => {
     const dialog = new ESPHomeAddComponentDialog();
     const addComponent = vi.fn().mockResolvedValue({ yaml: "MERGED" });

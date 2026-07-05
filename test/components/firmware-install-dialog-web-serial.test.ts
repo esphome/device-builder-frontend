@@ -27,6 +27,7 @@ import { JobSource, JobStatus } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { startWebSerialInstall } from "../../src/components/firmware-install-dialog/install-flow.js";
 import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
+import { identityLocalize } from "../_dom.js";
 
 function makeHost() {
   const api = {
@@ -67,7 +68,7 @@ function makeHost() {
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
     _fail: vi.fn(),
     _close: vi.fn(),
   };

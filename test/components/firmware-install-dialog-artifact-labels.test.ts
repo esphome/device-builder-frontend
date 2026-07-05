@@ -6,12 +6,12 @@
  * translation (unknown type, or a type without a key). Uses the real English
  * localize so the localized path is actually exercised.
  */
-import { render } from "lit";
 import { describe, expect, it } from "vitest";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { renderStatusExtra } from "../../src/components/firmware-install-dialog/renderers.js";
+import { renderInto } from "../_dom.js";
 
 function rowsText(binaries: FirmwareBinary[]): string {
   const host = {
@@ -21,8 +21,9 @@ function rowsText(binaries: FirmwareBinary[]): string {
     _localize: defaultLocalize,
     _onChooseBinary: () => {},
   };
-  const container = document.createElement("div");
-  render(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog), container);
+  const container = renderInto(
+    renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
+  );
   return container.textContent ?? "";
 }
 

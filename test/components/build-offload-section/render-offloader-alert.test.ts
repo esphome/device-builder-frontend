@@ -9,8 +9,7 @@ import type {
   OffloaderPinMismatchAlert,
 } from "../../../src/api/types/remote-build-events.js";
 import { renderOffloaderAlert } from "../../../src/components/settings-dialog/build-offload-alert.js";
-
-const localize = (key: string) => key;
+import { identityLocalize as localize } from "../../_dom.js";
 
 const pinMismatch: OffloaderPinMismatchAlert = {
   kind: "pin_mismatch",

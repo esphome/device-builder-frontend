@@ -4,13 +4,14 @@ import { describe, expect, it } from "vitest";
 
 import type { LanguageOption, LocalizeFunc } from "../../../src/common/localize.js";
 import { ESPHomeSettingsLanguage } from "../../../src/components/settings-dialog/language-section.js";
+import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
   visitTemplates,
 } from "../../_lit-template-walker.js";
 
-const localize: LocalizeFunc = ((key: string) => key) as LocalizeFunc;
+const localize: LocalizeFunc = identityLocalize as LocalizeFunc;
 
 // Flatten the static strings + string values across the template tree.
 // wa-select can't mount under happy-dom (form association), so inspect the

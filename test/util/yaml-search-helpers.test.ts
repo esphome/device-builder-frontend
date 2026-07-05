@@ -10,6 +10,7 @@ import {
   yamlHitLabel,
   yamlSnippetBlockHref,
 } from "../../src/util/yaml-search-helpers.js";
+import { identityLocalize } from "../_dom.js";
 
 /**
  * Build a ``YamlSearchMatch`` with sensible defaults.
@@ -224,7 +225,7 @@ describe("yamlEmptyMessageKey", () => {
 describe("yamlEmptyMessage", () => {
   // The localize stub passes the key through as-is so the
   // test assertions don't depend on the specific en.json values.
-  const passthroughLocalize = (k: string) => k;
+  const passthroughLocalize = identityLocalize;
 
   it("resolves the key through the localize function for empty states", () => {
     expect(yamlEmptyMessage(passthroughLocalize, null)).toBe("yaml_search.searching");

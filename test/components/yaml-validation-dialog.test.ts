@@ -6,31 +6,21 @@
  * force-save), the goto latch fires once, and the reactive ?open /
  * request-close / after-hide -> cancel contract holds.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeYamlValidationDialog } from "../../src/components/yaml-validation-dialog.js";
+import { mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
-
-async function mount(): Promise<ESPHomeYamlValidationDialog> {
-  const el = new ESPHomeYamlValidationDialog();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
 
 const baseDialog = (el: ESPHomeYamlValidationDialog): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;
 
 describe("yaml-validation-dialog ENTER", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("goes to the first error on Enter when a line is known", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.firstErrorLine = 12;
     el.firstErrorCol = 4;
     await el.updateComplete;
@@ -43,7 +33,7 @@ describe("yaml-validation-dialog ENTER", () => {
   });
 
   it("does nothing on Enter when no error line is known", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.firstErrorLine = 0;
     await el.updateComplete;
     const onGoto = vi.fn();
@@ -57,7 +47,7 @@ describe("yaml-validation-dialog ENTER", () => {
   });
 
   it("fires goto only once on a repeated Enter", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.firstErrorLine = 3;
     await el.updateComplete;
     const onGoto = vi.fn();
@@ -69,7 +59,7 @@ describe("yaml-validation-dialog ENTER", () => {
   });
 
   it("does not go to the error before the dialog is opened", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.firstErrorLine = 3;
     await el.updateComplete;
     const onGoto = vi.fn();
@@ -83,15 +73,11 @@ describe("yaml-validation-dialog ENTER", () => {
 // meaningless against the open buffer, so "Go to error" must disable rather
 // than navigate nowhere, and the dialog names the offending file instead.
 describe("yaml-validation-dialog included-file error", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const gotoButton = (el: ESPHomeYamlValidationDialog): HTMLButtonElement =>
     el.shadowRoot!.querySelector(".btn--goto")!;
 
   it("disables Go to error when the error is in an included file", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.firstErrorLine = 42;
     el.firstErrorFile = "base.yaml";
     await el.updateComplete;
@@ -100,7 +86,7 @@ describe("yaml-validation-dialog included-file error", () => {
   });
 
   it("does not fire goto on Enter when the error is in an included file", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.firstErrorLine = 42;
     el.firstErrorFile = "base.yaml";
     await el.updateComplete;
@@ -112,7 +98,7 @@ describe("yaml-validation-dialog included-file error", () => {
   });
 
   it("keeps Go to error enabled when the error is in the open file", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.firstErrorLine = 42;
     el.firstErrorFile = "";
     await el.updateComplete;
@@ -125,12 +111,8 @@ describe("yaml-validation-dialog included-file error", () => {
 // the request-close handler, and the after-hide -> cancel path. Pin them so the
 // dismiss-cancels contract (the page-leave guard depends on it) can't regress.
 describe("yaml-validation-dialog dismiss / request-close", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("fires a single cancel when dismissed without a decision", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.open();
     await el.updateComplete;
     const onCancel = vi.fn();
@@ -140,7 +122,7 @@ describe("yaml-validation-dialog dismiss / request-close", () => {
   });
 
   it("does not fire cancel after Go to error was chosen", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.firstErrorLine = 7;
     await el.updateComplete;
     const onGoto = vi.fn();
@@ -156,7 +138,7 @@ describe("yaml-validation-dialog dismiss / request-close", () => {
   });
 
   it("flips the reactive open flag to false on request-close", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlValidationDialog());
     el.open();
     await el.updateComplete;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

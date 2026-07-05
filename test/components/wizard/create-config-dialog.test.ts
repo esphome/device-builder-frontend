@@ -154,10 +154,6 @@ afterEach(() => {
 });
 
 describe("create-config-dialog create de-dupe + retry", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("drops a second create while the first is in flight", async () => {
     const inflight = deferred<{ configuration: string }>();
     const createDevice = vi.fn(() => inflight.promise);
@@ -451,10 +447,6 @@ describe("create-config-dialog create de-dupe + retry", () => {
 // Navigating (Back, or forward into a new step with another board) must clear
 // it so a stale message doesn't follow the user onto the next attempt (#1487).
 describe("create-config-dialog stale error on navigation", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const errorText = (el: ESPHomeCreateConfigDialog): string | null =>
     el.shadowRoot!.querySelector("p.error")?.textContent ?? null;
 
@@ -554,10 +546,6 @@ describe("create-config-dialog stale error on navigation", () => {
 // _open back to false is the load-bearing part — without it a user-driven
 // close (Escape / X / outside-click) wouldn't dismiss. Pin the contract.
 describe("create-config-dialog open/close contract", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const isOpen = (el: ESPHomeCreateConfigDialog): boolean =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._open;
@@ -591,10 +579,6 @@ describe("create-config-dialog open/close contract", () => {
 // A .tar.gz is binary, so the wizard routes it to importBundle (base64)
 // instead of reading it as text and shoving garbage into createDevice.
 describe("create-config-dialog bundle import", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const step = (el: ESPHomeCreateConfigDialog): string =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._step;
@@ -730,10 +714,6 @@ describe("create-config-dialog bundle import", () => {
 // A YAML upload that collides routes to a confirm step; confirming
 // re-sends with overwrite:true (the backend keeps the device's labels).
 describe("create-config-dialog upload overwrite", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const step = (el: ESPHomeCreateConfigDialog): string =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._step;
@@ -809,10 +789,6 @@ describe("create-config-dialog upload overwrite", () => {
 // it survives the method element being unmounted and re-created when the user
 // navigates into an advanced option (empty-config / import) and back.
 describe("create-config-dialog advanced disclosure persistence", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const methodEl = (el: ESPHomeCreateConfigDialog): HTMLElement | null =>
     el.shadowRoot!.querySelector("esphome-wizard-step-method");
 

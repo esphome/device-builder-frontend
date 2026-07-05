@@ -5,16 +5,15 @@
  * and logs dialog toolbars.
  */
 import type { TemplateResult } from "lit";
-import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import {
   renderTermButton,
   renderTermToggle,
 } from "../../../src/components/process-terminal/toolbar-button.js";
+import { renderInto } from "../../_dom.js";
 
 function mount(tpl: TemplateResult): HTMLButtonElement {
-  const container = document.createElement("div");
-  render(tpl, container);
+  const container = renderInto(tpl);
   return container.querySelector("button")!;
 }
 

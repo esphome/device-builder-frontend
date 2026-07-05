@@ -3,7 +3,7 @@
  *
  * Pins that Enter finishes the empty-config wizard step once a name is set.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ESPHomeWizardStepEmptyConfig } from "../../../src/components/wizard/wizard-step-empty-config.js";
 import { pressEnter } from "../../_press-enter.js";
 
@@ -16,10 +16,6 @@ async function mount(): Promise<ESPHomeWizardStepEmptyConfig> {
 }
 
 describe("wizard-step-empty-config ENTER", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("emits create-empty-config on Enter once a name is set", async () => {
     const el = await mount();
     const onCreate = vi.fn();

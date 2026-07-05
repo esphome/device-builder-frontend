@@ -5,7 +5,7 @@
  * status badge keeps showing the device state (an offline device with a
  * queued update still reads "offline").
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
@@ -24,10 +24,6 @@ async function mount(props: Partial<ESPHomeDeviceCard>): Promise<ESPHomeDeviceCa
 }
 
 describe("device-card queued-update indicator", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("shows the clock and keeps the offline status badge", async () => {
     const el = await mount({ queuedUpdate: true, state: DeviceState.OFFLINE });
     expect(el.shadowRoot!.querySelector(".indicator-queued")).not.toBeNull();

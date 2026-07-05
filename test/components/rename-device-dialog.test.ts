@@ -4,19 +4,13 @@
  * Pins that the rename dialog confirms a valid new name on Enter (via the
  * shared EnterController), and ignores Enter when unchanged or after close.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
 import { ESPHomeRenameDeviceDialog } from "../../src/components/rename-device-dialog.js";
+import { mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
-
-async function mount(): Promise<ESPHomeRenameDeviceDialog> {
-  const el = new ESPHomeRenameDeviceDialog();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
 
 function setValue(el: ESPHomeRenameDeviceDialog, value: string): Promise<unknown> {
   const input = el.shadowRoot!.querySelector("input")!;
@@ -26,12 +20,8 @@ function setValue(el: ESPHomeRenameDeviceDialog, value: string): Promise<unknown
 }
 
 describe("rename-device-dialog ENTER", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("confirms a valid new name on Enter", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeRenameDeviceDialog());
     el.open("oldname");
     await el.updateComplete;
     const onConfirm = vi.fn();
@@ -43,7 +33,7 @@ describe("rename-device-dialog ENTER", () => {
   });
 
   it("ignores Enter when the name is unchanged", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeRenameDeviceDialog());
     el.open("kitchen");
     await el.updateComplete;
     const onConfirm = vi.fn();
@@ -53,7 +43,7 @@ describe("rename-device-dialog ENTER", () => {
   });
 
   it("fires rename-confirm only once on a repeated Enter", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeRenameDeviceDialog());
     el.open("oldname");
     await el.updateComplete;
     const onConfirm = vi.fn();
@@ -69,7 +59,7 @@ describe("rename-device-dialog ENTER", () => {
     // identically on the repeat); the listener detaches in _onAfterHide, not
     // close(), so the _resolved latch is the only thing stopping a second
     // dispatch while the dialog is still hiding.
-    const el = await mount();
+    const el = await mount(new ESPHomeRenameDeviceDialog());
     el.open("oldname");
     await el.updateComplete;
     const onConfirm = vi.fn();
@@ -88,7 +78,7 @@ describe("rename-device-dialog ENTER", () => {
   });
 
   it("ignores Enter after the dialog hides", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeRenameDeviceDialog());
     el.open("oldname");
     await setValue(el, "kitchen");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,12 +101,8 @@ describe("rename-device-dialog ENTER", () => {
  * and the dialog could never dismiss.
  */
 describe("rename-device-dialog base-dialog open contract", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("open() / close() drive the reactive _open flag", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeRenameDeviceDialog());
     const view = el as unknown as { _open: boolean };
     el.open("oldname");
     expect(view._open).toBe(true);
@@ -125,7 +111,7 @@ describe("rename-device-dialog base-dialog open contract", () => {
   });
 
   it("_onRequestClose flips the reactive open flag", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeRenameDeviceDialog());
     const view = el as unknown as { _open: boolean; _onRequestClose: () => void };
     el.open("oldname");
     expect(view._open).toBe(true);

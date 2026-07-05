@@ -23,8 +23,10 @@
  * ``render-facets.test.ts``) and assert on the produced DOM rather
  * than on lit-html internals.
  */
-import { nothing, render } from "lit";
-import { afterEach, describe, expect, it } from "vitest";
+import { nothing } from "lit";
+import { describe, expect, it } from "vitest";
+
+import { renderInto } from "../_dom.js";
 
 import type { Label } from "../../src/api/types/devices.js";
 import {
@@ -35,12 +37,6 @@ import {
 
 function label(id: string, name: string, color: string | null = null): Label {
   return { id, name, color };
-}
-
-function renderInto(value: unknown): HTMLElement {
-  const container = document.createElement("div");
-  render(value, container);
-  return container;
 }
 
 function chipTexts(container: HTMLElement): string[] {
@@ -92,10 +88,6 @@ describe("resolveLabelIds", () => {
 });
 
 describe("renderLabelChip", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders the label name as the chip text", () => {
     const container = renderInto(renderLabelChip(label("a", "Kitchen")));
     expect(chipTexts(container)).toEqual(["Kitchen"]);
@@ -132,10 +124,6 @@ describe("renderLabelChip", () => {
 });
 
 describe("renderLabelChips", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const labels = [
     label("a", "Alpha"),
     label("b", "Beta"),

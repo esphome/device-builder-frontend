@@ -5,7 +5,7 @@
  * exposes its update api, so the kebab entry must render only when the backend
  * reports desktop_update_capable and stay hidden otherwise.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { renderOpenHeaderMenu } from "./_esphome-header-actions-helpers.js";
 
@@ -13,10 +13,6 @@ const renderOpenMenu = (desktopUpdateCapable: boolean) =>
   renderOpenHeaderMenu({ _desktopUpdateCapable: desktopUpdateCapable });
 
 describe("header-actions Check for updates visibility", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders the entry when the desktop app is update-capable", async () => {
     const el = await renderOpenMenu(true);
     expect(el.shadowRoot!.querySelector('wa-icon[name="update"]')).not.toBeNull();

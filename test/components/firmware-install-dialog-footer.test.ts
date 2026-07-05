@@ -9,13 +9,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { renderFooter } from "../../src/components/firmware-install-dialog/renderers.js";
+import { identityLocalize } from "../_dom.js";
 import { findTemplatesByAnchor } from "../_lit-template-walker.js";
 
 function footerHost(step: string) {
   return {
     _step: step,
     _installer: "binary-download",
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
     _close: vi.fn(),
     _cancel: vi.fn(),
     _retry: vi.fn(),

@@ -6,7 +6,7 @@
  * component picker lists the interface's providers, falling back to a
  * search only when the domain isn't a homeless interface (issue #1275).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/badge/badge.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -29,10 +29,6 @@ function response(ids: string[]) {
 }
 
 describe("component-catalog filterByDomain provides routing", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("probes the provides filter for an interface domain", async () => {
     const el = new ESPHomeComponentCatalog();
     const getComponents = vi

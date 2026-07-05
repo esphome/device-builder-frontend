@@ -5,7 +5,7 @@
  * missing marker (api `encryption:`, ota `password:`, web_server `auth:`) and
  * the generate flow that writes secrets.yaml + emits `apply-security-secrets`.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
@@ -42,10 +42,6 @@ async function mount(
   await el.updateComplete;
   return { el, inner };
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("security-notice — detection", () => {
   // [name, sectionKey, yaml, fromLine, markerPresent]

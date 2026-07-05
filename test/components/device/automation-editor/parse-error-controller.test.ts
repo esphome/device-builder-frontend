@@ -9,6 +9,7 @@ import type {
   ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
 import { ParseErrorController } from "../../../../src/components/device/automation-editor/parse-error-controller.js";
+import { identityLocalize } from "../../../_dom.js";
 import { fakeHost } from "../../../_fake-host.js";
 
 const SCRIPT: AutomationLocation = {
@@ -105,7 +106,7 @@ describe("ParseErrorController.resolve", () => {
       )
     ).toBeNull();
     expect(c.active).toBe(true);
-    const localize = vi.fn((k: string) => k);
+    const localize = vi.fn(identityLocalize);
     c.renderPanel(localize as never);
     expect(localize).toHaveBeenCalledWith("device.yaml_only_section");
     expect(localize).not.toHaveBeenCalledWith("device.automation_parse_error");
@@ -114,7 +115,7 @@ describe("ParseErrorController.resolve", () => {
   it("renders the error alert for a genuine parse error", () => {
     const c = new ParseErrorController(fakeHost());
     c.resolve([parsed({ error: "Unknown action id: 'x'" })], SCRIPT, "script");
-    const localize = vi.fn((k: string) => k);
+    const localize = vi.fn(identityLocalize);
     c.renderPanel(localize as never);
     expect(localize).toHaveBeenCalledWith("device.automation_parse_error");
     expect(localize).not.toHaveBeenCalledWith("device.yaml_only_section");
@@ -133,7 +134,7 @@ describe("ParseErrorController.resolve", () => {
     c.resolve([parsed({ error: "boom", unsupported: true })], SCRIPT, "script");
     c.resolve([parsed({ error: "Unknown action id: 'x'" })], SCRIPT, "script");
     expect(c.active).toBe(true);
-    const localize = vi.fn((k: string) => k);
+    const localize = vi.fn(identityLocalize);
     c.renderPanel(localize as never);
     expect(localize).toHaveBeenCalledWith("device.automation_parse_error");
     expect(localize).not.toHaveBeenCalledWith("device.yaml_only_section");

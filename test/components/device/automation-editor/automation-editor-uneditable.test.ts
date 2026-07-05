@@ -5,7 +5,7 @@
  * couldn't decompose it), the editor renders read-only and never
  * upserts — its empty tree must not overwrite the real YAML (#1050).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -75,10 +75,6 @@ async function flushPending(times = 8): Promise<void> {
 }
 
 describe("automation-editor uneditable (errored parse)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders read-only and never upserts when the parsed automation has an error", async () => {
     const upsertAutomation = vi.fn();
     const api = {
@@ -139,10 +135,6 @@ describe("automation-editor uneditable (errored parse)", () => {
 });
 
 describe("automation-editor parse-error banner", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("clears a stale parse error once the YAML parses again", async () => {
     const parseDeviceAutomations = vi
       .fn()

@@ -25,13 +25,12 @@
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 import { renderMdnsTxtRecords } from "../../../src/components/dashboard/device-drawer-render.js";
+import { identityLocalize } from "../../_dom.js";
 import {
   findTemplatesByAnchor,
   isTemplateResult,
   visitTemplates,
 } from "../../_lit-template-walker.js";
-
-const _identityLocalize: (key: string) => string = (key) => key;
 
 describe("renderMdnsTxtRecords", () => {
   it("renders a details/dl with one dt+dd per record, alphabetically sorted", () => {
@@ -43,7 +42,7 @@ describe("renderMdnsTxtRecords", () => {
       mac: "aabbccddeeff",
       api_encryption: "Noise_NNpsk0_25519_ChaChaPoly_SHA256",
     };
-    const result = renderMdnsTxtRecords(records, _identityLocalize);
+    const result = renderMdnsTxtRecords(records, identityLocalize);
     expect(isTemplateResult(result)).toBe(true);
 
     // One ``<details>`` wraps the whole thing, with a ``<dl>``
@@ -81,7 +80,7 @@ describe("renderMdnsTxtRecords", () => {
       version: "2025.4.0",
       api_encryption: "",
     };
-    const result = renderMdnsTxtRecords(records, _identityLocalize);
+    const result = renderMdnsTxtRecords(records, identityLocalize);
     const rowTemplates = findTemplatesByAnchor(result, "<dt>");
     expect(rowTemplates.length).toBe(2);
     const pairs = rowTemplates.map((t) => [t.values[0] as string, t.values[1] as string]);
@@ -122,7 +121,7 @@ describe("renderMdnsTxtRecords", () => {
     };
 
     const orderings = [ascending, descending, shuffled].map((records) => {
-      const result = renderMdnsTxtRecords(records, _identityLocalize);
+      const result = renderMdnsTxtRecords(records, identityLocalize);
       return findTemplatesByAnchor(result, "<dt>").map((t) => [
         t.values[0] as string,
         t.values[1] as string,
@@ -148,14 +147,14 @@ describe("renderMdnsTxtRecords", () => {
     // ``undefined`` on the wire — the drawer must render zero
     // markup so the section stays visually identical to the
     // pre-feature drawer.
-    expect(renderMdnsTxtRecords(undefined, _identityLocalize)).toBe(nothing);
+    expect(renderMdnsTxtRecords(undefined, identityLocalize)).toBe(nothing);
     // ``null`` is the explicit "backend computed the snapshot but
     // had no TXT to surface" signal. Same: zero markup.
-    expect(renderMdnsTxtRecords(null, _identityLocalize)).toBe(nothing);
+    expect(renderMdnsTxtRecords(null, identityLocalize)).toBe(nothing);
     // An empty mapping is the legitimate "TXT was decoded but no
     // entries had string values" case — still hide the section,
     // a chevron with zero rows is just visual noise.
-    expect(renderMdnsTxtRecords({}, _identityLocalize)).toBe(nothing);
+    expect(renderMdnsTxtRecords({}, identityLocalize)).toBe(nothing);
   });
 
   it("never splices key or value strings into static template text", () => {
@@ -175,7 +174,7 @@ describe("renderMdnsTxtRecords", () => {
       config_hash: '" onclick="alert(1)',
       "<key>": "innocent",
     };
-    const result = renderMdnsTxtRecords(dangerous, _identityLocalize);
+    const result = renderMdnsTxtRecords(dangerous, identityLocalize);
 
     // Walk every template and confirm:
     // - none of the static ``strings`` contain the dangerous

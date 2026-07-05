@@ -8,9 +8,10 @@
 import type { EditorView } from "@codemirror/view";
 import { html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { CodeMirrorEditorElement } from "../../src/components/codemirror-editor-element.js";
+import { mount } from "../_dom.js";
 
 @customElement("test-cm-editor")
 class TestCmEditor extends CodeMirrorEditorElement {
@@ -39,34 +40,23 @@ class TestCmEditor extends CodeMirrorEditorElement {
   }
 }
 
-async function mount(): Promise<TestCmEditor> {
-  const el = new TestCmEditor();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
-
 describe("CodeMirrorEditorElement", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("mounts a live EditorView into .cm-wrap", async () => {
-    const el = await mount();
+    const el = await mount(new TestCmEditor());
     expect(el.view).not.toBeNull();
     expect(el.view!.state.doc.toString()).toBe("hello\nworld\n");
     expect(el.container.querySelector(".cm-editor")).not.toBeNull();
   });
 
   it("destroys the view and drops the handle on _destroyView", async () => {
-    const el = await mount();
+    const el = await mount(new TestCmEditor());
     el.destroyView();
     expect(el.view).toBeNull();
     expect(el.container.querySelector(".cm-editor")).toBeNull();
   });
 
   it("tears down the prior view when mounted again", async () => {
-    const el = await mount();
+    const el = await mount(new TestCmEditor());
     const first = el.view!;
     el.remount("again");
     expect(el.view).not.toBe(first);
@@ -76,7 +66,7 @@ describe("CodeMirrorEditorElement", () => {
   });
 
   it("tears the view down when disconnected", async () => {
-    const el = await mount();
+    const el = await mount(new TestCmEditor());
     el.remove();
     expect(el.view).toBeNull();
   });

@@ -7,7 +7,7 @@
  * switch. Extracted to device-editor-toolbar.ts but rendered into the
  * device-editor shadow root, so these assertions mount the real element.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
@@ -41,10 +41,6 @@ function qa(el: ESPHomeDeviceEditor, sel: string): HTMLElement[] {
 }
 
 describe("device-editor header toolbar", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders the three-way layout switch with the active layout pressed", async () => {
     const el = await mount({ layout: "both" });
     const buttons = qa(el, ".layout-toggle button");
@@ -104,10 +100,6 @@ describe("device-editor header toolbar", () => {
 });
 
 describe("device-editor save button", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("enables on unsaved edits and shows the save icon", async () => {
     const el = await mount({ hasUnsavedEdits: true });
     const btn = q(el, ".save-button") as HTMLButtonElement;

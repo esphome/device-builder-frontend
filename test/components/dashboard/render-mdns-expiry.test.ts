@@ -12,23 +12,22 @@
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 import { renderMdnsExpiry } from "../../../src/components/dashboard/device-drawer-render.js";
+import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-walker.js";
-
-const _identityLocalize: (key: string) => string = (key) => key;
 
 describe("renderMdnsExpiry", () => {
   it("renders a details fold-down when remaining + lifetime are present", () => {
-    const result = renderMdnsExpiry(4321, 4500, _identityLocalize, "en");
+    const result = renderMdnsExpiry(4321, 4500, identityLocalize, "en");
     expect(isTemplateResult(result)).toBe(true);
     expect(findTemplatesByAnchor(result, "<details").length).toBe(1);
   });
 
   it("renders nothing when remaining is null (no PTR cached)", () => {
-    expect(renderMdnsExpiry(null, 4500, _identityLocalize, "en")).toBe(nothing);
+    expect(renderMdnsExpiry(null, 4500, identityLocalize, "en")).toBe(nothing);
   });
 
   it("renders nothing when the lifetime is null (no PTR cached)", () => {
-    expect(renderMdnsExpiry(4321, null, _identityLocalize, "en")).toBe(nothing);
+    expect(renderMdnsExpiry(4321, null, identityLocalize, "en")).toBe(nothing);
   });
 
   it("says 'expires soon' instead of a stuck 0s once the countdown hits zero", () => {

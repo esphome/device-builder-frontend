@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FileDropController } from "../../src/util/file-drop-controller.js";
 import { dragEvent } from "../_drag-event.js";
 import { FakeHost } from "../_fake-host.js";
@@ -16,10 +16,6 @@ function make(opts: { visible?: boolean } = {}) {
   ctrl.hostConnected();
   return { host, target, onFile, ctrl };
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("FileDropController", () => {
   it("accepts a dragged file: prevents default and flags dragging", () => {

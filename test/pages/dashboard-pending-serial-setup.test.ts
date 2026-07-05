@@ -47,7 +47,6 @@ describe("dashboard pending serial setup", () => {
   });
 
   afterEach(() => {
-    document.body.innerHTML = "";
     window.history.replaceState({}, "", "/");
   });
 

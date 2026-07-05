@@ -43,7 +43,6 @@ describe("dashboard yaml host attribute", () => {
   });
 
   afterEach(() => {
-    document.body.innerHTML = "";
     window.history.replaceState({}, "", "/");
     vi.restoreAllMocks();
   });

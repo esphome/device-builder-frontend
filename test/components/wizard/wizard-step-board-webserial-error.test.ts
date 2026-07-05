@@ -47,7 +47,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
   vi.restoreAllMocks();
 });
 

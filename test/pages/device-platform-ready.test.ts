@@ -106,7 +106,6 @@ function readBoard(page: ESPHomePageDevice): BoardCatalogEntry | null {
 
 describe("device page _platformReady lifecycle", () => {
   afterEach(() => {
-    document.body.innerHTML = "";
     vi.restoreAllMocks();
     // Shared board-body cache is a module singleton; clear it so a
     // board fetched in one case can't satisfy the next case's fetch.

@@ -38,7 +38,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
   vi.useRealTimers();
 });
 

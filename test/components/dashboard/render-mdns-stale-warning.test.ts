@@ -13,9 +13,8 @@ import { describe, expect, it } from "vitest";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import type { ReachabilityStateEvent } from "../../../src/api/types/reachability.js";
 import { renderMdnsStaleWarning } from "../../../src/components/dashboard/device-drawer-render.js";
+import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-walker.js";
-
-const _identityLocalize: (key: string) => string = (key) => key;
 
 function reachability(
   overrides: Partial<ReachabilityStateEvent> = {}
@@ -37,7 +36,7 @@ function reachability(
 
 describe("renderMdnsStaleWarning", () => {
   it("warns when mDNS is dark but Ping is live", () => {
-    const result = renderMdnsStaleWarning(reachability(), _identityLocalize);
+    const result = renderMdnsStaleWarning(reachability(), identityLocalize);
     expect(isTemplateResult(result)).toBe(true);
     expect(findTemplatesByAnchor(result, "<details").length).toBe(1);
   });
@@ -48,7 +47,7 @@ describe("renderMdnsStaleWarning", () => {
     // strict ONLINE gate hid it until a reload caught a later snapshot).
     const result = renderMdnsStaleWarning(
       reachability({ state: DeviceState.UNKNOWN, active_source: "ping" }),
-      _identityLocalize
+      identityLocalize
     );
     expect(findTemplatesByAnchor(result, "<details").length).toBe(1);
   });
@@ -61,7 +60,7 @@ describe("renderMdnsStaleWarning", () => {
         mqtt_last_seen_seconds_ago: 9,
         ping_rtt_ms: null,
       }),
-      _identityLocalize
+      identityLocalize
     );
     expect(findTemplatesByAnchor(result, "<details").length).toBe(1);
   });
@@ -69,7 +68,7 @@ describe("renderMdnsStaleWarning", () => {
   it("stays silent once mDNS has been seen", () => {
     const result = renderMdnsStaleWarning(
       reachability({ active_source: "mdns", mdns_last_seen_seconds_ago: 3 }),
-      _identityLocalize
+      identityLocalize
     );
     expect(result).toBe(nothing);
   });
@@ -77,7 +76,7 @@ describe("renderMdnsStaleWarning", () => {
   it("stays silent when no source is live (offline gets the waiting line)", () => {
     const result = renderMdnsStaleWarning(
       reachability({ ping_last_seen_seconds_ago: null, ping_rtt_ms: null }),
-      _identityLocalize
+      identityLocalize
     );
     expect(result).toBe(nothing);
   });
@@ -87,13 +86,13 @@ describe("renderMdnsStaleWarning", () => {
     // device goes offline; the "online over {source}" copy must not show.
     const result = renderMdnsStaleWarning(
       reachability({ state: DeviceState.OFFLINE, ping_last_seen_seconds_ago: 300 }),
-      _identityLocalize
+      identityLocalize
     );
     expect(result).toBe(nothing);
   });
 
   it("renders nothing for a null snapshot", () => {
-    expect(renderMdnsStaleWarning(null, _identityLocalize)).toBe(nothing);
+    expect(renderMdnsStaleWarning(null, identityLocalize)).toBe(nothing);
   });
 
   it("uses the summary and detail localize keys", () => {

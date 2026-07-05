@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import toast from "sonner-js";
 
@@ -51,10 +51,6 @@ function onChange(el: ESPHomeSecretsStructuredEditor): { value: string | null } 
   });
   return captured;
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("esphome-secrets-structured-editor", () => {
   test("renders one row per top-level scalar entry", async () => {

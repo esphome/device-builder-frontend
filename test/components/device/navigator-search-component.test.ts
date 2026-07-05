@@ -5,7 +5,7 @@
  * ``navigator-search`` payload shape, Escape-to-clear (gated on a
  * non-empty value), and that clearing zeroes ``value`` before emitting.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -24,10 +24,6 @@ async function mount(value = ""): Promise<void> {
 }
 
 const input = () => el.shadowRoot!.querySelector("input")!;
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("esphome-navigator-search", () => {
   beforeEach(() => mount());

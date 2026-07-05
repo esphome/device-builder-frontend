@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 // happy-dom can't host webawesome's form-associated internals; the dialog's
 // own button markup is what's under test.
@@ -10,11 +10,12 @@ vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}
 
 import { ESPHomeRemoteBuildJobDialog } from "../../src/components/remote-build-job-dialog.js";
 import { stubRemoteBuildJobState } from "../../src/context/index.js";
+import { identityLocalize } from "../_dom.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mountInputStep() {
   const el = new ESPHomeRemoteBuildJobDialog();
-  (el as any)._localize = (k: string) => k;
+  (el as any)._localize = identityLocalize;
   (el as any)._open = true;
   (el as any)._step = "input";
   (el as any)._pinSha256 = "ab".repeat(32);
@@ -30,7 +31,7 @@ async function mountInputStep() {
 async function mountExpandedListStep() {
   const el = new ESPHomeRemoteBuildJobDialog();
   const job = stubRemoteBuildJobState("job-1", "ab".repeat(32));
-  (el as any)._localize = (k: string) => k;
+  (el as any)._localize = identityLocalize;
   (el as any)._open = true;
   (el as any)._step = "list";
   (el as any)._jobs = new Map([[job.job_id, job]]);
@@ -48,10 +49,6 @@ function hasClasses(el: Element, want: string[]): boolean {
     !["btn-secondary", "btn-primary", "btn-danger"].some((c) => el.classList.contains(c))
   );
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("remote-build-job-dialog action buttons", () => {
   test("input-step buttons use the shared cancel / primary classes", async () => {

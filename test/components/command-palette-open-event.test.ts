@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 // Stub the real wa-dialog: happy-dom can't run its form-associated internals.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
@@ -9,10 +9,6 @@ import { ESPHomeCommandPalette } from "../../src/components/command-palette.js";
 
 /** A connected palette opens on the window event the kebab Search item fires. */
 describe("esphome-command-palette open-on-event", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   test("the open-palette event opens the palette", async () => {
     const palette = new ESPHomeCommandPalette();
     document.body.appendChild(palette);

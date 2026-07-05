@@ -6,11 +6,11 @@
  * wa-optgroup to carry real grouping). They must be ``aria-hidden`` so a
  * screen reader doesn't announce them as stray, contextless text mid-list.
  */
-import { render } from "lit";
 import { describe, expect, it } from "vitest";
 
 import { ConfigEntryType, PinFeature } from "../../../src/api/types/config-entries.js";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
+import { renderInto } from "../../_dom.js";
 import {
   makeBoardPin,
   makeEntry,
@@ -36,10 +36,8 @@ describe("renderPinField — group header a11y", () => {
       required: true,
       pin_features: [PinFeature.ADC],
     });
-    const container = document.createElement("div");
-    render(
-      renderPinField(entry, ["pin"], makeRenderCtx({}, { board: board() })),
-      container
+    const container = renderInto(
+      renderPinField(entry, ["pin"], makeRenderCtx({}, { board: board() }))
     );
 
     const labels = [...container.querySelectorAll(".pin-group-label")];

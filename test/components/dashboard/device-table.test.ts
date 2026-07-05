@@ -5,7 +5,7 @@
  * real row-count size (floored at 1), and the mounted table renders
  * every row on one page while a normal size paginates (discussion #3682).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
@@ -76,10 +76,6 @@ const pageSizeAttr = (el: ESPHomeDeviceTable) =>
   el.shadowRoot!.querySelector("esphome-table-pagination")?.getAttribute("page-size");
 
 describe("device-table All rendering", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("paginates at a normal page size (25 of 30 rows)", async () => {
     const el = await mount(30, 25);
     expect(rowCount(el)).toBe(25);

@@ -4,26 +4,13 @@
  * Pins the bundle conflict resolver: per-file overwrite toggles, the
  * main-config row flag, the secrets note, and the resolve-conflicts emit.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ESPHomeWizardStepResolveConflicts } from "../../../src/components/wizard/wizard-step-resolve-conflicts.js";
-
-async function mount(
-  props: Partial<ESPHomeWizardStepResolveConflicts>
-): Promise<ESPHomeWizardStepResolveConflicts> {
-  const el = new ESPHomeWizardStepResolveConflicts();
-  Object.assign(el, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { mount } from "../../_dom.js";
 
 describe("wizard-step-resolve-conflicts", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("emits the checked paths as the overwrite set", async () => {
-    const el = await mount({
+    const el = await mount(new ESPHomeWizardStepResolveConflicts(), {
       conflicts: ["device.yaml", "common/wifi.yaml"],
       mainConfig: "device.yaml",
     });
@@ -40,7 +27,10 @@ describe("wizard-step-resolve-conflicts", () => {
   });
 
   it("toggling a row off removes it from the overwrite set", async () => {
-    const el = await mount({ conflicts: ["device.yaml"], mainConfig: "device.yaml" });
+    const el = await mount(new ESPHomeWizardStepResolveConflicts(), {
+      conflicts: ["device.yaml"],
+      mainConfig: "device.yaml",
+    });
     const onResolve = vi.fn();
     el.addEventListener("resolve-conflicts", onResolve as EventListener);
     const box = el.shadowRoot!.querySelector<HTMLInputElement>("#cf-0")!;
@@ -51,7 +41,7 @@ describe("wizard-step-resolve-conflicts", () => {
   });
 
   it("flags the main-config row and shows the secrets note when present", async () => {
-    const el = await mount({
+    const el = await mount(new ESPHomeWizardStepResolveConflicts(), {
       conflicts: ["device.yaml"],
       mainConfig: "device.yaml",
       hasSecrets: true,
@@ -61,7 +51,7 @@ describe("wizard-step-resolve-conflicts", () => {
   });
 
   it("omits the badge and secrets note when not applicable", async () => {
-    const el = await mount({
+    const el = await mount(new ESPHomeWizardStepResolveConflicts(), {
       conflicts: ["common/wifi.yaml"],
       mainConfig: "device.yaml",
       hasSecrets: false,
@@ -71,7 +61,9 @@ describe("wizard-step-resolve-conflicts", () => {
   });
 
   it("cancel routes back to the method step", async () => {
-    const el = await mount({ conflicts: ["device.yaml"] });
+    const el = await mount(new ESPHomeWizardStepResolveConflicts(), {
+      conflicts: ["device.yaml"],
+    });
     const onNext = vi.fn();
     el.addEventListener("next-step", onNext as EventListener);
     el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--cancel")!.click();

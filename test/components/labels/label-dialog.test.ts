@@ -6,7 +6,7 @@
  * tracks create vs edit, and a catalog push dropping the edited
  * label requests close.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -33,10 +33,6 @@ const inner = (el: ESPHomeLabelDialog): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;
 
 describe("esphome-label-dialog", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("binds open to the inner dialog", async () => {
     const el = await mount();
     expect(inner(el).hasAttribute("open")).toBe(false);

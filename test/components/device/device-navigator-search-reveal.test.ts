@@ -8,7 +8,7 @@
  * it disappears entirely with Expert Mode off. Dialog children are no-oped so
  * the element constructs in happy-dom; see ``device-navigator-coalesce.test.ts``.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-component-dialog.js", () => ({}));
@@ -54,10 +54,6 @@ const searchBox = (nav: ESPHomeDeviceNavigator) =>
   nav.shadowRoot!.querySelector("esphome-navigator-search")!;
 const searchBtn = (nav: ESPHomeDeviceNavigator) =>
   nav.shadowRoot!.querySelector<HTMLButtonElement>(".search-btn");
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("navigator search reveal", () => {
   it("offers neither box nor magnifier on a short config", async () => {

@@ -57,7 +57,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
   if (origSerial) Object.defineProperty(navigator, "serial", origSerial);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   else if ("serial" in navigator) delete (navigator as any).serial;

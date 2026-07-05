@@ -17,7 +17,7 @@
  * children, so ``vi.mock`` no-ops those modules; the node itself
  * constructs in a happy-dom window.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -107,10 +107,6 @@ function enableAdvanced(el: ESPHomeAutomationActionNode): void {
 }
 
 describe("automation-action-node view-state reset on rebind", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("defaults to expanded", async () => {
     const el = await mountNode(node("set_variable"));
     expect(collapseButton(el).getAttribute("aria-expanded")).toBe("true");

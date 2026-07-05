@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { editorSearchPhrases } from "../../src/util/editor-search-phrases.js";
+import { identityLocalize } from "../_dom.js";
 
 /** Echoes the key so each phrase resolves to its own translation key. */
-const echo: LocalizeFunc = (key) => key;
+const echo: LocalizeFunc = identityLocalize;
 
 function phraseState(localize: LocalizeFunc): EditorState {
   return EditorState.create({ extensions: [editorSearchPhrases(localize)] });

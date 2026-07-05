@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
@@ -11,6 +11,7 @@ import type {
   AvailableComponentInstance,
 } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationTargetPicker } from "../../../../src/components/device/automation-editor/automation-target-picker.js";
+import { identityLocalize } from "../../../_dom.js";
 
 async function mount(
   devices: AvailableComponentInstance[],
@@ -18,7 +19,7 @@ async function mount(
 ): Promise<ESPHomeAutomationTargetPicker> {
   const el = new ESPHomeAutomationTargetPicker();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._localize = (key: string) => key;
+  (el as any)._localize = identityLocalize;
   el.devices = devices;
   el.value = value;
   document.body.appendChild(el);
@@ -27,10 +28,6 @@ async function mount(
 }
 
 describe("automation-target-picker sub-entity options", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("disambiguates same-named sub-entities by their parent", async () => {
     const devices: AvailableComponentInstance[] = [
       {

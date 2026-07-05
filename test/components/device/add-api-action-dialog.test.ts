@@ -8,18 +8,19 @@
  * the ``@request-close`` handler must clear it. Guards against a
  * re-render re-asserting ``?open`` and trapping the dialog open.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import { ESPHomeAddApiActionDialog } from "../../../src/components/device/add-api-action-dialog.js";
+import { identityLocalize } from "../../_dom.js";
 
 async function mountDialog(): Promise<ESPHomeAddApiActionDialog> {
   const dialog = new ESPHomeAddApiActionDialog();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (dialog as any)._localize = (key: string) => key; // no context provider in the test tree
+  (dialog as any)._localize = identityLocalize; // no context provider in the test tree
   document.body.appendChild(dialog);
   await dialog.updateComplete;
   return dialog;
@@ -32,10 +33,6 @@ const requestClose = (d: ESPHomeAddApiActionDialog): void =>
   (d as unknown as { _onRequestClose: () => void })._onRequestClose();
 
 describe("esphome-add-api-action-dialog base-dialog open contract", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("open() drives the reactive _open flag", async () => {
     const dialog = await mountDialog();
     expect(isOpen(dialog)).toBe(false);

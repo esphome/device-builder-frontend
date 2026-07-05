@@ -5,31 +5,18 @@
  * `null` loading variant, the `expert-row` class pass-through, and the status /
  * alert role.
  */
-import { render, type TemplateResult } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   renderStatusRow,
   renderToggleRow,
 } from "../../../src/components/settings-dialog/settings-rows.js";
-
-const localize = (key: string) => key;
-
-function mount(result: TemplateResult): HTMLElement {
-  const el = document.createElement("div");
-  render(result, el);
-  document.body.appendChild(el);
-  return el;
-}
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
+import { identityLocalize as localize, renderInto } from "../../_dom.js";
 
 describe("renderToggleRow", () => {
   it("renders the live toggle with a11y wiring and fires onToggle", () => {
     const onToggle = vi.fn();
-    const el = mount(
+    const el = renderInto(
       renderToggleRow(localize, {
         titleId: "my-title",
         titleKey: "settings.my_title",
@@ -53,7 +40,7 @@ describe("renderToggleRow", () => {
   });
 
   it("applies an extra row class", () => {
-    const el = mount(
+    const el = renderInto(
       renderToggleRow(localize, {
         titleId: "x",
         titleKey: "k",
@@ -68,7 +55,7 @@ describe("renderToggleRow", () => {
   });
 
   it("renders the loading variant (no button) when checked is null", () => {
-    const el = mount(
+    const el = renderInto(
       renderToggleRow(localize, {
         titleId: "x",
         titleKey: "settings.loading_title",
@@ -91,7 +78,7 @@ describe("renderToggleRow", () => {
 
 describe("renderStatusRow", () => {
   it("defaults to role=status with the localized key", () => {
-    const el = mount(renderStatusRow(localize, "settings.empty"));
+    const el = renderInto(renderStatusRow(localize, "settings.empty"));
     const row = el.querySelector(".row")!;
     expect(row.getAttribute("role")).toBe("status");
     expect(el.querySelector(".row-desc")?.textContent?.trim()).toBe("settings.empty");
@@ -99,7 +86,7 @@ describe("renderStatusRow", () => {
   });
 
   it("supports role=alert", () => {
-    const el = mount(renderStatusRow(localize, "settings.failed", "alert"));
+    const el = renderInto(renderStatusRow(localize, "settings.failed", "alert"));
     expect(el.querySelector(".row")!.getAttribute("role")).toBe("alert");
   });
 });

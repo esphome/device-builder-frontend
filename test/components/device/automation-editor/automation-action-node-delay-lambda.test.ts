@@ -10,7 +10,7 @@
  * The node imports ``lambda-editor`` (CodeMirror) directly; ``vi.mock``
  * no-ops it and the other heavy children so the node constructs in happy-dom.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -103,10 +103,6 @@ function toggleButtons(el: ESPHomeAutomationActionNode): HTMLButtonElement[] {
 }
 
 describe("automation-action-node delay lambda", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders the lambda body in the editor, not a 0/Seconds default", async () => {
     const { el } = await mountDelay({
       id: { _lambda: "return 0;", _tag: "!lambda" },

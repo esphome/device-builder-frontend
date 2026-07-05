@@ -64,7 +64,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
   // Direct prototype assignment isn't a vi.spyOn, so restore it explicitly.
   Element.prototype.scrollIntoView = originalScrollIntoView;
 });

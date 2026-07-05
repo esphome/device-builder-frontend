@@ -9,12 +9,13 @@
  * test in this folder stays node-env; this file opts into happy-dom
  * per-file so the element can mount.)
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeCatalogPickerDialog } from "../../../../src/components/device/automation-editor/catalog-picker-dialog.js";
+import { identityLocalize } from "../../../_dom.js";
 
 async function mountDialog(
   kind: "action" | "condition" = "action"
@@ -22,7 +23,7 @@ async function mountDialog(
   const dialog = new ESPHomeCatalogPickerDialog();
   dialog.kind = kind;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (dialog as any)._localize = (key: string) => key; // no context provider in the test tree
+  (dialog as any)._localize = identityLocalize; // no context provider in the test tree
   document.body.appendChild(dialog);
   await dialog.updateComplete;
   return dialog;
@@ -34,10 +35,6 @@ const activeTab = (d: ESPHomeCatalogPickerDialog): string =>
   (d as unknown as { _activeTab: string })._activeTab;
 
 describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("open() drives the reactive _open flag and resets the search", async () => {
     const dialog = await mountDialog("action");
     expect(isOpen(dialog)).toBe(false);

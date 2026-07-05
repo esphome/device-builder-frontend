@@ -5,7 +5,7 @@
  * drop" hint) must import the dropped file through the same
  * ``import-file`` event as the file-input path (#1386).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -23,10 +23,6 @@ async function mount(): Promise<ESPHomeWizardStepMethod> {
   return el;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("wizard-step-method drag and drop", () => {
   it("highlights the step while a file drag hovers", async () => {

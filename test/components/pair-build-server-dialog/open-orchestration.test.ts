@@ -13,6 +13,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
 import { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
+import { identityLocalize } from "../../_dom.js";
 
 function makeApi() {
   return {
@@ -30,7 +31,7 @@ function makeApi() {
 function makeDialog(api: unknown): ESPHomePairBuildServerDialog {
   const d = new ESPHomePairBuildServerDialog();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (d as any)._localize = (k: string) => k;
+  (d as any)._localize = identityLocalize;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (d as any)._api = api;
   return d;
@@ -38,7 +39,6 @@ function makeDialog(api: unknown): ESPHomePairBuildServerDialog {
 
 describe("pair dialog open() auto-preview orchestration", () => {
   afterEach(() => {
-    document.body.innerHTML = "";
     vi.clearAllMocks();
   });
 

@@ -13,6 +13,7 @@ import {
 } from "../../../src/components/device/navigator-labels.js";
 import { getCachedComponent } from "../../../src/util/component-name-cache.js";
 import type { YamlSection } from "../../../src/util/yaml-sections.js";
+import { identityLocalize } from "../../_dom.js";
 
 const mockGetCached = vi.mocked(getCachedComponent);
 const named = (name: string) =>
@@ -24,7 +25,7 @@ const ctx: LabelContext = {
   } as unknown as LabelContext["triggerCatalog"],
   platform: "",
   deviceName: "",
-  localize: (key) => key,
+  localize: identityLocalize,
 };
 
 const item = (key: string): YamlSection => ({ key }) as unknown as YamlSection;

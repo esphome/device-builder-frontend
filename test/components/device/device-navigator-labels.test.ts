@@ -48,7 +48,6 @@ describe("device-navigator core subtitle", () => {
   });
 
   afterEach(() => {
-    document.body.innerHTML = "";
     _clearComponentCache();
   });
 

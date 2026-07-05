@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 // happy-dom can't host webawesome's custom elements; we assert the
 // component's own shadow-DOM markup (input + option rows).
@@ -49,10 +49,6 @@ async function open(el: ESPHomeOptionsCombobox) {
   input(el).dispatchEvent(new FocusEvent("focus"));
   await el.updateComplete;
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("esphome-options-combobox", () => {
   test("closed field shows the committed value and no list", async () => {

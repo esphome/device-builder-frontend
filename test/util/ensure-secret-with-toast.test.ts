@@ -18,8 +18,9 @@ import {
   setSecretWithToast,
 } from "../../src/util/ensure-secret-with-toast.js";
 import { _resetSecretKeysCache } from "../../src/util/secrets-cache.js";
+import { identityLocalize } from "../_dom.js";
 
-const localize = ((key: string) => key) as (key: string, args?: unknown) => string;
+const localize = identityLocalize as (key: string, args?: unknown) => string;
 const messages = {
   createdKey: "device.created",
   errorKey: "device.error",
@@ -36,7 +37,6 @@ function apiWith(created: boolean, keys: string[]) {
 }
 
 afterEach(() => {
-  document.body.innerHTML = "";
   _resetSecretKeysCache();
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();

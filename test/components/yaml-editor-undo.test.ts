@@ -7,27 +7,17 @@
  */
 import { undo, undoDepth } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
-
-async function mount(): Promise<ESPHomeYamlEditor> {
-  const el = new ESPHomeYamlEditor();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { mount } from "../_dom.js";
 
 const viewOf = (el: ESPHomeYamlEditor): EditorView =>
   (el as unknown as { _view: EditorView })._view;
 
 describe("yaml-editor undo baseline (#1150)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("does not record the initial async content load in undo history", async () => {
-    const el = await mount(); // mounts with empty doc
+    const el = await mount(new ESPHomeYamlEditor()); // mounts with empty doc
     el.value = "wifi:\n  ssid: x\n"; // YAML arrives later
     await el.updateComplete;
 
@@ -38,7 +28,7 @@ describe("yaml-editor undo baseline (#1150)", () => {
   });
 
   it("keeps an external repopulate undoable after the user clears the doc", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlEditor());
     el.value = "wifi:\n  ssid: x\n"; // initial load (baselined)
     await el.updateComplete;
     const view = viewOf(el);
@@ -63,7 +53,7 @@ describe("yaml-editor undo baseline (#1150)", () => {
   });
 
   it("still scrolls to the highlight when value + highlightRange load in one cycle", async () => {
-    const el = await mount(); // empty
+    const el = await mount(new ESPHomeYamlEditor()); // empty
     const spy = vi.spyOn(
       el as unknown as { _applyHighlight: () => void },
       "_applyHighlight"
@@ -82,7 +72,7 @@ describe("yaml-editor undo baseline (#1150)", () => {
   });
 
   it("drops a highlight whose start line outlives a doc-shrinking value update", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlEditor());
     el.value = "a\nb\nc\nd\ne\nf\ng\n";
     el.highlightRange = { fromLine: 7, toLine: 7 };
     await el.updateComplete;

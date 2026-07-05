@@ -66,7 +66,6 @@ const fireSelectItem = (el: ESPHomeSecretPicker, selector: string): void => {
 };
 
 afterEach(() => {
-  document.body.innerHTML = "";
   _resetSecretKeysCache();
   navigate.mockClear();
 });

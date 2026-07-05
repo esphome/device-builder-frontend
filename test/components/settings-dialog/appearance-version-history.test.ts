@@ -6,7 +6,7 @@
  * `set-version-history-enabled` event carrying the *next* value so app-shell
  * can persist it.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Stub the wa-select/wa-option theme picker and wa-icon (happy-dom can't run
 // their form-associated internals; they're only chrome here).
@@ -38,10 +38,6 @@ const versionToggle = (el: ESPHomeSettingsAppearance) =>
   );
 
 describe("appearance version-history toggle", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("is hidden unless Expert Mode is on", async () => {
     expect(versionToggle(await mount(false))).toBeNull();
     expect(versionToggle(await mount(true))).not.toBeNull();

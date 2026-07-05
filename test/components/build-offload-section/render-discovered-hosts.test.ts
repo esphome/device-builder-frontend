@@ -6,10 +6,11 @@
  * needed both for the component import (WebAwesome touches ``CSSStyleSheet`` at
  * load) and to render the empty/loading status-row template back to its key.
  */
-import { render, type TemplateResult } from "lit";
+import { type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
 import type { RemoteBuildPeer } from "../../../src/api/types/remote-build.js";
 import { ESPHomeSettingsBuildOffload } from "../../../src/components/settings-dialog/build-offload-section.js";
+import { identityLocalize, renderInto } from "../../_dom.js";
 
 function peer(
   name: string,
@@ -34,7 +35,7 @@ type Row = { row: string };
 
 function makeHost(peers: RemoteBuildPeer[]) {
   return {
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
     _discoveredHosts: new Map(peers.map((p) => [p.name, p])),
     _hasPairingFor: () => false,
     _renderDiscoveredRow: (p: RemoteBuildPeer): Row => ({ row: p.name }),
@@ -53,8 +54,7 @@ function renderDiscoveredHosts(host: ReturnType<typeof makeHost>): unknown {
 // it and read back the localize key the row shows.
 function statusRowKey(result: unknown): string | null {
   if (Array.isArray(result)) return null;
-  const el = document.createElement("div");
-  render(result as TemplateResult, el);
+  const el = renderInto(result as TemplateResult);
   return el.querySelector(".row-desc")?.textContent?.trim() ?? null;
 }
 
@@ -85,9 +85,8 @@ function rowTitle(peerInfo: RemoteBuildPeer): string | null {
       (p: RemoteBuildPeer) => TemplateResult
     >
   )._renderDiscoveredRow;
-  const result = fn.call({ _localize: (key: string) => key }, peerInfo);
-  const el = document.createElement("div");
-  render(result, el);
+  const result = fn.call({ _localize: identityLocalize }, peerInfo);
+  const el = renderInto(result);
   return el.querySelector(".row-title")?.textContent?.trim() ?? null;
 }
 

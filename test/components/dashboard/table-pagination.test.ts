@@ -4,7 +4,7 @@
  * The list view's "All" page-size option: it offers value 0, reports 0
  * on change, and hides the page navigation while active (discussion #3682).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -25,10 +25,6 @@ async function mount(
 }
 
 describe("table-pagination All option", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("offers an 'All' option (value 0) in the page-size selector", async () => {
     const el = await mount({ pageSize: 25 });
     const all = [...el.shadowRoot!.querySelectorAll("option")].find(
@@ -67,10 +63,6 @@ describe("table-pagination All option", () => {
 });
 
 describe("table-pagination accessibility", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   // The visible "Rows per page" <span> is hidden on mobile (and was never
   // programmatically tied to the <select>), so the selector carries its own
   // aria-label to keep an accessible name on every viewport. Guard against a

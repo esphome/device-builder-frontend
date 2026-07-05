@@ -52,7 +52,6 @@ describe("add-component-dialog skips the form for configless components", () => 
   afterEach(() => {
     _clearComponentCache();
     vi.clearAllMocks();
-    document.body.innerHTML = "";
   });
 
   it("adds a configless component directly, toasts, and closes", async () => {

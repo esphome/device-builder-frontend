@@ -8,7 +8,7 @@
  * form-view back button renders in the wrapper's header-prefix slot and
  * returns to the catalog.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -27,13 +27,7 @@ vi.mock("../../../src/components/device/component-catalog.js", () => {
 });
 
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
-
-async function mount(): Promise<ESPHomeAddComponentDialog> {
-  const el = new ESPHomeAddComponentDialog();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { mount } from "../../_dom.js";
 
 const dialog = (el: ESPHomeAddComponentDialog): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;
@@ -42,12 +36,8 @@ const dialog = (el: ESPHomeAddComponentDialog): HTMLElement =>
 const isOpen = (el: ESPHomeAddComponentDialog): boolean => (el as any)._open;
 
 describe("add-component-dialog open/close contract", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("open() flips the reactive open flag and binds ?open", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeAddComponentDialog());
     expect(isOpen(el)).toBe(false);
     el.open();
     await el.updateComplete;
@@ -56,14 +46,14 @@ describe("add-component-dialog open/close contract", () => {
   });
 
   it("openWithSearch() also opens", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeAddComponentDialog());
     el.openWithSearch("output");
     await el.updateComplete;
     expect(isOpen(el)).toBe(true);
   });
 
   it("flips _open to false on request-close", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeAddComponentDialog());
     el.open();
     await el.updateComplete;
     dialog(el).dispatchEvent(new CustomEvent("request-close"));
@@ -71,7 +61,7 @@ describe("add-component-dialog open/close contract", () => {
   });
 
   it("renders the back button in header-prefix in form view and returns to the catalog", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeAddComponentDialog());
     el.open();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._selected = { name: "GPIO Switch" };

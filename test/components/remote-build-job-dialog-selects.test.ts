@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 // happy-dom can't host webawesome's form-associated internals; the
 // attributes under test are readable on the unknown elements.
@@ -29,10 +29,6 @@ async function mountInputStep() {
   return el;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("remote-build-job-dialog submit form selects", () => {
   test("configuration and target pickers are labelled wa-selects with values", async () => {

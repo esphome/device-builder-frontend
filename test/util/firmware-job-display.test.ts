@@ -4,6 +4,7 @@ import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { firmwareJobDisplayName } from "../../src/util/firmware-job-display.js";
+import { identityLocalize } from "../_dom.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 /**
@@ -32,7 +33,7 @@ function job(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
  * never falls through to it, so a key-verbatim stub keeps the
  * test focused on the title-resolution logic.
  */
-const localize: LocalizeFunc = ((key: string) => key) as LocalizeFunc;
+const localize: LocalizeFunc = identityLocalize as LocalizeFunc;
 
 const NO_DEVICES: ConfiguredDevice[] = [];
 

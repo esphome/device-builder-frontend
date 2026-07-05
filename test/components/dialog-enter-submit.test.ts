@@ -82,7 +82,6 @@ const cases: EnterCase[] = [
 ];
 
 afterEach(() => {
-  document.body.innerHTML = "";
   vi.clearAllMocks();
 });
 

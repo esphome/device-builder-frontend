@@ -4,23 +4,18 @@
 // dialog. Mounts the Lit TemplateResult into a happy-dom container (repo idiom)
 // and asserts on the produced DOM.
 
-import { nothing, render } from "lit";
+import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 
 import { JobSource } from "../../../src/api/types/firmware-jobs.js";
 import { renderSourceLine } from "../../../src/components/firmware-jobs-dialog/renderers.js";
+import { identityLocalize, renderInto } from "../../_dom.js";
 import { makeFirmwareJob } from "../../_make-firmware-job.js";
 
 // renderSourceLine only reads host._localize; a key-echoing stub lets us assert
 // which localization key the branch picked.
 function host(): { _localize: (key: string) => string } {
-  return { _localize: (key: string) => key };
-}
-
-function renderInto(value: unknown): HTMLElement {
-  const container = document.createElement("div");
-  render(value, container);
-  return container;
+  return { _localize: identityLocalize };
 }
 
 describe("renderSourceLine", () => {

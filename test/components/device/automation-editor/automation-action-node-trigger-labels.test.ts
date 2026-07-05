@@ -5,7 +5,7 @@
  * per trigger key, each labeled by its humanized key so on_response and
  * on_error read distinctly; else keeps its control-flow wording.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -30,6 +30,7 @@ import type {
 } from "../../../../src/api/types/automations.js";
 import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
 import { ESPHomeAutomationActionNode } from "../../../../src/components/device/automation-editor/automation-action-node.js";
+import { mount } from "../../../_dom.js";
 
 const urlEntry = {
   key: "url",
@@ -52,18 +53,6 @@ const httpGetNode: ActionNode = {
   children: { on_response: [], on_error: [] },
 } as unknown as ActionNode;
 
-async function mount(
-  action: AutomationAction,
-  node: ActionNode
-): Promise<ESPHomeAutomationActionNode> {
-  const el = new ESPHomeAutomationActionNode();
-  el.value = node;
-  el.catalog = [action];
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
-
 function nestedLabels(el: ESPHomeAutomationActionNode): string[] {
   return [...el.shadowRoot!.querySelectorAll(".ae-nested-label")].map((p) =>
     p.textContent!.trim()
@@ -71,12 +60,11 @@ function nestedLabels(el: ESPHomeAutomationActionNode): string[] {
 }
 
 describe("automation-action-node trigger labels (esphome/device-builder#1390)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("labels each trigger list by its humanized key", async () => {
-    const el = await mount(httpGetAction, httpGetNode);
+    const el = await mount(new ESPHomeAutomationActionNode(), {
+      value: httpGetNode,
+      catalog: [httpGetAction],
+    });
     expect(nestedLabels(el)).toEqual(["On Response", "On Error"]);
   });
 
@@ -93,12 +81,18 @@ describe("automation-action-node trigger labels (esphome/device-builder#1390)", 
       params: {},
       children: { on_multi_click: [] },
     } as unknown as ActionNode;
-    const el = await mount(action, node);
+    const el = await mount(new ESPHomeAutomationActionNode(), {
+      value: node,
+      catalog: [action],
+    });
     expect(nestedLabels(el)).toEqual(["On Multi Click"]);
   });
 
   it("renders one nested action list per trigger key alongside the params form", async () => {
-    const el = await mount(httpGetAction, httpGetNode);
+    const el = await mount(new ESPHomeAutomationActionNode(), {
+      value: httpGetNode,
+      catalog: [httpGetAction],
+    });
     expect(
       el.shadowRoot!.querySelectorAll("esphome-automation-action-list")
     ).toHaveLength(2);
@@ -118,7 +112,10 @@ describe("automation-action-node trigger labels (esphome/device-builder#1390)", 
       params: {},
       children: { then: [], else: [] },
     } as unknown as ActionNode;
-    const el = await mount(ifAction, ifNode);
+    const el = await mount(new ESPHomeAutomationActionNode(), {
+      value: ifNode,
+      catalog: [ifAction],
+    });
     // Default _localize echoes the key; else takes the localize branch,
     // not the humanizer (which would emit "Else").
     const labels = nestedLabels(el);

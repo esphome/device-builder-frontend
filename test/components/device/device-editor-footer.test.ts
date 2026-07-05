@@ -6,7 +6,7 @@
  * available, and a plain Install (-> picker) otherwise — including when the
  * config is in sync, which previously rendered no install button at all.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 // Stub the heavy children (they pull in CodeMirror / wa-button); the footer
@@ -31,10 +31,6 @@ function q(el: ESPHomeDeviceEditor, sel: string): HTMLElement | null {
 }
 
 describe("device-editor footer install action", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders a split button (Update + picker caret) when an update is available", async () => {
     const el = await mount({ showUpdate: true });
     const update = vi.fn();

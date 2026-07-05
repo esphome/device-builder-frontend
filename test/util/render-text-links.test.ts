@@ -7,11 +7,11 @@
  * renderTextLinks feeds the configuration-invalid banner.
  */
 
-import { render } from "lit";
 import { describe, expect, it } from "vitest";
 
 import { renderTextLinks } from "../../src/util/markdown.js";
 import { renderMessageNode } from "../../src/util/yaml-lint-backend.js";
+import { renderInto } from "../_dom.js";
 
 const MSG = "check the list at https://example.com/tz.";
 
@@ -43,8 +43,7 @@ describe("renderMessageNode", () => {
 
 describe("renderTextLinks", () => {
   it("renders a new-tab md-link anchor in a Lit template", () => {
-    const host = document.createElement("div");
-    render(renderTextLinks(MSG), host);
+    const host = renderInto(renderTextLinks(MSG));
     const anchor = host.querySelector("a")!;
     expect(anchor.getAttribute("href")).toBe("https://example.com/tz");
     expect(anchor.target).toBe("_blank");
@@ -53,8 +52,7 @@ describe("renderTextLinks", () => {
   });
 
   it("renders nothing for empty input", () => {
-    const host = document.createElement("div");
-    render(renderTextLinks(""), host);
+    const host = renderInto(renderTextLinks(""));
     expect(host.querySelector("a")).toBeNull();
     expect(host.textContent).toBe("");
   });

@@ -7,15 +7,11 @@
  * announces ``secrets-saved`` when the backend reports a create, set passes
  * ``overwrite=true`` and always announces.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { ensureSecretInYaml, setSecretInYaml } from "../../src/util/secrets-write.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 function apiWith(created: boolean) {
   return {

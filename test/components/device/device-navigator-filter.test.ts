@@ -7,7 +7,7 @@
  * no-oped so the element constructs in happy-dom; see
  * ``device-navigator-coalesce.test.ts``.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-component-dialog.js", () => ({}));
@@ -62,10 +62,6 @@ const rowSubtitles = (nav: ESPHomeDeviceNavigator) =>
   [...(nav.shadowRoot?.querySelectorAll(".nav-item-subtitle") ?? [])].map((el) =>
     el.textContent?.trim()
   );
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("navItemMatches", () => {
   it("matches any term case-insensitively", () => {

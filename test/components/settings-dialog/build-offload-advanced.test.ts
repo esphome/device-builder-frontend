@@ -6,7 +6,7 @@
  * from everyone who'd use it). Flipping it fires a bubbling, composed
  * `set-offloader-include-local` event carrying the next value.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { ESPHomeSettingsBuildOffloadAdvanced } from "../../../src/components/settings-dialog/build-offload-advanced.js";
 
@@ -26,10 +26,6 @@ const toggle = (el: ESPHomeSettingsBuildOffloadAdvanced) =>
   el.shadowRoot!.querySelector<HTMLButtonElement>('button.toggle[role="switch"]');
 
 describe("build-offload include-local toggle", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders the toggle inline, with no advanced-options disclosure", async () => {
     const el = await mount(false);
     const btn = toggle(el);

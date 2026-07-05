@@ -8,6 +8,7 @@ import {
   filteredBundles,
   visibleComponents,
 } from "../../../../src/components/device/component-catalog/filters.js";
+import { identityLocalize } from "../../../_dom.js";
 
 function entry(
   id: string,
@@ -378,7 +379,7 @@ describe("filteredBundles present-filter", () => {
 });
 
 describe("buildCategories Recommended collapse", () => {
-  const localize = (k: string) => k;
+  const localize = identityLocalize;
   const hostWith = (
     board: BoardCatalogEntry | null,
     yaml: string,

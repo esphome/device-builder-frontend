@@ -5,16 +5,12 @@
  * modifiers, IME, already-handled events, and self-handling focus targets.
  */
 import type { ReactiveControllerHost } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EnterController } from "../../src/util/enter-controller.js";
 
 const stubHost = { addController() {} } as unknown as ReactiveControllerHost;
 
 let target: HTMLElement;
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 function setup(onEnter = vi.fn()) {
   target = document.createElement("div");

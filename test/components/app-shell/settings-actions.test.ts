@@ -13,6 +13,7 @@ import {
   onSetTheme,
   onSetVersionHistoryEnabled,
 } from "../../../src/components/app-shell/settings-actions.js";
+import { identityLocalize } from "../../_dom.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock("sonner-js", () => ({
@@ -40,7 +41,7 @@ function makePrefsHost(
     _experienceLevel: null,
     _remoteComputeOnly: false,
     _versionHistoryEnabled: true,
-    _localize: ((key: string) => key) as ESPHomeApp["_localize"],
+    _localize: identityLocalize as ESPHomeApp["_localize"],
     _prefsWritesInFlight: 0,
     _api: { updatePreferences },
   };
@@ -65,7 +66,7 @@ function makeHost(api: StubHost["_api"]): StubHost {
     _offloaderRemoteBuildsEnabled: true,
     _offloaderIncludeLocalInPool: false,
     _offloaderWritesInFlight: 0,
-    _localize: ((key: string) => key) as ESPHomeApp["_localize"],
+    _localize: identityLocalize as ESPHomeApp["_localize"],
     _api: api,
   };
 }
@@ -212,7 +213,7 @@ function makePairingHost(
   return {
     _buildOffloadPairings: new Map([[PAIRING_PIN, makePairing(true)]]),
     _offloaderWritesInFlight: 0,
-    _localize: ((key: string) => key) as ESPHomeApp["_localize"],
+    _localize: identityLocalize as ESPHomeApp["_localize"],
     _api: api,
   };
 }
@@ -413,7 +414,7 @@ function makeRemoteBuildHost(
     _remoteBuildEnabled: false,
     _remoteBuildSetInFlight: false,
     _buildServerIdentityRotationCounter: 0,
-    _localize: ((key: string) => key) as ESPHomeApp["_localize"],
+    _localize: identityLocalize as ESPHomeApp["_localize"],
     _api: { setRemoteBuildSettings },
   };
 }

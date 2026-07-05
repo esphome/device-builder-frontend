@@ -5,7 +5,7 @@
  * Editor section). Flipping it must fire a bubbling, composed `set-expert-mode`
  * event carrying the *next* value so app-shell can persist it.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Stub the wa-select/wa-option theme picker (happy-dom can't run their
 // form-associated internals) and wa-icon (only chrome here).
@@ -30,10 +30,6 @@ const toggle = (el: ESPHomeSettingsAppearance) =>
   el.shadowRoot!.querySelector<HTMLButtonElement>('button.toggle[role="switch"]')!;
 
 describe("appearance Expert Mode toggle", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("hides the feature list until the chevron is opened", async () => {
     const el = await mount(false);
     const disclosure =

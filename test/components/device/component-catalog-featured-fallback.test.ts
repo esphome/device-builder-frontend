@@ -8,7 +8,7 @@
  * an explicitly pinned category opts out. Featured cards keep their styling
  * wherever they render.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/badge/badge.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -75,10 +75,6 @@ async function mountFeatured({
 }
 
 describe("component-catalog featured-empty fallback", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("falls back to all when the only recommendation is already configured", async () => {
     const { el, getComponents } = await mountFeatured({
       yaml: "ethernet:\n  type: LAN8720\n",
@@ -103,10 +99,6 @@ describe("component-catalog featured-empty fallback", () => {
 });
 
 describe("component-catalog search moves to All (featured leads there)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const typeSearch = (el: ESPHomeComponentCatalog, value: string) => {
     const input = { value } as HTMLInputElement;
     (el as unknown as { _onSearchInput: (ev: Event) => void })._onSearchInput({
@@ -147,10 +139,6 @@ describe("component-catalog search moves to All (featured leads there)", () => {
 });
 
 describe("component-catalog featured styling under All", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders a featured.* card with featured styling under All", async () => {
     const FEATURED_CARD = {
       id: "featured.esp32-poe-iso.onboard_ethernet",

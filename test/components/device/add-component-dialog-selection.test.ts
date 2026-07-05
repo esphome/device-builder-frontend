@@ -7,6 +7,7 @@ import {
   type SelectionHost,
 } from "../../../src/components/device/add-component-dialog-selection.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
+import { identityLocalize } from "../../_dom.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 function makeHost(
@@ -18,7 +19,7 @@ function makeHost(
     platform: "esp32",
     board: { id: "apollo-esk-1" },
     _selectionSeq: 0,
-    _localize: ((key: string) => key) as SelectionHost["_localize"],
+    _localize: identityLocalize as SelectionHost["_localize"],
     ...overrides,
   };
 }

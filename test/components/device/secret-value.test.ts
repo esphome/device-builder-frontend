@@ -65,7 +65,6 @@ const typeValue = async (el: ESPHomeSecretValue, value: string): Promise<void> =
 };
 
 afterEach(() => {
-  document.body.innerHTML = "";
   _resetSecretKeysCache();
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();

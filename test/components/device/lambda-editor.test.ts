@@ -8,25 +8,14 @@
  * echo a spurious change, dirty the form, and trigger a lossy
  * re-serialize of the whole section.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ESPHomeLambdaEditor } from "../../../src/components/device/config-entry-renderers/lambda-editor.js";
-
-async function mount(value: string): Promise<ESPHomeLambdaEditor> {
-  const el = new ESPHomeLambdaEditor();
-  el.value = value;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { mount } from "../../_dom.js";
 
 describe("lambda-editor lambda-change emission", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("does not emit on a programmatic value-prop sync", async () => {
-    const el = await mount("return 1;");
+    const el = await mount(new ESPHomeLambdaEditor(), { value: "return 1;" });
     const onChange = vi.fn();
     el.addEventListener("lambda-change", onChange);
 
@@ -54,7 +43,7 @@ describe("lambda-editor lambda-change emission", () => {
   });
 
   it("stays silent across repeated programmatic syncs (feedback loop)", async () => {
-    const el = await mount("return 1;");
+    const el = await mount(new ESPHomeLambdaEditor(), { value: "return 1;" });
     const onChange = vi.fn();
     el.addEventListener("lambda-change", onChange);
 
@@ -67,7 +56,7 @@ describe("lambda-editor lambda-change emission", () => {
   });
 
   it("emits exactly once on a user edit", async () => {
-    const el = await mount("return 1;");
+    const el = await mount(new ESPHomeLambdaEditor(), { value: "return 1;" });
     const onChange = vi.fn();
     el.addEventListener("lambda-change", onChange);
 
@@ -83,7 +72,7 @@ describe("lambda-editor lambda-change emission", () => {
   });
 
   it("suppresses a programmatic sync that follows a user edit", async () => {
-    const el = await mount("return 1;");
+    const el = await mount(new ESPHomeLambdaEditor(), { value: "return 1;" });
     const onChange = vi.fn();
     el.addEventListener("lambda-change", onChange);
 

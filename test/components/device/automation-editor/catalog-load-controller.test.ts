@@ -8,8 +8,9 @@ import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../../src/api/types/automations.js";
 import { CatalogLoadController } from "../../../../src/components/device/automation-editor/catalog-load-controller.js";
 import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
+import { identityLocalize } from "../../../_dom.js";
 
-const localize = ((key: string) => key) as never;
+const localize = identityLocalize as never;
 const stubHost = () => ({ addController: vi.fn() }) as unknown as ReactiveControllerHost;
 
 const emptySlim = (): AvailableAutomations =>

@@ -11,6 +11,7 @@ import type { ComponentCatalogEntry } from "../../../src/api/types/components.js
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
+import { identityLocalize } from "../../_dom.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 function ags10Component(): ComponentCatalogEntry {
@@ -49,7 +50,7 @@ function seededValues(
   };
   internals.component = component;
   internals.yaml = yaml;
-  internals._localize = (key) => key;
+  internals._localize = identityLocalize;
   internals._initValues();
   return internals._values;
 }
@@ -193,7 +194,7 @@ describe("add-component-form dep-add bus prefill (#1425)", () => {
         makeConfigEntry({ key: "sda", type: ConfigEntryType.PIN }),
       ],
     } as unknown as ComponentCatalogEntry;
-    internals._localize = (key) => key;
+    internals._localize = identityLocalize;
     return internals;
   }
 
@@ -235,7 +236,7 @@ describe("add-component-form dep-add bus prefill (#1425)", () => {
         }),
       ],
     } as unknown as ComponentCatalogEntry;
-    internals._localize = (key) => key;
+    internals._localize = identityLocalize;
     return internals;
   }
 

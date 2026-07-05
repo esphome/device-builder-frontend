@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import type { IdentityView } from "../../../src/api/types/remote-build.js";
 import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 import { renderSentStep } from "../../../src/components/pair-build-server-dialog/renderers.js";
+import { identityLocalize } from "../../_dom.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
@@ -33,7 +34,7 @@ const IDENTITY: IdentityView = {
 
 function makeHost(identity: IdentityView | null): ESPHomePairBuildServerDialog {
   return {
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
     _hostname: "buildbox.local",
     _port: "6055",
     _offloaderIdentity: identity,

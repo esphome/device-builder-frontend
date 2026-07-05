@@ -6,8 +6,7 @@
  * host's _clearSearch handler (issue #1160). The handler's own behavior
  * is covered in dashboard-clear-search.test.ts.
  */
-import { render } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -17,10 +16,11 @@ import {
   renderViewToggle,
 } from "../../../src/components/dashboard/render-toolbar.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
+import { identityLocalize, renderInto } from "../../_dom.js";
 
 function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
   return {
-    _localize: (k: string) => k,
+    _localize: identityLocalize,
     _yamlMode: false,
     _search: "",
     _syncYamlSearch: vi.fn(),
@@ -30,45 +30,33 @@ function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
   } as unknown as ESPHomePageDashboard;
 }
 
-function renderInto(host: ESPHomePageDashboard): HTMLElement {
-  const container = document.createElement("div");
-  render(renderSearchInput(host), container);
-  return container;
-}
-
 describe("renderSearchInput", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("hides the clear button when the query is empty", () => {
-    const container = renderInto(makeHost({ _search: "" }));
+    const container = renderInto(renderSearchInput(makeHost({ _search: "" })));
     expect(container.querySelector(".search-clear")).toBeNull();
   });
 
   it("hides the clear button for a whitespace-only query", () => {
-    const container = renderInto(makeHost({ _search: "   " }));
+    const container = renderInto(renderSearchInput(makeHost({ _search: " " })));
     expect(container.querySelector(".search-clear")).toBeNull();
   });
 
   it("shows the clear button when a query is present", () => {
-    const container = renderInto(makeHost({ _search: "kitchen" }));
+    const container = renderInto(renderSearchInput(makeHost({ _search: "kitchen" })));
     expect(container.querySelector(".search-clear")).not.toBeNull();
   });
 
   it("wires the clear button to the host's _clearSearch handler", () => {
     const clearSearch = vi.fn();
     const host = makeHost({ _search: "kitchen", _clearSearch: clearSearch });
-    renderInto(host).querySelector<HTMLButtonElement>(".search-clear")?.click();
+    renderInto(renderSearchInput(host))
+      .querySelector<HTMLButtonElement>(".search-clear")
+      ?.click();
     expect(clearSearch).toHaveBeenCalledOnce();
   });
 });
 
 describe("renderViewToggle Expert Mode gating", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   function makeToggleHost(expertMode: boolean): ESPHomePageDashboard {
     return makeHost({
       _view: DashboardView.CARDS,
@@ -79,8 +67,7 @@ describe("renderViewToggle Expert Mode gating", () => {
   }
 
   function renderToggle(host: ESPHomePageDashboard): HTMLElement {
-    const container = document.createElement("div");
-    render(renderViewToggle(host), container);
+    const container = renderInto(renderViewToggle(host));
     return container;
   }
 

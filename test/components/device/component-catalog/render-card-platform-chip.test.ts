@@ -4,7 +4,6 @@
 // category (stepper.a4988 / stepper.uln2003): it renders only when
 // renderCard is told the entry is ambiguous, and carries the id's stem.
 
-import { render } from "lit";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,6 +11,7 @@ import {
   ComponentCategory,
 } from "../../../../src/api/types/components.js";
 import { renderCard } from "../../../../src/components/device/component-catalog/renderers.js";
+import { identityLocalize as localize, renderInto } from "../../../_dom.js";
 
 function host(category = "stepper"): unknown {
   return {
@@ -37,14 +37,6 @@ function entry(id: string): ComponentCatalogEntry {
     config_entries: [],
   };
 }
-
-function renderInto(value: unknown): HTMLElement {
-  const container = document.createElement("div");
-  render(value, container);
-  return container;
-}
-
-const localize = (key: string) => key;
 
 describe("renderCard platform chip", () => {
   it("renders the platform stem when the entry is ambiguous", () => {

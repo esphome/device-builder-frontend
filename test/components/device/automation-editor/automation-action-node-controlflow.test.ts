@@ -4,7 +4,7 @@
  * A control-flow action node renders its params form alongside its
  * nested action list; children must not suppress the params form.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -64,10 +64,6 @@ async function mountNode(): Promise<ESPHomeAutomationActionNode> {
 }
 
 describe("automation-action-node control-flow rendering (#1285)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders the params form for a control-flow action that has nested children", async () => {
     const el = await mountNode();
     // Params form must render even though this action has a nested list.

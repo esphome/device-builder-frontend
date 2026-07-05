@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { AvailableComponentInstance } from "../../../../src/api/types/automations.js";
 import { ESPHomeComponentTargetPicker } from "../../../../src/components/device/automation-editor/component-target-picker.js";
@@ -63,10 +63,6 @@ function pressOn(
 }
 
 describe("component-target-picker", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("lists sub-entities as rows and the container as a group header", async () => {
     const el = await mount(aht());
     expect(choiceNames(el)).toEqual(["Temperature", "Humidity", "Relay"]);

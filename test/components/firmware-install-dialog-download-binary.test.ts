@@ -31,6 +31,7 @@ import {
   downloadSelectedBinary,
   startDownload,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
+import { identityLocalize } from "../_dom.js";
 
 const FACTORY: FirmwareBinary = { title: "Factory format", file: "firmware.factory.bin" };
 const OTA: FirmwareBinary = {
@@ -73,7 +74,7 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
     _fail: vi.fn(),
   };
   host._fail = vi.fn((msg: string) => {

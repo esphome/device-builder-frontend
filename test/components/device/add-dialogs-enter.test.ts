@@ -20,9 +20,9 @@ import { LitElement } from "lit";
 import { ESPHomeAddApiActionDialog } from "../../../src/components/device/add-api-action-dialog.js";
 import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-automation-dialog.js";
 import { ESPHomeAddScriptDialog } from "../../../src/components/device/add-script-dialog.js";
+import { identityLocalize } from "../../_dom.js";
 
 afterEach(() => {
-  document.body.innerHTML = "";
   vi.clearAllMocks();
 });
 
@@ -45,7 +45,7 @@ async function mount<T extends LitElement>(
   const dialog = new ctor();
   const onContinue = vi.fn();
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  (dialog as any)._localize = (key: string) => key; // no context provider here
+  (dialog as any)._localize = identityLocalize; // no context provider here
   (dialog as any)._onContinue = onContinue;
   /* eslint-enable @typescript-eslint/no-explicit-any */
   document.body.appendChild(dialog);

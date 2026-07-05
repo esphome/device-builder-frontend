@@ -7,31 +7,21 @@
  * request-close / after-hide -> cancel contract holds (the page-leave guard
  * depends on a definitive answer for every dismiss path).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeUnsavedChangesDialog } from "../../src/components/unsaved-changes-dialog.js";
+import { mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
-
-async function mount(): Promise<ESPHomeUnsavedChangesDialog> {
-  const el = new ESPHomeUnsavedChangesDialog();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
 
 const baseDialog = (el: ESPHomeUnsavedChangesDialog): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;
 
 describe("unsaved-changes-dialog ENTER", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("saves and leaves on Enter (never discards)", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeUnsavedChangesDialog());
     const onSave = vi.fn();
     const onDiscard = vi.fn();
     el.addEventListener("save", onSave);
@@ -43,7 +33,7 @@ describe("unsaved-changes-dialog ENTER", () => {
   });
 
   it("fires save only once on a repeated Enter", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeUnsavedChangesDialog());
     const onSave = vi.fn();
     el.addEventListener("save", onSave);
     el.open();
@@ -53,7 +43,7 @@ describe("unsaved-changes-dialog ENTER", () => {
   });
 
   it("does not save before the dialog is opened", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeUnsavedChangesDialog());
     const onSave = vi.fn();
     el.addEventListener("save", onSave);
     pressEnter();
@@ -65,12 +55,8 @@ describe("unsaved-changes-dialog ENTER", () => {
 // the request-close handler, and the after-hide -> cancel path. Pin them so the
 // dismiss-cancels contract can't silently regress.
 describe("unsaved-changes-dialog dismiss / request-close", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("fires a single cancel when dismissed without a decision", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeUnsavedChangesDialog());
     el.open();
     await el.updateComplete;
     const onCancel = vi.fn();
@@ -80,7 +66,7 @@ describe("unsaved-changes-dialog dismiss / request-close", () => {
   });
 
   it("does not fire cancel after a decision (save)", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeUnsavedChangesDialog());
     el.open();
     await el.updateComplete;
     const onSave = vi.fn();
@@ -94,7 +80,7 @@ describe("unsaved-changes-dialog dismiss / request-close", () => {
   });
 
   it("flips the reactive open flag to false on request-close", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeUnsavedChangesDialog());
     el.open();
     await el.updateComplete;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

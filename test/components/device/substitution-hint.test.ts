@@ -7,9 +7,8 @@
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 import { renderSubstitutionHint } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { identityLocalize as localize } from "../../_dom.js";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
-
-const localize = (k: string) => k;
 
 const spanValues = (tmpl: unknown): unknown[] =>
   findTemplatesByAnchor(tmpl, "<span").flatMap((t) => t.values as unknown[]);

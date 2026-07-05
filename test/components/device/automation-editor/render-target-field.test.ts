@@ -6,10 +6,9 @@
  */
 import { describe, expect, it } from "vitest";
 import { renderTargetField } from "../../../../src/components/device/automation-editor/render-target-field.js";
+import { identityLocalize as localize } from "../../../_dom.js";
 import { findTemplatesByAnchor } from "../../../_lit-template-walker.js";
 import { findElementBindings } from "../_renderer-fixtures.js";
-
-const localize = (k: string) => k;
 
 const spanValues = (tmpl: unknown): unknown[] =>
   findTemplatesByAnchor(tmpl, "<span").flatMap((t) => t.values as unknown[]);

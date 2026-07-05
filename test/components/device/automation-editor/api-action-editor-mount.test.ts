@@ -6,7 +6,7 @@
  * config_entries hydrated or they render fieldless. Heavy children are
  * no-op mocked so the editor constructs in a happy-dom window.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/device/config-entry-form.js", () => ({}));
 vi.mock(
@@ -65,9 +65,6 @@ describe("api-action-editor action-catalog hydration (#1286)", () => {
   beforeEach(() => {
     _clearAutomationBodyCache();
     vi.mocked(toast.error).mockClear();
-  });
-  afterEach(() => {
-    document.body.innerHTML = "";
   });
 
   it("hydrates action config_entries so the form renders", async () => {

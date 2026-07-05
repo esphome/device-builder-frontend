@@ -11,10 +11,11 @@ import {
   renderMacAddressRow,
   renderVersionSection,
 } from "../../../src/components/dashboard/device-drawer-content/render-sections.js";
+import { identityLocalize } from "../../_dom.js";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { makeConfiguredDevice as _device } from "../../_make-configured-device.js";
 
-const _localize = (key: string) => key;
+const _localize = identityLocalize;
 
 // Text bound inside each row's `.value` div.
 const valueTexts = (result: unknown): unknown[] =>

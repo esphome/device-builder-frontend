@@ -80,7 +80,6 @@ function methodOnClick(d: ESPHomeInstallMethodDialog, el: Element): string | nul
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 afterEach(() => {
-  document.body.innerHTML = "";
   if (origSerial) Object.defineProperty(navigator, "serial", origSerial);
   else if ("serial" in navigator) delete (navigator as any).serial;
   if (origSecure) Object.defineProperty(window, "isSecureContext", origSecure);

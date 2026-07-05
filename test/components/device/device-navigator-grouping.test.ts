@@ -6,7 +6,7 @@
  * stay flat. Dialog + search children are no-oped so the element
  * constructs in happy-dom; see ``device-navigator-coalesce.test.ts``.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-component-dialog.js", () => ({}));
@@ -63,10 +63,6 @@ async function setQuery(nav: ESPHomeDeviceNavigator, value: string): Promise<voi
   );
   await nav.updateComplete;
 }
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("device-navigator domain grouping", () => {
   it("renders a subgroup header per domain with its count", async () => {

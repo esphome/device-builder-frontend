@@ -47,7 +47,6 @@ const YAML = "wifi:\n  ssid: foo\n";
 
 describe("device-navigator kickoff gating", () => {
   afterEach(() => {
-    document.body.innerHTML = "";
     _clearAutomationCatalogCache();
     _clearComponentCache();
   });

@@ -6,7 +6,7 @@
  * Dialog + icon children are no-oped so the element constructs in happy-dom;
  * see ``device-navigator-coalesce.test.ts``.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/components/device/add-automation-dialog.js", () => ({}));
 vi.mock("../../../src/components/device/add-component-dialog.js", () => ({}));
@@ -41,10 +41,6 @@ async function mountNavigator(): Promise<ESPHomeDeviceNavigator> {
 
 const iconNames = (nav: ESPHomeDeviceNavigator, sel: string) =>
   [...(nav.shadowRoot?.querySelectorAll(sel) ?? [])].map((el) => el.getAttribute("name"));
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("device-navigator row icons", () => {
   it("gives ungrouped Core rows a leading domain glyph", async () => {

@@ -6,13 +6,13 @@
  * threshold, the count-label wiring, and the labels section's edit /
  * create requests driving the dashboard's label-dialog state.
  */
-import { render } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { renderFacets } from "../../../src/components/dashboard/render-facets.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
+import { identityLocalize, renderInto } from "../../_dom.js";
 
 // Minimal host-shaped fake. Empty _devices means the Area/Platform
 // facets compute no options and self-suppress, so the popover
@@ -21,7 +21,7 @@ import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     _devices: [],
-    _localize: (k: string) => k,
+    _localize: identityLocalize,
     _yamlMode: false,
     _selectedLabels: [],
     _selectedAreas: [],
@@ -39,24 +39,14 @@ function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
   } as unknown as ESPHomePageDashboard;
 }
 
-function renderInto(host: ESPHomePageDashboard): HTMLElement {
-  const container = document.createElement("div");
-  render(renderFacets(host), container);
-  return container;
-}
-
 const sectionByName = (root: HTMLElement, name: string) =>
   [...root.querySelectorAll("esphome-filter-section")].find(
     (el) => el.getAttribute("name") === name
   );
 
 describe("renderFacets", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("collapses every dimension into a single Filters popover", () => {
-    const container = renderInto(makeHost({ _activeFacetCount: 2 }));
+    const container = renderInto(renderFacets(makeHost({ _activeFacetCount: 2 })));
     expect(container.querySelector("esphome-filters-popover")).not.toBeNull();
     expect(container.querySelector("esphome-labels-filter-section")).not.toBeNull();
     // No legacy wrapper / inline pill row.
@@ -74,7 +64,7 @@ describe("renderFacets", () => {
       return key;
     };
     const popover = renderInto(
-      makeHost({ _activeFacetCount: count, _localize: localize })
+      renderFacets(makeHost({ _activeFacetCount: count, _localize: localize }))
     ).querySelector("esphome-filters-popover");
     expect(popover?.getAttribute("count-label")).toBe("dashboard.filter_menu_active");
     expect(calls).toContainEqual(["dashboard.filter_menu_active", { count }]);
@@ -89,17 +79,17 @@ describe("renderFacets", () => {
     const host = makeHost({
       _devices: [{ update_available: true, active_source: "mdns" }],
     });
-    expect(updatesSection(renderInto(host))).not.toBeUndefined();
+    expect(updatesSection(renderInto(renderFacets(host)))).not.toBeUndefined();
   });
 
   it("suppresses the Updates section when the fleet is current", () => {
     const host = makeHost({ _devices: [] });
-    expect(updatesSection(renderInto(host))).toBeUndefined();
+    expect(updatesSection(renderInto(renderFacets(host)))).toBeUndefined();
   });
 
   it("keeps the Updates section when a filter is selected but the fleet is current", () => {
     const host = makeHost({ _devices: [], _selectedUpdateStatus: ["update_available"] });
-    expect(updatesSection(renderInto(host))).not.toBeUndefined();
+    expect(updatesSection(renderInto(renderFacets(host)))).not.toBeUndefined();
   });
 
   it("suppresses the Updates section in YAML-search mode", () => {
@@ -107,11 +97,11 @@ describe("renderFacets", () => {
       _devices: [{ has_pending_changes: true, active_source: "mdns" }],
       _yamlMode: true,
     });
-    expect(updatesSection(renderInto(host))).toBeUndefined();
+    expect(updatesSection(renderInto(renderFacets(host)))).toBeUndefined();
   });
 
   it("suppresses the labels section in YAML-search mode", () => {
-    const container = renderInto(makeHost({ _yamlMode: true }));
+    const container = renderInto(renderFacets(makeHost({ _yamlMode: true })));
     expect(container.querySelector("esphome-labels-filter-section")).toBeNull();
   });
 
@@ -119,20 +109,20 @@ describe("renderFacets", () => {
     Array.from({ length: n }, (_, i) => ({ area: `Area ${i}` }));
 
   it("keeps the Area section plain at 8 or fewer options", () => {
-    const container = renderInto(makeHost({ _devices: areaDevices(8) }));
+    const container = renderInto(renderFacets(makeHost({ _devices: areaDevices(8) })));
     const area = sectionByName(container, "dashboard.filter_area");
     expect(area?.hasAttribute("searchable")).toBe(false);
   });
 
   it("makes the Area section searchable past 8 options", () => {
-    const container = renderInto(makeHost({ _devices: areaDevices(9) }));
+    const container = renderInto(renderFacets(makeHost({ _devices: areaDevices(9) })));
     const area = sectionByName(container, "dashboard.filter_area");
     expect(area?.hasAttribute("searchable")).toBe(true);
   });
 
   it("opens the label dialog in edit mode on request-edit-label", () => {
     const host = makeHost();
-    const container = renderInto(host);
+    const container = renderInto(renderFacets(host));
     const labels = container.querySelector("esphome-labels-filter-section")!;
     const label = { id: "l1", name: "kitchen", color: null };
     labels.dispatchEvent(
@@ -148,7 +138,7 @@ describe("renderFacets", () => {
 
   it("opens the label dialog in create mode on request-create-label", () => {
     const host = makeHost({ _labelDialogEditing: { id: "stale" } });
-    const container = renderInto(host);
+    const container = renderInto(renderFacets(host));
     const labels = container.querySelector("esphome-labels-filter-section")!;
     labels.dispatchEvent(
       new CustomEvent("request-create-label", { bubbles: true, composed: true })

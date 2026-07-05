@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -131,10 +131,6 @@ describe("logs-dialog header source chip", () => {
     return el.shadowRoot!.querySelector(".source-chip")?.textContent?.trim() ?? "";
   }
 
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("shows OTA for an OTA session", async () => {
     const el = mount();
     el.open("OTA");
@@ -169,10 +165,6 @@ describe("logs-dialog States toggle gate (#539)", () => {
   // The States toggle is the only toolbar control with aria-pressed.
   const hasStatesToggle = (el: ESPHomeLogsDialog): boolean =>
     el.shadowRoot!.querySelector("[aria-pressed]") !== null;
-
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
 
   it("shows the States toggle for an OTA (network) session", async () => {
     const el = mount();

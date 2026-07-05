@@ -70,7 +70,6 @@ function submitButton(el: ESPHomeAddComponentForm): HTMLButtonElement {
 
 describe("add-component-form provides-satisfied dependency", () => {
   afterEach(() => {
-    document.body.innerHTML = "";
     _clearComponentCache();
     _clearProvidesCache();
     // Restore the console.warn spy even if a test throws before its own restore.

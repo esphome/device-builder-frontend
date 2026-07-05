@@ -8,7 +8,7 @@
  * label toggle while the dialog stays open, so it deliberately does NOT bind
  * ?busy (that would dim/lock the dialog on each toggle).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -42,10 +42,6 @@ const dialog = (el: ESPHomeDeviceLabelsEditor): HTMLElement =>
 const isOpen = (el: ESPHomeDeviceLabelsEditor): boolean => (el as any)._open;
 
 describe("device-labels-editor open/close contract", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("opens via the Edit-labels trigger", async () => {
     const el = await mount();
     expect(isOpen(el)).toBe(false);

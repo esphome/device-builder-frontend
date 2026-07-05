@@ -40,6 +40,7 @@ class MockObserver {
 
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import { ESPHomeWizardStepBoardList } from "../../src/components/wizard/wizard-step-board-list.js";
+import { identityLocalize } from "../_dom.js";
 
 const board = (i: number): BoardCatalogEntry =>
   ({
@@ -60,7 +61,7 @@ async function mount(
   const el = new ESPHomeWizardStepBoardList();
   el.boards = boards;
   el.hasMore = hasMore;
-  el.localize = (k) => k;
+  el.localize = identityLocalize;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -77,7 +78,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.innerHTML = "";
   vi.unstubAllGlobals();
 });
 

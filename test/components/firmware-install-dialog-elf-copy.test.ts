@@ -11,6 +11,7 @@ import {
   cardStatusDetail,
   cardStatusMessage,
 } from "../../src/components/firmware-install-dialog/renderers.js";
+import { identityLocalize } from "../_dom.js";
 
 function textFor(filename: string): string {
   const host = {
@@ -18,7 +19,7 @@ function textFor(filename: string): string {
     _installer: "binary-download",
     _downloadedFilename: filename,
     _binaries: [],
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
   } as unknown as ESPHomeFirmwareInstallDialog;
   return `${cardStatusMessage(host)} ${cardStatusDetail(host)}`;
 }

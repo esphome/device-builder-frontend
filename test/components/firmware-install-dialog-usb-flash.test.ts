@@ -9,6 +9,7 @@ import {
   showOtaLogs,
   startUsbFlash,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
+import { identityLocalize } from "../_dom.js";
 
 const bin = (file: string): FirmwareBinary => ({ file, title: file });
 
@@ -36,7 +37,7 @@ function makeHost(opts: { compileOk: boolean; binaries?: FirmwareBinary[] }) {
       name: "x",
       target_platform: "esp32",
     } as ConfiguredDevice,
-    _localize: (k: string) => k,
+    _localize: identityLocalize,
     _step: "queued",
     _statusMessage: "",
     _errorMessage: "",

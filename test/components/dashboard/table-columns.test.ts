@@ -7,14 +7,15 @@
  * hyphen-looking glyph. Populated cells keep their own font.
  */
 import type { CellContext } from "@tanstack/lit-table";
-import { render, type TemplateResult } from "lit";
+import { type TemplateResult } from "lit";
 import { describe, expect, it } from "vitest";
 import {
   createDeviceColumns,
   type DeviceRow,
 } from "../../../src/components/dashboard/table-columns.js";
+import { identityLocalize, renderInto } from "../../_dom.js";
 
-const columns = createDeviceColumns((key) => key);
+const columns = createDeviceColumns(identityLocalize);
 
 function columnByKey(key: string) {
   const col = columns.find((c) => "accessorKey" in c && c.accessorKey === key);
@@ -86,8 +87,7 @@ describe("device table empty-cell placeholder (#1038)", () => {
 
 describe("device table actions", () => {
   it("renders the edit pencil with the accent (action) color", () => {
-    const container = document.createElement("div");
-    render(renderActionsCell(), container);
+    const container = renderInto(renderActionsCell());
     const edit = container.querySelector(".cell-action-btn--edit");
     expect(edit).not.toBeNull();
     expect(edit?.classList.contains("cell-action-btn--accent")).toBe(true);
@@ -120,16 +120,14 @@ function renderNameCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResult {
 // table agrees with the drawer's raw-flag badge instead of diverging (#1037).
 describe("name-cell encryption indicator uses the raw pending flag", () => {
   it("shows encryption-pending but hides the modified dot when the gate is off", () => {
-    const container = document.createElement("div");
-    render(
+    const container = renderInto(
       renderNameCell({
         hasPendingChanges: true, // raw: local edit not yet flashed
         showModified: false, // gated off: mDNS dark + hash-driven pending
         api_enabled: true,
         api_encrypted: true,
         api_encryption_active: null,
-      }),
-      container
+      })
     );
     expect(container.querySelector(".cell-encryption")).not.toBeNull();
     expect(container.querySelector(".cell-indicator--modified")).toBeNull();

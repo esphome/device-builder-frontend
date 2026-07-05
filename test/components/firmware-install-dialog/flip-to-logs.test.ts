@@ -17,6 +17,7 @@ vi.mock("../../../src/util/post-install-logs.js", () => ({
 
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import { flipToLogs } from "../../../src/components/firmware-install-dialog/install-flow.js";
+import { identityLocalize } from "../../_dom.js";
 
 function makeHost(loggerBaudRate: number | null): ESPHomeFirmwareInstallDialog {
   return {
@@ -26,7 +27,7 @@ function makeHost(loggerBaudRate: number | null): ESPHomeFirmwareInstallDialog {
       friendly_name: "X",
       logger_baud_rate: loggerBaudRate,
     },
-    _localize: (key: string) => key,
+    _localize: identityLocalize,
     _open: true,
     reopen: vi.fn(),
   } as unknown as ESPHomeFirmwareInstallDialog;

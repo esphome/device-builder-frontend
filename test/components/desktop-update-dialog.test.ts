@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { DesktopUpdateCheck } from "../../src/api/types/desktop.js";
 import { ESPHomeDesktopUpdateDialog } from "../../src/components/desktop-update-dialog.js";
+import { identityLocalize } from "../_dom.js";
 
 function makeCheck(anyAvailable: boolean): DesktopUpdateCheck {
   const upToDate = {
@@ -37,7 +38,7 @@ function make(api: unknown): ESPHomeDesktopUpdateDialog {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (el as any)._api = api;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (el as any)._localize = (key: string) => key;
+  (el as any)._localize = identityLocalize;
   return el;
 }
 

@@ -5,7 +5,7 @@
  * ``expanded`` (never self-flipped), ``facet-change`` payloads, and
  * search filtering with its empty states and reset-on-collapse.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
@@ -38,10 +38,6 @@ const rows = (el: ESPHomeFilterSection) => [
 ];
 
 describe("esphome-filter-section", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders collapsed by default with aria-expanded false", async () => {
     const el = await mount();
     expect(header(el).getAttribute("aria-expanded")).toBe("false");

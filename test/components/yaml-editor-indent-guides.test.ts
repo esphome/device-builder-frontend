@@ -5,27 +5,17 @@
  * indented rows (the legacy editor's "column lines").
  */
 import type { EditorView } from "@codemirror/view";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
-
-async function mount(): Promise<ESPHomeYamlEditor> {
-  const el = new ESPHomeYamlEditor();
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { mount } from "../_dom.js";
 
 const viewOf = (el: ESPHomeYamlEditor): EditorView =>
   (el as unknown as { _view: EditorView })._view;
 
 describe("yaml-editor indentation guides (#1231)", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("marks indented lines with the indent-guide decoration", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlEditor());
     el.value = "sensor:\n  - platform: dht\n    pin: D1\n";
     await el.updateComplete;
 
@@ -34,7 +24,7 @@ describe("yaml-editor indentation guides (#1231)", () => {
   });
 
   it("does not mark the top-level (unindented) line", async () => {
-    const el = await mount();
+    const el = await mount(new ESPHomeYamlEditor());
     el.value = "logger:\n  level: DEBUG\n";
     await el.updateComplete;
 

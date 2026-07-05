@@ -5,8 +5,7 @@
  * suppression, the managed flag forwarded to labels, and the onChange patch
  * carrying the facet key the emitting section owns.
  */
-import { render } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Inert section elements — we assert the props/attrs the helper binds, not
 // the components' own rendering.
@@ -16,6 +15,7 @@ vi.mock("../../../src/components/filters/labels-filter-section.js", () => ({}));
 import { DeviceState } from "../../../src/api/types/devices.js";
 import { renderFacetSections } from "../../../src/components/filters/facet-sections.js";
 import type { FacetSelection } from "../../../src/util/device-filter.js";
+import { identityLocalize, renderInto } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 
 const DEVICES = [
@@ -47,20 +47,17 @@ function emptySelection(): FacetSelection {
 
 function mount(overrides: Record<string, unknown> = {}) {
   const onChange = vi.fn();
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  render(
+  const container = renderInto(
     renderFacetSections({
       devices: DEVICES,
-      localize: (key: string) => key,
+      localize: identityLocalize,
       selection: emptySelection(),
       labelUsage: {},
       yamlMode: false,
       manageLabels: true,
       onChange,
       ...overrides,
-    }),
-    container
+    })
   );
   const sections = [...container.querySelectorAll<HTMLElement>("[data-facet-key]")];
   return { container, sections, onChange };
@@ -69,10 +66,6 @@ function mount(overrides: Record<string, unknown> = {}) {
 const keys = (sections: HTMLElement[]) => sections.map((s) => s.dataset.facetKey);
 
 describe("renderFacetSections", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("renders labels + area + platform + status + updates when the fleet warrants", () => {
     const { sections } = mount();
     // Two distinct platforms (>1), one named area (>0), both update buckets.
