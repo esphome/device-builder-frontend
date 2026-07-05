@@ -703,6 +703,39 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(payload);
   });
 
+  it("desktopCheckUpdate sends desktop/check_update and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = {
+      any_available: true,
+      app: { available: true, installed: "0.14.0", latest: "0.15.0", error: null },
+      esphome: {
+        available: false,
+        installed: "2026.6.4",
+        latest: "2026.6.4",
+        error: null,
+      },
+      device_builder: { available: false, installed: null, latest: null, error: null },
+    };
+    const pending = api.desktopCheckUpdate();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("desktop/check_update");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("desktopInstallUpdate sends desktop/update and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.desktopInstallUpdate();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("desktop/update");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: { started: true } });
+    await expect(pending).resolves.toEqual({ started: true });
+  });
+
   it("addComponent merges configuration into args", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
