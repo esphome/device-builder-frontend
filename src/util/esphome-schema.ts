@@ -33,6 +33,7 @@ import {
   type SchemaConfigVarKey,
   type SchemaSchema,
 } from "./esphome-schema-core.js";
+import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 
 export {
   fetchBundle,
@@ -58,8 +59,10 @@ export type {
   SchemaSchema,
 } from "./esphome-schema-core.js";
 
-/** Memoise nested-path docs by ``<bundle>|<component>|<a.b.c>``. */
-const configVarDocsCache = new Map<string, Promise<string | null>>();
+/** Memoise nested-path docs by ``<bundle>|<component>|<a.b.c>``.
+ *  A transient failure is evicted so the next hover retries instead
+ *  of replaying a rejected promise forever. */
+const configVarDocsCache = new KeyedPromiseCache<string | null>();
 
 /**
  * Reset the in-memory cache. Test-only entry point — production
@@ -86,9 +89,7 @@ export async function getConfigVarDocsAtPath(
 ): Promise<string | null> {
   if (path.length === 0) return null;
   const cacheKey = `${bundleName}|${componentKey}|${path.join(".")}`;
-  const cached = configVarDocsCache.get(cacheKey);
-  if (cached) return cached;
-  const promise = (async () => {
+  return configVarDocsCache.fetch(cacheKey, async () => {
     let cv = await loadSchemaCv(
       api,
       bundleName,
@@ -124,14 +125,7 @@ export async function getConfigVarDocsAtPath(
       cv = found;
     }
     return null;
-  })();
-  // Don't memoize a transient failure — evict on rejection so the next
-  // hover retries instead of replaying a rejected promise forever.
-  promise.catch(() => {
-    if (configVarDocsCache.get(cacheKey) === promise) configVarDocsCache.delete(cacheKey);
   });
-  configVarDocsCache.set(cacheKey, promise);
-  return promise;
 }
 
 /** Find the config-var named *key* reachable from *cv* — descending a

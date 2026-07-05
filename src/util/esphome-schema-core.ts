@@ -18,6 +18,7 @@
  * malformed JSON) so callers fall back to whatever they had before.
  */
 import type { ESPHomeAPI } from "../api/esphome-api.js";
+import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 
 const SCHEMA_HOST = "https://schema.esphome.io";
 
@@ -163,18 +164,23 @@ export interface SchemaConfigVarKey {
  *  key which means "haven't tried yet". */
 const cache = new Map<string, Promise<SchemaBundle | null>>();
 
-/** In-flight version-resolution promise. Stored as a promise so
- *  concurrent callers wait on the same answer; cleared on
- *  failure so the next caller retries (Copilot-flagged: marking
- *  versionResolved=true on failure made version negotiation
- *  non-retriable for the page lifetime — inconsistent with the
- *  bundle cache's transient-eviction behaviour). */
-let versionPromise: Promise<string> | null = null;
+/** In-flight version-resolution promise — a single-entry
+ *  ``KeyedPromiseCache`` under one fixed key so concurrent callers
+ *  wait on the same answer; evicted on failure so the next caller
+ *  retries (Copilot-flagged: marking versionResolved=true on failure
+ *  made version negotiation non-retriable for the page lifetime —
+ *  inconsistent with the bundle cache's transient-eviction
+ *  behaviour). */
+const versionCache = new KeyedPromiseCache<string>();
 
 /** Memoise resolved config-var key lists by ``<bundle>|<componentKey>``.
  *  The result is a Promise so concurrent callers dedupe on the same
- *  network round-trip. Cleared by ``_resetSchemaCacheForTests``. */
-const configVarKeysCache = new Map<string, Promise<SchemaConfigVarKey[]>>();
+ *  network round-trip. Cleared by ``_resetSchemaCacheForTests``. No
+ *  eviction: the collector never rejects (``fetchBundle`` resolves
+ *  ``null`` on every failure), so there is nothing to retry. */
+const configVarKeysCache = new KeyedPromiseCache<SchemaConfigVarKey[]>({
+  evictOnReject: false,
+});
 
 /**
  * Clear the lower-layer caches (bundle cache, in-flight version
@@ -185,7 +191,7 @@ const configVarKeysCache = new Map<string, Promise<SchemaConfigVarKey[]>>();
 export function _resetCoreSchemaCachesForTests() {
   cache.clear();
   configVarKeysCache.clear();
-  versionPromise = null;
+  versionCache.clear();
 }
 
 /**
@@ -202,8 +208,10 @@ export function _resetCoreSchemaCachesForTests() {
  * state when conditions change.
  */
 async function resolveVersion(api: ESPHomeAPI): Promise<string> {
-  if (versionPromise) return versionPromise;
-  const promise = (async () => {
+  // A successful resolution stays cached for the session — the
+  // dashboard's ``esphome_version`` doesn't change without a page
+  // reload. A failure is evicted so subsequent calls retry.
+  return versionCache.fetch("", async () => {
     const { esphome_version } = await api.getVersion();
     if (esphome_version.endsWith("dev")) return "dev";
     // Probe with GET, not HEAD: the schema CDN serves HEAD responses
@@ -224,15 +232,7 @@ async function resolveVersion(api: ESPHomeAPI): Promise<string> {
     // lifetime.)
     if (probe.status === 404) return "dev";
     throw new Error(`schema-host probe returned ${probe.status} for ${esphome_version}`);
-  })();
-  versionPromise = promise;
-  // Evict on failure so subsequent calls retry. A successful
-  // resolution stays cached for the session — the dashboard's
-  // ``esphome_version`` doesn't change without a page reload.
-  promise.catch(() => {
-    if (versionPromise === promise) versionPromise = null;
   });
-  return promise;
 }
 
 /**
@@ -462,9 +462,7 @@ export async function getConfigVarKeys(
   componentKey: string
 ): Promise<SchemaConfigVarKey[]> {
   const cacheKey = `${bundleName}|${componentKey}`;
-  const cached = configVarKeysCache.get(cacheKey);
-  if (cached) return cached;
-  const promise = (async () => {
+  return configVarKeysCache.fetch(cacheKey, async () => {
     const out: SchemaConfigVarKey[] = [];
     const seen = new Set<string>();
     await collectConfigVars(
@@ -477,9 +475,7 @@ export async function getConfigVarKeys(
       new Set()
     );
     return out;
-  })();
-  configVarKeysCache.set(cacheKey, promise);
-  return promise;
+  });
 }
 
 /** Recursively collect config-var keys from a schema, descending
