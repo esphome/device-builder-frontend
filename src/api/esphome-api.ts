@@ -1201,16 +1201,22 @@ export class ESPHomeAPI {
    *  decision and runs the install on the local CPU regardless of
    *  paired build servers — used by the install dialog's "Build
    *  locally instead" override link when the operator wants to
-   *  opt out of the transparent REMOTE routing for one install. */
+   *  opt out of the transparent REMOTE routing for one install.
+   *
+   *  ``bootloader=true`` makes the chain's upload flash the bootloader
+   *  image instead of the app (`esphome upload --bootloader`); OTA
+   *  targets only, refused while the device is offline. */
   async firmwareInstall(
     configuration: string,
     port = "OTA",
-    forceLocal = false
+    forceLocal = false,
+    bootloader = false
   ): Promise<FirmwareJob> {
     return this.sendCommand<FirmwareJob>("firmware/install", {
       configuration,
       port,
       force_local: forceLocal,
+      bootloader,
     });
   }
 

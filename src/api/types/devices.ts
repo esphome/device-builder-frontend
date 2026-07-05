@@ -71,6 +71,10 @@ export interface ConfiguredDevice {
   state: DeviceState;
   /** Indicates if an offline update has been compiled and is waiting for the device to wake up */
   queued_update?: boolean;
+  /** esp32 whose `ota: platform: esphome` sets `allow_partition_access` —
+   *  the YAML half of the OTA bootloader-update gate (see
+   *  `util/bootloader-flash.ts` for the deployed-firmware half). */
+  ota_partition_access?: boolean;
   /**
    * 8-char hex hash of the YAML as last successfully compiled,
    * persisted in the device-builder metadata sidecar. Matches the

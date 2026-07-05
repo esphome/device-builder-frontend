@@ -29,7 +29,7 @@ export function onInstallMethodSelect(
   applyInstallMethod(method, port, {
     device,
     firmwareDialog: host._firmwareDialog,
-    openInstall: (p) => openCommand(host, device, "install", p),
+    openInstall: (p, options) => openCommand(host, device, "install", p, options),
   });
 }
 
@@ -37,11 +37,10 @@ export function openCommand(
   host: ESPHomePageDashboard,
   device: ConfiguredDevice,
   type: CommandType,
-  port?: string
+  port?: string,
+  options?: { bootloader?: boolean }
 ): void {
-  host._commandDialog.configuration = device.configuration;
-  host._commandDialog.name = device.friendly_name || device.name;
-  host._commandDialog.open(type, port ? { port } : undefined);
+  host._commandDialog.openForDevice(device, type, { port, ...options });
 }
 
 export function showJobProgress(

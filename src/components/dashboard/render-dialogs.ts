@@ -4,6 +4,7 @@ import { DeviceState } from "../../api/types/devices.js";
 import type { ArchivedDevice } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { canFlashBootloader } from "../../util/bootloader-flash.js";
 import { computeLabelUsage } from "../../util/label-usage.js";
 import { performRename } from "./actions-ui.js";
 import {
@@ -246,6 +247,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       .deviceCurrentAddress=${
         host._installMethodDevice?.ip || host._installMethodDevice?.address || ""
       }
+      .canFlashBootloader=${canFlashBootloader(host._installMethodDevice)}
       .mode=${host._installMethodMode}
       @close=${() => {
         host._installMethodOpen = false;

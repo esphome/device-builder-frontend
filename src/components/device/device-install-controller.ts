@@ -1,5 +1,6 @@
 import { type ReactiveController, type ReactiveControllerHost } from "lit";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
+import { canFlashBootloader } from "../../util/bootloader-flash.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -38,6 +39,10 @@ export class DeviceInstallController implements ReactiveController {
     return this._host.device?.ip || this._host.device?.address || "";
   }
 
+  get canFlashBootloader(): boolean {
+    return canFlashBootloader(this._host.device);
+  }
+
   /** "Install" entry point — opens the install-method picker. */
   onInstall = () => {
     if (!this._host.device) return;
@@ -66,15 +71,16 @@ export class DeviceInstallController implements ReactiveController {
     applyInstallMethod(method, port, {
       device,
       firmwareDialog: this._host.firmwareDialog,
-      openInstall: (p) => this._openCommand(device, "install", p),
+      openInstall: (p, options) => this._openCommand(device, "install", p, options),
     });
   };
 
-  private _openCommand(device: ConfiguredDevice, type: CommandType, port?: string) {
-    const dialog = this._host.commandDialog;
-    if (!dialog) return;
-    dialog.configuration = device.configuration;
-    dialog.name = device.friendly_name || device.name;
-    dialog.open(type, port ? { port } : undefined);
+  private _openCommand(
+    device: ConfiguredDevice,
+    type: CommandType,
+    port?: string,
+    options?: { bootloader?: boolean }
+  ) {
+    this._host.commandDialog?.openForDevice(device, type, { port, ...options });
   }
 }

@@ -179,6 +179,8 @@ export class ESPHomeCommandDialog extends LitElement {
   _streamId = "";
   // Install target — "OTA" for network, an actual port for server-serial.
   _port = "OTA";
+  // Install flashes the bootloader image instead of the app (OTA-only).
+  _bootloader = false;
   // Active job id (cancel target). Empty for validate.
   _jobId = "";
 
@@ -212,9 +214,21 @@ export class ESPHomeCommandDialog extends LitElement {
     }
   }
 
-  public open(type: CommandType, options?: { port?: string }) {
+  /** Point the dialog at *device* and open — the shared host entry point. */
+  public openForDevice(
+    device: ConfiguredDevice,
+    type: CommandType,
+    options?: { port?: string; bootloader?: boolean }
+  ) {
+    this.configuration = device.configuration;
+    this.name = device.friendly_name || device.name;
+    this.open(type, options);
+  }
+
+  public open(type: CommandType, options?: { port?: string; bootloader?: boolean }) {
     this._commandType = type;
     this._port = options?.port ?? "OTA";
+    this._bootloader = options?.bootloader ?? false;
     this._state = null;
     this._lines = [];
     this._resetPendingLines();
@@ -248,6 +262,8 @@ export class ESPHomeCommandDialog extends LitElement {
     this.name = displayName;
     this._commandType = commandType ?? deriveFollowCommandType(this._jobs, job);
     this._port = job.port || "OTA";
+    // Restore so a "Build locally instead" retry keeps flashing the bootloader.
+    this._bootloader = job.flash_bootloader === true;
     resetRunState(this);
     // Fresh attach is a fresh session — reset toggle defaults so a prior
     // opt-out doesn't silently inherit.

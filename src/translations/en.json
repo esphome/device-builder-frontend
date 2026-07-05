@@ -163,6 +163,8 @@
     "install_method_usb_server_ha_desc": "For devices connected via USB to your Home Assistant server",
     "install_method_manual_download": "Download firmware binary",
     "install_method_manual_download_desc": "Compile here and download the binary, then flash it manually with your preferred tool",
+    "install_method_bootloader": "Update bootloader",
+    "install_method_bootloader_desc": "Flash a new bootloader over the network. Keep the device powered; a power loss or reset during the update can require a USB flash to recover",
     "install": "Install",
     "install_method_select_port": "Select a serial port",
     "install_method_no_ports": "No serial ports found. Make sure the device is connected to the server.",

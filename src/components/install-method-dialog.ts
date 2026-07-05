@@ -4,6 +4,7 @@ import {
   mdiChevronDown,
   mdiChevronRight,
   mdiChevronUp,
+  mdiChip,
   mdiDownload,
   mdiIpNetworkOutline,
   mdiSerialPort,
@@ -48,6 +49,7 @@ registerMdiIcons({
   "serial-port": mdiSerialPort,
   download: mdiDownload,
   "ip-network-outline": mdiIpNetworkOutline,
+  chip: mdiChip,
 });
 
 type DialogView = "method" | "port-select";
@@ -82,6 +84,14 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    */
   @property()
   deviceCurrentAddress = "";
+
+  /**
+   * Shows the "Update bootloader" advanced option. Hosts compute it
+   * via `canFlashBootloader`: the YAML enables `allow_partition_access`
+   * AND the running firmware was built with it (hash match).
+   */
+  @property({ type: Boolean, attribute: "can-flash-bootloader" })
+  canFlashBootloader = false;
 
   @state() private _view: DialogView = "method";
 
@@ -451,10 +461,39 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       body: () => html`
         <div class="advanced-panel-content">
           ${this._renderOtaAddressCard()}
+          ${
+            this.mode === "install" &&
+            this.canFlashBootloader &&
+            this.deviceState === DeviceState.ONLINE
+              ? this._renderBootloaderOption()
+              : nothing
+          }
           ${this.mode === "install" ? this._renderManualDownloadOption() : nothing}
         </div>
       `,
     });
+  }
+
+  /**
+   * OTA bootloader update — flashes the second-stage bootloader instead
+   * of the app (the "Bootloader too old for OTA rollback" warning's fix
+   * without a USB cable). Rendered only when the host says the device
+   * can accept it and it's online for the flash to land.
+   */
+  private _renderBootloaderOption() {
+    return html`
+      <div class="option" @click=${() => this._selectMethod("bootloader")}>
+        <wa-icon library="mdi" name="chip"></wa-icon>
+        <div class="info">
+          <span class="title"
+            >${this._localize("dashboard.install_method_bootloader")}</span
+          >
+          <span class="desc"
+            >${this._localize("dashboard.install_method_bootloader_desc")}</span
+          >
+        </div>
+      </div>
+    `;
   }
 
   /**

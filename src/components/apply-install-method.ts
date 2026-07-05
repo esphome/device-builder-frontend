@@ -4,8 +4,9 @@ import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js"
 export interface InstallMethodHandlers {
   device: ConfiguredDevice;
   /** Run the backend/OTA install with an optional address override
-   *  ("OTA" sentinel for the default address, a server serial port, etc.). */
-  openInstall: (port?: string) => void;
+   *  ("OTA" sentinel for the default address, a server serial port, etc.).
+   *  ``bootloader`` flashes the bootloader image instead of the app. */
+  openInstall: (port?: string, options?: { bootloader?: boolean }) => void;
   firmwareDialog: ESPHomeFirmwareInstallDialog | null;
 }
 
@@ -28,6 +29,9 @@ export function applyInstallMethod(
       // server-serial always carries the chosen port; guard rather than assert
       // so a malformed event can't open the install command without one.
       if (port) h.openInstall(port);
+      break;
+    case "bootloader":
+      h.openInstall("OTA", { bootloader: true });
       break;
     case "web-serial":
       h.firmwareDialog?.installWebSerial(h.device);

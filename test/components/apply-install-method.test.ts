@@ -59,4 +59,10 @@ describe("applyInstallMethod", () => {
     applyInstallMethod("binary-download", undefined, d);
     expect(d.firmwareDialog.installBinaryDownload).toHaveBeenCalledWith(device);
   });
+
+  it("bootloader opens an OTA install carrying the bootloader flag", () => {
+    const d = deps();
+    applyInstallMethod("bootloader", undefined, d);
+    expect(d.openInstall).toHaveBeenCalledWith("OTA", { bootloader: true });
+  });
 });
