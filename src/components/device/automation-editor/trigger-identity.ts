@@ -34,8 +34,9 @@ export function bareTriggerKey(catalogId: string): string {
 /**
  * Build the catalog-qualified trigger id for a ``component_on``
  * location, using the bound device's domain. Returns ``null``
- * when the device isn't yet loaded or the location has no
- * trigger picked.
+ * for other location kinds or when no trigger is picked; while
+ * the device list hasn't loaded yet the bare trigger key is
+ * returned unqualified so the caller still has a usable id.
  */
 export function catalogTriggerIdFor(
   loc: AutomationLocation,
@@ -75,8 +76,9 @@ export function effectiveTriggerIdFor(
  * the bound device's display name + catalog id (e.g.
  * "Warmtepomp (switch.gpio)") — no separate "Which component?"
  * row. For device_on it's "The device itself"; for interval
- * it's "Interval #N"; for script / light_effect we fall back
- * to the kind label (those land in their own editors anyway).
+ * it's "Interval #N"; for script / api_action / light_effect
+ * the row shows their own identifier (script id, action name,
+ * component id) since those land in their own editors anyway.
  */
 export function targetMetadataValue(
   loc: AutomationLocation,
