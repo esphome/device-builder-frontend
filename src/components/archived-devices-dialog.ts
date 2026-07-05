@@ -9,6 +9,7 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getErrorMessage } from "../util/error-message.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { renderAsyncState } from "../util/render-async-state.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
@@ -195,15 +196,14 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
       }
 
       .empty,
-      .loading,
-      .error {
+      .message {
         padding: var(--wa-space-2xl) var(--wa-space-l);
         text-align: center;
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-s);
       }
 
-      .error {
+      .message.error {
         color: var(--wa-color-danger-text-normal);
       }
 
@@ -292,14 +292,15 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
   }
 
   private _renderBody() {
-    if (this._loading && this._devices.length === 0) {
-      return html`<div class="loading">
-        ${this._localize("dashboard.archived_dialog_loading")}
-      </div>`;
-    }
-    if (this._error) {
-      return html`<div class="error">${this._error}</div>`;
-    }
+    return renderAsyncState({
+      loading: this._loading && this._devices.length === 0,
+      loadingMessage: this._localize("dashboard.archived_dialog_loading"),
+      error: this._error ?? "",
+      content: () => this._renderList(),
+    });
+  }
+
+  private _renderList() {
     if (this._devices.length === 0) {
       return html`<div class="empty">
         ${this._localize("dashboard.archived_dialog_empty")}

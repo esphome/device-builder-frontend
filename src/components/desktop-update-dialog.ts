@@ -12,6 +12,7 @@ import {
 } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { renderAsyncState } from "../util/render-async-state.js";
 
 import "./base-dialog.js";
 
@@ -159,19 +160,15 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
   }
 
   private _renderBody() {
-    if (this._updating) {
-      return html`<div class="message" role="status">
-        ${this._localize("desktop_update_dialog.updating")}
-      </div>`;
-    }
-    if (this._loading) {
-      return html`<div class="message" role="status">
-        ${this._localize("desktop_update_dialog.checking")}
-      </div>`;
-    }
-    if (this._error) {
-      return html`
-        <div class="message error" role="alert">${this._error}</div>
+    return renderAsyncState({
+      loading: this._updating || this._loading,
+      loadingMessage: this._localize(
+        this._updating
+          ? "desktop_update_dialog.updating"
+          : "desktop_update_dialog.checking"
+      ),
+      error: this._error,
+      errorActions: () => html`
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.close")}
@@ -180,8 +177,12 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
             ${this._localize("desktop_update_dialog.retry")}
           </button>
         </div>
-      `;
-    }
+      `,
+      content: () => this._renderCheck(),
+    });
+  }
+
+  private _renderCheck() {
     const check = this._check;
     if (!check) {
       return nothing;
