@@ -150,7 +150,12 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
   try {
     switch (host._commandType) {
       case "install":
-        job = await host._api.firmwareInstall(host.configuration, host._port);
+        job = await host._api.firmwareInstall(
+          host.configuration,
+          host._port,
+          false,
+          host._bootloader
+        );
         break;
       case "compile":
         job = await host._api.firmwareCompile(host.configuration);
@@ -337,7 +342,12 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
         if (!isCancelAlreadyTerminal(cancelErr)) throw cancelErr;
       }
     }
-    const job = await host._api.firmwareInstall(configuration, port, true);
+    const job = await host._api.firmwareInstall(
+      configuration,
+      port,
+      true,
+      host._bootloader
+    );
     // Keep _commandType "install": the public followJob would derive "compile"
     // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
     // attempt and reset the run state (the public followJob did this), then

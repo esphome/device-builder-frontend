@@ -747,7 +747,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await pending;
   });
 
-  it("firmwareInstall defaults port to OTA and force_local to false", async () => {
+  it("firmwareInstall defaults port to OTA, force_local and bootloader to false", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     api.firmwareInstall("foo.yaml");
@@ -756,6 +756,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       configuration: "foo.yaml",
       port: "OTA",
       force_local: false,
+      bootloader: false,
     });
   });
 
@@ -768,6 +769,20 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       configuration: "foo.yaml",
       port: "OTA",
       force_local: true,
+      bootloader: false,
+    });
+  });
+
+  it("firmwareInstall threads bootloader through to the backend", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    api.firmwareInstall("foo.yaml", "OTA", false, true);
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({
+      configuration: "foo.yaml",
+      port: "OTA",
+      force_local: false,
+      bootloader: true,
     });
   });
 

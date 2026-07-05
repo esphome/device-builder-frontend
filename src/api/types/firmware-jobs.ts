@@ -60,6 +60,9 @@ export interface FirmwareJob {
   output: string[];
   error: string | null;
   port: string;
+  /** Set on an UPLOAD that flashes the bootloader image instead of the
+   *  app (`esphome upload --bootloader`); OTA targets only. */
+  flash_bootloader?: boolean;
   /** New device name. Carried only by ``rename`` jobs; the backend
    *  dataclass defaults to ``""`` for every other job type so the
    *  field is always present on the wire — required here matches. */

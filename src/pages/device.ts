@@ -1085,6 +1085,7 @@ export class ESPHomePageDevice extends LitElement {
           .deviceState=${this._installCtrl.deviceState}
           .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
           .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
+          .canFlashBootloader=${this._installCtrl.canFlashBootloader}
           @close=${this._installCtrl.onInstallMethodClose}
           @select-method=${this._installCtrl.onInstallMethodSelect}
         ></esphome-install-method-dialog>

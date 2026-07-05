@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canFlashBootloader,
   mdnsOnline,
   showPendingChanges,
   showUpdateAvailable,
@@ -49,5 +50,42 @@ describe("device-sync mDNS gating", () => {
     });
     expect(showPendingChanges(live)).toBe(true);
     expect(showUpdateAvailable(live)).toBe(true);
+  });
+});
+
+describe("canFlashBootloader", () => {
+  it("requires the YAML flag and a deployed firmware built from the current config", () => {
+    expect(
+      canFlashBootloader(
+        makeConfiguredDevice({
+          ota_partition_access: true,
+          expected_config_hash: "aa11bb22",
+          deployed_config_hash: "aa11bb22",
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("stays off without the flag, without hashes, or on a hash mismatch", () => {
+    const hashes = { expected_config_hash: "aa11bb22", deployed_config_hash: "aa11bb22" };
+    expect(canFlashBootloader(makeConfiguredDevice(hashes))).toBe(false);
+    expect(
+      canFlashBootloader(
+        makeConfiguredDevice({
+          ota_partition_access: true,
+          expected_config_hash: "aa11bb22",
+          deployed_config_hash: "ff00ff00",
+        })
+      )
+    ).toBe(false);
+    expect(
+      canFlashBootloader(
+        makeConfiguredDevice({
+          ota_partition_access: true,
+          expected_config_hash: "",
+          deployed_config_hash: "",
+        })
+      )
+    ).toBe(false);
   });
 });
