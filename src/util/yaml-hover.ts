@@ -44,6 +44,7 @@ import {
   RE_PAIR_LINE,
   readPlatformSibling,
   stripComment,
+  unquote,
 } from "./yaml-line-walker.js";
 
 /** Resolved hover content — Markdown docs plus an optional "See also" link. */
@@ -51,16 +52,6 @@ export interface HoverTarget {
   description: string | null;
   docsUrl: string | null;
   docsTitle: string | null;
-}
-
-/** Strip one layer of matched quotes (mirrors the AST / line-walker). */
-function unquote(value: string): string {
-  if (value.length < 2) return value;
-  const q = value[0];
-  if ((q === '"' || q === "'") && value[value.length - 1] === q) {
-    return value.slice(1, -1);
-  }
-  return value;
 }
 
 /**

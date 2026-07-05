@@ -69,6 +69,22 @@ export function stripComment(line: string): string {
   return line.slice(0, m.index! + m[0].length - 1).trimEnd();
 }
 
+/** Strip a single layer of matched single or double quotes from
+ *  *value*. Mirrors the AST's ``readLiteralText`` so the regex
+ *  walkers (and ``yaml-hover``) and the AST agree on the
+ *  user-facing string. Deliberately NOT ``yaml-scalar``'s
+ *  ``stripQuotes``: importing ``yaml-scalar`` here would close an
+ *  import cycle (``yaml-scalar`` → ``yaml-serialize`` →
+ *  ``esphome-yaml-lang`` → this module). */
+export function unquote(value: string): string {
+  if (value.length < 2) return value;
+  const q = value[0];
+  if ((q === '"' || q === "'") && value[value.length - 1] === q) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
 // ─── Multi-line walkers ──────────────────────────────────────────────
 
 export interface ParentKey {
@@ -270,16 +286,4 @@ export function readPlatformSibling(
     if (m) return unquote(m[1]);
   }
   return null;
-}
-
-/** Strip a single layer of matched single or double quotes from
- *  *value*. Mirrors the AST's ``readLiteralText`` so the regex
- *  walker and the AST agree on the user-facing string. */
-function unquote(value: string): string {
-  if (value.length < 2) return value;
-  const q = value[0];
-  if ((q === '"' || q === "'") && value[value.length - 1] === q) {
-    return value.slice(1, -1);
-  }
-  return value;
 }

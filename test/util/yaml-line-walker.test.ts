@@ -10,6 +10,7 @@ import {
   keyPathByIndent,
   readPlatformSibling,
   stripComment,
+  unquote,
 } from "../../src/util/yaml-line-walker.js";
 
 /** Build a CodeMirror `Text` doc from an array of lines. */
@@ -45,6 +46,32 @@ describe("stripComment", () => {
 
   it("trims trailing whitespace when there's no comment", () => {
     expect(stripComment("name: foo   ")).toBe("name: foo");
+  });
+});
+
+describe("unquote", () => {
+  it("strips one layer of matched double quotes", () => {
+    expect(unquote('"gpio"')).toBe("gpio");
+  });
+
+  it("strips one layer of matched single quotes", () => {
+    expect(unquote("'gpio'")).toBe("gpio");
+  });
+
+  it("leaves an unquoted value untouched", () => {
+    expect(unquote("gpio")).toBe("gpio");
+  });
+
+  it("leaves mismatched quotes untouched", () => {
+    expect(unquote("\"gpio'")).toBe("\"gpio'");
+  });
+
+  it("leaves a lone quote character untouched", () => {
+    expect(unquote('"')).toBe('"');
+  });
+
+  it("strips only the outer layer of nested quotes", () => {
+    expect(unquote("'\"gpio\"'")).toBe('"gpio"');
   });
 });
 
