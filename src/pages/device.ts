@@ -32,8 +32,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import {
   backendErrorCounts,
-  backendErrorsForSection,
-  backendSectionMessages,
+  backendErrorsForInstance,
   formRelativePath,
   resolveBackendErrors,
   type BackendFieldError,
@@ -182,11 +181,10 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _backendErrors: BackendFieldError[] = [];
 
-  // Memoised so idle re-renders keep the Map identities stable — the
+  // Memoised so idle re-renders keep the prop identities stable — the
   // section editor keys its per-edit error suppression on the prop
-  // changing, and a fresh Map every render would wipe it immediately.
-  private _sectionBackendErrors = memoizeOne(backendErrorsForSection);
-  private _sectionBackendMessages = memoizeOne(backendSectionMessages);
+  // changing, and a fresh object every render would wipe it immediately.
+  private _instanceBackendErrors = memoizeOne(backendErrorsForInstance);
   private _navErrorCounts = memoizeOne(backendErrorCounts);
 
   /** Form-relative path of the last focused field, and whether its YAML
@@ -1045,12 +1043,7 @@ export class ESPHomePageDevice extends LitElement {
             .selectedSection=${this._selectedSection}
             .selectedFromLine=${this._selectedFromLine}
             .focusFieldPath=${this._focusFieldPath}
-            .backendErrors=${this._sectionBackendErrors(
-              this._backendErrors,
-              this._selectedSection,
-              this._selectedFromLine
-            )}
-            .backendSectionMessages=${this._sectionBackendMessages(
+            .backendErrors=${this._instanceBackendErrors(
               this._backendErrors,
               this._selectedSection,
               this._selectedFromLine

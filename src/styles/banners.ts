@@ -41,3 +41,43 @@ export const warningBannerStyles = css`
     font-size: var(--wa-font-size-s);
   }
 `;
+
+/**
+ * Danger-banner shape for backend validation errors: icon + column of
+ * bold messages on the danger token stack. Consumers layer positioning
+ * (the editor's floating placement) or outer spacing on top.
+ */
+export const dangerBannerStyles = css`
+  .danger-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-s) var(--wa-space-m);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-danger-fill-quiet);
+    border: var(--wa-border-width-s) solid var(--wa-color-danger-60);
+    color: var(--wa-color-danger-text-normal);
+  }
+
+  .danger-banner wa-icon {
+    flex: 0 0 auto;
+    font-size: 1.25rem;
+    margin-top: 0.05rem;
+    color: var(--wa-color-danger-60);
+  }
+
+  .danger-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    line-height: 1.4;
+    min-width: 0;
+  }
+
+  .danger-banner-text > * {
+    margin: 0;
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    word-break: break-word;
+  }
+`;

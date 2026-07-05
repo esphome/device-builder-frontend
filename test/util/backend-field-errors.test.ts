@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   backendErrorCounts,
-  backendErrorsForSection,
-  backendSectionMessages,
+  backendErrorsForInstance,
   formRelativePath,
   instanceKey,
   resolveBackendErrors,
@@ -174,52 +173,47 @@ describe("backendErrorCounts", () => {
   });
 });
 
-describe("backendErrorsForSection", () => {
+describe("backendErrorsForInstance", () => {
   const errors: BackendFieldError[] = [
     { sectionKey: "sensor.dht", fromLine: 16, relPath: "update_interval", message: "a" },
     { sectionKey: "sensor.dht", fromLine: 13, relPath: "pin", message: "b" },
     { sectionKey: "wifi", fromLine: 4, relPath: "", message: "section only" },
+    { sectionKey: "wifi", fromLine: 4, relPath: "ssid", message: "field error" },
   ];
 
-  it("returns the selected instance's errors as validation entries", () => {
-    const map = backendErrorsForSection(errors, "sensor.dht", 16);
-    expect([...map.keys()]).toEqual(["update_interval"]);
-    expect(map.get("update_interval")).toEqual({
-      key: "update_interval",
+  it("partitions the selected instance's errors for the section editor", () => {
+    const { fields, fieldMessages, sectionMessages } = backendErrorsForInstance(
+      errors,
+      "wifi",
+      4
+    );
+    expect([...fields.keys()]).toEqual(["ssid"]);
+    expect(fields.get("ssid")).toEqual({
+      key: "ssid",
       code: "validation.backend",
-      params: { message: "a" },
+      params: { message: "field error" },
     });
+    expect(fieldMessages).toEqual(["field error"]);
+    expect(sectionMessages).toEqual(["section only"]);
   });
 
   it("excludes other instances of the same section key", () => {
-    const map = backendErrorsForSection(errors, "sensor.dht", 13);
-    expect([...map.keys()]).toEqual(["pin"]);
+    expect([...backendErrorsForInstance(errors, "sensor.dht", 13).fields.keys()]).toEqual(
+      ["pin"]
+    );
   });
 
   it("matches any instance when fromLine is undefined", () => {
-    const map = backendErrorsForSection(errors, "sensor.dht", undefined);
-    expect([...map.keys()].sort()).toEqual(["pin", "update_interval"]);
+    expect(
+      [...backendErrorsForInstance(errors, "sensor.dht", undefined).fields.keys()].sort()
+    ).toEqual(["pin", "update_interval"]);
   });
 
-  it("skips section-level errors and unselected sections", () => {
-    expect(backendErrorsForSection(errors, "wifi", 4).size).toBe(0);
-    expect(backendErrorsForSection(errors, null, undefined).size).toBe(0);
-  });
-});
-
-describe("backendSectionMessages", () => {
-  const errors: BackendFieldError[] = [
-    { sectionKey: "wifi", fromLine: 4, relPath: "", message: "section broken" },
-    { sectionKey: "wifi", fromLine: 4, relPath: "ssid", message: "field error" },
-    { sectionKey: "mdns", fromLine: 9, relPath: "", message: "expected a dictionary" },
-  ];
-
-  it("returns only the selected instance's section-level messages", () => {
-    expect(backendSectionMessages(errors, "wifi", 4)).toEqual(["section broken"]);
-    expect(backendSectionMessages(errors, "mdns", undefined)).toEqual([
-      "expected a dictionary",
-    ]);
-    expect(backendSectionMessages(errors, "wifi", 99)).toEqual([]);
-    expect(backendSectionMessages(errors, null, undefined)).toEqual([]);
+  it("returns the shared empty value for no selection or no match", () => {
+    expect(backendErrorsForInstance(errors, null, undefined).fields.size).toBe(0);
+    const miss = backendErrorsForInstance(errors, "wifi", 99);
+    expect(miss.fields.size).toBe(0);
+    expect(miss.fieldMessages).toEqual([]);
+    expect(miss.sectionMessages).toEqual([]);
   });
 });

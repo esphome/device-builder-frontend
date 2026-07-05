@@ -27,7 +27,7 @@ export interface NavSectionView {
   /** Backend validation errors attributed to a row's section instance. */
   errorCount?: (item: YamlSection) => number;
   /** Localized accessible label for an error badge carrying count errors. */
-  errorLabel?: (count: number) => string;
+  errorLabel: (count: number) => string;
   onToggle: () => void;
   onItemEnter: (item: YamlSection) => void;
   onItemLeave: () => void;
@@ -95,15 +95,12 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
   `;
 }
 
-/** Small error-count pill; the section's fields carry the details. Without
- *  a label it stays a plain text span — a bare role="img" with no
- *  accessible name reads as an unnamed image. */
+/** Small error-count pill; the section's fields carry the details. */
 function renderErrorBadge(count: number, v: NavSectionView): TemplateResult {
-  const label = v.errorLabel?.(count);
   return html`<span
     class="nav-item-error-badge"
-    role=${ifDefined(label ? "img" : undefined)}
-    aria-label=${ifDefined(label)}
+    role="img"
+    aria-label=${v.errorLabel(count)}
     >${count}</span
   >`;
 }

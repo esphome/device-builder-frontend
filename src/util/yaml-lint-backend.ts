@@ -189,29 +189,43 @@ function keyAt(doc: Text, offset: number): string | null {
 }
 
 /**
+ * Trim a range that only spills onto blank lines (or the start of the
+ * next line) back to its last content line. ESPHome's end marks often
+ * land at column 0 past a blank separator, making single-line content
+ * read as multi-line.
+ */
+export function trimRangeToContent(
+  doc: Text,
+  range: { from: number; to: number }
+): { from: number; to: number } {
+  const startLine = doc.lineAt(range.from);
+  let toLine = doc.lineAt(range.to);
+  while (
+    toLine.number > startLine.number &&
+    !doc.sliceString(toLine.from, Math.min(range.to, toLine.to)).trim()
+  ) {
+    toLine = doc.line(toLine.number - 1);
+    range = { from: range.from, to: toLine.to };
+  }
+  return range;
+}
+
+/**
  * Move a block-level validation error onto the key of its enclosing block.
  *
  * ESPHome marks "Component not found" / "Platform missing" on the block's
  * value mapping, so a multi-line range spans the children. Walk it up to
  * the first less-indented `key:` line (clamp to the first line if none).
- * A range that only spills onto blank lines (or the start of the next
- * line) is single-line content — trimmed back and passed through
- * untouched, like any already-precise single-line range.
+ * Single-line content (after blank-spill trimming) passes through
+ * untouched — it's already precise.
  */
 export function retargetBlockDiagnostic(
   doc: Text,
   fallback: { from: number; to: number }
 ): { from: number; to: number } {
+  fallback = trimRangeToContent(doc, fallback);
   const startLine = doc.lineAt(fallback.from);
-  let toLine = doc.lineAt(fallback.to);
-  while (
-    toLine.number > startLine.number &&
-    !doc.sliceString(toLine.from, Math.min(fallback.to, toLine.to)).trim()
-  ) {
-    toLine = doc.line(toLine.number - 1);
-    fallback = { from: fallback.from, to: toLine.to };
-  }
-  if (toLine.number === startLine.number) return fallback;
+  if (doc.lineAt(fallback.to).number === startLine.number) return fallback;
 
   const startIndent = indentOf(startLine.text);
   for (let n = startLine.number - 1; n >= 1; n--) {
@@ -363,10 +377,11 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           bannerErrors.push(message);
           continue;
         }
-        const anchor = rangeToOffsets(view, err.range);
-        const { from, to } = retargetBlockDiagnostic(view.state.doc, anchor);
+        const doc = view.state.doc;
+        const anchor = trimRangeToContent(doc, rangeToOffsets(view, err.range));
+        const { from, to } = retargetBlockDiagnostic(doc, anchor);
         // Pinned on the `esphome:` core block → whole-config error → banner.
-        if (keyAt(view.state.doc, from) === CORE_BLOCK_KEY) {
+        if (keyAt(doc, from) === CORE_BLOCK_KEY) {
           bannerErrors.push(message);
           continue;
         }
@@ -384,16 +399,24 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // item; the enclosing key covers them all). Anchor inside the
         // first token — side -1 at the exact start would resolve to the
         // preceding node.
-        const keyPath = getKeyPathWithListIndices(
+        let keyPath = getKeyPathWithListIndices(
           view.state,
           Math.min(anchor.from + 1, anchor.to)
         );
+        // A multi-line range anchored on a key token is a container-level
+        // error: esphome marked a whole mapping, whose range starts at its
+        // first key. That key is incidental — attribute the error to the
+        // container so it lands on the section, not on an unrelated field.
+        const anchorLine = doc.lineAt(anchor.from);
+        if (
+          keyPath.length > 0 &&
+          doc.lineAt(anchor.to).number !== anchorLine.number &&
+          KEY_LINE_RE.test(anchorLine.text.slice(anchor.from - anchorLine.from))
+        ) {
+          keyPath = keyPath.slice(0, -1);
+        }
         if (keyPath.length > 0) {
-          mapped.push({
-            message,
-            line: view.state.doc.lineAt(anchor.from).number,
-            keyPath,
-          });
+          mapped.push({ message, line: anchorLine.number, keyPath });
         }
         // No form field to carry the message (a bare section header, or the
         // AST couldn't place it) — keep it in the banner; a section-level

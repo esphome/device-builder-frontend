@@ -102,49 +102,50 @@ export function backendErrorCounts(
   return counts;
 }
 
-/**
- * The selected instance's section-level messages (empty relPath). These
- * normally live in the document banner, which the visual-only layout
- * hides — the section editor surfaces them instead so a badge always
- * leads to a readable message.
- */
-export function backendSectionMessages(
-  errors: readonly BackendFieldError[],
-  sectionKey: string | null,
-  fromLine: number | undefined
-): string[] {
-  if (!sectionKey) return [];
-  const out: string[] = [];
-  for (const e of errors) {
-    if (e.sectionKey !== sectionKey) continue;
-    if (fromLine !== undefined && e.fromLine !== fromLine) continue;
-    if (!e.relPath) out.push(e.message);
-  }
-  return out;
+/** A section instance's errors, partitioned for the section editor. */
+export interface InstanceBackendErrors {
+  /** Field-mapped errors as the path-keyed map the config form renders. */
+  fields: Map<string, ValidationError>;
+  /** Raw messages of the field-mapped errors, for sections with no form. */
+  fieldMessages: string[];
+  /** Section-level messages (empty relPath) — banner material. */
+  sectionMessages: string[];
 }
 
+/** Shared empty value, so unwired consumers keep a stable identity. */
+export const NO_INSTANCE_ERRORS: InstanceBackendErrors = {
+  fields: new Map(),
+  fieldMessages: [],
+  sectionMessages: [],
+};
+
 /**
- * The selected section instance's errors as the path-keyed map the config
- * form renders. Section-level errors (empty relPath) are navigator/banner
- * material, not field errors. An undefined fromLine matches any instance
- * of the section key.
+ * The selected section instance's errors, partitioned once for every
+ * consumer in the section editor. An undefined fromLine matches any
+ * instance of the section key.
  */
-export function backendErrorsForSection(
+export function backendErrorsForInstance(
   errors: readonly BackendFieldError[],
   sectionKey: string | null,
   fromLine: number | undefined
-): Map<string, ValidationError> {
-  const out = new Map<string, ValidationError>();
-  if (!sectionKey) return out;
+): InstanceBackendErrors {
+  if (!sectionKey) return NO_INSTANCE_ERRORS;
+  const fields = new Map<string, ValidationError>();
+  const fieldMessages: string[] = [];
+  const sectionMessages: string[] = [];
   for (const e of errors) {
     if (e.sectionKey !== sectionKey) continue;
     if (fromLine !== undefined && e.fromLine !== fromLine) continue;
-    if (!e.relPath) continue;
-    out.set(e.relPath, {
+    if (!e.relPath) {
+      sectionMessages.push(e.message);
+      continue;
+    }
+    fieldMessages.push(e.message);
+    fields.set(e.relPath, {
       key: e.relPath,
       code: "validation.backend",
       params: { message: e.message },
     });
   }
-  return out;
+  return { fields, fieldMessages, sectionMessages };
 }
