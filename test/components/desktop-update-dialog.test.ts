@@ -12,7 +12,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { DesktopUpdateCheck } from "../../src/api/types/protocol.js";
+import type { DesktopUpdateCheck } from "../../src/api/types/desktop.js";
 import { ESPHomeDesktopUpdateDialog } from "../../src/components/desktop-update-dialog.js";
 
 function makeCheck(anyAvailable: boolean): DesktopUpdateCheck {

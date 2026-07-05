@@ -3,10 +3,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type {
-  DesktopComponentUpdate,
-  DesktopUpdateCheck,
-} from "../api/types/protocol.js";
+import type { DesktopComponentUpdate, DesktopUpdateCheck } from "../api/types/desktop.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";

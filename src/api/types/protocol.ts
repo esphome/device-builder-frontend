@@ -53,28 +53,6 @@ export interface ServerInfoMessage {
   desktop_update_capable?: boolean;
 }
 
-/** One component's update availability, from `desktop/check_update`. */
-export interface DesktopComponentUpdate {
-  available: boolean;
-  installed: string | null;
-  latest: string | null;
-  error: string | null;
-}
-
-/** Result of `desktop/check_update`: per-component update availability. */
-export interface DesktopUpdateCheck {
-  any_available: boolean;
-  /** The desktop app itself (its self-update from GitHub Releases). */
-  app: DesktopComponentUpdate;
-  esphome: DesktopComponentUpdate;
-  device_builder: DesktopComponentUpdate;
-}
-
-/** Result of `desktop/update`: the update was spawned (the app then restarts). */
-export interface DesktopUpdateStarted {
-  started: boolean;
-}
-
 export type ServerMessage = ResultMessage | ErrorMessage | EventMessage;
 
 export enum ErrorCode {

@@ -33,6 +33,7 @@ import type {
   ComponentCatalogEntry,
   PagedComponentsResponse,
 } from "./types/components.js";
+import type { DesktopUpdateCheck, DesktopUpdateStarted } from "./types/desktop.js";
 import type {
   AddComponentResponse,
   ConfiguredDevice,
@@ -56,8 +57,6 @@ import type {
 } from "./types/firmware-jobs.js";
 import type {
   CommandMessage,
-  DesktopUpdateCheck,
-  DesktopUpdateStarted,
   ErrorMessage,
   EventMessage,
   ResultMessage,
