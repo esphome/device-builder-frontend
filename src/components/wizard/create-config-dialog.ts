@@ -12,6 +12,7 @@ import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { fetchBoard, getCachedBoard } from "../../util/board-body-cache.js";
+import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId } from "../../util/featured-id.js";
 import { featuredComponentName, fullSetupComponentIds } from "../../util/full-setup.js";
 import { markJustCreated } from "../../util/just-created.js";
@@ -75,8 +76,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   // Drives the step components' Enter listeners: the steps stay mounted in
   // the wa-dialog while it's merely hidden (light-dismiss / Escape / close),
   // so they must deactivate on hide, not just on unmount.
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   /** Always a full body (only ever assigned in ``_enterSetupStep`` /
    *  ``openWithBoard``), so the setup step reads a real ``requires_wifi``. */
@@ -196,7 +196,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     this._submitting = false;
     this._pickedBoardId = null;
     this._resetCreateErrors();
-    this._open = true;
+    this._dialog.open = true;
   }
 
   /** Clear both error slots so a stale message from a prior
@@ -211,20 +211,13 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   }
 
   public close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  // esphome-base-dialog never flips its own open on a user-driven close
-  // (Escape / X / outside-click); the host owns _open, else a re-render
-  // re-asserts ?open and the dialog can't dismiss.
-  private _onRequestClose = () => {
-    this._open = false;
-  };
 
   // The step components stay mounted while the dialog is merely hidden, so
   // drop their Enter listeners once it has fully hidden.
   private _onHide = () => {
-    this._open = false;
+    this._dialog.open = false;
   };
 
   // ----- ImportFlowHost: the slice the import controller drives -----
@@ -273,10 +266,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     return html`
       <esphome-base-dialog
         class=${this._step === "board" ? "wide" : ""}
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         ?busy=${this._submitting}
         .label=${this._title}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onHide}
         @next-step=${this._onNextStep}
         @toggle-advanced=${this._onToggleAdvanced}
@@ -330,12 +323,12 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       case "setup":
         return html`<esphome-wizard-step-setup
           .board=${this._selectedBoard}
-          ?active=${this._open}
+          ?active=${this._dialog.open}
           ?submitting=${this._submitting}
         ></esphome-wizard-step-setup>`;
       case "empty-config":
         return html`<esphome-wizard-step-empty-config
-          ?active=${this._open}
+          ?active=${this._dialog.open}
         ></esphome-wizard-step-empty-config>`;
       case "resolve-conflicts":
         return html`<esphome-wizard-step-resolve-conflicts
@@ -350,7 +343,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       case "import-partial":
         return html`<esphome-wizard-step-import-partial
           .kept=${this._import.partial?.kept ?? []}
-          ?active=${this._open}
+          ?active=${this._dialog.open}
         ></esphome-wizard-step-import-partial>`;
     }
   }

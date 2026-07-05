@@ -110,7 +110,9 @@ describe("add-component-dialog preserves the editor draft (#1146)", () => {
     );
     expect(seen).toEqual([{ type: "yaml-draft" }]);
     // Navigate-and-close branch ran: dialog closed, selection cleared.
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
     expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
   });
 });

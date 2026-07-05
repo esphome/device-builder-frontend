@@ -47,6 +47,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { DialogOpenController } from "../../../util/dialog-open-controller.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import {
@@ -99,7 +100,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   @property({ attribute: false })
   devices: AvailableComponentInstance[] = [];
 
-  @state() private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
   @state() private _activeTab: Tab = "by-target";
   @state() private _query = "";
 
@@ -111,15 +112,8 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   public open() {
     this._activeTab = this.kind === "action" ? "by-target" : "by-type";
     this._query = "";
-    this._open = true;
+    this._dialog.open = true;
   }
-
-  // esphome-base-dialog never mutates its own ``open`` on a user
-  // close (Escape / X / outside-click); without this the next
-  // render re-asserts ``?open`` and the dialog can't dismiss.
-  private _onRequestClose = () => {
-    this._open = false;
-  };
 
   static styles = [
     espHomeStyles,
@@ -316,9 +310,9 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         : ["by-type", "building-blocks"];
 
     return html`<esphome-base-dialog
-      ?open=${this._open}
+      ?open=${this._dialog.open}
       .label=${title}
-      @request-close=${this._onRequestClose}
+      @request-close=${this._dialog.onRequestClose}
     >
       <div class="picker-search">
         <div class="picker-search-wrap">
@@ -547,7 +541,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         composed: true,
       })
     );
-    this._open = false;
+    this._dialog.open = false;
   }
 }
 

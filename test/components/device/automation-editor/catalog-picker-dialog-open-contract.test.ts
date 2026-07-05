@@ -30,7 +30,7 @@ async function mountDialog(
 }
 
 const isOpen = (d: ESPHomeCatalogPickerDialog): boolean =>
-  (d as unknown as { _open: boolean })._open;
+  (d as unknown as { _dialog: { open: boolean } })._dialog.open;
 const activeTab = (d: ESPHomeCatalogPickerDialog): string =>
   (d as unknown as { _activeTab: string })._activeTab;
 
@@ -51,11 +51,13 @@ describe("esphome-catalog-picker-dialog base-dialog open contract", () => {
     expect(activeTab(dialog)).toBe("by-type");
   });
 
-  it("_onRequestClose flips _open back to false", async () => {
+  it("the controller's onRequestClose flips the open flag back to false", async () => {
     const dialog = await mountDialog();
     dialog.open();
     expect(isOpen(dialog)).toBe(true);
-    (dialog as unknown as { _onRequestClose: () => void })._onRequestClose();
+    (
+      dialog as unknown as { _dialog: { onRequestClose: () => void } }
+    )._dialog.onRequestClose();
     expect(isOpen(dialog)).toBe(false);
   });
 

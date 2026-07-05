@@ -33,7 +33,7 @@ const dialog = (el: ESPHomeAddComponentDialog): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const isOpen = (el: ESPHomeAddComponentDialog): boolean => (el as any)._open;
+const isOpen = (el: ESPHomeAddComponentDialog): boolean => (el as any)._dialog.open;
 
 describe("add-component-dialog open/close contract", () => {
   it("open() flips the reactive open flag and binds ?open", async () => {

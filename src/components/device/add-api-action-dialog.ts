@@ -24,6 +24,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { formFieldStyles } from "../../styles/form-fields.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { normalizeEspHomeId } from "../../util/esphome-id.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -53,7 +54,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
-  @state() private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
   @state() private _name = "";
   @state() private _saving = false;
   @state() private _error = "";
@@ -137,15 +138,8 @@ export class ESPHomeAddApiActionDialog extends LitElement {
   public open() {
     this._name = "";
     this._error = "";
-    this._open = true;
+    this._dialog.open = true;
   }
-
-  // esphome-base-dialog never mutates its own open on a user-driven close
-  // (Escape / X / backdrop); the host owns flipping _open here, else a
-  // re-render re-asserts ?open and the dialog can't dismiss.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
 
   protected render() {
     const title = this.boardName
@@ -154,11 +148,11 @@ export class ESPHomeAddApiActionDialog extends LitElement {
         })
       : this._localize("device.add_api_action");
     return html`<esphome-base-dialog
-      ?open=${this._open}
+      ?open=${this._dialog.open}
       ?busy=${this._saving}
       .label=${title}
       .confirmOnEnter=${this._onContinue}
-      @request-close=${this._onRequestClose}
+      @request-close=${this._dialog.onRequestClose}
     >
       <p class="intro">
         ${renderMarkdown(this._localize("device.api_action_header_description"))}
@@ -246,7 +240,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
           composed: true,
         })
       );
-      this._open = false;
+      this._dialog.open = false;
     } catch (err) {
       const msg =
         err instanceof Error

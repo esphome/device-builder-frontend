@@ -30,6 +30,7 @@ import {
 } from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -77,7 +78,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   @state()
   _devices: ConfiguredDevice[] = [];
 
-  @state() private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
   // Logs dialog for the post-install hand-off when reattaching from this
   // surface. Without one, request-show-logs-after-install would no-op. (#139)
@@ -95,12 +96,12 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   open() {
     this._now = Date.now();
-    this._open = true;
+    this._dialog.open = true;
     this._startTicker();
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
     this._stopTicker();
   }
 
@@ -148,9 +149,9 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("firmware_jobs.title")}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         <div class="toolbar">
@@ -208,14 +209,8 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     }
   };
 
-  // Flip _open on the initiating close so a ticker-driven re-render can't
-  // re-assert ?open mid-hide; the ticker is torn down once hidden.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
-
   private _onAfterHide = (): void => {
-    this._open = false;
+    this._dialog.open = false;
     this._stopTicker();
   };
 

@@ -88,9 +88,9 @@ describe("confirm-dialog dismiss / request-close", () => {
     el.open();
     await el.updateComplete;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._open).toBe(true);
+    expect((el as any)._dialog.open).toBe(true);
     baseDialog(el).dispatchEvent(new CustomEvent("request-close"));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._open).toBe(false);
+    expect((el as any)._dialog.open).toBe(false);
   });
 });

@@ -36,6 +36,7 @@ import {
   quietCloseButtonStyles,
 } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import {
   labelChipStyles,
   renderLabelChip,
@@ -108,8 +109,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
    *  state non-deterministic on overlapping requests. */
   private _saveChain: Promise<unknown> = Promise.resolve();
 
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   @query("esphome-label-form")
   private _createForm?: ESPHomeLabelForm;
@@ -247,7 +247,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     // persist into the next device's editor and a still-pending save chained
     // against the previous device would gate this one's ``_saving`` indicator.
     if (prev !== undefined && prev.configuration !== this.device.configuration) {
-      this._open = false;
+      this._dialog.open = false;
       this._createForm?.collapse();
       this._saving = false;
       this._saveChain = Promise.resolve();
@@ -305,9 +305,9 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     const assignedSet = new Set(this._currentLabelIds);
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("dashboard.labels_dialog_title")}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onDialogClose}
       >
         <div
@@ -369,17 +369,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
   private _openDialog = () => {
     this._createForm?.collapse();
-    this._open = true;
-  };
-
-  // esphome-base-dialog never flips its own open on a user-driven close
-  // (Escape / X / outside-click); the host owns _open here.
-  private _onRequestClose = () => {
-    this._open = false;
+    this._dialog.open = true;
   };
 
   private _onDialogClose = () => {
-    this._open = false;
+    this._dialog.open = false;
     this._createForm?.collapse();
   };
 

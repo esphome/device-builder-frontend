@@ -23,7 +23,7 @@ import { _clearComponentCache } from "../../../src/util/component-name-cache.js"
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 interface Internals {
-  _open: boolean;
+  _dialog: { open: boolean };
   _prefillReference: { domain: string; id: string } | null;
   _bundleProgress: { current: number; total: number; bundleName: string } | null;
   _fastPathFields: (entry: unknown) => Record<string, unknown> | null;
@@ -92,7 +92,7 @@ describe("add-component-dialog one-shot bundle", () => {
       { component_id: "featured.bd.b", fields: { id: "xb" } },
       "Y1",
     ]);
-    expect(d._open).toBe(false);
+    expect(d._dialog.open).toBe(false);
   });
 
   it("skips a member already present in the device instead of re-adding it", async () => {
@@ -121,7 +121,7 @@ describe("add-component-dialog one-shot bundle", () => {
       component_id: "featured.bd.b",
       fields: { id: "new_b" },
     });
-    expect(d._open).toBe(false);
+    expect(d._dialog.open).toBe(false);
   });
 
   it("shows 'already set up' instead of 'Added' when every member is present", async () => {

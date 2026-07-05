@@ -24,7 +24,10 @@ import { EnterController } from "../util/enter-controller.js";
  * imperative ``dialog.open = true`` pattern some legacy
  * dialogs still use is incompatible with this wrapper —
  * those consumers should switch to a state-driven open flag
- * during migration.
+ * during migration. Consumers with no close-veto logic should
+ * use :class:`DialogOpenController` (``util/dialog-open-controller.ts``)
+ * for the flag + the trivial ``@request-close`` handler instead
+ * of hand-rolling both.
  *
  * **Busy gate**. When ``?busy=true``:
  *

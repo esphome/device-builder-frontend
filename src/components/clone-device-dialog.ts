@@ -11,6 +11,7 @@ import { dialogChromeStyles, quietCloseButtonStyles } from "../styles/dialog-chr
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
@@ -49,8 +50,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
   @state()
   private _friendlyName = "";
 
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
@@ -115,21 +115,13 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     this._name = "";
     this._friendlyName = "";
     this._resolved = false;
-    this._open = true;
+    this._dialog.open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  // Flip the reactive flag on the initiating close so a re-render can't
-  // re-assert ?open mid-hide; teardown (the EnterController unbind) stays
-  // in after-hide. esphome-base-dialog never mutates its own open in
-  // response to user actions, so the host owns flipping _open here.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
 
   private _onAfterHide = (): void => {
     this._enter.set(false);
@@ -154,11 +146,11 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
 
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("dashboard.action_clone_title", {
           name: this.sourceName,
         })}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         <div class="field">

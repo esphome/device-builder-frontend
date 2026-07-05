@@ -58,9 +58,9 @@ describe("clone-device-dialog ENTER", () => {
     input.dispatchEvent(new Event("input"));
     await el.updateComplete;
     pressEnter(); // confirms and runs close(), but after-hide hasn't fired
-    // close() flips the reactive _open flag; the base-dialog is still hiding
+    // close() flips the reactive open flag; the base-dialog is still hiding
     // (after-hide not yet fired) so the EnterController listener stays bound.
-    expect((el as unknown as { _open: boolean })._open).toBe(false);
+    expect((el as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(false);
     pressEnter(); // listener still bound; stopped only by the latch
     expect(onConfirm).toHaveBeenCalledTimes(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,28 +84,31 @@ describe("clone-device-dialog ENTER", () => {
  * Regression coverage for the esphome-base-dialog migration (#549).
  *
  * The migration swapped the imperative ``dialog.open`` for a reactive
- * ``_open`` flag, so the open/close contract is the part most likely to
- * silently regress. esphome-base-dialog never mutates its own ``open`` on
- * a user close, so the host must flip ``_open`` itself in ``_onRequestClose``
+ * open flag (now owned by DialogOpenController), so the open/close
+ * contract is the part most likely to silently regress.
+ * esphome-base-dialog never mutates its own ``open`` on a user close, so
+ * the host's controller must flip the flag in ``onRequestClose``
  * (Escape / X / backdrop) — otherwise a re-render would re-assert ``?open``
  * and the dialog could never dismiss.
  */
 describe("clone-device-dialog base-dialog open contract", () => {
-  it("open() / close() drive the reactive _open flag", async () => {
+  it("open() / close() drive the reactive open flag", async () => {
     const el = await mount(new ESPHomeCloneDeviceDialog());
-    const view = el as unknown as { _open: boolean };
+    const view = el as unknown as { _dialog: { open: boolean } };
     el.open("source");
-    expect(view._open).toBe(true);
+    expect(view._dialog.open).toBe(true);
     el.close();
-    expect(view._open).toBe(false);
+    expect(view._dialog.open).toBe(false);
   });
 
-  it("_onRequestClose flips the reactive open flag", async () => {
+  it("the controller's onRequestClose flips the reactive open flag", async () => {
     const el = await mount(new ESPHomeCloneDeviceDialog());
-    const view = el as unknown as { _open: boolean; _onRequestClose: () => void };
+    const view = el as unknown as {
+      _dialog: { open: boolean; onRequestClose: () => void };
+    };
     el.open("source");
-    expect(view._open).toBe(true);
-    view._onRequestClose();
-    expect(view._open).toBe(false);
+    expect(view._dialog.open).toBe(true);
+    view._dialog.onRequestClose();
+    expect(view._dialog.open).toBe(false);
   });
 });

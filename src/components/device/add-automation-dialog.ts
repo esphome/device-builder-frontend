@@ -36,6 +36,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { formFieldStyles } from "../../styles/form-fields.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
@@ -81,7 +82,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
-  @state() private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   @state() private _kind: TargetKind = "device_on";
   @state() private _componentId = "";
@@ -142,16 +143,9 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     this._intervalValue = "";
     this._intervalUnit = "s";
     this._error = "";
-    this._open = true;
+    this._dialog.open = true;
     void this._loadAvailable();
   }
-
-  // esphome-base-dialog never flips its own open on a user-driven close
-  // (Escape / X / outside-click); the host owns _open here. The busy gate
-  // (?busy=_saving) blocks dismissal while an upsert is in flight.
-  private _onRequestClose = () => {
-    this._open = false;
-  };
 
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
@@ -193,11 +187,11 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         })
       : this._localize("device.add_automation");
     return html`<esphome-base-dialog
-      ?open=${this._open}
+      ?open=${this._dialog.open}
       ?busy=${this._saving}
       .label=${title}
       .confirmOnEnter=${this._onContinue}
-      @request-close=${this._onRequestClose}
+      @request-close=${this._dialog.onRequestClose}
     >
       ${
         this._loading && !this._available
@@ -475,7 +469,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         this.yaml
       );
       dispatchAutomationAdded(this, this.yaml, location, yaml_diff);
-      this._open = false;
+      this._dialog.open = false;
     } catch (err) {
       const msg =
         err instanceof Error

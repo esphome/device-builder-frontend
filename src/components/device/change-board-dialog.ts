@@ -14,6 +14,7 @@ import {
 } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
+import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { changeBoardDialogStyles } from "./change-board-dialog.styles.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
@@ -38,8 +39,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   @property({ attribute: false })
   boards: SlimBoard[] = [];
 
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
@@ -51,25 +51,19 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   ];
 
   open() {
-    this._open = true;
+    this._dialog.open = true;
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  // esphome-base-dialog never mutates its own open in response to user
-  // actions, so the host owns flipping _open on the initiating close.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
 
   protected render() {
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("device.change_board_title")}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
       >
         <p class="intro">
           ${this._localize("device.change_board_desc", {

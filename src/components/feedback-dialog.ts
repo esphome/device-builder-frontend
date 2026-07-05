@@ -21,6 +21,7 @@ import {
 } from "../context/index.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -185,8 +186,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
   @state()
   private _esphomeVersion = "";
 
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   @state()
   private _screen: Screen = "main";
@@ -358,21 +358,15 @@ export class ESPHomeFeedbackDialog extends LitElement {
   ];
 
   open() {
-    this._open = true;
+    this._dialog.open = true;
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
 
-  // Flip the reactive flag on the initiating close (X / Esc / outside-click)
-  // before the hide animation, then let after-hide settle it.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
-
   private _onAfterHide = (): void => {
-    this._open = false;
+    this._dialog.open = false;
     this._screen = "main";
   };
 
@@ -384,7 +378,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
   // button), so move focus to the new screen's entry control; otherwise keyboard
   // and screen-reader users are dropped back to document.body.
   protected updated(changed: PropertyValues): void {
-    if (!this._open || !changed.has("_screen")) {
+    if (!this._dialog.open || !changed.has("_screen")) {
       return;
     }
     const previous = changed.get("_screen") as Screen | undefined;
@@ -442,9 +436,9 @@ export class ESPHomeFeedbackDialog extends LitElement {
     const drill = this._screen === "main" ? null : DRILL_SCREENS[this._screen];
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize(drill ? drill.titleKey : "feedback.title")}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         ${

@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -54,8 +55,7 @@ export class ESPHomeConfirmDialog extends LitElement {
   @property()
   icon = "alert-outline";
 
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
@@ -119,20 +119,20 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   open() {
     this._decided = false;
-    this._open = true;
+    this._dialog.open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
 
   protected render() {
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this.heading}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         <div class="body">
@@ -190,15 +190,8 @@ export class ESPHomeConfirmDialog extends LitElement {
     this.dispatchEvent(new CustomEvent("secondary", { bubbles: true }));
   }
 
-  // Flip _open the moment a close is requested (X / Esc / outside-click),
-  // before wa-dialog finishes hiding, so a re-render can't re-assert ?open
-  // and cancel the in-progress hide. Teardown stays in after-hide.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
-
   private _onAfterHide() {
-    this._open = false;
+    this._dialog.open = false;
     this._enter.set(false);
     if (!this._decided) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
