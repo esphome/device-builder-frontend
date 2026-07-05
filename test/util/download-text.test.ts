@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadAnsiText, triggerDownload } from "../../src/util/download-text.js";
+import {
+  downloadAnsiText,
+  downloadBlob,
+  triggerDownload,
+} from "../../src/util/download-text.js";
 
 /* The runtime test environment is Node, so we stub the bits of the
    browser API the helper touches. The download mechanics (anchor +
@@ -101,6 +105,21 @@ describe("downloadAnsiText", () => {
     const blob = FakeBlob.instances[0];
     expect(blob.options?.type).toBe("text/plain");
     expect(blob.parts).toEqual(["hello\nworld"]);
+  });
+});
+
+describe("downloadBlob", () => {
+  it("wraps the payload in a Blob with the caller's MIME type and clicks an anchor", () => {
+    const { anchor } = withBrowserStubs(() =>
+      downloadBlob("esphome:\n  name: kitchen\n", "kitchen.yaml", "text/yaml")
+    );
+    expect(FakeBlob.instances).toHaveLength(1);
+    const blob = FakeBlob.instances[0];
+    expect(blob.options?.type).toBe("text/yaml");
+    expect(blob.parts).toEqual(["esphome:\n  name: kitchen\n"]);
+    expect(anchor.href).toBe("blob:fake");
+    expect(anchor.download).toBe("kitchen.yaml");
+    expect(anchor.click).toHaveBeenCalledTimes(1);
   });
 });
 
