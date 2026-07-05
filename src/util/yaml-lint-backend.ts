@@ -192,14 +192,24 @@ function keyAt(doc: Text, offset: number): string | null {
  * ESPHome marks "Component not found" / "Platform missing" on the block's
  * value mapping, so a multi-line range spans the children. Walk it up to
  * the first less-indented `key:` line (clamp to the first line if none).
- * Single-line ranges are already precise and pass through untouched.
+ * A range that only spills onto blank lines (or the start of the next
+ * line) is single-line content — trimmed back and passed through
+ * untouched, like any already-precise single-line range.
  */
 export function retargetBlockDiagnostic(
   doc: Text,
   fallback: { from: number; to: number }
 ): { from: number; to: number } {
   const startLine = doc.lineAt(fallback.from);
-  if (doc.lineAt(fallback.to).number === startLine.number) return fallback;
+  let toLine = doc.lineAt(fallback.to);
+  while (
+    toLine.number > startLine.number &&
+    !doc.sliceString(toLine.from, Math.min(fallback.to, toLine.to)).trim()
+  ) {
+    toLine = doc.line(toLine.number - 1);
+    fallback = { from: fallback.from, to: toLine.to };
+  }
+  if (toLine.number === startLine.number) return fallback;
 
   const startIndent = indentOf(startLine.text);
   for (let n = startLine.number - 1; n >= 1; n--) {
@@ -351,10 +361,8 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           bannerErrors.push(message);
           continue;
         }
-        const { from, to } = retargetBlockDiagnostic(
-          view.state.doc,
-          rangeToOffsets(view, err.range)
-        );
+        const anchor = rangeToOffsets(view, err.range);
+        const { from, to } = retargetBlockDiagnostic(view.state.doc, anchor);
         // Pinned on the `esphome:` core block → whole-config error → banner.
         if (keyAt(view.state.doc, from) === CORE_BLOCK_KEY) {
           bannerErrors.push(message);
@@ -368,12 +376,22 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           message,
           renderMessage: () => renderMessageNode(message),
         });
-        // Anchor inside the first token (side -1 at the exact start would
-        // resolve to the preceding node) and collect the enclosing key
-        // chain for the form/navigator routing.
-        const keyPath = getKeyPathWithListIndices(view.state, Math.min(from + 1, to));
+        // Map from the range's own start, not the retargeted squiggle: a
+        // block error walked up to its enclosing key would attribute to
+        // the wrong list instance (the range starts inside the broken
+        // item; the enclosing key covers them all). Anchor inside the
+        // first token — side -1 at the exact start would resolve to the
+        // preceding node.
+        const keyPath = getKeyPathWithListIndices(
+          view.state,
+          Math.min(anchor.from + 1, anchor.to)
+        );
         if (keyPath.length > 0) {
-          mapped.push({ message, line: view.state.doc.lineAt(from).number, keyPath });
+          mapped.push({
+            message,
+            line: view.state.doc.lineAt(anchor.from).number,
+            keyPath,
+          });
         }
         // No form field to carry the message (a bare section header, or the
         // AST couldn't place it) — keep it in the banner; a section-level

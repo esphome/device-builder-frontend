@@ -388,6 +388,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // regression). Zero-entries sections also fall back here.
     const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
 
+    // Backend messages the left pane must carry when the banner's pane is
+    // hidden: section-level ones always, and field-level ones too when
+    // there is no form to render them inline (yaml-only sections).
+    const sectionAlerts = this.yamlPaneVisible
+      ? []
+      : [
+          ...this.backendSectionMessages,
+          ...(yamlOnly
+            ? [...this.backendErrors.values()].map((e) => String(e.params?.message ?? ""))
+            : []),
+        ].filter(Boolean);
+
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
 
     return html`
@@ -442,11 +454,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         }
       </div>
       ${
-        !this.yamlPaneVisible && this.backendSectionMessages.length > 0
+        sectionAlerts.length > 0
           ? html`<div class="section-error-banner" role="alert">
               <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
               <div class="section-error-banner-text">
-                ${this.backendSectionMessages.map((msg) => html`<p>${msg}</p>`)}
+                ${sectionAlerts.map((msg) => html`<p>${msg}</p>`)}
               </div>
             </div>`
           : nothing
