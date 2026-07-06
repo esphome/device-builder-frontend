@@ -166,8 +166,10 @@ export function resolveLogDocLink(
       }
     }
   }
-  // Cheap substring gate before the regex — embedded doc URLs are rare.
-  if (!actionable && clean.includes("https://esphome.io/")) {
+  // The pattern opens on a literal prefix, so the engine's scan for a
+  // non-matching line is as cheap as a substring search; the extracted
+  // URL is then host-gated by isSafeDocsUrl.
+  if (!actionable) {
     const embedded = clean.match(EMBEDDED_URL_RE)?.[0]?.replace(/[.,;:]+$/, "");
     if (embedded && isSafeDocsUrl(embedded)) {
       actionable = { kind: "actionable", url: embedded, body: "embedded" };
