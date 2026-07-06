@@ -202,7 +202,9 @@ export function renderActionableLine(
 ): TemplateResult {
   const title = localize("dashboard.logs_doc_actionable_link_title");
   // prettier-ignore
-  return html`<div class="log-line log-line--doc"><span class="log-line-text" style=${colorStyle || nothing}>${inner}</span><button class="log-doc-icon" type="button" title=${title} aria-label=${title} @click=${(e: MouseEvent) => onOpen(e, link)}><wa-icon library="mdi" name="information-outline"></wa-icon></button></div>`;
+  // Level colour on the container so the icon inherits it too; per-span
+  // ANSI styles inside ``inner`` still override.
+  return html`<div class="log-line log-line--doc" style=${colorStyle || nothing}><span class="log-line-text">${inner}</span><button class="log-doc-icon" type="button" title=${title} aria-label=${title} @click=${(e: MouseEvent) => onOpen(e, link)}><wa-icon library="mdi" name="information-outline"></wa-icon></button></div>`;
 }
 
 /** Children of a colour-flat component line: clean text, tag wrapped. */
