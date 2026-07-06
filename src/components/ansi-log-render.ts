@@ -4,9 +4,10 @@
  * Holds the ANSI span → template mapping plus the two doc-annotated line
  * shapes (a curated/embedded ``actionable`` line with a trailing info icon,
  * and a ``component`` line whose ``[tag:line]`` token becomes a quiet link).
- * The affordances sit outside the selectable text — the icon is
- * ``user-select: none`` and the tag stays plain text — so a multi-line
- * drag-select still copies clean log text.
+ * The affordances keep the copy buffer clean — the icon is
+ * ``user-select: none`` outside the text run, and the tag button stays
+ * inline with ``user-select: text`` — so a multi-line drag-select still
+ * copies clean log text.
  */
 import { mdiInformation } from "@mdi/js";
 import { css, html, nothing, type TemplateResult } from "lit";
