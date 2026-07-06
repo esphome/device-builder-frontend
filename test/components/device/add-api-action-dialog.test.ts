@@ -27,10 +27,10 @@ async function mountDialog(): Promise<ESPHomeAddApiActionDialog> {
 }
 
 const isOpen = (d: ESPHomeAddApiActionDialog): boolean =>
-  (d as unknown as { _open: boolean })._open;
+  (d as unknown as { _dialog: { open: boolean } })._dialog.open;
 
 const requestClose = (d: ESPHomeAddApiActionDialog): void =>
-  (d as unknown as { _onRequestClose: () => void })._onRequestClose();
+  (d as unknown as { _dialog: { onRequestClose: () => void } })._dialog.onRequestClose();
 
 describe("esphome-add-api-action-dialog base-dialog open contract", () => {
   it("open() drives the reactive _open flag", async () => {
@@ -40,7 +40,7 @@ describe("esphome-add-api-action-dialog base-dialog open contract", () => {
     expect(isOpen(dialog)).toBe(true);
   });
 
-  it("_onRequestClose flips _open back to false", async () => {
+  it("the controller's onRequestClose flips the open flag back to false", async () => {
     const dialog = await mountDialog();
     dialog.open();
     expect(isOpen(dialog)).toBe(true);

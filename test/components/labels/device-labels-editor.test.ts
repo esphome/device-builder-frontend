@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  *
  * Pins the label editor's reactive open/close contract after the migration
- * onto esphome-base-dialog (#549): the dialog tracks _open via ?open, and
+ * onto esphome-base-dialog (#549): the dialog tracks its open flag via ?open, and
  * request-close / after-hide both mirror it back to false so a user-driven
  * close (Escape / X / outside-click) actually dismisses. Saves fire on every
  * label toggle while the dialog stays open, so it deliberately does NOT bind
@@ -39,7 +39,7 @@ const dialog = (el: ESPHomeDeviceLabelsEditor): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const isOpen = (el: ESPHomeDeviceLabelsEditor): boolean => (el as any)._open;
+const isOpen = (el: ESPHomeDeviceLabelsEditor): boolean => (el as any)._dialog.open;
 
 describe("device-labels-editor open/close contract", () => {
   it("opens via the Edit-labels trigger", async () => {
@@ -51,19 +51,19 @@ describe("device-labels-editor open/close contract", () => {
     expect(dialog(el).hasAttribute("open")).toBe(true);
   });
 
-  it("flips _open to false on request-close", async () => {
+  it("flips the open flag to false on request-close", async () => {
     const el = await mount();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._open = true;
+    (el as any)._dialog.open = true;
     await el.updateComplete;
     dialog(el).dispatchEvent(new CustomEvent("request-close"));
     expect(isOpen(el)).toBe(false);
   });
 
-  it("flips _open to false on after-hide", async () => {
+  it("flips the open flag to false on after-hide", async () => {
     const el = await mount();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._open = true;
+    (el as any)._dialog.open = true;
     await el.updateComplete;
     dialog(el).dispatchEvent(new CustomEvent("after-hide"));
     expect(isOpen(el)).toBe(false);
@@ -72,7 +72,7 @@ describe("device-labels-editor open/close contract", () => {
   it("closes when the device prop swaps to a different device", async () => {
     const el = await mount();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._open = true;
+    (el as any)._dialog.open = true;
     await el.updateComplete;
     el.device = { configuration: "bedroom", labels: [] } as unknown as ConfiguredDevice;
     await el.updateComplete;
@@ -82,7 +82,7 @@ describe("device-labels-editor open/close contract", () => {
   it("stays open on a same-device update (e.g. DEVICE_UPDATED after a toggle)", async () => {
     const el = await mount();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._open = true;
+    (el as any)._dialog.open = true;
     await el.updateComplete;
     // Same configuration, new labels (and a new object ref, as the dashboard
     // hands down after set_labels) — the dialog must NOT close.

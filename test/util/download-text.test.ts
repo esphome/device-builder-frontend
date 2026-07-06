@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadAnsiText, triggerDownload } from "../../src/util/download-text.js";
+import {
+  downloadAnsiText,
+  downloadBlob,
+  triggerDownload,
+} from "../../src/util/download-text.js";
 
 /* The runtime test environment is Node, so we stub the bits of the
    browser API the helper touches. The download mechanics (anchor +
@@ -29,11 +33,22 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function withBrowserStubs<T>(fn: () => T): { result: T; anchor: FakeAnchor } {
+function withBrowserStubs<T>(fn: () => T): {
+  result: T;
+  anchor: FakeAnchor;
+  url: {
+    createObjectURL: ReturnType<typeof vi.fn>;
+    revokeObjectURL: ReturnType<typeof vi.fn>;
+  };
+} {
   const anchor = new FakeAnchor();
+  const url = {
+    createObjectURL: vi.fn(() => "blob:fake"),
+    revokeObjectURL: vi.fn(),
+  };
   const stubs = {
     Blob: FakeBlob,
-    URL: { createObjectURL: vi.fn(() => "blob:fake"), revokeObjectURL: vi.fn() },
+    URL: url,
     document: { createElement: vi.fn(() => anchor) },
   };
   const g = globalThis as Record<string, unknown>;
@@ -46,7 +61,7 @@ function withBrowserStubs<T>(fn: () => T): { result: T; anchor: FakeAnchor } {
     });
   }
   try {
-    return { result: fn(), anchor };
+    return { result: fn(), anchor, url };
   } finally {
     for (const fn of restore) fn();
   }
@@ -95,24 +110,58 @@ describe("downloadAnsiText", () => {
     expect(result).toBe("[INFO] startup\n[1;31m not-an-escape");
   });
 
-  it("creates a text/plain Blob with the joined content", () => {
-    withBrowserStubs(() => downloadAnsiText(["hello", "[32mworld[0m"], "greeting.txt"));
+  it("creates a text/plain Blob with the joined content and revokes its URL", () => {
+    const { url } = withBrowserStubs(() =>
+      downloadAnsiText(["hello", "[32mworld[0m"], "greeting.txt")
+    );
     expect(FakeBlob.instances).toHaveLength(1);
     const blob = FakeBlob.instances[0];
     expect(blob.options?.type).toBe("text/plain");
     expect(blob.parts).toEqual(["hello\nworld"]);
+    expect(url.revokeObjectURL).toHaveBeenCalledWith("blob:fake");
+  });
+});
+
+describe("downloadBlob", () => {
+  it("wraps the payload in a Blob with the caller's MIME type and clicks an anchor", () => {
+    const { anchor } = withBrowserStubs(() =>
+      downloadBlob("esphome:\n  name: kitchen\n", "kitchen.yaml", "text/yaml")
+    );
+    expect(FakeBlob.instances).toHaveLength(1);
+    const blob = FakeBlob.instances[0];
+    expect(blob.options?.type).toBe("text/yaml");
+    expect(blob.parts).toEqual(["esphome:\n  name: kitchen\n"]);
+    expect(anchor.href).toBe("blob:fake");
+    expect(anchor.download).toBe("kitchen.yaml");
+    expect(anchor.click).toHaveBeenCalledTimes(1);
+  });
+
+  it("revokes the minted object URL after the click so the Blob doesn't leak", () => {
+    const { anchor, url } = withBrowserStubs(() =>
+      downloadBlob("payload", "file.bin", "application/octet-stream")
+    );
+    expect(url.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(url.revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(url.revokeObjectURL).toHaveBeenCalledWith("blob:fake");
+    // The click fires before the URL is revoked — the reverse order
+    // would hand the browser a dead URL to download.
+    expect(anchor.click.mock.invocationCallOrder[0]).toBeLessThan(
+      url.revokeObjectURL.mock.invocationCallOrder[0]
+    );
   });
 });
 
 describe("triggerDownload", () => {
   it("navigates an anchor to the URL so the browser streams it to disk", () => {
-    const { anchor } = withBrowserStubs(() =>
+    const { anchor, url } = withBrowserStubs(() =>
       triggerDownload("/api/firmware/download?token=tok", "firmware.elf")
     );
     expect(anchor.href).toBe("/api/firmware/download?token=tok");
     expect(anchor.download).toBe("firmware.elf");
     expect(anchor.click).toHaveBeenCalledTimes(1);
-    // No Blob is constructed — the file is never buffered in memory.
+    // No Blob is constructed — the file is never buffered in memory,
+    // so there is no object URL to mint or revoke either.
     expect(FakeBlob.instances).toHaveLength(0);
+    expect(url.createObjectURL).not.toHaveBeenCalled();
   });
 });

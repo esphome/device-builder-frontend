@@ -9,6 +9,7 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -41,7 +42,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @state() private _password = "";
   @state() private _saving = false;
   @state() private _error: string | null = null;
-  @state() private _open = false;
+
+  private readonly _dialog = new DialogOpenController(this);
 
   @query("#onboarding-ssid")
   private _ssidInput?: HTMLInputElement;
@@ -58,14 +60,14 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._password = "";
     this._saving = false;
     this._error = null;
-    this._open = true;
+    this._dialog.open = true;
     this._enter.set(true);
     // autofocus is unreliable for a shadow-DOM input shown after first paint.
     void this.updateComplete.then(() => this._ssidInput?.focus());
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
 
   static styles = [
@@ -111,10 +113,10 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   protected render() {
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         ?busy=${this._saving}
         .label=${this._localize("onboarding.wifi.title")}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${() => this._enter.set(false)}
       >
         <div class="body">
@@ -188,16 +190,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this.close();
     this._saving = false;
   }
-
-  /**
-   * Flip the reactive flag on the initiating close so a re-render can't
-   * re-assert ?open mid-hide. While saving, esphome-base-dialog's busy gate
-   * absorbs the X / Escape / backdrop click and never emits request-close, so
-   * the dialog can't hide before the user sees an inline save error.
-   */
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
 }
 
 declare global {

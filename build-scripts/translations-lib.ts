@@ -92,10 +92,10 @@ function flattenBase(base: Messages): Map<string, string> {
 // least one translated key reads ≥1% so a barely-started language isn't shown
 // as a flat 0%.
 //
-// The language-manifest generator keeps a byte-compatible copy of this logic
-// (build-scripts/gen-language-manifest.cjs); it's a CommonJS build script that
-// can't import this ESM module, so the two must be kept in sync. This copy is
-// the unit-tested reference.
+// The language-manifest generator (build-scripts/gen-language-manifest.cjs)
+// `require`s this module directly — native type stripping plus require(esm)
+// make that work from CommonJS — so this unit-tested implementation is the
+// only copy.
 export function localeCompleteness(base: Messages, locale: Messages): number {
   const baseLeaves = flattenBase(base);
   const total = baseLeaves.size;

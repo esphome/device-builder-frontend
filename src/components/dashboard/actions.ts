@@ -5,6 +5,7 @@ import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
+import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { ESPHomeLogParser, isLikelyGarbageLine } from "../../util/esphome-log-parser.js";
 import { notifyError, notifySuccess, type NotifyOptions } from "../../util/notify.js";
@@ -254,23 +255,14 @@ export async function downloadYaml(
   localize: LocalizeFunc
 ) {
   const name = device.friendly_name || device.name;
-  let url: string | undefined;
   try {
     const yaml = await api.getConfig(device.configuration);
-    const blob = new Blob([yaml], { type: "text/yaml" });
-    url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = device.configuration.endsWith(".yaml")
+    const filename = device.configuration.endsWith(".yaml")
       ? device.configuration
       : `${device.configuration}.yaml`;
-    a.click();
+    downloadBlob(yaml, filename, "text/yaml");
   } catch {
     notifyError(localize("dashboard.action_download_yaml_failed", { name }));
-  } finally {
-    if (url) {
-      URL.revokeObjectURL(url);
-    }
   }
 }
 

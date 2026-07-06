@@ -21,11 +21,12 @@ import { stripAnsi } from "./strip-ansi.js";
  *   reads. Holding the URL around would leak the underlying
  *   ``Blob`` for the page's lifetime.
  *
- * Private helper — call sites use :func:`downloadAnsiText` rather than
- * touching this directly. (Binary artifacts download natively via
- * :func:`triggerDownload`, which streams from a URL and skips this.)
+ * Terminal-style output goes through :func:`downloadAnsiText`, which
+ * strips ANSI sequences before delegating here. (Binary artifacts
+ * download natively via :func:`triggerDownload`, which streams from a
+ * URL and skips this.)
  */
-function _downloadBlob(bytes: BlobPart, filename: string, mimeType: string): void {
+export function downloadBlob(bytes: BlobPart, filename: string, mimeType: string): void {
   const blob = new Blob([bytes], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -91,6 +92,6 @@ export function downloadAnsiText(lines: string[], filename: string): string {
      line per file row regardless of which terminator the upstream
      used. */
   const text = lines.map((line) => stripAnsi(line).replace(/[\r\n]+$/, "")).join("\n");
-  _downloadBlob(text, filename, "text/plain");
+  downloadBlob(text, filename, "text/plain");
   return text;
 }

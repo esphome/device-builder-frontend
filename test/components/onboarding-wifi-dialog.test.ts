@@ -23,7 +23,7 @@ import { ESPHomeOnboardingWifiDialog } from "../../src/components/onboarding-wif
 interface DialogPrivateView extends EventTarget {
   _ssid: string;
   _password: string;
-  _open: boolean;
+  _dialog: { open: boolean; onRequestClose(): void };
   _saving: boolean;
   _error: string | null;
   _api: {
@@ -31,7 +31,6 @@ interface DialogPrivateView extends EventTarget {
   };
   readonly _passwordTooShort: boolean;
   _save(): Promise<void>;
-  _onRequestClose(): void;
 }
 
 function makeDialog(): DialogPrivateView {
@@ -103,25 +102,26 @@ describe("onboarding-wifi-dialog password-length gate", () => {
  *
  * The migration moved the save-in-flight close veto onto base-dialog's
  * ``?busy`` gate and replaced the imperative ``dialog.open`` with a
- * reactive ``_open`` flag, so the close / error paths are the part most
+ * reactive open flag (owned by DialogOpenController), so the close /
+ * error paths are the part most
  * likely to silently regress. These pin the contract the host still
  * owns: a failed save keeps the dialog open with an inline error, a
  * successful save closes it and fires ``secrets-saved``, and the reactive
- * close path flips ``_open``.
+ * close path flips the controller's open flag.
  */
 describe("onboarding-wifi-dialog close / error gating", () => {
   test("a failed save shows the inline error and leaves the dialog open", async () => {
     const dialog = makeDialog();
     const setWifiCredentials = vi.fn().mockRejectedValue(new Error("write failed"));
     dialog._api = { setWifiCredentials };
-    dialog._open = true;
+    dialog._dialog.open = true;
     dialog._ssid = "MyNetwork";
     dialog._password = "12345678";
 
     await dialog._save();
 
     expect(dialog._error).toBeTruthy(); // inline error surfaced
-    expect(dialog._open).toBe(true); // dialog stays open to retry
+    expect(dialog._dialog.open).toBe(true); // dialog stays open to retry
     expect(dialog._saving).toBe(false); // re-enabled for another attempt
   });
 
@@ -129,7 +129,7 @@ describe("onboarding-wifi-dialog close / error gating", () => {
     const dialog = makeDialog();
     const setWifiCredentials = vi.fn().mockResolvedValue(undefined);
     dialog._api = { setWifiCredentials };
-    dialog._open = true;
+    dialog._dialog.open = true;
     dialog._ssid = "MyNetwork";
     dialog._password = "12345678";
 
@@ -142,14 +142,14 @@ describe("onboarding-wifi-dialog close / error gating", () => {
     }
 
     expect(setWifiCredentials).toHaveBeenCalledWith("MyNetwork", "12345678");
-    expect(dialog._open).toBe(false); // closed via the reactive flag
+    expect(dialog._dialog.open).toBe(false); // closed via the reactive flag
     expect(saved).toHaveBeenCalledTimes(1); // pickers + kebab wording refresh
   });
 
-  test("_onRequestClose flips the reactive open flag", () => {
+  test("the controller's onRequestClose flips the reactive open flag", () => {
     const dialog = makeDialog();
-    dialog._open = true;
-    dialog._onRequestClose();
-    expect(dialog._open).toBe(false);
+    dialog._dialog.open = true;
+    dialog._dialog.onRequestClose();
+    expect(dialog._dialog.open).toBe(false);
   });
 });

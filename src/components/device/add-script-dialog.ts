@@ -32,6 +32,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { formFieldStyles } from "../../styles/form-fields.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { normalizeEspHomeId } from "../../util/esphome-id.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -61,7 +62,7 @@ export class ESPHomeAddScriptDialog extends LitElement {
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
-  @state() private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
   @state() private _id = "";
   @state() private _available: AvailableAutomations | null = null;
   @state() private _saving = false;
@@ -146,16 +147,9 @@ export class ESPHomeAddScriptDialog extends LitElement {
   public open() {
     this._id = "";
     this._error = "";
-    this._open = true;
+    this._dialog.open = true;
     void this._loadAvailable();
   }
-
-  // esphome-base-dialog never mutates its own open in response to a user
-  // close (Escape / X / outside-click), so the host flips _open here to
-  // keep the next render's ?open binding in sync.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
 
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
@@ -176,11 +170,11 @@ export class ESPHomeAddScriptDialog extends LitElement {
         })
       : this._localize("device.add_script");
     return html`<esphome-base-dialog
-      ?open=${this._open}
+      ?open=${this._dialog.open}
       ?busy=${this._saving}
       .label=${title}
       .confirmOnEnter=${this._onContinue}
-      @request-close=${this._onRequestClose}
+      @request-close=${this._dialog.onRequestClose}
     >
       <p class="intro">
         ${renderMarkdown(this._localize("device.script_header_description"))}
@@ -250,7 +244,7 @@ export class ESPHomeAddScriptDialog extends LitElement {
         this.yaml
       );
       dispatchAutomationAdded(this, this.yaml, location, yaml_diff);
-      this._open = false;
+      this._dialog.open = false;
     } catch (err) {
       const msg =
         err instanceof Error

@@ -12,6 +12,7 @@ import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
 import { collectExistingIds } from "../../util/default-component-id.js";
+import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
@@ -92,8 +93,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @property({ attribute: false })
   lockedCategories: string[] = [];
 
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   @query("esphome-component-catalog")
   private _catalog!: ESPHomeComponentCatalog;
@@ -196,7 +196,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
-    this._open = true;
+    this._dialog.open = true;
     this.updateComplete.then(() => this._catalog?.load());
   }
 
@@ -212,7 +212,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
-    this._open = true;
+    this._dialog.open = true;
     this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
   }
 
@@ -268,10 +268,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     return html`
       <esphome-base-dialog
         class=${isForm ? "form-view" : ""}
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         ?busy=${this._submitting}
         .label=${title}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @add-component=${this._onComponentSelected}
         @add-bundle=${this._onBundleSelected}
         @form-cancel=${this._onBack}
@@ -351,13 +351,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
       </esphome-base-dialog>
     `;
   }
-
-  // esphome-base-dialog never flips its own open on a user-driven close
-  // (Escape / X / outside-click); the host owns _open here. The busy gate
-  // (?busy=_submitting) blocks dismissal while an add is in flight.
-  private _onRequestClose = () => {
-    this._open = false;
-  };
 
   private async _onComponentSelected(
     e: CustomEvent<{ component: ComponentCatalogEntry }>
@@ -650,7 +643,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         lastAdded = this._chainReference(entry, fields);
       }
       if (addedAny) this._dispatchDraft(this.yaml);
-      this._open = false;
+      this._dialog.open = false;
       this._selected = null;
       this._resetDetourState();
       // Every member already present is a no-op; don't claim we "Added" it.
@@ -871,7 +864,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
             })
           );
         }
-        this._open = false;
+        this._dialog.open = false;
         this._selected = null;
         this._resetDetourState();
         // Configless add skipped the form, so the close is the only

@@ -74,10 +74,13 @@ describe.each([
 
   it("stops firing once the dialog closes", async () => {
     const { dialog, onContinue } = await mount(ctor as new () => LitElement);
-    const view = dialog as unknown as { open: () => void; _onRequestClose: () => void };
+    const view = dialog as unknown as {
+      open: () => void;
+      _dialog: { onRequestClose: () => void };
+    };
     view.open();
     await dialog.updateComplete;
-    view._onRequestClose(); // flips _open false (Escape / X / backdrop path)
+    view._dialog.onRequestClose(); // flips the open flag false (Escape / X / backdrop path)
     await dialog.updateComplete;
     pressEnter();
     expect(onContinue).not.toHaveBeenCalled();

@@ -27,7 +27,6 @@
  * is outstanding.
  */
 import { consume } from "@lit/context";
-import { mdiArrowDecisionOutline, mdiDelete, mdiOpenInNew } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
@@ -36,52 +35,39 @@ import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
-  AutomationTrigger,
   AvailableAutomations,
   AvailableComponentInstance,
   AvailableScript,
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../../api/types/components.js";
-import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import { automationHeaderTitle } from "../../../util/automation-header-title.js";
-import {
-  fetchComponent,
-  getCachedComponent,
-} from "../../../util/component-name-cache.js";
-import { renderMarkdown } from "../../../util/markdown.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
-import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
-import "../config-entry-form.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
-import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
-import "./automation-target-picker.js";
-import "./automation-trigger-picker.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
-import { componentDomain, instanceName } from "./component-targets.js";
+import { loadIntervalComponent } from "./load-interval-component.js";
 import { ParseErrorController } from "./parse-error-controller.js";
-import { renderTargetField } from "./render-target-field.js";
+import { renderAutomationHeader } from "./render-automation-header.js";
+import {
+  renderActionsSection,
+  renderAddModePickers,
+  renderDeleteRow,
+  renderIdentityFields,
+  renderTriggerParamsForm,
+} from "./render-automation-sections.js";
 import {
   applyParamChange,
   emptyAutomationTree,
   sectionKeyFromLocation,
 } from "./serialise.js";
+import { bareTriggerKey, effectiveTriggerIdFor } from "./trigger-identity.js";
 
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-
-registerMdiIcons({
-  "arrow-decision-outline": mdiArrowDecisionOutline,
-  delete: mdiDelete,
-  "open-in-new": mdiOpenInNew,
-});
 
 @customElement("esphome-automation-editor")
 export class ESPHomeAutomationEditor extends LitElement {
@@ -261,26 +247,16 @@ export class ESPHomeAutomationEditor extends LitElement {
     }
   }
 
-  /** Lazy fetch of the ``interval`` component catalog entry.
-   *  Reuses the shared component-name cache so the navigator's
-   *  pre-fetch (for the label) doubles as the editor's source. */
+  /** Lazy fetch of the ``interval`` component catalog entry —
+   *  cache-first + error-swallowing, see the helper module. */
   private async _loadIntervalComponent() {
     if (!this._api) return;
-    const platform = this.platform || undefined;
-    const boardId = this.board?.id;
-    const cached = getCachedComponent(`interval`, platform, boardId);
-    if (cached) {
-      this._intervalComponent = cached;
-      return;
-    }
-    try {
-      const entry = await fetchComponent(this._api, `interval`, platform, boardId);
-      if (entry) this._intervalComponent = entry;
-    } catch {
-      /* swallow — the editor falls back to the static label when no
-         catalog entry is available; transient backend hiccups
-         shouldn't surface as an error here. */
-    }
+    const entry = await loadIntervalComponent(
+      this._api,
+      this.platform || undefined,
+      this.board?.id
+    );
+    if (entry) this._intervalComponent = entry;
   }
 
   /**
@@ -401,187 +377,76 @@ export class ESPHomeAutomationEditor extends LitElement {
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
-    // For ``device_on`` and ``component_on`` the trigger lives in the
-    // location alongside the YAML splice destination. Mirror it into
-    // the editor's effective trigger id so the picker shows the right
-    // selection on first paint without a manual sync step.
-    //
-    // ``trigger_id`` is the catalog-qualified id
-    // (``"switch.on_turn_on"``). ``location.trigger`` is the bare
-    // YAML key (``"on_turn_on"``) the writer splices under the
-    // component. For ``device_on`` the two coincide because
-    // device-level catalog ids carry no domain prefix.
-    const effectiveTriggerId =
-      automation.trigger_id ??
-      (target?.kind === "device_on"
-        ? target.trigger || null
-        : target?.kind === "component_on"
-          ? this._catalogIdFor(target) || null
-          : null);
+    const effectiveTriggerId = effectiveTriggerIdFor(automation, target, devices);
     const activeTrigger = effectiveTriggerId
       ? (triggers.find((t) => t.id === effectiveTriggerId) ?? null)
       : null;
     return html`
-      ${this._renderHeader(activeTrigger)}
+      ${renderAutomationHeader(
+        this.location,
+        this._intervalComponent,
+        activeTrigger,
+        this._localize
+      )}
       ${
         this.addMode
-          ? this._renderAddModePickers(
+          ? renderAddModePickers({
               target,
               triggers,
               devices,
               scripts,
               effectiveTriggerId,
               automation,
-              disabled
-            )
-          : html`${this._renderIdentityFields(
-              activeTrigger
-            )}${this._renderTriggerParamsForm(activeTrigger, automation, disabled)}`
+              board: this.board,
+              yaml: this.yaml,
+              disabled,
+              onTargetChange: this._onTargetChange,
+              onTriggerChange: this._onTriggerChange,
+              onTriggerParamsChange: this._onTriggerParamsChange,
+            })
+          : html`${renderIdentityFields(
+              this.location,
+              devices,
+              this._parseSubstitutions(this.yaml),
+              this._localize
+            )}${renderTriggerParamsForm({
+              location: this.location,
+              intervalComponent: this._intervalComponent,
+              activeTrigger,
+              automation,
+              board: this.board,
+              yaml: this.yaml,
+              disabled,
+              showAdvanced: this._showAdvanced,
+              onValueChange: this._onTriggerParamsValueChange,
+              onAdvancedToggle: this._onAdvancedToggle,
+            })}`
       }
-      <div class="field">
-        <div class="ae-actions-header">
-          <label class="field-label">
-            ${this._localize("device.automation_action")}
-          </label>
-          <button
-            type="button"
-            class="ae-section-add"
-            ?disabled=${disabled || actions.length === 0}
-            @click=${() => this._actionList?.openPicker()}
-          >
-            <wa-icon library="mdi" name="plus"></wa-icon>
-            ${this._localize("device.add_action")}
-          </button>
-        </div>
-        <p class="field-description">
-          ${renderMarkdown(this._localize("device.automation_actions_description"))}
-        </p>
-        <esphome-automation-action-list
-          no-header
-          hide-add
-          .actions=${automation.actions}
-          .catalog=${actions}
-          .conditionCatalog=${conditions}
-          .scripts=${scripts}
-          .devices=${devices}
-          .board=${this.board}
-          .yaml=${this.yaml}
-          ?disabled=${disabled}
-          @actions-change=${this._onActionsChange}
-        ></esphome-automation-action-list>
-      </div>
+      ${renderActionsSection({
+        automation,
+        catalog: actions,
+        conditionCatalog: conditions,
+        scripts,
+        devices,
+        board: this.board,
+        yaml: this.yaml,
+        disabled,
+        localize: this._localize,
+        onOpenPicker: () => this._actionList?.openPicker(),
+        onActionsChange: this._onActionsChange,
+      })}
       ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
       ${
         this.location && this.value && !this.addMode
-          ? html`<div class="ae-actions">
-              <button
-                type="button"
-                class="ae-danger"
-                ?disabled=${disabled}
-                @click=${this._onDelete}
-              >
-                <wa-icon library="mdi" name="delete"></wa-icon>
-                ${this._localize("device.delete_automation")}
-              </button>
-            </div>`
+          ? renderDeleteRow(this._localize, disabled, this._onDelete)
           : nothing
       }
-    `;
-  }
-
-  /**
-   * Trigger param form for edit-mode. The target / trigger
-   * dropdowns are gone — those become read-only metadata in the
-   * header. Only the trigger's ``config_entries`` need a form,
-   * since those ARE editable on an existing automation (e.g.
-   * tweaking ``min_length`` on an ``on_click`` trigger after the
-   * fact).
-   *
-   * ``interval`` automations special-case: the trigger
-   * (``interval.then``) carries no config_entries, but the parent
-   * ``interval`` *component* does — ``interval:`` (time), ``id:``,
-   * ``startup_delay:`` etc. all live in ``trigger_params`` in the
-   * AutomationTree, so render them from the component schema
-   * (filtered to drop ``then:``, which is the actions block).
-   */
-  private _renderTriggerParamsForm(
-    activeTrigger: AutomationTrigger | null,
-    automation: AutomationTree,
-    disabled: boolean
-  ) {
-    const entries = this._paramFormEntries(activeTrigger);
-    if (entries.length === 0) return nothing;
-    // No outer wrapper / no synthetic group label: the form renders
-    // each entry with its own catalog-derived label + description,
-    // and a section header above that ("Interval" / "Trigger
-    // options") would just duplicate the first field's name. Sit as
-    // a sibling of the header and the action-list so the :host gap
-    // alone handles vertical rhythm.
-    return html`
-      <esphome-config-entry-form
-        .entries=${entries}
-        .values=${automation.trigger_params}
-        .board=${this.board}
-        .yaml=${this.yaml}
-        ?disabled=${disabled}
-        advanced-section
-        ?show-advanced=${this._showAdvanced}
-        @value-change=${this._onTriggerParamsValueChange}
-        @advanced-toggle=${this._onAdvancedToggle}
-      ></esphome-config-entry-form>
     `;
   }
 
   private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
     this._showAdvanced = e.detail.show;
   };
-
-  /** Resolve the config_entries list that drives the trigger-params
-   *  form. Interval pulls from the component schema (since
-   *  ``interval.then``'s own config_entries is empty); everything
-   *  else stays on the trigger's own config_entries. */
-  private _paramFormEntries(activeTrigger: AutomationTrigger | null): ConfigEntry[] {
-    return triggerParamFormEntries(this.location, this._intervalComponent, activeTrigger);
-  }
-
-  /**
-   * Legacy add-mode pickers. The "+ Add automation" wizard now
-   * collects target / trigger before mounting the editor, so this
-   * path isn't normally reached from the navigator — kept for
-   * back-compat if a parent ever instantiates the editor in
-   * add-mode directly.
-   */
-  private _renderAddModePickers(
-    target: AutomationLocation | null,
-    triggers: AutomationTrigger[],
-    devices: AvailableComponentInstance[],
-    scripts: AvailableScript[],
-    effectiveTriggerId: string | null,
-    automation: AutomationTree,
-    disabled: boolean
-  ) {
-    return html`
-      <esphome-automation-target-picker
-        .value=${target}
-        .devices=${devices}
-        .scripts=${scripts}
-        ?disabled=${disabled}
-        @target-change=${this._onTargetChange}
-      ></esphome-automation-target-picker>
-      <esphome-automation-trigger-picker
-        .target=${target}
-        .triggers=${triggers}
-        .devices=${devices}
-        .triggerId=${effectiveTriggerId}
-        .triggerParams=${automation.trigger_params}
-        .board=${this.board}
-        .yaml=${this.yaml}
-        ?disabled=${disabled}
-        @trigger-change=${this._onTriggerChange}
-        @trigger-params-change=${this._onTriggerParamsChange}
-      ></esphome-automation-trigger-picker>
-    `;
-  }
 
   private _onTriggerParamsValueChange = (
     e: CustomEvent<{ path: string[]; value: unknown }>
@@ -594,128 +459,6 @@ export class ESPHomeAutomationEditor extends LitElement {
     const next = applyParamChange(automation.trigger_params, path, value);
     this._engine.withValue({ trigger_params: next });
   };
-
-  /**
-   * Component-style header card. Title is the catalog-resolved
-   * domain + trigger name (``Switch → Turn on``) so it matches the
-   * navigator's primary label and gives the user the same eye-line
-   * cue they get from clicking a regular component.
-   *
-   * For ``interval`` automations we reach further and pull the
-   * ``interval`` component catalog entry so the user gets the same
-   * name / description / docs / image they'd see in a regular
-   * component editor — no more bland generic "Automation".
-   *
-   * Title decomposes to the kind label (``Automation``) when we
-   * don't have enough metadata yet — fresh add-mode (no trigger
-   * picked) or script / light_effect locations.
-   */
-  private _renderHeader(activeTrigger: AutomationTrigger | null) {
-    const loc = this.location;
-    const intervalComp = loc?.kind === "interval" ? this._intervalComponent : null;
-    const title = intervalComp?.name ?? this._headerTitle(activeTrigger);
-    const docsUrl = intervalComp?.docs_url ?? activeTrigger?.docs_url ?? "";
-    const descText =
-      intervalComp?.description ??
-      activeTrigger?.description ??
-      this._localize("device.automation_header_description");
-    const imageUrl = intervalComp?.image_url ?? "";
-    return html`<div class="ae-header">
-      <div class="ae-header-text">
-        <h2 class="ae-header-title">${title}</h2>
-        ${
-          docsUrl
-            ? html`<a
-                class="ae-header-docs"
-                href=${docsUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                ${this._localize("device.docs")}
-                <wa-icon library="mdi" name="open-in-new"></wa-icon>
-              </a>`
-            : nothing
-        }
-        <p class="ae-header-desc">${renderMarkdown(descText)}</p>
-      </div>
-      <div class="ae-header-icon">
-        ${
-          imageUrl
-            ? html`<img alt="" src=${imageUrl} />`
-            : html`<wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>`
-        }
-      </div>
-    </div>`;
-  }
-
-  /**
-   * Compose the header title:
-   *
-   *   device_on / component_on (trigger picked)  → catalog's
-   *     ``trigger.name`` ("Switch → On Turn On") — already domain-
-   *     qualified, no extra prefix.
-   *   interval                                   → catalog component
-   *     name (handled by ``_renderHeader``); this is the fallback
-   *     when the component hasn't loaded yet.
-   *   anything else / fallback                   → static "Automation"
-   */
-  private _headerTitle(trigger: AutomationTrigger | null): string {
-    return automationHeaderTitle(this.location, trigger, this._localize);
-  }
-
-  /**
-   * Read-only target field — the only identity field we still
-   * surface, and only for ``component_on``: the catalog name
-   * (``Switch → On Turn On``) already sits as the editor's header
-   * title so a separate "Trigger" row underneath was just a copy
-   * of it, and ``device_on`` / ``interval`` have no meaningful
-   * target to display either ("the device itself" / "Interval #1"
-   * read as filler). Leaves only "which component instance is
-   * this automation bound to" — the one piece of identity the
-   * header can't carry.
-   */
-  private _renderIdentityFields(_activeTrigger: AutomationTrigger | null) {
-    const loc = this.location;
-    if (!loc) return nothing;
-    if (loc.kind !== "component_on" && loc.kind !== "component_action") return nothing;
-    const targetValue = this._targetMetadataValue(loc);
-    return renderTargetField(
-      targetValue,
-      this._parseSubstitutions(this.yaml),
-      this._localize
-    );
-  }
-
-  /**
-   * Compose the single TARGET row value. For component_on this is
-   * the bound device's display name + catalog id (e.g.
-   * "Warmtepomp (switch.gpio)") — no separate "Which component?"
-   * row. For device_on it's "The device itself"; for interval
-   * it's "Interval #N"; for script / light_effect we fall back
-   * to the kind label (those land in their own editors anyway).
-   */
-  private _targetMetadataValue(loc: AutomationLocation): string {
-    switch (loc.kind) {
-      case "device_on":
-        return this._localize("device.automation_target_device");
-      case "component_on":
-      case "component_action": {
-        const device = this._available?.devices.find((d) => d.id === loc.component_id);
-        if (!device) return loc.component_id;
-        return `${instanceName(device)} (${device.component_id})`;
-      }
-      case "interval":
-        return this._localize("device.automation_target_interval_n", {
-          index: loc.index + 1,
-        });
-      case "script":
-        return loc.id;
-      case "api_action":
-        return loc.action_name;
-      case "light_effect":
-        return loc.component_id;
-    }
-  }
 
   // ─── State mutations ─────────────────────────────────────────
 
@@ -750,47 +493,15 @@ export class ESPHomeAutomationEditor extends LitElement {
     // ``on_*:`` key the writer renders under). Mirror the new
     // trigger id into the location so save/delete target the right
     // range. ``interval`` / ``script`` / ``light_effect`` carry no
-    // ``trigger`` field.
-    //
-    // Wire-shape detail: ``AutomationTree.trigger_id`` is the
-    // catalog-qualified id (``"switch.on_turn_on"`` — what
-    // ``catalog.trigger_by_id`` returns a hit for).
-    // ``location.component_on.trigger`` is the BARE YAML key
-    // (``"on_turn_on"``) the writer splices under the component;
-    // the backend reconstructs the catalog id by combining the
-    // component's domain with the bare key. Device-level catalog
-    // ids carry no domain prefix so the two coincide for
-    // ``device_on``.
+    // ``trigger`` field. The catalog-qualified vs bare-YAML-key id
+    // forms are documented in ``trigger-identity.ts``.
     if (this.location?.kind === "device_on") {
       this.location = { ...this.location, trigger: e.detail.triggerId };
     } else if (this.location?.kind === "component_on") {
-      const bare = this._bareTriggerKey(e.detail.triggerId);
+      const bare = bareTriggerKey(e.detail.triggerId);
       this.location = { ...this.location, trigger: bare };
     }
   };
-
-  /**
-   * Drop the ``<domain>.`` prefix from a catalog trigger id to get
-   * the bare YAML key. ``"switch.on_turn_on"`` → ``"on_turn_on"``.
-   * Ids that already lack a domain are passed through.
-   */
-  private _bareTriggerKey(catalogId: string): string {
-    const dotIdx = catalogId.indexOf(".");
-    return dotIdx >= 0 ? catalogId.slice(dotIdx + 1) : catalogId;
-  }
-
-  /**
-   * Build the catalog-qualified trigger id for a ``component_on``
-   * location, using the bound device's domain. Returns ``null``
-   * when the device isn't yet loaded or the location has no
-   * trigger picked.
-   */
-  private _catalogIdFor(loc: AutomationLocation): string | null {
-    if (loc.kind !== "component_on" || !loc.trigger) return null;
-    const device = this._available?.devices.find((d) => d.id === loc.component_id);
-    const domain = device ? componentDomain(device.component_id) : null;
-    return domain ? `${domain}.${loc.trigger}` : loc.trigger;
-  }
 
   private _onTriggerParamsChange = (
     e: CustomEvent<{ params: Record<string, unknown> }>

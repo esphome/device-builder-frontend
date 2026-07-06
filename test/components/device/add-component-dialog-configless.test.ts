@@ -31,8 +31,8 @@ function makeDialog(entry: ReturnType<typeof makeComponentEntry>) {
   const dialog = new ESPHomeAddComponentDialog();
   Object.assign(dialog as unknown as Record<string, unknown>, {
     _api: { addComponent, getComponentBodies },
-    _open: true,
   });
+  (dialog as unknown as { _dialog: { open: boolean } })._dialog.open = true;
   dialog.configuration = "foo.yaml";
   dialog.yaml = "esphome:\n  name: foo\n";
   return { dialog, addComponent };
@@ -72,7 +72,9 @@ describe("add-component-dialog skips the form for configless components", () => 
       richColors: true,
     });
     // Form view never opened: dialog closed, selection cleared.
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
     expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
   });
 
@@ -89,7 +91,7 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect(toast.success).not.toHaveBeenCalled();
     // Form view: the entry is selected, dialog stays open.
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
   it("adds directly when the only fields are optional and non-name", async () => {
@@ -109,7 +111,9 @@ describe("add-component-dialog skips the form for configless components", () => 
       { component_id: "debug", fields: {} },
       "esphome:\n  name: foo\n"
     );
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
   });
 
   it("opens the form when an always-shown name field survives required-only", async () => {
@@ -125,7 +129,7 @@ describe("add-component-dialog skips the form for configless components", () => 
 
     expect(addComponent).not.toHaveBeenCalled();
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
   it("opens the form for a configless component with a missing dependency", async () => {
@@ -144,7 +148,7 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect(addComponent).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
   it("fast-paths a configless component once its dependency is present", async () => {
@@ -163,7 +167,9 @@ describe("add-component-dialog skips the form for configless components", () => 
       { component_id: "captive_portal", fields: {} },
       "wifi:\n  ssid: foo\n"
     );
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
   });
 
   it("opens the form for an advanced-only exclusive group (always-shown dropdown)", async () => {
@@ -182,7 +188,7 @@ describe("add-component-dialog skips the form for configless components", () => 
     await select(dialog, "chooser");
 
     expect(addComponent).not.toHaveBeenCalled();
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
   it("opens the form for an advanced-only constraint cluster (always-shown box)", async () => {
@@ -200,7 +206,7 @@ describe("add-component-dialog skips the form for configless components", () => 
     await select(dialog, "clustered");
 
     expect(addComponent).not.toHaveBeenCalled();
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
   it("adds an advanced-only component directly (Socket), toasts, and closes", async () => {
@@ -223,7 +229,9 @@ describe("add-component-dialog skips the form for configless components", () => 
     expect(toast.success).toHaveBeenCalledWith("device.component_added", {
       richColors: true,
     });
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
     expect((dialog as unknown as { _selected: unknown })._selected).toBeNull();
   });
 
@@ -248,7 +256,7 @@ describe("add-component-dialog skips the form for configless components", () => 
 
     expect(addComponent).not.toHaveBeenCalled();
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
   it("fast-paths but submits the seeded id the form would have sent (not {})", async () => {
@@ -274,7 +282,9 @@ describe("add-component-dialog skips the form for configless components", () => 
       },
       "esphome:\n  name: foo\n"
     );
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
   });
 
   it("fast-paths an advanced-only component whose dep is satisfied by a platform stem", async () => {
@@ -292,7 +302,9 @@ describe("add-component-dialog skips the form for configless components", () => 
     await select(dialog, "socket");
 
     expect(addComponent).toHaveBeenCalled();
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
   });
 
   it("opens the form for an advanced-only component when a prefill is active", async () => {
@@ -313,7 +325,7 @@ describe("add-component-dialog skips the form for configless components", () => 
 
     expect(addComponent).not.toHaveBeenCalled();
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
   it("opens the form for an advanced-only component with a missing dependency", async () => {
@@ -328,7 +340,7 @@ describe("add-component-dialog skips the form for configless components", () => 
 
     expect(addComponent).not.toHaveBeenCalled();
     expect((dialog as unknown as { _selected: unknown })._selected).toBe(entry);
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 
   it("fast-paths a featured entry but submits its from_preset values", async () => {
@@ -355,7 +367,9 @@ describe("add-component-dialog skips the form for configless components", () => 
       { component_id: "featured.bw15.socket", fields: { implementation: "lwip" } },
       "esphome:\n  name: foo\n"
     );
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
   });
 
   it("fast-paths a featured entry that has no config entries (no presets to lose)", async () => {
@@ -372,7 +386,9 @@ describe("add-component-dialog skips the form for configless components", () => 
       { component_id: "featured.bw15.async_tcp", fields: {} },
       "esphome:\n  name: foo\n"
     );
-    expect((dialog as unknown as { _open: boolean })._open).toBe(false);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
+      false
+    );
   });
 
   it("toasts the error and keeps the dialog open when a configless add fails", async () => {
@@ -389,6 +405,6 @@ describe("add-component-dialog skips the form for configless components", () => 
     // and the dialog stays open as a recovery surface.
     expect(toast.error).toHaveBeenCalledWith("boom", { richColors: true });
     expect(toast.success).not.toHaveBeenCalled();
-    expect((dialog as unknown as { _open: boolean })._open).toBe(true);
+    expect((dialog as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(true);
   });
 });

@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -53,7 +54,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   /** Included file the first error lives in, or "" when it's in the open config. */
   @property() firstErrorFile = "";
 
-  @state() private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
@@ -120,21 +121,13 @@ export class ESPHomeYamlValidationDialog extends LitElement {
 
   open() {
     this._resolvedExit = null;
-    this._open = true;
+    this._dialog.open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  // esphome-base-dialog never mutates its own open on a user-driven close
-  // (Escape / X / outside-click); the host owns flipping _open here, else a
-  // re-render re-asserts ?open and the dialog can't dismiss. Teardown +
-  // cancel-on-dismiss stay in _onAfterHide.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
 
   protected render() {
     const message = this._localize("device.yaml_invalid_message", {
@@ -148,9 +141,9 @@ export class ESPHomeYamlValidationDialog extends LitElement {
       : "";
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("device.yaml_invalid_title")}
-        @request-close=${this._onRequestClose}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         <div class="body">
@@ -211,7 +204,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   }
 
   private _onAfterHide() {
-    this._open = false;
+    this._dialog.open = false;
     this._enter.set(false);
     if (this._resolvedExit === null) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));

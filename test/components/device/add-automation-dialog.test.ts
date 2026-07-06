@@ -440,7 +440,7 @@ describe("add-automation-dialog open/close contract", () => {
   const baseDialog = (d: ESPHomeAddAutomationDialog): HTMLElement =>
     d.shadowRoot!.querySelector("esphome-base-dialog")!;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isOpen = (d: ESPHomeAddAutomationDialog): boolean => (d as any)._open;
+  const isOpen = (d: ESPHomeAddAutomationDialog): boolean => (d as any)._dialog.open;
 
   it("open() flips the reactive flag and binds ?open", async () => {
     const api = {

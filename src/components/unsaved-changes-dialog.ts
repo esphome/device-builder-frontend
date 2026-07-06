@@ -5,6 +5,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -29,7 +30,7 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   @property()
   message = "";
 
-  @state() private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   private _resolved = false;
 
@@ -38,21 +39,13 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
 
   open() {
     this._resolved = false;
-    this._open = true;
+    this._dialog.open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  // esphome-base-dialog never mutates its own open on a user-driven close
-  // (Escape / outside-click); the host owns flipping _open here, else a
-  // re-render re-asserts ?open and the dialog can't dismiss. Teardown +
-  // cancel-on-dismiss stay in _onAfterHide.
-  private _onRequestClose = (): void => {
-    this._open = false;
-  };
 
   static styles = [
     espHomeStyles,
@@ -175,8 +168,8 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   protected render() {
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
-        @request-close=${this._onRequestClose}
+        ?open=${this._dialog.open}
+        @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
         <div class="body">
@@ -222,7 +215,7 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   }
 
   private _onAfterHide() {
-    this._open = false;
+    this._dialog.open = false;
     this._enter.set(false);
     if (!this._resolved) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));

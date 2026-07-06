@@ -23,105 +23,59 @@
 const fs = require("fs");
 const path = require("path");
 
+// The locale helpers (`toBcp47`, `localeCompleteness`, the base-language
+// constant) live once in translations-lib.ts, under the unit tests in
+// test/build-scripts/translations-lib.test.ts. Node's native TypeScript type
+// stripping (which `node build-scripts/translations.ts` already relies on)
+// together with `require(esm)` — both available on the `engines` floor
+// (>= 22.18) — lets this CommonJS script require that ESM module
+// synchronously; this is the first script here that leans on `require(esm)`
+// specifically. `BASE_LANGUAGE` names the in-repo source-of-truth
+// English file; completeness is measured against its key set.
+let translationsLib;
+try {
+  translationsLib = require("./translations-lib.ts");
+} catch (err) {
+  // `engines` is only an install-time warning, so an unsupported Node still
+  // reaches this require and dies with an opaque loader error. Rephrase only
+  // the known loader/version failures: unknown `.ts` extension, require(esm)
+  // unavailable, or the CJS loader parsing unstripped TypeScript syntax as
+  // JavaScript (a bare SyntaxError; translations-lib.ts itself is
+  // syntax-checked by tsc and its unit tests, so a SyntaxError here means
+  // the loader). Anything else is a real bug and rethrows untouched.
+  const isLoaderFailure =
+    (err && err.code === "ERR_UNKNOWN_FILE_EXTENSION") ||
+    (err && err.code === "ERR_REQUIRE_ESM") ||
+    err instanceof SyntaxError;
+  if (!isLoaderFailure) {
+    throw err;
+  }
+  throw new Error(
+    `Loading build-scripts/translations-lib.ts failed on Node ${process.version}; ` +
+      "this script needs Node >= 22.18 (native TypeScript type stripping and require(esm)).",
+    { cause: err }
+  );
+}
+const { BASE_LANGUAGE, localeCompleteness, toBcp47 } = translationsLib;
+
 const ROOT_DIR = path.resolve(__dirname, "..");
 const TRANSLATIONS_DIR = path.join(ROOT_DIR, "src", "translations");
-const OUTPUT_DIR = path.join(ROOT_DIR, "src", "generated");
-const OUTPUT_FILE = path.join(OUTPUT_DIR, "language-manifest.json");
-
-// The in-repo source of truth English file; completeness is measured against
-// its key set.
-const BASE_LOCALE = "en";
+const OUTPUT_FILE = path.join(ROOT_DIR, "src", "generated", "language-manifest.json");
 
 // Placeholder shown when a locale file lacks a translated `flag` key (the
 // runtime picker uses the same white-flag fallback).
 const FLAG_FALLBACK = "🏳️";
 
-// Canonicalize a filename stem to a BCP 47 tag. Downloaded files already use
-// canonical hyphenated names (the download tool normalizes `zh_CN` → `zh-CN`),
-// so this is defensive: hyphenate then run through Intl for canonical casing,
-// falling back to the raw hyphenated form for anything Intl rejects.
-//
-// Intentionally duplicated from build-scripts/translations-lib.ts (the
-// bodies are byte-identical). It is NOT shared because this is a CommonJS
-// build-time script that can't `require` that `.ts` ESM module without a
-// loader. Keep the two copies in sync if you ever change one. (The runtime
-// localizer no longer needs its own copy: it derives AVAILABLE_LOCALES from
-// this manifest, which is already canonical, and the download tool
-// canonicalizes filenames at the write boundary.)
-const toBcp47 = (stem) => {
-  const hyphenated = stem.replace(/_/g, "-");
-  try {
-    return Intl.getCanonicalLocales(hyphenated)[0] ?? hyphenated;
-  } catch {
-    return hyphenated;
-  }
-};
-
-// Flatten a nested messages object to a map of dot-joined leaf key → string
-// value. Non-string leaves are skipped so they never count as translatable.
-//
-// Intentionally duplicated from build-scripts/translations-lib.ts (see the
-// toBcp47 note above for why this CommonJS script can't import that ESM
-// module). `localeCompleteness` there is the unit-tested reference; keep this
-// copy byte-compatible with it.
-const flattenMessages = (obj, prefix = "", out = new Map()) => {
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== null && typeof value === "object") {
-      flattenMessages(value, `${prefix}${key}.`, out);
-    } else if (typeof value === "string") {
-      out.set(`${prefix}${key}`, value);
-    }
-  }
-  return out;
-};
-
-// Flatten the English base once per base object and reuse it across locales
-// (every locale in a run is measured against the same base). Mirrors
-// translations-lib.ts; keep byte-compatible.
-const baseLeavesCache = new WeakMap();
-
-const flattenBase = (base) => {
-  let leaves = baseLeavesCache.get(base);
-  if (leaves === undefined) {
-    leaves = flattenMessages(base);
-    baseLeavesCache.set(base, leaves);
-  }
-  return leaves;
-};
-
-// Percentage (integer 0–100) of the English source's leaf keys that carry a
-// non-empty value in `locale`. See translations-lib.ts `localeCompleteness`
-// for the full rationale; this is the synced build-script copy.
-const localeCompleteness = (base, locale) => {
-  const baseLeaves = flattenBase(base);
-  const total = baseLeaves.size;
-  if (total === 0) {
-    return 100;
-  }
-  const localeLeaves = flattenMessages(locale);
-  let translated = 0;
-  for (const key of baseLeaves.keys()) {
-    const value = localeLeaves.get(key);
-    if (value !== undefined && value.length > 0) {
-      translated += 1;
-    }
-  }
-  if (translated >= total) {
-    return 100;
-  }
-  if (translated === 0) {
-    return 0;
-  }
-  return Math.min(99, Math.max(1, Math.round((translated / total) * 100)));
-};
-
-function generate() {
+// `outputFile` is overridable (CLI arg below) so tests can write to a temp
+// directory instead of the real src/generated file; every repo entry point
+// (build/dev/lint/test setup) uses the default.
+function generate(outputFile = OUTPUT_FILE) {
   const entries = fs
     .readdirSync(TRANSLATIONS_DIR)
     .filter((name) => name.endsWith(".json"))
     .sort();
 
-  const basePath = path.join(TRANSLATIONS_DIR, `${BASE_LOCALE}.json`);
+  const basePath = path.join(TRANSLATIONS_DIR, `${BASE_LANGUAGE}.json`);
   const baseData = JSON.parse(fs.readFileSync(basePath, "utf-8"));
 
   const manifest = {};
@@ -137,16 +91,19 @@ function generate() {
     };
   }
 
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  fs.writeFileSync(OUTPUT_FILE, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+  fs.writeFileSync(outputFile, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
   return manifest;
 }
 
 module.exports = { generate };
 
 if (require.main === module) {
-  const manifest = generate();
+  const outputFile = process.argv[2]
+    ? path.resolve(process.argv[2])
+    : OUTPUT_FILE;
+  const manifest = generate(outputFile);
   console.log(
-    `Wrote ${path.relative(ROOT_DIR, OUTPUT_FILE)} (${Object.keys(manifest).join(", ")})`
+    `Wrote ${path.relative(ROOT_DIR, outputFile)} (${Object.keys(manifest).join(", ")})`
   );
 }
