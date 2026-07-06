@@ -150,8 +150,9 @@ export function parseLogLine(clean: string): ParsedLogLine | undefined {
  * Resolve *line* to its documentation links, or ``undefined`` when none
  * apply. The two facets are independent — a curated warning on a
  * catalogued tag carries both. *integrationDocs* is the backend
- * ``components/get_integration_docs`` map (component name → its docs
- * URL + display name); a present entry guarantees the page exists.
+ * ``components/get_integration_docs`` map (component name → docs URL,
+ * display name, and trimmed description); a present entry guarantees
+ * the page exists.
  */
 export function resolveLogDocLink(
   line: string,

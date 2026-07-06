@@ -33,9 +33,11 @@ export class ESPHomeLogDocPopover extends LitElement {
   /** Localized label for the docs link. */
   @property({ attribute: false }) linkLabel = "";
 
+  // Popover API methods typed optional so environments without the API
+  // degrade to a no-op instead of crashing the log viewer.
   @query(".pop") private _pop?: HTMLElement & {
-    showPopover(): void;
-    hidePopover(): void;
+    showPopover?: () => void;
+    hidePopover?: () => void;
   };
 
   static styles = css`
@@ -100,10 +102,10 @@ export class ESPHomeLogDocPopover extends LitElement {
     // previous content under-clamps and the popover can run off-screen.
     await this.updateComplete;
     const pop = this._pop;
-    if (!pop) return;
+    if (!pop?.showPopover) return;
     // Re-show from a clean state: showPopover throws on an already-open
     // popover, and hidePopover throws when it's already closed.
-    if (pop.matches(":popover-open")) pop.hidePopover();
+    if (pop.matches(":popover-open")) pop.hidePopover?.();
     pop.showPopover();
     const a = anchor.getBoundingClientRect();
     const rect = pop.getBoundingClientRect();
@@ -122,7 +124,9 @@ export class ESPHomeLogDocPopover extends LitElement {
 
   /** Close the popover if open. */
   hide() {
-    if (this._pop?.matches(":popover-open")) this._pop.hidePopover();
+    const pop = this._pop;
+    // hidePopover present implies :popover-open parses; guard both together.
+    if (pop?.hidePopover && pop.matches(":popover-open")) pop.hidePopover();
   }
 
   private _onLinkClick = () => {

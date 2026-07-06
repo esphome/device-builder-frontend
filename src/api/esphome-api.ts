@@ -1447,9 +1447,10 @@ export class ESPHomeAPI {
    * refreshes with a backend release.
    *
    * The WS layer doesn't enforce a shape, so we filter the payload to
-   * the ``{string: {url, name}}`` contract here: anything that isn't a
-   * plain object is replaced with ``{}``, and entries whose value lacks
-   * string ``url``/``name`` fields are dropped. Consumers can rely on
+   * the ``{string: {url, name, description}}`` contract here: anything
+   * that isn't a plain object is replaced with ``{}``, entries whose
+   * value lacks string ``url``/``name`` fields are dropped, and a
+   * missing ``description`` coerces to ``""``. Consumers can rely on
    * the result being safe to spread into a context without further
    * validation.
    */
