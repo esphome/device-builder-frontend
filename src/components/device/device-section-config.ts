@@ -682,11 +682,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         })
       );
     } catch (err) {
-      const msg = formatApiError(
-        err,
-        this._localize,
-        "device.automation_save_error"
-      );
+      const msg = formatApiError(err, this._localize, "device.automation_save_error");
       notifyError(this._localize("device.automation_save_error"), {
         description: msg,
       });
