@@ -77,7 +77,7 @@ export class ESPHomeLogDocPopover extends LitElement {
 
   protected render() {
     return html`
-      <div class="pop" popover="auto" role="dialog" aria-label=${this.heading}>
+      <div class="pop" popover="auto" role="dialog" aria-label=${this.heading || nothing}>
         <div class="heading">${this.heading}</div>
         ${this.body ? html`<p class="body">${this.body}</p>` : nothing}
         <a
