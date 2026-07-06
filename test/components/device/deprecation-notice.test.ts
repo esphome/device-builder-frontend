@@ -16,10 +16,15 @@ import toast from "sonner-js";
 import { ESPHomeDeprecationNotice } from "../../../src/components/device/deprecation-notice.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-async function mount(sectionKey: string, values: Record<string, unknown>) {
+async function mount(
+  sectionKey: string,
+  values: Record<string, unknown>,
+  entries: any[] = []
+) {
   const el = new ESPHomeDeprecationNotice();
   el.sectionKey = sectionKey;
   el.values = values;
+  el.entries = entries;
   const changes: { path: string[]; value: unknown }[][] = [];
   el.addEventListener("apply-section-values", (e) =>
     changes.push((e as CustomEvent).detail.changes)
@@ -48,6 +53,25 @@ describe("deprecation-notice — detection", () => {
   for (const [name, sectionKey, values, shows] of cases) {
     it(`${name} → banner ${shows ? "shown" : "hidden"}`, async () => {
       const { el } = await mount(sectionKey, values);
+      expect(el.shadowRoot!.querySelector(".notice") !== null).toBe(shows);
+    });
+  }
+
+  // clk_mode is RMII-only; the schema entry's depends_on gate decides.
+  const clkModeEntry = {
+    key: "clk_mode",
+    depends_on: "type",
+    depends_on_value_any: ["LAN8720", "RTL8201"],
+  };
+  const gated: Array<[string, Record<string, unknown>, boolean]> = [
+    ["RMII type satisfies the gate", { type: "LAN8720", clk_mode: "GPIO17_OUT" }, true],
+    ["SPI type fails the gate", { type: "W5500", clk_mode: "GPIO17_OUT" }, false],
+    ["no schema entry → ungated", { type: "W5500", clk_mode: "GPIO17_OUT" }, true],
+  ];
+  for (const [name, values, shows] of gated) {
+    it(`schema gate: ${name} → banner ${shows ? "shown" : "hidden"}`, async () => {
+      const entries = name.includes("no schema entry") ? [] : [clkModeEntry];
+      const { el } = await mount("ethernet", values, entries);
       expect(el.shadowRoot!.querySelector(".notice") !== null).toBe(shows);
     });
   }

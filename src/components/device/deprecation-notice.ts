@@ -15,9 +15,11 @@ import { consume } from "@lit/context";
 import { mdiUpdate } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { isEntryVisible } from "../../util/config-validation.js";
 import { notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -89,6 +91,10 @@ export class ESPHomeDeprecationNotice extends LitElement {
   /** The section's draft values (the host's `_values`). */
   @property({ attribute: false }) values: Record<string, unknown> = {};
 
+  /** The section's schema entries, to honor `depends_on` gates (e.g. ethernet
+   *  `clk_mode` applies only to RMII PHY types, never SPI). */
+  @property({ attribute: false }) entries: ConfigEntry[] = [];
+
   /** Registry entries whose deprecated key is present with a migratable value. */
   private _migratable(): {
     option: DeprecatedOption;
@@ -101,6 +107,10 @@ export class ESPHomeDeprecationNotice extends LitElement {
     }[] = [];
     for (const option of DEPRECATED_OPTIONS[this.sectionKey]) {
       if (!Object.prototype.hasOwnProperty.call(this.values, option.key)) continue;
+      // A schema-gated deprecated key that doesn't apply to the current
+      // values (wrong `type`) is a different problem than a migration.
+      const entry = this.entries.find((e) => e.key === option.key);
+      if (entry && !isEntryVisible(entry, this.values)) continue;
       const changes = option.migrate(this.values[option.key]);
       if (changes) out.push({ option, changes });
     }

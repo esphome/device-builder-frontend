@@ -533,6 +533,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                   ? html`<esphome-deprecation-notice
                       .sectionKey=${this.sectionKey}
                       .values=${this._values}
+                      .entries=${renderEntries}
                       @apply-section-values=${this._onApplySectionValues}
                     ></esphome-deprecation-notice>`
                   : nothing
