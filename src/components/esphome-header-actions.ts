@@ -131,6 +131,10 @@ export class ESPHomeHeaderActions extends LitElement {
   @state()
   private _desktopUpdateCapable = false;
 
+  /** Computed once per instance: the platform is constant for a session, so
+   *  the search-shortcut check needn't re-run the regex on every render. */
+  private readonly _isApplePlatform = isApplePlatform();
+
   static styles = [espHomeStyles, dropdownMenuStyles, headerActionsStyles];
 
   connectedCallback(): void {
@@ -165,7 +169,7 @@ export class ESPHomeHeaderActions extends LitElement {
     const hasAlerts = this._offloaderAlertsCount() > 0;
     const ignoredCount = this._importableDevices.filter((d) => d.ignored).length;
     // ⌘ is a locale-independent Apple glyph; the "Ctrl" label localizes (STRG in German).
-    const searchShortcut = isApplePlatform()
+    const searchShortcut = this._isApplePlatform
       ? "⌘K"
       : this._localize("layout.search_shortcut");
     return html`
