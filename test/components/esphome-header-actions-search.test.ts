@@ -23,6 +23,15 @@ describe("header-actions Search item", () => {
     expect(el.shadowRoot!.querySelector(".menu-item-shortcut")).not.toBeNull();
   });
 
+  it("localizes the Ctrl shortcut hint so it can be translated (e.g. STRG)", async () => {
+    const el = await renderOpenHeaderMenu({
+      _localize: (key) => (key === "layout.search_shortcut" ? "Strg K" : key),
+    });
+    expect(el.shadowRoot!.querySelector(".menu-item-shortcut")!.textContent!.trim()).toBe(
+      "Strg K"
+    );
+  });
+
   it("fires the open-palette event and closes the menu on click", async () => {
     const el = await renderOpenHeaderMenu();
     const listener = vi.fn();

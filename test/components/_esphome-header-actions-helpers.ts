@@ -6,17 +6,20 @@
  * gating prop they set first, so that boilerplate lives here rather than
  * getting copy-pasted per suite.
  */
+import type { LocalizeFunc } from "../../src/common/localize.js";
 import { ESPHomeHeaderActions } from "../../src/components/esphome-header-actions.js";
 
 /**
  * Gating flags the kebab-menu suites toggle before opening the menu — the
  * public ``dashboardRoute`` prop and the private ``_desktopUpdateCapable``
- * state. Narrowly typed (rather than ``Record<string, unknown>``) so a typo
- * in a gate name is a compile error; extend it as new suites need more gates.
+ * state, plus a ``_localize`` stub for suites asserting localized copy.
+ * Narrowly typed (rather than ``Record<string, unknown>``) so a typo in a
+ * gate name is a compile error; extend it as new suites need more gates.
  */
 export interface HeaderMenuOverrides {
   dashboardRoute?: boolean;
   _desktopUpdateCapable?: boolean;
+  _localize?: LocalizeFunc;
 }
 
 /**

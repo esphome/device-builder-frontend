@@ -995,6 +995,7 @@
     "theme_system": "System",
     "settings": "Settings",
     "search": "Search commands",
+    "search_shortcut": "Ctrl K",
     "archived_devices": "Archived devices",
     "show_ignored_discoveries": "Show ignored discoveries ({count})",
     "hide_ignored_discoveries": "Hide ignored discoveries",

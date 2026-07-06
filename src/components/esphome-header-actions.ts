@@ -55,15 +55,13 @@ registerMdiIcons({
   "wifi-cog": mdiWifiCog,
 });
 
-/** Cmd+K on Apple platforms, Ctrl K elsewhere — matches the command
- *  palette binding. ``userAgentData`` first; ``navigator.platform`` is
- *  deprecated but remains the only signal on Firefox and Safari. */
-const SEARCH_SHORTCUT = /mac|iphone|ipad/i.test(
+/** True on Apple platforms, where the search shortcut uses the ⌘ glyph.
+ *  ``userAgentData`` first; ``navigator.platform`` is deprecated but remains
+ *  the only signal on Firefox and Safari. */
+const IS_APPLE_PLATFORM = /mac|iphone|ipad/i.test(
   (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ??
     navigator.platform
-)
-  ? "⌘K"
-  : "Ctrl K";
+);
 
 @customElement("esphome-header-actions")
 export class ESPHomeHeaderActions extends LitElement {
@@ -162,6 +160,10 @@ export class ESPHomeHeaderActions extends LitElement {
         : this._localize("dashboard.more_options");
     const hasAlerts = this._offloaderAlertsCount() > 0;
     const ignoredCount = this._importableDevices.filter((d) => d.ignored).length;
+    // ⌘ is a locale-independent Apple glyph; the "Ctrl" label localizes (STRG in German).
+    const searchShortcut = IS_APPLE_PLATFORM
+      ? "⌘K"
+      : this._localize("layout.search_shortcut");
     return html`
       <button
         type="button"
@@ -324,7 +326,7 @@ export class ESPHomeHeaderActions extends LitElement {
                 >
                   <wa-icon library="mdi" name="magnify"></wa-icon>
                   <span class="menu-item-label">${this._localize("layout.search")}</span>
-                  <kbd class="menu-item-shortcut">${SEARCH_SHORTCUT}</kbd>
+                  <kbd class="menu-item-shortcut">${searchShortcut}</kbd>
                 </div>
                 <div class="menu-divider" role="separator"></div>
                 <div
