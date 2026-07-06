@@ -138,11 +138,9 @@ export function docPopoverText(
 ): LogDocPopoverText {
   const linkLabel = localize("dashboard.logs_doc_view");
   if (link.kind === "component") {
-    return {
-      heading: link.component,
-      body: localize("dashboard.logs_doc_component_body", { component: link.component }),
-      linkLabel,
-    };
+    // The catalog display name is the headline ("Ethernet Component");
+    // no body — the name plus the docs link say everything.
+    return { heading: link.displayName || link.component, body: "", linkLabel };
   }
   const keys = CURATED_COPY[link.body];
   return { heading: localize(keys.title), body: localize(keys.body), linkLabel };
@@ -218,7 +216,7 @@ export function renderComponentLineChildren(
 
 function componentLinkTitle(link: ComponentLogDocLink, localize: LocalizeFunc): string {
   return localize("dashboard.logs_doc_component_link_title", {
-    component: link.component,
+    component: link.displayName || link.component,
   });
 }
 

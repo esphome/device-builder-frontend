@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
+import type { IntegrationDoc } from "../../../api/types/components.js";
 import type { ConfiguredDevice } from "../../../api/types/devices.js";
 import { isSafeDocsUrl } from "../../../common/docs.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
@@ -50,9 +51,9 @@ export function renderEncryptionBadge(
 
 function renderIntegrationTag(
   name: string,
-  integrationDocs: Record<string, string>
+  integrationDocs: Record<string, IntegrationDoc>
 ): TemplateResult {
-  const url = integrationDocs[name];
+  const url = integrationDocs[name]?.url;
   return url && isSafeDocsUrl(url)
     ? html`<a class="tag tag--link" href=${url} target="_blank" rel="noopener noreferrer"
         >${name}</a
@@ -67,7 +68,7 @@ function renderIntegrationTag(
 export function renderLoadedIntegrationsSection(
   d: ConfiguredDevice,
   localize: LocalizeFunc,
-  integrationDocs: Record<string, string>
+  integrationDocs: Record<string, IntegrationDoc>
 ): TemplateResult | typeof nothing {
   if (!d.loaded_integrations || d.loaded_integrations.length === 0) {
     return nothing;

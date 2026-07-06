@@ -6,6 +6,7 @@
  */
 import { createContext } from "@lit/context";
 import { ESPHomeAPI } from "../api/index.js";
+import type { IntegrationDoc } from "../api/types/components.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
 import type { VersionMatchPolicy } from "../api/types/event-subscription.js";
 import {
@@ -179,7 +180,7 @@ export const remoteBuildCleanupTtlContext = createContext<number>(
  *  once on app load via ``components/get_integration_docs``; the
  *  drawer's loaded-integration tags consult it to decide whether to
  *  render each name as a link or plain text. */
-export const integrationDocsContext = createContext<Record<string, string>>(
+export const integrationDocsContext = createContext<Record<string, IntegrationDoc>>(
   Symbol("esphome-integration-docs")
 );
 

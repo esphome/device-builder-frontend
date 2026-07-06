@@ -7,6 +7,7 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import type { IntegrationDoc } from "../api/types/components.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { integrationDocsContext, localizeContext } from "../context/index.js";
 import { ansiLogThemes } from "../styles/ansi-log/index.js";
@@ -264,7 +265,7 @@ export class ESPHomeAnsiLog extends LitElement {
   // component links. Defaults empty when no provider (isolated use / tests).
   @consume({ context: integrationDocsContext, subscribe: true })
   @state()
-  private _integrationDocs: Record<string, string> = {};
+  private _integrationDocs: Record<string, IntegrationDoc> = {};
 
   @consume({ context: localizeContext, subscribe: true })
   @state()

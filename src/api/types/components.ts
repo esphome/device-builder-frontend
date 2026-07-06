@@ -133,3 +133,10 @@ export interface PagedComponentsResponse extends PagedResponse {
   components: ComponentCatalogEntry[];
   categories: Array<{ id: string; name: string; count: number }>;
 }
+
+/** One `components/get_integration_docs` map value: canonical esphome.io
+ *  docs URL plus the catalog display name ("Ethernet Component"). */
+export interface IntegrationDoc {
+  url: string;
+  name: string;
+}

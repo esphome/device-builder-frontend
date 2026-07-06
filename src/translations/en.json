@@ -50,7 +50,6 @@
     "logs_doc_view": "View documentation",
     "logs_doc_actionable_link_title": "Show documentation for this message",
     "logs_doc_component_link_title": "Open {component} documentation",
-    "logs_doc_component_body": "Documentation for the {component} component.",
     "logs_doc_embedded_title": "ESPHome documentation",
     "logs_doc_embedded_body": "This log message links to the ESPHome documentation.",
     "logs_doc_bootloader_title": "Bootloader too old for OTA rollback",

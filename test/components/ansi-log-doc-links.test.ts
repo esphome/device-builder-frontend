@@ -2,10 +2,13 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import type { IntegrationDoc } from "../../src/api/types/components.js";
 import { ESPHomeAnsiLog } from "../../src/components/ansi-log.js";
 import { mount } from "../_dom.js";
 
-const DOCS = { ethernet: "https://esphome.io/components/ethernet" };
+const DOCS = {
+  ethernet: { url: "https://esphome.io/components/ethernet", name: "Ethernet Component" },
+};
 
 const BOOTLOADER =
   "[13:22:07][W][app:193]: Bootloader too old for OTA rollback. Flash via USB once to update the bootloader";
@@ -15,7 +18,9 @@ const PLAIN = "[13:22:07][I][main:042]: Some unremarkable status line";
 async function mountLog(lines: string[]): Promise<ESPHomeAnsiLog> {
   const el = new ESPHomeAnsiLog();
   el.lines = lines;
-  (el as unknown as { _integrationDocs: Record<string, string> })._integrationDocs = DOCS;
+  (
+    el as unknown as { _integrationDocs: Record<string, IntegrationDoc> }
+  )._integrationDocs = DOCS;
   await mount(el);
   return el;
 }
@@ -57,8 +62,10 @@ describe("ansi-log doc-link annotations", () => {
       "[10:11:53.745][E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***";
     const both = new ESPHomeAnsiLog();
     both.lines = [crash];
-    (both as unknown as { _integrationDocs: Record<string, string> })._integrationDocs = {
-      esp8266: "https://esphome.io/components/esp8266",
+    (
+      both as unknown as { _integrationDocs: Record<string, IntegrationDoc> }
+    )._integrationDocs = {
+      esp8266: { url: "https://esphome.io/components/esp8266", name: "ESP8266 Platform" },
     };
     await mount(both);
     const doc = root(both).querySelector(".log-line--doc")!;
@@ -70,13 +77,30 @@ describe("ansi-log doc-link annotations", () => {
     expect(doc.querySelector(".log-line-text")!.textContent).toBe(crash);
   });
 
+  it("titles the tag link with the catalog display name", async () => {
+    const el = await mountLog([ETHERNET]);
+    // The default localize stub echoes the key; substitute one that echoes
+    // the interpolation so the displayName plumbing is observable.
+    (
+      el as unknown as {
+        _localize: (k: string, v?: Record<string, string | number>) => string;
+      }
+    )._localize = (key, values) => String(values?.component ?? key);
+    await el.updateComplete;
+    const link = root(el).querySelector<HTMLButtonElement>(".log-tag-link")!;
+    // The popover heading uses the same displayName field; the tooltip is
+    // the DOM-visible surface to pin it on.
+    expect(link.title).toBe("Ethernet Component");
+  });
+
   it("re-resolves cached lines when the integration docs map changes", async () => {
     const bare = new ESPHomeAnsiLog();
     bare.lines = [ETHERNET];
     await mount(bare);
     expect(root(bare).querySelector(".log-tag-link")).toBeNull();
-    (bare as unknown as { _integrationDocs: Record<string, string> })._integrationDocs =
-      DOCS;
+    (
+      bare as unknown as { _integrationDocs: Record<string, IntegrationDoc> }
+    )._integrationDocs = DOCS;
     await bare.updateComplete;
     expect(root(bare).querySelector(".log-tag-link")).not.toBeNull();
   });

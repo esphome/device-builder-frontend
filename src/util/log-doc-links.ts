@@ -10,6 +10,7 @@
  * through ``isSafeDocsUrl`` so a compromised map entry or a spoofed
  * inline URL can't render a ``javascript:`` anchor.
  */
+import type { IntegrationDoc } from "../api/types/components.js";
 import { isSafeDocsUrl } from "../common/docs.js";
 import { stripAnsi } from "./ansi-escapes.js";
 
@@ -26,8 +27,10 @@ export interface ComponentLogDocLink {
   /** Canonical esphome.io URL, already whitelisted. */
   url: string;
   body: "component";
-  /** Resolved component slug (popover title). */
+  /** Resolved component slug (the map key that matched). */
   component: string;
+  /** Catalog display name ("Ethernet Component") — the popover title. */
+  displayName: string;
   /** Char range of the tag token within ``clean``. */
   tagRange: { start: number; end: number };
   /** The ANSI-stripped line ``tagRange`` indexes into. */
@@ -125,12 +128,12 @@ export function parseLogLine(clean: string): ParsedLogLine | undefined {
  * Resolve *line* to its documentation links, or ``undefined`` when none
  * apply. The two facets are independent — a curated warning on a
  * catalogued tag carries both. *integrationDocs* is the backend
- * ``components/get_integration_docs`` map (component name → esphome.io
- * URL); a present entry guarantees the page exists.
+ * ``components/get_integration_docs`` map (component name → its docs
+ * URL + display name); a present entry guarantees the page exists.
  */
 export function resolveLogDocLink(
   line: string,
-  integrationDocs: Record<string, string>
+  integrationDocs: Record<string, IntegrationDoc>
 ): LogDocLinks | undefined {
   const clean = stripAnsi(line);
   const parsed = parseLogLine(clean);
@@ -159,13 +162,14 @@ export function resolveLogDocLink(
   let component: ComponentLogDocLink | undefined;
   if (parsed) {
     for (const slug of tagCandidates(parsed.tag)) {
-      const url = integrationDocs[slug];
-      if (url && isSafeDocsUrl(url)) {
+      const entry = integrationDocs[slug];
+      if (entry && isSafeDocsUrl(entry.url)) {
         component = {
           kind: "component",
-          url,
+          url: entry.url,
           body: "component",
           component: slug,
+          displayName: entry.name,
           tagRange: { start: parsed.tagStart, end: parsed.tagEnd },
           clean,
         };

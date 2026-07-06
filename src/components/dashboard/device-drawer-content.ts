@@ -32,6 +32,7 @@ import {
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
+import type { IntegrationDoc } from "../../api/types/components.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type {
   ReachabilityStateEvent,
@@ -110,7 +111,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   _localize: LocalizeFunc = (key) => key;
   @consume({ context: integrationDocsContext, subscribe: true })
   @state()
-  _integrationDocs: Record<string, string> = {};
+  _integrationDocs: Record<string, IntegrationDoc> = {};
   @consume({ context: apiContext }) @state() _api?: ESPHomeAPI;
 
   @property({ attribute: false }) device!: ConfiguredDevice;

@@ -7,10 +7,10 @@ import {
 } from "../../src/util/log-doc-links.js";
 
 const DOCS = {
-  ethernet: "https://esphome.io/components/ethernet",
-  i2c: "https://esphome.io/components/i2c",
-  wifi: "https://esphome.io/components/wifi",
-  sensor: "https://esphome.io/components/sensor",
+  ethernet: { url: "https://esphome.io/components/ethernet", name: "Ethernet Component" },
+  i2c: { url: "https://esphome.io/components/i2c", name: "I2C Bus" },
+  wifi: { url: "https://esphome.io/components/wifi", name: "WiFi Component" },
+  sensor: { url: "https://esphome.io/components/sensor", name: "sensor" },
 };
 
 function expectComponent(links: LogDocLinks | undefined): ComponentLogDocLink {
@@ -87,7 +87,7 @@ describe("resolveLogDocLink — actionable", () => {
     const line =
       "[09:28:39.132][E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***";
     const links = resolveLogDocLink(line, {
-      esp8266: "https://esphome.io/components/esp8266",
+      esp8266: { url: "https://esphome.io/components/esp8266", name: "ESP8266 Platform" },
     });
     expect(links?.actionable?.url).toBe("https://esphome.io/guides/troubleshooting/");
     expect(links?.component?.url).toBe("https://esphome.io/components/esp8266");
@@ -107,7 +107,8 @@ describe("resolveLogDocLink — component", () => {
     const links = resolveLogDocLink(line, DOCS);
     expect(links?.actionable).toBeUndefined();
     const link = expectComponent(links);
-    expect(link.url).toBe(DOCS.ethernet);
+    expect(link.url).toBe(DOCS.ethernet.url);
+    expect(link.displayName).toBe("Ethernet Component");
     expect(link.component).toBe("ethernet");
     expect(link.clean).toBe(line);
     const { start, end } = link.tagRange;
@@ -117,7 +118,7 @@ describe("resolveLogDocLink — component", () => {
   it("resolves a dotted framework tag to the base component, ranging the whole tag", () => {
     const line = "[13:22:07][C][i2c.idf:092]: I2C Bus:";
     const link = expectComponent(resolveLogDocLink(line, DOCS));
-    expect(link.url).toBe(DOCS.i2c);
+    expect(link.url).toBe(DOCS.i2c.url);
     const { start, end } = link.tagRange;
     expect(line.slice(start, end)).toBe("i2c.idf");
   });
@@ -129,8 +130,11 @@ describe("resolveLogDocLink — component", () => {
     const line = "[13:22:07][C][esphome.ota:108]: Over-The-Air updates:";
     const link = expectComponent(
       resolveLogDocLink(line, {
-        esphome: "https://esphome.io/components/esphome",
-        "esphome.ota": "https://esphome.io/components/ota/esphome",
+        esphome: { url: "https://esphome.io/components/esphome", name: "ESPHome Core" },
+        "esphome.ota": {
+          url: "https://esphome.io/components/ota/esphome",
+          name: "ESPHome OTA Platform",
+        },
       })
     );
     expect(link.url).toBe("https://esphome.io/components/ota/esphome");
@@ -139,13 +143,13 @@ describe("resolveLogDocLink — component", () => {
 
   it("strips a platform suffix (wifi_esp32 -> wifi)", () => {
     const line = "[13:22:07][C][wifi_esp32:482]: WiFi:";
-    expect(resolveLogDocLink(line, DOCS)?.component?.url).toBe(DOCS.wifi);
+    expect(resolveLogDocLink(line, DOCS)?.component?.url).toBe(DOCS.wifi.url);
   });
 
   it("links the bare-domain tag of an [S] state line", () => {
     const line = "[10:18:17.439][S][sensor]: 'Ethernet Uptime' >> 68523 s";
     const link = expectComponent(resolveLogDocLink(line, DOCS));
-    expect(link.url).toBe(DOCS.sensor);
+    expect(link.url).toBe(DOCS.sensor.url);
     const { start, end } = link.tagRange;
     expect(line.slice(start, end)).toBe("sensor");
   });
@@ -178,16 +182,22 @@ describe("resolveLogDocLink — misses and safety", () => {
 
   it("rejects an unsafe (non-https / off-host) docs URL from the map", () => {
     const line = "[13:22:07][C][evil:1]: hi";
-    expect(resolveLogDocLink(line, { evil: "javascript:alert(1)" })).toBeUndefined();
     expect(
-      resolveLogDocLink(line, { evil: "https://evil.example.com/components/evil" })
+      resolveLogDocLink(line, { evil: { url: "javascript:alert(1)", name: "evil" } })
+    ).toBeUndefined();
+    expect(
+      resolveLogDocLink(line, {
+        evil: { url: "https://evil.example.com/components/evil", name: "evil" },
+      })
     ).toBeUndefined();
   });
 
   it("keeps the component facet alongside a curated actionable match", () => {
     const line =
       "[13:22:07][W][app:193]: Bootloader too old for OTA rollback. Flash via USB once";
-    const links = resolveLogDocLink(line, { app: "https://esphome.io/components/app" });
+    const links = resolveLogDocLink(line, {
+      app: { url: "https://esphome.io/components/app", name: "Native API Something" },
+    });
     expect(links?.actionable?.body).toBe("bootloader");
     expect(links?.component?.url).toBe("https://esphome.io/components/app");
   });

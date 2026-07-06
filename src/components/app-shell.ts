@@ -3,6 +3,7 @@ import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
+import type { IntegrationDoc } from "../api/types/components.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
 import type { VersionMatchPolicy } from "../api/types/event-subscription.js";
 import type { FirmwareJob, RemoteBuildSubmitTarget } from "../api/types/firmware-jobs.js";
@@ -166,7 +167,7 @@ export class ESPHomeApp extends LitElement {
     CLEANUP_TTL_DEFAULT_SECONDS;
   @provide({ context: integrationDocsContext }) @state() _integrationDocs: Record<
     string,
-    string
+    IntegrationDoc
   > = {};
   @provide({ context: labelsContext }) @state() _labels: Label[] = [];
   @provide({ context: onboardingPendingContext }) @state() _onboardingPending = false;
