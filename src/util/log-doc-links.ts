@@ -45,6 +45,9 @@ export type LogDocLink = ActionableLogDocLink | ComponentLogDocLink;
 export interface LogDocLinks {
   actionable?: ActionableLogDocLink;
   component?: ComponentLogDocLink;
+  /** Log level of a parsed line, so the renderer colours annotated lines
+   *  without re-running the line regex every frame. */
+  level?: string;
 }
 
 export interface ParsedLogLine {
@@ -206,6 +209,7 @@ export function resolveLogDocLink(
   const links: LogDocLinks = {};
   if (actionable) links.actionable = actionable;
   if (component) links.component = component;
+  if (parsed) links.level = parsed.level;
   return links;
 }
 

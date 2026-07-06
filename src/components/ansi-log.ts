@@ -11,7 +11,7 @@ import type { IntegrationDoc } from "../api/types/components.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { integrationDocsContext, localizeContext } from "../context/index.js";
 import { ansiLogThemes } from "../styles/ansi-log/index.js";
-import { ANSI_ESCAPE_RE, stripAnsi } from "../util/ansi-escapes.js";
+import { ANSI_ESCAPE_RE } from "../util/ansi-escapes.js";
 import { chunksToVisualLines } from "../util/log-chunks.js";
 import {
   type LogDocLink,
@@ -379,7 +379,7 @@ export class ESPHomeAnsiLog extends LitElement {
         this._openDoc
       );
     } else if (component) {
-      const levelColor = detectLogLevelColor(component.clean);
+      const levelColor = resolved?.level && LOG_LEVEL_COLORS[resolved.level];
       colorStyle = levelColor ? `color:${levelColor}` : "";
       inner = renderComponentLineChildren(component, this._localize, this._openDoc);
     } else {
@@ -397,8 +397,8 @@ export class ESPHomeAnsiLog extends LitElement {
       // The icon inherits the container colour, so give ANSI-styled lines
       // (whose colour lives on inner spans) the level colour there too.
       let containerStyle = colorStyle;
-      if (!containerStyle) {
-        const levelColor = detectLogLevelColor(component?.clean ?? stripAnsi(line));
+      if (!containerStyle && resolved.level) {
+        const levelColor = LOG_LEVEL_COLORS[resolved.level];
         if (levelColor) containerStyle = `color:${levelColor}`;
       }
       return renderActionableLine(

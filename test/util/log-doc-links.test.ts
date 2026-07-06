@@ -43,6 +43,7 @@ describe("resolveLogDocLink — actionable", () => {
         url: "https://esphome.io/components/ota/esphome/#updating-the-bootloader-on-esp32",
         body: "bootloader",
       },
+      level: "W",
     });
   });
 
