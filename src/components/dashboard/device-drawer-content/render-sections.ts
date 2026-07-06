@@ -47,6 +47,17 @@ export function renderRow(
   `;
 }
 
+// MAC address and deployed config hash reach the dashboard only over the
+// native-API mDNS service (_esphomelib._tcp); a device with no api: never
+// broadcasts them, so a "waiting for mDNS" spinner would spin forever. Gate on
+// api_enabled (the field can never arrive), not mdnsOnline() (only whether mDNS
+// is live right now). Mirrors the api_enabled gate in encryption-state.
+function emptyMdnsText(d: ConfiguredDevice, localize: LocalizeFunc): string {
+  return localize(
+    d.api_enabled ? "dashboard.drawer_waiting_for_mdns" : "dashboard.drawer_no_native_api"
+  );
+}
+
 export function renderEncryptionBadge(
   localize: LocalizeFunc,
   state: EncryptionState
@@ -232,7 +243,7 @@ export function renderConfigHashSection(
                 localize("dashboard.drawer_config_hash_deployed"),
                 deployed,
                 true,
-                localize("dashboard.drawer_waiting_for_mdns")
+                emptyMdnsText(d, localize)
               )}
             `
       }
@@ -360,7 +371,7 @@ export function renderMacAddressRow(
     localize("dashboard.drawer_mac_address"),
     d.mac_address,
     true,
-    localize("dashboard.drawer_waiting_for_mdns")
+    emptyMdnsText(d, localize)
   );
 }
 
@@ -392,7 +403,9 @@ export function renderEthernetMacRow(
       true
     );
   }
-  if (!d.mac_address && deviceHasEthernet(d)) {
+  // Only a waiting hint; hidden when there's no native API to deliver it (the
+  // primary MAC row already says so, so don't repeat it here).
+  if (!d.mac_address && d.api_enabled && deviceHasEthernet(d)) {
     return renderRow(
       "ethernet",
       localize("dashboard.drawer_ethernet_mac"),
@@ -416,7 +429,7 @@ export function renderBluetoothMacRow(
       true
     );
   }
-  if (!d.mac_address && deviceHasBluetooth(d)) {
+  if (!d.mac_address && d.api_enabled && deviceHasBluetooth(d)) {
     return renderRow(
       "bluetooth",
       localize("dashboard.drawer_bluetooth_mac"),

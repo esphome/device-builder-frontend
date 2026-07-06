@@ -233,6 +233,7 @@
     "drawer_round_trip_ms": "{n} ms",
     "drawer_waiting_for_signal": "Waiting for first signal…",
     "drawer_waiting_for_mdns": "Waiting for mDNS discovery…",
+    "drawer_no_native_api": "This device does not have Native API",
     "drawer_show_mdns_txt_records": "{count, plural, one {Show # mDNS TXT record} other {Show # mDNS TXT records}}",
     "drawer_mdns_expires_in": "Expires in {t}",
     "drawer_mdns_expires_soon": "Expires soon",

@@ -1,6 +1,11 @@
 /**
- * Pins that mDNS-derived rows (MAC, deployed version) show
- * "Waiting for mDNS discovery" instead of a bare dash while empty (#1453).
+ * Empty-state behaviour of the drawer's mDNS-derived rows.
+ *
+ * MAC address and deployed config hash show "Waiting for mDNS discovery" while a
+ * native-API device hasn't announced (#1453), but "This device does not have
+ * Native API" for a no-api device whose MAC / config hash can never arrive; the
+ * ethernet / bluetooth waiting rows hide entirely for such devices. The deployed
+ * version row is exempt: it can still arrive over the _http._tcp fallback.
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
@@ -22,9 +27,20 @@ const valueTexts = (result: unknown): unknown[] =>
   findTemplatesByAnchor(result, 'class="value').flatMap((t) => t.values);
 
 describe("renderMacAddressRow", () => {
-  it("shows the waiting-for-mDNS message when mac_address is empty", () => {
-    const result = renderMacAddressRow(_device({ mac_address: "" }), _localize);
+  it("shows the waiting-for-mDNS message when a native-API device hasn't announced", () => {
+    const result = renderMacAddressRow(
+      _device({ mac_address: "", api_enabled: true }),
+      _localize
+    );
     expect(valueTexts(result)).toContain("dashboard.drawer_waiting_for_mdns");
+  });
+
+  it("says the device has no Native API when api is disabled", () => {
+    const result = renderMacAddressRow(
+      _device({ mac_address: "", api_enabled: false }),
+      _localize
+    );
+    expect(valueTexts(result)).toContain("dashboard.drawer_no_native_api");
   });
 
   it("shows the MAC when present", () => {
@@ -50,6 +66,7 @@ describe("renderEthernetMacRow", () => {
       _device({
         mac_address: "",
         ethernet_mac: "",
+        api_enabled: true,
         loaded_integrations: ["ethernet", "wifi"],
       }),
       _localize
@@ -57,9 +74,27 @@ describe("renderEthernetMacRow", () => {
     expect(valueTexts(result)).toContain("dashboard.drawer_waiting_for_mdns");
   });
 
+  it("hides the waiting hint when the device has no Native API", () => {
+    const result = renderEthernetMacRow(
+      _device({
+        mac_address: "",
+        ethernet_mac: "",
+        api_enabled: false,
+        loaded_integrations: ["ethernet", "wifi"],
+      }),
+      _localize
+    );
+    expect(result).toBe(nothing);
+  });
+
   it("hides when the device has no ethernet integration", () => {
     const result = renderEthernetMacRow(
-      _device({ mac_address: "", ethernet_mac: "", loaded_integrations: ["wifi"] }),
+      _device({
+        mac_address: "",
+        ethernet_mac: "",
+        api_enabled: true,
+        loaded_integrations: ["wifi"],
+      }),
       _localize
     );
     expect(result).toBe(nothing);
@@ -84,6 +119,7 @@ describe("renderBluetoothMacRow", () => {
       _device({
         mac_address: "",
         bluetooth_mac: "",
+        api_enabled: true,
         loaded_integrations: ["esp32_ble_tracker"],
       }),
       _localize
@@ -91,9 +127,27 @@ describe("renderBluetoothMacRow", () => {
     expect(valueTexts(result)).toContain("dashboard.drawer_waiting_for_mdns");
   });
 
+  it("hides the waiting hint when the device has no Native API", () => {
+    const result = renderBluetoothMacRow(
+      _device({
+        mac_address: "",
+        bluetooth_mac: "",
+        api_enabled: false,
+        loaded_integrations: ["esp32_ble_tracker"],
+      }),
+      _localize
+    );
+    expect(result).toBe(nothing);
+  });
+
   it("hides when the device loads no bluetooth integration", () => {
     const result = renderBluetoothMacRow(
-      _device({ mac_address: "", bluetooth_mac: "", loaded_integrations: ["wifi"] }),
+      _device({
+        mac_address: "",
+        bluetooth_mac: "",
+        api_enabled: true,
+        loaded_integrations: ["wifi"],
+      }),
       _localize
     );
     expect(result).toBe(nothing);
@@ -102,6 +156,8 @@ describe("renderBluetoothMacRow", () => {
 
 describe("renderVersionSection deployed row", () => {
   it("shows waiting-for-mDNS on the deployed row when only the local version is known", () => {
+    // Version is NOT gated on api_enabled: it can still arrive over the
+    // _http._tcp mDNS fallback for MQTT-only devices.
     const result = renderVersionSection(
       _device({ current_version: "2026.5.2", deployed_version: "" }),
       _localize
@@ -113,13 +169,31 @@ describe("renderVersionSection deployed row", () => {
 });
 
 describe("renderConfigHashSection deployed row", () => {
-  it("shows waiting-for-mDNS on the deployed hash when only the local hash is known", () => {
+  it("shows waiting-for-mDNS on the deployed hash for a native-API device", () => {
     const result = renderConfigHashSection(
-      _device({ expected_config_hash: "abc123", deployed_config_hash: "" }),
+      _device({
+        expected_config_hash: "abc123",
+        deployed_config_hash: "",
+        api_enabled: true,
+      }),
       _localize
     );
     const texts = valueTexts(result);
     expect(texts).toContain("abc123");
     expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
+  });
+
+  it("says the device has no Native API on the deployed hash when api is disabled", () => {
+    const result = renderConfigHashSection(
+      _device({
+        expected_config_hash: "abc123",
+        deployed_config_hash: "",
+        api_enabled: false,
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).toContain("abc123");
+    expect(texts).toContain("dashboard.drawer_no_native_api");
   });
 });
