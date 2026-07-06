@@ -37,6 +37,22 @@ describe("resolveLogDocLink — actionable", () => {
     expect(resolveLogDocLink(line, {})?.actionable?.body).toBe("chip_revision");
   });
 
+  it("maps the sram1_as_iram hint to the ESP32 advanced-config page", () => {
+    const line =
+      "[10:24:27.031][W][app:198]: Bootloader supports SRAM1 as IRAM (+40KB). Set sram1_as_iram: true under esp32 > framework > advanced";
+    expect(resolveLogDocLink(line, {})?.actionable).toEqual({
+      kind: "actionable",
+      url: "https://esphome.io/components/esp32/#advanced-configuration",
+      body: "sram1_as_iram",
+    });
+  });
+
+  it("matches the combined bootloader-and-SRAM1 variant as the bootloader entry", () => {
+    const line =
+      "[10:24:27.031][W][app:190]: Bootloader too old for OTA rollback and SRAM1 as IRAM (+40KB). Flash via USB once to update the bootloader";
+    expect(resolveLogDocLink(line, {})?.actionable?.body).toBe("bootloader");
+  });
+
   it("surfaces an esphome.io URL already embedded in the message", () => {
     const line =
       "[13:22:07][W][safe_mode:099]: Last reset was due to brownout - check your power supply! See https://esphome.io/guides/faq.html#brownout-detector-was-triggered";

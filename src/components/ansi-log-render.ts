@@ -122,6 +122,10 @@ const CURATED_COPY: Record<
     title: "dashboard.logs_doc_crash_title",
     body: "dashboard.logs_doc_crash_body",
   },
+  sram1_as_iram: {
+    title: "dashboard.logs_doc_sram1_title",
+    body: "dashboard.logs_doc_sram1_body",
+  },
   embedded: {
     title: "dashboard.logs_doc_embedded_title",
     body: "dashboard.logs_doc_embedded_body",

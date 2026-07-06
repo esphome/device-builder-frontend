@@ -59,6 +59,8 @@
     "logs_doc_chip_revision_body": "Setting a minimum chip revision lets ESPHome drop older-revision workarounds and shrink the binary.",
     "logs_doc_crash_title": "Crash detected on previous boot",
     "logs_doc_crash_body": "The device rebooted after a crash. The troubleshooting guide explains how to read the crash log and find the cause.",
+    "logs_doc_sram1_title": "Reclaim SRAM1 as IRAM",
+    "logs_doc_sram1_body": "This device's bootloader can use SRAM1 as instruction RAM. Setting sram1_as_iram frees about 40KB.",
     "logs_source_web_serial": "Web Serial",
     "logs_placeholder": "Waiting for logs…",
     "logs_stop": "Stop",

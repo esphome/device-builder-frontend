@@ -18,7 +18,7 @@ export interface ActionableLogDocLink {
   /** Canonical esphome.io URL, already whitelisted. */
   url: string;
   /** Discriminates the popover copy the renderer localizes. */
-  body: "bootloader" | "chip_revision" | "crash" | "embedded";
+  body: "bootloader" | "chip_revision" | "crash" | "embedded" | "sram1_as_iram";
 }
 
 export interface ComponentLogDocLink {
@@ -76,6 +76,13 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     pattern: /Set minimum_chip_revision/,
     url: "https://esphome.io/components/esp32/#advanced-configuration",
     body: "chip_revision",
+  },
+  {
+    level: "W",
+    tags: ["app"],
+    pattern: /Set sram1_as_iram/,
+    url: "https://esphome.io/components/esp32/#advanced-configuration",
+    body: "sram1_as_iram",
   },
   {
     level: "E",
