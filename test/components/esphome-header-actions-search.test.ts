@@ -33,6 +33,7 @@ describe("header-actions Search item", () => {
   });
 
   it("keeps the ⌘ glyph on Apple platforms, never the localized label", async () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, "userAgentData");
     Object.defineProperty(navigator, "userAgentData", {
       value: { platform: "macOS" },
       configurable: true,
@@ -45,7 +46,11 @@ describe("header-actions Search item", () => {
         el.shadowRoot!.querySelector(".menu-item-shortcut")!.textContent!.trim()
       ).toBe("⌘K");
     } finally {
-      Reflect.deleteProperty(navigator, "userAgentData");
+      if (original) {
+        Object.defineProperty(navigator, "userAgentData", original);
+      } else {
+        Reflect.deleteProperty(navigator, "userAgentData");
+      }
     }
   });
 
