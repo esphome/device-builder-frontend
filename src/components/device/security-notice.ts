@@ -9,7 +9,7 @@
  * - `web_server` — missing `auth:` → generate an inline username + a password.
  *
  * On confirm it stores each generated secret in secrets.yaml (via
- * `ensureSecretInYaml`) and emits `apply-security-secrets` so the host points
+ * `ensureSecretInYaml`) and emits `apply-section-values` so the host points
  * the config field(s) at them (a `!secret` ref for secret fields, the literal
  * value for inline fields). The user can reveal the stored value inline from the
  * field's secret picker. Adding a setting is a single registry entry + its copy.
@@ -33,6 +33,8 @@ import { ensureSecretInYaml } from "../../util/secrets-write.js";
 import { indentOf } from "../../util/yaml-line-walker.js";
 import { TOP_LEVEL_KEY_START_RE } from "../../util/yaml-section-lexer.js";
 import { findSectionStart } from "../../util/yaml-section-reader.js";
+import { dispatchApplySectionValues } from "./notice-banner.js";
+import { noticeBannerStyles } from "./notice-banner.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../confirm-dialog.js";
@@ -105,13 +107,6 @@ export const SECURITY_SETTINGS: Record<string, SecuritySetting> = {
  *  YAML key like `__proto__` can't resolve to an inherited (non-setting) value. */
 export const isSecuritySection = (sectionKey: string): boolean =>
   Object.prototype.hasOwnProperty.call(SECURITY_SETTINGS, sectionKey);
-
-/** Detail for the `apply-security-secrets` event. */
-export interface ApplySecuritySecretsDetail {
-  /** Each generated field's draft path and the value to write there (a
-   *  `!secret <key>` reference for secret fields, the literal for inline ones). */
-  secrets: { path: string[]; value: string }[];
-}
 
 @customElement("esphome-security-notice")
 export class ESPHomeSecurityNotice extends LitElement {
@@ -233,13 +228,7 @@ export class ESPHomeSecurityNotice extends LitElement {
           applied.push({ path: field.path, value: generated });
         }
       }
-      this.dispatchEvent(
-        new CustomEvent<ApplySecuritySecretsDetail>("apply-security-secrets", {
-          detail: { secrets: applied },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      dispatchApplySectionValues(this, applied);
       notifySuccess(this._localize("device.security_applied"));
     } catch (err) {
       // ensureSecretInYaml aborts (throws) on a read failure rather than
@@ -253,64 +242,8 @@ export class ESPHomeSecurityNotice extends LitElement {
 
   static styles = [
     espHomeStyles,
+    noticeBannerStyles,
     css`
-      .notice {
-        display: flex;
-        align-items: flex-start;
-        gap: var(--wa-space-s);
-        margin-bottom: var(--wa-space-m);
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border: var(--wa-border-width-s) solid var(--esphome-warning, #f59e0b);
-        background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 90%);
-        border-radius: var(--wa-border-radius-m);
-        color: var(--wa-color-text-normal);
-        font-size: var(--wa-font-size-s);
-        line-height: 1.5;
-      }
-
-      .notice wa-icon {
-        flex-shrink: 0;
-        font-size: 20px;
-        color: var(--esphome-warning, #f59e0b);
-      }
-
-      .body {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-        flex: 1;
-        min-width: 0;
-      }
-
-      .body p {
-        margin: 0;
-      }
-
-      .cta {
-        align-self: flex-start;
-        padding: var(--wa-space-2xs) var(--wa-space-m);
-        border: none;
-        border-radius: var(--wa-border-radius-m);
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-        font-family: inherit;
-        font-size: inherit;
-        font-weight: var(--wa-font-weight-bold);
-        cursor: pointer;
-        transition:
-          background 0.12s,
-          opacity 0.12s;
-      }
-
-      .cta:hover:not(:disabled) {
-        background: var(--esphome-primary-hover);
-      }
-
-      .cta:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
       .dialog-body code {
         font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
         font-size: var(--wa-font-size-s);

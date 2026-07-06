@@ -56,7 +56,7 @@ import {
   selectTriggerRows,
 } from "./device-section-config/automation-rows.js";
 import {
-  applySecuritySecrets,
+  applySectionValues,
   flushDraft,
   onDeleteConfirmed,
   onValueChange,
@@ -70,9 +70,12 @@ import {
   resolveShortcutTarget,
   type ShortcutTarget,
 } from "./device-section-config/shortcut-target.js";
-// The value import (isSecuritySection) already executes the module, registering
-// the <esphome-security-notice> element — no separate side-effect import needed.
-import { isSecuritySection, type ApplySecuritySecretsDetail } from "./security-notice.js";
+// The value imports (isSecuritySection / isDeprecationSection) already execute
+// the modules, registering the notice elements — no separate side-effect
+// imports needed.
+import { isDeprecationSection } from "./deprecation-notice.js";
+import type { ApplySectionValuesDetail } from "./notice-banner.js";
+import { isSecuritySection } from "./security-notice.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
@@ -396,8 +399,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private _onDeleteConfirmed = () => onDeleteConfirmed(this);
 
-  private _onApplySecuritySecrets = (e: CustomEvent<ApplySecuritySecretsDetail>) =>
-    applySecuritySecrets(this, e.detail.secrets);
+  private _onApplySectionValues = (e: CustomEvent<ApplySectionValuesDetail>) =>
+    applySectionValues(this, e.detail.changes);
 
   protected render() {
     if (this._loading) {
@@ -521,8 +524,17 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                       .yaml=${this.yaml}
                       .configuration=${this.configuration}
                       .fromLine=${this._resolvedFromLine}
-                      @apply-security-secrets=${this._onApplySecuritySecrets}
+                      @apply-section-values=${this._onApplySectionValues}
                     ></esphome-security-notice>`
+                  : nothing
+              }
+              ${
+                isDeprecationSection(this.sectionKey)
+                  ? html`<esphome-deprecation-notice
+                      .sectionKey=${this.sectionKey}
+                      .values=${this._values}
+                      @apply-section-values=${this._onApplySectionValues}
+                    ></esphome-deprecation-notice>`
                   : nothing
               }
               <esphome-config-entry-form

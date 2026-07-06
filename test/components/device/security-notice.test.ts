@@ -3,7 +3,7 @@
  *
  * Pins the generalized security nudge across its three settings: detecting a
  * missing marker (api `encryption:`, ota `password:`, web_server `auth:`) and
- * the generate flow that writes secrets.yaml + emits `apply-security-secrets`.
+ * the generate flow that writes secrets.yaml + emits `apply-section-values`.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -151,8 +151,8 @@ describe("security-notice — generate", () => {
     inner._api = { setSecret } as Partial<ESPHomeAPI>;
     inner._devices = devices.map((d) => ({ ...d, configuration: "device.yaml" }));
     const applied: { path: string[]; value: string }[][] = [];
-    el.addEventListener("apply-security-secrets", (e) =>
-      applied.push((e as CustomEvent).detail.secrets)
+    el.addEventListener("apply-section-values", (e) =>
+      applied.push((e as CustomEvent).detail.changes)
     );
     return { el, inner, setSecret, applied };
   }

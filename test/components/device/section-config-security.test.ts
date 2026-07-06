@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  *
  * Pins that the host applies the security notice's generated secrets into the
- * unsaved draft: `applySecuritySecrets` sets each path and flushes one
+ * unsaved draft: `applySectionValues` sets each path and flushes one
  * `yaml-draft` so the `!secret` reference(s) land in the editor buffer.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -12,7 +12,7 @@ vi.mock("sonner-js", () => ({
 }));
 
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
-import { applySecuritySecrets } from "../../../src/components/device/device-section-config/draft-and-delete.js";
+import { applySectionValues } from "../../../src/components/device/device-section-config/draft-and-delete.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function host(sectionKey: string, yaml: string, fromLine: number, values: object) {
@@ -31,12 +31,12 @@ function host(sectionKey: string, yaml: string, fromLine: number, values: object
   return { c, inner, drafts };
 }
 
-describe("applySecuritySecrets", () => {
+describe("applySectionValues", () => {
   it("api: sets encryption.key and dispatches one yaml-draft", () => {
     const { c, inner, drafts } = host("api", "api:\n  id: api_server\n", 1, {
       id: "api_server",
     });
-    applySecuritySecrets(c, [
+    applySectionValues(c, [
       { path: ["encryption", "key"], value: "!secret kitchen__encryption_key" },
     ]);
     expect(inner._values.encryption.key).toBe("!secret kitchen__encryption_key");
@@ -48,7 +48,7 @@ describe("applySecuritySecrets", () => {
     const { c, inner, drafts } = host("ota.esphome", "ota:\n  - platform: esphome\n", 2, {
       platform: "esphome",
     });
-    applySecuritySecrets(c, [
+    applySectionValues(c, [
       { path: ["password"], value: "!secret kitchen__ota_password" },
     ]);
     expect(inner._values.password).toBe("!secret kitchen__ota_password");
@@ -59,7 +59,7 @@ describe("applySecuritySecrets", () => {
     const { c, inner, drafts } = host("web_server", "web_server:\n  port: 80\n", 1, {
       port: 80,
     });
-    applySecuritySecrets(c, [
+    applySectionValues(c, [
       { path: ["auth", "username"], value: "falcon" },
       { path: ["auth", "password"], value: "!secret kitchen__web_password" },
     ]);
