@@ -99,6 +99,21 @@ describe("resolveLogDocLink — component", () => {
     expect(line.slice(start, end)).toBe("i2c.idf");
   });
 
+  it("prefers the exact dotted tag over the before-the-dot fallback", () => {
+    // The backend map carries qualified aliases for platform log tags
+    // (esphome.ota is the ota.esphome platform, not the esphome core
+    // component); the exact-tag candidate must win over the prefix.
+    const line = "[13:22:07][C][esphome.ota:108]: Over-The-Air updates:";
+    const link = expectComponent(
+      resolveLogDocLink(line, {
+        esphome: "https://esphome.io/components/esphome",
+        "esphome.ota": "https://esphome.io/components/ota/esphome",
+      })
+    );
+    expect(link.url).toBe("https://esphome.io/components/ota/esphome");
+    expect(link.component).toBe("esphome.ota");
+  });
+
   it("strips a platform suffix (wifi_esp32 -> wifi)", () => {
     const line = "[13:22:07][C][wifi_esp32:482]: WiFi:";
     expect(resolveLogDocLink(line, DOCS)?.url).toBe(DOCS.wifi);
