@@ -32,6 +32,23 @@ describe("header-actions Search item", () => {
     );
   });
 
+  it("keeps the ⌘ glyph on Apple platforms, never the localized label", async () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: { platform: "macOS" },
+      configurable: true,
+    });
+    try {
+      const el = await renderOpenHeaderMenu({
+        _localize: (key) => (key === "layout.search_shortcut" ? "Strg K" : key),
+      });
+      expect(
+        el.shadowRoot!.querySelector(".menu-item-shortcut")!.textContent!.trim()
+      ).toBe("⌘K");
+    } finally {
+      Reflect.deleteProperty(navigator, "userAgentData");
+    }
+  });
+
   it("fires the open-palette event and closes the menu on click", async () => {
     const el = await renderOpenHeaderMenu();
     const listener = vi.fn();

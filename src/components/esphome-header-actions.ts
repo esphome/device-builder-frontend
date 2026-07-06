@@ -57,11 +57,15 @@ registerMdiIcons({
 
 /** True on Apple platforms, where the search shortcut uses the ⌘ glyph.
  *  ``userAgentData`` first; ``navigator.platform`` is deprecated but remains
- *  the only signal on Firefox and Safari. */
-const IS_APPLE_PLATFORM = /mac|iphone|ipad/i.test(
-  (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ??
-    navigator.platform
-);
+ *  the only signal on Firefox and Safari. Read lazily and guarded so importing
+ *  the module never touches an absent ``navigator``. */
+function isApplePlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /mac|iphone|ipad/i.test(
+    (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+      navigator.platform
+  );
+}
 
 @customElement("esphome-header-actions")
 export class ESPHomeHeaderActions extends LitElement {
@@ -161,7 +165,7 @@ export class ESPHomeHeaderActions extends LitElement {
     const hasAlerts = this._offloaderAlertsCount() > 0;
     const ignoredCount = this._importableDevices.filter((d) => d.ignored).length;
     // ⌘ is a locale-independent Apple glyph; the "Ctrl" label localizes (STRG in German).
-    const searchShortcut = IS_APPLE_PLATFORM
+    const searchShortcut = isApplePlatform()
       ? "⌘K"
       : this._localize("layout.search_shortcut");
     return html`
