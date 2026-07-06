@@ -557,34 +557,38 @@ export class ESPHomeGuidedTour extends LitElement {
         </div>
         <h2>${this._localize(step.titleKey)}</h2>
         <p>${this._localize(step.bodyKey)}</p>
-        ${step.kind === "action"
-          ? html`
-              <div class="hint">
-                <span class="hint-dot" aria-hidden="true"></span>
-                ${this._localize(step.hintKey ?? "tour.continue")}
-              </div>
-              <div class="actions action-only">
-                <button
-                  type="button"
-                  class="btn btn-skip ${this._skipHover ? "hovered" : ""}"
-                  @click=${this._skip}
-                >
-                  ${this._localize("tour.skip")}
-                </button>
-              </div>
-            `
-          : html`
-              <div class="actions">
-                <button type="button" class="btn btn-skip" @click=${this._skip}>
-                  ${this._localize("tour.skip")}
-                </button>
-                <button type="button" class="btn btn-next" @click=${() => this._next()}>
-                  ${this._stepIndex >= TOUR_STEPS.length - 1
-                    ? this._localize("tour.finish")
-                    : this._localize("tour.next")}
-                </button>
-              </div>
-            `}
+        ${
+          step.kind === "action"
+            ? html`
+                <div class="hint">
+                  <span class="hint-dot" aria-hidden="true"></span>
+                  ${this._localize(step.hintKey ?? "tour.continue")}
+                </div>
+                <div class="actions action-only">
+                  <button
+                    type="button"
+                    class="btn btn-skip ${this._skipHover ? "hovered" : ""}"
+                    @click=${this._skip}
+                  >
+                    ${this._localize("tour.skip")}
+                  </button>
+                </div>
+              `
+            : html`
+                <div class="actions">
+                  <button type="button" class="btn btn-skip" @click=${this._skip}>
+                    ${this._localize("tour.skip")}
+                  </button>
+                  <button type="button" class="btn btn-next" @click=${() => this._next()}>
+                    ${
+                      this._stepIndex >= TOUR_STEPS.length - 1
+                        ? this._localize("tour.finish")
+                        : this._localize("tour.next")
+                    }
+                  </button>
+                </div>
+              `
+        }
       </div>
     `;
   }

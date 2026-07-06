@@ -286,9 +286,11 @@ export class ESPHomeDeviceEditor extends LitElement {
           <div class="editor-header-main">
             <div class="editor-header-titlerow">
               <h2 class="editor-header-title">${title}</h2>
-              ${this.configuration && !compactHeader
-                ? html`<span class="editor-header-file">${this.configuration}</span>`
-                : nothing}
+              ${
+                this.configuration && !compactHeader
+                  ? html`<span class="editor-header-file">${this.configuration}</span>`
+                  : nothing
+              }
             </div>
           </div>
           ${renderEditorToolbar({
@@ -327,17 +329,21 @@ export class ESPHomeDeviceEditor extends LitElement {
               @click=${this._onSave}
               title=${this._localize("device.save_yaml")}
             >
-              ${this.saving
-                ? html`<wa-spinner></wa-spinner>`
-                : html`<wa-icon library="mdi" name="content-save"></wa-icon>`}
+              ${
+                this.saving
+                  ? html`<wa-spinner></wa-spinner>`
+                  : html`<wa-icon library="mdi" name="content-save"></wa-icon>`
+              }
               ${this._localize("device.save")}
             </button>
           </div>
           <div
             class="editor-layout ${layoutClass} ${this._dragging ? "dragging" : ""}"
-            style=${effectiveLayout === "both"
-              ? `grid-template-columns: ${this._splitRatio}fr var(--pane-divider-width) ${1 - this._splitRatio}fr`
-              : ""}
+            style=${
+              effectiveLayout === "both"
+                ? `grid-template-columns: ${this._splitRatio}fr var(--pane-divider-width) ${1 - this._splitRatio}fr`
+                : ""
+            }
           >
             <div class="editor-pane editor-pane--left" ${tourAnchor("central")}>
               <esphome-device-board-info

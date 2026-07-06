@@ -291,25 +291,29 @@ export class ESPHomeWizardStepSetup extends LitElement {
             <h2 class="board-info-title">
               ${board ? board.name : this._localize("wizard.title_setup")}
             </h2>
-            ${board
-              ? html`<div class="board-tags">
-                  ${board.tags.map(
-                    (tag) =>
-                      html`<span class="tag"
-                        >${this._localize(`wizard.tag.${tag}`)}</span
-                      >`
-                  )}
-                </div>`
-              : null}
+            ${
+              board
+                ? html`<div class="board-tags">
+                    ${board.tags.map(
+                      (tag) =>
+                        html`<span class="tag"
+                          >${this._localize(`wizard.tag.${tag}`)}</span
+                        >`
+                    )}
+                  </div>`
+                : null
+            }
           </div>
         </div>
-        ${board
-          ? html`<img
-              class="board-image"
-              src=${boardImageUrl(board)}
-              alt=${board.name}
-            />`
-          : null}
+        ${
+          board
+            ? html`<img
+                class="board-image"
+                src=${boardImageUrl(board)}
+                alt=${board.name}
+              />`
+            : null
+        }
       </div>
 
       <hr class="divider" />
@@ -335,9 +339,11 @@ export class ESPHomeWizardStepSetup extends LitElement {
             @click=${this._onNext}
           >
             ${this.submitting ? html`<wa-spinner></wa-spinner>` : nothing}
-            ${this._stage === "name" && this._collectWifi
-              ? this._localize("wizard.next")
-              : this._localize("wizard.finish_setup")}
+            ${
+              this._stage === "name" && this._collectWifi
+                ? this._localize("wizard.next")
+                : this._localize("wizard.finish_setup")
+            }
           </button>
         </div>
       </div>
@@ -368,20 +374,24 @@ export class ESPHomeWizardStepSetup extends LitElement {
           />
         </div>
 
-        ${boardOffersFullSetup(this.board)
-          ? html`<div class="full-setup">
-              <wa-checkbox
-                .checked=${this._fullSetup}
-                @change=${(e: Event) => {
-                  this._fullSetup = (
-                    e.currentTarget as HTMLElement & { checked: boolean }
-                  ).checked;
-                }}
-                >${this._localize("wizard.full_setup")}</wa-checkbox
-              >
-              <p class="section-subtitle">${this._localize("wizard.full_setup_desc")}</p>
-            </div>`
-          : null}
+        ${
+          boardOffersFullSetup(this.board)
+            ? html`<div class="full-setup">
+                <wa-checkbox
+                  .checked=${this._fullSetup}
+                  @change=${(e: Event) => {
+                    this._fullSetup = (
+                      e.currentTarget as HTMLElement & { checked: boolean }
+                    ).checked;
+                  }}
+                  >${this._localize("wizard.full_setup")}</wa-checkbox
+                >
+                <p class="section-subtitle">
+                  ${this._localize("wizard.full_setup_desc")}
+                </p>
+              </div>`
+            : null
+        }
       </section>
     `;
   }
