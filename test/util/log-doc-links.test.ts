@@ -126,6 +126,14 @@ describe("resolveLogDocLink — component", () => {
     expect(resolveLogDocLink(line, DOCS)?.component?.url).toBe(DOCS.wifi);
   });
 
+  it("links the bare-domain tag of an [S] state line", () => {
+    const line = "[10:18:17.439][S][sensor]: 'Ethernet Uptime' >> 68523 s";
+    const link = expectComponent(resolveLogDocLink(line, DOCS));
+    expect(link.url).toBe(DOCS.sensor);
+    const { start, end } = link.tagRange;
+    expect(line.slice(start, end)).toBe("sensor");
+  });
+
   it("resolves a real-ESC ANSI line and ranges the tag in the clean text", () => {
     const raw = "\u001b[0;36m[13:22:07][C][ethernet:495]: Ethernet:\u001b[0m";
     const link = expectComponent(resolveLogDocLink(raw, DOCS));

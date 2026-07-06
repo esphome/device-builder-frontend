@@ -92,8 +92,10 @@ const ACTIONABLE: readonly ActionableEntry[] = [
 const EMBEDDED_URL_RE = /https:\/\/esphome\.io\/[^\s)"']+/;
 
 // A device-log record: [timestamp][LEVEL][tag:line]. Group 1 is the level,
-// group 2 the ``tag:line`` token. ESPHome always appends ``:<line>``.
-const LOG_LINE_RE = /^\[\d[\d:.]*\]\[([EWICDV]V?)\]\[([^\]]+)\]/;
+// group 2 the ``tag:line`` token. Firmware levels always append ``:<line>``;
+// ``S`` state lines (client-side reconstructed by aioesphomeapi's
+// state_log_formatter) carry a bare entity-domain tag with no line number.
+const LOG_LINE_RE = /^\[\d[\d:.]*\]\[([EWICDV]V?|S)\]\[([^\]]+)\]/;
 
 // Platform-specific tag suffixes (``wifi_esp32`` → ``wifi``). The ``.idf`` /
 // ``.arduino`` framework variants use a dot and are handled by the
