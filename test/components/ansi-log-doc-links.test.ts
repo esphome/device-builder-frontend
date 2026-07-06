@@ -37,6 +37,7 @@ function root(el: ESPHomeAnsiLog): ShadowRoot {
 function internals(el: ESPHomeAnsiLog): {
   _integrationDocs: Record<string, IntegrationDoc>;
   _localize: (k: string, v?: Record<string, string | number>) => string;
+  _docLinkCache: Map<string, unknown>;
 } {
   return el as unknown as ReturnType<typeof internals>;
 }
@@ -101,6 +102,15 @@ describe("ansi-log doc-link annotations", () => {
     // The popover heading uses the same displayName field; the tooltip is
     // the DOM-visible surface to pin it on.
     expect(link.title).toBe("Ethernet Component");
+  });
+
+  it("keeps one cache entry per unique line across re-renders", async () => {
+    const el = await mountLog([ETHERNET, PLAIN]);
+    el.lines = [ETHERNET, PLAIN, BOOTLOADER];
+    await el.updateComplete;
+    el.lines = [ETHERNET, PLAIN, BOOTLOADER, ETHERNET];
+    await el.updateComplete;
+    expect(internals(el)._docLinkCache.size).toBe(3);
   });
 
   it("re-resolves cached lines when the integration docs map changes", async () => {

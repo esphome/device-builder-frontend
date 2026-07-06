@@ -123,6 +123,11 @@ interface AnsiState {
   dim: boolean;
 }
 
+// Doc-link cache cap — comfortably above the log dialogs' 5000-line buffer
+// so steady-state streaming never prunes; the prune only bounds very long
+// sessions whose unique lines churn past the buffer.
+const DOC_LINK_CACHE_MAX = 10_000;
+
 function newAnsiState(): AnsiState {
   return { color: undefined, bgColor: undefined, bold: false, dim: false };
 }
@@ -241,9 +246,13 @@ export class ESPHomeAnsiLog extends LitElement {
   @query("esphome-log-doc-popover")
   private _docPopover?: ESPHomeLogDocPopover;
 
-  // Doc-link resolutions for the lines rendered last pass; render() swaps in
-  // a fresh map each pass so the cache never outgrows the visible buffer.
-  private _docLinkCache = new Map<string, LogDocLinks | undefined>();
+  // Doc-link resolutions keyed by line text. Logs are append-mostly, so
+  // insertion order approximates age; when the map outgrows the cap the
+  // oldest half is pruned instead of rebuilding it every render (an LRU's
+  // per-hit recency bump would double the work for no better retention —
+  // each frame touches every visible key anyway). ``null`` = resolved to
+  // no links, distinct from "never resolved".
+  private _docLinkCache = new Map<string, LogDocLinks | null>();
 
   static styles = [
     /* Theme-aware ANSI palette + log surface variables. Each theme
@@ -339,30 +348,20 @@ export class ESPHomeAnsiLog extends LitElement {
     // records (a WARNING that opens ``\x1b[33m`` on line 1 and only
     // resets on line 5) keep their colour on the continuation lines.
     const state = newAnsiState();
-    // Fresh per-render link map; _renderLine fills it from the previous
-    // render's cache (or a cold resolve) and the swap below drops entries
-    // for lines that scrolled out of the buffer, so the cache stays bounded
-    // while streaming re-renders skip the per-line regex resolution.
-    const links = new Map<string, LogDocLinks | undefined>();
     const rows =
       visual.length === 0 && this.placeholder
         ? html`<div class="log-line placeholder">${this.placeholder}</div>`
-        : visual.map((line) => this._renderLine(line, state, links));
-    this._docLinkCache = links;
+        : visual.map((line) => this._renderLine(line, state));
     return html`
       <div class="log-container" @scroll=${this._handleScroll}>${rows}</div>
       <esphome-log-doc-popover></esphome-log-doc-popover>
     `;
   }
 
-  private _renderLine(
-    line: string,
-    state: AnsiState,
-    links: Map<string, LogDocLinks | undefined>
-  ) {
+  private _renderLine(line: string, state: AnsiState) {
     const spans = parseAnsiLine(line, state);
     const hasAnsiColor = spans.some((s) => s.color || s.bgColor);
-    const resolved = this._resolveDocLinkCached(line, links);
+    const resolved = this._resolveDocLinkCached(line);
     const component = resolved?.component;
 
     // Line content first — the two facets are independent, so a curated
@@ -423,18 +422,22 @@ export class ESPHomeAnsiLog extends LitElement {
       : html`<div class="log-line">${inner}</div>`;
   }
 
-  // Look up a line's doc link in the previous render's cache before paying
-  // the regex resolve, recording the result in this render's map either way.
-  private _resolveDocLinkCached(
-    line: string,
-    links: Map<string, LogDocLinks | undefined>
-  ): LogDocLinks | undefined {
-    if (links.has(line)) return links.get(line);
-    const link = this._docLinkCache.has(line)
-      ? this._docLinkCache.get(line)
-      : resolveLogDocLink(line, this._integrationDocs);
-    links.set(line, link);
-    return link;
+  // Resolve once per unique line; a steady-state cache hit is one Map.get.
+  private _resolveDocLinkCached(line: string): LogDocLinks | undefined {
+    const cache = this._docLinkCache;
+    const hit = cache.get(line);
+    if (hit !== undefined) return hit ?? undefined;
+    const links = resolveLogDocLink(line, this._integrationDocs) ?? null;
+    if (cache.size >= DOC_LINK_CACHE_MAX) {
+      // Prune the oldest half (Map iterates in insertion order).
+      let drop = cache.size - DOC_LINK_CACHE_MAX / 2;
+      for (const key of cache.keys()) {
+        if (drop-- <= 0) break;
+        cache.delete(key);
+      }
+    }
+    cache.set(line, links);
+    return links ?? undefined;
   }
 
   // Populate the shared popover from the clicked line's link and anchor it to
