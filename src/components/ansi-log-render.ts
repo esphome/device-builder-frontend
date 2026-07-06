@@ -11,7 +11,11 @@
 import { mdiInformationOutline } from "@mdi/js";
 import { css, html, nothing, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { LogDocLink } from "../util/log-doc-links.js";
+import type {
+  ActionableLogDocLink,
+  ComponentLogDocLink,
+  LogDocLink,
+} from "../util/log-doc-links.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -101,61 +105,79 @@ export interface LogDocPopoverText {
   linkLabel: string;
 }
 
+// en.json keys for each curated/embedded popover body.
+const CURATED_COPY: Record<
+  ActionableLogDocLink["body"],
+  { title: string; body: string }
+> = {
+  bootloader: {
+    title: "dashboard.logs_doc_bootloader_title",
+    body: "dashboard.logs_doc_bootloader_body",
+  },
+  chip_revision: {
+    title: "dashboard.logs_doc_chip_revision_title",
+    body: "dashboard.logs_doc_chip_revision_body",
+  },
+  embedded: {
+    title: "dashboard.logs_doc_embedded_title",
+    body: "dashboard.logs_doc_embedded_body",
+  },
+};
+
 export function docPopoverText(
   link: LogDocLink,
   localize: LocalizeFunc
 ): LogDocPopoverText {
   const linkLabel = localize("dashboard.logs_doc_view");
-  switch (link.body) {
-    case "bootloader":
-      return {
-        heading: localize("dashboard.logs_doc_bootloader_title"),
-        body: localize("dashboard.logs_doc_bootloader_body"),
-        linkLabel,
-      };
-    case "chip_revision":
-      return {
-        heading: localize("dashboard.logs_doc_chip_revision_title"),
-        body: localize("dashboard.logs_doc_chip_revision_body"),
-        linkLabel,
-      };
-    case "embedded":
-      return {
-        heading: localize("dashboard.logs_doc_embedded_title"),
-        body: localize("dashboard.logs_doc_embedded_body"),
-        linkLabel,
-      };
-    case "component": {
-      const component = link.component ?? "";
-      return {
-        heading: component,
-        body: localize("dashboard.logs_doc_component_body", { component }),
-        linkLabel,
-      };
-    }
+  if (link.kind === "component") {
+    return {
+      heading: link.component,
+      body: localize("dashboard.logs_doc_component_body", { component: link.component }),
+      linkLabel,
+    };
   }
+  const keys = CURATED_COPY[link.body];
+  return { heading: localize(keys.title), body: localize(keys.body), linkLabel };
 }
 
-/** Map ANSI spans to styled children (fast path returns a bare string). */
+/** Map ANSI spans to styled children (an unstyled span stays a bare string). */
 export function renderSpanChildren(spans: AnsiSpan[]): (TemplateResult | string)[] {
-  // prettier-ignore keeps each <span> on one line: the parent .log-line uses
-  // white-space: pre-wrap, so inter-tag whitespace would render as blank rows.
-  return spans.map((span) => {
-    const style = [
-      span.color ? `color:${span.color}` : "",
-      span.bgColor ? `background:${span.bgColor}` : "",
-    ]
-      .filter(Boolean)
-      .join(";");
-    const classes = [span.bold ? "bold" : "", span.dim ? "dim" : ""]
-      .filter(Boolean)
-      .join(" ");
-    if (style || classes) {
-      // prettier-ignore
-      return html`<span class=${classes || nothing} style=${style || nothing}>${span.text}</span>`;
+  return spans.map((span) => styledSpan(span, span.text));
+}
+
+/**
+ * ``renderSpanChildren`` with the tag token wrapped in the link button.
+ *
+ * ``link.tagRange`` indexes the concatenated span text (the ANSI-stripped
+ * line), so per-span styling survives on multi-colour lines.
+ */
+export function renderSpanChildrenWithTagLink(
+  spans: AnsiSpan[],
+  link: ComponentLogDocLink,
+  localize: LocalizeFunc,
+  onOpen: OpenDocHandler
+): (TemplateResult | string)[] {
+  const { start, end } = link.tagRange;
+  const title = componentLinkTitle(link, localize);
+  const children: (TemplateResult | string)[] = [];
+  let offset = 0;
+  for (const span of spans) {
+    const spanStart = offset;
+    const spanEnd = offset + span.text.length;
+    offset = spanEnd;
+    if (spanEnd <= start || spanStart >= end) {
+      children.push(styledSpan(span, span.text));
+      continue;
     }
-    return span.text;
-  });
+    const from = Math.max(start - spanStart, 0);
+    const to = Math.min(end - spanStart, span.text.length);
+    const before = span.text.slice(0, from);
+    const tag = span.text.slice(from, to);
+    const after = span.text.slice(to);
+    // prettier-ignore
+    children.push(styledSpan(span, html`${before}${tagLinkButton(tag, title, link, onOpen)}${after}`));
+  }
+  return children;
 }
 
 /** A curated/embedded actionable line: normal content + trailing info icon. */
@@ -171,23 +193,50 @@ export function renderActionableLine(
   return html`<div class="log-line log-line--doc"><span class="log-line-text" style=${colorStyle || nothing}>${inner}</span><button class="log-doc-icon" type="button" title=${title} aria-label=${title} @click=${(e: MouseEvent) => onOpen(e, link)}><wa-icon library="mdi" name="information-outline"></wa-icon></button></div>`;
 }
 
-/** A component line: the [tag:line] token becomes a quiet inline link. */
+/** A colour-flat component line: the [tag:line] token becomes a quiet link. */
 export function renderComponentLine(
-  clean: string,
+  link: ComponentLogDocLink,
   colorStyle: string,
-  link: LogDocLink,
   localize: LocalizeFunc,
   onOpen: OpenDocHandler
 ): TemplateResult {
-  const range = link.tagRange;
-  if (!range)
-    return html`<div class="log-line" style=${colorStyle || nothing}>${clean}</div>`;
-  const before = clean.slice(0, range.start);
-  const tag = clean.slice(range.start, range.end);
-  const after = clean.slice(range.end);
-  const title = localize("dashboard.logs_doc_component_link_title", {
-    component: link.component ?? "",
-  });
+  const { start, end } = link.tagRange;
+  const title = componentLinkTitle(link, localize);
+  const before = link.clean.slice(0, start);
+  const tag = link.clean.slice(start, end);
+  const after = link.clean.slice(end);
   // prettier-ignore
-  return html`<div class="log-line" style=${colorStyle || nothing}>${before}<button class="log-tag-link" type="button" title=${title} aria-label=${title} @click=${(e: MouseEvent) => onOpen(e, link)}>${tag}</button>${after}</div>`;
+  return html`<div class="log-line" style=${colorStyle || nothing}>${before}${tagLinkButton(tag, title, link, onOpen)}${after}</div>`;
+}
+
+function componentLinkTitle(link: ComponentLogDocLink, localize: LocalizeFunc): string {
+  return localize("dashboard.logs_doc_component_link_title", {
+    component: link.component,
+  });
+}
+
+// prettier-ignore
+function tagLinkButton(tag: string, title: string, link: ComponentLogDocLink, onOpen: OpenDocHandler): TemplateResult {
+  // prettier-ignore
+  return html`<button class="log-tag-link" type="button" title=${title} aria-label=${title} @click=${(e: MouseEvent) => onOpen(e, link)}>${tag}</button>`;
+}
+
+function styledSpan(
+  span: AnsiSpan,
+  content: TemplateResult | string
+): TemplateResult | string {
+  const style = [
+    span.color ? `color:${span.color}` : "",
+    span.bgColor ? `background:${span.bgColor}` : "",
+  ]
+    .filter(Boolean)
+    .join(";");
+  const classes = [span.bold ? "bold" : "", span.dim ? "dim" : ""]
+    .filter(Boolean)
+    .join(" ");
+  if (style || classes) {
+    // prettier-ignore
+    return html`<span class=${classes || nothing} style=${style || nothing}>${content}</span>`;
+  }
+  return content;
 }

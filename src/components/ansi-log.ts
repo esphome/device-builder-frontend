@@ -10,10 +10,11 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { integrationDocsContext, localizeContext } from "../context/index.js";
 import { ansiLogThemes } from "../styles/ansi-log/index.js";
+import { ANSI_ESCAPE_RE } from "../util/ansi-escapes.js";
 import {
   type LogDocLink,
+  parseLogLine,
   resolveLogDocLink,
-  stripLogAnsi,
 } from "../util/log-doc-links.js";
 import {
   type AnsiSpan,
@@ -22,6 +23,7 @@ import {
   renderActionableLine,
   renderComponentLine,
   renderSpanChildren,
+  renderSpanChildrenWithTagLink,
 } from "./ansi-log-render.js";
 import type { ESPHomeLogDocPopover } from "./log-doc-popover.js";
 
@@ -97,32 +99,9 @@ const LOG_LEVEL_COLORS: Record<string, string> = {
 
 /** Detect ESPHome log level from a line like `[22:40:23.513][C][component:123]: text` */
 function detectLogLevelColor(line: string): string | undefined {
-  const match = line.match(/^\[[\d:.]+\]\[([EWICDV]V?)\]\[/);
-  return match ? LOG_LEVEL_COLORS[match[1]] : undefined;
+  const level = parseLogLine(line)?.level;
+  return level ? LOG_LEVEL_COLORS[level] : undefined;
 }
-
-/**
- * Match every ANSI escape sequence we care about as one of three
- * shapes:
- *   - CSI: `ESC [` <params> <intermediate> <final> — group 1 is the
- *     final byte. SGR (`m`) drives colors; everything else (cursor
- *     positioning, erase-line, DECTCEM `?25l/?25h`, ...) we silently
- *     discard so it doesn't leak into the rendered text.
- *   - OSC: `ESC ]` ... terminator — terminal title sets, hyperlinks,
- *     etc. Always discarded.
- *   - Two-char escapes: `ESC` + a single control char. Also discarded.
- * Final-byte / intermediate / parameter ranges follow ECMA-48.
- *
- * The introducer alternation matches BOTH the real `\x1b` byte AND
- * the four-character literal `\033` text that ESPHome's `--dashboard`
- * log formatter emits. ESPHome rewrites `\x1b` to literal `\033` so
- * `colorama` can't strip the codes when stdout is piped to us — without
- * matching the literal form here, the colours would render as plain
- * `\033[32m` text. The original ESPHome dashboard's frontend matches
- * both forms for the same reason.
- */
-const ANSI_ESCAPE_RE =
-  /(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*([\x40-\x7e])|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>]/g;
 
 /**
  * Mutable SGR state carried *across* ``parseAnsiLine`` calls.
@@ -401,14 +380,22 @@ export class ESPHomeAnsiLog extends LitElement {
     const hasAnsiColor = spans.some((s) => s.color || s.bgColor);
     const link = resolveLogDocLink(line, this._integrationDocs);
 
-    // A component line is rebuilt from clean text so the [tag:line] token
-    // can be wrapped; ESPHome colours the whole record by level, so the
-    // single level colour reproduces the line's appearance.
-    if (link?.kind === "component" && link.tagRange) {
-      const clean = stripLogAnsi(line);
-      const levelColor = detectLogLevelColor(clean);
+    if (link?.kind === "component") {
+      // ANSI-styled lines wrap the tag at the span level so per-span colours
+      // survive; colour-flat lines rebuild from the already-stripped text.
+      if (hasAnsiColor) {
+        const children = renderSpanChildrenWithTagLink(
+          spans,
+          link,
+          this._localize,
+          this._openDoc
+        );
+        // prettier-ignore
+        return html`<div class="log-line">${children}</div>`;
+      }
+      const levelColor = detectLogLevelColor(link.clean);
       const colorStyle = levelColor ? `color:${levelColor}` : "";
-      return renderComponentLine(clean, colorStyle, link, this._localize, this._openDoc);
+      return renderComponentLine(link, colorStyle, this._localize, this._openDoc);
     }
 
     // Normal content — fast path (level-coloured or plain string) or the

@@ -72,4 +72,19 @@ describe("ansi-log annotation selection-safety", () => {
     // The whole clean line (tag link text included) is the copied text.
     expect(line.textContent).toBe(ETHERNET);
   });
+
+  it("preserves per-span ANSI colours while linking the tag", async () => {
+    const raw = `\u001b[0;36m${ETHERNET}\u001b[0m \u001b[0;35mup\u001b[0m`;
+    const el = await mountLog([raw]);
+    const line = root(el).querySelector(".log-line")!;
+    expect(line.querySelector<HTMLButtonElement>(".log-tag-link")?.textContent).toBe(
+      "ethernet"
+    );
+    const styles = Array.from(line.querySelectorAll("span")).map(
+      (s) => s.getAttribute("style") ?? ""
+    );
+    expect(styles.some((s) => s.includes("--ansi-fg-36"))).toBe(true);
+    expect(styles.some((s) => s.includes("--ansi-fg-35"))).toBe(true);
+    expect(line.textContent).toBe(`${ETHERNET} up`);
+  });
 });

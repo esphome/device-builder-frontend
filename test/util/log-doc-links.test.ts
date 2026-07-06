@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { resolveLogDocLink, stripLogAnsi } from "../../src/util/log-doc-links.js";
+import { stripAnsi } from "../../src/util/ansi-escapes.js";
+import {
+  type ComponentLogDocLink,
+  type LogDocLink,
+  resolveLogDocLink,
+} from "../../src/util/log-doc-links.js";
 
 const DOCS = {
   ethernet: "https://esphome.io/components/ethernet",
@@ -8,18 +13,23 @@ const DOCS = {
   sensor: "https://esphome.io/components/sensor",
 };
 
+function expectComponent(link: LogDocLink | undefined): ComponentLogDocLink {
+  if (link?.kind !== "component") throw new Error("expected a component link");
+  return link;
+}
+
 describe("resolveLogDocLink — actionable", () => {
-  it("maps the bootloader warning to the ESP32 advanced-config page", () => {
+  it("maps the bootloader warning to the OTA bootloader-update section", () => {
     const line =
       "[13:22:07][W][app:193]: Bootloader too old for OTA rollback. Flash via USB once to update the bootloader";
     expect(resolveLogDocLink(line, {})).toEqual({
       kind: "actionable",
-      url: "https://esphome.io/components/esp32.html#advanced-configuration",
+      url: "https://esphome.io/components/ota/esphome/#updating-the-bootloader-on-esp32",
       body: "bootloader",
     });
   });
 
-  it("maps the minimum_chip_revision hint to the same page", () => {
+  it("maps the minimum_chip_revision hint to the ESP32 advanced-config page", () => {
     const line =
       '[13:22:07][W][app:168]: Chip rev >= 3.0 detected. Set minimum_chip_revision: "3.0" to save ~10KB IRAM';
     expect(resolveLogDocLink(line, {})?.body).toBe("chip_revision");
@@ -44,19 +54,19 @@ describe("resolveLogDocLink — actionable", () => {
 describe("resolveLogDocLink — component", () => {
   it("links a simple tag to its component page and ranges the token", () => {
     const line = "[13:22:07][C][ethernet:495]: Ethernet:";
-    const link = resolveLogDocLink(line, DOCS);
-    expect(link?.kind).toBe("component");
-    expect(link?.url).toBe(DOCS.ethernet);
-    expect(link?.component).toBe("ethernet");
-    const { start, end } = link!.tagRange!;
+    const link = expectComponent(resolveLogDocLink(line, DOCS));
+    expect(link.url).toBe(DOCS.ethernet);
+    expect(link.component).toBe("ethernet");
+    expect(link.clean).toBe(line);
+    const { start, end } = link.tagRange;
     expect(line.slice(start, end)).toBe("ethernet");
   });
 
   it("resolves a dotted framework tag to the base component, ranging the whole tag", () => {
     const line = "[13:22:07][C][i2c.idf:092]: I2C Bus:";
-    const link = resolveLogDocLink(line, DOCS);
-    expect(link?.url).toBe(DOCS.i2c);
-    const { start, end } = link!.tagRange!;
+    const link = expectComponent(resolveLogDocLink(line, DOCS));
+    expect(link.url).toBe(DOCS.i2c);
+    const { start, end } = link.tagRange;
     expect(line.slice(start, end)).toBe("i2c.idf");
   });
 
@@ -66,19 +76,19 @@ describe("resolveLogDocLink — component", () => {
   });
 
   it("resolves a real-ESC ANSI line and ranges the tag in the clean text", () => {
-    const raw = "[0;36m[13:22:07][C][ethernet:495]: Ethernet:[0m";
-    const link = resolveLogDocLink(raw, DOCS);
-    expect(link?.component).toBe("ethernet");
-    const clean = stripLogAnsi(raw);
-    expect(clean).toBe("[13:22:07][C][ethernet:495]: Ethernet:");
-    const { start, end } = link!.tagRange!;
-    expect(clean.slice(start, end)).toBe("ethernet");
+    const raw = "\u001b[0;36m[13:22:07][C][ethernet:495]: Ethernet:\u001b[0m";
+    const link = expectComponent(resolveLogDocLink(raw, DOCS));
+    expect(link.component).toBe("ethernet");
+    expect(link.clean).toBe("[13:22:07][C][ethernet:495]: Ethernet:");
+    expect(link.clean).toBe(stripAnsi(raw));
+    const { start, end } = link.tagRange;
+    expect(link.clean.slice(start, end)).toBe("ethernet");
   });
 
   it("also strips the literal \\033 escape form the dashboard formatter emits", () => {
     const raw = "\\033[0;36m[13:22:07][C][ethernet:495]: Ethernet:\\033[0m";
-    expect(stripLogAnsi(raw)).toBe("[13:22:07][C][ethernet:495]: Ethernet:");
-    expect(resolveLogDocLink(raw, DOCS)?.component).toBe("ethernet");
+    expect(stripAnsi(raw)).toBe("[13:22:07][C][ethernet:495]: Ethernet:");
+    expect(expectComponent(resolveLogDocLink(raw, DOCS)).component).toBe("ethernet");
   });
 });
 

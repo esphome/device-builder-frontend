@@ -10,20 +10,36 @@
  * inline URL can't render a ``javascript:`` anchor.
  */
 import { isSafeDocsUrl } from "../common/docs.js";
+import { stripAnsi } from "./ansi-escapes.js";
 
-export type LogDocLinkKind = "actionable" | "component";
-
-export interface LogDocLink {
-  kind: LogDocLinkKind;
+export interface ActionableLogDocLink {
+  kind: "actionable";
   /** Canonical esphome.io URL, already whitelisted. */
   url: string;
-  /** For ``component`` kind: the resolved component slug (popover title). */
-  component?: string;
-  /** For ``component`` kind: char range of the tag token within the
-   *  ANSI-stripped line, so the renderer can wrap just that token. */
-  tagRange?: { start: number; end: number };
-  /** Discriminates the popover body copy the renderer localizes. */
-  body: "bootloader" | "chip_revision" | "embedded" | "component";
+  /** Discriminates the popover copy the renderer localizes. */
+  body: "bootloader" | "chip_revision" | "embedded";
+}
+
+export interface ComponentLogDocLink {
+  kind: "component";
+  /** Canonical esphome.io URL, already whitelisted. */
+  url: string;
+  body: "component";
+  /** Resolved component slug (popover title). */
+  component: string;
+  /** Char range of the tag token within ``clean``. */
+  tagRange: { start: number; end: number };
+  /** The ANSI-stripped line ``tagRange`` indexes into. */
+  clean: string;
+}
+
+export type LogDocLink = ActionableLogDocLink | ComponentLogDocLink;
+
+export interface ParsedLogLine {
+  level: string;
+  tag: string;
+  tagStart: number;
+  tagEnd: number;
 }
 
 /** Curated actionable message → verified docs page. */
@@ -32,35 +48,28 @@ interface ActionableEntry {
   tag: string;
   pattern: RegExp;
   url: string;
-  body: LogDocLink["body"];
+  body: ActionableLogDocLink["body"];
 }
 
-// Verified live against esphome.io. Both ESP32 messages point at the
-// Advanced Configuration section that documents minimum_chip_revision +
-// enable_ota_rollback (the "Flash via USB" fix). Keep this list small and
-// URL-verified; most lines resolve through the component map below.
+// Verified live against esphome.io (200, anchor present, no redirect).
+// Keep this list small and URL-verified; most lines resolve through the
+// component map below.
 const ACTIONABLE: readonly ActionableEntry[] = [
   {
     level: "W",
     tag: "app",
     pattern: /Bootloader too old for OTA rollback/,
-    url: "https://esphome.io/components/esp32.html#advanced-configuration",
+    url: "https://esphome.io/components/ota/esphome/#updating-the-bootloader-on-esp32",
     body: "bootloader",
   },
   {
     level: "W",
     tag: "app",
     pattern: /Set minimum_chip_revision/,
-    url: "https://esphome.io/components/esp32.html#advanced-configuration",
+    url: "https://esphome.io/components/esp32/#advanced-configuration",
     body: "chip_revision",
   },
 ] as const;
-
-// Strips every ANSI escape sequence in either the real ``\x1b`` form or the
-// literal ``\033`` text ESPHome's dashboard formatter emits (see ansi-log's
-// ANSI_ESCAPE_RE for the full rationale). Global so ``replace`` clears all.
-const ANSI_STRIP_RE =
-  /(?:\x1b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]|(?:\x1b|\\033)\][^\x07\x1b]*(?:\x07|\x1b\\|\\033\\)|(?:\x1b|\\033)[NOPVWX^_=>]/g;
 
 /** First ``https://esphome.io`` URL in a line (trailing sentence punctuation
  *  trimmed in ``resolveLogDocLink``). */
@@ -75,20 +84,8 @@ const LOG_LINE_RE = /^\[\d[\d:.]*\]\[([EWICDV]V?)\]\[([^\]]+)\]/;
 // before-the-dot split instead.
 const PLATFORM_SUFFIX_RE = /_(esp32\w*|esp8266|rp2040|libretiny|lt|host|bk72xx|rtl87xx)$/;
 
-/** Strip every ANSI escape sequence from a log line. */
-export function stripLogAnsi(line: string): string {
-  return line.replace(ANSI_STRIP_RE, "");
-}
-
-interface ParsedLine {
-  level: string;
-  tag: string;
-  tagStart: number;
-  tagEnd: number;
-}
-
 /** Parse level + tag (and the tag's char range) from a clean log line. */
-function parseLogLine(clean: string): ParsedLine | undefined {
+export function parseLogLine(clean: string): ParsedLogLine | undefined {
   const match = clean.match(LOG_LINE_RE);
   if (!match) return undefined;
   const inner = match[2];
@@ -97,16 +94,6 @@ function parseLogLine(clean: string): ParsedLine | undefined {
   // one char before the closing bracket; the tag is inner's leading slice.
   const tagStart = match[0].length - inner.length - 1;
   return { level: match[1], tag, tagStart, tagEnd: tagStart + tag.length };
-}
-
-/** Ordered component-slug candidates for a log tag. */
-function tagCandidates(tag: string): string[] {
-  const candidates = [tag];
-  const dot = tag.indexOf(".");
-  if (dot > 0) candidates.push(tag.slice(0, dot));
-  const base = tag.replace(PLATFORM_SUFFIX_RE, "");
-  if (base !== tag) candidates.push(base);
-  return candidates;
 }
 
 /**
@@ -119,7 +106,7 @@ export function resolveLogDocLink(
   line: string,
   integrationDocs: Record<string, string>
 ): LogDocLink | undefined {
-  const clean = stripLogAnsi(line);
+  const clean = stripAnsi(line);
   const parsed = parseLogLine(clean);
 
   if (parsed) {
@@ -147,13 +134,24 @@ export function resolveLogDocLink(
         return {
           kind: "component",
           url,
+          body: "component",
           component: slug,
           tagRange: { start: parsed.tagStart, end: parsed.tagEnd },
-          body: "component",
+          clean,
         };
       }
     }
   }
 
   return undefined;
+}
+
+/** Ordered component-slug candidates for a log tag. */
+function tagCandidates(tag: string): string[] {
+  const candidates = [tag];
+  const dot = tag.indexOf(".");
+  if (dot > 0) candidates.push(tag.slice(0, dot));
+  const base = tag.replace(PLATFORM_SUFFIX_RE, "");
+  if (base !== tag) candidates.push(base);
+  return candidates;
 }
