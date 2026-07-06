@@ -275,6 +275,10 @@ export class ESPHomeAnsiLog extends LitElement {
   @query("esphome-log-doc-popover")
   private _docPopover?: ESPHomeLogDocPopover;
 
+  // Doc-link resolutions for the lines rendered last pass; render() swaps in
+  // a fresh map each pass so the cache never outgrows the visible buffer.
+  private _docLinkCache = new Map<string, LogDocLink | undefined>();
+
   static styles = [
     /* Theme-aware ANSI palette + log surface variables. Each theme
        lives in its own sibling file under ../styles/ansi-log/ —
@@ -349,6 +353,12 @@ export class ESPHomeAnsiLog extends LitElement {
     logDocLinkStyles,
   ];
 
+  protected willUpdate(changedProperties: Map<string, unknown>) {
+    // Resolutions are pure in (line, docs map); a docs-map change is the one
+    // input the line-keyed cache can't see, so drop it here.
+    if (changedProperties.has("_integrationDocs")) this._docLinkCache.clear();
+  }
+
   protected updated(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("lines") && this.autoScroll && !this._isUserScrolled) {
       // Sync (not rAF-deferred): ``updated`` runs post-DOM-commit,
@@ -363,27 +373,35 @@ export class ESPHomeAnsiLog extends LitElement {
     // records (a WARNING that opens ``\x1b[33m`` on line 1 and only
     // resets on line 5) keep their colour on the continuation lines.
     const state = newAnsiState();
+    // Fresh per-render link map; _renderLine fills it from the previous
+    // render's cache (or a cold resolve) and the swap below drops entries
+    // for lines that scrolled out of the buffer, so the cache stays bounded
+    // while streaming re-renders skip the per-line regex resolution.
+    const links = new Map<string, LogDocLink | undefined>();
+    const rows =
+      visual.length === 0 && this.placeholder
+        ? html`<div class="log-line placeholder">${this.placeholder}</div>`
+        : visual.map((line) => this._renderLine(line, state, links));
+    this._docLinkCache = links;
     return html`
-      <div class="log-container" @scroll=${this._handleScroll}>
-        ${
-          visual.length === 0 && this.placeholder
-            ? html`<div class="log-line placeholder">${this.placeholder}</div>`
-            : visual.map((line) => this._renderLine(line, state))
-        }
-      </div>
+      <div class="log-container" @scroll=${this._handleScroll}>${rows}</div>
       <esphome-log-doc-popover></esphome-log-doc-popover>
     `;
   }
 
-  private _renderLine(line: string, state: AnsiState) {
+  private _renderLine(
+    line: string,
+    state: AnsiState,
+    links: Map<string, LogDocLink | undefined>
+  ) {
     const spans = parseAnsiLine(line, state);
     const hasAnsiColor = spans.some((s) => s.color || s.bgColor);
-    const link = resolveLogDocLink(line, this._integrationDocs);
+    const link = this._resolveDocLinkCached(line, links);
 
     if (link?.kind === "component") {
       // ANSI-styled lines wrap the tag at the span level so per-span colours
-      // survive; colour-flat lines rebuild from the already-stripped text.
-      if (hasAnsiColor) {
+      // (and bold/dim) survive; style-free lines rebuild from stripped text.
+      if (hasAnsiColor || spans.some((s) => s.bold || s.dim)) {
         const children = renderSpanChildrenWithTagLink(
           spans,
           link,
@@ -426,6 +444,20 @@ export class ESPHomeAnsiLog extends LitElement {
     return colorStyle
       ? html`<div class="log-line" style=${colorStyle}>${inner}</div>`
       : html`<div class="log-line">${inner}</div>`;
+  }
+
+  // Look up a line's doc link in the previous render's cache before paying
+  // the regex resolve, recording the result in this render's map either way.
+  private _resolveDocLinkCached(
+    line: string,
+    links: Map<string, LogDocLink | undefined>
+  ): LogDocLink | undefined {
+    if (links.has(line)) return links.get(line);
+    const link = this._docLinkCache.has(line)
+      ? this._docLinkCache.get(line)
+      : resolveLogDocLink(line, this._integrationDocs);
+    links.set(line, link);
+    return link;
   }
 
   // Populate the shared popover from the clicked line's link and anchor it to

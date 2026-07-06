@@ -51,6 +51,17 @@ describe("ansi-log doc-link annotations", () => {
     expect(plain!.querySelector(".log-doc-icon")).toBeNull();
     expect(plain!.querySelector(".log-tag-link")).toBeNull();
   });
+
+  it("re-resolves cached lines when the integration docs map changes", async () => {
+    const bare = new ESPHomeAnsiLog();
+    bare.lines = [ETHERNET];
+    await mount(bare);
+    expect(root(bare).querySelector(".log-tag-link")).toBeNull();
+    (bare as unknown as { _integrationDocs: Record<string, string> })._integrationDocs =
+      DOCS;
+    await bare.updateComplete;
+    expect(root(bare).querySelector(".log-tag-link")).not.toBeNull();
+  });
 });
 
 describe("ansi-log annotation selection-safety", () => {
