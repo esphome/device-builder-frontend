@@ -83,7 +83,12 @@ export class UnsupportedChipError extends Error {
   readonly chipName: string;
 
   constructor(chipName: string) {
-    super(`${chipName} is not supported by browser flashing yet`);
+    // Surfaces raw through err.message on the wizard / dashboard-scan paths,
+    // so the message itself carries the next step.
+    super(
+      `${chipName} is not supported by browser flashing yet — download the ` +
+        `firmware and flash it with esptool from the command line instead`
+    );
     this.name = "UnsupportedChipError";
     this.chipName = chipName;
   }
@@ -109,10 +114,10 @@ async function guardMisdetectedP4(loader: ESPLoader): Promise<void> {
   } catch {
     return;
   }
-  // flags(4) + flash_crypt_cnt(1) + key_purposes(7) + chip_id(4) +
-  // api_version(4), then trailing status bytes; chip_id parses from the
-  // front regardless of how many status bytes the ROM appends.
-  if (data.length < 20) return;
+  // flags(4) + flash_crypt_cnt(1) + key_purposes(7) + chip_id(4), then
+  // api_version and trailing status bytes; chip_id parses from the front
+  // regardless of how many bytes the ROM appends after it.
+  if (data.length < 16) return;
   const chipId = new DataView(data.buffer, data.byteOffset).getUint32(12, true);
   if (chipId === ESP32P4_CHIP_ID) return;
   throw new UnsupportedChipError(

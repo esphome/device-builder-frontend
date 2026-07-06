@@ -16,6 +16,7 @@ import {
   isPortPickerCancel,
   readDeviceManifest,
   readMacAddress,
+  UnsupportedChipError,
 } from "../../util/web-serial.js";
 import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
@@ -357,9 +358,11 @@ export async function detectAndOpenWizard(
     // failure gets named instead of vanishing (#1414).
     if (!isPortPickerCancel(err) && options.localize) {
       notifyError(
-        options.localize("dashboard.serial_connect_failed", {
-          error: getErrorMessage(err),
-        })
+        err instanceof UnsupportedChipError
+          ? options.localize("serial.unsupported_chip", { chip: err.chipName })
+          : options.localize("dashboard.serial_connect_failed", {
+              error: getErrorMessage(err),
+            })
       );
     }
     createDialog.open("board");

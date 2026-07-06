@@ -120,11 +120,24 @@ describe("connectToPort — misdetected-P4 guard", () => {
   });
 
   it("fails open on a response too short to carry a chip id", async () => {
-    state.securityInfo = () => Promise.resolve([0, new Uint8Array(14)]);
+    state.securityInfo = () => Promise.resolve([0, new Uint8Array(15)]);
 
     await connectToPort(fakePort);
 
     expect(state.stubRuns).toBe(1);
+  });
+
+  it("refuses on the minimal 16-byte response carrying a chip id", async () => {
+    state.securityInfo = () => {
+      const data = new Uint8Array(16);
+      new DataView(data.buffer).setUint32(12, 32, true);
+      return Promise.resolve([0, data]);
+    };
+
+    const err = await connectToPort(fakePort).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UnsupportedChipError);
+    expect(state.stubRuns).toBe(0);
   });
 
   it("never queries security info on a non-P4 detection", async () => {
