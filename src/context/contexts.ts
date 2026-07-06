@@ -176,10 +176,10 @@ export const remoteBuildCleanupTtlContext = createContext<number>(
   Symbol("esphome-remote-build-cleanup-ttl")
 );
 
-/** Context for the integration → esphome.io docs URL map. Populated
- *  once on app load via ``components/get_integration_docs``; the
- *  drawer's loaded-integration tags consult it to decide whether to
- *  render each name as a link or plain text. */
+/** Context for the integration docs map: name → its esphome.io docs
+ *  URL, catalog display name, and trimmed description. Populated once
+ *  on app load via ``components/get_integration_docs``; the drawer's
+ *  loaded-integration tags and the log doc-link popover consult it. */
 export const integrationDocsContext = createContext<Record<string, IntegrationDoc>>(
   Symbol("esphome-integration-docs")
 );

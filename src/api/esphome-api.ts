@@ -1455,10 +1455,12 @@ export class ESPHomeAPI {
    */
   async getIntegrationDocs(): Promise<Record<string, IntegrationDoc>> {
     const raw = await this.sendCommand<unknown>("components/get_integration_docs");
+    // Null-prototype so an untrusted ``__proto__`` / ``constructor`` key
+    // can't pollute the prototype when assigned below.
+    const result: Record<string, IntegrationDoc> = Object.create(null);
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-      return {};
+      return result;
     }
-    const result: Record<string, IntegrationDoc> = {};
     for (const [key, value] of Object.entries(raw)) {
       if (typeof key !== "string" || value === null || typeof value !== "object") {
         continue;
