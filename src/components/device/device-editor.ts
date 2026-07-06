@@ -33,6 +33,7 @@ import {
 } from "../../util/split-ratio.js";
 import type { BannerError, YamlDiagnosticsDetail } from "../../util/yaml-lint-backend.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { ESPHomeYamlEditor, HighlightRange } from "../yaml-editor.js";
 import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
@@ -285,11 +286,9 @@ export class ESPHomeDeviceEditor extends LitElement {
           <div class="editor-header-main">
             <div class="editor-header-titlerow">
               <h2 class="editor-header-title">${title}</h2>
-              ${
-                this.configuration && !compactHeader
-                  ? html`<span class="editor-header-file">${this.configuration}</span>`
-                  : nothing
-              }
+              ${this.configuration && !compactHeader
+                ? html`<span class="editor-header-file">${this.configuration}</span>`
+                : nothing}
             </div>
           </div>
           ${renderEditorToolbar({
@@ -312,6 +311,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                  Carries Validate too (Install validates anyway, so the
                  explicit button rarely earned its slot on the bar). -->
             <esphome-device-actions-menu
+              ${tourAnchor("validate")}
               ?busy=${this.busy}
               ?validate-disabled=${this.hasUnsavedEdits}
               .webUiUrl=${this.webUiUrl}
@@ -321,28 +321,25 @@ export class ESPHomeDeviceEditor extends LitElement {
             <button
               type="button"
               class="save-button"
+              ${tourAnchor("save")}
               ?disabled=${!this.hasUnsavedEdits || this.saving}
               aria-busy=${this.saving}
               @click=${this._onSave}
               title=${this._localize("device.save_yaml")}
             >
-              ${
-                this.saving
-                  ? html`<wa-spinner></wa-spinner>`
-                  : html`<wa-icon library="mdi" name="content-save"></wa-icon>`
-              }
+              ${this.saving
+                ? html`<wa-spinner></wa-spinner>`
+                : html`<wa-icon library="mdi" name="content-save"></wa-icon>`}
               ${this._localize("device.save")}
             </button>
           </div>
           <div
             class="editor-layout ${layoutClass} ${this._dragging ? "dragging" : ""}"
-            style=${
-              effectiveLayout === "both"
-                ? `grid-template-columns: ${this._splitRatio}fr var(--pane-divider-width) ${1 - this._splitRatio}fr`
-                : ""
-            }
+            style=${effectiveLayout === "both"
+              ? `grid-template-columns: ${this._splitRatio}fr var(--pane-divider-width) ${1 - this._splitRatio}fr`
+              : ""}
           >
-            <div class="editor-pane editor-pane--left">
+            <div class="editor-pane editor-pane--left" ${tourAnchor("central")}>
               <esphome-device-board-info
                 .board=${this.board}
                 .yaml=${this.yaml}
@@ -376,7 +373,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                   ></div>`
                 : nothing
             }
-            <div class="editor-pane editor-pane--right">
+            <div class="editor-pane editor-pane--right" ${tourAnchor("yaml")}>
               <div class="editor-pane-body">
                 ${
                   this._showDiff

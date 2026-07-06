@@ -11,6 +11,11 @@ import { boardImageUrl } from "../../util/board-image.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { boardOffersFullSetup } from "../../util/full-setup.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../../util/secrets-cache.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
+import {
+  clearTourSuggestedName,
+  getTourSuggestedName,
+} from "../guided-tour/tour-session.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
 
@@ -90,6 +95,12 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
+
+    if (!this._deviceName) {
+      const suggested = getTourSuggestedName();
+      if (suggested) this._deviceName = suggested;
+    }
+    clearTourSuggestedName();
     // Already configured ⇒ skip the Wi-Fi stage and reuse !secret. Read via the
     // shared, secrets-saved-refreshed key cache (caches [] on failure).
     this._wifiConfigured = hasSharedWifiSecret(await fetchSecretKeys(this._api));
@@ -280,29 +291,25 @@ export class ESPHomeWizardStepSetup extends LitElement {
             <h2 class="board-info-title">
               ${board ? board.name : this._localize("wizard.title_setup")}
             </h2>
-            ${
-              board
-                ? html`<div class="board-tags">
-                    ${board.tags.map(
-                      (tag) =>
-                        html`<span class="tag"
-                          >${this._localize(`wizard.tag.${tag}`)}</span
-                        >`
-                    )}
-                  </div>`
-                : null
-            }
+            ${board
+              ? html`<div class="board-tags">
+                  ${board.tags.map(
+                    (tag) =>
+                      html`<span class="tag"
+                        >${this._localize(`wizard.tag.${tag}`)}</span
+                      >`
+                  )}
+                </div>`
+              : null}
           </div>
         </div>
-        ${
-          board
-            ? html`<img
-                class="board-image"
-                src=${boardImageUrl(board)}
-                alt=${board.name}
-              />`
-            : null
-        }
+        ${board
+          ? html`<img
+              class="board-image"
+              src=${boardImageUrl(board)}
+              alt=${board.name}
+            />`
+          : null}
       </div>
 
       <hr class="divider" />
@@ -322,16 +329,15 @@ export class ESPHomeWizardStepSetup extends LitElement {
           <button
             class="btn btn-primary"
             type="button"
+            ${tourAnchor("name-finish")}
             ?disabled=${!this._canAdvance() || this.submitting}
             aria-busy=${this.submitting || nothing}
             @click=${this._onNext}
           >
             ${this.submitting ? html`<wa-spinner></wa-spinner>` : nothing}
-            ${
-              this._stage === "name" && this._collectWifi
-                ? this._localize("wizard.next")
-                : this._localize("wizard.finish_setup")
-            }
+            ${this._stage === "name" && this._collectWifi
+              ? this._localize("wizard.next")
+              : this._localize("wizard.finish_setup")}
           </button>
         </div>
       </div>
@@ -362,24 +368,20 @@ export class ESPHomeWizardStepSetup extends LitElement {
           />
         </div>
 
-        ${
-          boardOffersFullSetup(this.board)
-            ? html`<div class="full-setup">
-                <wa-checkbox
-                  .checked=${this._fullSetup}
-                  @change=${(e: Event) => {
-                    this._fullSetup = (
-                      e.currentTarget as HTMLElement & { checked: boolean }
-                    ).checked;
-                  }}
-                  >${this._localize("wizard.full_setup")}</wa-checkbox
-                >
-                <p class="section-subtitle">
-                  ${this._localize("wizard.full_setup_desc")}
-                </p>
-              </div>`
-            : null
-        }
+        ${boardOffersFullSetup(this.board)
+          ? html`<div class="full-setup">
+              <wa-checkbox
+                .checked=${this._fullSetup}
+                @change=${(e: Event) => {
+                  this._fullSetup = (
+                    e.currentTarget as HTMLElement & { checked: boolean }
+                  ).checked;
+                }}
+                >${this._localize("wizard.full_setup")}</wa-checkbox
+              >
+              <p class="section-subtitle">${this._localize("wizard.full_setup_desc")}</p>
+            </div>`
+          : null}
       </section>
     `;
   }

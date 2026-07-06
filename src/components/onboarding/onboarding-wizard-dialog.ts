@@ -13,6 +13,7 @@ import { ExperienceLevel } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
+import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
@@ -22,6 +23,8 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { onChoiceGroupKeydown, renderChoiceCard, rovingTabbable } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
+import { wifiFieldsStyles } from "./wifi-fields-styles.js";
+import { isWifiPasswordTooShort, renderWifiFields } from "./wifi-fields.js";
 import { type WizardScreen, wizardScreens } from "./wizard-screens.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -67,6 +70,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   @state() private _useCaseChosen = false;
   @state() private _remoteCompute = false;
   @state() private _experience: ExperienceLevel | null = null;
+  @state() private _wifiSsid = "";
+  @state() private _wifiPassword = "";
 
   private _exitedExplicitly = false;
   private _enter = new EnterController(this, () => {
@@ -81,6 +86,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._useCaseChosen = false;
     this._remoteCompute = false;
     this._experience = null;
+    this._wifiSsid = "";
+    this._wifiPassword = "";
     this._exitedExplicitly = false;
     this._enter.set(true);
   }
@@ -94,11 +101,17 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     dialogActionButtonStyles,
     choiceCardStyles,
     onboardingWizardStyles,
+    inputStyles,
+    wifiFieldsStyles,
   ];
 
-  /** Ordered screens for the current environment. */
+  private get _collectWifi(): boolean {
+    return this._experience === ExperienceLevel.BEGINNER && !this._remoteCompute;
+  }
+
+  /** Ordered screens for the current environment + choices. */
   private get _screens(): WizardScreen[] {
-    return wizardScreens({ hasUseCase: this.hasUseCase });
+    return wizardScreens({ hasUseCase: this.hasUseCase, collectWifi: this._collectWifi });
   }
 
   private get _screen(): WizardScreen {
@@ -116,6 +129,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         return this._useCaseChosen;
       case "experience":
         return this._experience !== null;
+      case "wifi":
+        return !!this._wifiSsid.trim() && !isWifiPasswordTooShort(this._wifiPassword);
     }
   }
 
@@ -191,7 +206,27 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         return this._renderUseCase();
       case "experience":
         return this._renderExperience();
+      case "wifi":
+        return this._renderWifi();
     }
+  }
+
+  private _renderWifi() {
+    return html`
+      <p class="intro">${this._localize("onboarding.wizard.wifi.intro")}</p>
+      ${renderWifiFields({
+        localize: this._localize,
+        ssid: this._wifiSsid,
+        password: this._wifiPassword,
+        disabled: this._saving,
+        onSsidInput: (v) => {
+          this._wifiSsid = v;
+        },
+        onPasswordInput: (v) => {
+          this._wifiPassword = v;
+        },
+      })}
+    `;
   }
 
   private _renderUseCase() {
@@ -280,6 +315,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           this._index += 1;
         }
         return;
+      case "wifi":
+        await this._finish();
+        return;
     }
   }
 
@@ -310,7 +348,20 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     }
   }
 
+  private async _saveWifi(): Promise<boolean> {
+    try {
+      await this._api.setWifiCredentials(this._wifiSsid, this._wifiPassword);
+    } catch (err) {
+      this._error = formatApiError(err, this._localize, "onboarding.wifi.save_failed");
+      this._saving = false;
+      return false;
+    }
+    window.dispatchEvent(new CustomEvent("secrets-saved", { detail: { source: this } }));
+    return true;
+  }
+
   private async _acknowledgeAndClose() {
+    if (this._collectWifi && !(await this._saveWifi())) return;
     // Persist the picks BEFORE acknowledging, so a failed write can't leave
     // the wizard marked done with experience / remote-compute unset (which
     // would never re-pop). The app shell refreshes its context from these

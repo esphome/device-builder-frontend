@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DashboardView } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { renderFacets } from "./render-facets.js";
 import { renderYamlPreviewPivot } from "./render-yaml.js";
 
@@ -18,6 +19,7 @@ export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
       class="view-toggle"
       role="group"
       aria-label=${host._localize("dashboard.view_toggle_group_label")}
+      ${tourAnchor("view-toggle")}
     >
       <button
         class="view-toggle-btn ${!yaml && view === DashboardView.CARDS ? "active" : ""}"
@@ -228,7 +230,11 @@ export function renderAddDeviceCard(
   // Remote-compute installs don't create devices.
   if (host._hideDeviceCreation) return nothing;
   return html`
-    <div class="add-device-card" @click=${() => host._createDialog.open()}>
+    <div
+      class="add-device-card"
+      ${tourAnchor("add-device-card")}
+      @click=${() => host._createDialog.open()}
+    >
       <div class="add-device-icon-wrap">
         <wa-icon library="mdi" name="plus"></wa-icon>
       </div>
@@ -277,7 +283,11 @@ export function renderSelectBarOrFab(
   if (host._view === DashboardView.CARDS && !host._hideDeviceCreation) {
     return html`
       <div class="fab-container">
-        <button class="fab-btn" @click=${() => host._createDialog.open()}>
+        <button
+          class="fab-btn"
+          ${tourAnchor("create-device-fab")}
+          @click=${() => host._createDialog.open()}
+        >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${host._localize("dashboard.create_device")}
         </button>

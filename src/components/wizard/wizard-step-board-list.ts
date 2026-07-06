@@ -10,6 +10,7 @@ import { boardImageUrl } from "../../util/board-image.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { renderLoadMoreFooter } from "../shared/load-more-footer.js";
 
 import { wizardStepBoardStyles } from "./wizard-step-board.styles.js";
@@ -174,7 +175,12 @@ export class ESPHomeWizardStepBoardList extends LitElement {
               ${this.localize("wizard.more_info")}
               <wa-icon library="mdi" name="open-in-new"></wa-icon>
             </a>
-            <button class="select-board" type="button" @click=${() => this._onAdd(board)}>
+            <button
+              class="select-board"
+              type="button"
+              ${tourAnchor("board-featured")}
+              @click=${() => this._onAdd(board)}
+            >
               <wa-icon library="mdi" name="plus"></wa-icon>
               ${this.localize("wizard.add_board")}
             </button>

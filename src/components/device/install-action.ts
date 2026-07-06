@@ -1,6 +1,7 @@
 import { html, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 
 export interface InstallActionProps {
   localize: LocalizeFunc;
@@ -35,6 +36,7 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
       <button
         type="button"
         class="install-fab install-split__main"
+        ${tourAnchor("install")}
         @click=${p.onUpdate}
         title=${updateActionTitle(
           p.localize,
@@ -63,6 +65,7 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
   return html`<button
     type="button"
     class="install-fab ${p.showModified ? "" : "install-fab--muted"}"
+    ${tourAnchor("install")}
     @click=${p.onInstall}
     title=${installLabel}
   >

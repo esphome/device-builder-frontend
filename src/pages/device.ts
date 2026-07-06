@@ -1333,6 +1333,7 @@ export class ESPHomePageDevice extends LitElement {
   private _renderNavigator(className: "drawer-nav" | "desktop-nav") {
     return html`<esphome-device-navigator
       class=${className}
+      .tourAnchorId=${className === "desktop-nav" ? "nav" : undefined}
       .openSections=${this._openSections}
       .yaml=${this._yaml}
       .board=${this._board}
