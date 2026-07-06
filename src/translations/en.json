@@ -487,7 +487,8 @@
     "downloading": "Downloading {file}…",
     "flashing": "Flashing firmware…",
     "resetting": "Resetting device…",
-    "connect_failed": "Could not connect to the device. Unplug and replug the cable, hold the BOOT button while plugging in, or try another USB port or browser."
+    "connect_failed": "Could not connect to the device. Unplug and replug the cable, hold the BOOT button while plugging in, or try another USB port or browser.",
+    "unsupported_chip": "This looks like an {chip}, which browser flashing doesn't support yet. Download the firmware and flash it from the command line with esptool instead."
   },
   "wizard": {
     "title_create": "Create configuration",

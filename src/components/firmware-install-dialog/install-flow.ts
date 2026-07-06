@@ -16,6 +16,7 @@ import {
   flashFirmware,
   isPortPickerCancel,
   resetAndDisconnect,
+  UnsupportedChipError,
   type DetectedChip,
 } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -88,6 +89,10 @@ export async function startWebSerialInstall(
   } catch (err) {
     if (isPortPickerCancel(err)) {
       host._close();
+      return;
+    }
+    if (err instanceof UnsupportedChipError) {
+      host._fail(host._localize("serial.unsupported_chip", { chip: err.chipName }));
       return;
     }
     // The picker succeeded but the chip never answered — fail loud with

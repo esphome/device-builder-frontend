@@ -62,6 +62,64 @@ export function isPortPickerCancel(err: unknown): boolean {
   return err instanceof DOMException && err.name === "NotFoundError";
 }
 
+/** GET_SECURITY_INFO ROM command opcode (esptool.py's ``ESP_GET_SECURITY_INFO``). */
+const ESP_GET_SECURITY_INFO = 0x14;
+
+/** ``chip_id`` a genuine ESP32-P4 reports in its security info. */
+const ESP32P4_CHIP_ID = 18;
+
+// chip_id values (esptool.py IMAGE_CHIP_ID) of chips esptool-js has no target
+// for. They all read 0 at the magic-detect register and get claimed as an
+// ESP32-P4 (espressif/esptool-js#248).
+const UNSUPPORTED_CHIP_NAMES: Record<number, string> = {
+  25: "ESP32-H21",
+  28: "ESP32-H4",
+  31: "ESP32-E22",
+  32: "ESP32-S31",
+};
+
+/** The connected chip has no esptool-js target; flashing needs the esptool CLI. */
+export class UnsupportedChipError extends Error {
+  readonly chipName: string;
+
+  constructor(chipName: string) {
+    super(`${chipName} is not supported by browser flashing yet`);
+    this.name = "UnsupportedChipError";
+    this.chipName = chipName;
+  }
+}
+
+/**
+ * Refuse a "detected ESP32-P4" that is really a newer, unsupported chip.
+ *
+ * esptool-js identifies chips by the legacy magic register alone and maps the
+ * value 0 to ESP32-P4; newer chips (S31, H21, H4, E22, …) read 0 there too, so
+ * they get claimed as a P4 and the P4 stub flasher then wedges the session
+ * (espressif/esptool-js#248, backend log ends at "Uploading stub..."). Cross-
+ * check the ROM's GET_SECURITY_INFO chip_id — the signal esptool.py identifies
+ * these chips by — and throw ``UnsupportedChipError`` before the stub upload.
+ * Fails open on any command / response-shape problem so a genuine P4 that
+ * can't answer keeps today's behaviour.
+ */
+async function guardMisdetectedP4(loader: ESPLoader): Promise<void> {
+  if (loader.chip?.CHIP_NAME !== "ESP32-P4") return;
+  let data: Uint8Array;
+  try {
+    [, data] = await loader.command(ESP_GET_SECURITY_INFO);
+  } catch {
+    return;
+  }
+  // flags(4) + flash_crypt_cnt(1) + key_purposes(7) + chip_id(4) +
+  // api_version(4), then trailing status bytes; chip_id parses from the
+  // front regardless of how many status bytes the ROM appends.
+  if (data.length < 20) return;
+  const chipId = new DataView(data.buffer, data.byteOffset).getUint32(12, true);
+  if (chipId === ESP32P4_CHIP_ID) return;
+  throw new UnsupportedChipError(
+    UNSUPPORTED_CHIP_NAMES[chipId] ?? `unsupported ESP chip (chip id ${chipId})`
+  );
+}
+
 /**
  * The ``127.0.0.1`` equivalent of a dashboard opened on ``0.0.0.0`` — same
  * port and path. ``0.0.0.0`` is reachable only from the same machine (it
@@ -142,6 +200,14 @@ export async function connectToPort(
   });
 
   try {
+    // main() has no hook between magic-register chip detection and the stub
+    // upload, so wrap runStub to cross-check the chip id first. Remove when
+    // espressif/esptool-js#248 lands.
+    const runStub = loader.runStub.bind(loader);
+    loader.runStub = async () => {
+      await guardMisdetectedP4(loader);
+      return runStub();
+    };
     const chipName = await loader.main();
     return { chipName, port, transport, loader };
   } catch (error) {
