@@ -31,6 +31,8 @@ export interface ComponentLogDocLink {
   component: string;
   /** Catalog display name ("Ethernet Component") — the popover title. */
   displayName: string;
+  /** First sentence of the catalog description — the popover body. */
+  description: string;
   /** Char range of the tag token within ``clean``. */
   tagRange: { start: number; end: number };
   /** The ANSI-stripped line ``tagRange`` indexes into. */
@@ -175,6 +177,7 @@ export function resolveLogDocLink(
           body: "component",
           component: slug,
           displayName: entry.name,
+          description: entry.description,
           tagRange: { start: parsed.tagStart, end: parsed.tagEnd },
           clean,
         };

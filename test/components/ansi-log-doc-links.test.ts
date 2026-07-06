@@ -7,7 +7,11 @@ import { ESPHomeAnsiLog } from "../../src/components/ansi-log.js";
 import { mount } from "../_dom.js";
 
 const DOCS = {
-  ethernet: { url: "https://esphome.io/components/ethernet", name: "Ethernet Component" },
+  ethernet: {
+    url: "https://esphome.io/components/ethernet",
+    name: "Ethernet Component",
+    description: "This ESPHome component enables wired Ethernet connections.",
+  },
 };
 
 const BOOTLOADER =
@@ -65,7 +69,11 @@ describe("ansi-log doc-link annotations", () => {
     (
       both as unknown as { _integrationDocs: Record<string, IntegrationDoc> }
     )._integrationDocs = {
-      esp8266: { url: "https://esphome.io/components/esp8266", name: "ESP8266 Platform" },
+      esp8266: {
+        url: "https://esphome.io/components/esp8266",
+        name: "ESP8266 Platform",
+        description: "",
+      },
     };
     await mount(both);
     const doc = root(both).querySelector(".log-line--doc")!;

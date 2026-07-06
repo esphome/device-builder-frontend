@@ -1463,9 +1463,17 @@ export class ESPHomeAPI {
       if (typeof key !== "string" || value === null || typeof value !== "object") {
         continue;
       }
-      const { url, name } = value as { url?: unknown; name?: unknown };
+      const { url, name, description } = value as {
+        url?: unknown;
+        name?: unknown;
+        description?: unknown;
+      };
       if (typeof url === "string" && url && typeof name === "string" && name) {
-        result[key] = { url, name };
+        result[key] = {
+          url,
+          name,
+          description: typeof description === "string" ? description : "",
+        };
       }
     }
     return result;

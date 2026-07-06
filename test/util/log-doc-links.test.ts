@@ -6,11 +6,26 @@ import {
   resolveLogDocLink,
 } from "../../src/util/log-doc-links.js";
 
+const ETH_DESC =
+  "This ESPHome component enables wired Ethernet connections for ESP32 and RP2040 boards.";
+
 const DOCS = {
-  ethernet: { url: "https://esphome.io/components/ethernet", name: "Ethernet Component" },
-  i2c: { url: "https://esphome.io/components/i2c", name: "I2C Bus" },
-  wifi: { url: "https://esphome.io/components/wifi", name: "WiFi Component" },
-  sensor: { url: "https://esphome.io/components/sensor", name: "sensor" },
+  ethernet: {
+    url: "https://esphome.io/components/ethernet",
+    name: "Ethernet Component",
+    description: ETH_DESC,
+  },
+  i2c: { url: "https://esphome.io/components/i2c", name: "I2C Bus", description: "" },
+  wifi: {
+    url: "https://esphome.io/components/wifi",
+    name: "WiFi Component",
+    description: "",
+  },
+  sensor: {
+    url: "https://esphome.io/components/sensor",
+    name: "sensor",
+    description: "",
+  },
 };
 
 function expectComponent(links: LogDocLinks | undefined): ComponentLogDocLink {
@@ -87,7 +102,11 @@ describe("resolveLogDocLink — actionable", () => {
     const line =
       "[09:28:39.132][E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***";
     const links = resolveLogDocLink(line, {
-      esp8266: { url: "https://esphome.io/components/esp8266", name: "ESP8266 Platform" },
+      esp8266: {
+        url: "https://esphome.io/components/esp8266",
+        name: "ESP8266 Platform",
+        description: "",
+      },
     });
     expect(links?.actionable?.url).toBe("https://esphome.io/guides/troubleshooting/");
     expect(links?.component?.url).toBe("https://esphome.io/components/esp8266");
@@ -109,6 +128,7 @@ describe("resolveLogDocLink — component", () => {
     const link = expectComponent(links);
     expect(link.url).toBe(DOCS.ethernet.url);
     expect(link.displayName).toBe("Ethernet Component");
+    expect(link.description).toBe(ETH_DESC);
     expect(link.component).toBe("ethernet");
     expect(link.clean).toBe(line);
     const { start, end } = link.tagRange;
@@ -130,10 +150,15 @@ describe("resolveLogDocLink — component", () => {
     const line = "[13:22:07][C][esphome.ota:108]: Over-The-Air updates:";
     const link = expectComponent(
       resolveLogDocLink(line, {
-        esphome: { url: "https://esphome.io/components/esphome", name: "ESPHome Core" },
+        esphome: {
+          url: "https://esphome.io/components/esphome",
+          name: "ESPHome Core",
+          description: "",
+        },
         "esphome.ota": {
           url: "https://esphome.io/components/ota/esphome",
           name: "ESPHome OTA Platform",
+          description: "",
         },
       })
     );
@@ -183,11 +208,17 @@ describe("resolveLogDocLink — misses and safety", () => {
   it("rejects an unsafe (non-https / off-host) docs URL from the map", () => {
     const line = "[13:22:07][C][evil:1]: hi";
     expect(
-      resolveLogDocLink(line, { evil: { url: "javascript:alert(1)", name: "evil" } })
+      resolveLogDocLink(line, {
+        evil: { url: "javascript:alert(1)", name: "evil", description: "" },
+      })
     ).toBeUndefined();
     expect(
       resolveLogDocLink(line, {
-        evil: { url: "https://evil.example.com/components/evil", name: "evil" },
+        evil: {
+          url: "https://evil.example.com/components/evil",
+          name: "evil",
+          description: "",
+        },
       })
     ).toBeUndefined();
   });
@@ -196,7 +227,11 @@ describe("resolveLogDocLink — misses and safety", () => {
     const line =
       "[13:22:07][W][app:193]: Bootloader too old for OTA rollback. Flash via USB once";
     const links = resolveLogDocLink(line, {
-      app: { url: "https://esphome.io/components/app", name: "Native API Something" },
+      app: {
+        url: "https://esphome.io/components/app",
+        name: "Native API Something",
+        description: "",
+      },
     });
     expect(links?.actionable?.body).toBe("bootloader");
     expect(links?.component?.url).toBe("https://esphome.io/components/app");

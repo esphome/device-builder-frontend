@@ -140,9 +140,13 @@ export function docPopoverText(
 ): LogDocPopoverText {
   const linkLabel = localize("dashboard.logs_doc_view");
   if (link.kind === "component") {
-    // The catalog display name is the headline ("Ethernet Component");
-    // no body — the name plus the docs link say everything.
-    return { heading: link.displayName || link.component, body: "", linkLabel };
+    // Catalog display name as the headline, catalog description as the
+    // body — the same copy the editor's component panel leads with.
+    return {
+      heading: link.displayName || link.component,
+      body: link.description,
+      linkLabel,
+    };
   }
   const keys = CURATED_COPY[link.body];
   return { heading: localize(keys.title), body: localize(keys.body), linkLabel };
