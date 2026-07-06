@@ -4,9 +4,28 @@
  * Renders log lines with ANSI color codes converted to styled HTML spans.
  * Supports auto-scrolling to the bottom as new lines arrive.
  */
-import { LitElement, css, html, nothing } from "lit";
+import { consume } from "@lit/context";
+import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import type { LocalizeFunc } from "../common/localize.js";
+import { integrationDocsContext, localizeContext } from "../context/index.js";
 import { ansiLogThemes } from "../styles/ansi-log/index.js";
+import {
+  type LogDocLink,
+  resolveLogDocLink,
+  stripLogAnsi,
+} from "../util/log-doc-links.js";
+import {
+  type AnsiSpan,
+  docPopoverText,
+  logDocLinkStyles,
+  renderActionableLine,
+  renderComponentLine,
+  renderSpanChildren,
+} from "./ansi-log-render.js";
+import type { ESPHomeLogDocPopover } from "./log-doc-popover.js";
+
+import "./log-doc-popover.js";
 
 /**
  * ANSI 4-bit colour palette as CSS variable references. The
@@ -60,14 +79,6 @@ const ANSI_BG_COLORS: Record<number, string> = {
   106: "var(--ansi-bg-106)",
   107: "var(--ansi-bg-107)",
 };
-
-interface AnsiSpan {
-  text: string;
-  color?: string;
-  bgColor?: string;
-  bold?: boolean;
-  dim?: boolean;
-}
 
 /**
  * ESPHome log level colors.
@@ -269,8 +280,21 @@ export class ESPHomeAnsiLog extends LitElement {
   @state()
   private _isUserScrolled = false;
 
+  // Backend component-name → esphome.io docs URL map; drives the per-line
+  // component links. Defaults empty when no provider (isolated use / tests).
+  @consume({ context: integrationDocsContext, subscribe: true })
+  @state()
+  private _integrationDocs: Record<string, string> = {};
+
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
   @query(".log-container")
   private _container!: HTMLDivElement;
+
+  @query("esphome-log-doc-popover")
+  private _docPopover?: ESPHomeLogDocPopover;
 
   static styles = [
     /* Theme-aware ANSI palette + log surface variables. Each theme
@@ -343,6 +367,7 @@ export class ESPHomeAnsiLog extends LitElement {
         opacity: 0.6;
       }
     `,
+    logDocLinkStyles,
   ];
 
   protected updated(changedProperties: Map<string, unknown>) {
@@ -367,50 +392,70 @@ export class ESPHomeAnsiLog extends LitElement {
             : visual.map((line) => this._renderLine(line, state))
         }
       </div>
+      <esphome-log-doc-popover></esphome-log-doc-popover>
     `;
   }
 
   private _renderLine(line: string, state: AnsiState) {
     const spans = parseAnsiLine(line, state);
     const hasAnsiColor = spans.some((s) => s.color || s.bgColor);
+    const link = resolveLogDocLink(line, this._integrationDocs);
 
-    // If no ANSI colors, try ESPHome log-level colorization
+    // A component line is rebuilt from clean text so the [tag:line] token
+    // can be wrapped; ESPHome colours the whole record by level, so the
+    // single level colour reproduces the line's appearance.
+    if (link?.kind === "component" && link.tagRange) {
+      const clean = stripLogAnsi(line);
+      const levelColor = detectLogLevelColor(clean);
+      const colorStyle = levelColor ? `color:${levelColor}` : "";
+      return renderComponentLine(clean, colorStyle, link, this._localize, this._openDoc);
+    }
+
+    // Normal content — fast path (level-coloured or plain string) or the
+    // ANSI span children. ``inner`` feeds both the plain and annotated shapes.
+    let inner: unknown;
+    let colorStyle = "";
     if (!hasAnsiColor) {
       const levelColor = detectLogLevelColor(line);
       if (levelColor) {
-        return html`<div class="log-line" style="color:${levelColor}">${line}</div>`;
+        colorStyle = `color:${levelColor}`;
+        inner = line;
       }
     }
+    if (inner === undefined) inner = renderSpanChildren(spans);
 
-    // The ``<div class="log-line">`` opening tag, the ``${spans.map(...)}``
-    // children, and the closing ``</div>`` MUST stay on one logical line:
-    // ``.log-line`` has ``white-space: pre-wrap`` (preserves runs of
-    // newlines and leading spaces in the log text), so inter-tag
-    // whitespace from a multi-line template literal renders as a
-    // visible blank row + leading-space indent on every log line.
-    // Prettier reformatting will silently re-introduce the bug — keep
-    // the prettier-ignore directive here. The same shape applies to
-    // the per-span ``<span ...>`` template below.
+    if (link?.kind === "actionable") {
+      return renderActionableLine(inner, colorStyle, link, this._localize, this._openDoc);
+    }
+
+    // The ``<div class="log-line">`` opening tag, the children, and the
+    // closing ``</div>`` MUST stay on one logical line: ``.log-line`` has
+    // ``white-space: pre-wrap`` (preserves runs of newlines and leading
+    // spaces in the log text), so inter-tag whitespace from a multi-line
+    // template literal renders as a visible blank row + leading-space indent
+    // on every log line. Prettier reformatting will silently re-introduce the
+    // bug — keep the prettier-ignore directive here.
     /* prettier-ignore */
-    const children = spans.map((span) => {
-      const style = [
-        span.color ? `color:${span.color}` : "",
-        span.bgColor ? `background:${span.bgColor}` : "",
-      ]
-        .filter(Boolean)
-        .join(";");
-      const classes = [span.bold ? "bold" : "", span.dim ? "dim" : ""]
-        .filter(Boolean)
-        .join(" ");
-      if (style || classes) {
-        // prettier-ignore
-        return html`<span class=${classes || nothing} style=${style || nothing}>${span.text}</span>`;
-      }
-      return span.text;
-    });
-    // prettier-ignore
-    return html`<div class="log-line">${children}</div>`;
+    return colorStyle
+      ? html`<div class="log-line" style=${colorStyle}>${inner}</div>`
+      : html`<div class="log-line">${inner}</div>`;
   }
+
+  // Populate the shared popover from the clicked line's link and anchor it to
+  // the trigger. stopPropagation so the log-container's own handlers (and the
+  // popover's outside-click dismissal) don't treat this as a dismiss.
+  private _openDoc = (e: MouseEvent, link: LogDocLink) => {
+    e.stopPropagation();
+    const pop = this._docPopover;
+    const target = e.currentTarget;
+    if (!pop || !(target instanceof HTMLElement)) return;
+    const text = docPopoverText(link, this._localize);
+    pop.heading = text.heading;
+    pop.body = text.body;
+    pop.url = link.url;
+    pop.linkLabel = text.linkLabel;
+    pop.showAt(target);
+  };
 
   private _ignoreNextScroll = false;
 
@@ -420,6 +465,9 @@ export class ESPHomeAnsiLog extends LitElement {
       this._ignoreNextScroll = false;
       return;
     }
+    // A user scroll moves lines out from under an open popover; close it so it
+    // can't hang over an unrelated line. Auto-scroll bails above via the flag.
+    this._docPopover?.hide();
     const { scrollTop, scrollHeight, clientHeight } = this._container;
     this._isUserScrolled = scrollHeight - scrollTop - clientHeight > 40;
   }

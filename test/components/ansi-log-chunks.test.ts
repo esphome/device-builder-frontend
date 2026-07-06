@@ -1,3 +1,8 @@
+/**
+ * @vitest-environment happy-dom
+ */
+// ansi-log transitively imports the wa-icon component (for the doc-link
+// annotations), which needs DOM globals (CSSStyleSheet) at module load.
 import { describe, expect, it } from "vitest";
 import { chunksToVisualLines } from "../../src/components/ansi-log.js";
 

@@ -1,6 +1,25 @@
 /** Origin of the ESPHome documentation site; build doc links from this. */
 export const ESPHOME_DOCS_BASE = "https://esphome.io";
 
+/** Hostname every rendered docs anchor is bound to. */
+export const ESPHOME_DOCS_HOST = "esphome.io";
+
+/**
+ * Whitelist a docs URL to ``https://esphome.io``.
+ *
+ * Backend-populated maps and raw log text both feed rendered anchors; a
+ * ``javascript:`` / ``data:`` scheme would run code on click, so bound every
+ * link to the canonical host before rendering it.
+ */
+export function isSafeDocsUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname === ESPHOME_DOCS_HOST;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Secure-context Web Serial flasher the dashboard hands firmware to over
  * postMessage (the HA add-on is plain http, so it can't run Web Serial itself).

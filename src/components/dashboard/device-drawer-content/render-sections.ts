@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice } from "../../../api/types/devices.js";
+import { isSafeDocsUrl } from "../../../common/docs.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { mdnsOnline } from "../../../util/device-sync.js";
 import {
@@ -11,18 +12,6 @@ import { splitIntegrations } from "../../../util/integration-split.js";
 import { buildWebUiUrlForHost } from "../../../util/web-ui-url.js";
 import type { ESPHomeDeviceDrawerContent } from "../device-drawer-content.js";
 import { renderAddressValue } from "../device-drawer-render.js";
-
-// Whitelist docs URLs to https://esphome.io. The map is backend-populated;
-// a compromised entry interpolating a javascript: / data: scheme would run
-// code on click, so bound the rendered anchors to the canonical host.
-function isSafeDocsUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.hostname === "esphome.io";
-  } catch {
-    return false;
-  }
-}
 
 export function renderRow(
   icon: string,
