@@ -200,7 +200,7 @@ export function renderSpanChildrenWithTagLink(
 export function renderActionableLine(
   inner: unknown,
   colorStyle: string,
-  link: LogDocLink,
+  link: ActionableLogDocLink,
   localize: LocalizeFunc,
   onOpen: OpenDocHandler
 ): TemplateResult {
