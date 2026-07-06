@@ -19,7 +19,18 @@ export interface ActionableLogDocLink {
   /** Canonical esphome.io URL, already whitelisted. */
   url: string;
   /** Discriminates the popover copy the renderer localizes. */
-  body: "bootloader" | "chip_revision" | "crash" | "embedded" | "sram1_as_iram";
+  body:
+    | "ble_slots"
+    | "boot_loop"
+    | "bootloader"
+    | "chip_revision"
+    | "crash"
+    | "embedded"
+    | "nvs"
+    | "ota_rollback"
+    | "slow_component"
+    | "sram1_as_iram"
+    | "wifi_reconnect";
 }
 
 export interface ComponentLogDocLink {
@@ -68,6 +79,7 @@ interface ActionableEntry {
 }
 
 const ESP32_ADVANCED_URL = "https://esphome.io/components/esp32/#advanced-configuration";
+const TROUBLESHOOTING_URL = "https://esphome.io/guides/troubleshooting/";
 
 // Verified live against esphome.io (200, anchor present, no redirect).
 // Keep this list small and URL-verified; most lines resolve through the
@@ -99,8 +111,53 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     // One crash handler per platform, each logging under its own tag.
     tags: ["esp32.crash", "esp8266", "rp2040.crash"],
     pattern: /CRASH DETECTED ON PREVIOUS BOOT/,
-    url: "https://esphome.io/guides/troubleshooting/",
+    url: TROUBLESHOOTING_URL,
     body: "crash",
+  },
+  {
+    // core/component.cpp — the ``component`` tag has no docs page, so
+    // these lines get no link at all without this entry.
+    level: "W",
+    tags: ["component"],
+    pattern: /took a long time for an operation/,
+    url: `${TROUBLESHOOTING_URL}#took-a-long-time-for-an-operation-warning`,
+    body: "slow_component",
+  },
+  {
+    // The W level excludes the benign INFO "Station Roaming" variant.
+    level: "W",
+    tags: ["wifi"],
+    pattern: /Connection lost; reconnecting|Disconnected ssid=/,
+    url: "https://esphome.io/guides/faq/#my-node-keeps-reconnecting-randomly",
+    body: "wifi_reconnect",
+  },
+  {
+    level: "W",
+    tags: ["safe_mode"],
+    pattern: /Last reset too quick/,
+    url: TROUBLESHOOTING_URL,
+    body: "boot_loop",
+  },
+  {
+    level: "W",
+    tags: ["safe_mode"],
+    pattern: /OTA rollback detected/,
+    url: TROUBLESHOOTING_URL,
+    body: "ota_rollback",
+  },
+  {
+    level: "W",
+    tags: ["preferences"],
+    pattern: /nvs_open failed/,
+    url: "https://esphome.io/guides/faq/#component-states-not-restored-after-reboot",
+    body: "nvs",
+  },
+  {
+    level: "W",
+    tags: ["bluetooth_proxy"],
+    pattern: /No free connections available/,
+    url: "https://esphome.io/components/bluetooth_proxy/#how-active-connections-work",
+    body: "ble_slots",
   },
 ] as const;
 

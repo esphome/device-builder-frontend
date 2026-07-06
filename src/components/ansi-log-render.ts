@@ -136,6 +136,30 @@ const CURATED_COPY: Record<
     title: "dashboard.logs_doc_embedded_title",
     body: "dashboard.logs_doc_embedded_body",
   },
+  slow_component: {
+    title: "dashboard.logs_doc_slow_component_title",
+    body: "dashboard.logs_doc_slow_component_body",
+  },
+  wifi_reconnect: {
+    title: "dashboard.logs_doc_wifi_reconnect_title",
+    body: "dashboard.logs_doc_wifi_reconnect_body",
+  },
+  boot_loop: {
+    title: "dashboard.logs_doc_boot_loop_title",
+    body: "dashboard.logs_doc_boot_loop_body",
+  },
+  ota_rollback: {
+    title: "dashboard.logs_doc_ota_rollback_title",
+    body: "dashboard.logs_doc_ota_rollback_body",
+  },
+  nvs: {
+    title: "dashboard.logs_doc_nvs_title",
+    body: "dashboard.logs_doc_nvs_body",
+  },
+  ble_slots: {
+    title: "dashboard.logs_doc_ble_slots_title",
+    body: "dashboard.logs_doc_ble_slots_body",
+  },
 };
 
 export function docPopoverText(

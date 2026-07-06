@@ -114,6 +114,61 @@ describe("resolveLogDocLink — actionable", () => {
     expect(links?.component?.component).toBe("esp8266");
   });
 
+  it.each([
+    [
+      "slow_component",
+      "[10:24:27.031][W][component:473]: sensor.dht took a long time for an operation (67 ms), max is 30 ms",
+      "https://esphome.io/guides/troubleshooting/#took-a-long-time-for-an-operation-warning",
+    ],
+    [
+      "wifi_reconnect",
+      "[10:24:27.031][W][wifi:810]: Connection lost; reconnecting",
+      "https://esphome.io/guides/faq/#my-node-keeps-reconnecting-randomly",
+    ],
+    [
+      "wifi_reconnect",
+      "[10:24:27.031][W][wifi:852]: Disconnected ssid='mynet' bssid=aa:bb reason='Beacon Timeout'",
+      "https://esphome.io/guides/faq/#my-node-keeps-reconnecting-randomly",
+    ],
+    [
+      "boot_loop",
+      "[10:24:27.031][W][safe_mode:085]: Last reset too quick; invoke in 5 restarts",
+      "https://esphome.io/guides/troubleshooting/",
+    ],
+    [
+      "ota_rollback",
+      "[10:24:27.031][W][safe_mode:094]: OTA rollback detected! Rolled back from partition 'ota_1'",
+      "https://esphome.io/guides/troubleshooting/",
+    ],
+    [
+      "nvs",
+      "[10:24:27.031][W][preferences:100]: nvs_open failed: ESP_ERR_NVS_NOT_INITIALIZED - NVS unavailable",
+      "https://esphome.io/guides/faq/#component-states-not-restored-after-reboot",
+    ],
+    [
+      "ble_slots",
+      "[10:24:27.031][W][bluetooth_proxy:175]: No free connections available",
+      "https://esphome.io/components/bluetooth_proxy/#how-active-connections-work",
+    ],
+  ])("maps the issue-mined %s entry", (body, line, url) => {
+    expect(resolveLogDocLink(line, {})?.actionable).toEqual({
+      kind: "actionable",
+      url,
+      body,
+    });
+  });
+
+  it("does not match the INFO wifi roaming variant", () => {
+    const line =
+      "[10:24:27.031][I][wifi:847]: Disconnected ssid='mynet' reason='Station Roaming'";
+    expect(resolveLogDocLink(line, {})?.actionable).toBeUndefined();
+  });
+
+  it("does not match an ordinary component-tag line", () => {
+    const line = "[10:24:27.031][W][component:200]: some other warning";
+    expect(resolveLogDocLink(line, {})).toBeUndefined();
+  });
+
   it("leaves the crash detail lines (Reason/PC) to the component resolver", () => {
     const line =
       "[09:28:39.132][E][esp8266:186]:   Reason: Soft WDT - Level1Int (exccause=4)";
