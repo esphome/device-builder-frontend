@@ -8,7 +8,7 @@
  * ``user-select: none`` and the tag stays plain text — so a multi-line
  * drag-select still copies clean log text.
  */
-import { mdiInformationOutline } from "@mdi/js";
+import { mdiInformation } from "@mdi/js";
 import { css, html, nothing, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../common/localize.js";
 import type {
@@ -20,14 +20,14 @@ import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
-registerMdiIcons({ "information-outline": mdiInformationOutline });
+registerMdiIcons({ information: mdiInformation });
 
 /** Styles for the annotated line shapes; spread into ansi-log's shadow DOM. */
 export const logDocLinkStyles = css`
-  /* Actionable line: text keeps pre-wrap in its own column so the trailing
-     icon can sit beside it without joining the selectable text. The text
-     column takes only its natural width, so the icon lands right where the
-     message ends — pinned to the far margin it goes unnoticed. */
+  /* Actionable line: text keeps pre-wrap in its own column so the icon can
+     sit in the right margin without joining the selectable text. The icon
+     stays at the fixed right edge so warnings share one scannable column;
+     colour + brightness (below) make it read as part of the line. */
   .log-line--doc {
     display: flex;
     align-items: flex-start;
@@ -35,7 +35,7 @@ export const logDocLinkStyles = css`
   }
 
   .log-line-text {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-width: 0;
     white-space: pre-wrap;
     word-break: break-word;
@@ -54,16 +54,19 @@ export const logDocLinkStyles = css`
     padding: 0;
     border: none;
     background: none;
+    /* Inherits the line's level colour from the container; brightness
+       lifts it above the message text so the fixed right-margin column
+       stays noticeable. */
     color: inherit;
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1;
-    opacity: 0.75;
+    filter: brightness(1.35);
     cursor: pointer;
   }
 
   .log-doc-icon:hover,
   .log-doc-icon:focus-visible {
-    opacity: 1;
+    filter: brightness(1.7);
   }
 
   /* Component tag link stays inline text (still selectable/copyable) so it
@@ -204,7 +207,7 @@ export function renderActionableLine(
   // prettier-ignore
   // Level colour on the container so the icon inherits it too; per-span
   // ANSI styles inside ``inner`` still override.
-  return html`<div class="log-line log-line--doc" style=${colorStyle || nothing}><span class="log-line-text">${inner}</span><button class="log-doc-icon" type="button" title=${title} aria-label=${title} @click=${(e: MouseEvent) => onOpen(e, link)}><wa-icon library="mdi" name="information-outline"></wa-icon></button></div>`;
+  return html`<div class="log-line log-line--doc" style=${colorStyle || nothing}><span class="log-line-text">${inner}</span><button class="log-doc-icon" type="button" title=${title} aria-label=${title} @click=${(e: MouseEvent) => onOpen(e, link)}><wa-icon library="mdi" name="information"></wa-icon></button></div>`;
 }
 
 /** Children of a colour-flat component line: clean text, tag wrapped. */

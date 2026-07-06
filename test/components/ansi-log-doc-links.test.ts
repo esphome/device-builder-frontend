@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { IntegrationDoc } from "../../src/api/types/components.js";
 import { ESPHomeAnsiLog } from "../../src/components/ansi-log.js";
+import { ESPHomeLogParser } from "../../src/util/esphome-log-parser.js";
 import { mount } from "../_dom.js";
 
 const DOCS = {
@@ -111,6 +112,33 @@ describe("ansi-log doc-link annotations", () => {
     )._integrationDocs = DOCS;
     await bare.updateComplete;
     expect(root(bare).querySelector(".log-tag-link")).not.toBeNull();
+  });
+});
+
+describe("ansi-log doc links on the Web Serial pipeline", () => {
+  // Web Serial lines skip the backend: raw UART text runs through
+  // ESPHomeLogParser and gets a second-resolution [HH:MM:SS] stamp
+  // prepended BEFORE the ANSI colour (streamSerialToDialog). Pin that
+  // exact shape so serial sessions keep their links too.
+  it("links the tag on a parser-stamped serial line", async () => {
+    const parser = new ESPHomeLogParser();
+    const uart = "\u001b[0;36m[C][ethernet:495]: Ethernet:\u001b[0m";
+    const stamped = `[11:22:33]${parser.parseLine(uart)}`;
+    const el = await mountLog([stamped]);
+    const line = root(el).querySelector(".log-line")!;
+    expect(line.querySelector<HTMLButtonElement>(".log-tag-link")?.textContent).toBe(
+      "ethernet"
+    );
+    expect(line.textContent).toBe("[11:22:33][C][ethernet:495]: Ethernet:");
+  });
+
+  it("shows the icon on a parser-stamped serial crash banner", async () => {
+    const parser = new ESPHomeLogParser();
+    const uart =
+      "\u001b[0;31m[E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***\u001b[0m";
+    const stamped = `[11:22:33]${parser.parseLine(uart)}`;
+    const el = await mountLog([stamped]);
+    expect(root(el).querySelector(".log-line--doc .log-doc-icon")).not.toBeNull();
   });
 });
 
