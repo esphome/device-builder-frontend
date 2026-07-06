@@ -118,6 +118,10 @@ const CURATED_COPY: Record<
     title: "dashboard.logs_doc_chip_revision_title",
     body: "dashboard.logs_doc_chip_revision_body",
   },
+  crash: {
+    title: "dashboard.logs_doc_crash_title",
+    body: "dashboard.logs_doc_crash_body",
+  },
   embedded: {
     title: "dashboard.logs_doc_embedded_title",
     body: "dashboard.logs_doc_embedded_body",

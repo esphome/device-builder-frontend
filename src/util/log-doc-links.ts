@@ -17,7 +17,7 @@ export interface ActionableLogDocLink {
   /** Canonical esphome.io URL, already whitelisted. */
   url: string;
   /** Discriminates the popover copy the renderer localizes. */
-  body: "bootloader" | "chip_revision" | "embedded";
+  body: "bootloader" | "chip_revision" | "crash" | "embedded";
 }
 
 export interface ComponentLogDocLink {
@@ -45,7 +45,8 @@ export interface ParsedLogLine {
 /** Curated actionable message → verified docs page. */
 interface ActionableEntry {
   level: string;
-  tag: string;
+  /** Emitting log tags, verified against the esphome source. */
+  tags: readonly string[];
   pattern: RegExp;
   url: string;
   body: ActionableLogDocLink["body"];
@@ -57,17 +58,25 @@ interface ActionableEntry {
 const ACTIONABLE: readonly ActionableEntry[] = [
   {
     level: "W",
-    tag: "app",
+    tags: ["app"],
     pattern: /Bootloader too old for OTA rollback/,
     url: "https://esphome.io/components/ota/esphome/#updating-the-bootloader-on-esp32",
     body: "bootloader",
   },
   {
     level: "W",
-    tag: "app",
+    tags: ["app"],
     pattern: /Set minimum_chip_revision/,
     url: "https://esphome.io/components/esp32/#advanced-configuration",
     body: "chip_revision",
+  },
+  {
+    level: "E",
+    // One crash handler per platform, each logging under its own tag.
+    tags: ["esp32.crash", "esp8266", "rp2040.crash"],
+    pattern: /CRASH DETECTED ON PREVIOUS BOOT/,
+    url: "https://esphome.io/guides/troubleshooting/",
+    body: "crash",
   },
 ] as const;
 
@@ -113,7 +122,7 @@ export function resolveLogDocLink(
     for (const entry of ACTIONABLE) {
       if (
         entry.level === parsed.level &&
-        entry.tag === parsed.tag &&
+        entry.tags.includes(parsed.tag) &&
         entry.pattern.test(clean) &&
         isSafeDocsUrl(entry.url)
       ) {

@@ -57,6 +57,8 @@
     "logs_doc_bootloader_body": "Flash this device once over USB to update the bootloader, then OTA rollback works again.",
     "logs_doc_chip_revision_title": "Set minimum_chip_revision",
     "logs_doc_chip_revision_body": "Setting a minimum chip revision lets ESPHome drop older-revision workarounds and shrink the binary.",
+    "logs_doc_crash_title": "Crash detected on previous boot",
+    "logs_doc_crash_body": "The device rebooted after a crash. The troubleshooting guide explains how to read the crash log and find the cause.",
     "logs_source_web_serial": "Web Serial",
     "logs_placeholder": "Waiting for logs…",
     "logs_stop": "Stop",

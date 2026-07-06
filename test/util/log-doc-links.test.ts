@@ -49,6 +49,35 @@ describe("resolveLogDocLink — actionable", () => {
     const line = "[13:22:07][W][ota:099]: See https://esphome.io/components/ota/.";
     expect(resolveLogDocLink(line, {})?.url).toBe("https://esphome.io/components/ota/");
   });
+
+  it.each([
+    ["esp32.crash", "[12:31:55][E][esp32.crash:221]"],
+    ["esp8266", "[09:28:39.132][E][esp8266:171]"],
+    ["rp2040.crash", "[12:31:55][E][rp2040.crash:103]"],
+  ])("maps the %s crash banner to the troubleshooting guide", (_tag, prefix) => {
+    const line = `${prefix}: *** CRASH DETECTED ON PREVIOUS BOOT ***`;
+    expect(resolveLogDocLink(line, {})).toEqual({
+      kind: "actionable",
+      url: "https://esphome.io/guides/troubleshooting/",
+      body: "crash",
+    });
+  });
+
+  it("prefers the crash entry over the platform's own component page", () => {
+    const line =
+      "[09:28:39.132][E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***";
+    const link = resolveLogDocLink(line, {
+      esp8266: "https://esphome.io/components/esp8266",
+    });
+    expect(link?.kind).toBe("actionable");
+    expect(link?.url).toBe("https://esphome.io/guides/troubleshooting/");
+  });
+
+  it("leaves the crash detail lines (Reason/PC) to the component resolver", () => {
+    const line =
+      "[09:28:39.132][E][esp8266:186]:   Reason: Soft WDT - Level1Int (exccause=4)";
+    expect(resolveLogDocLink(line, {})).toBeUndefined();
+  });
 });
 
 describe("resolveLogDocLink — component", () => {
