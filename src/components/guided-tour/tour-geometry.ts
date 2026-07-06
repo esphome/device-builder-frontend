@@ -1,12 +1,3 @@
-/**
- * Pure geometry for the guided-tour coachmark overlay.
- *
- * Given a target's viewport rect, the viewport size, and the preferred bubble
- * side, compute the four dim panels (everything outside the spotlight), the
- * highlight ring, and the clamped tip-bubble position. Kept free of DOM/Lit so
- * it can be unit-tested in isolation. Ported from the design comp's render math.
- */
-
 export interface Rect {
   x: number;
   y: number;
@@ -21,7 +12,6 @@ export interface Viewport {
   h: number;
 }
 
-/** A box positioned by viewport coordinates. */
 export interface Box {
   x: number;
   y: number;
@@ -33,7 +23,6 @@ export interface Ring extends Box {
   radius: number;
 }
 
-/** Bubble anchored by ``left`` plus exactly one of ``top`` / ``bottom``. */
 export interface Bubble {
   left: number;
   top?: number;
@@ -54,7 +43,6 @@ export const BUBBLE_WIDTH = 300;
 export const BUBBLE_GAP = 16;
 const RING_MAX_RADIUS = 14;
 const EDGE_MARGIN = 16;
-/** Keep a top-anchored bubble from being pinned so low its body clips. */
 const BUBBLE_BOTTOM_RESERVE = 200;
 const BUBBLE_HEIGHT_EST = 220;
 
@@ -66,8 +54,6 @@ const SIDE_ORDER: Record<Side, Side[]> = {
 };
 
 export function clamp(value: number, lo: number, hi: number): number {
-  // hi can fall below lo on tiny viewports; bias to lo so the bubble stays on
-  // screen rather than flipping to a negative range.
   return Math.max(lo, Math.min(Math.max(lo, hi), value));
 }
 

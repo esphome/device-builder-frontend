@@ -2,7 +2,6 @@ export const STARTER_DEVICE_NAME = "esphome-starter";
 
 export type TourStepKind = "action" | "info";
 export type TourSide = "top" | "bottom" | "left" | "right";
-/** Which route the step's anchor lives on. ``device`` ⇒ ``/device/:id``. */
 export type TourRoute = "dashboard" | "device";
 
 export interface TourStep {

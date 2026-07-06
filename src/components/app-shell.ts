@@ -496,9 +496,6 @@ export class ESPHomeApp extends LitElement {
   _onOnboardingAcknowledged = () => {
     this._onboardingShouldShow = false;
     void loadOnboardingState(this);
-    // The wizard persists experience / remote-compute before acknowledging;
-    // refresh prefs so the contexts (and the gated UI) reflect the picks, then
-    // offer the guided tour to a genuine new user who can create devices.
     void loadPreferences(this).then(() => this._maybeOfferTour());
   };
 
@@ -508,8 +505,6 @@ export class ESPHomeApp extends LitElement {
     void navigate("/?tourStep=1");
   }
 
-  // Kebab "Take a tour": start the guided tour directly so a returning user can
-  // run the full flow again.
   private _onOpenGuidedTour = () => {
     this._guidedTour?.start();
   };

@@ -31,7 +31,6 @@ export class ESPHomeGuidedTour extends LitElement {
   @query(".tour-popover") private _popover?: HTMLElement;
   @query(".btn-skip") private _skipButton?: HTMLElement;
 
-  /** Live registry of anchor id → element, fed by ``TOUR_ANCHOR_EVENT``. */
   private readonly _anchors = new Map<string, Element>();
 
   private _clickTargets: Element[] = [];
@@ -283,14 +282,16 @@ export class ESPHomeGuidedTour extends LitElement {
   private _consumeTourStepParam(): void {
     const params = new URLSearchParams(window.location.search);
     const raw = params.get("tourStep");
+
     if (raw === null) return;
-    // Strip it regardless of validity so a stale value can't wedge in the URL.
+
     params.delete("tourStep");
     const query = params.toString();
     const cleaned =
       window.location.pathname + (query ? `?${query}` : "") + window.location.hash;
     window.history.replaceState(window.history.state, "", cleaned);
     const n = Number(raw);
+
     if (Number.isInteger(n) && n >= 1 && n <= TOUR_STEPS.length) this.start(n - 1);
   }
 
@@ -332,16 +333,14 @@ export class ESPHomeGuidedTour extends LitElement {
 
   private _onKeydown = (event: KeyboardEvent): void => {
     if (!this._active) return;
+
     if (event.key === "Escape") {
-      // Universal exit: skip the tour without also closing whatever modal sits
-      // beneath (the user can press Escape again for that).
       event.preventDefault();
       event.stopPropagation();
       this._skip();
       return;
     }
-    // Enter / → advance only the Next-button (info) steps; action steps own
-    // the keyboard so typing in the wizard's name field isn't hijacked.
+
     if (
       this._step.kind === "info" &&
       (event.key === "Enter" || event.key === "ArrowRight")
@@ -418,8 +417,6 @@ export class ESPHomeGuidedTour extends LitElement {
     this._teardownClicks();
     this._stepIndex = index;
     this._frame = null;
-    // The final dashboard steps follow the editor steps; pull back to the
-    // dashboard ourselves (the create flow navigated us into the editor).
     if (this._step.route === "dashboard" && this._onDeviceRoute()) {
       void navigate("/");
     }
@@ -452,8 +449,6 @@ export class ESPHomeGuidedTour extends LitElement {
     );
   }
 
-  /** Measure on the next frame, after navigation / dialog renders settle.
-   *  In-dialog steps re-assert the popover above the modal first. */
   private _scheduleMeasure(): void {
     requestAnimationFrame(() => {
       if (!this._active) return;
@@ -472,9 +467,7 @@ export class ESPHomeGuidedTour extends LitElement {
     if (!el.matches(":popover-open")) {
       try {
         el.showPopover();
-      } catch {
-        // Already shown / not yet upgraded — harmless.
-      }
+      } catch {}
     }
   }
 
@@ -483,16 +476,12 @@ export class ESPHomeGuidedTour extends LitElement {
     if (el?.matches(":popover-open")) el.hidePopover();
   }
 
-  // Re-add to the top layer so the popover paints above a modal dialog opened
-  // after it (top-layer order = show order).
   private _bouncePopover(): void {
     this._hidePopover();
     this._showPopover();
   }
 
   protected updated(): void {
-    // Keep the popover's top-layer presence in sync with active state for the
-    // page-level (non-dialog) steps; dialog steps bounce explicitly.
     if (this._active) {
       if (!this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) this._showPopover();
     } else {
@@ -501,8 +490,6 @@ export class ESPHomeGuidedTour extends LitElement {
   }
 
   protected render() {
-    // The popover element is always present so the query ref resolves; its
-    // spotlight content renders only while a measured step is active.
     return html`<div class="tour-popover" popover="manual">
       ${this._active && this._frame ? this._renderSpotlight(this._frame) : nothing}
     </div>`;
