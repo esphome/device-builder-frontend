@@ -124,10 +124,12 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     body: "slow_component",
   },
   {
-    // The W level excludes the benign INFO "Station Roaming" variant.
+    // The W level excludes the benign "Station Roaming" variant (emitted
+    // at INFO with an early return in wifi_component_esp_idf.cpp); the
+    // lookahead keeps it excluded even if that level ever changes.
     level: "W",
     tags: ["wifi"],
-    pattern: /Connection lost; reconnecting|Disconnected ssid=/,
+    pattern: /Connection lost; reconnecting|Disconnected ssid=(?!.*Station Roaming)/,
     url: "https://esphome.io/guides/faq/#my-node-keeps-reconnecting-randomly",
     body: "wifi_reconnect",
   },

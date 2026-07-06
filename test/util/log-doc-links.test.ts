@@ -164,6 +164,12 @@ describe("resolveLogDocLink — actionable", () => {
     expect(resolveLogDocLink(line, {})?.actionable).toBeUndefined();
   });
 
+  it("excludes roaming even if esphome ever logs it at W", () => {
+    const line =
+      "[10:24:27.031][W][wifi:847]: Disconnected ssid='mynet' reason='Station Roaming'";
+    expect(resolveLogDocLink(line, {})?.actionable).toBeUndefined();
+  });
+
   it("does not match an ordinary component-tag line", () => {
     const line = "[10:24:27.031][W][component:200]: some other warning";
     expect(resolveLogDocLink(line, {})).toBeUndefined();
