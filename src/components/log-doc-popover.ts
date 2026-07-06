@@ -94,7 +94,11 @@ export class ESPHomeLogDocPopover extends LitElement {
   }
 
   /** Open the popover anchored below (or above) *anchor*. */
-  showAt(anchor: HTMLElement) {
+  async showAt(anchor: HTMLElement) {
+    // The caller assigns heading/body/url right before calling; wait out the
+    // re-render so the measured size reflects the new content — measuring the
+    // previous content under-clamps and the popover can run off-screen.
+    await this.updateComplete;
     const pop = this._pop;
     if (!pop) return;
     // Re-show from a clean state: showPopover throws on an already-open

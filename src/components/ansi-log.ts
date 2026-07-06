@@ -473,7 +473,7 @@ export class ESPHomeAnsiLog extends LitElement {
     pop.body = text.body;
     pop.url = link.url;
     pop.linkLabel = text.linkLabel;
-    pop.showAt(target);
+    void pop.showAt(target);
   };
 
   private _ignoreNextScroll = false;
