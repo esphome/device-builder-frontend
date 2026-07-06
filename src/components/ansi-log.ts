@@ -13,6 +13,7 @@ import { ansiLogThemes } from "../styles/ansi-log/index.js";
 import { ANSI_ESCAPE_RE } from "../util/ansi-escapes.js";
 import {
   type LogDocLink,
+  type LogDocLinks,
   parseLogLine,
   resolveLogDocLink,
 } from "../util/log-doc-links.js";
@@ -21,7 +22,7 @@ import {
   docPopoverText,
   logDocLinkStyles,
   renderActionableLine,
-  renderComponentLine,
+  renderComponentLineChildren,
   renderSpanChildren,
   renderSpanChildrenWithTagLink,
 } from "./ansi-log-render.js";
@@ -277,7 +278,7 @@ export class ESPHomeAnsiLog extends LitElement {
 
   // Doc-link resolutions for the lines rendered last pass; render() swaps in
   // a fresh map each pass so the cache never outgrows the visible buffer.
-  private _docLinkCache = new Map<string, LogDocLink | undefined>();
+  private _docLinkCache = new Map<string, LogDocLinks | undefined>();
 
   static styles = [
     /* Theme-aware ANSI palette + log surface variables. Each theme
@@ -377,7 +378,7 @@ export class ESPHomeAnsiLog extends LitElement {
     // render's cache (or a cold resolve) and the swap below drops entries
     // for lines that scrolled out of the buffer, so the cache stays bounded
     // while streaming re-renders skip the per-line regex resolution.
-    const links = new Map<string, LogDocLink | undefined>();
+    const links = new Map<string, LogDocLinks | undefined>();
     const rows =
       visual.length === 0 && this.placeholder
         ? html`<div class="log-line placeholder">${this.placeholder}</div>`
@@ -392,45 +393,49 @@ export class ESPHomeAnsiLog extends LitElement {
   private _renderLine(
     line: string,
     state: AnsiState,
-    links: Map<string, LogDocLink | undefined>
+    links: Map<string, LogDocLinks | undefined>
   ) {
     const spans = parseAnsiLine(line, state);
     const hasAnsiColor = spans.some((s) => s.color || s.bgColor);
-    const link = this._resolveDocLinkCached(line, links);
+    const resolved = this._resolveDocLinkCached(line, links);
+    const component = resolved?.component;
 
-    if (link?.kind === "component") {
-      // ANSI-styled lines wrap the tag at the span level so per-span colours
-      // (and bold/dim) survive; style-free lines rebuild from stripped text.
-      if (hasAnsiColor || spans.some((s) => s.bold || s.dim)) {
-        const children = renderSpanChildrenWithTagLink(
-          spans,
-          link,
-          this._localize,
-          this._openDoc
-        );
-        // prettier-ignore
-        return html`<div class="log-line">${children}</div>`;
-      }
-      const levelColor = detectLogLevelColor(link.clean);
-      const colorStyle = levelColor ? `color:${levelColor}` : "";
-      return renderComponentLine(link, colorStyle, this._localize, this._openDoc);
-    }
-
-    // Normal content — fast path (level-coloured or plain string) or the
-    // ANSI span children. ``inner`` feeds both the plain and annotated shapes.
+    // Line content first — the two facets are independent, so a curated
+    // warning on a catalogued tag gets its tag wrapped AND the icon below.
     let inner: unknown;
     let colorStyle = "";
-    if (!hasAnsiColor) {
-      const levelColor = detectLogLevelColor(line);
-      if (levelColor) {
-        colorStyle = `color:${levelColor}`;
-        inner = line;
+    if (component && (hasAnsiColor || spans.some((s) => s.bold || s.dim))) {
+      // ANSI-styled lines wrap the tag at the span level so per-span
+      // colours (and bold/dim) survive.
+      inner = renderSpanChildrenWithTagLink(
+        spans,
+        component,
+        this._localize,
+        this._openDoc
+      );
+    } else if (component) {
+      const levelColor = detectLogLevelColor(component.clean);
+      colorStyle = levelColor ? `color:${levelColor}` : "";
+      inner = renderComponentLineChildren(component, this._localize, this._openDoc);
+    } else {
+      if (!hasAnsiColor) {
+        const levelColor = detectLogLevelColor(line);
+        if (levelColor) {
+          colorStyle = `color:${levelColor}`;
+          inner = line;
+        }
       }
+      if (inner === undefined) inner = renderSpanChildren(spans);
     }
-    if (inner === undefined) inner = renderSpanChildren(spans);
 
-    if (link?.kind === "actionable") {
-      return renderActionableLine(inner, colorStyle, link, this._localize, this._openDoc);
+    if (resolved?.actionable) {
+      return renderActionableLine(
+        inner,
+        colorStyle,
+        resolved.actionable,
+        this._localize,
+        this._openDoc
+      );
     }
 
     // The ``<div class="log-line">`` opening tag, the children, and the
@@ -450,8 +455,8 @@ export class ESPHomeAnsiLog extends LitElement {
   // the regex resolve, recording the result in this render's map either way.
   private _resolveDocLinkCached(
     line: string,
-    links: Map<string, LogDocLink | undefined>
-  ): LogDocLink | undefined {
+    links: Map<string, LogDocLinks | undefined>
+  ): LogDocLinks | undefined {
     if (links.has(line)) return links.get(line);
     const link = this._docLinkCache.has(line)
       ? this._docLinkCache.get(line)

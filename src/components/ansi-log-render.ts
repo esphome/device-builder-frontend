@@ -197,20 +197,19 @@ export function renderActionableLine(
   return html`<div class="log-line log-line--doc"><span class="log-line-text" style=${colorStyle || nothing}>${inner}</span><button class="log-doc-icon" type="button" title=${title} aria-label=${title} @click=${(e: MouseEvent) => onOpen(e, link)}><wa-icon library="mdi" name="information-outline"></wa-icon></button></div>`;
 }
 
-/** A colour-flat component line: the [tag:line] token becomes a quiet link. */
-export function renderComponentLine(
+/** Children of a colour-flat component line: clean text, tag wrapped. */
+export function renderComponentLineChildren(
   link: ComponentLogDocLink,
-  colorStyle: string,
   localize: LocalizeFunc,
   onOpen: OpenDocHandler
-): TemplateResult {
+): (TemplateResult | string)[] {
   const { start, end } = link.tagRange;
   const title = componentLinkTitle(link, localize);
-  const before = link.clean.slice(0, start);
-  const tag = link.clean.slice(start, end);
-  const after = link.clean.slice(end);
-  // prettier-ignore
-  return html`<div class="log-line" style=${colorStyle || nothing}>${before}${tagLinkButton(tag, title, link, onOpen)}${after}</div>`;
+  return [
+    link.clean.slice(0, start),
+    tagLinkButton(link.clean.slice(start, end), title, link, onOpen),
+    link.clean.slice(end),
+  ];
 }
 
 function componentLinkTitle(link: ComponentLogDocLink, localize: LocalizeFunc): string {

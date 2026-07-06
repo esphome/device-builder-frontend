@@ -1,11 +1,12 @@
 /**
- * Resolve a single device-log line to an ESPHome documentation link.
+ * Resolve a single device-log line to its ESPHome documentation links.
  *
- * Two kinds are produced. ``actionable`` covers curated
- * warnings/errors whose fix lives at a specific page (or that already
- * embed an ``esphome.io`` URL in their text); ``component`` maps the
- * ``[tag:line]`` token to that component's ``/components/<slug>/`` page
- * via the backend-populated integration-docs map. Every URL is passed
+ * A line carries up to two independent facets. ``actionable`` covers
+ * curated warnings/errors whose fix lives at a specific page (or that
+ * already embed an ``esphome.io`` URL in their text); ``component``
+ * maps the ``[tag:line]`` token to that component's docs page via the
+ * backend-populated integration-docs map. A crash banner has both — the
+ * icon links the fix, the tag links the platform. Every URL is passed
  * through ``isSafeDocsUrl`` so a compromised map entry or a spoofed
  * inline URL can't render a ``javascript:`` anchor.
  */
@@ -34,6 +35,12 @@ export interface ComponentLogDocLink {
 }
 
 export type LogDocLink = ActionableLogDocLink | ComponentLogDocLink;
+
+/** The independent doc-link facets one log line can carry. */
+export interface LogDocLinks {
+  actionable?: ActionableLogDocLink;
+  component?: ComponentLogDocLink;
+}
 
 export interface ParsedLogLine {
   level: string;
@@ -106,18 +113,20 @@ export function parseLogLine(clean: string): ParsedLogLine | undefined {
 }
 
 /**
- * Resolve *line* to a documentation link, or ``undefined`` when none
- * applies. *integrationDocs* is the backend ``components/get_integration_docs``
- * map (component name → esphome.io URL); a present entry guarantees the page
- * exists.
+ * Resolve *line* to its documentation links, or ``undefined`` when none
+ * apply. The two facets are independent — a curated warning on a
+ * catalogued tag carries both. *integrationDocs* is the backend
+ * ``components/get_integration_docs`` map (component name → esphome.io
+ * URL); a present entry guarantees the page exists.
  */
 export function resolveLogDocLink(
   line: string,
   integrationDocs: Record<string, string>
-): LogDocLink | undefined {
+): LogDocLinks | undefined {
   const clean = stripAnsi(line);
   const parsed = parseLogLine(clean);
 
+  let actionable: ActionableLogDocLink | undefined;
   if (parsed) {
     for (const entry of ACTIONABLE) {
       if (
@@ -126,21 +135,24 @@ export function resolveLogDocLink(
         entry.pattern.test(clean) &&
         isSafeDocsUrl(entry.url)
       ) {
-        return { kind: "actionable", url: entry.url, body: entry.body };
+        actionable = { kind: "actionable", url: entry.url, body: entry.body };
+        break;
       }
     }
   }
-
-  const embedded = clean.match(EMBEDDED_URL_RE)?.[0]?.replace(/[.,;:]+$/, "");
-  if (embedded && isSafeDocsUrl(embedded)) {
-    return { kind: "actionable", url: embedded, body: "embedded" };
+  if (!actionable) {
+    const embedded = clean.match(EMBEDDED_URL_RE)?.[0]?.replace(/[.,;:]+$/, "");
+    if (embedded && isSafeDocsUrl(embedded)) {
+      actionable = { kind: "actionable", url: embedded, body: "embedded" };
+    }
   }
 
+  let component: ComponentLogDocLink | undefined;
   if (parsed) {
     for (const slug of tagCandidates(parsed.tag)) {
       const url = integrationDocs[slug];
       if (url && isSafeDocsUrl(url)) {
-        return {
+        component = {
           kind: "component",
           url,
           body: "component",
@@ -148,11 +160,13 @@ export function resolveLogDocLink(
           tagRange: { start: parsed.tagStart, end: parsed.tagEnd },
           clean,
         };
+        break;
       }
     }
   }
 
-  return undefined;
+  if (!actionable && !component) return undefined;
+  return { actionable, component };
 }
 
 /** Ordered component-slug candidates for a log tag. */

@@ -52,6 +52,24 @@ describe("ansi-log doc-link annotations", () => {
     expect(plain!.querySelector(".log-tag-link")).toBeNull();
   });
 
+  it("links the tag and shows the icon on an actionable component line", async () => {
+    const crash =
+      "[10:11:53.745][E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***";
+    const both = new ESPHomeAnsiLog();
+    both.lines = [crash];
+    (both as unknown as { _integrationDocs: Record<string, string> })._integrationDocs = {
+      esp8266: "https://esphome.io/components/esp8266",
+    };
+    await mount(both);
+    const doc = root(both).querySelector(".log-line--doc")!;
+    expect(doc).not.toBeNull();
+    expect(doc.querySelector(".log-doc-icon")).not.toBeNull();
+    expect(doc.querySelector<HTMLButtonElement>(".log-tag-link")?.textContent).toBe(
+      "esp8266"
+    );
+    expect(doc.querySelector(".log-line-text")!.textContent).toBe(crash);
+  });
+
   it("re-resolves cached lines when the integration docs map changes", async () => {
     const bare = new ESPHomeAnsiLog();
     bare.lines = [ETHERNET];
