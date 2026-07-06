@@ -107,10 +107,11 @@ const EMBEDDED_URL_RE = /https:\/\/esphome\.io\/[^\s)"']+/;
 // state_log_formatter) carry a bare entity-domain tag with no line number.
 const LOG_LINE_RE = /^\[\d[\d:.]*\]\[([EWICDV]V?|S)\]\[([^\]]+)\]/;
 
-// Platform-specific tag suffixes (``wifi_esp32`` → ``wifi``). The ``.idf`` /
-// ``.arduino`` framework variants use a dot and are handled by the
-// before-the-dot split instead.
-const PLATFORM_SUFFIX_RE = /_(esp32\w*|esp8266|rp2040|libretiny|lt|host|bk72xx|rtl87xx)$/;
+// Platform-specific tag suffixes, limited to the ones the esphome tree
+// actually emits (``wifi_esp32`` / ``wifi_esp8266`` / ``wifi_lt``). The
+// ``.idf`` / ``.arduino`` framework variants use a dot and are handled by
+// the before-the-dot split instead.
+const PLATFORM_SUFFIX_RE = /_(esp32\w*|esp8266|lt)$/;
 
 /** Parse level + tag (and the tag's char range) from a clean log line. */
 export function parseLogLine(clean: string): ParsedLogLine | undefined {
@@ -162,7 +163,11 @@ export function resolveLogDocLink(
   let component: ComponentLogDocLink | undefined;
   if (parsed) {
     for (const slug of tagCandidates(parsed.tag)) {
-      const entry = integrationDocs[slug];
+      // Own-property check: the tag is untrusted log text, and a bare
+      // index read would surface prototype members for e.g. "constructor".
+      const entry = Object.prototype.hasOwnProperty.call(integrationDocs, slug)
+        ? integrationDocs[slug]
+        : undefined;
       if (entry && isSafeDocsUrl(entry.url)) {
         component = {
           kind: "component",
@@ -179,7 +184,12 @@ export function resolveLogDocLink(
   }
 
   if (!actionable && !component) return undefined;
-  return { actionable, component };
+  // Assign facets conditionally so an absent one is truly absent —
+  // no enumerable ``undefined`` keys to trip deep-equality or ``in``.
+  const links: LogDocLinks = {};
+  if (actionable) links.actionable = actionable;
+  if (component) links.component = component;
+  return links;
 }
 
 /** Ordered component-slug candidates for a log tag. */

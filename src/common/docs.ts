@@ -1,8 +1,9 @@
 /** Origin of the ESPHome documentation site; build doc links from this. */
 export const ESPHOME_DOCS_BASE = "https://esphome.io";
 
-/** Hostname every rendered docs anchor is bound to. */
-export const ESPHOME_DOCS_HOST = "esphome.io";
+// Derived so the allowlist host can't drift from the base URL (same
+// single-source shape as FLASHER_ORIGIN / FLASHER_HOST below).
+export const ESPHOME_DOCS_HOST = new URL(ESPHOME_DOCS_BASE).hostname;
 
 /**
  * Whitelist a docs URL to ``https://esphome.io``.

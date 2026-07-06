@@ -12,6 +12,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { integrationDocsContext, localizeContext } from "../context/index.js";
 import { ansiLogThemes } from "../styles/ansi-log/index.js";
 import { ANSI_ESCAPE_RE } from "../util/ansi-escapes.js";
+import { chunksToVisualLines } from "../util/log-chunks.js";
 import {
   type LogDocLink,
   type LogDocLinks,
@@ -201,43 +202,6 @@ function parseAnsiLine(line: string, state: AnsiState): AnsiSpan[] {
   }
 
   return spans;
-}
-
-/** Strip leading non-SGR ANSI controls and trailing whitespace. */
-export function cleanLine(line: string): string {
-  return line
-    .replace(
-      /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x6c\x6e-\x7e]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
-      ""
-    )
-    .replace(/\s+$/, "");
-}
-
-/**
- * Fold ``\r``- and ``\n``-terminated output chunks into visual lines.
- *
- * An empty-after-cleaning chunk (PIO's ``\x1b[K\r`` between progress
- * ticks, a bare ``\r``) is a no-op that doesn't toggle the overwrite
- * flag; without that, the next real tick pops a non-progress line
- * above the bar instead of starting fresh (#840).
- */
-export function chunksToVisualLines(chunks: string[]): string[] {
-  const visual: string[] = [];
-  let prevEndedInCR = false;
-  for (const chunk of chunks) {
-    const text = cleanLine(chunk.replace(/[\r\n]+$/, ""));
-    const hasContent = text.replace(ANSI_ESCAPE_RE, "").trim().length > 0;
-    if (hasContent) {
-      if (prevEndedInCR && chunk !== "\n" && visual.length > 0) {
-        visual.pop();
-      }
-      visual.push(text);
-      prevEndedInCR = chunk.endsWith("\r");
-    } else if (chunk.endsWith("\n")) {
-      prevEndedInCR = false;
-    }
-  }
-  return visual;
 }
 
 @customElement("esphome-ansi-log")
@@ -486,13 +450,14 @@ export class ESPHomeAnsiLog extends LitElement {
 
   private _handleScroll() {
     if (!this._container) return;
+    // ANY scroll — user or streaming auto-scroll — moves lines out from
+    // under an open popover; close it before the programmatic early-return
+    // so it can't hang fixed over an unrelated line.
+    this._docPopover?.hide();
     if (this._ignoreNextScroll) {
       this._ignoreNextScroll = false;
       return;
     }
-    // A user scroll moves lines out from under an open popover; close it so it
-    // can't hang over an unrelated line. Auto-scroll bails above via the flag.
-    this._docPopover?.hide();
     const { scrollTop, scrollHeight, clientHeight } = this._container;
     this._isUserScrolled = scrollHeight - scrollTop - clientHeight > 40;
   }
