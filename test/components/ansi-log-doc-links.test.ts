@@ -23,15 +23,22 @@ const PLAIN = "[13:22:07][I][main:042]: Some unremarkable status line";
 async function mountLog(lines: string[]): Promise<ESPHomeAnsiLog> {
   const el = new ESPHomeAnsiLog();
   el.lines = lines;
-  (
-    el as unknown as { _integrationDocs: Record<string, IntegrationDoc> }
-  )._integrationDocs = DOCS;
+  internals(el)._integrationDocs = DOCS;
   await mount(el);
   return el;
 }
 
 function root(el: ESPHomeAnsiLog): ShadowRoot {
   return el.shadowRoot!;
+}
+
+// Reach the component's private reactive fields without repeating the
+// unknown-cast at every call site.
+function internals(el: ESPHomeAnsiLog): {
+  _integrationDocs: Record<string, IntegrationDoc>;
+  _localize: (k: string, v?: Record<string, string | number>) => string;
+} {
+  return el as unknown as ReturnType<typeof internals>;
 }
 
 describe("ansi-log doc-link annotations", () => {
@@ -67,9 +74,7 @@ describe("ansi-log doc-link annotations", () => {
       "[10:11:53.745][E][esp8266:171]: *** CRASH DETECTED ON PREVIOUS BOOT ***";
     const both = new ESPHomeAnsiLog();
     both.lines = [crash];
-    (
-      both as unknown as { _integrationDocs: Record<string, IntegrationDoc> }
-    )._integrationDocs = {
+    internals(both)._integrationDocs = {
       esp8266: {
         url: "https://esphome.io/components/esp8266",
         name: "ESP8266 Platform",
@@ -90,11 +95,7 @@ describe("ansi-log doc-link annotations", () => {
     const el = await mountLog([ETHERNET]);
     // The default localize stub echoes the key; substitute one that echoes
     // the interpolation so the displayName plumbing is observable.
-    (
-      el as unknown as {
-        _localize: (k: string, v?: Record<string, string | number>) => string;
-      }
-    )._localize = (key, values) => String(values?.component ?? key);
+    internals(el)._localize = (key, values) => String(values?.component ?? key);
     await el.updateComplete;
     const link = root(el).querySelector<HTMLButtonElement>(".log-tag-link")!;
     // The popover heading uses the same displayName field; the tooltip is
@@ -107,9 +108,7 @@ describe("ansi-log doc-link annotations", () => {
     bare.lines = [ETHERNET];
     await mount(bare);
     expect(root(bare).querySelector(".log-tag-link")).toBeNull();
-    (
-      bare as unknown as { _integrationDocs: Record<string, IntegrationDoc> }
-    )._integrationDocs = DOCS;
+    internals(bare)._integrationDocs = DOCS;
     await bare.updateComplete;
     expect(root(bare).querySelector(".log-tag-link")).not.toBeNull();
   });

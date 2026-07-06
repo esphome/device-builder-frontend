@@ -4,16 +4,11 @@
  * Pure string helpers shared by the log viewer — no DOM or Lit
  * dependency, so consumers (and tests) run under plain node.
  */
-import { stripAnsi } from "./ansi-escapes.js";
+import { ANSI_LEADING_NON_SGR_RE, stripAnsi } from "./ansi-escapes.js";
 
 /** Strip leading non-SGR ANSI controls and trailing whitespace. */
 export function cleanLine(line: string): string {
-  return line
-    .replace(
-      /^(?:(?:\x1b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x6c\x6e-\x7e]|(?:\x1b|\\033)\][^\x07\x1b]*(?:\x07|\x1b\\|\\033\\)|(?:\x1b|\\033)[NOPVWX^_=>])*/g,
-      ""
-    )
-    .replace(/\s+$/, "");
+  return line.replace(ANSI_LEADING_NON_SGR_RE, "").replace(/\s+$/, "");
 }
 
 /**

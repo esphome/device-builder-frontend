@@ -64,6 +64,8 @@ interface ActionableEntry {
   body: ActionableLogDocLink["body"];
 }
 
+const ESP32_ADVANCED_URL = "https://esphome.io/components/esp32/#advanced-configuration";
+
 // Verified live against esphome.io (200, anchor present, no redirect).
 // Keep this list small and URL-verified; most lines resolve through the
 // component map below.
@@ -79,14 +81,14 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     level: "W",
     tags: ["app"],
     pattern: /Set minimum_chip_revision/,
-    url: "https://esphome.io/components/esp32/#advanced-configuration",
+    url: ESP32_ADVANCED_URL,
     body: "chip_revision",
   },
   {
     level: "W",
     tags: ["app"],
     pattern: /Set sram1_as_iram/,
-    url: "https://esphome.io/components/esp32/#advanced-configuration",
+    url: ESP32_ADVANCED_URL,
     body: "sram1_as_iram",
   },
   {
@@ -98,6 +100,20 @@ const ACTIONABLE: readonly ActionableEntry[] = [
     body: "crash",
   },
 ] as const;
+
+// Tag-keyed index so the per-line check is one Map miss for the vast
+// majority of tags, with zero regex work. URLs are static, so the safety
+// gate runs once here instead of per line; an entry that ever failed it
+// would simply never be indexed.
+const ACTIONABLE_BY_TAG = new Map<string, ActionableEntry[]>();
+for (const entry of ACTIONABLE) {
+  if (!isSafeDocsUrl(entry.url)) continue;
+  for (const tag of entry.tags) {
+    const bucket = ACTIONABLE_BY_TAG.get(tag);
+    if (bucket) bucket.push(entry);
+    else ACTIONABLE_BY_TAG.set(tag, [entry]);
+  }
+}
 
 /** First ``https://esphome.io`` URL in a line (trailing sentence punctuation
  *  trimmed in ``resolveLogDocLink``). */
@@ -143,19 +159,15 @@ export function resolveLogDocLink(
 
   let actionable: ActionableLogDocLink | undefined;
   if (parsed) {
-    for (const entry of ACTIONABLE) {
-      if (
-        entry.level === parsed.level &&
-        entry.tags.includes(parsed.tag) &&
-        entry.pattern.test(clean) &&
-        isSafeDocsUrl(entry.url)
-      ) {
+    for (const entry of ACTIONABLE_BY_TAG.get(parsed.tag) ?? []) {
+      if (entry.level === parsed.level && entry.pattern.test(clean)) {
         actionable = { kind: "actionable", url: entry.url, body: entry.body };
         break;
       }
     }
   }
-  if (!actionable) {
+  // Cheap substring gate before the regex — embedded doc URLs are rare.
+  if (!actionable && clean.includes("https://esphome.io/")) {
     const embedded = clean.match(EMBEDDED_URL_RE)?.[0]?.replace(/[.,;:]+$/, "");
     if (embedded && isSafeDocsUrl(embedded)) {
       actionable = { kind: "actionable", url: embedded, body: "embedded" };
