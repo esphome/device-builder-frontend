@@ -25,7 +25,9 @@ registerMdiIcons({ "information-outline": mdiInformationOutline });
 /** Styles for the annotated line shapes; spread into ansi-log's shadow DOM. */
 export const logDocLinkStyles = css`
   /* Actionable line: text keeps pre-wrap in its own column so the trailing
-     icon can sit in the right margin without joining the selectable text. */
+     icon can sit beside it without joining the selectable text. The text
+     column takes only its natural width, so the icon lands right where the
+     message ends — pinned to the far margin it goes unnoticed. */
   .log-line--doc {
     display: flex;
     align-items: flex-start;
@@ -33,7 +35,7 @@ export const logDocLinkStyles = css`
   }
 
   .log-line-text {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
     white-space: pre-wrap;
     word-break: break-word;
@@ -55,7 +57,7 @@ export const logDocLinkStyles = css`
     color: inherit;
     font-size: 15px;
     line-height: 1;
-    opacity: 0.55;
+    opacity: 0.75;
     cursor: pointer;
   }
 
