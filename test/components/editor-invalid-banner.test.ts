@@ -118,6 +118,17 @@ describe("editor-invalid-banner smart reveal", () => {
     expect(banner(el)).not.toBeNull();
   });
 
+  it("shows a pre-existing error promptly when the user never typed", async () => {
+    const el = document.createElement("esphome-editor-invalid-banner");
+    el.editorFocused = true;
+    el.caretLine = 57; // near the error, but the idle clock reads never-typed
+    document.body.appendChild(el);
+    await el.updateComplete;
+    el.errors = [err(57)];
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+  });
+
   it("treats a line-less error as suppressible", async () => {
     const { el } = await mountBanner({ caret: 55 });
     el.errors = [err(undefined)];

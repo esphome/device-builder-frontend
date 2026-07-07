@@ -72,9 +72,10 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
   editorFocused = false;
 
   /** Timestamp accessor (performance.now clock) of the last YAML edit — a
-   *  pull accessor so the host doesn't re-render per keystroke. */
+   *  pull accessor so the host doesn't re-render per keystroke. -Infinity
+   *  means "never typed": the idle backstop is already satisfied. */
   @property({ attribute: false })
-  getLastEditAt: () => number = () => 0;
+  getLastEditAt: () => number = () => Number.NEGATIVE_INFINITY;
 
   /** The errors actually on screen; empty renders nothing (the host's
    *  display: contents means no flex box and no pane gap either). */

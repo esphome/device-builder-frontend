@@ -213,8 +213,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   private _editorFocused = false;
 
   /** performance.now() of the last YAML edit; read by the banner through
-   *  the stable accessor below so keystrokes don't re-render this host. */
-  private _lastEditAt = 0;
+   *  the stable accessor below so keystrokes don't re-render this host.
+   *  Starts (and resets, on device switch) to -Infinity — "never typed",
+   *  so a pre-existing error is never deferred by the idle backstop. */
+  private _lastEditAt = Number.NEGATIVE_INFINITY;
 
   private _getLastEditAt = () => this._lastEditAt;
 
@@ -492,6 +494,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     if (changed.has("configuration")) {
       if (this._liveErrors.length) this._liveErrors = [];
       this._caretLine = 0;
+      this._lastEditAt = Number.NEGATIVE_INFINITY;
     }
     if (this._showDiff && changed.has("_showDiffButton") && !this._showDiffButton) {
       this._showDiff = false;
