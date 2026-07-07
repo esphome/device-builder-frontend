@@ -1,8 +1,8 @@
 import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
-import { stripAnsiSgr } from "../../util/ansi-escapes.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 
@@ -44,20 +44,6 @@ export function findDependentUpload(
     if (j.depends_on === job.job_id && j.job_type === JobType.UPLOAD) return j;
   }
   return undefined;
-}
-
-// Anchored ERROR prefix so a debug line that quotes the phrase can't match.
-// Log format is "<asctime>? <LEVEL> <message>" (esphome/log.py).
-const LOADER_ERROR = /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
-
-// Two distinct ESPHome validation-failure markers:
-//   "Failed config" — schema-validator banner from esphome/config.py
-//   "ERROR Error while reading config: …" — YAML-load step _LOGGER.error
-// Both indicate the build never reached C++ compile; clean/reset can't help.
-export function isValidationFailureLine(line: string): boolean {
-  const stripped = stripAnsiSgr(line).trim();
-  if (stripped === "Failed config") return true;
-  return LOADER_ERROR.test(stripped);
 }
 
 export async function detachStream(host: ESPHomeCommandDialog): Promise<void> {

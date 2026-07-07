@@ -3,7 +3,6 @@ import {
   JobStatus,
   type FirmwareBinary,
 } from "../../api/types/firmware-jobs.js";
-import { stripAnsiSgr } from "../../util/ansi-escapes.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
@@ -11,6 +10,7 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import { openFlasher } from "../../util/usb-flasher.js";
+import { isValidationFailureLine } from "../../util/validation-log.js";
 import {
   detectChip,
   disconnect,
@@ -22,16 +22,6 @@ import {
 } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { OTA_PORT } from "../logs-session.js";
-
-const LOADER_ERROR = /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
-
-// "Failed config" — bold-red schema-validator banner; ERROR-prefixed line is
-// the YAML-load step's _LOGGER.error. Both mean the build never reached C++.
-export function isValidationFailureLine(line: string): boolean {
-  const stripped = stripAnsiSgr(line).trim();
-  if (stripped === "Failed config") return true;
-  return LOADER_ERROR.test(stripped);
-}
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
