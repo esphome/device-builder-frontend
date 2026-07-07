@@ -14,11 +14,13 @@ import {
 } from "../../src/util/dark-mode.js";
 
 afterEach(() => {
-  localStorage.removeItem(THEME_STORAGE_KEY);
-  // stubGlobal restores whether or not the environment defined
-  // matchMedia in the first place — happy-dom shares one window per
-  // suite file, so a leaked stub would bleed into later tests.
+  // Unstub first: the storage-throws test replaces localStorage with an
+  // object that has no removeItem. stubGlobal restores whether or not
+  // the environment defined the global in the first place — happy-dom
+  // shares one window per suite file, so a leaked stub would bleed into
+  // later tests.
   vi.unstubAllGlobals();
+  localStorage.removeItem(THEME_STORAGE_KEY);
 });
 
 function mockPrefersDark(matches: boolean): void {
@@ -37,6 +39,13 @@ describe("themeIsDark", () => {
     mockPrefersDark(false);
     expect(themeIsDark(Theme.SYSTEM)).toBe(false);
   });
+
+  it("returns false for SYSTEM when matchMedia is unavailable", () => {
+    // The guard that keeps field initializers safe in environments
+    // without a matchMedia implementation.
+    vi.stubGlobal("matchMedia", undefined);
+    expect(themeIsDark(Theme.SYSTEM)).toBe(false);
+  });
 });
 
 describe("initialDarkMode", () => {
@@ -50,5 +59,16 @@ describe("initialDarkMode", () => {
   it("falls back to the OS preference with nothing persisted", () => {
     mockPrefersDark(true);
     expect(initialDarkMode()).toBe(true);
+  });
+
+  it("returns false when localStorage access throws", () => {
+    // Privacy-mode / blocked-storage guard: the catch is what makes
+    // the util safe to call from every consumer's field initializer.
+    vi.stubGlobal("localStorage", {
+      getItem() {
+        throw new Error("denied");
+      },
+    });
+    expect(initialDarkMode()).toBe(false);
   });
 });
