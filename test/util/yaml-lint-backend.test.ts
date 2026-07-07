@@ -149,6 +149,134 @@ describe("parseYamlErrorPosition", () => {
   });
 });
 
+describe("analyzeIndentMismatch", () => {
+  // The reproduction: dash at column 0, properties indented 4 spaces.
+  const lines = [
+    "sensor:", // 1
+    "- platform: dht", // 2
+    "    model: DHT11", // 3
+    "    pin: GPIO0", // 4
+  ];
+  const readLine = (n: number): string | undefined => lines[n - 1];
+
+  it("pinpoints the misaligned list-item marker, key, and space delta", async () => {
+    const { analyzeIndentMismatch } = await import("../../src/util/yaml-lint-backend.js");
+    expect(analyzeIndentMismatch(readLine, 3)).toEqual({
+      markerLine: 2,
+      markerKey: "platform",
+      delta: 2,
+    });
+  });
+
+  it("returns null when the item and its properties already line up", async () => {
+    const { analyzeIndentMismatch } = await import("../../src/util/yaml-lint-backend.js");
+    const ok = (n: number): string | undefined =>
+      ["sensor:", "  - platform: dht", "    model: DHT11"][n - 1];
+    expect(analyzeIndentMismatch(ok, 3)).toBeNull();
+  });
+
+  it("returns null when no list-item marker precedes the error line", async () => {
+    const { analyzeIndentMismatch } = await import("../../src/util/yaml-lint-backend.js");
+    const plain = (n: number): string | undefined =>
+      ["esphome:", "  name: x", "  bogus: y"][n - 1];
+    expect(analyzeIndentMismatch(plain, 3)).toBeNull();
+  });
+});
+
+describe("describeYamlError", () => {
+  // Echo the key + interpolated values so a hit is distinguishable from raw.
+  const localize = (key: string, values?: Record<string, string | number>): string =>
+    values ? `${key}:${JSON.stringify(values)}` : key;
+  const pos = (line: number) => ({ line, col: 1 });
+  const dhtLines = ["sensor:", "- platform: dht", "    model: DHT11"];
+  const readDht = (n: number): string | undefined => dhtLines[n - 1];
+
+  it("gives the exact indentation fix + auto-fix when the document pinpoints it", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(
+      describeYamlError("mapping values are not allowed here", pos(3), localize, readDht)
+    ).toEqual({
+      text: 'yaml_editor.error_indent_fix:{"line":2,"key":"platform","spaces":2}',
+      jumpLine: 2,
+      fix: { line: 2, indent: 2 },
+    });
+  });
+
+  it("falls back to the generic indentation hint (no auto-fix) when it can't pinpoint", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    // No readLine, so no document to analyze.
+    expect(
+      describeYamlError("mapping values are not allowed here", pos(9), localize)
+    ).toEqual({ text: 'yaml_editor.error_indent_hint:{"line":9}', jumpLine: 9 });
+  });
+
+  it("maps a block-end / missing-colon parse error to the indentation family", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(
+      describeYamlError("expected <block end>, but found '<scalar>'", pos(8), localize)
+        .text
+    ).toBe('yaml_editor.error_indent_hint:{"line":8}');
+    expect(describeYamlError("could not find expected ':'", pos(5), localize).text).toBe(
+      'yaml_editor.error_indent_hint:{"line":5}'
+    );
+  });
+
+  it("maps a tab error to the tab hint (PyYAML names the char via %r)", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(
+      describeYamlError(
+        "found character '\\t' that cannot start any token",
+        pos(3),
+        localize
+      ).text
+    ).toBe('yaml_editor.error_tab_hint:{"line":3}');
+  });
+
+  it("maps a non-tab unscannable character to the stray-symbol hint", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(
+      describeYamlError(
+        "found character '@' that cannot start any token",
+        pos(6),
+        localize
+      ).text
+    ).toBe('yaml_editor.error_char_hint:{"line":6}');
+  });
+
+  it("maps an unterminated quoted scalar to the unterminated-string hint", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(
+      describeYamlError(
+        "while scanning a quoted scalar found unexpected end of stream",
+        pos(7),
+        localize
+      ).text
+    ).toBe('yaml_editor.error_unterminated_string_hint:{"line":7}');
+  });
+
+  it("maps a duplicate key to the duplicate-key hint", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(describeYamlError('found duplicate key "name"', pos(11), localize).text).toBe(
+      'yaml_editor.error_duplicate_key_hint:{"line":11}'
+    );
+  });
+
+  it("passes an unrecognized message through, sanitized", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(describeYamlError("some other yaml error", pos(4), localize)).toEqual({
+      text: "some other yaml error",
+      jumpLine: 4,
+    });
+  });
+
+  it("has no jump line when the message carries no position", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(
+      describeYamlError("mapping values are not allowed here", null, localize)
+    ).toEqual({ text: "mapping values are not allowed here", jumpLine: null });
+  });
+});
+
 describe("getLastValidatedResult", () => {
   it("returns null when nothing has been validated for the configuration", async () => {
     const { getLastValidatedResult } =

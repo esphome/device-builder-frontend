@@ -887,26 +887,33 @@ export class ESPHomePageDevice extends LitElement {
    *  isn't left looking at a different section's form panel after
    *  the scroll lands. */
   private _onValidationGoTo = (e: CustomEvent<{ line: number; col: number }>) => {
-    const line = e.detail.line;
-    if (line && line >= 1) {
-      // Sections-only layout would scroll a hidden editor — flip
-      // to the split view so the user actually sees where they're
-      // landing.
-      if (this._layout === "left") {
-        // Implicit expand to reveal the error: cache it locally but don't
-        // record it as the user's durable layout preference.
-        this._cacheLayout("both");
-      }
-      this._setHighlight({ fromLine: line, toLine: line }, true, true);
-      const resolved = resolveSectionForUrlLine(this._yaml, line, null);
-      if (resolved) {
-        this._selectedSection = resolved.sectionKey;
-      }
-    }
+    this._jumpToErrorLine(e.detail.line);
     // The user wants to fix the error, not leave with it unsaved
     // — resolve as "not saved" so the page-leave guard stays put.
     this._resolveValidationPrompt(false);
   };
+
+  /** Jump-to from the live error banner (esphome-device-editor's goto-line). */
+  private _onEditorGoToLine = (e: CustomEvent<{ line: number }>) => {
+    this._jumpToErrorLine(e.detail.line);
+  };
+
+  /** Highlight, scroll to, and switch section for an error's 1-indexed line. */
+  private _jumpToErrorLine(line: number) {
+    if (!line || line < 1) return;
+    // Sections-only layout would scroll a hidden editor — flip
+    // to the split view so the user actually sees where they're
+    // landing. Implicit expand to reveal the error: cache it locally
+    // but don't record it as the user's durable layout preference.
+    if (this._layout === "left") {
+      this._cacheLayout("both");
+    }
+    this._setHighlight({ fromLine: line, toLine: line }, true, true);
+    const resolved = resolveSectionForUrlLine(this._yaml, line, null);
+    if (resolved) {
+      this._selectedSection = resolved.sectionKey;
+    }
+  }
 
   /** Light-dismiss / close-button / Cancel button on the
    *  validation prompt — fall through here so the page-leave
@@ -1054,6 +1061,7 @@ export class ESPHomePageDevice extends LitElement {
             )}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
+            @goto-line=${this._onEditorGoToLine}
             @change-board=${this._onChangeBoard}
             ?hasUnsavedEdits=${this._isDirty}
             ?saving=${this._saving}

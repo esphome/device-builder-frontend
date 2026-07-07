@@ -5,6 +5,24 @@ export const deviceEditorStyles = css`
     display: contents;
   }
 
+  .invalid-banner-goto {
+    appearance: none;
+    margin-left: 0.35em;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: var(--wa-font-weight-semibold);
+    text-decoration: underline;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .invalid-banner-goto:hover {
+    text-decoration: none;
+  }
+
   .card {
     background: var(--wa-color-surface-default);
     border-radius: var(--editor-border-radius, var(--wa-border-radius-l));

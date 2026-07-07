@@ -25,7 +25,13 @@ function mountView(validateYaml: ESPHomeAPI["validateYaml"]): EditorView {
   return new EditorView({
     state: EditorState.create({
       doc: "esphome:\n  name: x\n",
-      extensions: [createBackendYamlLinter({ api, getConfiguration: () => "x.yaml" })],
+      extensions: [
+        createBackendYamlLinter({
+          api,
+          getConfiguration: () => "x.yaml",
+          localize: (key) => key,
+        }),
+      ],
     }),
     parent: document.body,
   });

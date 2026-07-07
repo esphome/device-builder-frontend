@@ -55,6 +55,9 @@ export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 // Delay before an at-rest caret opens the completion popup for discovery.
 const IDLE_COMPLETION_DELAY_MS = 1500;
 
+// A YAML list-item line — guards the indentation auto-fix against a stale line.
+const LIST_ITEM_LINE_RE = /^\s*-\s/;
+
 // `#` must be percent-encoded (`%23`) inside a data-URI background-image.
 const errorDot = (fill: string, stroke: string): string =>
   `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">` +
@@ -504,6 +507,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         createBackendYamlLinter({
           api: this._api,
           getConfiguration: () => this.configuration,
+          localize: this._localize,
           onResult: (errors, mapped, configuration) =>
             this.dispatchEvent(
               new CustomEvent<YamlDiagnosticsDetail>("yaml-diagnostics", {
@@ -548,6 +552,25 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     // Remount paths in updated() return before the highlightRange
     // branch, so re-apply a pending highlight (+ scroll) here.
     if (this.highlightRange) this._applyHighlight();
+  }
+
+  /**
+   * Insert `indent` spaces at the start of 1-indexed `line` to repair an
+   * indentation error, then focus so the change is undoable in place.
+   *
+   * Guarded: only applies when the target line is still a `- ` list item
+   * (the banner it came from may be a lint pass behind the buffer).
+   */
+  applyIndentFix(line: number, indent: number) {
+    const view = this._view;
+    if (!view || indent <= 0 || line < 1 || line > view.state.doc.lines) return;
+    const target = view.state.doc.line(line);
+    if (!LIST_ITEM_LINE_RE.test(target.text)) return;
+    view.dispatch({
+      changes: { from: target.from, insert: " ".repeat(indent) },
+      scrollIntoView: true,
+    });
+    view.focus();
   }
 
   /** Set (or clear) the highlight mark and scroll it into view. */

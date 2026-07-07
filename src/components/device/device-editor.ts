@@ -34,8 +34,8 @@ import {
   nextSplitRatioForKey,
   saveSplitRatio,
 } from "../../util/split-ratio.js";
-import type { YamlDiagnosticsDetail } from "../../util/yaml-lint-backend.js";
-import type { HighlightRange } from "../yaml-editor.js";
+import type { BannerError, YamlDiagnosticsDetail } from "../../util/yaml-lint-backend.js";
+import type { ESPHomeYamlEditor, HighlightRange } from "../yaml-editor.js";
 import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
 import { renderInstallAction } from "./install-action.js";
@@ -201,7 +201,7 @@ export class ESPHomeDeviceEditor extends LitElement {
   /** Live lint error messages from the editor's backend linter. Drives the
    *  "configuration invalid" banner above the editor. */
   @state()
-  private _liveErrors: string[] = [];
+  private _liveErrors: BannerError[] = [];
 
   @state()
   private _splitRatio = loadSplitRatio();
@@ -211,6 +211,9 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   @query(".editor-layout")
   private _layoutEl?: HTMLElement;
+
+  @query("esphome-yaml-editor")
+  private _yamlEditor?: ESPHomeYamlEditor;
 
   static styles = [espHomeStyles, dangerBannerStyles, deviceEditorStyles];
 
@@ -361,9 +364,39 @@ export class ESPHomeDeviceEditor extends LitElement {
                   ? html`<div class="danger-banner invalid-banner" role="alert">
                       <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
                       <div class="danger-banner-text">
-                        ${this._liveErrors
-                          .slice(0, MAX_BANNER_ERRORS)
-                          .map((msg) => html`<span>${renderTextLinks(msg)}</span>`)}
+                        ${this._liveErrors.slice(0, MAX_BANNER_ERRORS).map(
+                          (err) =>
+                            html`<span
+                              >${renderTextLinks(err.message)}${
+                                err.fix
+                                  ? html`
+                                      <button
+                                        type="button"
+                                        class="invalid-banner-goto"
+                                        title=${this._localize("yaml_editor.error_auto_fix_hint")}
+                                        @click=${() => this._autoFix(err.fix!)}
+                                      >
+                                        ${this._localize("yaml_editor.error_auto_fix")}
+                                      </button>
+                                    `
+                                  : nothing
+                              }${
+                                err.line
+                                  ? html`
+                                      <button
+                                        type="button"
+                                        class="invalid-banner-goto"
+                                        @click=${() => this._gotoErrorLine(err.line!)}
+                                      >
+                                        ${this._localize("yaml_editor.error_go_to_line", {
+                                          line: err.line,
+                                        })}
+                                      </button>
+                                    `
+                                  : nothing
+                              }</span
+                            >`
+                        )}
                         ${
                           this._liveErrors.length > MAX_BANNER_ERRORS
                             ? html`<span class="invalid-banner-more"
@@ -484,11 +517,31 @@ export class ESPHomeDeviceEditor extends LitElement {
     // actually changed so an unchanged lint pass doesn't re-announce it.
     if (
       next.length === this._liveErrors.length &&
-      next.every((msg, i) => msg === this._liveErrors[i])
+      next.every(
+        (err, i) =>
+          err.message === this._liveErrors[i].message &&
+          err.line === this._liveErrors[i].line
+      )
     ) {
       return;
     }
     this._liveErrors = next;
+  }
+
+  /** Apply a banner error's one-click indentation repair in the editor. */
+  private _autoFix(fix: NonNullable<BannerError["fix"]>) {
+    this._yamlEditor?.applyIndentFix(fix.line, fix.indent);
+  }
+
+  /** Ask the page to highlight and scroll to a banner error's line. */
+  private _gotoErrorLine(line: number) {
+    this.dispatchEvent(
+      new CustomEvent("goto-line", {
+        detail: { line },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   private _setLayout(layout: DeviceLayoutMode) {
