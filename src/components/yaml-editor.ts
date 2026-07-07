@@ -440,17 +440,21 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
               composed: true,
             })
           );
-          // A hand edit invalidates the block highlight: the stored
+          // A hand edit invalidates a *block* highlight: the stored
           // range is a static line snapshot and the mark decoration
           // only position-maps, so lines typed inside the section
           // fall outside it (a half-highlighted block). Gate on a
           // userEvent annotation (typing, paste, delete, undo, drag)
           // so programmatic doc syncs (the `value` prop, form-driven
-          // splices) keep a field-focus highlight alive; gate on an
-          // active highlight so this fires once per highlight, not
-          // per keystroke.
+          // splices) don't fire it; gate on a multi-line range so
+          // single-line highlights stay out of it — a line decoration
+          // can't go half-stale, and the error-jump highlight has its
+          // own active → edited → clear-on-diagnostics lifecycle this
+          // must not bypass. The multi-line gate also bounds emission:
+          // the page clears the range on the first event.
           if (
             this.highlightRange !== null &&
+            this.highlightRange.toLine > this.highlightRange.fromLine &&
             update.transactions.some(
               (tr) => tr.docChanged && tr.annotation(Transaction.userEvent) !== undefined
             )

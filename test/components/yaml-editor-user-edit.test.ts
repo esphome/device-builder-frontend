@@ -83,6 +83,20 @@ describe("yaml-editor yaml-user-edit emission", () => {
     expect(seen.count).toBe(0);
   });
 
+  it("does not emit for a single-line highlight", async () => {
+    // Error-jump and field-focus highlights are single-line: a line
+    // decoration can't go half-stale, and the error-jump highlight must
+    // survive edits until the next diagnostics pass clears it.
+    const el = await mount("logger:\n  level: DEBUG\n");
+    el.highlightRange = { fromLine: 2, toLine: 2 };
+    await el.updateComplete;
+    const seen = record(el);
+
+    typeAtEnd(viewOf(el), "x");
+
+    expect(seen.count).toBe(0);
+  });
+
   it("does not emit when no highlight is active", async () => {
     const el = await mount("logger:\n  level: DEBUG\n");
     const seen = record(el);
