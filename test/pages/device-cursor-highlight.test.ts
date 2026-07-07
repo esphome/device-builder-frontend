@@ -103,12 +103,13 @@ describe("cursor-driven YAML highlight (#1885)", () => {
     expect(internals(page)._highlightRange).toBe(first);
   });
 
-  it("leaves highlight and selection on the old section when the guard vetoes", () => {
+  it("leaves highlight and selection on the old section when the guard runs no callback", () => {
     const page = makePage();
     clickYamlLine(page, 2); // i2c:
     const before = internals(page)._highlightRange;
 
-    // Simulate an unsaved-edits veto: the guard invokes no callback.
+    // The guard always runs its callback today; pin the invariant that if it
+    // ever vetoes (invokes no callback), highlight and selection stay put.
     vi.spyOn(internals(page), "_guardSectionSwitch").mockImplementation(() => {});
     clickYamlLine(page, 5); // would move to sensor, but vetoed
 
