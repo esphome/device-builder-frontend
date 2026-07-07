@@ -729,7 +729,19 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     this._container.innerHTML = "";
     this._lastReportedCursorLine = 0;
     this._lastReportedPathKey = "";
-    this._lastCompletionOpen = false;
+    // A remount destroys any open completion popup without a state
+    // transition the update listener could see — emit the close ourselves
+    // or the host would hold the invalid banner forever.
+    if (this._lastCompletionOpen) {
+      this._lastCompletionOpen = false;
+      this.dispatchEvent(
+        new CustomEvent("yaml-completion-open", {
+          detail: { open: false },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
     this._mountEditor();
   }
 

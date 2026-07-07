@@ -501,6 +501,12 @@ export class ESPHomeDeviceEditor extends LitElement {
       if (this._liveErrors.length) this._liveErrors = [];
       this._caretLine = 0;
       this._lastEditAt = Number.NEGATIVE_INFINITY;
+      // The editor remounts on a device switch, silently dropping focus and
+      // any open completion popup (a removed focused node fires no focusout,
+      // and the popup's close never transitions on a fresh view) — clear
+      // both so the new config's banner can't stay suppressed.
+      this._editorFocused = false;
+      this._completionOpen = false;
     }
     if (this._showDiff && changed.has("_showDiffButton") && !this._showDiffButton) {
       this._showDiff = false;
@@ -527,6 +533,7 @@ export class ESPHomeDeviceEditor extends LitElement {
         return (
           err.message === prev.message &&
           err.line === prev.line &&
+          err.kind === prev.kind &&
           err.fix?.line === prev.fix?.line &&
           err.fix?.indent === prev.fix?.indent &&
           err.fix?.key === prev.fix?.key
