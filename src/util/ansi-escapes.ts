@@ -50,3 +50,24 @@ export function stripAnsi(text: string): string {
   if (!text.includes("\x1b") && !text.includes("\\033")) return text;
   return text.replace(ANSI_STRIP_RE, "");
 }
+
+/** SGR colour sequences only: introducer + ``[`` + digits/semicolons + ``m``
+ *  — the Select Graphic Rendition subset, which covers every colour / weight
+ *  code in ESPHome output. */
+const ANSI_SGR_RE = new RegExp(`${INTRODUCER}\\[[0-9;]*m`, "g");
+
+/**
+ * Strip only SGR (colour / weight) sequences from *text*, leaving any
+ * other escape shape untouched.
+ *
+ * Use this instead of :func:`stripAnsi` where the caller's contract is
+ * "remove the colours, change nothing else": the saved-log download and
+ * the validation-failure line classifier both match against text that
+ * should otherwise be byte-identical to what the stream delivered.
+ * Matches both introducer forms for the same reason the module-level
+ * matchers do — ESPHome's ``--dashboard`` formatter emits the literal
+ * ``\033`` text, while device UART output carries the real ESC byte.
+ */
+export function stripAnsiSgr(text: string): string {
+  return text.replace(ANSI_SGR_RE, "");
+}

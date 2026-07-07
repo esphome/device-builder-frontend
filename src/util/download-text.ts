@@ -1,4 +1,4 @@
-import { stripAnsi } from "./strip-ansi.js";
+import { stripAnsiSgr } from "./ansi-escapes.js";
 
 /**
  * Trigger a browser save of *bytes* as *filename* via an
@@ -69,7 +69,7 @@ export function configurationStem(
  * Save terminal-style output to a plain text file.
  *
  * Used by the logs and command dialogs' download buttons. ANSI
- * colour-control sequences are stripped via the shared ``stripAnsi``
+ * colour-control sequences are stripped via the shared ``stripAnsiSgr``
  * helper so the saved file reads cleanly in editors that don't
  * render them and the rest of the codebase's ANSI handling stays in
  * one place. The live dialog still keeps the colours.
@@ -91,7 +91,7 @@ export function downloadAnsiText(lines: string[], filename: string): string {
      per entry before the join so the output reads as one real log
      line per file row regardless of which terminator the upstream
      used. */
-  const text = lines.map((line) => stripAnsi(line).replace(/[\r\n]+$/, "")).join("\n");
+  const text = lines.map((line) => stripAnsiSgr(line).replace(/[\r\n]+$/, "")).join("\n");
   downloadBlob(text, filename, "text/plain");
   return text;
 }

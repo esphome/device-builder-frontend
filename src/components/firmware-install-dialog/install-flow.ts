@@ -3,6 +3,7 @@ import {
   JobStatus,
   type FirmwareBinary,
 } from "../../api/types/firmware-jobs.js";
+import { stripAnsiSgr } from "../../util/ansi-escapes.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
@@ -22,14 +23,12 @@ import {
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { OTA_PORT } from "../logs-session.js";
 
-// Dashboard mode pins escaped form (\033[…m); raw branch is defensive.
-const ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
 const LOADER_ERROR = /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
 
 // "Failed config" — bold-red schema-validator banner; ERROR-prefixed line is
 // the YAML-load step's _LOGGER.error. Both mean the build never reached C++.
 export function isValidationFailureLine(line: string): boolean {
-  const stripped = line.replace(ANSI_SGR, "").trim();
+  const stripped = stripAnsiSgr(line).trim();
   if (stripped === "Failed config") return true;
   return LOADER_ERROR.test(stripped);
 }

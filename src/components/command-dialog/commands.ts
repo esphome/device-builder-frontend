@@ -1,6 +1,7 @@
 import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
+import { stripAnsiSgr } from "../../util/ansi-escapes.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
@@ -45,8 +46,6 @@ export function findDependentUpload(
   return undefined;
 }
 
-// Dashboard mode pins escaped form (\033[…m); raw form (\x1b[…m) is defensive.
-const ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
 // Anchored ERROR prefix so a debug line that quotes the phrase can't match.
 // Log format is "<asctime>? <LEVEL> <message>" (esphome/log.py).
 const LOADER_ERROR = /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
@@ -56,7 +55,7 @@ const LOADER_ERROR = /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config
 //   "ERROR Error while reading config: …" — YAML-load step _LOGGER.error
 // Both indicate the build never reached C++ compile; clean/reset can't help.
 export function isValidationFailureLine(line: string): boolean {
-  const stripped = line.replace(ANSI_SGR, "").trim();
+  const stripped = stripAnsiSgr(line).trim();
   if (stripped === "Failed config") return true;
   return LOADER_ERROR.test(stripped);
 }
