@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Theme } from "../../src/api/types/system.js";
 import {
   initialDarkMode,
+  persistTheme,
+  storedTheme,
   THEME_STORAGE_KEY,
   themeIsDark,
 } from "../../src/util/dark-mode.js";
@@ -70,5 +72,21 @@ describe("initialDarkMode", () => {
       },
     });
     expect(initialDarkMode()).toBe(false);
+  });
+});
+
+describe("persistTheme", () => {
+  it("round-trips through storedTheme", () => {
+    persistTheme(Theme.DARK);
+    expect(storedTheme()).toBe(Theme.DARK);
+  });
+
+  it("drops the write when storage throws, so the switch still applies", () => {
+    vi.stubGlobal("localStorage", {
+      setItem() {
+        throw new Error("denied");
+      },
+    });
+    expect(() => persistTheme(Theme.DARK)).not.toThrow();
   });
 });

@@ -57,7 +57,12 @@ import {
   versionHistoryEnabledContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { initialDarkMode, THEME_STORAGE_KEY, themeIsDark } from "../util/dark-mode.js";
+import {
+  initialDarkMode,
+  persistTheme,
+  storedTheme,
+  themeIsDark,
+} from "../util/dark-mode.js";
 import { isExpert } from "../util/experience.js";
 import { notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
@@ -403,7 +408,7 @@ export class ESPHomeApp extends LitElement {
   }
 
   applyTheme(theme: Theme) {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    persistTheme(theme);
     const prefersDark = themeIsDark(theme);
     this._darkMode = prefersDark;
     document.documentElement.classList.toggle("wa-dark", prefersDark);
@@ -411,8 +416,7 @@ export class ESPHomeApp extends LitElement {
   }
 
   private _initDarkMode() {
-    const saved = (localStorage.getItem(THEME_STORAGE_KEY) as Theme) ?? Theme.SYSTEM;
-    this.applyTheme(saved);
+    this.applyTheme(storedTheme());
   }
 
   private async _init() {
