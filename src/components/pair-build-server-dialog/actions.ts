@@ -114,6 +114,9 @@ export async function onConfirmSubmit(host: ESPHomePairBuildServerDialog): Promi
       ...(pairingKey ? { pairing_key: pairingKey } : {}),
     });
     host._step = "sent";
+    // The key was consumed by the send; drop it so it doesn't linger in
+    // state while the dialog sits on the terminal "sent" step.
+    host._pairingKey = "";
     // Pin the auto-close watch key. summary.pin_sha256 is the stable
     // cryptographic identity the backend's _pairings dict and app-shell's
     // _buildOffloadPairings both key on (4a-o part 6 — pin-keyed state).

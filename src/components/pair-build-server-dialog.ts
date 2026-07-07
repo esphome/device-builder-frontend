@@ -181,12 +181,17 @@ export class ESPHomePairBuildServerDialog extends LitElement {
 
   close = (): void => {
     this._open = false;
+    // Drop the typed one-time key so it doesn't linger in component state
+    // or the hidden shadow-DOM input after the dialog closes (render() is
+    // gated on _step, not _open, so the confirm step stays mounted).
+    this._pairingKey = "";
   };
 
   private _onAfterHide = (): void => {
     // wa-dialog finished hiding (after Esc / outside-click / X). Flip the
     // local open flag so the next render's ?open binding matches.
     this._open = false;
+    this._pairingKey = "";
   };
 
   protected willUpdate(changed: Map<string, unknown>): void {

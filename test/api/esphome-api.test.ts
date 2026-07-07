@@ -2345,4 +2345,29 @@ describe("ESPHomeAPI — console-debug redaction", () => {
     expect(text).not.toContain("topsecretvalue");
     expect(text).toContain("<redacted>");
   });
+
+  it("redacts the pairing_key of a request_pair frame (but sends it on the wire)", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.requestRemoteBuildPair({
+      hostname: "buildbox.local",
+      port: 6055,
+      pin_sha256: "abc123",
+      receiver_label: "buildbox",
+      offloader_label: "ha-green",
+      pairing_key: "ABCD-EFGH-JKMN-PQRS",
+    });
+    const sent = ws.sentAs<{ args: { pairing_key: string }; message_id: string }>(0);
+    ws.receive({ message_id: sent.message_id, result: { pin_sha256: "abc123" } });
+    await pending;
+
+    // The key must reach the backend on the wire...
+    expect(sent.args.pairing_key).toBe("ABCD-EFGH-JKMN-PQRS");
+    // ...but never appear in the debug log.
+    const text = debugText(debugSpy);
+    expect(text).not.toContain("ABCD-EFGH-JKMN-PQRS");
+    expect(text).toContain("<redacted>");
+  });
 });

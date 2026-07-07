@@ -108,6 +108,7 @@ function redactForLog(payload: unknown): unknown {
   const containsSecret =
     (command !== null && command.startsWith("auth")) ||
     command === "config/set_secret" ||
+    command === "remote_build/request_pair" ||
     "token" in obj ||
     "password" in obj ||
     (result !== null && ("token" in result || "password" in result));
@@ -120,10 +121,12 @@ function redactForLog(payload: unknown): unknown {
     const safeArgs: Record<string, unknown> = { ...args };
     if ("token" in safeArgs) safeArgs.token = "<redacted>";
     if ("password" in safeArgs) safeArgs.password = "<redacted>";
-    // config/set_secret carries the secret in ``value``.
+    // config/set_secret carries the secret in ``value``; the
+    // remote-build pair request carries the one-time key in ``pairing_key``.
     if (command === "config/set_secret" && "value" in safeArgs) {
       safeArgs.value = "<redacted>";
     }
+    if ("pairing_key" in safeArgs) safeArgs.pairing_key = "<redacted>";
     clone.args = safeArgs;
   }
   if (result !== null) {
