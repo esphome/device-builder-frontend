@@ -7,13 +7,15 @@
  * overlay).
  *
  * The reveal is damped so the banner doesn't pop over a half-typed token:
- * while the editor is focused and every error is a YAML parse error within
- * NEAR_CARET_LINES of the caret, new errors stay squiggle-only until the
- * caret moves away, the editor loses focus, or the user has been idle for
- * REVEAL_IDLE_MS. A parse error far from the caret, or any validation
- * error (the document parses — real breakage), shows as soon as the lint
- * pass lands; a fixed config clears the banner immediately; a banner
- * already on screen tracks lint updates live.
+ * while the editor is focused and every error — parse or validation — is
+ * anchored within NEAR_CARET_LINES of the caret, new errors stay
+ * squiggle-only until the caret moves away, the editor loses focus, or
+ * the user has been idle for REVEAL_IDLE_MS. An error anchored far from
+ * the caret, or a line-less validation error (whole-config breakage like
+ * a missing platform), shows as soon as the lint pass lands — except
+ * while the completion popup is open, which holds every reveal. A fixed
+ * config clears the banner immediately; a banner already on screen
+ * tracks lint updates live.
  */
 import { consume } from "@lit/context";
 import { mdiAlertCircleOutline } from "@mdi/js";
