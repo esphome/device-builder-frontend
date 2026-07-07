@@ -8,6 +8,7 @@ import {
   dialogActionsRowStyles,
 } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles, quietCloseButtonStyles } from "../styles/dialog-chrome.js";
+import { dialogFieldStyles } from "../styles/dialog-fields.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
@@ -60,6 +61,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     quietCloseButtonStyles,
     dialogActionsRowStyles,
     dialogActionButtonStyles,
+    dialogFieldStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -67,37 +69,6 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
 
       esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
-      }
-
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-xs);
-        padding-bottom: var(--wa-space-m);
-      }
-
-      label {
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-quiet);
-      }
-
-      .helper {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        margin-top: var(--wa-space-2xs);
-      }
-
-      .field-error {
-        color: var(--esphome-error);
-        font-size: var(--wa-font-size-xs);
-        margin-top: var(--wa-space-2xs);
-      }
-
-      .field-warning {
-        color: var(--esphome-warning, #d97706);
-        font-size: var(--wa-font-size-xs);
-        margin-top: var(--wa-space-2xs);
       }
     `,
   ];
