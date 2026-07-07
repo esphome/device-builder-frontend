@@ -556,19 +556,29 @@ export class ESPHomeDeviceEditor extends LitElement {
    *  ``_confirmAutoFix`` when the fix parses but other YAML errors remain. */
   private _autoFix(fix: NonNullable<BannerError["fix"]>) {
     const editor = this._yamlEditor;
-    if (!editor) return;
+    if (!editor) {
+      // The button only renders under a mounted editor, so a missing ref is a
+      // wiring bug, not a normal path — surface it rather than a dead click.
+      console.error("[auto-fix] no editor ref");
+      notifyError(this._localize("yaml_editor.auto_fix_failed"));
+      return;
+    }
     editor
       .applyIndentFix(fix, () => this._confirmAutoFix())
       .then((outcome) => {
-        // A stale click (the doc shifted since the banner) is a safe no-op, but
-        // say so rather than letting the button look dead.
         if (outcome === "stale") {
+          // A stale click (the doc shifted since the banner) is a safe no-op,
+          // but say so rather than letting the button look dead.
           notifyWarning(this._localize("yaml_editor.auto_fix_stale"));
+        } else if (outcome === "unavailable") {
+          // Defensive (no view/api); shouldn't happen, but don't stay silent.
+          console.error("[auto-fix] editor unavailable");
+          notifyError(this._localize("yaml_editor.auto_fix_failed"));
         }
       })
       .catch((err: unknown) => {
-        // A validation round-trip failure (WS drop, server error) must not leave
-        // the click looking ignored.
+        // A validation round-trip failure (WS drop, server error), or the
+        // confirm dialog failing to mount, must not leave the click ignored.
         console.error("[auto-fix] could not run:", err);
         notifyError(this._localize("yaml_editor.auto_fix_failed"));
       });
@@ -589,7 +599,9 @@ export class ESPHomeDeviceEditor extends LitElement {
     const dialog = this._autoFixConfirmDialog;
     if (!dialog) {
       this._autoFixConfirmOpen = false;
-      return false;
+      // A missing dialog is a wiring/timing bug, not a user decision — throw so
+      // the caller surfaces it instead of silently treating it as a decline.
+      throw new Error("auto-fix confirm dialog failed to mount");
     }
     try {
       return await new Promise<boolean>((resolve) => {
