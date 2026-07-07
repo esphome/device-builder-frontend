@@ -142,4 +142,19 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     expect(view.state.doc.toString()).toBe(FIXED);
     expect(validateYaml).not.toHaveBeenCalled();
   });
+
+  it("no-ops when the item is followed by a shallower sibling, not a property", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    // `- platform: dht` (contentCol 2) followed by a top-level sibling, not a
+    // property: the delta re-check must treat that as "no property" (null),
+    // not a spurious negative delta, and bail.
+    const doc = "sensor:\n- platform: dht\nbinary_sensor:\n  - platform: gpio\n";
+    const el = await mountEditor(validateYaml, doc);
+    const view = viewOf(el);
+
+    expect(await el.applyIndentFix(FIX)).toBe("stale");
+
+    expect(view.state.doc.toString()).toBe(doc);
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
 });

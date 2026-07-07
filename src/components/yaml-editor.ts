@@ -618,7 +618,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   }
 
   /** Indent of the list item's first property line minus `contentCol` (where
-   *  its key starts), or null when it has no following property line. */
+   *  its key starts), or null when the item has no property line — the next
+   *  content is a shallower sibling/dedent (indent below `contentCol`), not a
+   *  property, so it never reports a spurious negative delta. */
   private _firstPropertyDelta(
     doc: Text,
     line: number,
@@ -627,7 +629,8 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     for (let n = line + 1; n <= doc.lines; n++) {
       const text = doc.line(n).text;
       if (!text.trim() || text.trimStart().startsWith("#")) continue;
-      return indentOf(text) - contentCol;
+      const indent = indentOf(text);
+      return indent < contentCol ? null : indent - contentCol;
     }
     return null;
   }

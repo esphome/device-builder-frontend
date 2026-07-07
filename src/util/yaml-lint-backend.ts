@@ -476,11 +476,12 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
       _lastValidated.set(configuration, { content, result: res, at: performance.now() });
 
       const diagnostics: Diagnostic[] = [];
-      // Whole-config errors (a structural error esphome pins on the root
-      // esphome block, an included-file error, or an unplaceable parse
-      // error) go in the banner instead of a squiggle; localized errors
-      // keep their squiggle and are also resolved to a key path so the
-      // host can pin them on the matching form field.
+      // Banner material. A locatable YAML parse error goes to BOTH an inline
+      // squiggle and the banner (with an optional auto-fix). A whole-config
+      // error (pinned on the root esphome block, an included-file error, or an
+      // unplaceable parse error) goes to the banner only; a localized
+      // validation error keeps its squiggle and also resolves to a key path so
+      // the host can pin it on the matching form field.
       const bannerErrors: BannerError[] = [];
       const mapped: MappedValidationError[] = [];
 
