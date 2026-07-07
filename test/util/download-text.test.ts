@@ -104,9 +104,10 @@ describe("downloadAnsiText", () => {
     const { result } = withBrowserStubs(() =>
       downloadAnsiText(["[INFO] startup", "[1;31m not-an-escape"], "log.txt")
     );
-    /* stripAnsiSgr only matches when ESC () is present, so plain
-       bracketed text — which shows up in real ESPHome logs as level
-       prefixes like ``[I][component]`` — is preserved verbatim. */
+    /* stripAnsiSgr only strips runs introduced by the ESC byte or the
+       literal ``\\033`` text, so plain bracketed text — which shows up
+       in real ESPHome logs as level prefixes like ``[I][component]`` —
+       is preserved verbatim. */
     expect(result).toBe("[INFO] startup\n[1;31m not-an-escape");
   });
 

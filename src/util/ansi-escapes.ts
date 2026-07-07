@@ -69,5 +69,7 @@ const ANSI_SGR_RE = new RegExp(`${INTRODUCER}\\[[0-9;]*m`, "g");
  * ``\033`` text, while device UART output carries the real ESC byte.
  */
 export function stripAnsiSgr(text: string): string {
+  // Escape-free fast path — most log lines carry no ANSI at all.
+  if (!text.includes("\x1b") && !text.includes("\\033")) return text;
   return text.replace(ANSI_SGR_RE, "");
 }
