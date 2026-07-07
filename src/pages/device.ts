@@ -1374,6 +1374,10 @@ export class ESPHomePageDevice extends LitElement {
       this._selectedSection = sectionKey;
       this._selectedFromLine = match.fromLine;
       this._focusFieldPath = rel;
+      // Move the block highlight to the section the caret entered so the YAML
+      // pane tracks the navigator selection instead of stranding it on the
+      // previously clicked component. No scroll: the caret is already in view.
+      this._setHighlight({ fromLine: match.fromLine, toLine: match.toLine }, false);
       this._updateUrl();
     });
   }
