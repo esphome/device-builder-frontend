@@ -39,6 +39,11 @@ export const RE_TOP_LEVEL_KEY = /^([A-Za-z0-9_]+)\s*:/;
  *  uses this to skip the dash line's inline key. */
 export const RE_LIST_ITEM = /^\s*-\s/;
 
+/** A list-item line, capturing the item's own first key token (the text after
+ *  the ``- `` up to whitespace, ``:``, or ``#``). ``match[0].length -
+ *  match[1].length`` is the column where that key starts. */
+export const RE_LIST_ITEM_KEY = /^\s*-\s+([^\s:#]+)/;
+
 /** ``platform: gpio`` sibling reader. Same shape as
  *  ``RE_PAIR_LINE`` but constrains the key to literal
  *  ``platform``. Accepts unquoted (``platform: gpio``),

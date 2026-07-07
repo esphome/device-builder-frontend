@@ -24,6 +24,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import { renderTextLinks } from "../../util/markdown.js";
+import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
 import {
@@ -444,8 +445,6 @@ export class ESPHomeDeviceEditor extends LitElement {
                 heading=${this._localize("yaml_editor.auto_fix_confirm_heading")}
                 message=${this._localize("yaml_editor.auto_fix_confirm_message")}
                 confirm-label=${this._localize("yaml_editor.auto_fix_confirm_apply")}
-                @confirm=${() => this._settleAutoFixConfirm(true)}
-                @cancel=${() => this._settleAutoFixConfirm(false)}
               ></esphome-confirm-dialog>`
             : nothing
         }
@@ -549,11 +548,17 @@ export class ESPHomeDeviceEditor extends LitElement {
    *  editor validates the proposed edit first and calls back through
    *  ``_confirmAutoFix`` when the fix parses but other YAML errors remain. */
   private _autoFix(fix: NonNullable<BannerError["fix"]>) {
-    void this._yamlEditor?.applyIndentFix(fix, () => this._confirmAutoFix());
+    const editor = this._yamlEditor;
+    if (!editor) return;
+    editor
+      .applyIndentFix(fix, () => this._confirmAutoFix())
+      .catch((err: unknown) => {
+        // A validation round-trip failure (WS drop, server error) must not leave
+        // the click looking ignored.
+        console.error("[auto-fix] could not run:", err);
+        notifyError(this._localize("yaml_editor.auto_fix_failed"));
+      });
   }
-
-  /** Resolve callback for the in-flight auto-fix confirmation, if any. */
-  private _autoFixConfirmResolve: ((apply: boolean) => void) | null = null;
 
   /** Mounts the confirm dialog only while a prompt is pending — its
    *  form-associated buttons are expensive to instantiate otherwise. */
@@ -561,18 +566,30 @@ export class ESPHomeDeviceEditor extends LitElement {
   private _autoFixConfirmOpen = false;
 
   /** Open the "errors remain" prompt and resolve with the user's choice. */
-  private _confirmAutoFix(): Promise<boolean> {
-    return new Promise((resolve) => {
-      this._autoFixConfirmResolve = resolve;
-      this._autoFixConfirmOpen = true;
-      void this.updateComplete.then(() => this._autoFixConfirmDialog?.open());
-    });
-  }
-
-  private _settleAutoFixConfirm(apply: boolean) {
-    this._autoFixConfirmResolve?.(apply);
-    this._autoFixConfirmResolve = null;
-    this._autoFixConfirmOpen = false;
+  private async _confirmAutoFix(): Promise<boolean> {
+    this._autoFixConfirmOpen = true;
+    await this.updateComplete;
+    const dialog = this._autoFixConfirmDialog;
+    if (!dialog) {
+      this._autoFixConfirmOpen = false;
+      return false;
+    }
+    try {
+      return await new Promise<boolean>((resolve) => {
+        const settle = (apply: boolean) => {
+          dialog.removeEventListener("confirm", onConfirm);
+          dialog.removeEventListener("cancel", onCancel);
+          resolve(apply);
+        };
+        const onConfirm = () => settle(true);
+        const onCancel = () => settle(false);
+        dialog.addEventListener("confirm", onConfirm);
+        dialog.addEventListener("cancel", onCancel);
+        dialog.open();
+      });
+    } finally {
+      this._autoFixConfirmOpen = false;
+    }
   }
 
   /** Ask the page to highlight and scroll to a banner error's line. */

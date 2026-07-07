@@ -11,7 +11,6 @@ import { css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
-import type { EditorValidateResponse } from "../api/types/editor.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import {
@@ -36,6 +35,7 @@ import {
   blankLineContext,
   fieldPathByIndent,
   keyPathByIndent,
+  RE_LIST_ITEM_KEY,
 } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
@@ -56,10 +56,6 @@ export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 
 // Delay before an at-rest caret opens the completion popup for discovery.
 const IDLE_COMPLETION_DELAY_MS = 1500;
-
-// A list-item line, capturing the item's first key so the auto-fix can confirm
-// it still targets the same item after edits shift line numbers.
-const LIST_ITEM_KEY_RE = /^\s*-\s+([^\s:#]+)/;
 
 // `#` must be percent-encoded (`%23`) inside a data-URI background-image.
 const errorDot = (fill: string, stroke: string): string =>
@@ -563,10 +559,12 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    * remain `confirm` decides whether to apply anyway. Applied as a real,
    * undoable transaction.
    *
-   * Guarded against a stale banner: it re-checks (before and after the async
-   * validation) that the target line is still the `- <key>` list item the fix
-   * was computed for, so edits can't redirect it onto an unrelated item or
-   * double-indent one the user already fixed.
+   * The re-validation is the real safety net against a stale banner: the
+   * `- <key>` re-check (before and after the async step) is a cheap filter,
+   * but the key is often a shared token (`platform`), so validating the
+   * proposed document is what actually catches indenting the wrong item or
+   * double-indenting one already fixed. A validation failure rejects (the
+   * caller surfaces it) rather than silently applying.
    */
   async applyIndentFix(
     fix: YamlAutoFix,
@@ -579,7 +577,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       const doc = view.state.doc;
       if (fix.line < 1 || fix.line > doc.lines) return null;
       const t = doc.line(fix.line);
-      return t.text.match(LIST_ITEM_KEY_RE)?.[1] === fix.key ? t.from : null;
+      return t.text.match(RE_LIST_ITEM_KEY)?.[1] === fix.key ? t.from : null;
     };
     const from = targetFrom();
     if (from === null) return;
@@ -587,15 +585,13 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     const doc = view.state.doc;
     const spaces = " ".repeat(fix.indent);
     const proposed = doc.sliceString(0, from) + spaces + doc.sliceString(from);
-    let res: EditorValidateResponse;
-    try {
-      res = await this._api.validateYaml(this.configuration, proposed);
-    } catch {
-      return; // can't validate → don't apply blindly
-    }
+    // A validation failure propagates: don't apply blindly, and let the caller
+    // surface it rather than swallowing the click.
+    const res = await this._api.validateYaml(this.configuration, proposed);
     // Clean result → just do it; otherwise ask before applying over errors.
     const clean = !res.yaml_errors?.length && !res.validation_errors?.length;
-    if (!clean && !(await (confirm?.() ?? Promise.resolve(false)))) return;
+    const proceed = clean || (await (confirm?.() ?? Promise.resolve(false)));
+    if (!proceed) return;
 
     // Re-resolve the target: the doc may have changed while we awaited.
     const settled = targetFrom();

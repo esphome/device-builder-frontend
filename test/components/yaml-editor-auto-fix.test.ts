@@ -106,6 +106,17 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     expect(viewOf(el).state.doc.toString()).toBe(BROKEN);
   });
 
+  it("propagates a validation failure without applying", async () => {
+    const validateYaml = vi.fn(async () => {
+      throw new Error("WS down");
+    });
+    const el = await mountEditor(validateYaml);
+    const view = viewOf(el);
+
+    await expect(el.applyIndentFix(FIX)).rejects.toThrow("WS down");
+    expect(view.state.doc.toString()).toBe(BROKEN);
+  });
+
   it("no-ops when the target line is no longer the same item (stale banner)", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
     const el = await mountEditor(validateYaml);

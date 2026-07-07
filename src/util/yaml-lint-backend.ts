@@ -27,7 +27,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { formRelativePath } from "./backend-field-errors.js";
 import { splitTextLinks } from "./markdown.js";
 import { getKeyPathWithListIndices } from "./yaml-ast.js";
-import { indentOf } from "./yaml-line-walker.js";
+import { indentOf, RE_LIST_ITEM_KEY } from "./yaml-line-walker.js";
 import { isOpenConfigFile } from "./yaml-validation-summary.js";
 
 /** A validation error resolved to a key chain in the open document. */
@@ -190,13 +190,6 @@ export function parseYamlErrorPosition(
 /** A line accessor over the current document; `undefined` past the ends. */
 export type ReadLine = (line1: number) => string | undefined;
 
-// A list-item marker whose body column we need — stricter than the shared
-// `RE_LIST_ITEM` (requires an item, allows multiple spaces after the dash) so
-// `match[0].length` lands on the body's first character.
-const LIST_ITEM_BODY_RE = /^\s*-\s+\S/;
-/** The first bare key token of a line (up to whitespace, `:`, or `#`). */
-const FIRST_KEY_TOKEN_RE = /^([^\s:#]+)/;
-
 /**
  * Pinpoint the exact indentation fix behind a `mapping values ...` error.
  *
@@ -219,18 +212,17 @@ export function analyzeIndentMismatch(
   for (let n = errorLine - 1; n >= 1 && n >= errorLine - 50; n--) {
     const text = readLine(n);
     if (text === undefined || !text.trim()) continue;
-    const marker = text.match(LIST_ITEM_BODY_RE);
+    const marker = text.match(RE_LIST_ITEM_KEY);
     if (!marker) {
       // Left the item's block once a line is shallower than the property.
       if (indentOf(text) < propIndent) return null;
       continue;
     }
-    // The match ends on the body's first character, so its length minus that
-    // one character is the column where the item's own key starts.
-    const contentCol = marker[0].length - 1;
+    // The captured key ends the match, so its length subtracted from the whole
+    // match is the column where the item's own key starts.
+    const contentCol = marker[0].length - marker[1].length;
     if (propIndent <= contentCol) return null;
-    const markerKey = text.slice(contentCol).match(FIRST_KEY_TOKEN_RE)?.[1] ?? "";
-    return { markerLine: n, markerKey, delta: propIndent - contentCol };
+    return { markerLine: n, markerKey: marker[1], delta: propIndent - contentCol };
   }
   return null;
 }
