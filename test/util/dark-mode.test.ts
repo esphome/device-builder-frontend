@@ -15,13 +15,14 @@ import {
 
 afterEach(() => {
   localStorage.removeItem(THEME_STORAGE_KEY);
-  vi.restoreAllMocks();
+  // stubGlobal restores whether or not the environment defined
+  // matchMedia in the first place — happy-dom shares one window per
+  // suite file, so a leaked stub would bleed into later tests.
+  vi.unstubAllGlobals();
 });
 
 function mockPrefersDark(matches: boolean): void {
-  vi.spyOn(window, "matchMedia").mockReturnValue({
-    matches,
-  } as MediaQueryList);
+  vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches } as MediaQueryList));
 }
 
 describe("themeIsDark", () => {
