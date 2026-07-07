@@ -31,7 +31,7 @@ const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
 /** An inline ``on_*:`` trigger handler: group 1 the indent, group 2 the key. */
 const _ON_HANDLER_RE = /^(\s+)(on_[a-zA-Z_]+):/;
 /** A bare mapping-key line (``temperature:``) — key, no value, optional comment. */
-const _BARE_MAPPING_KEY_RE = /^ *[A-Za-z_][\w.]*:\s*(#.*)?$/;
+const _BARE_MAPPING_KEY_RE = /^ *([A-Za-z_][\w.]*):\s*(#.*)?$/;
 
 /**
  * Synchronous fallback parser for automation sections. The navigator
@@ -312,14 +312,17 @@ function _subEntity(
   childIndent: number
 ): { id: string | null; key: string; name?: string } | null {
   let headerIdx = -1;
+  let key = "";
   for (let j = handlerIdx - 1; j >= 0; j--) {
     if (isBlankOrCommentLine(lines[j])) continue;
     const ind = lineIndent(lines[j]);
     if (ind < childIndent) return null; // left the instance's children
     if (ind === childIndent) {
       // Must be a bare mapping key (``temperature:``), not a sibling scalar.
-      if (!_BARE_MAPPING_KEY_RE.test(lines[j])) return null;
+      const header = lines[j].match(_BARE_MAPPING_KEY_RE);
+      if (!header) return null;
       headerIdx = j;
+      key = header[1];
       break;
     }
   }
@@ -339,7 +342,6 @@ function _subEntity(
     id = readInstanceScalar(lines[k], "id") ?? id;
     name = readInstanceScalar(lines[k], "name") ?? name;
   }
-  const key = lines[headerIdx].trim().replace(/:.*$/, "");
   return { id, key, name };
 }
 

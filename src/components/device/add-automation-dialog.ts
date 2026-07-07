@@ -217,11 +217,13 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     const prefillContainer = this._prefillContainer();
     const showComponentRow =
       this._kind === "component_on" && (!this._prefilled || !!prefillContainer);
-    // A container with no configured sub-entities has no valid target;
+    // A container with no selectable sub-entities has no valid target;
     // explain instead of showing an empty picker with a dead Add button.
     const containerEmpty =
       !!prefillContainer &&
-      !this._available?.devices.some((d) => d.parent_id === prefillContainer.id);
+      !firstSelectableTarget(
+        scopeToContainer(this._available?.devices ?? [], prefillContainer)
+      );
     return html`
       <p class="intro">
         ${renderMarkdown(this._localize("device.automation_header_description"))}
