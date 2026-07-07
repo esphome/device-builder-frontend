@@ -1,8 +1,8 @@
 /**
  * Tests for ``onConfirmSubmit`` request args. Pins that the optional pairing
  * key is trimmed and forwarded only when non-empty (a blank field omits the
- * ``psk`` arg entirely so a normal dashboard pair is unaffected), and that the
- * fixed args (host, port, pin, labels) always ride along.
+ * ``pairing_key`` arg entirely so a normal dashboard pair is unaffected), and
+ * that the fixed args (host, port, pin, labels) always ride along.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
@@ -12,7 +12,7 @@ import { identityLocalize } from "../../_dom.js";
 
 type RequestArgs = Parameters<ESPHomeAPI["requestRemoteBuildPair"]>[0];
 
-function makeHost(psk: string): {
+function makeHost(pairingKey: string): {
   host: ESPHomePairBuildServerDialog;
   request: ReturnType<typeof vi.fn>;
 } {
@@ -27,7 +27,7 @@ function makeHost(psk: string): {
     _previewedPin: "abc123",
     _receiverLabel: "buildbox",
     _offloaderLabel: "ha-green",
-    _psk: psk,
+    _pairingKey: pairingKey,
     _error: null,
     _step: "confirm",
     _sentKey: null,
@@ -42,7 +42,7 @@ describe("onConfirmSubmit", () => {
     await onConfirmSubmit(host);
 
     const args = request.mock.calls[0][0] as RequestArgs;
-    expect(args.psk).toBe("ABCD-EFGH-JKMN-PQRS");
+    expect(args.pairing_key).toBe("ABCD-EFGH-JKMN-PQRS");
     expect(args).toMatchObject({
       hostname: "buildbox.local",
       port: 6055,
@@ -53,11 +53,11 @@ describe("onConfirmSubmit", () => {
     expect(host._step).toBe("sent");
   });
 
-  it("omits the psk arg entirely when the field is blank", async () => {
+  it("omits the pairing_key arg entirely when the field is blank", async () => {
     const { host, request } = makeHost("   ");
     await onConfirmSubmit(host);
 
     const args = request.mock.calls[0][0] as RequestArgs;
-    expect("psk" in args).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(args, "pairing_key")).toBe(false);
   });
 });

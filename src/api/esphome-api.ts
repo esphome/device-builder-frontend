@@ -2043,7 +2043,7 @@ export class ESPHomeAPI {
    * sent to the receiver in msg3 for *their* pairing-requests
    * inbox.
    *
-   * ``psk`` is the one-time pairing key a headless
+   * ``pairing_key`` is the one-time pairing key a headless
    * ``--remote-build-only`` build server prints on its console;
    * it rides in the encrypted msg3 and is only sent after the
    * receiver's static key matched ``pin_sha256``. Omit it when
@@ -2069,7 +2069,7 @@ export class ESPHomeAPI {
     pin_sha256: string;
     receiver_label: string;
     offloader_label: string;
-    psk?: string;
+    pairing_key?: string;
   }): Promise<PairingSummary> {
     return this.sendCommand<PairingSummary>("remote_build/request_pair", args);
   }

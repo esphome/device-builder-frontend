@@ -20,7 +20,6 @@ function makeHost(
     error?: string | null;
     busy?: boolean;
     sending?: boolean;
-    psk?: string;
   } = {}
 ): ESPHomePairBuildServerDialog {
   return {
@@ -32,7 +31,7 @@ function makeHost(
     _port: "6055",
     _receiverLabel: "buildbox",
     _offloaderLabel: "ha-green",
-    _psk: opts.psk ?? "",
+    _pairingKey: "",
     _error: opts.error ?? null,
     _skippedInput: opts.skippedInput ?? false,
     _onConfirmBack: () => {},
@@ -91,17 +90,10 @@ describe("renderConfirmStep", () => {
 
   it("renders the collapsed pairing-key disclosure with its input", () => {
     const tree = renderConfirmStep(makeHost({ pin: "abc" }));
-    expect(findTemplatesByAnchor(tree, "psk-disclosure")).toHaveLength(1);
-    expect(findTemplatesByAnchor(tree, 'id="pair-psk"')).toHaveLength(1);
-    expect(allValues(tree)).toContain("settings.pair_build_server_psk_disclosure");
-  });
-
-  it("opens the disclosure when a key is already entered", () => {
-    const [details] = findTemplatesByAnchor(
-      renderConfirmStep(makeHost({ pin: "abc", psk: "ABCD-EFGH-JKMN-PQRS" })),
-      "psk-disclosure"
+    expect(findTemplatesByAnchor(tree, "pairing-key-disclosure")).toHaveLength(1);
+    expect(findTemplatesByAnchor(tree, 'id="pair-pairing-key"')).toHaveLength(1);
+    expect(allValues(tree)).toContain(
+      "settings.pair_build_server_pairing_key_disclosure"
     );
-    // The ?open binding is the single interpolated value on the details node.
-    expect(details.values).toContain(true);
   });
 });

@@ -164,27 +164,35 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
     <div class="trust-warning" role="alert">
       ${host._localize("settings.pair_build_server_trust_warning")}
     </div>
-    <details class="psk-disclosure" ?open=${host._psk.length > 0}>
-      <summary>${host._localize("settings.pair_build_server_psk_disclosure")}</summary>
+    <!-- Uncontrolled <details> (no ?open binding): the key is never
+         prefilled so it always starts closed, and binding open-ness to the
+         field contents would snap it shut mid-edit when the user clears the
+         field to empty. -->
+    <details class="pairing-key-disclosure">
+      <summary>
+        ${host._localize("settings.pair_build_server_pairing_key_disclosure")}
+      </summary>
       <div class="field">
-        <label for="pair-psk">
-          ${host._localize("settings.pair_build_server_psk_label")}
+        <label for="pair-pairing-key">
+          ${host._localize("settings.pair_build_server_pairing_key_label")}
         </label>
         <input
-          id="pair-psk"
+          id="pair-pairing-key"
           type="text"
           autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
           spellcheck="false"
           ?disabled=${host._busy}
-          .value=${host._psk}
-          placeholder=${host._localize("settings.pair_build_server_psk_placeholder")}
+          .value=${host._pairingKey}
+          placeholder=${host._localize("settings.pair_build_server_pairing_key_placeholder")}
           @input=${(e: Event) => {
-            host._psk = (e.target as HTMLInputElement).value;
+            host._pairingKey = (e.target as HTMLInputElement).value;
             host._error = null;
           }}
         />
         <span class="helper">
-          ${host._localize("settings.pair_build_server_psk_helper")}
+          ${host._localize("settings.pair_build_server_pairing_key_helper")}
         </span>
       </div>
     </details>

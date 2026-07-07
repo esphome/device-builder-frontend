@@ -140,18 +140,18 @@ export const pairBuildServerDialogStyles = css`
   /* Optional pairing key, collapsed by default — only headless build
      servers (--remote-build-only) need it, so the common dashboard-pairing
      path doesn't see an unexplained field. */
-  .psk-disclosure {
+  .pairing-key-disclosure {
     padding-bottom: var(--wa-space-m);
   }
 
-  .psk-disclosure summary {
+  .pairing-key-disclosure summary {
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-quiet);
     cursor: pointer;
     padding-bottom: var(--wa-space-xs);
   }
 
-  .psk-disclosure .field {
+  .pairing-key-disclosure .field {
     padding-bottom: 0;
   }
 
