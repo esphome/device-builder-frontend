@@ -198,7 +198,7 @@ describe("describeYamlError", () => {
     ).toEqual({
       text: 'yaml_editor.error_indent_fix:{"line":2,"key":"platform","spaces":2}',
       jumpLine: 2,
-      fix: { line: 2, indent: 2 },
+      fix: { line: 2, indent: 2, key: "platform" },
     });
   });
 

@@ -35,6 +35,7 @@ import {
   saveSplitRatio,
 } from "../../util/split-ratio.js";
 import type { BannerError, YamlDiagnosticsDetail } from "../../util/yaml-lint-backend.js";
+import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeYamlEditor, HighlightRange } from "../yaml-editor.js";
 import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
@@ -43,6 +44,7 @@ import { renderInstallAction } from "./install-action.js";
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../confirm-dialog.js";
 import "../yaml-diff.js";
 import "../yaml-editor.js";
 import "./device-board-info.js";
@@ -214,6 +216,9 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   @query("esphome-yaml-editor")
   private _yamlEditor?: ESPHomeYamlEditor;
+
+  @query("esphome-confirm-dialog.auto-fix-confirm")
+  private _autoFixConfirmDialog?: ESPHomeConfirmDialog;
 
   static styles = [espHomeStyles, dangerBannerStyles, deviceEditorStyles];
 
@@ -432,6 +437,18 @@ export class ESPHomeDeviceEditor extends LitElement {
             </div>
           </div>
         </div>
+        ${
+          this._autoFixConfirmOpen
+            ? html`<esphome-confirm-dialog
+                class="auto-fix-confirm"
+                heading=${this._localize("yaml_editor.auto_fix_confirm_heading")}
+                message=${this._localize("yaml_editor.auto_fix_confirm_message")}
+                confirm-label=${this._localize("yaml_editor.auto_fix_confirm_apply")}
+                @confirm=${() => this._settleAutoFixConfirm(true)}
+                @cancel=${() => this._settleAutoFixConfirm(false)}
+              ></esphome-confirm-dialog>`
+            : nothing
+        }
       </section>
     `;
   }
@@ -528,9 +545,34 @@ export class ESPHomeDeviceEditor extends LitElement {
     this._liveErrors = next;
   }
 
-  /** Apply a banner error's one-click indentation repair in the editor. */
+  /** Apply a banner error's one-click indentation repair in the editor. The
+   *  editor validates the proposed edit first and calls back through
+   *  ``_confirmAutoFix`` when the fix parses but other YAML errors remain. */
   private _autoFix(fix: NonNullable<BannerError["fix"]>) {
-    this._yamlEditor?.applyIndentFix(fix.line, fix.indent);
+    void this._yamlEditor?.applyIndentFix(fix, () => this._confirmAutoFix());
+  }
+
+  /** Resolve callback for the in-flight auto-fix confirmation, if any. */
+  private _autoFixConfirmResolve: ((apply: boolean) => void) | null = null;
+
+  /** Mounts the confirm dialog only while a prompt is pending — its
+   *  form-associated buttons are expensive to instantiate otherwise. */
+  @state()
+  private _autoFixConfirmOpen = false;
+
+  /** Open the "errors remain" prompt and resolve with the user's choice. */
+  private _confirmAutoFix(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this._autoFixConfirmResolve = resolve;
+      this._autoFixConfirmOpen = true;
+      void this.updateComplete.then(() => this._autoFixConfirmDialog?.open());
+    });
+  }
+
+  private _settleAutoFixConfirm(apply: boolean) {
+    this._autoFixConfirmResolve?.(apply);
+    this._autoFixConfirmResolve = null;
+    this._autoFixConfirmOpen = false;
   }
 
   /** Ask the page to highlight and scroll to a banner error's line. */

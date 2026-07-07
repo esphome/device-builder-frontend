@@ -73,7 +73,7 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
         {
           message: "yaml_editor.error_indent_fix:2",
           line: 2,
-          fix: { line: 2, indent: 2 },
+          fix: { line: 2, indent: 2, key: "platform" },
         },
       ]);
 

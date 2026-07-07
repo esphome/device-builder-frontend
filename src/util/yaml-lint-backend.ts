@@ -239,6 +239,9 @@ export function analyzeIndentMismatch(
 export interface YamlAutoFix {
   line: number;
   indent: number;
+  /** The list item's own key, so the apply site can confirm the line still
+   *  targets the same item after edits shift line numbers. */
+  key: string;
 }
 
 /** A humanized YAML error: display text, best line to jump to, optional auto-fix. */
@@ -308,7 +311,7 @@ export function describeYamlError(
           spaces: fix.delta,
         }),
         jumpLine: fix.markerLine,
-        fix: { line: fix.markerLine, indent: fix.delta },
+        fix: { line: fix.markerLine, indent: fix.delta, key: fix.markerKey },
       };
     }
     return hint("yaml_editor.error_indent_hint");

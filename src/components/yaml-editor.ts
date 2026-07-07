@@ -11,6 +11,7 @@ import { css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
+import type { EditorValidateResponse } from "../api/types/editor.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import {
@@ -35,12 +36,12 @@ import {
   blankLineContext,
   fieldPathByIndent,
   keyPathByIndent,
-  RE_LIST_ITEM,
 } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
   relintEffect,
+  type YamlAutoFix,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
 import type { YamlSection } from "../util/yaml-sections.js";
@@ -55,6 +56,10 @@ export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 
 // Delay before an at-rest caret opens the completion popup for discovery.
 const IDLE_COMPLETION_DELAY_MS = 1500;
+
+// A list-item line, capturing the item's first key so the auto-fix can confirm
+// it still targets the same item after edits shift line numbers.
+const LIST_ITEM_KEY_RE = /^\s*-\s+([^\s:#]+)/;
 
 // `#` must be percent-encoded (`%23`) inside a data-URI background-image.
 const errorDot = (fill: string, stroke: string): string =>
@@ -553,19 +558,50 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   }
 
   /**
-   * Insert `indent` spaces at the start of 1-indexed `line` to repair an
-   * indentation error, then focus so the change is undoable in place.
+   * Validate a proposed indentation fix, then apply it. When the proposed
+   * document validates cleanly the fix applies straight away; when errors
+   * remain `confirm` decides whether to apply anyway. Applied as a real,
+   * undoable transaction.
    *
-   * Guarded: only applies when the target line is still a `- ` list item
-   * (the banner it came from may be a lint pass behind the buffer).
+   * Guarded against a stale banner: it re-checks (before and after the async
+   * validation) that the target line is still the `- <key>` list item the fix
+   * was computed for, so edits can't redirect it onto an unrelated item or
+   * double-indent one the user already fixed.
    */
-  applyIndentFix(line: number, indent: number) {
+  async applyIndentFix(
+    fix: YamlAutoFix,
+    confirm?: () => Promise<boolean>
+  ): Promise<void> {
     const view = this._view;
-    if (!view || indent <= 0 || line < 1 || line > view.state.doc.lines) return;
-    const target = view.state.doc.line(line);
-    if (!RE_LIST_ITEM.test(target.text)) return;
+    if (!view || !this._api || fix.indent <= 0) return;
+    // Resolve the target only when it is still the same `- <key>` item.
+    const targetFrom = (): number | null => {
+      const doc = view.state.doc;
+      if (fix.line < 1 || fix.line > doc.lines) return null;
+      const t = doc.line(fix.line);
+      return t.text.match(LIST_ITEM_KEY_RE)?.[1] === fix.key ? t.from : null;
+    };
+    const from = targetFrom();
+    if (from === null) return;
+
+    const doc = view.state.doc;
+    const spaces = " ".repeat(fix.indent);
+    const proposed = doc.sliceString(0, from) + spaces + doc.sliceString(from);
+    let res: EditorValidateResponse;
+    try {
+      res = await this._api.validateYaml(this.configuration, proposed);
+    } catch {
+      return; // can't validate → don't apply blindly
+    }
+    // Clean result → just do it; otherwise ask before applying over errors.
+    const clean = !res.yaml_errors?.length && !res.validation_errors?.length;
+    if (!clean && !(await (confirm?.() ?? Promise.resolve(false)))) return;
+
+    // Re-resolve the target: the doc may have changed while we awaited.
+    const settled = targetFrom();
+    if (settled === null) return;
     view.dispatch({
-      changes: { from: target.from, insert: " ".repeat(indent) },
+      changes: { from: settled, insert: spaces },
       scrollIntoView: true,
     });
     view.focus();
