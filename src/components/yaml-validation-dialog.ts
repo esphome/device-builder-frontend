@@ -7,7 +7,6 @@ import { localizeContext } from "../context/index.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
-import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -109,10 +108,12 @@ export class ESPHomeYamlValidationDialog extends LitElement {
 
   private _resolvedExit: "goto" | "save-anyway" | null = null;
 
-  // Enter goes to the first error (the safe path), never force-save.
-  private _enter = new EnterController(this, () => {
+  // Enter goes to the first error (the safe path), never force-save. Passed
+  // as base-dialog's ``confirmOnEnter``; always bound (the guard lives
+  // inside) so an unusable go-to-error still claims the Enter keydown.
+  private _gotoOnEnter = () => {
     if (this._canGoToError) this._goto();
-  });
+  };
 
   /** Navigation only works when the error is in the open buffer at a known line. */
   private get _canGoToError(): boolean {
@@ -122,7 +123,6 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   open() {
     this._resolvedExit = null;
     this._dialog.open = true;
-    this._enter.set(true);
   }
 
   close() {
@@ -143,6 +143,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._dialog.open}
         .label=${this._localize("device.yaml_invalid_title")}
+        .confirmOnEnter=${this._gotoOnEnter}
         @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
@@ -205,7 +206,6 @@ export class ESPHomeYamlValidationDialog extends LitElement {
 
   private _onAfterHide() {
     this._dialog.open = false;
-    this._enter.set(false);
     if (this._resolvedExit === null) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
     }

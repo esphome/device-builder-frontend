@@ -2,15 +2,15 @@
  * @vitest-environment happy-dom
  *
  * Pins that the friendly-name dialog confirms a changed value on Enter via
- * the shared EnterController, and goes inert once closed.
+ * base-dialog's confirmOnEnter, and goes inert once closed.
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../src/components/base-dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/checkbox/checkbox.js", () => ({}));
 
 import { ESPHomeFriendlyNameDialog } from "../../src/components/friendly-name-dialog.js";
-import { mount } from "../_dom.js";
+import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 
 function setValue(el: ESPHomeFriendlyNameDialog, value: string): Promise<unknown> {
@@ -24,7 +24,7 @@ describe("friendly-name-dialog ENTER", () => {
   it("confirms a changed friendly name on Enter", async () => {
     const el = await mount(new ESPHomeFriendlyNameDialog());
     el.open("kitchen", "Kitchen");
-    await el.updateComplete;
+    await baseDialogSettled(el);
     const onConfirm = vi.fn();
     el.addEventListener("friendly-name-confirm", onConfirm as EventListener);
     await setValue(el, "Living Room");
@@ -37,17 +37,17 @@ describe("friendly-name-dialog ENTER", () => {
 
   it("fires friendly-name-confirm once on a held (auto-repeat) Enter", async () => {
     // Models OS auto-repeat as separate tasks with a microtask drain
-    // between (keydown -> updateComplete -> keydown). The listener
-    // detaches in willUpdate on the first keydown's close(), so the
+    // between (keydown -> settle -> keydown). The listener detaches in
+    // base-dialog's willUpdate on the first keydown's close(), so the
     // second finds it gone — no latch needed.
     const el = await mount(new ESPHomeFriendlyNameDialog());
     el.open("kitchen", "Kitchen");
-    await el.updateComplete;
+    await baseDialogSettled(el);
     const onConfirm = vi.fn();
     el.addEventListener("friendly-name-confirm", onConfirm as EventListener);
     await setValue(el, "Living Room");
     pressEnter({ repeat: true }); // confirms + runs close(), schedules the detaching update
-    await el.updateComplete; // the inter-keystroke turn: willUpdate unbinds the listener
+    await baseDialogSettled(el); // the inter-keystroke turn: willUpdate unbinds the listener
     pressEnter({ repeat: true }); // listener already gone — no second dispatch
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
@@ -57,7 +57,7 @@ describe("friendly-name-dialog ENTER", () => {
     el.open("kitchen", "Kitchen");
     await setValue(el, "Living Room");
     el.close();
-    await el.updateComplete;
+    await baseDialogSettled(el);
     const onConfirm = vi.fn();
     el.addEventListener("friendly-name-confirm", onConfirm as EventListener);
     pressEnter();

@@ -1,15 +1,16 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins that the rename dialog confirms a valid new name on Enter (via the
- * shared EnterController), and ignores Enter when unchanged or after close.
+ * Pins that the rename dialog confirms a valid new name on Enter (via
+ * base-dialog's confirmOnEnter), and ignores Enter when unchanged or after
+ * close.
  */
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
 import { ESPHomeRenameDeviceDialog } from "../../src/components/rename-device-dialog.js";
-import { mount } from "../_dom.js";
+import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 
 function setValue(el: ESPHomeRenameDeviceDialog, value: string): Promise<unknown> {
@@ -54,35 +55,34 @@ describe("rename-device-dialog ENTER", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps Enter reachable after close() until after-hide", async () => {
+  it("stops a same-task Enter repeat via the one-shot latch", async () => {
     // The unchanged/invalid checks are not idempotency guards (they pass
-    // identically on the repeat); the listener detaches in _onAfterHide, not
-    // close(), so the _resolved latch is the only thing stopping a second
-    // dispatch while the dialog is still hiding.
+    // identically on the repeat). base-dialog detaches its Enter listener
+    // in its own update after close() flips ?open — asynchronously — so an
+    // Enter landing in the same task as the confirm still finds the
+    // listener bound; the _resolved latch is what stops a second dispatch.
     const el = await mount(new ESPHomeRenameDeviceDialog());
     el.open("oldname");
-    await el.updateComplete;
+    await baseDialogSettled(el);
     const onConfirm = vi.fn();
     el.addEventListener("rename-confirm", onConfirm as EventListener);
     await setValue(el, "kitchen");
-    pressEnter(); // confirms and runs close(), but after-hide hasn't fired
-    // close() flips the reactive open flag; the base-dialog is still hiding
-    // (after-hide not yet fired) so the EnterController listener stays bound.
+    pressEnter(); // confirms and runs close(); the detaching update is queued
     expect((el as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(false);
-    pressEnter(); // listener still bound; stopped only by the latch
+    pressEnter(); // same task: listener still bound; stopped only by the latch
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._onAfterHide(); // unbinds the listener
+    await baseDialogSettled(el); // base-dialog's willUpdate unbinds the listener
     pressEnter();
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores Enter after the dialog hides", async () => {
+  it("ignores Enter after close() settles", async () => {
     const el = await mount(new ESPHomeRenameDeviceDialog());
     el.open("oldname");
+    await baseDialogSettled(el);
     await setValue(el, "kitchen");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._onAfterHide(); // wa-dialog close path
+    el.close();
+    await baseDialogSettled(el); // detaches the Enter listener
     const onConfirm = vi.fn();
     el.addEventListener("rename-confirm", onConfirm as EventListener);
     pressEnter();

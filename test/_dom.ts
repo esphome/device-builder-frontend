@@ -48,3 +48,18 @@ export function renderInto(tpl: unknown): HTMLElement {
 
 /** Identity localize stub for host fakes: returns the key unchanged. */
 export const identityLocalize = (key: string): string => key;
+
+/**
+ * Await the host's update *and* its nested ``<esphome-base-dialog>``'s.
+ *
+ * The base dialog binds its ``confirmOnEnter`` Enter listener in its own
+ * ``willUpdate`` — one update cycle after the host renders ``?open`` — so
+ * a test that presses Enter right after the host's ``updateComplete``
+ * races the binding. Settle both cycles before (and after close, to see
+ * the detach) dispatching keydowns.
+ */
+export async function baseDialogSettled(el: HTMLElement): Promise<void> {
+  await (el as { updateComplete?: Promise<unknown> }).updateComplete;
+  const base = el.shadowRoot?.querySelector("esphome-base-dialog");
+  await (base as { updateComplete?: Promise<unknown> } | null)?.updateComplete;
+}

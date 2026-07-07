@@ -12,7 +12,7 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeYamlValidationDialog } from "../../src/components/yaml-validation-dialog.js";
-import { mount } from "../_dom.js";
+import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 
 const baseDialog = (el: ESPHomeYamlValidationDialog): HTMLElement =>
@@ -27,6 +27,7 @@ describe("yaml-validation-dialog ENTER", () => {
     const onGoto = vi.fn();
     el.addEventListener("goto", onGoto as EventListener);
     el.open();
+    await baseDialogSettled(el);
     pressEnter();
     expect(onGoto).toHaveBeenCalledTimes(1);
     expect(onGoto.mock.calls[0][0].detail).toEqual({ line: 12, col: 4 });
@@ -41,6 +42,7 @@ describe("yaml-validation-dialog ENTER", () => {
     el.addEventListener("goto", onGoto);
     el.addEventListener("save-anyway", onSaveAnyway);
     el.open();
+    await baseDialogSettled(el);
     pressEnter();
     expect(onGoto).not.toHaveBeenCalled();
     expect(onSaveAnyway).not.toHaveBeenCalled();
@@ -53,6 +55,9 @@ describe("yaml-validation-dialog ENTER", () => {
     const onGoto = vi.fn();
     el.addEventListener("goto", onGoto);
     el.open();
+    await baseDialogSettled(el);
+    // Same-task repeat: the base detaches Enter asynchronously after the
+    // first press's close(), so the _resolvedExit latch stops the second.
     pressEnter();
     pressEnter();
     expect(onGoto).toHaveBeenCalledTimes(1);
@@ -93,6 +98,7 @@ describe("yaml-validation-dialog included-file error", () => {
     const onGoto = vi.fn();
     el.addEventListener("goto", onGoto);
     el.open();
+    await baseDialogSettled(el);
     pressEnter();
     expect(onGoto).not.toHaveBeenCalled();
   });
@@ -131,6 +137,7 @@ describe("yaml-validation-dialog dismiss / request-close", () => {
     el.addEventListener("cancel", onCancel);
     pressEnter(); // not open yet -> no-op
     el.open();
+    await baseDialogSettled(el);
     pressEnter(); // resolves as "goto"
     baseDialog(el).dispatchEvent(new CustomEvent("after-hide"));
     expect(onGoto).toHaveBeenCalledTimes(1);

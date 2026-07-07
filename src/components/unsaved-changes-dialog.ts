@@ -6,7 +6,6 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
-import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -34,13 +33,13 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
 
   private _resolved = false;
 
-  // Enter saves and leaves (the primary action); never Discard.
-  private _enter = new EnterController(this, () => this._onSave());
+  // Enter saves and leaves (the primary action); never Discard. Passed as
+  // base-dialog's ``confirmOnEnter``; _onSave self-guards via _resolved.
+  private _saveOnEnter = () => this._onSave();
 
   open() {
     this._resolved = false;
     this._dialog.open = true;
-    this._enter.set(true);
   }
 
   close() {
@@ -169,6 +168,7 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
+        .confirmOnEnter=${this._saveOnEnter}
         @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
@@ -216,7 +216,6 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
 
   private _onAfterHide() {
     this._dialog.open = false;
-    this._enter.set(false);
     if (!this._resolved) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
     }

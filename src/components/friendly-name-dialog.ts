@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
@@ -11,7 +11,6 @@ import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { dialogFieldStyles } from "../styles/dialog-fields.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
@@ -89,19 +88,6 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
     `,
   ];
 
-  // Enter confirms; _confirm self-guards on empty / unchanged.
-  // No one-shot latch needed here: the listener detaches in willUpdate
-  // on the _open flip (a microtask, drains before the next auto-repeat
-  // keydown). The sibling dialogs (rename/clone/confirm/unsaved-changes/
-  // yaml-validation) detach on wa-after-hide — many turns later — so they
-  // need the _resolved latch and this one doesn't. Move teardown to
-  // wa-after-hide and you must add it.
-  private _enter = new EnterController(this, () => this._confirm());
-
-  protected willUpdate(changed: PropertyValues): void {
-    if (changed.has("_open")) this._enter.set(this._open);
-  }
-
   open(deviceName: string, currentFriendlyName: string) {
     this.deviceName = deviceName;
     this.currentFriendlyName = currentFriendlyName;
@@ -139,6 +125,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
         .label=${this._localize("dashboard.action_friendly_name_title", {
           name: this.deviceName,
         })}
+        .confirmOnEnter=${this._confirm}
         @after-hide=${this._onAfterHide}
       >
         <div class="field">
@@ -199,6 +186,10 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
     `;
   }
 
+  // Passed as base-dialog's ``confirmOnEnter`` (Enter confirms). Self-guards
+  // on empty / unchanged, as that contract requires; no one-shot latch needed
+  // because the base detaches Enter on the ``open`` flip (a microtask, drains
+  // before the next auto-repeat keydown).
   private _confirm = () => {
     const newFriendlyName = this._value.trim();
     if (!newFriendlyName || newFriendlyName === this.currentFriendlyName) {

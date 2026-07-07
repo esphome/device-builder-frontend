@@ -7,7 +7,6 @@ import { localizeContext } from "../context/index.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
-import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -112,15 +111,17 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   private _decided = false;
 
-  // Enter confirms, but never a destructive prompt (a stray Enter must not delete).
-  private _enter = new EnterController(this, () => {
+  // Enter confirms, but never a destructive prompt (a stray Enter must not
+  // delete). Always bound (the guard lives inside) so this dialog still
+  // claims the Enter keydown even when destructive — an unbound
+  // ``confirmOnEnter`` would let a stacked opener's own Enter handler act.
+  private _confirmOnEnter = () => {
     if (!this.destructive) this._confirm();
-  });
+  };
 
   open() {
     this._decided = false;
     this._dialog.open = true;
-    this._enter.set(true);
   }
 
   close() {
@@ -132,6 +133,7 @@ export class ESPHomeConfirmDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._dialog.open}
         .label=${this.heading}
+        .confirmOnEnter=${this._confirmOnEnter}
         @request-close=${this._dialog.onRequestClose}
         @after-hide=${this._onAfterHide}
       >
@@ -192,7 +194,6 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   private _onAfterHide() {
     this._dialog.open = false;
-    this._enter.set(false);
     if (!this._decided) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
     }

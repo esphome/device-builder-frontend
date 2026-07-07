@@ -1,15 +1,15 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins that the clone dialog confirms a valid new name on Enter via the
- * shared EnterController.
+ * Pins that the clone dialog confirms a valid new name on Enter via
+ * base-dialog's confirmOnEnter.
  */
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 
 import { ESPHomeCloneDeviceDialog } from "../../src/components/clone-device-dialog.js";
-import { mount } from "../_dom.js";
+import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 
 describe("clone-device-dialog ENTER", () => {
@@ -43,28 +43,26 @@ describe("clone-device-dialog ENTER", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps Enter reachable after close() until after-hide", async () => {
+  it("stops a same-task Enter repeat via the one-shot latch", async () => {
     // The empty/same/invalid checks are not idempotency guards (they pass
-    // identically on the repeat); the listener detaches in _onAfterHide, not
-    // close(), so the _resolved latch is the only thing stopping a second
-    // dispatch while the dialog is still hiding.
+    // identically on the repeat). base-dialog detaches its Enter listener
+    // in its own update after close() flips ?open — asynchronously — so an
+    // Enter landing in the same task as the confirm still finds the
+    // listener bound; the _resolved latch is what stops a second dispatch.
     const el = await mount(new ESPHomeCloneDeviceDialog());
     el.open("source");
-    await el.updateComplete;
+    await baseDialogSettled(el);
     const onConfirm = vi.fn();
     el.addEventListener("clone-confirm", onConfirm as EventListener);
     const input = el.shadowRoot!.querySelector<HTMLInputElement>("#clone-new-name")!;
     input.value = "kitchen";
     input.dispatchEvent(new Event("input"));
     await el.updateComplete;
-    pressEnter(); // confirms and runs close(), but after-hide hasn't fired
-    // close() flips the reactive open flag; the base-dialog is still hiding
-    // (after-hide not yet fired) so the EnterController listener stays bound.
+    pressEnter(); // confirms and runs close(); the detaching update is queued
     expect((el as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(false);
-    pressEnter(); // listener still bound; stopped only by the latch
+    pressEnter(); // same task: listener still bound; stopped only by the latch
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._onAfterHide(); // unbinds the listener
+    await baseDialogSettled(el); // base-dialog's willUpdate unbinds the listener
     pressEnter();
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });

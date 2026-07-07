@@ -13,7 +13,6 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
-import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
 import "./base-dialog.js";
@@ -52,29 +51,21 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
     `,
   ];
 
-  // One-shot latch: close() only starts the hide animation, so the
-  // EnterController listener stays live until wa-after-hide; without this a
-  // held Enter re-enters _confirm and dispatches rename-confirm twice.
+  // One-shot latch: base-dialog detaches its Enter listener the instant
+  // ``open`` flips false, but the buttons stay clickable through the hide
+  // animation — a second activation must not dispatch rename-confirm twice.
   private _resolved = false;
-
-  // Enter confirms; _confirm self-guards on unchanged / invalid.
-  private _enter = new EnterController(this, () => this._confirm());
 
   open(name: string) {
     this.deviceName = name;
     this._value = name;
     this._resolved = false;
     this._dialog.open = true;
-    this._enter.set(true);
   }
 
   close() {
     this._dialog.open = false;
   }
-
-  private _onAfterHide = (): void => {
-    this._enter.set(false);
-  };
 
   protected render() {
     const trimmed = this._value.trim();
@@ -91,8 +82,8 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._dialog.open}
         .label=${this._localize("dashboard.action_rename_title")}
+        .confirmOnEnter=${this._confirm}
         @request-close=${this._dialog.onRequestClose}
-        @after-hide=${this._onAfterHide}
       >
         <div class="field">
           <label>${this._localize("dashboard.action_rename_label")}</label>
@@ -130,7 +121,9 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
     `;
   }
 
-  private _confirm() {
+  // Arrow property: passed as base-dialog's ``confirmOnEnter`` (Enter
+  // confirms). Self-guards on unchanged / invalid, as that contract requires.
+  private _confirm = () => {
     if (this._resolved) return;
     const newName = this._value.trim();
     if (!newName || newName === this.deviceName) return;
@@ -144,7 +137,7 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
         composed: true,
       })
     );
-  }
+  };
 }
 
 declare global {

@@ -9,7 +9,7 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeConfirmDialog } from "../../src/components/confirm-dialog.js";
-import { mount } from "../_dom.js";
+import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 
 describe("confirm-dialog ENTER", () => {
@@ -18,6 +18,7 @@ describe("confirm-dialog ENTER", () => {
     const onConfirm = vi.fn();
     el.addEventListener("confirm", onConfirm);
     el.open();
+    await baseDialogSettled(el);
     pressEnter();
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
@@ -29,6 +30,7 @@ describe("confirm-dialog ENTER", () => {
     const onConfirm = vi.fn();
     el.addEventListener("confirm", onConfirm);
     el.open();
+    await baseDialogSettled(el);
     pressEnter();
     expect(onConfirm).not.toHaveBeenCalled();
   });
@@ -38,6 +40,10 @@ describe("confirm-dialog ENTER", () => {
     const onConfirm = vi.fn();
     el.addEventListener("confirm", onConfirm);
     el.open();
+    await baseDialogSettled(el);
+    // Same-task repeat: the first Enter confirms and runs close(), but the
+    // base detaches its listener asynchronously (in its next update), so
+    // the second keydown still lands — only the _decided latch stops it.
     pressEnter();
     pressEnter();
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -72,7 +78,7 @@ describe("confirm-dialog dismiss / request-close", () => {
   it("does not fire cancel when the dialog was confirmed", async () => {
     const el = await mount(new ESPHomeConfirmDialog());
     el.open();
-    await el.updateComplete;
+    await baseDialogSettled(el);
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
     el.addEventListener("confirm", onConfirm);

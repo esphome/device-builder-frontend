@@ -13,7 +13,6 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
-import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
 import "./base-dialog.js";
@@ -73,13 +72,10 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     `,
   ];
 
-  // One-shot latch: close() only starts the hide animation, so the
-  // EnterController listener stays live until wa-after-hide; without this a
-  // held Enter re-enters _confirm and dispatches clone-confirm twice.
+  // One-shot latch: base-dialog detaches its Enter listener the instant
+  // ``open`` flips false, but the buttons stay clickable through the hide
+  // animation — a second activation must not dispatch clone-confirm twice.
   private _resolved = false;
-
-  // Enter confirms; _confirm self-guards on empty / same / invalid.
-  private _enter = new EnterController(this, () => this._confirm());
 
   open(sourceName: string) {
     this.sourceName = sourceName;
@@ -87,16 +83,11 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     this._friendlyName = "";
     this._resolved = false;
     this._dialog.open = true;
-    this._enter.set(true);
   }
 
   close() {
     this._dialog.open = false;
   }
-
-  private _onAfterHide = (): void => {
-    this._enter.set(false);
-  };
 
   protected render() {
     const trimmedName = this._name.trim();
@@ -121,8 +112,8 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
         .label=${this._localize("dashboard.action_clone_title", {
           name: this.sourceName,
         })}
+        .confirmOnEnter=${this._confirm}
         @request-close=${this._dialog.onRequestClose}
-        @after-hide=${this._onAfterHide}
       >
         <div class="field">
           <label for="clone-new-name"
@@ -183,6 +174,8 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     `;
   }
 
+  // Passed as base-dialog's ``confirmOnEnter`` (Enter confirms).
+  // Self-guards on empty / same / invalid, as that contract requires.
   private _confirm = () => {
     if (this._resolved) return;
     const newName = this._name.trim();

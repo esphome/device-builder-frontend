@@ -13,7 +13,7 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeUnsavedChangesDialog } from "../../src/components/unsaved-changes-dialog.js";
-import { mount } from "../_dom.js";
+import { baseDialogSettled, mount } from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 
 const baseDialog = (el: ESPHomeUnsavedChangesDialog): HTMLElement =>
@@ -27,6 +27,7 @@ describe("unsaved-changes-dialog ENTER", () => {
     el.addEventListener("save", onSave);
     el.addEventListener("discard", onDiscard);
     el.open();
+    await baseDialogSettled(el);
     pressEnter();
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onDiscard).not.toHaveBeenCalled();
@@ -37,6 +38,9 @@ describe("unsaved-changes-dialog ENTER", () => {
     const onSave = vi.fn();
     el.addEventListener("save", onSave);
     el.open();
+    await baseDialogSettled(el);
+    // Same-task repeat: the base detaches Enter asynchronously after the
+    // first press's close(), so the _resolved latch stops the second.
     pressEnter();
     pressEnter();
     expect(onSave).toHaveBeenCalledTimes(1);
@@ -68,7 +72,7 @@ describe("unsaved-changes-dialog dismiss / request-close", () => {
   it("does not fire cancel after a decision (save)", async () => {
     const el = await mount(new ESPHomeUnsavedChangesDialog());
     el.open();
-    await el.updateComplete;
+    await baseDialogSettled(el);
     const onSave = vi.fn();
     const onCancel = vi.fn();
     el.addEventListener("save", onSave);
