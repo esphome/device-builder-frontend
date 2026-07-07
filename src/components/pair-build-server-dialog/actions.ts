@@ -72,6 +72,10 @@ export async function onPreviewSubmit(host: ESPHomePairBuildServerDialog): Promi
     const response = await host._api.previewRemoteBuildPair({ hostname, port });
     if (host._previewGeneration !== generation) return;
     host._previewedPin = response.pin_sha256;
+    // A fresh preview is a fresh receiver identity: drop any key typed for a
+    // previous target so it can never be sent to a different receiver (e.g.
+    // Back from a headless confirm, then pair a normal dashboard).
+    host._pairingKey = "";
     // A headless build server in its bootstrap window reports it needs the
     // console key, so the confirm step can require it up front.
     host._pairingKeyRequired = response.requires_pairing_key === true;

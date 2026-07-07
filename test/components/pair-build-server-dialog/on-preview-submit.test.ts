@@ -19,6 +19,7 @@ function makeHost(
     _hostname: "buildbox.local",
     _port: "6055",
     _previewedPin: "",
+    _pairingKey: "",
     _pairingKeyRequired: false,
     _error: null,
     _step: "confirm",
@@ -45,6 +46,16 @@ describe("onPreviewSubmit", () => {
     await onPreviewSubmit(host);
 
     expect(host._pairingKeyRequired).toBe(true);
+  });
+
+  it("clears a stale key so it can't carry to a different receiver", async () => {
+    // A key was typed for a previous (headless) target.
+    const host = makeHost(async () => ({ pin_sha256: "abc123" }));
+    host._pairingKey = "OLD-KEY-FOR-OTHER-SERVER";
+    await onPreviewSubmit(host);
+
+    expect(host._pairingKey).toBe("");
+    expect(host._pairingKeyRequired).toBe(false);
   });
 
   it("falls back to the input step on a failed preview", async () => {
