@@ -13,6 +13,7 @@ import {
 import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { THEME_STORAGE_KEY } from "../../util/dark-mode.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 import { renderToggleRow } from "./settings-rows.js";
@@ -65,7 +66,7 @@ export class ESPHomeSettingsAppearance extends LitElement {
   private _versionHistoryEnabled = true;
 
   @state()
-  private _theme: string = localStorage.getItem("esphome-theme") ?? "system";
+  private _theme: string = localStorage.getItem(THEME_STORAGE_KEY) ?? "system";
 
   // Collapsed by default so the feature list doesn't lengthen the page.
   @state()

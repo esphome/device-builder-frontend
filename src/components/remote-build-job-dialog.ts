@@ -20,6 +20,7 @@ import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { jobStatusPillStyles } from "../styles/job-status-pill.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { initialDarkMode } from "../util/dark-mode.js";
 import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 import { renderErrorBanner } from "../util/render-error.js";
 import { remoteBuildJobDialogStyles } from "./remote-build-job-dialog.styles.js";
@@ -102,7 +103,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
 
   @consume({ context: darkModeContext, subscribe: true })
   @state()
-  private _darkMode = false;
+  private _darkMode = initialDarkMode();
 
   @state() private _open = false;
   @state() private _step: Step = "input";

@@ -25,6 +25,7 @@ import {
   lightHighlight,
   selectEditorTheme,
 } from "../util/codemirror-theme.js";
+import { initialDarkMode } from "../util/dark-mode.js";
 import { editorSearchPhrases } from "../util/editor-search-phrases.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { idleCompletion } from "../util/idle-completion.js";
@@ -109,7 +110,7 @@ const highlightField = StateField.define<DecorationSet>({
 export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   @consume({ context: darkModeContext, subscribe: true })
   @state()
-  private _darkMode = false;
+  private _darkMode = initialDarkMode();
 
   @consume({ context: apiContext })
   @state()

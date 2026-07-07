@@ -32,6 +32,7 @@ import {
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -88,7 +89,8 @@ export class ESPHomeCommandDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;
-  @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode = true;
+  @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode =
+    initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
   // Live firmware-job snapshot keyed by job_id. Drives the queued overlay so

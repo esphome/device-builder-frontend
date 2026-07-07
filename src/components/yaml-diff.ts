@@ -3,13 +3,14 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { darkModeContext, localizeContext } from "../context/index.js";
+import { initialDarkMode } from "../util/dark-mode.js";
 import { diffLines, type DiffLine } from "../util/diff-lines.js";
 
 @customElement("esphome-yaml-diff")
 export class ESPHomeYamlDiff extends LitElement {
   @consume({ context: darkModeContext, subscribe: true })
   @state()
-  private _darkMode = false;
+  private _darkMode = initialDarkMode();
 
   @consume({ context: localizeContext, subscribe: true })
   @state()

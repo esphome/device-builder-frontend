@@ -19,6 +19,7 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { notifyError } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -69,7 +70,7 @@ export class ESPHomeLogsDialog extends LitElement {
 
   @consume({ context: darkModeContext, subscribe: true })
   @state()
-  private _darkMode = true;
+  private _darkMode = initialDarkMode();
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;

@@ -57,6 +57,7 @@ import {
   versionHistoryEnabledContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { initialDarkMode, THEME_STORAGE_KEY, themeIsDark } from "../util/dark-mode.js";
 import { isExpert } from "../util/experience.js";
 import { notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
@@ -126,7 +127,7 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: desktopUpdateCapableContext })
   @state()
   _desktopUpdateCapable = false;
-  @provide({ context: darkModeContext }) @state() _darkMode = false;
+  @provide({ context: darkModeContext }) @state() _darkMode = initialDarkMode();
   @provide({ context: isHaIngressContext }) @state() _isHaIngress = false;
   @provide({ context: activeJobsContext }) @state() _activeJobs: Map<
     string,
@@ -402,18 +403,15 @@ export class ESPHomeApp extends LitElement {
   }
 
   applyTheme(theme: Theme) {
-    localStorage.setItem("esphome-theme", theme);
-    const prefersDark =
-      theme === Theme.SYSTEM
-        ? window.matchMedia("(prefers-color-scheme: dark)").matches
-        : theme === Theme.DARK;
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    const prefersDark = themeIsDark(theme);
     this._darkMode = prefersDark;
     document.documentElement.classList.toggle("wa-dark", prefersDark);
     document.documentElement.classList.toggle("wa-light", !prefersDark);
   }
 
   private _initDarkMode() {
-    const saved = (localStorage.getItem("esphome-theme") as Theme) ?? Theme.SYSTEM;
+    const saved = (localStorage.getItem(THEME_STORAGE_KEY) as Theme) ?? Theme.SYSTEM;
     this.applyTheme(saved);
   }
 

@@ -18,6 +18,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { initialDarkMode } from "../util/dark-mode.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import type { DetectedChip } from "../util/web-serial.js";
 import {
@@ -76,7 +77,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;
-  @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode = true;
+  @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode =
+    initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
   @state() _open = false;

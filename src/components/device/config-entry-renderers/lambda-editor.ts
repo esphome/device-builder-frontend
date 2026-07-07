@@ -28,6 +28,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { darkModeContext, localizeContext } from "../../../context/index.js";
 import { editorHeightTheme, selectEditorTheme } from "../../../util/codemirror-theme.js";
+import { initialDarkMode } from "../../../util/dark-mode.js";
 import { editorSearchPhrases } from "../../../util/editor-search-phrases.js";
 import { CodeMirrorEditorElement } from "../../codemirror-editor-element.js";
 
@@ -40,7 +41,7 @@ const externalSync = Annotation.define<boolean>();
 export class ESPHomeLambdaEditor extends CodeMirrorEditorElement {
   @consume({ context: darkModeContext, subscribe: true })
   @state()
-  private _darkMode = false;
+  private _darkMode = initialDarkMode();
 
   // Not subscribed: phrases are captured at mount, so the panel localizes at mount only.
   @consume({ context: localizeContext })
