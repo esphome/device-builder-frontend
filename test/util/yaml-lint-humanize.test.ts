@@ -28,13 +28,14 @@ const localize = (key: string, values?: Record<string, string | number>): string
 function mountView(
   validateYaml: ESPHomeAPI["validateYaml"],
   onResult: (errors: BannerError[], mapped: MappedValidationError[]) => void,
-  onAutoFix?: (fix: YamlAutoFix) => void
+  onAutoFix?: (fix: YamlAutoFix) => void,
+  // Three lines so the parse error at line 3 has an offset to map to.
+  doc = "sensor:\n- platform: dht\n    model: DHT11\n"
 ): EditorView {
   const api = { validateYaml } as unknown as ESPHomeAPI;
   return new EditorView({
     state: EditorState.create({
-      // Three lines so the parse error at line 3 has an offset to map to.
-      doc: "sensor:\n- platform: dht\n    model: DHT11\n",
+      doc,
       extensions: [
         createBackendYamlLinter({
           api,
@@ -120,6 +121,80 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
 
       actions[0].apply(view, 0, 0);
       expect(fixes).toEqual([{ line: 2, indent: 2, key: "platform" }]);
+    } finally {
+      view.destroy();
+    }
+  });
+
+  it("omits the tooltip action when no onAutoFix handler is wired", async () => {
+    const validateYaml = vi.fn(async () => ({
+      yaml_errors: [
+        {
+          message:
+            'mapping values are not allowed here\n  in "x.yaml", line 3, column 10',
+        },
+      ],
+      validation_errors: [],
+    })) as unknown as ESPHomeAPI["validateYaml"];
+
+    const view = mountView(validateYaml, () => {});
+    try {
+      forceLinting(view);
+      await flush();
+      const actions: unknown[] = [];
+      forEachDiagnostic(view.state, (d) => actions.push(...(d.actions ?? [])));
+      expect(actions).toEqual([]);
+    } finally {
+      view.destroy();
+    }
+  });
+
+  it("banners a locatable validation error with its line and nested-list hint", async () => {
+    const doc = [
+      "light:", // 1
+      "  - platform: x", // 2
+      "    effects:", // 3
+      "    - addressable_twinkle:", // 4
+      "      - flicker:", // 5
+      "      - pulse:", // 6
+      "",
+    ].join("\n");
+    const twinkleStart = doc.indexOf("- addressable_twinkle");
+    const line4 = doc.split("\n")[3];
+    const validateYaml = vi.fn(async () => ({
+      yaml_errors: [],
+      validation_errors: [
+        {
+          message: "expected a dictionary.",
+          range: {
+            document: "x.yaml",
+            start_line: 3,
+            start_col: line4.indexOf("addressable_twinkle"),
+            end_line: 3,
+            end_col: line4.length,
+          },
+        },
+      ],
+    })) as unknown as ESPHomeAPI["validateYaml"];
+    void twinkleStart;
+
+    let banner: BannerError[] = [];
+    const view = mountView(
+      validateYaml,
+      (errors) => {
+        banner = errors;
+      },
+      undefined,
+      doc
+    );
+    try {
+      forceLinting(view);
+      await flush();
+      expect(banner).toHaveLength(1);
+      expect(banner[0].kind).toBe("validation");
+      expect(banner[0].line).toBe(4);
+      expect(banner[0].message).toContain("expected a dictionary.");
+      expect(banner[0].message).toContain("yaml_editor.error_nested_list_hint");
     } finally {
       view.destroy();
     }

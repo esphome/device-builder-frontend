@@ -143,6 +143,38 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     expect(validateYaml).not.toHaveBeenCalled();
   });
 
+  it("applies a negative fix by removing leading spaces (sibling dedent)", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const broken =
+      "light:\n  - platform: x\n    effects:\n" +
+      "      - addressable_twinkle:\n      - flicker:\n       - pulse:\n";
+    const fixed =
+      "light:\n  - platform: x\n    effects:\n" +
+      "      - addressable_twinkle:\n      - flicker:\n      - pulse:\n";
+    const el = await mountEditor(validateYaml, broken);
+    const view = viewOf(el);
+
+    expect(await el.applyIndentFix({ line: 6, indent: -1, key: "pulse" })).toBe(
+      "applied"
+    );
+
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
+    undo(view);
+    expect(view.state.doc.toString()).toBe(broken);
+  });
+
+  it("no-ops a stale dedent whose line already lines up", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const doc =
+      "light:\n  - platform: x\n    effects:\n" +
+      "      - addressable_twinkle:\n      - flicker:\n      - pulse:\n";
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(await el.applyIndentFix({ line: 6, indent: -1, key: "pulse" })).toBe("stale");
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
+
   it("no-ops when the item is followed by a shallower sibling, not a property", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
     // `- platform: dht` (contentCol 2) followed by a top-level sibling, not a

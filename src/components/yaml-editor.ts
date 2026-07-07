@@ -36,11 +36,10 @@ import {
   blankLineContext,
   fieldPathByIndent,
   keyPathByIndent,
-  parseListItemMarker,
 } from "../util/yaml-line-walker.js";
 import {
+  analyzeIndentMismatch,
   createBackendYamlLinter,
-  firstPropertyDelta,
   lintErrorLineGutter,
   relintEffect,
   type YamlAutoFix,
@@ -611,30 +610,44 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     confirm?: () => Promise<boolean>
   ): Promise<AutoFixOutcome> {
     const view = this._view;
-    if (!view || !this._api || fix.indent <= 0) return "unavailable";
-    // Resolve the target only when it is still the same `- <key>` item that
-    // still needs exactly `fix.indent` — recomputing the delta from its first
-    // property bails on an item the user already fixed by hand (whose key still
-    // matches), so a stale click can't double-indent it.
+    if (!view || !this._api || fix.indent === 0) return "unavailable";
+    // Resolve the target only when re-running the analysis on the fix line
+    // still yields this exact repair — a stale click on an item the user
+    // already re-indented by hand (whose key still matches) can't move it
+    // again. Every analysis shape blames the line it would move except the
+    // classic over-indented-properties case, where re-analyzing the marker
+    // line itself reproduces the fix through the properties below it.
     const targetFrom = (): number | null => {
       const doc = view.state.doc;
       if (fix.line < 1 || fix.line > doc.lines) return null;
       const t = doc.line(fix.line);
-      const marker = parseListItemMarker(t.text);
-      if (!marker || marker.key !== fix.key) return null;
       const readLine = (n: number) =>
         n >= 1 && n <= doc.lines ? doc.line(n).text : undefined;
-      if (firstPropertyDelta(readLine, fix.line, marker.contentCol) !== fix.indent) {
+      const cur = analyzeIndentMismatch(readLine, fix.line);
+      if (
+        !cur ||
+        cur.markerLine !== fix.line ||
+        cur.markerKey !== fix.key ||
+        cur.delta !== fix.indent
+      ) {
         return null;
       }
+      // A dedent must have the spaces it wants to remove.
+      if (fix.indent < 0 && /[^ ]/.test(t.text.slice(0, -fix.indent))) return null;
       return t.from;
     };
     const from = targetFrom();
     if (from === null) return "stale";
 
     const doc = view.state.doc;
-    const spaces = " ".repeat(fix.indent);
-    const proposed = doc.sliceString(0, from) + spaces + doc.sliceString(from);
+    const changeAt = (at: number) =>
+      fix.indent > 0
+        ? { from: at, insert: " ".repeat(fix.indent) }
+        : { from: at, to: at - fix.indent };
+    const proposed =
+      fix.indent > 0
+        ? doc.sliceString(0, from) + " ".repeat(fix.indent) + doc.sliceString(from)
+        : doc.sliceString(0, from) + doc.sliceString(from - fix.indent);
     // A validation failure propagates: don't apply blindly, and let the caller
     // surface it rather than swallowing the click.
     const res = await this._api.validateYaml(this.configuration, proposed);
@@ -647,7 +660,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     const settled = targetFrom();
     if (settled === null) return "stale";
     view.dispatch({
-      changes: { from: settled, insert: spaces },
+      changes: changeAt(settled),
       scrollIntoView: true,
     });
     view.focus();
