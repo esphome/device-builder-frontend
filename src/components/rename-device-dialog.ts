@@ -89,6 +89,7 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
           <label>${this._localize("dashboard.action_rename_label")}</label>
           <input
             type="text"
+            autofocus
             class=${err ? "invalid" : ""}
             .value=${this._value}
             @input=${(e: Event) => {

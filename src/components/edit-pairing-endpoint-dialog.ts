@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -70,8 +70,6 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
   @state() private _submitting = false;
   @state() private _errorMessage = "";
 
-  @query("input[name='hostname']") private _hostInput?: HTMLInputElement;
-
   // Enter saves while the dialog is open; mirrors the Save button's guard.
   private _enter = new EnterController(this, () => {
     if (!this._saveDisabled()) void this._onSave();
@@ -106,14 +104,10 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
     this._initialPort = this._port;
     this._submitting = false;
     this._errorMessage = "";
+    // Focus + select of the hostname field rides on its ``autofocus``
+    // attribute — <esphome-base-dialog> honours it once the dialog has
+    // fully shown (wa-after-show).
     this._open = true;
-    // Autofocus the hostname field on next paint. ``_open``
-    // gates the whole render tree, so the input doesn't
-    // exist until ``updateComplete`` fires.
-    void this.updateComplete.then(() => {
-      this._hostInput?.focus();
-      this._hostInput?.select();
-    });
   }
 
   private _close = () => {
@@ -273,6 +267,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
             id="ep-hostname"
             name="hostname"
             type="text"
+            autofocus
             autocomplete="off"
             spellcheck="false"
             .value=${this._hostname}

@@ -122,6 +122,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
           <input
             id="clone-new-name"
             type="text"
+            autofocus
             class=${err ? "invalid" : ""}
             .value=${this._name}
             placeholder=${this.sourceName}

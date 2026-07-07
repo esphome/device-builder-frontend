@@ -135,6 +135,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
           <input
             id="friendly-name-input"
             type="text"
+            autofocus
             class=${err ? "invalid" : ""}
             .value=${this._value}
             placeholder=${this.currentFriendlyName || this.deviceName}
