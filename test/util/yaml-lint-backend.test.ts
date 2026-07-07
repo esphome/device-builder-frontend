@@ -181,6 +181,41 @@ describe("analyzeIndentMismatch", () => {
       ["esphome:", "  name: x", "  bogus: y"][n - 1];
     expect(analyzeIndentMismatch(plain, 3)).toBeNull();
   });
+
+  // The mirror shape: the marker itself dedented out of its list, which the
+  // scanner blames directly ("expected <block end>, but found '-'").
+  it("pinpoints an under-indented marker from the properties below it", async () => {
+    const { analyzeIndentMismatch } = await import("../../src/util/yaml-lint-backend.js");
+    const dedented = (n: number): string | undefined =>
+      [
+        "time:", // 1
+        "  - platform: homeassistant", // 2
+        "    id: ha_time", // 3
+        "", // 4
+        "- platform: sntp", // 5
+        "    id: sntp_time", // 6
+        "    servers: kkk", // 7
+      ][n - 1];
+    expect(analyzeIndentMismatch(dedented, 5)).toEqual({
+      markerLine: 5,
+      markerKey: "platform",
+      delta: 2,
+    });
+  });
+
+  it("returns null for a blamed marker followed by a shallower sibling", async () => {
+    const { analyzeIndentMismatch } = await import("../../src/util/yaml-lint-backend.js");
+    const bare = (n: number): string | undefined =>
+      ["time:", "- platform: sntp", "sensor:"][n - 1];
+    expect(analyzeIndentMismatch(bare, 2)).toBeNull();
+  });
+
+  it("returns null for a blamed marker whose properties already line up", async () => {
+    const { analyzeIndentMismatch } = await import("../../src/util/yaml-lint-backend.js");
+    const aligned = (n: number): string | undefined =>
+      ["time:", "- platform: sntp", "  id: sntp_time"][n - 1];
+    expect(analyzeIndentMismatch(aligned, 2)).toBeNull();
+  });
 });
 
 describe("describeYamlError", () => {
@@ -218,6 +253,42 @@ describe("describeYamlError", () => {
     expect(
       describeYamlError("mapping values are not allowed here", pos(3), localize, read)
     ).toEqual({ text: 'yaml_editor.error_indent_hint:{"line":3}', jumpLine: 3 });
+  });
+
+  // Real PyYAML shape for a bare `kkk` inside a list item: the context mark
+  // (first position) names the word's own line; the problem mark (last)
+  // blames wherever scanning gave up, lines later.
+  it("names the bare key missing its ':' instead of the indent hint", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    const doc = [
+      "time:", // 1
+      "  - platform: homeassistant", // 2
+      "    id: ha_time", // 3
+      "    kkk", // 4
+      "", // 5
+      "  - platform: sntp", // 6
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      'while scanning a simple key\n  in "x.yaml", line 4, column 5\n' +
+      "could not find expected ':'\n  in \"x.yaml\", line 6, column 3";
+    expect(describeYamlError(msg, { line: 6, col: 3 }, localize, read)).toEqual({
+      text: 'yaml_editor.error_missing_colon_hint:{"line":4,"key":"kkk"}',
+      jumpLine: 4,
+      squiggleLine: 4,
+    });
+  });
+
+  it("keeps the indent hint for a missing ':' whose context line has one", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    const aligned = ["sensor:", "  - platform: dht", "    model: DHT11"];
+    const read = (n: number): string | undefined => aligned[n - 1];
+    const msg =
+      'while scanning a simple key\n  in "x.yaml", line 2, column 3\n' +
+      "could not find expected ':'\n  in \"x.yaml\", line 3, column 1";
+    expect(describeYamlError(msg, { line: 3, col: 1 }, localize, read).text).toBe(
+      'yaml_editor.error_indent_hint:{"line":3}'
+    );
   });
 
   it("maps the indentation family to the indent hint", async () => {

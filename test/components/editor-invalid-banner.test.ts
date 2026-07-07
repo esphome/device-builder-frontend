@@ -15,6 +15,7 @@ import "../../src/components/device/editor-invalid-banner.js";
 const err = (line?: number): BannerError => ({
   message: `boom at ${line ?? "nowhere"}`,
   line,
+  kind: "parse",
 });
 
 interface Harness {
@@ -110,6 +111,13 @@ describe("editor-invalid-banner smart reveal", () => {
     expect(banner(el)).not.toBeNull();
   });
 
+  it("shows a validation error immediately even near the caret", async () => {
+    const { el } = await mountBanner({ caret: 55 });
+    el.errors = [{ message: "Platform missing.", kind: "validation" }];
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+  });
+
   it("treats a line-less error as suppressible", async () => {
     const { el } = await mountBanner({ caret: 55 });
     el.errors = [err(undefined)];
@@ -182,7 +190,7 @@ describe("editor-invalid-banner events", () => {
   it("dispatches banner-goto-line and banner-auto-fix from the buttons", async () => {
     const { el } = await mountBanner({ focused: false });
     const fix = { line: 57, indent: 2, key: "platform" };
-    el.errors = [{ message: "boom", line: 57, fix }];
+    el.errors = [{ message: "boom", line: 57, fix, kind: "parse" }];
     await el.updateComplete;
 
     const gotoLines: number[] = [];

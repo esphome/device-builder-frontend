@@ -49,6 +49,10 @@ export interface BannerError {
   line?: number;
   /** A one-click indentation repair, when the error can be fixed deterministically. */
   fix?: YamlAutoFix;
+  /** What produced it: a YAML parse failure (often a half-typed token, so
+   *  the banner damps its reveal while the user types) or a validation
+   *  error on a parseable config (real breakage — reveal right away). */
+  kind: "parse" | "validation";
 }
 
 /** Detail payload of the yaml-diagnostics event the editor re-emits. */
@@ -81,6 +85,12 @@ interface BackendLinterOptions {
     mapped: MappedValidationError[],
     configuration: string
   ) => void;
+  /**
+   * Called when the user picks the auto-fix action on a diagnostic's hover
+   * tooltip, with the same repair payload the banner button carries — the
+   * host routes both through one validate-confirm-apply path.
+   */
+  onAutoFix?: (fix: YamlAutoFix) => void;
 }
 
 /**
@@ -187,8 +197,47 @@ export function parseYamlErrorPosition(
   return null;
 }
 
+/**
+ * The FIRST position in a PyYAML message — the context mark, where the
+ * construct the scanner choked on begins (e.g. the simple key it was
+ * scanning), as opposed to where scanning gave up.
+ */
+export function parseYamlErrorContext(
+  message: string
+): { line: number; col: number | null } | null {
+  const colMatch = [...message.matchAll(YAML_LINE_COL_RE)][0];
+  if (colMatch) {
+    return {
+      line: Number.parseInt(colMatch[1], 10),
+      col: Number.parseInt(colMatch[2], 10),
+    };
+  }
+  const lineMatch = [...message.matchAll(YAML_LINE_RE)][0];
+  return lineMatch ? { line: Number.parseInt(lineMatch[1], 10), col: null } : null;
+}
+
 /** A line accessor over the current document; `undefined` past the ends. */
 export type ReadLine = (line1: number) => string | undefined;
+
+/**
+ * Indent of a list item's first property line minus *contentCol* (where its
+ * key starts), or `null` when the item has no property line — the next
+ * content is a shallower sibling/dedent (indent below *contentCol*), not a
+ * property, so it never reports a spurious negative delta.
+ */
+export function firstPropertyDelta(
+  readLine: ReadLine,
+  line: number,
+  contentCol: number
+): number | null {
+  for (let n = line + 1; ; n++) {
+    const text = readLine(n);
+    if (text === undefined) return null;
+    if (!text.trim() || text.trimStart().startsWith("#")) continue;
+    const indent = indentOf(text);
+    return indent < contentCol ? null : indent - contentCol;
+  }
+}
 
 /**
  * Pinpoint the exact indentation fix behind a `mapping values ...` error.
@@ -198,8 +247,11 @@ export type ReadLine = (line1: number) => string | undefined;
  * `dht` scalar swallow `model`, and the scanner blames the property
  * line. Walk up from that line to the owning `- ` marker; when the
  * properties sit deeper than the marker's content column, the fix is to
- * indent the marker so the two line up. Returns the marker's line, key,
- * and the space delta, or `null` when the shape isn't this mismatch.
+ * indent the marker so the two line up. The under-indented mirror — a
+ * `- ` marker dedented out of its list, which the scanner blames
+ * directly (`expected <block end>, but found '-'`) — resolves against
+ * the properties *below* it instead. Returns the marker's line, key,
+ * and the space delta, or `null` when the shape is neither mismatch.
  */
 export function analyzeIndentMismatch(
   readLine: ReadLine,
@@ -207,6 +259,15 @@ export function analyzeIndentMismatch(
 ): { markerLine: number; markerKey: string; delta: number } | null {
   const errText = readLine(errorLine);
   if (errText === undefined || !errText.trim()) return null;
+  // Blamed line is itself a list-item marker: its own properties (the
+  // deeper-indented lines that follow) say how far to indent it back.
+  const errMarker = parseListItemMarker(errText);
+  if (errMarker) {
+    const delta = firstPropertyDelta(readLine, errorLine, errMarker.contentCol);
+    return delta !== null && delta > 0
+      ? { markerLine: errorLine, markerKey: errMarker.key, delta }
+      : null;
+  }
   const propIndent = indentOf(errText);
   // Bound the walk so a huge doc can't turn one lint pass into a scan.
   for (let n = errorLine - 1; n >= 1 && n >= errorLine - 50; n--) {
@@ -242,6 +303,9 @@ export interface YamlErrorDescription {
   text: string;
   jumpLine: number | null;
   fix?: YamlAutoFix;
+  /** Overrides the squiggle's line when the scanner's problem mark blames
+   *  the wrong place (e.g. a missing-colon error marks lines later). */
+  squiggleLine?: number;
 }
 
 /**
@@ -283,6 +347,24 @@ export function describeYamlError(
     lower.includes("while scanning a quoted scalar")
   ) {
     return hint("yaml_editor.error_unterminated_string_hint");
+  }
+  // A bare word where a `key: value` was expected: the scanner reads it as
+  // a "simple key" and then never finds the ':', blaming wherever it gave
+  // up — often lines later. The context mark points at the word itself;
+  // when that line really has no ':', name it instead of the indent hint.
+  if (lower.includes("could not find expected ':'") && lower.includes("simple key")) {
+    const ctx = parseYamlErrorContext(message);
+    const token = ctx && readLine ? readLine(ctx.line)?.trim() : undefined;
+    if (ctx && token && !token.includes(":")) {
+      return {
+        text: localize("yaml_editor.error_missing_colon_hint", {
+          line: ctx.line,
+          key: token.length > 24 ? `${token.slice(0, 24)}…` : token,
+        }),
+        jumpLine: ctx.line,
+        squiggleLine: ctx.line,
+      };
+    }
   }
   // Same option set twice in a block.
   if (lower.includes("duplicate key")) {
@@ -499,12 +581,16 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           text: message,
           jumpLine,
           fix,
+          squiggleLine,
         } = describeYamlError(msg, pos, opts.localize, readLine);
         if (pos === null) {
-          bannerErrors.push({ message }); // no position to squiggle
+          bannerErrors.push({ message, kind: "parse" }); // no position to squiggle
           continue;
         }
-        const { from, to } = lineToOffsets(view, pos.line, pos.col);
+        const { from, to } =
+          squiggleLine !== undefined
+            ? lineToOffsets(view, squiggleLine, null)
+            : lineToOffsets(view, pos.line, pos.col);
         diagnostics.push({
           from,
           to,
@@ -512,11 +598,22 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           source: "yaml",
           message,
           renderMessage: () => renderMessageNode(message),
+          // Offer the same one-click repair on the squiggle's hover tooltip
+          // as on the banner button — while the banner reveal is damped
+          // during typing, the tooltip is where the fix is discoverable.
+          actions: fix
+            ? [
+                {
+                  name: opts.localize("yaml_editor.error_auto_fix"),
+                  apply: () => opts.onAutoFix?.(fix),
+                },
+              ]
+            : undefined,
         });
         // Also surface it in the persistent banner — a squiggle plus a
         // gutter dot is easy to miss — with the fix site to jump to and,
         // when we can pinpoint it, a one-click auto-fix.
-        bannerErrors.push({ message, line: jumpLine ?? pos.line, fix });
+        bannerErrors.push({ message, line: jumpLine ?? pos.line, fix, kind: "parse" });
       }
 
       // Schema/validation errors carry an explicit range.
@@ -527,14 +624,14 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // error, and a foreign document when the error lives in an included
         // file — neither has a location in this buffer.
         if (!err.range || !isOpenConfigFile(err.range.document ?? "", configuration)) {
-          bannerErrors.push({ message });
+          bannerErrors.push({ message, kind: "validation" });
           continue;
         }
         const anchor = trimRangeToContent(doc, rangeToOffsets(view, err.range));
         const { from, to } = retargetBlockDiagnostic(doc, anchor);
         // Pinned on the `esphome:` core block → whole-config error → banner.
         if (keyAt(doc, from) === CORE_BLOCK_KEY) {
-          bannerErrors.push({ message });
+          bannerErrors.push({ message, kind: "validation" });
           continue;
         }
         diagnostics.push({
@@ -574,7 +671,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // AST couldn't place it) — keep it in the banner; a section-level
         // error still badges the navigator through the mapped entry.
         if (formRelativePath(keyPath).length === 0) {
-          bannerErrors.push({ message });
+          bannerErrors.push({ message, kind: "validation" });
         }
       }
 

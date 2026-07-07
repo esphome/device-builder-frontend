@@ -1118,6 +1118,7 @@
     "sticky_jump_to_line": "Jump to line {line}",
     "error_indent_fix": "Indentation mismatch: line {line} \"- {key}\" is indented less than its properties. Indent line {line} by {spaces, plural, one {# space} other {# spaces}} so \"- {key}\" lines up with them.",
     "error_indent_hint": "YAML indentation problem near line {line}. Make sure each list item's properties are indented consistently under its \"- \" marker; an over-indented or under-indented line, or a stray \":\" in a value, causes this.",
+    "error_missing_colon_hint": "Line {line}: \"{key}\" looks like an option name without a value. Add \":\" and a value after it, or remove the line.",
     "error_tab_hint": "A tab is used for indentation near line {line}; YAML needs spaces. Replace the tab with spaces.",
     "error_char_hint": "Unexpected character near line {line}; a value starting with a symbol such as @, %, or * must be wrapped in quotes.",
     "error_unterminated_string_hint": "Unterminated string near line {line}; a quote was opened but not closed. Add the missing closing quote.",

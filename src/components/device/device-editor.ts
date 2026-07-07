@@ -393,6 +393,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                         .revealSensitive=${this._revealSensitive}
                         @yaml-change=${this._onYamlChange}
                         @yaml-diagnostics=${this._onYamlDiagnostics}
+                        @yaml-auto-fix=${this._onBannerAutoFix}
                         @yaml-cursor-line=${this._onYamlCursorLine}
                         @focusin=${this._onEditorFocusIn}
                         @focusout=${this._onEditorFocusOut}

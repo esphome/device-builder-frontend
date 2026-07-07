@@ -2,8 +2,8 @@ import { autocompletion } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { forceLinting } from "@codemirror/lint";
-import { StateEffect, StateField, Transaction, type Text } from "@codemirror/state";
-import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
+import { StateEffect, StateField, Transaction } from "@codemirror/state";
+import { Decoration, keymap, tooltips, type DecorationSet } from "@codemirror/view";
 import { consume } from "@lit/context";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { basicSetup, EditorView } from "codemirror";
@@ -35,12 +35,12 @@ import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   blankLineContext,
   fieldPathByIndent,
-  indentOf,
   keyPathByIndent,
   parseListItemMarker,
 } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
+  firstPropertyDelta,
   lintErrorLineGutter,
   relintEffect,
   type YamlAutoFix,
@@ -208,6 +208,12 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         colors: INDENT_GUIDE_COLORS,
       }),
       highlightField,
+      // Keep every tooltip (lint hover, docs hover, completion) inside the
+      // code pane: near the bottom they flip above the line instead of
+      // spilling over the invalid banner / action row below the editor.
+      tooltips({
+        tooltipSpace: (view) => view.scrollDOM.getBoundingClientRect(),
+      }),
       sensitiveValueMaskExtension(this.revealSensitive, this.maskAllValues),
       yamlStickyScroll({
         highlightStyle: this._darkMode ? darkHighlight : lightHighlight,
@@ -541,6 +547,14 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
                 composed: true,
               })
             ),
+          onAutoFix: (fix) =>
+            this.dispatchEvent(
+              new CustomEvent<{ fix: YamlAutoFix }>("yaml-auto-fix", {
+                detail: { fix },
+                bubbles: true,
+                composed: true,
+              })
+            ),
         }),
         lintErrorLineGutter
       );
@@ -608,7 +622,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       const t = doc.line(fix.line);
       const marker = parseListItemMarker(t.text);
       if (!marker || marker.key !== fix.key) return null;
-      if (this._firstPropertyDelta(doc, fix.line, marker.contentCol) !== fix.indent) {
+      const readLine = (n: number) =>
+        n >= 1 && n <= doc.lines ? doc.line(n).text : undefined;
+      if (firstPropertyDelta(readLine, fix.line, marker.contentCol) !== fix.indent) {
         return null;
       }
       return t.from;
@@ -636,24 +652,6 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     });
     view.focus();
     return "applied";
-  }
-
-  /** Indent of the list item's first property line minus `contentCol` (where
-   *  its key starts), or null when the item has no property line — the next
-   *  content is a shallower sibling/dedent (indent below `contentCol`), not a
-   *  property, so it never reports a spurious negative delta. */
-  private _firstPropertyDelta(
-    doc: Text,
-    line: number,
-    contentCol: number
-  ): number | null {
-    for (let n = line + 1; n <= doc.lines; n++) {
-      const text = doc.line(n).text;
-      if (!text.trim() || text.trimStart().startsWith("#")) continue;
-      const indent = indentOf(text);
-      return indent < contentCol ? null : indent - contentCol;
-    }
-    return null;
   }
 
   /** Set (or clear) the highlight mark and scroll it into view. */

@@ -16,6 +16,7 @@ import {
   createBackendYamlLinter,
   type BannerError,
   type MappedValidationError,
+  type YamlAutoFix,
 } from "../../src/util/yaml-lint-backend.js";
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -26,7 +27,8 @@ const localize = (key: string, values?: Record<string, string | number>): string
 
 function mountView(
   validateYaml: ESPHomeAPI["validateYaml"],
-  onResult: (errors: BannerError[], mapped: MappedValidationError[]) => void
+  onResult: (errors: BannerError[], mapped: MappedValidationError[]) => void,
+  onAutoFix?: (fix: YamlAutoFix) => void
 ): EditorView {
   const api = { validateYaml } as unknown as ESPHomeAPI;
   return new EditorView({
@@ -39,6 +41,7 @@ function mountView(
           getConfiguration: () => "x.yaml",
           localize,
           onResult: (errors, mapped) => onResult(errors, mapped),
+          onAutoFix,
         }),
       ],
     }),
@@ -74,6 +77,7 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
           message: "yaml_editor.error_indent_fix:2",
           line: 2,
           fix: { line: 2, indent: 2, key: "platform" },
+          kind: "parse",
         },
       ]);
 
@@ -81,6 +85,41 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
       const messages: string[] = [];
       forEachDiagnostic(view.state, (d) => messages.push(d.message));
       expect(messages).toEqual(["yaml_editor.error_indent_fix:2"]);
+    } finally {
+      view.destroy();
+    }
+  });
+
+  it("carries the auto-fix as a hover-tooltip action on the diagnostic", async () => {
+    const validateYaml = vi.fn(async () => ({
+      yaml_errors: [
+        {
+          message:
+            'mapping values are not allowed here\n  in "x.yaml", line 3, column 10',
+        },
+      ],
+      validation_errors: [],
+    })) as unknown as ESPHomeAPI["validateYaml"];
+
+    const fixes: YamlAutoFix[] = [];
+    const view = mountView(
+      validateYaml,
+      () => {},
+      (fix) => fixes.push(fix)
+    );
+    try {
+      forceLinting(view);
+      await flush();
+
+      const actions: {
+        name: string;
+        apply: (v: EditorView, a: number, b: number) => void;
+      }[] = [];
+      forEachDiagnostic(view.state, (d) => actions.push(...(d.actions ?? [])));
+      expect(actions.map((a) => a.name)).toEqual(["yaml_editor.error_auto_fix"]);
+
+      actions[0].apply(view, 0, 0);
+      expect(fixes).toEqual([{ line: 2, indent: 2, key: "platform" }]);
     } finally {
       view.destroy();
     }

@@ -7,12 +7,13 @@
  * overlay).
  *
  * The reveal is damped so the banner doesn't pop over a half-typed token:
- * while the editor is focused and every locatable error sits within
+ * while the editor is focused and every error is a YAML parse error within
  * NEAR_CARET_LINES of the caret, new errors stay squiggle-only until the
  * caret moves away, the editor loses focus, or the user has been idle for
- * REVEAL_IDLE_MS. An error far from the caret is real breakage and shows
- * as soon as the lint pass lands; a fixed config clears the banner
- * immediately; a banner already on screen tracks lint updates live.
+ * REVEAL_IDLE_MS. A parse error far from the caret, or any validation
+ * error (the document parses — real breakage), shows as soon as the lint
+ * pass lands; a fixed config clears the banner immediately; a banner
+ * already on screen tracks lint updates live.
  */
 import { consume } from "@lit/context";
 import { mdiAlertCircleOutline } from "@mdi/js";
@@ -222,8 +223,12 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
 
   private _shouldReveal(): boolean {
     if (!this.editorFocused) return true;
-    // A locatable error far from the caret isn't the user's in-progress
-    // token. Line-less (whole-config) errors count as near — suppressible.
+    // Only a YAML parse error is plausibly the user's half-typed token; a
+    // validation error means the document parses, so it's real breakage (a
+    // deleted esp32: block, an included-file error) — show it right away.
+    if (this.errors.some((err) => err.kind !== "parse")) return true;
+    // A locatable parse error far from the caret isn't the in-progress
+    // token either. Line-less parse errors count as near — suppressible.
     if (
       this.errors.some(
         (err) =>
