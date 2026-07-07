@@ -20,6 +20,7 @@ function makeHost(
     error?: string | null;
     busy?: boolean;
     sending?: boolean;
+    pairingKeyRequired?: boolean;
   } = {}
 ): ESPHomePairBuildServerDialog {
   return {
@@ -32,6 +33,7 @@ function makeHost(
     _receiverLabel: "buildbox",
     _offloaderLabel: "ha-green",
     _pairingKey: "",
+    _pairingKeyRequired: opts.pairingKeyRequired ?? false,
     _error: opts.error ?? null,
     _skippedInput: opts.skippedInput ?? false,
     _onConfirmBack: () => {},
@@ -88,12 +90,14 @@ describe("renderConfirmStep", () => {
     expect(allValues(tree)).toContain("boom");
   });
 
-  it("renders the collapsed pairing-key disclosure with its input", () => {
-    const tree = renderConfirmStep(makeHost({ pin: "abc" }));
-    expect(findTemplatesByAnchor(tree, "pairing-key-disclosure")).toHaveLength(1);
+  it("hides the pairing-key field when the receiver doesn't require it", () => {
+    const tree = renderConfirmStep(makeHost({ pin: "abc", pairingKeyRequired: false }));
+    expect(findTemplatesByAnchor(tree, 'id="pair-pairing-key"')).toHaveLength(0);
+  });
+
+  it("shows the pairing-key field when the receiver requires it", () => {
+    const tree = renderConfirmStep(makeHost({ pin: "abc", pairingKeyRequired: true }));
     expect(findTemplatesByAnchor(tree, 'id="pair-pairing-key"')).toHaveLength(1);
-    expect(allValues(tree)).toContain(
-      "settings.pair_build_server_pairing_key_disclosure"
-    );
+    expect(allValues(tree)).toContain("settings.pair_build_server_pairing_key_label");
   });
 });

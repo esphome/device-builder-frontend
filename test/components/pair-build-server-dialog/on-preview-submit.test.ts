@@ -10,7 +10,7 @@ import { onPreviewSubmit } from "../../../src/components/pair-build-server-dialo
 import { identityLocalize } from "../../_dom.js";
 
 function makeHost(
-  preview: () => Promise<{ pin_sha256: string }>
+  preview: () => Promise<{ pin_sha256: string; requires_pairing_key?: boolean }>
 ): ESPHomePairBuildServerDialog {
   return {
     _localize: identityLocalize,
@@ -19,6 +19,7 @@ function makeHost(
     _hostname: "buildbox.local",
     _port: "6055",
     _previewedPin: "",
+    _pairingKeyRequired: false,
     _error: null,
     _step: "confirm",
     _skippedInput: true,
@@ -33,6 +34,17 @@ describe("onPreviewSubmit", () => {
     expect(host._previewedPin).toBe("abc123");
     expect(host._step).toBe("confirm");
     expect(host._error).toBeNull();
+    expect(host._pairingKeyRequired).toBe(false);
+  });
+
+  it("records that the receiver requires a pairing key", async () => {
+    const host = makeHost(async () => ({
+      pin_sha256: "abc123",
+      requires_pairing_key: true,
+    }));
+    await onPreviewSubmit(host);
+
+    expect(host._pairingKeyRequired).toBe(true);
   });
 
   it("falls back to the input step on a failed preview", async () => {

@@ -2022,8 +2022,11 @@ export class ESPHomeAPI {
   async previewRemoteBuildPair(args: {
     hostname: string;
     port: number;
-  }): Promise<{ pin_sha256: string }> {
-    return this.sendCommand<{ pin_sha256: string }>("remote_build/preview_pair", args);
+  }): Promise<{ pin_sha256: string; requires_pairing_key?: boolean }> {
+    return this.sendCommand<{ pin_sha256: string; requires_pairing_key?: boolean }>(
+      "remote_build/preview_pair",
+      args
+    );
   }
 
   /**
