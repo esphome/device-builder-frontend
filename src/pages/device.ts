@@ -1025,6 +1025,7 @@ export class ESPHomePageDevice extends LitElement {
           @yaml-change=${this._onYamlChange}
           @yaml-diagnostics=${this._onYamlDiagnostics}
           @yaml-cursor-line=${this._onYamlCursorLine}
+          @yaml-user-edit=${this._onYamlUserEdit}
           @yaml-highlight=${this._onYamlHighlight}
           @yaml-updated=${this._onYamlUpdated}
           @yaml-draft=${this._onYamlDraft}
@@ -1374,6 +1375,11 @@ export class ESPHomePageDevice extends LitElement {
       this._selectedSection = sectionKey;
       this._selectedFromLine = match.fromLine;
       this._focusFieldPath = rel;
+      // The navigator selection follows the caret; a block highlight
+      // left on the previously clicked component would disagree with
+      // it (#1885). The highlight is a navigator/form affordance —
+      // clear it rather than dragging it under the caret.
+      this._setHighlight(null, false);
       this._updateUrl();
     });
   }
@@ -1452,6 +1458,11 @@ export class ESPHomePageDevice extends LitElement {
     e: CustomEvent<{ range: HighlightRange | null; scroll: boolean }>
   ) {
     this._setHighlight(e.detail.range, e.detail.scroll);
+  }
+
+  /** Hand edit in the YAML pane → drop the (now stale-ranged) highlight. */
+  private _onYamlUserEdit() {
+    if (this._highlightRange) this._setHighlight(null, false);
   }
 
   /** Single write path for the editor highlight, so the error-jump

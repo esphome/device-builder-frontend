@@ -2,7 +2,7 @@ import { autocompletion } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { forceLinting } from "@codemirror/lint";
-import { StateEffect, StateField, type Text } from "@codemirror/state";
+import { StateEffect, StateField, Transaction, type Text } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
 import { consume } from "@lit/context";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
@@ -440,6 +440,25 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
               composed: true,
             })
           );
+          // A hand edit invalidates the block highlight: the stored
+          // range is a static line snapshot and the mark decoration
+          // only position-maps, so lines typed inside the section
+          // fall outside it (a half-highlighted block). Gate on a
+          // userEvent annotation (typing, paste, delete, undo, drag)
+          // so programmatic doc syncs (the `value` prop, form-driven
+          // splices) keep a field-focus highlight alive; gate on an
+          // active highlight so this fires once per highlight, not
+          // per keystroke.
+          if (
+            this.highlightRange !== null &&
+            update.transactions.some(
+              (tr) => tr.docChanged && tr.annotation(Transaction.userEvent) !== undefined
+            )
+          ) {
+            this.dispatchEvent(
+              new CustomEvent("yaml-user-edit", { bubbles: true, composed: true })
+            );
+          }
         }
         // Cursor moved (click, arrow keys, find-jump) or a user edit
         // moved it. Emit the 1-indexed line + key path so the page can
