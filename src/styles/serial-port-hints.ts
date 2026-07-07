@@ -28,7 +28,7 @@ export const serialPortHintStyles = css`
   }
 
   .port-hint {
-    margin: 0;
+    margin: var(--wa-space-s) 0 var(--wa-space-2xs);
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-2xs);
     line-height: 1.4;
