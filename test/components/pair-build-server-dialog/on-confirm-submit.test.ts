@@ -28,6 +28,7 @@ function makeHost(pairingKey: string): {
     _receiverLabel: "buildbox",
     _offloaderLabel: "ha-green",
     _pairingKey: pairingKey,
+    _pairingKeyRequired: false,
     _error: null,
     _step: "confirm",
     _sentKey: null,
@@ -59,5 +60,14 @@ describe("onConfirmSubmit", () => {
 
     const args = request.mock.calls[0][0] as RequestArgs;
     expect(Object.prototype.hasOwnProperty.call(args, "pairing_key")).toBe(false);
+  });
+
+  it("blocks submit (e.g. via Enter) when a required key is empty", async () => {
+    const { host, request } = makeHost("   ");
+    host._pairingKeyRequired = true;
+    await onConfirmSubmit(host);
+
+    expect(request).not.toHaveBeenCalled();
+    expect(host._error).toBe("settings.pair_build_server_pairing_key_required");
   });
 });

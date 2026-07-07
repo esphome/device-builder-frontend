@@ -1193,6 +1193,7 @@
     "pair_build_server_pairing_key_label": "Pairing key",
     "pair_build_server_pairing_key_placeholder": "XXXX-XXXX-XXXX-XXXX",
     "pair_build_server_pairing_key_helper": "This build server needs the one-time pairing key shown on its console next to the fingerprint.",
+    "pair_build_server_pairing_key_required": "Enter the pairing key shown on the build server's console.",
     "pair_build_server_pin_label": "Receiver fingerprint (SHA-256)",
     "pair_build_server_pin_hex_summary": "Show hex bytes",
     "pair_build_server_target": "Connected to {hostname}:{port}",

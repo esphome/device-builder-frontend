@@ -103,6 +103,12 @@ export async function onConfirmSubmit(host: ESPHomePairBuildServerDialog): Promi
     return;
   }
   const pairingKey = host._pairingKey.trim();
+  // Enter bypasses the button's canSubmit gate, so re-check the required key
+  // here too — otherwise a headless pair would send keyless and be refused.
+  if (host._pairingKeyRequired && !pairingKey) {
+    host._error = host._localize("settings.pair_build_server_pairing_key_required");
+    return;
+  }
   host._busy = true;
   // The mutating send: veto dismissal until it resolves (don't orphan it).
   host._sending = true;
