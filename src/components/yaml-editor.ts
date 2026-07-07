@@ -55,6 +55,10 @@ import { CodeMirrorEditorElement } from "./codemirror-editor-element.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 
+/** Result of an auto-fix attempt: applied, user-declined, a stale/no-target
+ *  no-op (the doc shifted since the banner), or an unreachable defensive bail. */
+export type AutoFixOutcome = "applied" | "declined" | "stale" | "unavailable";
+
 // Delay before an at-rest caret opens the completion popup for discovery.
 const IDLE_COMPLETION_DELAY_MS = 1500;
 
@@ -570,9 +574,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   async applyIndentFix(
     fix: YamlAutoFix,
     confirm?: () => Promise<boolean>
-  ): Promise<void> {
+  ): Promise<AutoFixOutcome> {
     const view = this._view;
-    if (!view || !this._api || fix.indent <= 0) return;
+    if (!view || !this._api || fix.indent <= 0) return "unavailable";
     // Resolve the target only when it is still the same `- <key>` item that
     // still needs exactly `fix.indent` — recomputing the delta from its first
     // property bails on an item the user already fixed by hand (whose key still
@@ -589,7 +593,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       return t.from;
     };
     const from = targetFrom();
-    if (from === null) return;
+    if (from === null) return "stale";
 
     const doc = view.state.doc;
     const spaces = " ".repeat(fix.indent);
@@ -600,16 +604,17 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     // Clean result → just do it; otherwise ask before applying over errors.
     const clean = !res.yaml_errors?.length && !res.validation_errors?.length;
     const proceed = clean || (await (confirm?.() ?? Promise.resolve(false)));
-    if (!proceed) return;
+    if (!proceed) return "declined";
 
     // Re-resolve the target: the doc may have changed while we awaited.
     const settled = targetFrom();
-    if (settled === null) return;
+    if (settled === null) return "stale";
     view.dispatch({
       changes: { from: settled, insert: spaces },
       scrollIntoView: true,
     });
     view.focus();
+    return "applied";
   }
 
   /** Indent of the list item's first property line minus `contentCol` (where

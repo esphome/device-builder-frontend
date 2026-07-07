@@ -53,7 +53,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml);
     const view = viewOf(el);
 
-    await el.applyIndentFix(FIX);
+    expect(await el.applyIndentFix(FIX)).toBe("applied");
 
     expect(view.state.doc.toString()).toBe(FIXED);
     expect(validateYaml).toHaveBeenCalledWith("x.yaml", FIXED);
@@ -92,7 +92,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
     const confirm = vi.fn(async () => false);
 
-    await el.applyIndentFix(FIX, confirm);
+    expect(await el.applyIndentFix(FIX, confirm)).toBe("declined");
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(view.state.doc.toString()).toBe(BROKEN);
@@ -124,7 +124,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
 
     // A fix that points at line 2 but expects a different key.
-    await el.applyIndentFix({ ...FIX, key: "uptime" });
+    expect(await el.applyIndentFix({ ...FIX, key: "uptime" })).toBe("stale");
 
     expect(view.state.doc.toString()).toBe(BROKEN);
     expect(validateYaml).not.toHaveBeenCalled(); // bailed before validating
@@ -137,7 +137,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml, FIXED);
     const view = viewOf(el);
 
-    await el.applyIndentFix(FIX);
+    expect(await el.applyIndentFix(FIX)).toBe("stale");
 
     expect(view.state.doc.toString()).toBe(FIXED);
     expect(validateYaml).not.toHaveBeenCalled();

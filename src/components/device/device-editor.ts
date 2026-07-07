@@ -24,7 +24,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import { renderTextLinks } from "../../util/markdown.js";
-import { notifyError } from "../../util/notify.js";
+import { notifyError, notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
 import {
@@ -559,6 +559,13 @@ export class ESPHomeDeviceEditor extends LitElement {
     if (!editor) return;
     editor
       .applyIndentFix(fix, () => this._confirmAutoFix())
+      .then((outcome) => {
+        // A stale click (the doc shifted since the banner) is a safe no-op, but
+        // say so rather than letting the button look dead.
+        if (outcome === "stale") {
+          notifyWarning(this._localize("yaml_editor.auto_fix_stale"));
+        }
+      })
       .catch((err: unknown) => {
         // A validation round-trip failure (WS drop, server error) must not leave
         // the click looking ignored.
