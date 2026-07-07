@@ -220,15 +220,15 @@ describe("describeYamlError", () => {
     ).toEqual({ text: 'yaml_editor.error_indent_hint:{"line":3}', jumpLine: 3 });
   });
 
-  it("maps the indentation family to the indent hint (pure-Python and C wording)", async () => {
+  it("maps the indentation family to the indent hint", async () => {
     const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
-    // Pure-Python and the C loader word the same structural errors differently.
+    // Real esphome messages (pyyaml pure-Python loader, which esphome falls
+    // back to for readable errors): a stray colon, a block-mapping dedent, and
+    // a block-collection mis-indent.
     for (const msg of [
-      "expected <block end>, but found '<scalar>'", // pure-Python
-      "could not find expected ':'", // pure-Python
-      "mapping values are not allowed in this context", // C loader
-      "while parsing a block mapping\ndid not find expected key", // C loader dedent
-      "while parsing a block collection\ndid not find expected '-' indicator", // C list
+      "mapping values are not allowed here",
+      "expected <block end>, but found '<block mapping start>'",
+      "could not find expected ':'",
     ]) {
       expect(describeYamlError(msg, pos(5), localize).text).toBe(
         'yaml_editor.error_indent_hint:{"line":5}'
@@ -236,19 +236,26 @@ describe("describeYamlError", () => {
     }
   });
 
-  it("maps a stray-character error to the char hint (pure-Python and C wording)", async () => {
+  it("maps a tab error to the tab hint (pyyaml names the char via %r)", async () => {
     const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
-    // Pure-Python names the char (tab / symbol); the C loader omits it. All
-    // route to one hint since the C message can't be told apart by char.
-    for (const msg of [
-      "found character '\\t' that cannot start any token", // pure-Python tab
-      "found character '@' that cannot start any token", // pure-Python symbol
-      "found character that cannot start any token", // C loader (no char)
-    ]) {
-      expect(describeYamlError(msg, pos(6), localize).text).toBe(
-        'yaml_editor.error_char_hint:{"line":6}'
-      );
-    }
+    expect(
+      describeYamlError(
+        "found character '\\t' that cannot start any token",
+        pos(3),
+        localize
+      ).text
+    ).toBe('yaml_editor.error_tab_hint:{"line":3}');
+  });
+
+  it("maps a non-tab stray character to the char hint", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    expect(
+      describeYamlError(
+        "found character '@' that cannot start any token",
+        pos(6),
+        localize
+      ).text
+    ).toBe('yaml_editor.error_char_hint:{"line":6}');
   });
 
   it("maps an unterminated quoted scalar to the unterminated-string hint", async () => {
@@ -276,7 +283,8 @@ describe("describeYamlError", () => {
 
   it("maps a duplicate key to the duplicate-key hint", async () => {
     const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
-    expect(describeYamlError('found duplicate key "name"', pos(11), localize).text).toBe(
+    // esphome's own message shape (see yaml_util's ESPHomeLoaderMixin).
+    expect(describeYamlError('Duplicate key "wifi"', pos(11), localize).text).toBe(
       'yaml_editor.error_duplicate_key_hint:{"line":11}'
     );
   });

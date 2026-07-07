@@ -269,11 +269,13 @@ export function describeYamlError(
   });
   const lower = message.toLowerCase();
 
-  // A stray tab or reserved symbol where a token was expected. The pure-Python
-  // loader names the char (``'\t'``, ``'@'``) but the C loader omits it, so we
-  // can't reliably single out tabs — one hint covers both causes.
+  // A stray tab or reserved symbol where a token was expected. ESPHome falls
+  // back to pyyaml's pure-Python loader for readable errors, which names the
+  // char via ``%r`` — a tab shows as the literal ``'\t'`` repr.
   if (lower.includes("cannot start any token")) {
-    return hint("yaml_editor.error_char_hint");
+    return message.includes("'\\t'")
+      ? hint("yaml_editor.error_tab_hint")
+      : hint("yaml_editor.error_char_hint");
   }
   // Unterminated quoted scalar — a `"` or `'` opened but never closed.
   if (
@@ -292,15 +294,11 @@ export function describeYamlError(
     return hint("yaml_editor.error_flow_hint");
   }
   // Indentation family: the over-indented list-item swallow and its structural
-  // cousins. The pure-Python and C loaders word these differently (``expected
-  // <block end>`` vs ``did not find expected key`` / ``'-' indicator``), so
-  // match both. Try to pinpoint the exact fix from the document.
+  // cousins. Try to pinpoint the exact fix from the document.
   if (
     lower.includes("mapping values are not allowed") ||
     lower.includes("could not find expected ':'") ||
-    lower.includes("expected <block end>") ||
-    lower.includes("did not find expected key") ||
-    lower.includes("did not find expected '-'")
+    lower.includes("expected <block end>")
   ) {
     const fix = readLine ? analyzeIndentMismatch(readLine, line) : null;
     if (fix) {
