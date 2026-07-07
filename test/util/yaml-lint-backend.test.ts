@@ -220,37 +220,35 @@ describe("describeYamlError", () => {
     ).toEqual({ text: 'yaml_editor.error_indent_hint:{"line":3}', jumpLine: 3 });
   });
 
-  it("maps a block-end / missing-colon parse error to the indentation family", async () => {
+  it("maps the indentation family to the indent hint (pure-Python and C wording)", async () => {
     const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
-    expect(
-      describeYamlError("expected <block end>, but found '<scalar>'", pos(8), localize)
-        .text
-    ).toBe('yaml_editor.error_indent_hint:{"line":8}');
-    expect(describeYamlError("could not find expected ':'", pos(5), localize).text).toBe(
-      'yaml_editor.error_indent_hint:{"line":5}'
-    );
+    // Pure-Python and the C loader word the same structural errors differently.
+    for (const msg of [
+      "expected <block end>, but found '<scalar>'", // pure-Python
+      "could not find expected ':'", // pure-Python
+      "mapping values are not allowed in this context", // C loader
+      "while parsing a block mapping\ndid not find expected key", // C loader dedent
+      "while parsing a block collection\ndid not find expected '-' indicator", // C list
+    ]) {
+      expect(describeYamlError(msg, pos(5), localize).text).toBe(
+        'yaml_editor.error_indent_hint:{"line":5}'
+      );
+    }
   });
 
-  it("maps a tab error to the tab hint (PyYAML names the char via %r)", async () => {
+  it("maps a stray-character error to the char hint (pure-Python and C wording)", async () => {
     const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
-    expect(
-      describeYamlError(
-        "found character '\\t' that cannot start any token",
-        pos(3),
-        localize
-      ).text
-    ).toBe('yaml_editor.error_tab_hint:{"line":3}');
-  });
-
-  it("maps a non-tab unscannable character to the stray-symbol hint", async () => {
-    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
-    expect(
-      describeYamlError(
-        "found character '@' that cannot start any token",
-        pos(6),
-        localize
-      ).text
-    ).toBe('yaml_editor.error_char_hint:{"line":6}');
+    // Pure-Python names the char (tab / symbol); the C loader omits it. All
+    // route to one hint since the C message can't be told apart by char.
+    for (const msg of [
+      "found character '\\t' that cannot start any token", // pure-Python tab
+      "found character '@' that cannot start any token", // pure-Python symbol
+      "found character that cannot start any token", // C loader (no char)
+    ]) {
+      expect(describeYamlError(msg, pos(6), localize).text).toBe(
+        'yaml_editor.error_char_hint:{"line":6}'
+      );
+    }
   });
 
   it("maps an unterminated quoted scalar to the unterminated-string hint", async () => {
@@ -262,6 +260,18 @@ describe("describeYamlError", () => {
         localize
       ).text
     ).toBe('yaml_editor.error_unterminated_string_hint:{"line":7}');
+  });
+
+  it("maps an unclosed flow collection to the flow hint", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    for (const msg of [
+      "while parsing a flow sequence\nexpected ',' or ']', but got '<stream end>'",
+      "while parsing a flow mapping\nexpected ',' or '}', but got '<stream end>'",
+    ]) {
+      expect(describeYamlError(msg, pos(2), localize).text).toBe(
+        'yaml_editor.error_flow_hint:{"line":2}'
+      );
+    }
   });
 
   it("maps a duplicate key to the duplicate-key hint", async () => {
