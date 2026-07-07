@@ -1379,7 +1379,7 @@ export class ESPHomePageDevice extends LitElement {
       // left on the previously clicked component would disagree with
       // it (#1885). The highlight is a navigator/form affordance —
       // clear it rather than dragging it under the caret.
-      this._setHighlight(null, false);
+      this._clearBlockHighlight();
       this._updateUrl();
     });
   }
@@ -1460,9 +1460,14 @@ export class ESPHomePageDevice extends LitElement {
     this._setHighlight(e.detail.range, e.detail.scroll);
   }
 
-  /** Hand edit in the YAML pane → drop the (now stale-ranged) highlight.
-   *  Error-jump highlights survive: they clear on the next lint pass. */
+  /** Hand edit in the YAML pane → drop the (now stale-ranged) highlight. */
   private _onYamlUserEdit() {
+    this._clearBlockHighlight();
+  }
+
+  /** Clear a navigator/form block highlight; an error-jump highlight
+   *  survives — only the next lint pass clears those. */
+  private _clearBlockHighlight() {
     if (this._highlightRange && this._errorHighlight === "none") {
       this._setHighlight(null, false);
     }

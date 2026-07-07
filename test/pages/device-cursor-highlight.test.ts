@@ -149,6 +149,20 @@ describe("cursor-driven YAML highlight (#1885)", () => {
     expect(internals(page)._highlightRange).toBeNull();
   });
 
+  it("an active error-jump highlight survives a cross-section caret move", () => {
+    // Clicking elsewhere isn't a fix: the error marker stays until the
+    // next diagnostics pass clears it, same as for hand edits.
+    const page = makePage();
+    clickYamlLine(page, 2); // select i2c
+    internals(page)._setHighlight({ fromLine: 2, toLine: 2 }, true, true);
+
+    clickYamlLine(page, 5); // cross into sensor
+
+    expect(internals(page)._selectedSection).not.toBe("i2c");
+    expect(internals(page)._highlightRange).toEqual({ fromLine: 2, toLine: 2 });
+    expect(internals(page)._errorHighlight).toBe("active");
+  });
+
   it("an active error-jump highlight survives a hand edit", () => {
     // The error marker must stay visible while the user fixes the line;
     // only the next diagnostics pass clears it (the active → edited →
