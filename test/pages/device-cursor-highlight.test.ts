@@ -148,4 +148,18 @@ describe("cursor-driven YAML highlight (#1885)", () => {
     expect(spy).not.toHaveBeenCalled();
     expect(internals(page)._highlightRange).toBeNull();
   });
+
+  it("an active error-jump highlight survives a hand edit", () => {
+    // The error marker must stay visible while the user fixes the line;
+    // only the next diagnostics pass clears it (the active → edited →
+    // clear-on-lint lifecycle).
+    const page = makePage();
+    internals(page)._setHighlight({ fromLine: 2, toLine: 2 }, true, true);
+    expect(internals(page)._errorHighlight).toBe("active");
+
+    internals(page)._onYamlUserEdit();
+
+    expect(internals(page)._highlightRange).toEqual({ fromLine: 2, toLine: 2 });
+    expect(internals(page)._errorHighlight).toBe("active");
+  });
 });

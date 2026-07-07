@@ -1460,9 +1460,12 @@ export class ESPHomePageDevice extends LitElement {
     this._setHighlight(e.detail.range, e.detail.scroll);
   }
 
-  /** Hand edit in the YAML pane → drop the (now stale-ranged) highlight. */
+  /** Hand edit in the YAML pane → drop the (now stale-ranged) highlight.
+   *  Error-jump highlights survive: they clear on the next lint pass. */
   private _onYamlUserEdit() {
-    if (this._highlightRange) this._setHighlight(null, false);
+    if (this._highlightRange && this._errorHighlight === "none") {
+      this._setHighlight(null, false);
+    }
   }
 
   /** Single write path for the editor highlight, so the error-jump
