@@ -855,6 +855,7 @@
     "automation_pick_no_results": "Nothing matched your search.",
     "automation_trigger_on_component": "Trigger fired by {component} ({domain})",
     "automation_trigger_none_available": "No triggers available for this target.",
+    "automation_container_no_entities": "This component has no entities enabled yet. Enable one of its entities first, then add the automation.",
     "automation_trigger": "Trigger",
     "automation_trigger_label": "When",
     "automation_action_field_edit": "Edit actions",

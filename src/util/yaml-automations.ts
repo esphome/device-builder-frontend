@@ -291,23 +291,26 @@ function _resolveHandlerScope(
   if (allowSubEntity && indent > childIndent) {
     const sub = _subEntity(lines, handlerIdx, childIndent);
     if (sub) {
+      const parentComponentId = instanceComponentId(sections, host);
       return {
-        componentId: sub.id,
+        // An id-less sub-block keys on the backend's synthetic
+        // <parent>_<sub_key> id, mirroring the <domain>_<idx> convention.
+        componentId: sub.id ?? `${parentComponentId}_${sub.key}`,
         displayName: sub.name,
-        parentComponentId: instanceComponentId(sections, host),
+        parentComponentId,
       };
     }
   }
   return null;
 }
 
-/** The ided sub-entity block (``temperature:`` / ``humidity:``) enclosing the
+/** The sub-entity block (``temperature:`` / ``humidity:``) enclosing the
  *  handler at ``handlerIdx``, or ``null`` when it isn't inside one. */
 function _subEntity(
   lines: string[],
   handlerIdx: number,
   childIndent: number
-): { id: string; name?: string } | null {
+): { id: string | null; key: string; name?: string } | null {
   let headerIdx = -1;
   for (let j = handlerIdx - 1; j >= 0; j--) {
     if (isBlankOrCommentLine(lines[j])) continue;
@@ -336,7 +339,8 @@ function _subEntity(
     id = readInstanceScalar(lines[k], "id") ?? id;
     name = readInstanceScalar(lines[k], "name") ?? name;
   }
-  return id ? { id, name } : null;
+  const key = lines[headerIdx].trim().replace(/:.*$/, "");
+  return { id, key, name };
 }
 
 /** Index of the first line past the block opened at ``startIdx`` (its key

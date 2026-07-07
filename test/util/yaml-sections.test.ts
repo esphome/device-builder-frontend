@@ -608,6 +608,40 @@ describe("parseYamlAutomations", () => {
     expect(items[1].name).toBeUndefined();
   });
 
+  it("scopes an id-less sub-entity handler to the synthetic <parent>_<sub_key> id", () => {
+    const yaml = `sensor:
+  - platform: aht10
+    id: aht20
+    temperature:
+      name: "Kit Temperature"
+      on_value:
+        then:
+          - light.toggle: led
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe("aht20_temperature");
+    expect(items[0].name).toBe("Kit Temperature");
+    expect(items[0].parentComponentId).toBe("aht20");
+  });
+
+  it("composes the synthetic sub-entity id on an id-less parent's positional id", () => {
+    const yaml = `sensor:
+  - platform: aht10
+    temperature:
+      on_value:
+        - logger.log: t
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe("sensor_0_temperature");
+    expect(items[0].parentComponentId).toBe("sensor_0");
+  });
+
   it("ignores a nested id: in the handler body when scoping a sub-entity", () => {
     // A globals.set action inside the handler carries its own id: at a deeper
     // indent; it must not retarget the automation away from the sub-sensor.
@@ -1059,11 +1093,10 @@ describe("parseYamlAutomations", () => {
     expect(entry.key).toBe("automation:component_on:my_relay:on_turn_on");
   });
 
-  it("leaves a nested sub-component on_* unscoped (backend parses direct keys only)", () => {
-    // ``on_value`` lives under the ``temperature:`` sub-mapping, not as a
-    // direct key on the dht list item, so the backend's instance.items()
-    // scan never sees it. The fallback parser must not claim a
-    // ``sensor_0`` handle ``automations/parse`` won't confirm.
+  it("scopes a nested id-less sub-block handler to the synthetic sub-entity id", () => {
+    // ``on_value`` lives under the ``temperature:`` sub-mapping; the backend
+    // parses it to the synthetic ``<parent>_<sub_key>`` id, so the fallback
+    // parser claims the same handle instead of leaving the row unscoped.
     const yaml = `sensor:
   - platform: dht
     temperature:
@@ -1072,8 +1105,10 @@ describe("parseYamlAutomations", () => {
         - logger.log: "x"
 `;
     const entry = parseYamlAutomations(yaml).find((s) => s.key.includes("on_value"));
-    expect(entry?.key).toBe("automation:unscoped:on_value:5");
-    expect(entry?.id).toBeUndefined();
+    expect(entry?.key).toBe("automation:component_on:sensor_0_temperature:on_value");
+    expect(entry?.id).toBe("sensor_0_temperature");
+    expect(entry?.name).toBe("Temp");
+    expect(entry?.parentComponentId).toBe("sensor_0");
   });
 
   it("scopes a flat block's on_* to its declared id", () => {

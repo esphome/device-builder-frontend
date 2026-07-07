@@ -430,6 +430,42 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
       (dialog as any)._filteredTriggers().map((t: { id: string }) => t.id)
     ).toContain("sensor.on_value_range");
   });
+
+  it("explains an empty container prefill instead of showing a dead picker", async () => {
+    // A multi-entity component with no sub-entities configured (#1886): the
+    // shortcut still opens the dialog, which must say why there is nothing
+    // to target and keep the submit blocked.
+    const emptyContainer = {
+      ...ahtAvailable(),
+      devices: [
+        {
+          id: "aht20",
+          name: "AHT20",
+          component_id: "sensor.aht10",
+          is_entity_container: true,
+        },
+      ],
+    } as AvailableAutomations;
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(emptyContainer)),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    dialog.open({ kind: "component_on", componentId: "aht20" });
+    await dialog.updateComplete;
+    await flushPending();
+    await dialog.updateComplete;
+
+    expect(dialog.shadowRoot!.textContent).toContain(
+      "device.automation_container_no_entities"
+    );
+    expect(
+      dialog.shadowRoot!.querySelector("esphome-component-target-picker")
+    ).toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._componentId).toBe("");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((dialog as any)._canContinue()).toBe(false);
+  });
 });
 
 // The migration onto esphome-base-dialog swapped the imperative
