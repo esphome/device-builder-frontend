@@ -4,6 +4,20 @@ import type { SerialPort } from "../api/types/system.js";
 
 export const SERIAL_PORTS_POLL_INTERVAL_MS = 5000;
 
+const HINT_RANK: Record<string, number> = { esp: 0, bridge: 1 };
+
+const hintRank = (p: SerialPort) => (p.hint !== null ? (HINT_RANK[p.hint] ?? 2) : 2);
+
+/**
+ * Likely ESP candidates first: Espressif native-USB ports, then known
+ * USB-UART bridges, then everything else; path order within a tier.
+ */
+export function sortSerialPorts(ports: SerialPort[]): SerialPort[] {
+  return [...ports].sort(
+    (a, b) => hintRank(a) - hintRank(b) || a.port.localeCompare(b.port)
+  );
+}
+
 /**
  * Reactive controller that polls ``config/serial_ports`` while a
  * port-picker surface is visible. Hosts call ``set(visible)`` from
@@ -88,7 +102,8 @@ export class SerialPortsPollController implements ReactiveController {
     }
   }
 
-  private _apply(ports: SerialPort[]) {
+  private _apply(unsorted: SerialPort[]) {
+    const ports = sortSerialPorts(unsorted);
     const paths = new Set(ports.map((p) => p.port));
     // A port absent from the previous fetch is new, and stays flagged
     // while present; pruning unplugged ports lets a replug re-flag.
@@ -102,7 +117,10 @@ export class SerialPortsPollController implements ReactiveController {
       this.error !== null ||
       ports.length !== this.ports.length ||
       ports.some(
-        (p, i) => p.port !== this.ports[i].port || p.desc !== this.ports[i].desc
+        (p, i) =>
+          p.port !== this.ports[i].port ||
+          p.desc !== this.ports[i].desc ||
+          p.hint !== this.ports[i].hint
       ) ||
       fresh.size !== this.newPorts.size ||
       [...fresh].some((path) => !this.newPorts.has(path));

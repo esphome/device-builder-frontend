@@ -15,6 +15,7 @@ import type { SerialPort } from "../../src/api/types/system.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 import { SERIAL_PORTS_POLL_INTERVAL_MS } from "../../src/util/serial-ports-poll-controller.js";
+import { makeSerialPort } from "../_make-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mount(getSerialPorts: () => Promise<SerialPort[]>) {
@@ -43,7 +44,7 @@ afterEach(() => {
 
 describe("install-method-dialog port polling", () => {
   it("refreshes the open port list and highlights the newly connected port", async () => {
-    let ports: SerialPort[] = [{ port: "/dev/ttyUSB0", desc: "CP2102" }];
+    let ports: SerialPort[] = [makeSerialPort("/dev/ttyUSB0", "CP2102")];
     const getSerialPorts = vi.fn(async () => ports);
     const dialog = await mount(getSerialPorts);
 
@@ -51,7 +52,7 @@ describe("install-method-dialog port polling", () => {
     await dialog.updateComplete;
     expect(portRows(dialog)).toHaveLength(1);
 
-    ports = [...ports, { port: "/dev/ttyUSB1", desc: "CH340" }];
+    ports = [...ports, makeSerialPort("/dev/ttyUSB1", "CH340")];
     await vi.advanceTimersByTimeAsync(SERIAL_PORTS_POLL_INTERVAL_MS);
     await dialog.updateComplete;
 

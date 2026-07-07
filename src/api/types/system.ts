@@ -6,9 +6,19 @@
 
 // ─── Config / System ─────────────────────────────────────────
 
+export type SerialPortHint = "esp" | "bridge";
+
 export interface SerialPort {
   port: string;
   desc: string;
+  /** USB vendor/product ids; ``null`` when the port carries no USB
+   *  metadata (e.g. a by-id symlink entry). */
+  vid: number | null;
+  pid: number | null;
+  /** Backend VID classification: ``esp`` is an Espressif native-USB
+   *  device (definitely an ESP), ``bridge`` a common USB-UART bridge
+   *  chip (CP210x, CH340, FTDI, Prolific). */
+  hint: SerialPortHint | null;
 }
 
 /**

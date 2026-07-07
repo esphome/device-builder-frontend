@@ -22,6 +22,7 @@ import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { disclosureStyles } from "../styles/disclosure.js";
 import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
+import { serialPortHintStyles } from "../styles/serial-port-hints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
 import { isEsptoolPlatform } from "../util/esptool-platform.js";
@@ -34,6 +35,10 @@ import {
 } from "../util/web-serial.js";
 import { installMethodDialogStyles } from "./install-method-dialog.styles.js";
 import { renderDisclosure } from "./shared/disclosure.js";
+import {
+  renderSerialPortBadges,
+  renderSerialPortReplugHint,
+} from "./shared/serial-port-hints.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -149,6 +154,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     primaryDialogHeaderStyles,
     inputStyles,
     newItemHighlightStyles,
+    serialPortHintStyles,
     installMethodDialogStyles,
   ];
 
@@ -394,17 +400,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
                         <span class="title">${p.port}</span>
                         ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
                       </div>
-                      ${
-                        this._portsPoll.newPorts.has(p.port)
-                          ? html`<span class="new-badge"
-                              >${this._localize("dashboard.serial_port_new")}</span
-                            >`
-                          : nothing
-                      }
+                      ${renderSerialPortBadges(p, this._portsPoll.newPorts, this._localize)}
                     </div>
                   `
                 )}
               </div>
+              ${renderSerialPortReplugHint(this._portsPoll.ports, this._localize)}
             `
       }
     `;

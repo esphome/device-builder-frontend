@@ -16,6 +16,7 @@ import { defaultLocalize } from "../../../src/common/localize.js";
 import type { ESPHomeWizardStepBoardPortSelect } from "../../../src/components/wizard/wizard-step-board-port-select.js";
 import { ESPHomeWizardStepBoard } from "../../../src/components/wizard/wizard-step-board.js";
 import { SERIAL_PORTS_POLL_INTERVAL_MS } from "../../../src/util/serial-ports-poll-controller.js";
+import { makeSerialPort } from "../../_make-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function mount(getSerialPorts: () => Promise<SerialPort[]>) {
@@ -53,7 +54,7 @@ describe("wizard-step-board port fetch error recovery", () => {
     let fail = true;
     const getSerialPorts = vi.fn(async () => {
       if (fail) throw new Error("backend offline");
-      return [{ port: "/dev/ttyUSB0", desc: "CP2102" }];
+      return [makeSerialPort("/dev/ttyUSB0", "CP2102")];
     });
     const el = await mount(getSerialPorts);
 
@@ -65,6 +66,6 @@ describe("wizard-step-board port fetch error recovery", () => {
     await vi.advanceTimersByTimeAsync(SERIAL_PORTS_POLL_INTERVAL_MS);
     await el.updateComplete;
     expect(portSelect(el).errorMessage).toBe("");
-    expect(portSelect(el).ports).toEqual([{ port: "/dev/ttyUSB0", desc: "CP2102" }]);
+    expect(portSelect(el).ports).toEqual([makeSerialPort("/dev/ttyUSB0", "CP2102")]);
   });
 });

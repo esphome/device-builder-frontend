@@ -8,9 +8,14 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { newItemHighlightStyles } from "../../styles/new-item-highlight.js";
+import { serialPortHintStyles } from "../../styles/serial-port-hints.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { DeploymentEnvironment } from "../../util/environment.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import {
+  renderSerialPortBadges,
+  renderSerialPortReplugHint,
+} from "../shared/serial-port-hints.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -56,6 +61,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
     espHomeStyles,
     inputStyles,
     newItemHighlightStyles,
+    serialPortHintStyles,
     css`
       :host {
         display: flex;
@@ -227,17 +233,12 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
                 <span class="title">${p.port}</span>
                 ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
               </div>
-              ${
-                this.newPorts.has(p.port)
-                  ? html`<span class="new-badge"
-                      >${this._localize("dashboard.serial_port_new")}</span
-                    >`
-                  : nothing
-              }
+              ${renderSerialPortBadges(p, this.newPorts, this._localize)}
             </button>
           `
         )}
       </div>
+      ${renderSerialPortReplugHint(this.ports, this._localize)}
     `;
   }
 

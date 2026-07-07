@@ -196,6 +196,8 @@
     "install_method_loading_ports": "Scanning for serial ports…",
     "install_method_back": "Back",
     "serial_port_new": "New",
+    "serial_port_esp": "ESP device",
+    "serial_port_unsure_hint": "Not sure which port? Unplug the device, plug it back in, then pick the port marked New.",
     "table_columns": "Columns",
     "table_toggle_columns": "Toggle columns",
     "view_cards": "Card view",

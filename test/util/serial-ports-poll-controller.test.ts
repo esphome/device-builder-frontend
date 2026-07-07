@@ -4,11 +4,13 @@ import type { SerialPort } from "../../src/api/types/system.js";
 import {
   SERIAL_PORTS_POLL_INTERVAL_MS,
   SerialPortsPollController,
+  sortSerialPorts,
 } from "../../src/util/serial-ports-poll-controller.js";
 import { FakeHost } from "../_fake-host.js";
+import { makeSerialPort } from "../_make-serial-port.js";
 
-const A: SerialPort = { port: "/dev/ttyUSB0", desc: "CP2102" };
-const B: SerialPort = { port: "/dev/ttyUSB1", desc: "CH340" };
+const A: SerialPort = makeSerialPort("/dev/ttyUSB0", "CP2102");
+const B: SerialPort = makeSerialPort("/dev/ttyUSB1", "CH340");
 
 function make(initial: SerialPort[] = [A]) {
   const host = new FakeHost();
@@ -175,6 +177,24 @@ describe("SerialPortsPollController", () => {
     expect(ctrl.error).toBeNull();
     expect(ctrl.ports).toEqual([A, B]);
     expect(ctrl.newPorts.size).toBe(0);
+  });
+
+  it("sorts likely ESP candidates first", async () => {
+    const generic = makeSerialPort("/dev/cu.usbmodem1", "Some webcam");
+    const bridge = makeSerialPort("/dev/cu.usbserial-2", "CH340", {
+      vid: 0x1a86,
+      hint: "bridge",
+    });
+    const esp = makeSerialPort("/dev/cu.usbmodem3", "USB JTAG/serial debug unit", {
+      vid: 0x303a,
+      hint: "esp",
+    });
+    expect(sortSerialPorts([generic, bridge, esp])).toEqual([esp, bridge, generic]);
+
+    const { ctrl } = make([generic, bridge, esp]);
+    ctrl.set(true);
+    await flush();
+    expect(ctrl.ports).toEqual([esp, bridge, generic]);
   });
 
   it("swallows poll errors after a successful fetch, keeping the last good list", async () => {
