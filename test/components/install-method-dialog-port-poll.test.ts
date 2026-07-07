@@ -63,6 +63,32 @@ describe("install-method-dialog port polling", () => {
     expect(rows[1].querySelector(".new-badge")?.textContent).toBe("New");
   });
 
+  it("badges Espressif native-USB ports and shows the replug hint on multi-port lists", async () => {
+    const ports = [
+      makeSerialPort("/dev/ttyACM0", "USB JTAG/serial debug unit", {
+        vid: 0x303a,
+        hint: "esp",
+      }),
+      makeSerialPort("/dev/ttyUSB0", "CP2102", { vid: 0x10c4, hint: "bridge" }),
+    ];
+    const dialog = await mount(async () => ports);
+    await vi.advanceTimersByTimeAsync(0);
+    await dialog.updateComplete;
+
+    const rows = portRows(dialog);
+    expect(rows[0].querySelector(".esp-badge")?.textContent).toBe("ESP device");
+    expect(rows[1].querySelector(".esp-badge")).toBeNull();
+    expect(dialog.shadowRoot!.querySelector(".port-hint")).not.toBeNull();
+  });
+
+  it("omits the replug hint when a single port leaves no room for doubt", async () => {
+    const dialog = await mount(async () => [makeSerialPort("/dev/ttyUSB0", "CP2102")]);
+    await vi.advanceTimersByTimeAsync(0);
+    await dialog.updateComplete;
+
+    expect(dialog.shadowRoot!.querySelector(".port-hint")).toBeNull();
+  });
+
   it("stops polling when the dialog closes", async () => {
     const getSerialPorts = vi.fn(async () => [] as SerialPort[]);
     const dialog = await mount(getSerialPorts);

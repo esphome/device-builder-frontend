@@ -191,6 +191,10 @@ describe("SerialPortsPollController", () => {
     });
     expect(sortSerialPorts([generic, bridge, esp])).toEqual([esp, bridge, generic]);
 
+    const com2 = makeSerialPort("COM2", "CP2102");
+    const com10 = makeSerialPort("COM10", "CP2102");
+    expect(sortSerialPorts([com10, com2])).toEqual([com2, com10]);
+
     const { ctrl } = make([generic, bridge, esp]);
     ctrl.set(true);
     await flush();

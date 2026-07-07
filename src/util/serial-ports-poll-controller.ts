@@ -8,13 +8,20 @@ const HINT_RANK: Record<SerialPortHint, number> = { esp: 0, bridge: 1 };
 
 const hintRank = (p: SerialPort) => (p.hint !== null ? HINT_RANK[p.hint] : 2);
 
+/** Numeric-aware so COM2 sorts before COM10 (same shape as
+ *  DEVICE_SORT_COLLATOR in device-sort.ts). */
+const PORT_COLLATOR = new Intl.Collator(undefined, {
+  sensitivity: "base",
+  numeric: true,
+});
+
 /**
  * Likely ESP candidates first: Espressif native-USB ports, then known
  * USB-UART bridges, then everything else; path order within a tier.
  */
 export function sortSerialPorts(ports: SerialPort[]): SerialPort[] {
   return [...ports].sort(
-    (a, b) => hintRank(a) - hintRank(b) || a.port.localeCompare(b.port)
+    (a, b) => hintRank(a) - hintRank(b) || PORT_COLLATOR.compare(a.port, b.port)
   );
 }
 
