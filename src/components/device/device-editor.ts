@@ -212,6 +212,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   @state()
   private _editorFocused = false;
 
+  /** The editor's completion popup is showing; holds the banner reveal. */
+  @state()
+  private _completionOpen = false;
+
   /** performance.now() of the last YAML edit; read by the banner through
    *  the stable accessor below so keystrokes don't re-render this host.
    *  Starts (and resets, on device switch) to -Infinity — "never typed",
@@ -397,6 +401,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                         @yaml-diagnostics=${this._onYamlDiagnostics}
                         @yaml-auto-fix=${this._onBannerAutoFix}
                         @yaml-cursor-line=${this._onYamlCursorLine}
+                        @yaml-completion-open=${this._onYamlCompletionOpen}
                         @focusin=${this._onEditorFocusIn}
                         @focusout=${this._onEditorFocusOut}
                       ></esphome-yaml-editor>`
@@ -408,6 +413,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                       .errors=${this._liveErrors}
                       .caretLine=${this._caretLine}
                       .editorFocused=${this._editorFocused}
+                      .completionOpen=${this._completionOpen}
                       .getLastEditAt=${this._getLastEditAt}
                       @banner-auto-fix=${this._onBannerAutoFix}
                       @banner-goto-line=${this._onBannerGotoLine}
@@ -534,6 +540,10 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   private _onYamlCursorLine(e: CustomEvent<{ line: number }>) {
     this._caretLine = e.detail.line;
+  }
+
+  private _onYamlCompletionOpen(e: CustomEvent<{ open: boolean }>) {
+    this._completionOpen = e.detail.open;
   }
 
   private _onEditorFocusIn = () => {

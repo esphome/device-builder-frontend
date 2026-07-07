@@ -1,4 +1,4 @@
-import { autocompletion } from "@codemirror/autocomplete";
+import { autocompletion, completionStatus } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { forceLinting } from "@codemirror/lint";
@@ -166,6 +166,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    *  whole path keeps both section- and field-following in sync without
    *  churning on plain column moves. */
   private _lastReportedPathKey = "";
+
+  /** Last completion-popup visibility emitted as `yaml-completion-open`. */
+  private _lastCompletionOpen = false;
 
   static styles = css`
     :host {
@@ -424,6 +427,19 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         },
       }),
       EditorView.updateListener.of((update) => {
+        // Surface completion-popup visibility so the host can hold the
+        // invalid banner while the user is still picking an option.
+        const completionOpen = completionStatus(update.state) === "active";
+        if (completionOpen !== this._lastCompletionOpen) {
+          this._lastCompletionOpen = completionOpen;
+          this.dispatchEvent(
+            new CustomEvent("yaml-completion-open", {
+              detail: { open: completionOpen },
+              bubbles: true,
+              composed: true,
+            })
+          );
+        }
         // LOAD-BEARING ORDER: `yaml-change` MUST be dispatched
         // before `yaml-cursor-line` within a single update.
         // The page's `_onYamlChange` writes `_yaml` from the
@@ -570,6 +586,19 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
           icons: true,
           closeOnBlur: true,
           maxRenderedOptions: 60,
+          // Pin the option-docs panel beside the list, or flush below it
+          // when the side lacks room — the default "narrow" placement lays
+          // the panel over the options themselves.
+          positionInfo: (view, list, option) => {
+            const space = view.scrollDOM.getBoundingClientRect();
+            const listW = list.right - list.left;
+            if (space.right - list.right >= 320) {
+              return {
+                style: `top: ${Math.max(0, option.top - list.top)}px; left: ${listW}px`,
+              };
+            }
+            return { style: `top: ${list.bottom - list.top}px; left: 0px` };
+          },
         }),
         // Open the popup when the caret idles on a blank/empty line, so
         // keys/values are discoverable without typing a partial first.
@@ -700,6 +729,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     this._container.innerHTML = "";
     this._lastReportedCursorLine = 0;
     this._lastReportedPathKey = "";
+    this._lastCompletionOpen = false;
     this._mountEditor();
   }
 

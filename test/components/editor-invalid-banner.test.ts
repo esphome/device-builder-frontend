@@ -111,9 +111,43 @@ describe("editor-invalid-banner smart reveal", () => {
     expect(banner(el)).not.toBeNull();
   });
 
-  it("shows a validation error immediately even near the caret", async () => {
+  it("shows a line-less validation error immediately even while typing", async () => {
     const { el } = await mountBanner({ caret: 55 });
     el.errors = [{ message: "Platform missing.", kind: "validation" }];
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+  });
+
+  it("damps a validation error anchored near the caret like a parse error", async () => {
+    const { el } = await mountBanner({ caret: 15 });
+    el.errors = [{ message: "expected a dictionary.", line: 15, kind: "validation" }];
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+
+    vi.advanceTimersByTime(15_200);
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+  });
+
+  it("shows a validation error anchored far from the caret immediately", async () => {
+    const { el } = await mountBanner({ caret: 55 });
+    el.errors = [{ message: "expected a dictionary.", line: 15, kind: "validation" }];
+    await el.updateComplete;
+    expect(banner(el)).not.toBeNull();
+  });
+
+  it("holds every reveal while the completion popup is open", async () => {
+    const { el } = await mountBanner({ caret: 55 });
+    el.completionOpen = true;
+    el.errors = [{ message: "Platform missing.", kind: "validation" }];
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+
+    vi.advanceTimersByTime(20_000); // even the idle backstop waits
+    await el.updateComplete;
+    expect(banner(el)).toBeNull();
+
+    el.completionOpen = false;
     await el.updateComplete;
     expect(banner(el)).not.toBeNull();
   });

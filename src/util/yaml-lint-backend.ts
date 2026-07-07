@@ -417,6 +417,30 @@ export function describeNestedListValue(
   return null;
 }
 
+/**
+ * Add the misindent / half-typed-key cause to a wrong-value-type
+ * validation message ("expected a dictionary.") anchored at *line*: a
+ * value-less `- key:` whose items landed one level deeper, or a bare word
+ * with no ':' (a lone "le" under "logger:" parses as its string value).
+ * Null when the anchored line is neither shape.
+ */
+export function describeValueTypeCause(
+  readLine: ReadLine,
+  line: number,
+  localize: LocalizeFunc
+): string | null {
+  const nested = describeNestedListValue(readLine, line, localize);
+  if (nested) return nested;
+  const token = readLine(line)?.trim();
+  if (token && !token.includes(":") && !token.startsWith("#") && !token.startsWith("-")) {
+    return localize("yaml_editor.error_missing_colon_hint", {
+      line,
+      key: token.length > 24 ? `${token.slice(0, 24)}…` : token,
+    });
+  }
+  return null;
+}
+
 /** A one-click indentation repair: add `indent` spaces at the start of
  *  `line` (or remove them, when negative). */
 export interface YamlAutoFix {
@@ -778,11 +802,11 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           bannerErrors.push({ message, kind: "validation" });
           continue;
         }
-        // A bare "expected a dictionary." on a value-less `- key:` whose
-        // list items landed one level deeper reads as nonsense — name the
-        // indentation mistake that made those items the key's value.
+        // A bare "expected a dictionary." reads as nonsense — when the
+        // anchored line shows why the value took the wrong type (nested
+        // list items, a half-typed key with no ':'), name that cause.
         const squiggleLineNum = doc.lineAt(from).number;
-        const hint = describeNestedListValue(readLine, squiggleLineNum, opts.localize);
+        const hint = describeValueTypeCause(readLine, squiggleLineNum, opts.localize);
         if (hint) message = `${message} ${hint}`;
         diagnostics.push({
           from,

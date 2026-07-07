@@ -71,6 +71,11 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
   @property({ type: Boolean })
   editorFocused = false;
 
+  /** The completion popup is open — the user is mid-decision, so every
+   *  reveal (including line-less validation errors) holds until it closes. */
+  @property({ type: Boolean })
+  completionOpen = false;
+
   /** Timestamp accessor (performance.now clock) of the last YAML edit — a
    *  pull accessor so the host doesn't re-render per keystroke. -Infinity
    *  means "never typed": the idle backstop is already satisfied. */
@@ -124,7 +129,8 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
     if (
       changed.has("errors") ||
       changed.has("caretLine") ||
-      changed.has("editorFocused")
+      changed.has("editorFocused") ||
+      changed.has("completionOpen")
     ) {
       this._evaluate();
     }
@@ -223,13 +229,21 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
   }
 
   private _shouldReveal(): boolean {
+    // An open completion popup means the user is still picking — hold
+    // everything; closing it re-evaluates through the property change.
+    if (this.completionOpen) return false;
     if (!this.editorFocused) return true;
-    // Only a YAML parse error is plausibly the user's half-typed token; a
-    // validation error means the document parses, so it's real breakage (a
-    // deleted esp32: block, an included-file error) — show it right away.
-    if (this.errors.some((err) => err.kind !== "parse")) return true;
-    // A locatable parse error far from the caret isn't the in-progress
-    // token either. Line-less parse errors count as near — suppressible.
+    // A line-less validation error is whole-config breakage (a deleted
+    // esp32: block, an included-file error) — nothing ties it to what the
+    // user is typing, so show it right away. Anything anchored near the
+    // caret is plausibly the half-typed token, whether the parser or the
+    // validator complained (a lone "l" under "logger:" parses as a string
+    // and surfaces as "expected a dictionary."), so it stays damped. A
+    // line-less PARSE error is an unplaceable artifact of mid-edit YAML —
+    // suppressible.
+    if (this.errors.some((err) => err.kind !== "parse" && err.line === undefined)) {
+      return true;
+    }
     if (
       this.errors.some(
         (err) =>

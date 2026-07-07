@@ -178,6 +178,17 @@ describe("describeNestedListValue", () => {
       ["    - platform: gpio", "      - nested:"][n - 1];
     expect(describeNestedListValue(valued, 1, localize)).toBeNull();
   });
+
+  it("names a bare half-typed word that became the key's string value", async () => {
+    const { describeValueTypeCause } =
+      await import("../../src/util/yaml-lint-backend.js");
+    const doc = (n: number): string | undefined => ["logger:", "  le"][n - 1];
+    expect(describeValueTypeCause(doc, 2, localize)).toBe(
+      'yaml_editor.error_missing_colon_hint:{"line":2,"key":"le"}'
+    );
+    const keyed = (n: number): string | undefined => ["logger:", "  level: DEBUG"][n - 1];
+    expect(describeValueTypeCause(keyed, 2, localize)).toBeNull();
+  });
 });
 
 describe("analyzeIndentMismatch", () => {
