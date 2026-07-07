@@ -362,8 +362,7 @@ export const deviceEditorStyles = css`
   /* The code editor brings its own line-number gutter, so the full
      var(--wa-space-m) inset the config form needs reads as wasted padding that
      shrinks the text area. Trim the editor pane to a tighter, even inset on the
-     top + sides; the bottom keeps the action-row reserve above. Also the
-     positioning context for the floating invalid banner. */
+     top + sides; the bottom keeps the action-row reserve above. */
   .editor-pane--right {
     position: relative;
     padding-top: var(--wa-space-xs);
