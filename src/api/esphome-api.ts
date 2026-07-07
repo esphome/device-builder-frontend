@@ -2043,6 +2043,14 @@ export class ESPHomeAPI {
    * sent to the receiver in msg3 for *their* pairing-requests
    * inbox.
    *
+   * ``psk`` is the one-time pairing key a headless
+   * ``--remote-build-only`` build server prints on its console;
+   * it rides in the encrypted msg3 and is only sent after the
+   * receiver's static key matched ``pin_sha256``. Omit it when
+   * pairing a normal dashboard receiver. A wrong key surfaces as
+   * ``NO_PAIRING_WINDOW`` (the receiver deliberately doesn't
+   * distinguish the two).
+   *
    * Errors:
    * - ``ErrorCode.PRECONDITION_FAILED`` — pin mismatch (TOCTOU
    *   between preview and confirm) or receiver-side REJECTED.
@@ -2061,6 +2069,7 @@ export class ESPHomeAPI {
     pin_sha256: string;
     receiver_label: string;
     offloader_label: string;
+    psk?: string;
   }): Promise<PairingSummary> {
     return this.sendCommand<PairingSummary>("remote_build/request_pair", args);
   }

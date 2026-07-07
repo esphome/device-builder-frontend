@@ -137,6 +137,24 @@ export const pairBuildServerDialogStyles = css`
     font-size: var(--wa-font-size-s);
   }
 
+  /* Optional pairing key, collapsed by default — only headless build
+     servers (--remote-build-only) need it, so the common dashboard-pairing
+     path doesn't see an unexplained field. */
+  .psk-disclosure {
+    padding-bottom: var(--wa-space-m);
+  }
+
+  .psk-disclosure summary {
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-quiet);
+    cursor: pointer;
+    padding-bottom: var(--wa-space-xs);
+  }
+
+  .psk-disclosure .field {
+    padding-bottom: 0;
+  }
+
   .sent-body {
     padding-bottom: var(--wa-space-m);
     font-size: var(--wa-font-size-s);

@@ -73,6 +73,9 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   @state() _previewedPin = "";
   @state() _receiverLabel = "";
   @state() _offloaderLabel = "";
+  // One-time pairing key from a headless build server's console banner.
+  // Optional — left empty when pairing a normal dashboard receiver.
+  @state() _psk = "";
   @state() _error: string | null = null;
   @state() _open = false;
 
@@ -145,6 +148,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
       prefill?.receiverLabel?.trim() || friendlyHostname(this._hostname);
     this._receiverLabelTouched = false;
     this._offloaderLabel = friendlyHostname(window.location.hostname);
+    this._psk = "";
     this._error = null;
     this._sentKey = null;
     this._offloaderIdentity = null;

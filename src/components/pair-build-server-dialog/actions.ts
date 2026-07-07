@@ -99,6 +99,7 @@ export async function onConfirmSubmit(host: ESPHomePairBuildServerDialog): Promi
     host._error = host._localize("settings.pair_build_server_label_required");
     return;
   }
+  const psk = host._psk.trim();
   host._busy = true;
   // The mutating send: veto dismissal until it resolves (don't orphan it).
   host._sending = true;
@@ -110,6 +111,7 @@ export async function onConfirmSubmit(host: ESPHomePairBuildServerDialog): Promi
       pin_sha256: host._previewedPin,
       receiver_label: receiverLabel,
       offloader_label: offloaderLabel,
+      ...(psk ? { psk } : {}),
     });
     host._step = "sent";
     // Pin the auto-close watch key. summary.pin_sha256 is the stable

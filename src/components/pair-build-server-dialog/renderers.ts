@@ -164,6 +164,30 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
     <div class="trust-warning" role="alert">
       ${host._localize("settings.pair_build_server_trust_warning")}
     </div>
+    <details class="psk-disclosure" ?open=${host._psk.length > 0}>
+      <summary>${host._localize("settings.pair_build_server_psk_disclosure")}</summary>
+      <div class="field">
+        <label for="pair-psk">
+          ${host._localize("settings.pair_build_server_psk_label")}
+        </label>
+        <input
+          id="pair-psk"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          ?disabled=${host._busy}
+          .value=${host._psk}
+          placeholder=${host._localize("settings.pair_build_server_psk_placeholder")}
+          @input=${(e: Event) => {
+            host._psk = (e.target as HTMLInputElement).value;
+            host._error = null;
+          }}
+        />
+        <span class="helper">
+          ${host._localize("settings.pair_build_server_psk_helper")}
+        </span>
+      </div>
+    </details>
     <div class="field">
       <label for="pair-receiver-label">
         ${host._localize("settings.pair_build_server_receiver_label_label")}
