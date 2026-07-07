@@ -1,6 +1,5 @@
 import { consume } from "@lit/context";
 import {
-  mdiAlertCircleOutline,
   mdiCheckCircleOutline,
   mdiChevronDown,
   mdiContentSave,
@@ -17,13 +16,11 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { expertModeContext, localizeContext } from "../../context/index.js";
-import { dangerBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
   NO_INSTANCE_ERRORS,
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
-import { renderTextLinks } from "../../util/markdown.js";
 import { notifyError, notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
@@ -40,6 +37,10 @@ import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeYamlEditor, HighlightRange } from "../yaml-editor.js";
 import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
+import type {
+  BannerAutoFixDetail,
+  BannerGotoLineDetail,
+} from "./editor-invalid-banner.js";
 import { renderInstallAction } from "./install-action.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
@@ -49,9 +50,9 @@ import "../confirm-dialog.js";
 import "../yaml-diff.js";
 import "../yaml-editor.js";
 import "./device-board-info.js";
+import "./editor-invalid-banner.js";
 
 registerMdiIcons({
-  "alert-circle-outline": mdiAlertCircleOutline,
   "check-circle-outline": mdiCheckCircleOutline,
   "chevron-down": mdiChevronDown,
   "content-save": mdiContentSave,
@@ -65,9 +66,6 @@ registerMdiIcons({
 });
 
 export type DeviceLayoutMode = "both" | "left" | "right";
-
-/** Cap the errors listed in the invalid banner; the rest collapse to "+N more". */
-const MAX_BANNER_ERRORS = 6;
 
 @customElement("esphome-device-editor")
 export class ESPHomeDeviceEditor extends LitElement {
@@ -202,9 +200,23 @@ export class ESPHomeDeviceEditor extends LitElement {
   private _revealSensitive = false;
 
   /** Live lint error messages from the editor's backend linter. Drives the
-   *  "configuration invalid" banner above the editor. */
+   *  "configuration invalid" banner below the editor. */
   @state()
   private _liveErrors: BannerError[] = [];
+
+  /** Caret's 1-indexed line from the yaml-cursor-line event; feeds the banner's
+   *  near-caret reveal suppression. */
+  @state()
+  private _caretLine = 0;
+
+  @state()
+  private _editorFocused = false;
+
+  /** performance.now() of the last YAML edit; read by the banner through
+   *  the stable accessor below so keystrokes don't re-render this host. */
+  private _lastEditAt = 0;
+
+  private _getLastEditAt = () => this._lastEditAt;
 
   @state()
   private _splitRatio = loadSplitRatio();
@@ -221,7 +233,7 @@ export class ESPHomeDeviceEditor extends LitElement {
   @query("esphome-confirm-dialog.auto-fix-confirm")
   private _autoFixConfirmDialog?: ESPHomeConfirmDialog;
 
-  static styles = [espHomeStyles, dangerBannerStyles, deviceEditorStyles];
+  static styles = [espHomeStyles, deviceEditorStyles];
 
   protected render() {
     // On mobile we collapse the split view down to a single pane to
@@ -365,57 +377,6 @@ export class ESPHomeDeviceEditor extends LitElement {
                 : nothing
             }
             <div class="editor-pane editor-pane--right">
-              ${
-                !this._showDiff && this._liveErrors.length > 0
-                  ? html`<div class="danger-banner invalid-banner" role="alert">
-                      <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
-                      <div class="danger-banner-text">
-                        ${this._liveErrors.slice(0, MAX_BANNER_ERRORS).map(
-                          (err) =>
-                            html`<span
-                              >${renderTextLinks(err.message)}${
-                                err.fix
-                                  ? html`
-                                      <button
-                                        type="button"
-                                        class="invalid-banner-goto"
-                                        title=${this._localize("yaml_editor.error_auto_fix_hint")}
-                                        @click=${() => this._autoFix(err.fix!)}
-                                      >
-                                        ${this._localize("yaml_editor.error_auto_fix")}
-                                      </button>
-                                    `
-                                  : nothing
-                              }${
-                                err.line
-                                  ? html`
-                                      <button
-                                        type="button"
-                                        class="invalid-banner-goto"
-                                        @click=${() => this._gotoErrorLine(err.line!)}
-                                      >
-                                        ${this._localize("yaml_editor.error_go_to_line", {
-                                          line: err.line,
-                                        })}
-                                      </button>
-                                    `
-                                  : nothing
-                              }</span
-                            >`
-                        )}
-                        ${
-                          this._liveErrors.length > MAX_BANNER_ERRORS
-                            ? html`<span class="invalid-banner-more"
-                                >${this._localize("device.editor_invalid_more", {
-                                  count: this._liveErrors.length - MAX_BANNER_ERRORS,
-                                })}</span
-                              >`
-                            : nothing
-                        }
-                      </div>
-                    </div>`
-                  : nothing
-              }
               <div class="editor-pane-body">
                 ${
                   this._showDiff
@@ -432,9 +393,24 @@ export class ESPHomeDeviceEditor extends LitElement {
                         .revealSensitive=${this._revealSensitive}
                         @yaml-change=${this._onYamlChange}
                         @yaml-diagnostics=${this._onYamlDiagnostics}
+                        @yaml-cursor-line=${this._onYamlCursorLine}
+                        @focusin=${this._onEditorFocusIn}
+                        @focusout=${this._onEditorFocusOut}
                       ></esphome-yaml-editor>`
                 }
               </div>
+              ${
+                !this._showDiff
+                  ? html`<esphome-editor-invalid-banner
+                      .errors=${this._liveErrors}
+                      .caretLine=${this._caretLine}
+                      .editorFocused=${this._editorFocused}
+                      .getLastEditAt=${this._getLastEditAt}
+                      @banner-auto-fix=${this._onBannerAutoFix}
+                      @banner-goto-line=${this._onBannerGotoLine}
+                    ></esphome-editor-invalid-banner>`
+                  : nothing
+              }
             </div>
           </div>
         </div>
@@ -512,8 +488,9 @@ export class ESPHomeDeviceEditor extends LitElement {
   willUpdate(changed: Map<string, unknown>) {
     // Switching device clears the banner until the new file re-lints, so a
     // stale "invalid" never flashes over a freshly-opened valid config.
-    if (changed.has("configuration") && this._liveErrors.length) {
-      this._liveErrors = [];
+    if (changed.has("configuration")) {
+      if (this._liveErrors.length) this._liveErrors = [];
+      this._caretLine = 0;
     }
     if (this._showDiff && changed.has("_showDiffButton") && !this._showDiffButton) {
       this._showDiff = false;
@@ -549,6 +526,31 @@ export class ESPHomeDeviceEditor extends LitElement {
       return;
     }
     this._liveErrors = next;
+  }
+
+  private _onYamlCursorLine(e: CustomEvent<{ line: number }>) {
+    this._caretLine = e.detail.line;
+  }
+
+  private _onEditorFocusIn = () => {
+    this._editorFocused = true;
+  };
+
+  /** CM-internal focus shifts (tooltips, completion) stay inside the
+   *  editor's shadow tree, so their retargeted relatedTarget is the editor
+   *  host itself — only a move outside it counts as leaving. */
+  private _onEditorFocusOut = (e: FocusEvent) => {
+    const editor = e.currentTarget as HTMLElement;
+    this._editorFocused =
+      e.relatedTarget instanceof Node && editor.contains(e.relatedTarget);
+  };
+
+  private _onBannerAutoFix(e: CustomEvent<BannerAutoFixDetail>) {
+    this._autoFix(e.detail.fix);
+  }
+
+  private _onBannerGotoLine(e: CustomEvent<BannerGotoLineDetail>) {
+    this._gotoErrorLine(e.detail.line);
   }
 
   /** Apply a banner error's one-click indentation repair in the editor. The
@@ -704,6 +706,7 @@ export class ESPHomeDeviceEditor extends LitElement {
   }
 
   private _onYamlChange(e: CustomEvent) {
+    this._lastEditAt = performance.now();
     this.dispatchEvent(
       new CustomEvent("yaml-change", {
         detail: e.detail,
