@@ -27,7 +27,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { formRelativePath } from "./backend-field-errors.js";
 import { splitTextLinks } from "./markdown.js";
 import { getKeyPathWithListIndices } from "./yaml-ast.js";
-import { indentOf, RE_LIST_ITEM_KEY } from "./yaml-line-walker.js";
+import { indentOf, parseListItemMarker } from "./yaml-line-walker.js";
 import { isOpenConfigFile } from "./yaml-validation-summary.js";
 
 /** A validation error resolved to a key chain in the open document. */
@@ -212,17 +212,18 @@ export function analyzeIndentMismatch(
   for (let n = errorLine - 1; n >= 1 && n >= errorLine - 50; n--) {
     const text = readLine(n);
     if (text === undefined || !text.trim()) continue;
-    const marker = text.match(RE_LIST_ITEM_KEY);
+    const marker = parseListItemMarker(text);
     if (!marker) {
       // Left the item's block once a line is shallower than the property.
       if (indentOf(text) < propIndent) return null;
       continue;
     }
-    // The captured key ends the match, so its length subtracted from the whole
-    // match is the column where the item's own key starts.
-    const contentCol = marker[0].length - marker[1].length;
-    if (propIndent <= contentCol) return null;
-    return { markerLine: n, markerKey: marker[1], delta: propIndent - contentCol };
+    if (propIndent <= marker.contentCol) return null;
+    return {
+      markerLine: n,
+      markerKey: marker.key,
+      delta: propIndent - marker.contentCol,
+    };
   }
   return null;
 }

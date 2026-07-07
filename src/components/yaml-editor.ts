@@ -2,7 +2,7 @@ import { autocompletion } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { forceLinting } from "@codemirror/lint";
-import { StateEffect, StateField } from "@codemirror/state";
+import { StateEffect, StateField, type Text } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
 import { consume } from "@lit/context";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
@@ -34,8 +34,9 @@ import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   blankLineContext,
   fieldPathByIndent,
+  indentOf,
   keyPathByIndent,
-  RE_LIST_ITEM_KEY,
+  parseListItemMarker,
 } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
@@ -572,12 +573,20 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   ): Promise<void> {
     const view = this._view;
     if (!view || !this._api || fix.indent <= 0) return;
-    // Resolve the target only when it is still the same `- <key>` item.
+    // Resolve the target only when it is still the same `- <key>` item that
+    // still needs exactly `fix.indent` — recomputing the delta from its first
+    // property bails on an item the user already fixed by hand (whose key still
+    // matches), so a stale click can't double-indent it.
     const targetFrom = (): number | null => {
       const doc = view.state.doc;
       if (fix.line < 1 || fix.line > doc.lines) return null;
       const t = doc.line(fix.line);
-      return t.text.match(RE_LIST_ITEM_KEY)?.[1] === fix.key ? t.from : null;
+      const marker = parseListItemMarker(t.text);
+      if (!marker || marker.key !== fix.key) return null;
+      if (this._firstPropertyDelta(doc, fix.line, marker.contentCol) !== fix.indent) {
+        return null;
+      }
+      return t.from;
     };
     const from = targetFrom();
     if (from === null) return;
@@ -601,6 +610,21 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       scrollIntoView: true,
     });
     view.focus();
+  }
+
+  /** Indent of the list item's first property line minus `contentCol` (where
+   *  its key starts), or null when it has no following property line. */
+  private _firstPropertyDelta(
+    doc: Text,
+    line: number,
+    contentCol: number
+  ): number | null {
+    for (let n = line + 1; n <= doc.lines; n++) {
+      const text = doc.line(n).text;
+      if (!text.trim() || text.trimStart().startsWith("#")) continue;
+      return indentOf(text) - contentCol;
+    }
+    return null;
   }
 
   /** Set (or clear) the highlight mark and scroll it into view. */

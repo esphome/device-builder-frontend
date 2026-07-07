@@ -531,13 +531,20 @@ export class ESPHomeDeviceEditor extends LitElement {
     const next = e.detail.errors;
     // The banner is an `aria-live` region — only reassign when the list
     // actually changed so an unchanged lint pass doesn't re-announce it.
+    // Compare the fix too: its payload can change (or appear/disappear) while
+    // a localized message stays the same, and it drives the auto-fix button.
     if (
       next.length === this._liveErrors.length &&
-      next.every(
-        (err, i) =>
-          err.message === this._liveErrors[i].message &&
-          err.line === this._liveErrors[i].line
-      )
+      next.every((err, i) => {
+        const prev = this._liveErrors[i];
+        return (
+          err.message === prev.message &&
+          err.line === prev.line &&
+          err.fix?.line === prev.fix?.line &&
+          err.fix?.indent === prev.fix?.indent &&
+          err.fix?.key === prev.fix?.key
+        );
+      })
     ) {
       return;
     }
@@ -565,8 +572,11 @@ export class ESPHomeDeviceEditor extends LitElement {
   @state()
   private _autoFixConfirmOpen = false;
 
-  /** Open the "errors remain" prompt and resolve with the user's choice. */
+  /** Open the "errors remain" prompt and resolve with the user's choice. A
+   *  second call while a prompt is already up declines rather than opening a
+   *  competing dialog. */
   private async _confirmAutoFix(): Promise<boolean> {
+    if (this._autoFixConfirmOpen) return false;
     this._autoFixConfirmOpen = true;
     await this.updateComplete;
     const dialog = this._autoFixConfirmDialog;

@@ -210,6 +210,16 @@ describe("describeYamlError", () => {
     ).toEqual({ text: 'yaml_editor.error_indent_hint:{"line":9}', jumpLine: 9 });
   });
 
+  it("falls back to the generic hint (no auto-fix) when the document has no mismatch", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
+    // readLine present, but the item and its properties already line up.
+    const aligned = ["sensor:", "  - platform: dht", "    model: DHT11"];
+    const read = (n: number): string | undefined => aligned[n - 1];
+    expect(
+      describeYamlError("mapping values are not allowed here", pos(3), localize, read)
+    ).toEqual({ text: 'yaml_editor.error_indent_hint:{"line":3}', jumpLine: 3 });
+  });
+
   it("maps a block-end / missing-colon parse error to the indentation family", async () => {
     const { describeYamlError } = await import("../../src/util/yaml-lint-backend.js");
     expect(

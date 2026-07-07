@@ -44,6 +44,15 @@ export const RE_LIST_ITEM = /^\s*-\s/;
  *  match[1].length`` is the column where that key starts. */
 export const RE_LIST_ITEM_KEY = /^\s*-\s+([^\s:#]+)/;
 
+/** Parse a list-item line into its first key and the column that key starts at
+ *  (past the ``- ``), or ``null`` when the line isn't a ``- <key>`` item. */
+export function parseListItemMarker(
+  line: string
+): { key: string; contentCol: number } | null {
+  const m = line.match(RE_LIST_ITEM_KEY);
+  return m ? { key: m[1], contentCol: m[0].length - m[1].length } : null;
+}
+
 /** ``platform: gpio`` sibling reader. Same shape as
  *  ``RE_PAIR_LINE`` but constrains the key to literal
  *  ``platform``. Accepts unquoted (``platform: gpio``),

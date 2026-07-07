@@ -33,14 +33,15 @@ const STILL_INVALID: EditorValidateResponse = {
 };
 
 async function mountEditor(
-  validateYaml: (config: string, content: string) => Promise<EditorValidateResponse>
+  validateYaml: (config: string, content: string) => Promise<EditorValidateResponse>,
+  doc: string = BROKEN
 ): Promise<ESPHomeYamlEditor> {
   const el = new ESPHomeYamlEditor();
   (el as unknown as { _api: ESPHomeAPI })._api = {
     validateYaml,
   } as unknown as ESPHomeAPI;
   el.configuration = "x.yaml";
-  el.value = BROKEN;
+  el.value = doc;
   await mount(el);
   await el.updateComplete;
   return el;
@@ -127,5 +128,18 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
 
     expect(view.state.doc.toString()).toBe(BROKEN);
     expect(validateYaml).not.toHaveBeenCalled(); // bailed before validating
+  });
+
+  it("no-ops when the item is already indented correctly (stale double-fix)", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    // Already aligned: the item no longer needs `fix.indent`, so applying it
+    // would double-indent. The delta re-check bails before validating.
+    const el = await mountEditor(validateYaml, FIXED);
+    const view = viewOf(el);
+
+    await el.applyIndentFix(FIX);
+
+    expect(view.state.doc.toString()).toBe(FIXED);
+    expect(validateYaml).not.toHaveBeenCalled();
   });
 });
