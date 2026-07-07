@@ -35,6 +35,7 @@ import {
   blankLineContext,
   fieldPathByIndent,
   keyPathByIndent,
+  RE_LIST_ITEM,
 } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
@@ -54,9 +55,6 @@ export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 
 // Delay before an at-rest caret opens the completion popup for discovery.
 const IDLE_COMPLETION_DELAY_MS = 1500;
-
-// A YAML list-item line — guards the indentation auto-fix against a stale line.
-const LIST_ITEM_LINE_RE = /^\s*-\s/;
 
 // `#` must be percent-encoded (`%23`) inside a data-URI background-image.
 const errorDot = (fill: string, stroke: string): string =>
@@ -565,7 +563,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     const view = this._view;
     if (!view || indent <= 0 || line < 1 || line > view.state.doc.lines) return;
     const target = view.state.doc.line(line);
-    if (!LIST_ITEM_LINE_RE.test(target.text)) return;
+    if (!RE_LIST_ITEM.test(target.text)) return;
     view.dispatch({
       changes: { from: target.from, insert: " ".repeat(indent) },
       scrollIntoView: true,

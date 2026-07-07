@@ -190,8 +190,10 @@ export function parseYamlErrorPosition(
 /** A line accessor over the current document; `undefined` past the ends. */
 export type ReadLine = (line1: number) => string | undefined;
 
-/** A YAML list-item marker: leading indent, then `-`, then the item body. */
-const LIST_ITEM_RE = /^(\s*)-\s+\S/;
+// A list-item marker whose body column we need — stricter than the shared
+// `RE_LIST_ITEM` (requires an item, allows multiple spaces after the dash) so
+// `match[0].length` lands on the body's first character.
+const LIST_ITEM_BODY_RE = /^\s*-\s+\S/;
 /** The first bare key token of a line (up to whitespace, `:`, or `#`). */
 const FIRST_KEY_TOKEN_RE = /^([^\s:#]+)/;
 
@@ -212,19 +214,19 @@ export function analyzeIndentMismatch(
 ): { markerLine: number; markerKey: string; delta: number } | null {
   const errText = readLine(errorLine);
   if (errText === undefined || !errText.trim()) return null;
-  const propIndent = errText.length - errText.trimStart().length;
+  const propIndent = indentOf(errText);
   // Bound the walk so a huge doc can't turn one lint pass into a scan.
   for (let n = errorLine - 1; n >= 1 && n >= errorLine - 50; n--) {
     const text = readLine(n);
     if (text === undefined || !text.trim()) continue;
-    const marker = text.match(LIST_ITEM_RE);
+    const marker = text.match(LIST_ITEM_BODY_RE);
     if (!marker) {
       // Left the item's block once a line is shallower than the property.
-      const indent = text.length - text.trimStart().length;
-      if (indent < propIndent) return null;
+      if (indentOf(text) < propIndent) return null;
       continue;
     }
-    // `content column` = where the item's own key starts (past `- `).
+    // The match ends on the body's first character, so its length minus that
+    // one character is the column where the item's own key starts.
     const contentCol = marker[0].length - 1;
     if (propIndent <= contentCol) return null;
     const markerKey = text.slice(contentCol).match(FIRST_KEY_TOKEN_RE)?.[1] ?? "";
