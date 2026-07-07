@@ -1,12 +1,12 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { SerialPort } from "../api/types/system.js";
+import type { SerialPort, SerialPortHint } from "../api/types/system.js";
 
 export const SERIAL_PORTS_POLL_INTERVAL_MS = 5000;
 
-const HINT_RANK: Record<string, number> = { esp: 0, bridge: 1 };
+const HINT_RANK: Record<SerialPortHint, number> = { esp: 0, bridge: 1 };
 
-const hintRank = (p: SerialPort) => (p.hint !== null ? (HINT_RANK[p.hint] ?? 2) : 2);
+const hintRank = (p: SerialPort) => (p.hint !== null ? HINT_RANK[p.hint] : 2);
 
 /**
  * Likely ESP candidates first: Espressif native-USB ports, then known
@@ -120,6 +120,8 @@ export class SerialPortsPollController implements ReactiveController {
         (p, i) =>
           p.port !== this.ports[i].port ||
           p.desc !== this.ports[i].desc ||
+          p.vid !== this.ports[i].vid ||
+          p.pid !== this.ports[i].pid ||
           p.hint !== this.ports[i].hint
       ) ||
       fresh.size !== this.newPorts.size ||
