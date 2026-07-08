@@ -530,26 +530,55 @@ export function describeNestedListValue(
   return null;
 }
 
+/** A named cause behind a validation error, with a one-click repair when
+ *  the shape supports one. */
+export interface ValueTypeCause {
+  text: string;
+  fix?: YamlAutoFix;
+}
+
 /**
  * Add the misindent / half-typed-key cause to a wrong-value-type
  * validation message ("expected a dictionary.") anchored at *line*: a
- * value-less `- key:` whose items landed one level deeper, or a bare word
- * with no ':' (a lone "le" under "logger:" parses as its string value).
- * Null when the anchored line is neither shape.
+ * value-less `- key:` whose items landed one level deeper, a bare word
+ * with no ':' (a lone "le" under "logger:" parses as its string value),
+ * or a dash stuck to its key (`-platform:` parses as a mapping key, so
+ * the section fails schema validation instead of the YAML parse).
+ * Null when the anchored line is none of these shapes.
  */
 export function describeValueTypeCause(
   readLine: ReadLine,
   line: number,
   localize: LocalizeFunc
-): string | null {
+): ValueTypeCause | null {
   const nested = describeNestedListValue(readLine, line, localize);
-  if (nested) return nested;
-  const token = readLine(line)?.trim();
+  if (nested) return { text: nested };
+  const text = readLine(line);
+  if (text === undefined) return null;
+  const dashKey = botchedDashKey(text);
+  if (dashKey !== null) {
+    return {
+      text: localize("yaml_editor.error_dash_space_fix", {
+        line,
+        key: dashKey.slice(1),
+      }),
+      fix: {
+        line,
+        indent: 0,
+        key: dashKey,
+        fromIndent: indentOf(text),
+        kind: "dash-space",
+      },
+    };
+  }
+  const token = text.trim();
   if (token && !token.includes(":") && !token.startsWith("#") && !token.startsWith("-")) {
-    return localize("yaml_editor.error_missing_colon_hint", {
-      line,
-      key: token.length > 24 ? `${token.slice(0, 24)}…` : token,
-    });
+    return {
+      text: localize("yaml_editor.error_missing_colon_hint", {
+        line,
+        key: token.length > 24 ? `${token.slice(0, 24)}…` : token,
+      }),
+    };
   }
   return null;
 }

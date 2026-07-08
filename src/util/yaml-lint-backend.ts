@@ -398,10 +398,12 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         }
         // A bare "expected a dictionary." reads as nonsense — when the
         // anchored line shows why the value took the wrong type (nested
-        // list items, a half-typed key with no ':'), name that cause.
+        // list items, a half-typed key with no ':', a dash stuck to its
+        // key), name that cause, and carry its repair when it has one.
         const squiggleLineNum = doc.lineAt(from).number;
-        const hint = describeValueTypeCause(readLine, squiggleLineNum, opts.localize);
-        if (hint) message = `${message} ${hint}`;
+        const cause = describeValueTypeCause(readLine, squiggleLineNum, opts.localize);
+        if (cause) message = `${message} ${cause.text}`;
+        const causeFix = cause?.fix;
         diagnostics.push({
           from,
           to,
@@ -409,6 +411,15 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           source: "esphome",
           message,
           renderMessage: () => renderMessageNode(message),
+          actions:
+            causeFix && onAutoFix
+              ? [
+                  {
+                    name: opts.localize("yaml_editor.error_auto_fix"),
+                    apply: () => onAutoFix(causeFix),
+                  },
+                ]
+              : undefined,
         });
         // Map from the range's own start, not the retargeted squiggle: a
         // block error walked up to its enclosing key would attribute to
@@ -440,7 +451,12 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // error still badges the navigator through the mapped entry. The
         // anchor line gives the banner its "Go to line" jump.
         if (formRelativePath(keyPath).length === 0) {
-          bannerErrors.push({ message, line: squiggleLineNum, kind: "validation" });
+          bannerErrors.push({
+            message,
+            line: squiggleLineNum,
+            fix: causeFix,
+            kind: "validation",
+          });
         }
       }
 

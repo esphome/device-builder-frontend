@@ -101,11 +101,25 @@ describe("describeValueTypeCause", () => {
     const { describeValueTypeCause } =
       await import("../../src/util/yaml-error-analysis.js");
     const doc = (n: number): string | undefined => ["logger:", "  le"][n - 1];
-    expect(describeValueTypeCause(doc, 2, localize)).toBe(
-      'yaml_editor.error_missing_colon_hint:{"line":2,"key":"le"}'
-    );
+    expect(describeValueTypeCause(doc, 2, localize)).toEqual({
+      text: 'yaml_editor.error_missing_colon_hint:{"line":2,"key":"le"}',
+    });
     const keyed = (n: number): string | undefined => ["logger:", "  level: DEBUG"][n - 1];
     expect(describeValueTypeCause(keyed, 2, localize)).toBeNull();
+  });
+
+  // The valid-YAML variant of the stuck dash: `-platform:` with no deeper
+  // lines parses as a mapping key, so the section fails schema validation
+  // and the cause carries the dash-space repair.
+  it("names the stuck dash behind a schema error and carries its repair", async () => {
+    const { describeValueTypeCause } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      ["ota:", "  -platform: esphome"][n - 1];
+    expect(describeValueTypeCause(doc, 2, localize)).toEqual({
+      text: 'yaml_editor.error_dash_space_fix:{"line":2,"key":"platform"}',
+      fix: { line: 2, indent: 0, key: "-platform", fromIndent: 2, kind: "dash-space" },
+    });
   });
 });
 
