@@ -1026,11 +1026,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (cached) return cached;
     if (this._api && !this._interfaceProvidersPending.has(interfaceName)) {
       this._interfaceProvidersPending.add(interfaceName);
-      // ``limit: 200`` captures every provider of the interface in one shot
-      // (interfaces have at most a couple dozen); this is the full dropdown
-      // candidate set, distinct from the Add-component picker's paginated grid.
+      // ``limit: 500`` captures every provider of the interface in one shot
+      // (same-domain sub-entity providers put ``sensor`` near 200); this is
+      // the full dropdown candidate set, distinct from the Add-component
+      // picker's paginated grid.
       this._api
-        .getComponents({ provides: interfaceName, limit: 200 })
+        .getComponents({ provides: interfaceName, limit: 500 })
         .then((resp) => {
           this._interfaceProviders.set(
             interfaceName,

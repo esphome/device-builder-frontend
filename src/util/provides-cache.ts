@@ -21,9 +21,10 @@ export function providerIds(
         provides: interfaceName,
         platform: platform ?? undefined,
         board_id: boardId ?? undefined,
-        // One page holds every provider; an interface has at most a handful,
-        // so this never truncates (mirrors config-entry-form's provider fetch).
-        limit: 200,
+        // One page holds every provider; same-domain sub-entity providers put
+        // ``sensor`` near 200, so headroom keeps this from truncating
+        // (mirrors config-entry-form's provider fetch).
+        limit: 500,
       })
       .then((resp): ReadonlySet<string> => new Set(resp.components.map((c) => c.id)))
   );

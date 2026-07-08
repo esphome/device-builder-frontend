@@ -658,6 +658,82 @@ describe("findComponentsByProviders (nested provider idPaths)", () => {
   });
 });
 
+describe("findComponentsByProviders (same-domain sub-entity idPaths)", () => {
+  // The reported config (#1902): the AHT20's temperature/humidity are the
+  // referenceable sensors; the platform item's own id is the hub component,
+  // the wrong type for a sensor reference.
+  const yaml = [
+    "sensor:",
+    "  - platform: aht10",
+    "    i2c_id: i2c_bus",
+    "    variant: AHT20",
+    "    humidity:",
+    "      id: aht20_humidity",
+    "      name: Humidity",
+    "    temperature:",
+    "      id: aht20_temperature",
+    "      name: Temperature",
+    "    id: aht20",
+    "  - platform: template",
+    "    id: plain_sensor",
+    "",
+  ].join("\n");
+  const aht10 = {
+    domain: "sensor",
+    stem: "aht10",
+    idPaths: [
+      ["humidity", "id"],
+      ["temperature", "id"],
+    ],
+  };
+
+  it("offers the sub-sensor ids and suppresses the hub id (real call path)", () => {
+    const ids = findReferenceCandidates(yaml, "sensor", [aht10]).map((c) => c.id);
+    expect(ids).toContain("aht20_humidity");
+    expect(ids).toContain("aht20_temperature");
+    expect(ids).not.toContain("aht20");
+  });
+
+  it("keeps offering a single-entity platform's own id in the same block", () => {
+    const ids = findReferenceCandidates(yaml, "sensor", [aht10]).map((c) => c.id);
+    expect(ids).toContain("plain_sensor");
+  });
+
+  it("labels a sub-sensor with its sibling name", () => {
+    const humidity = findReferenceCandidates(yaml, "sensor", [aht10]).find(
+      (c) => c.id === "aht20_humidity"
+    );
+    expect(humidity).toEqual({ id: "aht20_humidity", name: "Humidity" });
+  });
+
+  it("keeps the root entity of a hybrid platform via its root path", () => {
+    const hybrid = [
+      "sensor:",
+      "  - platform: pulse_counter",
+      "    id: pulses",
+      "    total:",
+      "      id: pulses_total",
+      "",
+    ].join("\n");
+    const ids = findReferenceCandidates(hybrid, "sensor", [
+      { domain: "sensor", stem: "pulse_counter", idPaths: [["id"], ["total", "id"]] },
+    ]).map((c) => c.id);
+    expect(ids).toEqual(["pulses", "pulses_total"]);
+  });
+
+  it("offers nothing for a sub-block without an id, still suppressing the hub", () => {
+    const idless = [
+      "sensor:",
+      "  - platform: aht10",
+      "    id: aht20",
+      "    temperature:",
+      "      name: Temperature",
+      "",
+    ].join("\n");
+    expect(findReferenceCandidates(idless, "sensor", [aht10])).toEqual([]);
+  });
+});
+
 describe("yamlHasMergedSources", () => {
   it("is true for a top-level packages: block", () => {
     expect(yamlHasMergedSources("packages:\n  base: !include base.yaml\n")).toBe(true);
