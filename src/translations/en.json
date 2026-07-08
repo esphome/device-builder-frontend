@@ -1120,7 +1120,7 @@
     "error_misaligned_indent_fix": "Indentation mismatch: line {line} \"{key}\" is indented too little. Indent line {line} by {spaces, plural, one {# space} other {# spaces}} so it lines up.",
     "error_misaligned_dedent_fix": "Indentation mismatch: line {line} \"{key}\" is indented too deep. Remove {spaces, plural, one {# space} other {# spaces}} from the start of line {line} so it lines up.",
     "error_nested_list_hint": "The \"- \" items below \"{key}\" are indented as its value. If they should be separate list entries, dedent them to line up with \"- {key}\".",
-    "error_indent_hint": "YAML indentation problem near line {line}. Make sure each list item's properties are indented consistently under its \"- \" marker; an over-indented or under-indented line, or a stray \":\" in a value, causes this.",
+    "error_indent_hint": "YAML indentation problem near line {line}. Make sure the line and its neighbours are indented consistently with their block; an over-indented or under-indented line, or a stray \":\" in a value, causes this.",
     "error_missing_colon_hint": "Line {line}: \"{key}\" looks like an option name without a value. Add \":\" and a value after it, or remove the line.",
     "error_tab_hint": "A tab is used for indentation near line {line}; YAML needs spaces. Replace the tab with spaces.",
     "error_char_hint": "Unexpected character near line {line}; a value starting with a symbol such as @, %, or * must be wrapped in quotes.",

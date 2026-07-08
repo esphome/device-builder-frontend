@@ -415,6 +415,70 @@ describe("analyzeIndentMismatch", () => {
     });
   });
 
+  // The same reading under a TOP-LEVEL opener: `wifi:`'s first child went
+  // too deep. The `name:` line above `wifi:` belongs to the previous
+  // section and must not re-indent the top-level key.
+  it("dedents an over-deep first child under a top-level opener", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "esphome:", // 1
+        "  name: newstk", // 2
+        "", // 3
+        "wifi:", // 4
+        "  ", // 5
+        "    ssid: mynet", // 6
+        "  password: mypass", // 7
+        "  ap:", // 8
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 7)).toEqual({
+      markerLine: 6,
+      markerKey: "ssid",
+      delta: -2,
+      reason: "align",
+    });
+  });
+
+  // A childless section head nudged just off column 0, with only plain
+  // mappings above it (no marker context).
+  it("dedents a childless section head nudged off the margin", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "wifi:", // 1
+        "  ssid: mynet", // 2
+        "  ap:", // 3
+        "    ssid: fallback", // 4
+        "", // 5
+        " captive_portal:", // 6
+        "", // 7
+        "switch:", // 8
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 6)).toEqual({
+      markerLine: 6,
+      markerKey: "captive_portal",
+      delta: -1,
+      reason: "align",
+    });
+  });
+
+  it("won't dedent a nudged key that opens a deeper block", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    // ` ap:` at 1 with children at 4 could as well belong at 2 inside
+    // `wifi:` — ambiguous, so no confident repair.
+    const doc = (n: number): string | undefined =>
+      [
+        "wifi:", // 1
+        "  ssid: mynet", // 2
+        " ap:", // 3
+        "    ssid: fallback", // 4
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 3)).toBeNull();
+  });
+
   // An over-indented property whose FOLLOWING siblings sit at the content
   // column: the marker aligns with its list, so the blamed line moved.
   it("dedents an over-indented property when the properties below line up", async () => {
@@ -697,6 +761,62 @@ describe("describeYamlError", () => {
       text: 'yaml_editor.error_misaligned_dedent_fix:{"line":7,"key":"input","spaces":2}',
       jumpLine: 7,
       fix: { line: 7, indent: -2, key: "input", fromIndent: 10 },
+    });
+  });
+
+  // Real PyYAML shape for an over-deep first child under a TOP-LEVEL key:
+  // the problem mark blames the next child that no longer fits.
+  it("dedents the over-deep first child of a top-level key from its message", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "esphome:", // 1
+      "  name: newstk", // 2
+      "", // 3
+      "wifi:", // 4
+      "  ", // 5
+      "    ssid: mynet", // 6
+      "  password: mypass", // 7
+      "  ap:", // 8
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      "while parsing a block mapping\n" +
+      '  in "x.yaml", line 1, column 1\n' +
+      "expected <block end>, but found '<block mapping start>'\n" +
+      '  in "x.yaml", line 7, column 3';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_misaligned_dedent_fix:{"line":6,"key":"ssid","spaces":2}',
+      jumpLine: 6,
+      fix: { line: 6, indent: -2, key: "ssid", fromIndent: 4 },
+    });
+  });
+
+  // Real PyYAML shape for a childless section head nudged off column 0
+  // with no marker context above it.
+  it("dedents the nudged section head with no marker context from its message", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "wifi:", // 1
+      "  ssid: mynet", // 2
+      "  ap:", // 3
+      "    ssid: fallback", // 4
+      "", // 5
+      " captive_portal:", // 6
+      "", // 7
+      "switch:", // 8
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      "while parsing a block mapping\n" +
+      '  in "x.yaml", line 1, column 1\n' +
+      "expected <block end>, but found '<block mapping start>'\n" +
+      '  in "x.yaml", line 6, column 2';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_misaligned_dedent_fix:{"line":6,"key":"captive_portal","spaces":1}',
+      jumpLine: 6,
+      fix: { line: 6, indent: -1, key: "captive_portal", fromIndent: 1 },
     });
   });
 
