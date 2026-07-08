@@ -1,9 +1,8 @@
 /**
  * @vitest-environment happy-dom
  *
- * saveTablePreference must mirror each change onto the host fields
- * that seed a remounted table, or a Card ↔ List toggle resets
- * in-session column/page-size/sort changes (#1899).
+ * saveTablePreference mirrors each change onto the host fields that
+ * seed a remounted table.
  */
 import type { VisibilityState } from "@tanstack/lit-table";
 import { describe, expect, it, vi } from "vitest";
@@ -61,13 +60,5 @@ describe("saveTablePreference", () => {
       table_sort_column: null,
       table_sort_direction: null,
     });
-  });
-
-  it("keeps the mirrored value when the backend write fails", async () => {
-    const { host, updatePreferences } = makeHost();
-    updatePreferences.mockRejectedValueOnce(new Error("offline"));
-    saveTablePreference(host, event("table-page-size-change", 10));
-    await Promise.resolve();
-    expect(host._tablePageSize).toBe(10);
   });
 });

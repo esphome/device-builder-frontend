@@ -128,15 +128,15 @@ export class ESPHomeDeviceTable extends LitElement {
   @property({ attribute: false })
   recentJobs = new Map<string, FirmwareJob>();
 
-  /** Initial sorting from preferences — applied once when first set. */
+  /** Sorting from preferences — the host mirrors saves back, so a remount reseeds it. */
   @property({ attribute: false })
   initialSorting: SortingState | null = null;
 
-  /** Initial column visibility from preferences — applied once when first set. */
+  /** Column visibility from preferences — the host mirrors saves back, so a remount reseeds it. */
   @property({ attribute: false })
   initialColumnVisibility: VisibilityState | null = null;
 
-  /** Initial page size from preferences — applied once when first set. */
+  /** Page size from preferences — the host mirrors saves back, so a remount reseeds it. */
   @property({ type: Number, attribute: "initial-page-size" })
   initialPageSize = 25;
 
@@ -233,7 +233,7 @@ export class ESPHomeDeviceTable extends LitElement {
   // ─── Lifecycle ───
 
   protected willUpdate(changed: PropertyValues) {
-    // Apply initial values from preferences when they arrive
+    // Apply preference values when they arrive or the host mirrors a save back
     if (changed.has("initialSorting") && this.initialSorting !== null) {
       this._sorting = this.initialSorting;
     }

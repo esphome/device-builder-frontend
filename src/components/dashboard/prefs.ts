@@ -23,11 +23,7 @@ export async function loadPreferences(host: ESPHomePageDashboard): Promise<void>
   }
 }
 
-/**
- * Persist a table preference and mirror it onto the host state that
- * seeds a remounted table, so a Card ↔ List toggle (which destroys
- * the table element) doesn't reset in-session changes (#1899).
- */
+/** Persist a table preference and mirror it onto the host state that seeds a remounted table. */
 export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent): void {
   const type = e.type;
   if (type === "table-sort-change") {
