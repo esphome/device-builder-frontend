@@ -31,11 +31,12 @@ import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { idleCompletion } from "../util/idle-completion.js";
 import { getKeyPath, isInsideBlockScalar } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
-import { analyzeIndentMismatch, type YamlAutoFix } from "../util/yaml-error-analysis.js";
+import { lineKeyToken, type YamlAutoFix } from "../util/yaml-error-analysis.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   blankLineContext,
   fieldPathByIndent,
+  indentOf,
   keyPathByIndent,
 } from "../util/yaml-line-walker.js";
 import {
@@ -639,25 +640,19 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   ): Promise<AutoFixOutcome> {
     const view = this._view;
     if (!view || !this._api || fix.indent === 0) return "unavailable";
-    // Resolve the target only when re-running the analysis on the fix line
-    // still yields this exact repair — a stale click on an item the user
-    // already re-indented by hand (whose key still matches) can't move it
-    // again. Every analysis shape blames the line it would move except the
-    // classic over-indented-properties case, where re-analyzing the marker
-    // line itself reproduces the fix through the properties below it.
+    // Resolve the target only when the line the fix wants to move is still
+    // the line the analysis saw — same key, same indent — so a stale click
+    // after edits shifted line numbers, or on a line the user already
+    // re-indented by hand, can't move the wrong line. The check is
+    // structural rather than a re-run of the analysis: the diagnosis can be
+    // anchored on a different line than the one it repairs (a continuation
+    // error blames the line below the pair that moves), so re-analyzing at
+    // the fix line can't reproduce every shape.
     const targetFrom = (): number | null => {
       const doc = view.state.doc;
       if (fix.line < 1 || fix.line > doc.lines) return null;
       const t = doc.line(fix.line);
-      const readLine = (n: number) =>
-        n >= 1 && n <= doc.lines ? doc.line(n).text : undefined;
-      const cur = analyzeIndentMismatch(readLine, fix.line);
-      if (
-        !cur ||
-        cur.markerLine !== fix.line ||
-        cur.markerKey !== fix.key ||
-        cur.delta !== fix.indent
-      ) {
+      if (lineKeyToken(t.text) !== fix.key || indentOf(t.text) !== fix.fromIndent) {
         return null;
       }
       // A dedent must have the spaces it wants to remove.

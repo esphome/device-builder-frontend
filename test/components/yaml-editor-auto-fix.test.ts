@@ -23,7 +23,7 @@ const viewOf = (el: ESPHomeYamlEditor): EditorView =>
 // indents line 2 (`- platform`) by 2 so it lines up with its properties.
 const BROKEN = "sensor:\n- platform: dht\n    model: DHT11\n";
 const FIXED = "sensor:\n  - platform: dht\n    model: DHT11\n";
-const FIX: YamlAutoFix = { line: 2, indent: 2, key: "platform" };
+const FIX: YamlAutoFix = { line: 2, indent: 2, key: "platform", fromIndent: 0 };
 
 const CLEAN: EditorValidateResponse = { yaml_errors: [], validation_errors: [] };
 // Proposed document still has an error after the fix.
@@ -154,9 +154,9 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml, broken);
     const view = viewOf(el);
 
-    expect(await el.applyIndentFix({ line: 6, indent: -1, key: "pulse" })).toBe(
-      "applied"
-    );
+    expect(
+      await el.applyIndentFix({ line: 6, indent: -1, key: "pulse", fromIndent: 7 })
+    ).toBe("applied");
 
     expect(view.state.doc.toString()).toBe(fixed);
     expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
@@ -171,22 +171,32 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
       "      - addressable_twinkle:\n      - flicker:\n      - pulse:\n";
     const el = await mountEditor(validateYaml, doc);
 
-    expect(await el.applyIndentFix({ line: 6, indent: -1, key: "pulse" })).toBe("stale");
+    expect(
+      await el.applyIndentFix({ line: 6, indent: -1, key: "pulse", fromIndent: 7 })
+    ).toBe("stale");
     expect(validateYaml).not.toHaveBeenCalled();
   });
 
-  it("no-ops when the item is followed by a shallower sibling, not a property", async () => {
+  it("applies a fix whose diagnosis was anchored on a different line", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
-    // `- platform: dht` (contentCol 2) followed by a top-level sibling, not a
-    // property: the delta re-check must treat that as "no property" (null),
-    // not a spurious negative delta, and bail.
-    const doc = "sensor:\n- platform: dht\nbinary_sensor:\n  - platform: gpio\n";
-    const el = await mountEditor(validateYaml, doc);
+    // The continuation shape: `input: true` dedented out of `mode:`, blamed
+    // by the scanner on the deeper `pullup` line below it. The fix targets
+    // the `input` line; the guard must accept it on the line's own key +
+    // indent, not by re-running the analysis anchored there.
+    const broken =
+      "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: true\n" +
+      "      mode:\n      input: true\n        pullup: true\n      number: 9\n";
+    const fixed =
+      "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: true\n" +
+      "      mode:\n        input: true\n        pullup: true\n      number: 9\n";
+    const el = await mountEditor(validateYaml, broken);
     const view = viewOf(el);
 
-    expect(await el.applyIndentFix(FIX)).toBe("stale");
+    expect(
+      await el.applyIndentFix({ line: 6, indent: 2, key: "input", fromIndent: 6 })
+    ).toBe("applied");
 
-    expect(view.state.doc.toString()).toBe(doc);
-    expect(validateYaml).not.toHaveBeenCalled();
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
   });
 });

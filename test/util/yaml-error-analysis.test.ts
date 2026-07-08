@@ -293,6 +293,155 @@ describe("analyzeIndentMismatch", () => {
       reason: "align",
     });
   });
+
+  // Continuation shape: the blamed line sits deeper than the valued pair
+  // above it, so the scanner reads it as that value's plain-scalar
+  // continuation ("mapping values are not allowed here").
+  it("re-indents a valued pair dedented out of the value-less block above it", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "    pin:", // 1
+        "      inverted: true", // 2
+        "      mode:", // 3
+        "      input: true", // 4
+        "        pullup: true", // 5
+        "      number: 9", // 6
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 5)).toEqual({
+      markerLine: 4,
+      markerKey: "input",
+      delta: 2,
+      reason: "align",
+    });
+  });
+
+  it("dedents a blamed line sitting deeper than the valued pair above it", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "    pin:", // 1
+        "      inverted: true", // 2
+        "        pullup: true", // 3
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 3)).toEqual({
+      markerLine: 3,
+      markerKey: "pullup",
+      delta: -2,
+      reason: "align",
+    });
+  });
+
+  it("won't guess the continuation repair beyond a few spaces", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "      mode:", // 1
+        "      input: true", // 2
+        "            pullup: true", // 3
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 3)).toBeNull();
+  });
+
+  // Dedented block opener: `mode:` dropped to the item-property level while
+  // its children stay deep; the scanner blames the block-close line
+  // (`number:`), but the aligned sibling above (`inverted:`) proves the
+  // value-less key is what moved.
+  it("re-indents a dedented value-less key blamed on its block-close line", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "binary_sensor:", // 1
+        "  - platform: gpio", // 2
+        "    name: Boot Button", // 3
+        "    pin:", // 4
+        "      inverted: true", // 5
+        "    mode:", // 6
+        "        input: true", // 7
+        "        pullup: true", // 8
+        "      number: 9", // 9
+        "    id: boot_button", // 10
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 9)).toEqual({
+      markerLine: 6,
+      markerKey: "mode",
+      delta: 2,
+      reason: "align",
+    });
+  });
+
+  // The mirror: the opener sits where it belongs (a sibling shares its
+  // indent, the blamed line is at its canonical child indent) and the
+  // block's first child is what went too deep.
+  it("dedents an over-deep first child blamed on the opener's next child", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "binary_sensor:", // 1
+        "  - platform: gpio", // 2
+        "    name: Button Module", // 3
+        "    pin:", // 4
+        "      inverted: true", // 5
+        "      mode:", // 6
+        "          input: true", // 7
+        "        pullup: true", // 8
+        "      number: 6", // 9
+        "    id: button_module", // 10
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 8)).toEqual({
+      markerLine: 7,
+      markerKey: "input",
+      delta: -2,
+      reason: "align",
+    });
+  });
+
+  // An over-indented property whose FOLLOWING siblings sit at the content
+  // column: the marker aligns with its list, so the blamed line moved.
+  it("dedents an over-indented property when the properties below line up", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "binary_sensor:", // 1
+        "  - platform: gpio", // 2
+        "     name: Button Module", // 3
+        "    pin:", // 4
+        "      inverted: true", // 5
+        "    id: button_module", // 6
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 3)).toEqual({
+      markerLine: 3,
+      markerKey: "name",
+      delta: -1,
+      reason: "align",
+    });
+  });
+
+  it("re-indents a property dedented to its list's marker indent", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "binary_sensor:", // 1
+        "  - platform: gpio", // 2
+        "    name: Motion Module", // 3
+        "    pin: 3", // 4
+        "  device_class: motion", // 5
+        "    id: motion_module", // 6
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 5)).toEqual({
+      markerLine: 5,
+      markerKey: "device_class",
+      delta: 2,
+      reason: "align",
+    });
+  });
 });
 
 describe("describeYamlError", () => {
@@ -310,7 +459,7 @@ describe("describeYamlError", () => {
     ).toEqual({
       text: 'yaml_editor.error_indent_fix:{"line":2,"key":"platform","spaces":2}',
       jumpLine: 2,
-      fix: { line: 2, indent: 2, key: "platform" },
+      fix: { line: 2, indent: 2, key: "platform", fromIndent: 0 },
     });
   });
 
@@ -387,7 +536,7 @@ describe("describeYamlError", () => {
     ).toEqual({
       text: 'yaml_editor.error_misaligned_dedent_fix:{"line":4,"key":"- pulse","spaces":1}',
       jumpLine: 4,
-      fix: { line: 4, indent: -1, key: "pulse" },
+      fix: { line: 4, indent: -1, key: "pulse", fromIndent: 7 },
     });
   });
 
@@ -410,7 +559,141 @@ describe("describeYamlError", () => {
     ).toEqual({
       text: 'yaml_editor.error_misaligned_indent_fix:{"line":4,"key":"id","spaces":1}',
       jumpLine: 4,
-      fix: { line: 4, indent: 1, key: "id" },
+      fix: { line: 4, indent: 1, key: "id", fromIndent: 4 },
+    });
+  });
+
+  // Real PyYAML shape for a pair dedented out of its block: the scanner
+  // blames the ':' on the deeper line below the pair, not the pair itself.
+  it("re-indents the dedented pair from a mapping-values message", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "    pin:", // 1
+      "      inverted: true", // 2
+      "      mode:", // 3
+      "      input: true", // 4
+      "        pullup: true", // 5
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    expect(
+      describeYamlError(
+        'mapping values are not allowed here\n  in "x.yaml", line 5, column 15',
+        { line: 5, col: 15 },
+        localize,
+        read
+      )
+    ).toEqual({
+      text: 'yaml_editor.error_misaligned_indent_fix:{"line":4,"key":"input","spaces":2}',
+      jumpLine: 4,
+      fix: { line: 4, indent: 2, key: "input", fromIndent: 6 },
+    });
+  });
+
+  // Real PyYAML shape for a dedented value-less key: the problem mark blames
+  // the line that closes the key's too-deep block, lines below the key.
+  it("re-indents the dedented block opener from a block-mapping message", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "binary_sensor:", // 1
+      "  - platform: gpio", // 2
+      "    name: Boot Button", // 3
+      "    pin:", // 4
+      "      inverted: true", // 5
+      "    mode:", // 6
+      "        input: true", // 7
+      "        pullup: true", // 8
+      "      number: 9", // 9
+      "    id: boot_button", // 10
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      "while parsing a block mapping\n" +
+      '  in "x.yaml", line 2, column 5\n' +
+      "expected <block end>, but found '<block mapping start>'\n" +
+      '  in "x.yaml", line 9, column 7';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_misaligned_indent_fix:{"line":6,"key":"mode","spaces":2}',
+      jumpLine: 6,
+      fix: { line: 6, indent: 2, key: "mode", fromIndent: 4 },
+    });
+  });
+
+  // Real PyYAML shape for an over-deep first child: the problem mark blames
+  // the opener's next child, which no longer fits the too-deep block.
+  it("dedents the over-deep first child from a block-mapping message", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "binary_sensor:", // 1
+      "  - platform: gpio", // 2
+      "    name: Button Module", // 3
+      "    pin:", // 4
+      "      inverted: true", // 5
+      "      mode:", // 6
+      "          input: true", // 7
+      "        pullup: true", // 8
+      "      number: 6", // 9
+      "    id: button_module", // 10
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      "while parsing a block mapping\n" +
+      '  in "x.yaml", line 5, column 7\n' +
+      "expected <block end>, but found '<block mapping start>'\n" +
+      '  in "x.yaml", line 8, column 9';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_misaligned_dedent_fix:{"line":7,"key":"input","spaces":2}',
+      jumpLine: 7,
+      fix: { line: 7, indent: -2, key: "input", fromIndent: 10 },
+    });
+  });
+
+  // Real PyYAML shape for an over-indented property directly after its
+  // marker: the scanner reads it as a continuation of the marker's value.
+  it("dedents the over-indented first property from a mapping-values message", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "binary_sensor:", // 1
+      "  - platform: gpio", // 2
+      "     name: Button Module", // 3
+      "    pin:", // 4
+      "      inverted: true", // 5
+      "    id: button_module", // 6
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg = 'mapping values are not allowed here\n  in "x.yaml", line 3, column 10';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_misaligned_dedent_fix:{"line":3,"key":"name","spaces":1}',
+      jumpLine: 3,
+      fix: { line: 3, indent: -1, key: "name", fromIndent: 5 },
+    });
+  });
+
+  // Real PyYAML shape for a property dedented to the markers' own indent:
+  // the problem mark (last position) blames the property line itself.
+  it("re-indents the marker-indent property from a block-collection message", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "binary_sensor:", // 1
+      "  - platform: gpio", // 2
+      "    name: Motion Module", // 3
+      "    pin: 3", // 4
+      "  device_class: motion", // 5
+      "    id: motion_module", // 6
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      "while parsing a block collection\n" +
+      '  in "x.yaml", line 2, column 3\n' +
+      "expected <block end>, but found '?'\n" +
+      '  in "x.yaml", line 5, column 3';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_misaligned_indent_fix:{"line":5,"key":"device_class","spaces":2}',
+      jumpLine: 5,
+      fix: { line: 5, indent: 2, key: "device_class", fromIndent: 2 },
     });
   });
 

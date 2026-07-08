@@ -76,7 +76,7 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
         {
           message: "yaml_editor.error_indent_fix:2",
           line: 2,
-          fix: { line: 2, indent: 2, key: "platform" },
+          fix: { line: 2, indent: 2, key: "platform", fromIndent: 0 },
           kind: "parse",
         },
       ]);
@@ -119,7 +119,7 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
       expect(actions.map((a) => a.name)).toEqual(["yaml_editor.error_auto_fix"]);
 
       actions[0].apply(view, 0, 0);
-      expect(fixes).toEqual([{ line: 2, indent: 2, key: "platform" }]);
+      expect(fixes).toEqual([{ line: 2, indent: 2, key: "platform", fromIndent: 0 }]);
     } finally {
       view.destroy();
     }

@@ -236,7 +236,7 @@ describe("editor-invalid-banner events", () => {
 
   it("dispatches banner-goto-line and banner-auto-fix from the buttons", async () => {
     const { el } = await mountBanner({ focused: false });
-    const fix = { line: 57, indent: 2, key: "platform" };
+    const fix = { line: 57, indent: 2, key: "platform", fromIndent: 0 };
     el.errors = [{ message: "boom", line: 57, fix, kind: "parse" }];
     await el.updateComplete;
 
