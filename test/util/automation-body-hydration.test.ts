@@ -21,7 +21,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { AutomationCatalogBody } from "../../src/api/types/automations.js";
-import type { ConfigEntry } from "../../src/api/types/config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "../../src/api/types/config-entries.js";
 import {
   emptyHydrationResult,
   hydrateEntryConfigEntries,
@@ -213,5 +213,36 @@ describe("tallyOutcome", () => {
     expect(result.succeeded).toBe(2);
     expect(result.missingBody).toBe(1);
     expect(result.rejected).toBe(0);
+  });
+});
+
+describe("hydrateEntryConfigEntries required_groups", () => {
+  it("copies the body's required_groups onto the entry", async () => {
+    const groups = [{ kind: "at_least_one", keys: ["above", "below"] }];
+    const body = {
+      ...bodyWithEntries("sensor.in_range", [configEntry("above")]),
+      required_groups: groups,
+    } as AutomationCatalogBody;
+    const fetchBody = vi.fn(async () => body);
+    const entry = hydratable("sensor.in_range") as ReturnType<typeof hydratable> & {
+      required_groups?: RequiredGroup[] | null;
+    };
+
+    await hydrateEntryConfigEntries(makeApi(), "conditions", entry, fetchBody);
+
+    expect(entry.required_groups).toEqual(groups);
+    // Disjoint copy — mutating the entry's groups must not poison the body.
+    expect(entry.required_groups).not.toBe(groups);
+  });
+
+  it("leaves required_groups unset when the body has none", async () => {
+    const fetchBody = vi.fn(async () => bodyWithEntries("on_boot", []));
+    const entry = hydratable("on_boot") as ReturnType<typeof hydratable> & {
+      required_groups?: RequiredGroup[] | null;
+    };
+
+    await hydrateEntryConfigEntries(makeApi(), "triggers", entry, fetchBody);
+
+    expect("required_groups" in entry).toBe(false);
   });
 });

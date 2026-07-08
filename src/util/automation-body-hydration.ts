@@ -3,7 +3,7 @@ import type {
   AutomationCatalogBody,
   AutomationCatalogBodyType,
 } from "../api/types/automations.js";
-import type { ConfigEntry } from "../api/types/config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "../api/types/config-entries.js";
 import { fetchAutomationBody } from "./automation-body-cache.js";
 
 /** Single source of truth for the per-entry hydration shape. Both
@@ -29,6 +29,7 @@ export interface HydrationResult {
 interface _Hydratable {
   id: string;
   config_entries: ConfigEntry[];
+  required_groups?: RequiredGroup[] | null;
 }
 
 /** Fetch one entry's body and replace ``entry.config_entries`` with
@@ -50,6 +51,10 @@ export async function hydrateEntryConfigEntries(
     // poison the cache. Wire payload is JSON-shaped so
     // structuredClone is faithful.
     entry.config_entries = structuredClone(body.config_entries);
+    // The slim index drops required_groups; the body is its only carrier.
+    if ("required_groups" in body) {
+      entry.required_groups = structuredClone(body.required_groups);
+    }
     return "ok";
   }
   const reason = body === null ? "no body returned" : "body shape missing config_entries";

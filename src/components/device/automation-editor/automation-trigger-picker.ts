@@ -17,7 +17,7 @@
  * toggle introduced in section A all work for free.
  */
 import { consume } from "@lit/context";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import type {
@@ -68,7 +68,15 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
   @property({ type: Boolean })
   disabled = false;
 
+  /** "Show advanced settings" gate for the trigger params form. */
+  @state() private _showAdvanced = false;
+
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+
+  protected willUpdate(changed: PropertyValues<this>): void {
+    // A new trigger means a new schema — start with advanced collapsed.
+    if (changed.has("triggerId")) this._showAdvanced = false;
+  }
 
   protected render() {
     if (!this.target) {
@@ -141,7 +149,10 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
                 .board=${this.board}
                 .yaml=${this.yaml}
                 ?disabled=${this.disabled}
+                advanced-section
+                ?show-advanced=${this._showAdvanced}
                 @value-change=${this._onParamChange}
+                @advanced-toggle=${this._onAdvancedToggle}
               ></esphome-config-entry-form>`
             : nothing
         }
@@ -174,6 +185,10 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
         composed: true,
       })
     );
+  };
+
+  private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
+    this._showAdvanced = e.detail.show;
   };
 
   private _onParamChange = (e: CustomEvent<ConfigEntryValueChange>) => {

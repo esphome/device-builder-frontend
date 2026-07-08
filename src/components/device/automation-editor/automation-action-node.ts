@@ -397,6 +397,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
     return html`<esphome-config-entry-form
       .entries=${def.config_entries}
       .values=${this.value.params}
+      .requiredGroups=${def.required_groups ?? []}
       .board=${this.board}
       .yaml=${this.yaml}
       ?disabled=${this.disabled}

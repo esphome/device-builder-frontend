@@ -106,6 +106,11 @@ export class ESPHomeAutomationConditionTree extends LitElement {
    */
   @state() private _changingIdx = -1;
 
+  /** Rows with "Show advanced settings" open. Keyed by index because the
+   *  list renders by position (no keyed repeat); move / remove / kind
+   *  changes remap or drop entries so the flag follows its row. */
+  @state() private _advancedIdxs: ReadonlySet<number> = new Set();
+
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   protected render() {
@@ -196,11 +201,16 @@ export class ESPHomeAutomationConditionTree extends LitElement {
               ? html`<esphome-config-entry-form
                   .entries=${def.config_entries}
                   .values=${node.params}
+                  .requiredGroups=${def.required_groups ?? []}
                   .board=${this.board}
                   .yaml=${this.yaml}
                   ?disabled=${this.disabled}
+                  advanced-section
+                  ?show-advanced=${this._advancedIdxs.has(idx)}
                   @value-change=${(e: CustomEvent<ConfigEntryValueChange>) =>
                     this._onParamChange(idx, e)}
+                  @advanced-toggle=${(e: CustomEvent<{ show: boolean }>) =>
+                    this._onAdvancedToggle(idx, e)}
                 ></esphome-config-entry-form>`
               : nothing
           }
@@ -253,6 +263,8 @@ export class ESPHomeAutomationConditionTree extends LitElement {
       node.params = { ...node.params, ...e.detail.preFilledParams };
     }
     if (this._changingIdx >= 0) {
+      // A new kind means a new schema — reopen with advanced collapsed.
+      this._setRowAdvanced(this._changingIdx, false);
       this._emit(replaceAt(this.conditions, this._changingIdx, node));
     } else {
       this._emit([...this.conditions, node]);
@@ -267,6 +279,21 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     this._emit(replaceAt(this.conditions, idx, { ...old, params }));
   }
 
+  private _onAdvancedToggle(idx: number, e: CustomEvent<{ show: boolean }>) {
+    e.stopPropagation();
+    this._setRowAdvanced(idx, e.detail.show);
+  }
+
+  private _setRowAdvanced(idx: number, show: boolean) {
+    const next = new Set(this._advancedIdxs);
+    if (show) {
+      next.add(idx);
+    } else {
+      next.delete(idx);
+    }
+    this._advancedIdxs = next;
+  }
+
   private _onChildrenChange(
     idx: number,
     e: CustomEvent<{ conditions: ConditionNode[] }>
@@ -279,10 +306,19 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   }
 
   private _move(from: number, to: number) {
+    const next = new Set(this._advancedIdxs);
+    if (this._advancedIdxs.has(from)) next.add(to);
+    else next.delete(to);
+    if (this._advancedIdxs.has(to)) next.add(from);
+    else next.delete(from);
+    this._advancedIdxs = next;
     this._emit(swap(this.conditions, from, to));
   }
 
   private _remove(idx: number) {
+    this._advancedIdxs = new Set(
+      [...this._advancedIdxs].filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i))
+    );
     this._emit(removeAt(this.conditions, idx));
   }
 
