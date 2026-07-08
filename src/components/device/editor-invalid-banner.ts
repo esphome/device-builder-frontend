@@ -26,7 +26,8 @@ import { localizeContext } from "../../context/index.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
 import { renderTextLinks } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import type { BannerError, YamlAutoFix } from "../../util/yaml-lint-backend.js";
+import type { YamlAutoFix } from "../../util/yaml-error-analysis.js";
+import type { BannerError } from "../../util/yaml-lint-backend.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 

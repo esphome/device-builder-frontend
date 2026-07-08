@@ -12,11 +12,11 @@ import { EditorView } from "@codemirror/view";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import type { YamlAutoFix } from "../../src/util/yaml-error-analysis.js";
 import {
   createBackendYamlLinter,
   type BannerError,
   type MappedValidationError,
-  type YamlAutoFix,
 } from "../../src/util/yaml-lint-backend.js";
 
 const flush = () => new Promise((r) => setTimeout(r, 0));

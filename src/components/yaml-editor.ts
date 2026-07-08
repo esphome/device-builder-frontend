@@ -31,6 +31,7 @@ import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { idleCompletion } from "../util/idle-completion.js";
 import { getKeyPath, isInsideBlockScalar } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
+import { analyzeIndentMismatch, type YamlAutoFix } from "../util/yaml-error-analysis.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   blankLineContext,
@@ -38,11 +39,9 @@ import {
   keyPathByIndent,
 } from "../util/yaml-line-walker.js";
 import {
-  analyzeIndentMismatch,
   createBackendYamlLinter,
   lintErrorLineGutter,
   relintEffect,
-  type YamlAutoFix,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
 import type { YamlSection } from "../util/yaml-sections.js";

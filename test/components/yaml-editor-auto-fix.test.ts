@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import type { EditorValidateResponse } from "../../src/api/types/editor.js";
 import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
-import type { YamlAutoFix } from "../../src/util/yaml-lint-backend.js";
+import type { YamlAutoFix } from "../../src/util/yaml-error-analysis.js";
 import { mount } from "../_dom.js";
 
 const viewOf = (el: ESPHomeYamlEditor): EditorView =>
