@@ -61,4 +61,16 @@ describe("saveTablePreference", () => {
       table_sort_direction: null,
     });
   });
+
+  it("logs a failed persist instead of swallowing it, keeping the mirror", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { host, updatePreferences } = makeHost();
+    const boom = new Error("offline");
+    updatePreferences.mockRejectedValueOnce(boom);
+    saveTablePreference(host, event("table-page-size-change", 10));
+    await Promise.resolve();
+    expect(host._tablePageSize).toBe(10);
+    expect(warn).toHaveBeenCalledWith("Failed to save table preferences", boom);
+    warn.mockRestore();
+  });
 });
