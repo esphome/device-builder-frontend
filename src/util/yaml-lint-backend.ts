@@ -230,13 +230,15 @@ export function firstPropertyDelta(
   line: number,
   contentCol: number
 ): number | null {
-  for (let n = line + 1; ; n++) {
+  // Bound the walk so a huge run of blanks can't turn a lint pass into a scan.
+  for (let n = line + 1; n <= line + 50; n++) {
     const text = readLine(n);
     if (text === undefined) return null;
     if (!text.trim() || text.trimStart().startsWith("#")) continue;
     const indent = indentOf(text);
     return indent < contentCol ? null : indent - contentCol;
   }
+  return null;
 }
 
 /** Don't guess a sibling alignment beyond this many spaces — a large

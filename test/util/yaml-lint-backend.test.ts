@@ -178,6 +178,11 @@ describe("describeNestedListValue", () => {
       ["    - platform: gpio", "      - nested:"][n - 1];
     expect(describeNestedListValue(valued, 1, localize)).toBeNull();
   });
+});
+
+describe("describeValueTypeCause", () => {
+  const localize = (key: string, values?: Record<string, string | number>): string =>
+    values ? `${key}:${JSON.stringify(values)}` : key;
 
   it("names a bare half-typed word that became the key's string value", async () => {
     const { describeValueTypeCause } =
