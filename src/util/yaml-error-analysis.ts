@@ -440,19 +440,18 @@ export function analyzeIndentMismatch(
         // blamed key nudged just off column 0 that opens no deeper block is
         // a section head — dedent it back to the margin.
         if (indent === 0) {
+          if (propIndent >= YAML_INDENT_STEP) return null;
           const errKey = lineKeyToken(errText);
-          if (errKey && propIndent < YAML_INDENT_STEP) {
-            const next = contentLineBelow(readLine, errorLine);
-            if (next === null || indentOf(next.text) <= propIndent) {
-              return {
+          if (!errKey) return null;
+          const next = contentLineBelow(readLine, errorLine);
+          return next === null || indentOf(next.text) <= propIndent
+            ? {
                 markerLine: errorLine,
                 markerKey: errKey,
                 delta: -propIndent,
                 reason: "align",
-              };
-            }
-          }
-          return null;
+              }
+            : null;
         }
         if (shallowerIndent === null) shallowerIndent = indent;
       }
