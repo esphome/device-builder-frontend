@@ -78,7 +78,7 @@ describe("openLogsWithMethod web-serial", () => {
 
   it("blocks serial logs and notifies when logging is disabled (baud_rate 0)", async () => {
     vi.stubGlobal("navigator", { serial: {} });
-    const host = makeDashboardHost({ _localize: localize });
+    const host = makeDashboardHost();
     const device = {
       configuration: "x.yaml",
       name: "x",
