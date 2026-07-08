@@ -194,20 +194,21 @@ function valuelessKeyOf(text: string): string | null {
   return lineHasValue(text) ? null : lineKeyToken(text);
 }
 
-/** The key of a `-key:` pair (a list dash stuck to its key), else null. */
-function botchedDashKey(text: string | undefined): string | null {
-  if (text === undefined || parseListItemMarker(text)) return null;
-  const key = lineKeyToken(text);
-  return key !== null && key.length > 1 && key[0] === "-" && key[1] !== "-"
-    ? key.slice(1)
+/** The raw key of a `-key:` pair (a list dash stuck to its key), else null. */
+function botchedDashKey(text: string): string | null {
+  if (parseListItemMarker(text)) return null;
+  const key = text.match(PAIR_RE)?.[1];
+  return key !== undefined && key.length > 1 && key[0] === "-" && key[1] !== "-"
+    ? key
     : null;
 }
 
 /** A `- ` list marker typed without its space (`-platform:`), which the
  *  scanner reads as a `-platform` mapping key. */
-export interface MissingDashSpace {
+interface MissingDashSpace {
   line: number;
-  /** The key without its stuck dash (`platform`). */
+  /** The stuck-dash key exactly as `lineKeyToken` reads it (`-platform`),
+   *  so the apply-site staleness check compares the same token. */
   key: string;
   fromIndent: number;
 }
@@ -218,14 +219,16 @@ export interface MissingDashSpace {
  * (whose deeper "properties" the scanner chokes on). Null when neither
  * is a dash stuck to its key.
  */
-export function missingDashSpace(
+function missingDashSpace(
   readLine: ReadLine,
   blamedLine: number
 ): MissingDashSpace | null {
   const ownText = readLine(blamedLine);
-  const own = botchedDashKey(ownText);
-  if (own !== null && ownText !== undefined) {
-    return { line: blamedLine, key: own, fromIndent: indentOf(ownText) };
+  if (ownText !== undefined) {
+    const own = botchedDashKey(ownText);
+    if (own !== null) {
+      return { line: blamedLine, key: own, fromIndent: indentOf(ownText) };
+    }
   }
   const prev = contentLineAbove(readLine, blamedLine);
   if (prev === null) return null;
@@ -665,13 +668,13 @@ export function describeYamlError(
       return {
         text: localize("yaml_editor.error_dash_space_fix", {
           line: dash.line,
-          key: dash.key,
+          key: dash.key.slice(1),
         }),
         jumpLine: dash.line,
         fix: {
           line: dash.line,
           indent: 0,
-          key: `-${dash.key}`,
+          key: dash.key,
           fromIndent: dash.fromIndent,
           kind: "dash-space",
         },
