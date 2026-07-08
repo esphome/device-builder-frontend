@@ -442,6 +442,43 @@ describe("analyzeIndentMismatch", () => {
       reason: "align",
     });
   });
+
+  // A section head nudged off its level: the key sits strictly between the
+  // list's parent level and its markers, closing the list at a level
+  // nothing occupies.
+  it("dedents a section head sitting between the parent level and the markers", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "rtttl:", // 1
+        "  - output: buzzer_output", // 2
+        "    id: rtttl_player", // 3
+        "", // 4
+        " i2c:", // 5
+        "  - scl: 0", // 6
+        "    sda: 1", // 7
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 5)).toEqual({
+      markerLine: 5,
+      markerKey: "i2c",
+      delta: -1,
+      reason: "align",
+    });
+  });
+
+  it("won't claim a shallow key when the parent level isn't adjacent", async () => {
+    const { analyzeIndentMismatch } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = (n: number): string | undefined =>
+      [
+        "    effects:", // 1
+        "      - addressable_twinkle:", // 2
+        "      - flicker:", // 3
+        " i2c:", // 4
+      ][n - 1];
+    expect(analyzeIndentMismatch(doc, 4)).toBeNull();
+  });
 });
 
 describe("describeYamlError", () => {
@@ -668,6 +705,33 @@ describe("describeYamlError", () => {
       text: 'yaml_editor.error_misaligned_dedent_fix:{"line":3,"key":"name","spaces":1}',
       jumpLine: 3,
       fix: { line: 3, indent: -1, key: "name", fromIndent: 5 },
+    });
+  });
+
+  // Real PyYAML shape for a section head nudged off its level: the problem
+  // mark blames the key line itself, one space into the closed list.
+  it("dedents the nudged section head from a block-mapping message", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "rtttl:", // 1
+      "  - output: buzzer_output", // 2
+      "    id: rtttl_player", // 3
+      "", // 4
+      " i2c:", // 5
+      "  - scl: 0", // 6
+      "    sda: 1", // 7
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      "while parsing a block mapping\n" +
+      '  in "x.yaml", line 1, column 1\n' +
+      "expected <block end>, but found '<block mapping start>'\n" +
+      '  in "x.yaml", line 5, column 2';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_misaligned_dedent_fix:{"line":5,"key":"i2c","spaces":1}',
+      jumpLine: 5,
+      fix: { line: 5, indent: -1, key: "i2c", fromIndent: 1 },
     });
   });
 

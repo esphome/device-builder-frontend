@@ -325,6 +325,8 @@ function misplacedOpenerFix(
  *   moves), a property at the markers' own indent (re-indent it to the
  *   content column), or a property out of line with siblings already
  *   sitting at the marker's content column (re-indent the blamed line).
+ * - Blamed key strictly between a list's parent level and its markers
+ *   (a section head nudged off the parent level): dedent it back.
  */
 export function analyzeIndentMismatch(
   readLine: ReadLine,
@@ -420,14 +422,33 @@ export function analyzeIndentMismatch(
         reason: "props-below",
       };
     }
+    const markerIndent = indentOf(text);
     // A property at the markers' own indent, or between it and the content
     // column, can't be part of the sequence — re-indent it to the content
     // column where the item's properties sit.
-    if (propIndent < marker.contentCol && propIndent >= indentOf(text) && errKey) {
+    if (propIndent < marker.contentCol && propIndent >= markerIndent && errKey) {
       return {
         markerLine: errorLine,
         markerKey: errKey,
         delta: marker.contentCol - propIndent,
+        reason: "align",
+      };
+    }
+    // A key strictly between the list's parent level and its markers closes
+    // the list at a level nothing occupies — a section head nudged off the
+    // parent level (` i2c:` between top-level sections). Dedent it back.
+    const parentLevel = markerIndent - YAML_INDENT_STEP;
+    if (
+      errKey &&
+      parentLevel >= 0 &&
+      propIndent > parentLevel &&
+      propIndent < markerIndent &&
+      propIndent - parentLevel <= MAX_SIBLING_ALIGN
+    ) {
+      return {
+        markerLine: errorLine,
+        markerKey: errKey,
+        delta: parentLevel - propIndent,
         reason: "align",
       };
     }
