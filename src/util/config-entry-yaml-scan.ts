@@ -407,10 +407,11 @@ export function findComponentsByProviders(
         ownIdMatched = true;
       }
     }
-    // An idPaths provider knows where this section's interface ids live; the
-    // section's own id is then NOT one of them (a multi-entity platform's is
-    // the hub, the wrong type for the reference), so the stemless catch-all
-    // provider findReferenceCandidates injects must not offer it either.
+    // An idPaths provider enumerates every interface id in this section, so
+    // the stemless catch-all provider findReferenceCandidates injects must
+    // not add the section's own id on top: for a multi-entity platform it is
+    // the hub (the wrong type for the reference), and a hybrid's root entity
+    // already arrived through its ["id"] path.
     if (ownIdMatched && !hasIdPathProvider && section.id) {
       add(section.id, section.name ?? "");
     }

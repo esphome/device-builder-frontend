@@ -1,9 +1,10 @@
 import type { ESPHomeAPI } from "../api/index.js";
 import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 
-/** One page holds every provider of an interface. Same-domain sub-entity
- *  providers put `sensor` near 200, so headroom keeps a fetch-all
- *  `getComponents({provides})` from truncating. */
+/** Page size for the fetch-all `getComponents({provides})` sites. Sized so a
+ *  single page covers every known interface today (same-domain sub-entity
+ *  providers put `sensor` near 200); a larger catalog would truncate
+ *  silently until the callers page on `resp.total` (#1152). */
 export const PROVIDER_FETCH_LIMIT = 500;
 
 /** Ids of the components that provide an interface, board-scoped and cached
