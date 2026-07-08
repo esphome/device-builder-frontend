@@ -538,6 +538,24 @@ export interface ValueTypeCause {
 }
 
 /**
+ * The dash-space repair payload for a stuck-dash *key* at *fromIndent* on
+ * *line* — one constructor so the message args, the dash-keeping `key`
+ * the apply-site staleness check compares, and the fix shape can't drift
+ * between the parse-error and validation-error surfaces.
+ */
+function dashSpaceCause(
+  line: number,
+  key: string,
+  fromIndent: number,
+  localize: LocalizeFunc
+): ValueTypeCause {
+  return {
+    text: localize("yaml_editor.error_dash_space_fix", { line, key: key.slice(1) }),
+    fix: { line, indent: 0, key, fromIndent, kind: "dash-space" },
+  };
+}
+
+/**
  * Add the misindent / half-typed-key cause to a wrong-value-type
  * validation message ("expected a dictionary.") anchored at *line*: a
  * value-less `- key:` whose items landed one level deeper, a bare word
@@ -557,19 +575,7 @@ export function describeValueTypeCause(
   if (text === undefined) return null;
   const dashKey = botchedDashKey(text);
   if (dashKey !== null) {
-    return {
-      text: localize("yaml_editor.error_dash_space_fix", {
-        line,
-        key: dashKey.slice(1),
-      }),
-      fix: {
-        line,
-        indent: 0,
-        key: dashKey,
-        fromIndent: indentOf(text),
-        kind: "dash-space",
-      },
-    };
+    return dashSpaceCause(line, dashKey, indentOf(text), localize);
   }
   const token = text.trim();
   if (token && !token.includes(":") && !token.startsWith("#") && !token.startsWith("-")) {
@@ -695,18 +701,8 @@ export function describeYamlError(
     const dash = readLine ? missingDashSpace(readLine, line) : null;
     if (dash) {
       return {
-        text: localize("yaml_editor.error_dash_space_fix", {
-          line: dash.line,
-          key: dash.key.slice(1),
-        }),
+        ...dashSpaceCause(dash.line, dash.key, dash.fromIndent, localize),
         jumpLine: dash.line,
-        fix: {
-          line: dash.line,
-          indent: 0,
-          key: dash.key,
-          fromIndent: dash.fromIndent,
-          kind: "dash-space",
-        },
         squiggleLine: dash.line,
       };
     }

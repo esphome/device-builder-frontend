@@ -333,6 +333,18 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
       const readLine: ReadLine = (n) =>
         n >= 1 && n <= doc.lines ? doc.line(n).text : undefined;
       const onAutoFix = opts.onAutoFix;
+      // Offer the one-click repair on the squiggle's hover tooltip — while
+      // the banner reveal is damped during typing, the tooltip is where the
+      // fix is discoverable.
+      const autoFixActions = (fix: YamlAutoFix | undefined) =>
+        fix && onAutoFix
+          ? [
+              {
+                name: opts.localize("yaml_editor.error_auto_fix"),
+                apply: () => onAutoFix(fix),
+              },
+            ]
+          : undefined;
       for (const err of res.yaml_errors ?? []) {
         const msg = err.message ?? "";
         const pos = parseYamlErrorPosition(msg);
@@ -359,18 +371,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           source: "yaml",
           message,
           renderMessage: () => renderMessageNode(message),
-          // Offer the same one-click repair on the squiggle's hover tooltip
-          // as on the banner button — while the banner reveal is damped
-          // during typing, the tooltip is where the fix is discoverable.
-          actions:
-            fix && onAutoFix
-              ? [
-                  {
-                    name: opts.localize("yaml_editor.error_auto_fix"),
-                    apply: () => onAutoFix(fix),
-                  },
-                ]
-              : undefined,
+          actions: autoFixActions(fix),
         });
         // Also surface it in the persistent banner — a squiggle plus a
         // gutter dot is easy to miss — with the fix site to jump to and,
@@ -403,7 +404,6 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         const squiggleLineNum = doc.lineAt(from).number;
         const cause = describeValueTypeCause(readLine, squiggleLineNum, opts.localize);
         if (cause) message = `${message} ${cause.text}`;
-        const causeFix = cause?.fix;
         diagnostics.push({
           from,
           to,
@@ -411,15 +411,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           source: "esphome",
           message,
           renderMessage: () => renderMessageNode(message),
-          actions:
-            causeFix && onAutoFix
-              ? [
-                  {
-                    name: opts.localize("yaml_editor.error_auto_fix"),
-                    apply: () => onAutoFix(causeFix),
-                  },
-                ]
-              : undefined,
+          actions: autoFixActions(cause?.fix),
         });
         // Map from the range's own start, not the retargeted squiggle: a
         // block error walked up to its enclosing key would attribute to
@@ -454,7 +446,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           bannerErrors.push({
             message,
             line: squiggleLineNum,
-            fix: causeFix,
+            fix: cause?.fix,
             kind: "validation",
           });
         }
