@@ -209,6 +209,101 @@ export interface IndentMismatch {
 }
 
 /**
+ * Continuation-scalar repair: the blamed line sits deeper than the valued
+ * `key: value` directly above it (*prev*), so the scanner reads it as that
+ * value's plain-scalar continuation and chokes on the ':'. Re-indent the
+ * pair back under the value-less `key:` it fell out of, or dedent the
+ * blamed line when there is no such block. Null when the mismatch is too
+ * large to call.
+ */
+function continuationScalarFix(
+  readLine: ReadLine,
+  errorLine: number,
+  errText: string,
+  propIndent: number,
+  prev: { line: number; text: string }
+): IndentMismatch | null {
+  const prevIndent = indentOf(prev.text);
+  const prevKey = lineKeyToken(prev.text);
+  const delta = propIndent - prevIndent;
+  if (prevKey === null || delta > MAX_SIBLING_ALIGN) return null;
+  const parent = contentLineAbove(readLine, prev.line);
+  if (
+    parent &&
+    !parseListItemMarker(parent.text) &&
+    indentOf(parent.text) === prevIndent &&
+    valuelessKeyOf(parent.text) !== null
+  ) {
+    return { markerLine: prev.line, markerKey: prevKey, delta, reason: "align" };
+  }
+  const blamedKey = lineKeyToken(errText);
+  return blamedKey
+    ? { markerLine: errorLine, markerKey: blamedKey, delta: -delta, reason: "align" }
+    : null;
+}
+
+/**
+ * Repairs for a blamed line that closes a value-less opener's too-deep
+ * block: re-indent the opener when a sibling above it sits at the blamed
+ * line's indent (the opener was dedented — `mode:` dropped out of `pin:`,
+ * blamed on `number:`), else dedent the block's first child when the blamed
+ * line already sits at the opener's canonical child indent (the child went
+ * too deep). Null when neither reading holds.
+ */
+function misplacedOpenerFix(
+  readLine: ReadLine,
+  errorLine: number,
+  propIndent: number
+): IndentMismatch | null {
+  // The opener candidate: the nearest line above the blamed one that sits
+  // shallower, provided it is a value-less `key:` still inside the same
+  // marker-less stretch.
+  let opener: { line: number; indent: number; key: string } | null = null;
+  for (let n = errorLine - 1; n >= 1 && n >= errorLine - WALK_BOUND; n--) {
+    const text = readLine(n);
+    if (text === undefined || isBlankOrComment(text)) continue;
+    if (parseListItemMarker(text)) break;
+    const indent = indentOf(text);
+    if (opener === null) {
+      if (indent >= propIndent) continue;
+      if (indent === 0) break;
+      const key = valuelessKeyOf(text);
+      if (key === null) break;
+      opener = { line: n, indent, key };
+      continue;
+    }
+    // Above the opener: a sibling at exactly the blamed line's indent
+    // proves the opener was dedented out of that level.
+    if (indent === propIndent && propIndent - opener.indent <= MAX_SIBLING_ALIGN) {
+      return {
+        markerLine: opener.line,
+        markerKey: opener.key,
+        delta: propIndent - opener.indent,
+        reason: "align",
+      };
+    }
+    // Leaving the opener's block ends the sibling search.
+    if (indent < opener.indent) break;
+  }
+  // The competing reading: the opener sits where it belongs (the blamed
+  // line is at its canonical child indent) and the block's first child is
+  // what went too deep.
+  if (opener === null || propIndent !== opener.indent + YAML_INDENT_STEP) return null;
+  const child = contentLineBelow(readLine, opener.line);
+  const childKey = child === null ? null : lineKeyToken(child.text);
+  if (child === null || childKey === null) return null;
+  const childIndent = indentOf(child.text);
+  return childIndent > propIndent && childIndent - propIndent <= MAX_SIBLING_ALIGN
+    ? {
+        markerLine: child.line,
+        markerKey: childKey,
+        delta: propIndent - childIndent,
+        reason: "align",
+      }
+    : null;
+}
+
+/**
  * Pinpoint the exact indentation fix behind a YAML indentation error.
  *
  * Shapes covered, in priority order:
@@ -261,48 +356,28 @@ export function analyzeIndentMismatch(
     return null;
   }
   const propIndent = errIndent;
-  // Continuation-scalar shape: the blamed line sits deeper than the valued
-  // `key: value` directly above it, so the scanner reads it as that value's
-  // plain-scalar continuation and chokes on the ':'. The repair depends on
-  // which line moved: a value-less `key:` above the pair at the pair's own
-  // indent means the pair was dedented out of that block (indent it back);
-  // otherwise the blamed line itself is over-indented (dedent it to join
-  // the pair as a sibling).
   const prev = contentLineAbove(readLine, errorLine);
   const prevIndent = prev === null ? -1 : indentOf(prev.text);
-  if (prev && !parseListItemMarker(prev.text)) {
-    const prevKey = lineKeyToken(prev.text);
-    if (prevIndent < propIndent && prevKey && lineHasValue(prev.text)) {
-      const delta = propIndent - prevIndent;
-      if (delta > MAX_SIBLING_ALIGN) return null;
-      const parent = contentLineAbove(readLine, prev.line);
-      if (
-        parent &&
-        !parseListItemMarker(parent.text) &&
-        indentOf(parent.text) === prevIndent &&
-        valuelessKeyOf(parent.text) !== null
-      ) {
-        return { markerLine: prev.line, markerKey: prevKey, delta, reason: "align" };
-      }
-      const blamedKey = lineKeyToken(errText);
-      return blamedKey
-        ? { markerLine: errorLine, markerKey: blamedKey, delta: -delta, reason: "align" }
-        : null;
-    }
+  // The line directly above decides the reading: a shallower valued pair
+  // makes the blamed line its plain-scalar continuation; a deeper line means
+  // the blamed line closes a block, the signature of a misplaced value-less
+  // opener (or its over-deep first child) above.
+  if (
+    prev &&
+    !parseListItemMarker(prev.text) &&
+    prevIndent < propIndent &&
+    lineHasValue(prev.text)
+  ) {
+    return continuationScalarFix(readLine, errorLine, errText, propIndent, prev);
   }
-  // The blamed line closes a block deeper than itself when the line directly
-  // above it sits deeper — the signature of a dedented block opener above.
-  const prevDeeper = prevIndent > propIndent;
+  if (prevIndent > propIndent) {
+    const openerFix = misplacedOpenerFix(readLine, errorLine, propIndent);
+    if (openerFix) return openerFix;
+  }
   // Nearest shallower non-marker line passed on the way up — when it sits
   // exactly at the marker's content column, the surrounding structure is
   // consistent and the blamed line is the one to move.
-  let shallower: { line: number; indent: number; text: string } | null = null;
-  // Set on crossing a line shallower than `shallower`: the dedented-opener
-  // reading is dead, a later same-indent line is unrelated structure.
-  let leftShallowerBlock = false;
-  // Over-deep first child of a value-less opener, held until the walk rules
-  // out the dedented-opener reading above it.
-  let openerChild: IndentMismatch | null = null;
+  let shallowerIndent: number | null = null;
   // Bound the walk so a huge doc can't turn one lint pass into a scan.
   for (let n = errorLine - 1; n >= 1 && n >= errorLine - WALK_BOUND; n--) {
     const text = readLine(n);
@@ -310,70 +385,19 @@ export function analyzeIndentMismatch(
     const marker = parseListItemMarker(text);
     if (!marker) {
       const indent = indentOf(text);
-      // Dedented block opener: the blamed line closes a too-deep block run
-      // by a value-less `key:` sitting shallower than the level it should be
-      // on — proven by a sibling at exactly the blamed line's indent above
-      // that key (case: `mode:` dedented out of `pin:`, blamed on `number:`).
-      // The key is what moved; re-indent it to the blamed line's level.
-      if (
-        prevDeeper &&
-        shallower !== null &&
-        !leftShallowerBlock &&
-        indent === propIndent
-      ) {
-        const openerKey = valuelessKeyOf(shallower.text);
-        if (openerKey !== null && propIndent - shallower.indent <= MAX_SIBLING_ALIGN) {
-          return {
-            markerLine: shallower.line,
-            markerKey: openerKey,
-            delta: propIndent - shallower.indent,
-            reason: "align",
-          };
-        }
-      }
       if (indent < propIndent) {
         // A top-level line means we left every block without a marker.
-        if (indent === 0) return openerChild;
-        if (shallower !== null && indent < shallower.indent) leftShallowerBlock = true;
-        if (shallower === null) {
-          shallower = { line: n, indent, text };
-          // The competing reading: the opener sits where it belongs (the
-          // blamed line is at its canonical child indent) and the block's
-          // first child above the blamed line is what went too deep. Held,
-          // not returned — a sibling above the opener at the blamed line's
-          // indent proves the opener moved instead.
-          const child =
-            prevDeeper &&
-            propIndent === indent + YAML_INDENT_STEP &&
-            valuelessKeyOf(text) !== null
-              ? contentLineBelow(readLine, n)
-              : null;
-          const childKey = child === null ? null : lineKeyToken(child.text);
-          if (child !== null && childKey !== null) {
-            const childIndent = indentOf(child.text);
-            if (
-              childIndent > propIndent &&
-              childIndent - propIndent <= MAX_SIBLING_ALIGN
-            ) {
-              openerChild = {
-                markerLine: child.line,
-                markerKey: childKey,
-                delta: propIndent - childIndent,
-                reason: "align",
-              };
-            }
-          }
-        }
+        if (indent === 0) return null;
+        if (shallowerIndent === null) shallowerIndent = indent;
       }
       continue;
     }
-    if (openerChild) return openerChild;
     const errKey = lineKeyToken(errText);
     if (propIndent > marker.contentCol) {
       // Siblings already aligned at the content column — above or below the
       // blamed line — make the blamed line the odd one out; otherwise assume
       // the marker is what needs to move.
-      const alignedAbove = shallower?.indent === marker.contentCol;
+      const alignedAbove = shallowerIndent === marker.contentCol;
       const next =
         !alignedAbove && errKey && propIndent - marker.contentCol <= MAX_SIBLING_ALIGN
           ? contentLineBelow(readLine, errorLine)
@@ -409,7 +433,7 @@ export function analyzeIndentMismatch(
     }
     return null;
   }
-  return openerChild;
+  return null;
 }
 
 /** Matches a value-less `- key:` list item (optionally with a comment). */
