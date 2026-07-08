@@ -227,6 +227,13 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
       this._visible = this.errors;
       return;
     }
+    // The completion popup holds reveals without a deadline; closing it
+    // re-evaluates through the property change, so no timer churns while
+    // it stays open.
+    if (this.completionOpen) {
+      this._cancelRevealTimer();
+      return;
+    }
     this._armRevealTimer();
   }
 

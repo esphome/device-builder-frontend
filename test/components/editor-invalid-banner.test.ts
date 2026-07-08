@@ -142,6 +142,8 @@ describe("editor-invalid-banner smart reveal", () => {
     el.errors = [{ message: "Platform missing.", kind: "validation" }];
     await el.updateComplete;
     expect(banner(el)).toBeNull();
+    // The hold is timerless — closing the popup is the only wake signal.
+    expect(vi.getTimerCount()).toBe(0);
 
     vi.advanceTimersByTime(20_000); // even the idle backstop waits
     await el.updateComplete;
