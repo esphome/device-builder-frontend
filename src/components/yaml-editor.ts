@@ -656,7 +656,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         return null;
       }
       // A dedent must have the spaces it wants to remove.
-      if (fix.indent < 0 && /[^ ]/.test(t.text.slice(0, -fix.indent))) return null;
+      if (fix.indent < 0 && fix.fromIndent + fix.indent < 0) return null;
       return t.from;
     };
     const from = targetFrom();
