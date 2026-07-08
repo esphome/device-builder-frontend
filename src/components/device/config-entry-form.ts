@@ -47,6 +47,7 @@ import {
   getCachedPinRegistryModes,
   subscribePinRegistryModes,
 } from "../../util/pin-registry-modes-cache.js";
+import { PROVIDER_FETCH_LIMIT } from "../../util/provides-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
 import { looksLikeSubstitution, parseSubstitutions } from "../../util/substitutions.js";
@@ -1026,12 +1027,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (cached) return cached;
     if (this._api && !this._interfaceProvidersPending.has(interfaceName)) {
       this._interfaceProvidersPending.add(interfaceName);
-      // ``limit: 500`` captures every provider of the interface in one shot
-      // (same-domain sub-entity providers put ``sensor`` near 200); this is
-      // the full dropdown candidate set, distinct from the Add-component
-      // picker's paginated grid.
+      // The full dropdown candidate set in one shot, distinct from the
+      // Add-component picker's paginated grid.
       this._api
-        .getComponents({ provides: interfaceName, limit: 500 })
+        .getComponents({ provides: interfaceName, limit: PROVIDER_FETCH_LIMIT })
         .then((resp) => {
           this._interfaceProviders.set(
             interfaceName,

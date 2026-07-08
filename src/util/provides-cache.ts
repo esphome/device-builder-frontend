@@ -1,6 +1,11 @@
 import type { ESPHomeAPI } from "../api/index.js";
 import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 
+/** One page holds every provider of an interface. Same-domain sub-entity
+ *  providers put `sensor` near 200, so headroom keeps a fetch-all
+ *  `getComponents({provides})` from truncating. */
+export const PROVIDER_FETCH_LIMIT = 500;
+
 /** Ids of the components that provide an interface, board-scoped and cached
  *  for the process lifetime. The backend catalog is immutable for that
  *  lifetime (see `component-name-cache`), so the same `provides` query never
@@ -21,10 +26,7 @@ export function providerIds(
         provides: interfaceName,
         platform: platform ?? undefined,
         board_id: boardId ?? undefined,
-        // One page holds every provider; same-domain sub-entity providers put
-        // ``sensor`` near 200, so headroom keeps this from truncating
-        // (mirrors config-entry-form's provider fetch).
-        limit: 500,
+        limit: PROVIDER_FETCH_LIMIT,
       })
       .then((resp): ReadonlySet<string> => new Set(resp.components.map((c) => c.id)))
   );
