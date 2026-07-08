@@ -16,18 +16,16 @@ import {
   renderViewToggle,
 } from "../../../src/components/dashboard/render-toolbar.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
+import { renderInto } from "../../_dom.js";
+import { makeDashboardHost } from "./_host.js";
 
 function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
-  return {
-    _localize: identityLocalize,
-    _yamlMode: false,
-    _search: "",
+  return makeDashboardHost({
     _syncYamlSearch: vi.fn(),
     _onSearchKeyDown: vi.fn(),
     _clearSearch: vi.fn(),
     ...overrides,
-  } as unknown as ESPHomePageDashboard;
+  });
 }
 
 describe("renderSearchInput", () => {

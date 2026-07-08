@@ -8,16 +8,16 @@ import type { VisibilityState } from "@tanstack/lit-table";
 import { describe, expect, it, vi } from "vitest";
 import { SortDirection } from "../../../src/api/types/system.js";
 import { saveTablePreference } from "../../../src/components/dashboard/prefs.js";
-import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
+import { makeDashboardHost } from "./_host.js";
 
 function makeHost() {
   const updatePreferences = vi.fn(async () => {});
-  const host = {
+  const host = makeDashboardHost({
     _api: { updatePreferences },
     _tablePageSize: 25,
     _tableColumnVisibility: null,
     _tableSorting: null,
-  } as unknown as ESPHomePageDashboard;
+  });
   return { host, updatePreferences };
 }
 
