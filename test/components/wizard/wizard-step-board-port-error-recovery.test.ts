@@ -16,6 +16,7 @@ import { defaultLocalize } from "../../../src/common/localize.js";
 import type { ESPHomeWizardStepBoardPortSelect } from "../../../src/components/wizard/wizard-step-board-port-select.js";
 import { ESPHomeWizardStepBoard } from "../../../src/components/wizard/wizard-step-board.js";
 import { SERIAL_PORTS_POLL_INTERVAL_MS } from "../../../src/util/serial-ports-poll-controller.js";
+import { flushTimers } from "../../_dom.js";
 import { makeSerialPort } from "../../_make-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -58,7 +59,7 @@ describe("wizard-step-board port fetch error recovery", () => {
     });
     const el = await mount(getSerialPorts);
 
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     await el.updateComplete;
     expect(portSelect(el).errorMessage).toBe("backend offline");
 

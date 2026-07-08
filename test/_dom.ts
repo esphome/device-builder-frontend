@@ -1,11 +1,13 @@
 /**
- * Shared DOM helpers for the happy-dom test suites.
+ * Shared DOM and settle helpers for the test suites.
  *
  * Nearly every component/dialog test used to hand-roll the same snippets:
  * an async mount (append + settle), a render-into-a-container helper for
- * pure template functions, and an identity localize stub for host fakes.
- * They live here once instead; ``test/_setup-dom.ts`` owns the matching
- * ``document.body`` cleanup between tests.
+ * pure template functions, an identity localize stub for host fakes, and
+ * a flush helper in one of three shapes (zero-delay timeout, microtask
+ * drain, fake-timer advance). They live here once instead;
+ * ``test/_setup-dom.ts`` owns the matching ``document.body`` cleanup
+ * between tests.
  */
 import { render } from "lit";
 import { vi } from "vitest";
@@ -68,13 +70,8 @@ export async function baseDialogSettled(el: HTMLElement): Promise<void> {
 /** Resolve after a zero-delay timeout so queued real-timer callbacks run. */
 export const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
-/**
- * Drain ``times`` microtask turns.
- *
- * Suites pass the count their async chain needs — a plain await per
- * ``.then`` link — so keep the caller's tuned value when migrating.
- */
-export async function flushMicrotasks(times = 1): Promise<void> {
+/** Drain ``times`` microtask turns — one per await/``.then`` link the chain under test needs. */
+export async function flushMicrotasks(times: number): Promise<void> {
   for (let i = 0; i < times; i++) {
     await Promise.resolve();
   }

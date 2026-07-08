@@ -32,6 +32,7 @@ import {
   _resetSecretKeysCache,
   fetchSecretKeys,
 } from "../../../src/util/secrets-cache.js";
+import { flush } from "../../_dom.js";
 
 const makeApi = (keys: string[]): ESPHomeAPI =>
   ({ getSecretKeys: vi.fn(async () => keys) }) as unknown as ESPHomeAPI;
@@ -253,7 +254,7 @@ describe("esphome-secret-picker", () => {
     el.addEventListener("secret-selected", onSelected as EventListener);
 
     fireSelectItem(el, ".manual");
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
 
     expect(api.getConfig).toHaveBeenCalledWith("secrets.yaml");
     expect((onSelected.mock.calls[0][0] as CustomEvent).detail.value).toBe("myssid");
@@ -273,7 +274,7 @@ describe("esphome-secret-picker", () => {
     el.addEventListener("secret-selected", onSelected as EventListener);
 
     fireSelectItem(el, ".manual");
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
 
     // A transient read failure must not replace the reference with a blank.
     expect(onSelected).not.toHaveBeenCalled();
@@ -291,7 +292,7 @@ describe("esphome-secret-picker", () => {
     el.addEventListener("secret-selected", onSelected as EventListener);
 
     fireSelectItem(el, ".manual");
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
 
     // Key absent (read succeeded) → a legit empty inline, not an error.
     expect((onSelected.mock.calls[0][0] as CustomEvent).detail.value).toBe("");
@@ -315,7 +316,7 @@ describe("esphome-secret-picker", () => {
     window.addEventListener("secrets-saved", saved as EventListener);
 
     fireSelectItem(el, ".migrate");
-    await new Promise((r) => setTimeout(r, 0)); // let the async write settle
+    await flush(); // let the async write settle
 
     // The double-underscore form is created (create-if-absent), never the alias.
     expect(api.setSecret).toHaveBeenCalledWith(
@@ -347,7 +348,7 @@ describe("esphome-secret-picker", () => {
     el.addEventListener("secret-selected", onSelected as EventListener);
 
     fireSelectItem(el, ".migrate");
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
 
     // A failed write must never change the field to a !secret ref.
     expect(onSelected).not.toHaveBeenCalled();
@@ -369,7 +370,7 @@ describe("esphome-secret-picker", () => {
     el.addEventListener("secret-selected", onSelected as EventListener);
 
     fireSelectItem(el, ".migrate");
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
 
     // create-if-absent left the existing value; reference the key with a distinct
     // "linked" toast (its value may differ from what the user typed).
