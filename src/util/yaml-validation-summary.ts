@@ -85,10 +85,13 @@ export function summarizeValidation(
   }
 
   const err = validationErrors[0];
-  // ``range.start_line`` / ``start_col`` are 0-indexed upstream;
-  // convert to the 1-indexed shape the editor + URL helpers use.
-  const line = Math.max(1, (err.range?.start_line ?? 0) + 1);
-  const col = Math.max(1, (err.range?.start_col ?? 0) + 1);
+  // ``range.start_line`` / ``start_col`` are 0-indexed upstream; convert to
+  // the 1-indexed shape the editor + URL helpers use. A missing range means
+  // the validator couldn't place the error — line 0 disables "Go to error"
+  // rather than jumping to the top of the file.
+  const hasRange = err.range != null;
+  const line = hasRange ? Math.max(1, (err.range?.start_line ?? 0) + 1) : 0;
+  const col = hasRange ? Math.max(1, (err.range?.start_col ?? 0) + 1) : 0;
   const file = err.range?.document ?? null;
   let message = sanitizeMessage((err.message ?? "Invalid configuration").trim());
   // The cause hint reads the open buffer, so only add it when the error's
@@ -98,7 +101,7 @@ export function summarizeValidation(
   // CodeMirror-retargeted range (which can't live in this pure module) —
   // when the two diverge the shape check fails and the hint is simply
   // omitted, never wrong.
-  if (!file || file === "<file>") {
+  if (hasRange && (!file || file === "<file>")) {
     const hint = describeValueTypeCause(readLine, line, localize);
     if (hint) message = `${message} ${hint}`;
   }

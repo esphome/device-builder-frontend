@@ -248,6 +248,17 @@ describe("summarizeValidation", () => {
     expect(summary.first?.message).toBe("expected a dictionary.");
   });
 
+  it("disables navigation for a validation error without a range", () => {
+    // The linter path already treats a null range as unplaceable; the
+    // dialog reads line 0 as "no jump target" rather than jumping to 1:1.
+    const summary = summarize(
+      res([], [{ message: "Component not found: foo", range: null }])
+    );
+    expect(summary.first?.line).toBe(0);
+    expect(summary.first?.col).toBe(0);
+    expect(summary.first?.message).toBe("Component not found: foo");
+  });
+
   it("counts every error across both buckets", () => {
     const summary = summarize(
       res(

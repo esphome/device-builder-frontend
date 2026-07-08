@@ -22,7 +22,8 @@ export interface EditorYamlError {
 
 export interface EditorValidationError {
   message: string;
-  range: EditorRange;
+  /** Null when the upstream validator can't place the error in any file. */
+  range: EditorRange | null;
 }
 
 export interface EditorValidateResponse {
