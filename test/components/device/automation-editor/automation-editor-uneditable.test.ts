@@ -32,6 +32,7 @@ import type {
   ParsedAutomation,
 } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
+import { flushMicrotasks } from "../../../_dom.js";
 
 const ON_BOOT: AutomationLocation = {
   kind: "device_on",
@@ -70,10 +71,6 @@ const slimAvailable = (): AvailableAutomations =>
     devices: [],
   }) as unknown as AvailableAutomations;
 
-async function flushPending(times = 8): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
-
 describe("automation-editor uneditable (errored parse)", () => {
   it("renders read-only and never upserts when the parsed automation has an error", async () => {
     const upsertAutomation = vi.fn();
@@ -91,7 +88,7 @@ describe("automation-editor uneditable (errored parse)", () => {
     editor.location = ON_BOOT;
     document.body.appendChild(editor);
     await editor.updateComplete;
-    await flushPending();
+    await flushMicrotasks(8);
 
     // The errored automation is flagged read-only; its empty tree was
     // not adopted, and the error surfaces in the rendered panel.
@@ -155,7 +152,7 @@ describe("automation-editor parse-error banner", () => {
     editor.yaml = "broken: [";
     document.body.appendChild(editor);
     await editor.updateComplete;
-    await flushPending();
+    await flushMicrotasks(8);
     // The failed parse surfaced an error banner.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((editor as any)._error).toContain("Failed to parse");
@@ -164,7 +161,7 @@ describe("automation-editor parse-error banner", () => {
     editor.yaml = "on_boot:\n  then: []\n";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (editor as any).reload();
-    await flushPending();
+    await flushMicrotasks(8);
     // A successful parse clears the stale error.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((editor as any)._error).toBe("");

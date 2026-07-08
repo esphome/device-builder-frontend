@@ -13,11 +13,10 @@ import {
   getCachedSecretKeys,
   subscribeSecretKeys,
 } from "../../src/util/secrets-cache.js";
+import { flush } from "../_dom.js";
 
 const makeApi = (impl: () => Promise<string[]>): ESPHomeAPI =>
   ({ getSecretKeys: vi.fn(impl) }) as unknown as ESPHomeAPI;
-
-const tick = () => new Promise((r) => setTimeout(r, 0));
 
 afterEach(() => {
   _resetSecretKeysCache();
@@ -36,7 +35,7 @@ describe("secrets-cache refresh on secrets-saved", () => {
     // A save elsewhere refreshes the cache in place (no empty flash).
     keys = ["wifi_ssid", "fresh_secret"];
     window.dispatchEvent(new CustomEvent("secrets-saved", { detail: { source: {} } }));
-    await tick();
+    await flush();
 
     expect(api.getSecretKeys).toHaveBeenCalledTimes(2);
     expect(getCachedSecretKeys()).toEqual(["wifi_ssid", "fresh_secret"]);
@@ -46,7 +45,7 @@ describe("secrets-cache refresh on secrets-saved", () => {
   it("does nothing before any fetch has provided an api", async () => {
     // No picker ever mounted → no api captured → the handler is a no-op.
     window.dispatchEvent(new CustomEvent("secrets-saved", { detail: { source: {} } }));
-    await tick();
+    await flush();
     expect(getCachedSecretKeys()).toBeUndefined();
   });
 });

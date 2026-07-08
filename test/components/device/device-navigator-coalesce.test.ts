@@ -18,10 +18,7 @@ import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
 import { _clearAutomationCatalogCache } from "../../../src/util/automation-catalog-cache.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
-
-async function flushPending(times = 5): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
+import { flushMicrotasks } from "../../_dom.js";
 
 async function mountNavigator(
   api: ESPHomeAPI,
@@ -39,7 +36,7 @@ async function mountNavigator(
   if (props.platformReady !== undefined) nav.platformReady = props.platformReady;
   document.body.appendChild(nav);
   await nav.updateComplete;
-  await flushPending();
+  await flushMicrotasks(5);
   return nav;
 }
 
@@ -77,7 +74,7 @@ describe("device-navigator kickoff gating", () => {
     const nav = await mountNavigator(api, { yaml: "", platformReady: false });
     nav.platformReady = true;
     await nav.updateComplete;
-    await flushPending();
+    await flushMicrotasks(5);
 
     expect(getAutomationTriggers).not.toHaveBeenCalled();
     expect(getComponentBodies).not.toHaveBeenCalled();
@@ -98,7 +95,7 @@ describe("device-navigator kickoff gating", () => {
     nav.platformReady = true;
     await nav.updateComplete;
     // Microtask-batched body cache; let queued fetches flush.
-    await flushPending(10);
+    await flushMicrotasks(10);
 
     expect(getAutomationTriggers).toHaveBeenCalledTimes(1);
     expect(getAutomationTriggers).toHaveBeenCalledWith("esp32", undefined);
@@ -121,7 +118,7 @@ describe("device-navigator kickoff gating", () => {
 
     nav.yaml = YAML;
     await nav.updateComplete;
-    await flushPending(10);
+    await flushMicrotasks(10);
 
     expect(getAutomationTriggers).toHaveBeenCalledTimes(1);
     expect(getAutomationTriggers).toHaveBeenCalledWith("esp32", undefined);
@@ -137,7 +134,7 @@ describe("device-navigator kickoff gating", () => {
     const nav = await mountNavigator(api, { yaml: YAML, platformReady: false });
     nav.platformReady = true;
     await nav.updateComplete;
-    await flushPending(10);
+    await flushMicrotasks(10);
 
     expect(getAutomationTriggers).toHaveBeenCalledTimes(1);
     expect(getAutomationTriggers).toHaveBeenCalledWith(undefined, undefined);
@@ -152,14 +149,14 @@ describe("device-navigator kickoff gating", () => {
       platform: "esp32",
       platformReady: true,
     });
-    await flushPending(10);
+    await flushMicrotasks(10);
     expect(getAutomationTriggers).toHaveBeenCalledTimes(1);
 
     // An unrelated prop change shouldn't refire (selection update
     // doesn't touch yaml / platform / platformReady).
     nav.selectedKey = "wifi";
     await nav.updateComplete;
-    await flushPending(10);
+    await flushMicrotasks(10);
 
     expect(getAutomationTriggers).toHaveBeenCalledTimes(1);
   });

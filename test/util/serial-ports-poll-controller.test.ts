@@ -6,6 +6,7 @@ import {
   SerialPortsPollController,
   sortSerialPorts,
 } from "../../src/util/serial-ports-poll-controller.js";
+import { flushTimers } from "../_dom.js";
 import { FakeHost } from "../_fake-host.js";
 import { makeSerialPort } from "../_make-serial-port.js";
 
@@ -33,7 +34,6 @@ function make(initial: SerialPort[] = [A]) {
   };
 }
 
-const flush = () => vi.advanceTimersByTimeAsync(0);
 const tick = () => vi.advanceTimersByTimeAsync(SERIAL_PORTS_POLL_INTERVAL_MS);
 
 beforeEach(() => {
@@ -53,7 +53,7 @@ describe("SerialPortsPollController", () => {
 
     ctrl.set(true);
     expect(ctrl.loading).toBe(true);
-    await flush();
+    await flushTimers();
     expect(getSerialPorts).toHaveBeenCalledTimes(1);
     expect(ctrl.loading).toBe(false);
     expect(ctrl.ports).toEqual([A]);
@@ -68,7 +68,7 @@ describe("SerialPortsPollController", () => {
   it("flags ports that appear after the first fetch and keeps them flagged while present", async () => {
     const { ctrl, respond } = make([A]);
     ctrl.set(true);
-    await flush();
+    await flushTimers();
 
     respond([A, B]);
     await tick();
@@ -90,14 +90,14 @@ describe("SerialPortsPollController", () => {
   it("stops polling on deactivation and on host disconnect", async () => {
     const { ctrl, getSerialPorts } = make();
     ctrl.set(true);
-    await flush();
+    await flushTimers();
     ctrl.set(false);
     await tick();
     await tick();
     expect(getSerialPorts).toHaveBeenCalledTimes(1);
 
     ctrl.set(true);
-    await flush();
+    await flushTimers();
     expect(getSerialPorts).toHaveBeenCalledTimes(2);
     ctrl.hostDisconnected();
     await tick();
@@ -107,7 +107,7 @@ describe("SerialPortsPollController", () => {
   it("does not fetch from an interval callback that was queued before deactivation", async () => {
     const { ctrl, getSerialPorts } = make();
     ctrl.set(true);
-    await flush();
+    await flushTimers();
     ctrl.set(false);
     // A callback already queued when clearInterval ran still fires.
     await (ctrl as unknown as { _poll(): Promise<void> })._poll();
@@ -117,7 +117,7 @@ describe("SerialPortsPollController", () => {
   it("resets the list and the new-port baseline on each activation", async () => {
     const { ctrl, respond } = make([A]);
     ctrl.set(true);
-    await flush();
+    await flushTimers();
     respond([A, B]);
     await tick();
     expect(ctrl.newPorts.has(B.port)).toBe(true);
@@ -127,7 +127,7 @@ describe("SerialPortsPollController", () => {
 
     ctrl.set(true);
     expect(ctrl.ports).toEqual([]);
-    await flush();
+    await flushTimers();
     expect(ctrl.ports).toEqual([A, B]);
     expect(ctrl.newPorts.size).toBe(0);
   });
@@ -135,7 +135,7 @@ describe("SerialPortsPollController", () => {
   it("only requests a host update when the list actually changes", async () => {
     const { ctrl, host } = make([A]);
     ctrl.set(true);
-    await flush();
+    await flushTimers();
     const after = host.updates;
     await tick();
     await tick();
@@ -147,7 +147,7 @@ describe("SerialPortsPollController", () => {
     const boom = new Error("boom");
     respond(boom);
     ctrl.set(true);
-    await flush();
+    await flushTimers();
     expect(ctrl.error).toBe(boom);
     expect(ctrl.loading).toBe(false);
     expect(host.updates).toBe(1);
@@ -170,7 +170,7 @@ describe("SerialPortsPollController", () => {
     const { ctrl, respond } = make();
     respond(new Error("boom"));
     ctrl.set(true);
-    await flush();
+    await flushTimers();
 
     respond([A, B]);
     await tick();
@@ -197,14 +197,14 @@ describe("SerialPortsPollController", () => {
 
     const { ctrl } = make([generic, bridge, esp]);
     ctrl.set(true);
-    await flush();
+    await flushTimers();
     expect(ctrl.ports).toEqual([esp, bridge, generic]);
   });
 
   it("swallows poll errors after a successful fetch, keeping the last good list", async () => {
     const { ctrl, respond } = make([A]);
     ctrl.set(true);
-    await flush();
+    await flushTimers();
 
     respond(new Error("transient"));
     await tick();

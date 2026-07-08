@@ -13,7 +13,7 @@ import {
   onSetTheme,
   onSetVersionHistoryEnabled,
 } from "../../../src/components/app-shell/settings-actions.js";
-import { identityLocalize } from "../../_dom.js";
+import { flush, identityLocalize } from "../../_dom.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock("sonner-js", () => ({
@@ -21,9 +21,6 @@ vi.mock("sonner-js", () => ({
     error: (...args: unknown[]) => toastError(...args),
   },
 }));
-
-/** Let pending .catch()/.finally() microtasks run. */
-const flush = () => new Promise((r) => setTimeout(r, 0));
 
 type PrefsHost = Pick<
   ESPHomeApp,

@@ -30,6 +30,7 @@ vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
+import { flushMicrotasks } from "../../../_dom.js";
 
 const slimAvailable = (): AvailableAutomations =>
   ({
@@ -39,10 +40,6 @@ const slimAvailable = (): AvailableAutomations =>
     scripts: [],
     devices: [],
   }) as unknown as AvailableAutomations;
-
-async function flushPending(times = 5): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
 
 /** Construct an editor, plant the api on its consumer-private
  *  ``_api`` slot (no Lit context provider in the test tree),
@@ -58,7 +55,7 @@ async function mountEditor(
   if (configuration !== undefined) editor.configuration = configuration;
   document.body.appendChild(editor);
   await editor.updateComplete;
-  await flushPending();
+  await flushMicrotasks(5);
   return editor;
 }
 
@@ -115,7 +112,7 @@ describe("automation-editor mount-time load (behavioral)", () => {
     expect((editor as any)._loading).toBe(false);
 
     resolveBodies({});
-    await flushPending();
+    await flushMicrotasks(5);
   });
 
   it("setting configuration after mount triggers the load", async () => {
@@ -128,7 +125,7 @@ describe("automation-editor mount-time load (behavioral)", () => {
 
     editor.configuration = "device.yaml";
     await editor.updateComplete;
-    await flushPending();
+    await flushMicrotasks(5);
 
     expect(getAvailableAutomations).toHaveBeenCalledTimes(1);
   });
@@ -156,7 +153,7 @@ describe("automation-editor mount-time load (behavioral)", () => {
     (editor as any).value = { trigger_id: null, trigger_params: {}, actions: [] };
     document.body.appendChild(editor);
     await editor.updateComplete;
-    await flushPending();
+    await flushMicrotasks(5);
 
     // Header derives from the field (no trigger to name); edit-mode means
     // the add-only trigger picker is never instantiated.

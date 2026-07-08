@@ -3,11 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { SessionBlobCacheController } from "../../src/util/session-blob-cache-controller.js";
 import { createSessionBlobCache } from "../../src/util/session-blob-cache.js";
+import { flush } from "../_dom.js";
 import { fakeHost } from "../_fake-host.js";
 
 const fakeApi = (): ESPHomeAPI => ({}) as unknown as ESPHomeAPI;
-
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /** A no-arg session-blob cache over a fetcher that resolves to ``payload``,
  *  exposed as the {@link SessionBlobCacheBinding} a controller consumes. */

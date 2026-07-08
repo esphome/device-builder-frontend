@@ -29,6 +29,7 @@ import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeCreateConfigDialog } from "../../../src/components/wizard/create-config-dialog.js";
 import enMessages from "../../../src/translations/en.json";
 import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
+import { flushMicrotasks } from "../../_dom.js";
 
 function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
   let resolve!: (v: T) => void;
@@ -36,13 +37,11 @@ function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
   return { promise, resolve };
 }
 
-const flush = async (): Promise<void> => {
-  // Drain enough microtasks for the setup-step board upgrade to settle: it
-  // now hops through the shared ``board-body-cache`` (queueMicrotask batch +
-  // a getBoard round trip), a deeper async chain than the former direct
-  // ``await getBoard`` call.
-  for (let i = 0; i < 12; i++) await Promise.resolve();
-};
+// Drain enough microtasks for the setup-step board upgrade to settle: it
+// now hops through the shared ``board-body-cache`` (queueMicrotask batch +
+// a getBoard round trip), a deeper async chain than the former direct
+// ``await getBoard`` call.
+const flush = () => flushMicrotasks(12);
 
 // Render an en.json key with real ICU MessageFormat so the full-setup tests
 // exercise the actual template (the name cap and =0/other plural branches

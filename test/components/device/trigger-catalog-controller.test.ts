@@ -8,6 +8,7 @@ import {
   fetchAutomationTriggers,
   getCachedAutomationTriggers,
 } from "../../../src/util/automation-catalog-cache.js";
+import { flush } from "../../_dom.js";
 import { fakeHost } from "../../_fake-host.js";
 
 const trigger = (id: string, name: string): AutomationTrigger => ({
@@ -23,8 +24,6 @@ const trigger = (id: string, name: string): AutomationTrigger => ({
 
 const fakeApi = (triggers: AutomationTrigger[]): ESPHomeAPI =>
   ({ getAutomationTriggers: vi.fn(async () => triggers) }) as unknown as ESPHomeAPI;
-
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 afterEach(() => _clearAutomationCatalogCache());
 

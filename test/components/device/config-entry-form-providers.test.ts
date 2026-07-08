@@ -15,6 +15,7 @@ vi.mock("sonner-js", () => ({
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ESPHomeConfigEntryForm } from "../../../src/components/device/config-entry-form.js";
 import type { ComponentProvider } from "../../../src/util/config-entry-yaml-scan.js";
+import { flushMicrotasks } from "../../_dom.js";
 
 const resolve = (
   form: ESPHomeConfigEntryForm,
@@ -26,12 +27,8 @@ const resolve = (
     }
   )._resolveInterfaceProviders(name);
 
-const flush = async () => {
-  // Let the getComponents promise's then/catch/finally chain settle.
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-};
+// Let the getComponents promise's then/catch/finally chain settle.
+const flush = () => flushMicrotasks(3);
 
 function withApi(getComponents: ReturnType<typeof vi.fn>): ESPHomeConfigEntryForm {
   const form = new ESPHomeConfigEntryForm();

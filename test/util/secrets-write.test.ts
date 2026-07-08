@@ -10,8 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { ensureSecretInYaml, setSecretInYaml } from "../../src/util/secrets-write.js";
-
-const tick = () => new Promise((r) => setTimeout(r, 0));
+import { flush } from "../_dom.js";
 
 function apiWith(created: boolean) {
   return {
@@ -29,7 +28,7 @@ describe("ensureSecretInYaml", () => {
 
     expect(result).toEqual({ created: true });
     expect(api.setSecret).toHaveBeenCalledWith("kitchen__encryption_key", "oQ3==", false);
-    await tick();
+    await flush();
     expect(saved).toHaveBeenCalled();
     window.removeEventListener("secrets-saved", saved as EventListener);
   });
@@ -42,7 +41,7 @@ describe("ensureSecretInYaml", () => {
     const result = await ensureSecretInYaml(api, "kitchen__encryption_key", "new");
 
     expect(result).toEqual({ created: false });
-    await tick();
+    await flush();
     expect(saved).not.toHaveBeenCalled();
     window.removeEventListener("secrets-saved", saved as EventListener);
   });
@@ -67,7 +66,7 @@ describe("setSecretInYaml", () => {
     await setSecretInYaml(api, "kitchen__encryption_key", "new");
 
     expect(api.setSecret).toHaveBeenCalledWith("kitchen__encryption_key", "new", true);
-    await tick();
+    await flush();
     expect(saved).toHaveBeenCalled();
     window.removeEventListener("secrets-saved", saved as EventListener);
   });

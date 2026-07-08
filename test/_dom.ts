@@ -8,6 +8,7 @@
  * ``document.body`` cleanup between tests.
  */
 import { render } from "lit";
+import { vi } from "vitest";
 
 /**
  * Append ``el`` to ``document.body`` and wait for its first render.
@@ -62,4 +63,24 @@ export async function baseDialogSettled(el: HTMLElement): Promise<void> {
   await (el as { updateComplete?: Promise<unknown> }).updateComplete;
   const base = el.shadowRoot?.querySelector("esphome-base-dialog");
   await (base as { updateComplete?: Promise<unknown> } | null)?.updateComplete;
+}
+
+/** Resolve after a zero-delay timeout so queued real-timer callbacks run. */
+export const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+/**
+ * Drain ``times`` microtask turns.
+ *
+ * Suites pass the count their async chain needs — a plain await per
+ * ``.then`` link — so keep the caller's tuned value when migrating.
+ */
+export async function flushMicrotasks(times = 1): Promise<void> {
+  for (let i = 0; i < times; i++) {
+    await Promise.resolve();
+  }
+}
+
+/** ``flush`` for suites under ``vi.useFakeTimers``: run zero-delay fake timers. */
+export async function flushTimers(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0);
 }

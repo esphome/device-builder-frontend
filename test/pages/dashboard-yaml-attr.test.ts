@@ -12,10 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
-
-async function flushPending(times = 8): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
+import { flushMicrotasks } from "../_dom.js";
 
 async function mountDashboard(
   yamlMode: boolean,
@@ -30,7 +27,7 @@ async function mountDashboard(
   (page as any)._yamlMode = yamlMode;
   document.body.appendChild(page);
   await page.updateComplete;
-  await flushPending();
+  await flushMicrotasks(8);
   return page;
 }
 
@@ -71,13 +68,13 @@ describe("dashboard yaml host attribute", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (page as any)._yamlMode = true;
     await page.updateComplete;
-    await flushPending();
+    await flushMicrotasks(8);
     expect(page.hasAttribute("yaml")).toBe(true);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (page as any)._yamlMode = false;
     await page.updateComplete;
-    await flushPending();
+    await flushMicrotasks(8);
     expect(page.hasAttribute("yaml")).toBe(false);
   });
 });

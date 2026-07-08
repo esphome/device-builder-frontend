@@ -11,6 +11,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { streamSerialToDialog } from "../../../src/components/dashboard/actions.js";
+import { flushMicrotasks } from "../../_dom.js";
 
 interface MockDialog {
   _lines: string[];
@@ -66,11 +67,7 @@ function createMockPort(chunks: Uint8Array[]) {
 }
 
 /** Drain pending microtasks so the read loop advances past awaits. */
-async function flush() {
-  for (let i = 0; i < 5; i++) {
-    await Promise.resolve();
-  }
-}
+const flush = () => flushMicrotasks(5);
 
 describe("streamSerialToDialog", () => {
   beforeEach(() => {

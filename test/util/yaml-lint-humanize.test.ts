@@ -18,8 +18,7 @@ import {
   type BannerError,
   type MappedValidationError,
 } from "../../src/util/yaml-lint-backend.js";
-
-const flush = () => new Promise((r) => setTimeout(r, 0));
+import { flush } from "../_dom.js";
 
 // Echo the key + line so a humanized hit is distinguishable from raw text.
 const localize = (key: string, values?: Record<string, string | number>): string =>
