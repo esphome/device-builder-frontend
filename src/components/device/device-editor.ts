@@ -587,7 +587,7 @@ export class ESPHomeDeviceEditor extends LitElement {
       return;
     }
     editor
-      .applyIndentFix(fix, () => this._confirmAutoFix())
+      .applyAutoFix(fix, () => this._confirmAutoFix())
       .then((outcome) => {
         if (outcome === "stale") {
           // A stale click (the doc shifted since the banner) is a safe no-op,

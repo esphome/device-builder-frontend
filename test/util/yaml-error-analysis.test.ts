@@ -708,6 +708,51 @@ describe("describeYamlError", () => {
     });
   });
 
+  // A dash stuck to its key: the scanner reads `-platform: gpio` as a
+  // `-platform` mapping key and blames the deeper line below it.
+  it("offers the dash-space fix when the line above the blame is a stuck dash", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "switch:", // 1
+      "  -platform: gpio", // 2
+      "    id: accessory_power", // 3
+      "    internal: true", // 4
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg = 'mapping values are not allowed here\n  in "x.yaml", line 3, column 7';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_dash_space_fix:{"line":2,"key":"platform"}',
+      jumpLine: 2,
+      squiggleLine: 2,
+      fix: { line: 2, indent: 0, key: "-platform", fromIndent: 2, kind: "dash-space" },
+    });
+  });
+
+  // The same typo mixed into a real list gets blamed on its own line.
+  it("offers the dash-space fix when the blamed line itself is a stuck dash", async () => {
+    const { describeYamlError, parseYamlErrorPosition } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "light:", // 1
+      "  - platform: x", // 2
+      "  -platform: y", // 3
+      "    id: z", // 4
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      "while parsing a block collection\n" +
+      '  in "x.yaml", line 2, column 3\n' +
+      "expected <block end>, but found '?'\n" +
+      '  in "x.yaml", line 3, column 3';
+    expect(describeYamlError(msg, parseYamlErrorPosition(msg), localize, read)).toEqual({
+      text: 'yaml_editor.error_dash_space_fix:{"line":3,"key":"platform"}',
+      jumpLine: 3,
+      squiggleLine: 3,
+      fix: { line: 3, indent: 0, key: "-platform", fromIndent: 2, kind: "dash-space" },
+    });
+  });
+
   // Real PyYAML shape for a section head nudged off its level: the problem
   // mark blames the key line itself, one space into the closed list.
   it("dedents the nudged section head from a block-mapping message", async () => {

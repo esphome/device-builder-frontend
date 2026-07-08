@@ -194,6 +194,47 @@ function valuelessKeyOf(text: string): string | null {
   return lineHasValue(text) ? null : lineKeyToken(text);
 }
 
+/** The key of a `-key:` pair (a list dash stuck to its key), else null. */
+function botchedDashKey(text: string | undefined): string | null {
+  if (text === undefined || parseListItemMarker(text)) return null;
+  const key = lineKeyToken(text);
+  return key !== null && key.length > 1 && key[0] === "-" && key[1] !== "-"
+    ? key.slice(1)
+    : null;
+}
+
+/** A `- ` list marker typed without its space (`-platform:`), which the
+ *  scanner reads as a `-platform` mapping key. */
+export interface MissingDashSpace {
+  line: number;
+  /** The key without its stuck dash (`platform`). */
+  key: string;
+  fromIndent: number;
+}
+
+/**
+ * Find the botched `- ` marker behind an indent-family error: the blamed
+ * line itself (a `-key:` mixed into a real list) or the line above it
+ * (whose deeper "properties" the scanner chokes on). Null when neither
+ * is a dash stuck to its key.
+ */
+export function missingDashSpace(
+  readLine: ReadLine,
+  blamedLine: number
+): MissingDashSpace | null {
+  const ownText = readLine(blamedLine);
+  const own = botchedDashKey(ownText);
+  if (own !== null && ownText !== undefined) {
+    return { line: blamedLine, key: own, fromIndent: indentOf(ownText) };
+  }
+  const prev = contentLineAbove(readLine, blamedLine);
+  if (prev === null) return null;
+  const above = botchedDashKey(prev.text);
+  return above !== null
+    ? { line: prev.line, key: above, fromIndent: indentOf(prev.text) }
+    : null;
+}
+
 /**
  * A pinpointed indentation repair for the line the scanner blamed (or, for
  * `reason: "props-below"`, the marker above it). `delta` is signed: positive
@@ -516,10 +557,12 @@ export function lineAccessorFor(content: string): ReadLine {
   return (line1) => (line1 >= 1 && line1 <= lines.length ? lines[line1 - 1] : undefined);
 }
 
-/** A one-click indentation repair: add `indent` spaces at the start of
- *  `line` (or remove them, when negative). */
+/** A one-click one-line repair: re-indent `line` by the signed `indent`
+ *  delta, or (kind "dash-space") insert the missing space after its list
+ *  dash. */
 export interface YamlAutoFix {
   line: number;
+  /** Signed leading-space delta; 0 (unused) for kind "dash-space". */
   indent: number;
   /** The target line's own key, so the apply site can confirm the line still
    *  targets the same item after edits shift line numbers. */
@@ -527,6 +570,8 @@ export interface YamlAutoFix {
   /** The target line's indent when the fix was computed; the apply site
    *  refuses when the line no longer starts there. */
   fromIndent: number;
+  /** Absent means re-indent; "dash-space" inserts a space after the dash. */
+  kind?: "dash-space";
 }
 
 /** A humanized YAML error: display text, best line to jump to, optional auto-fix. */
@@ -613,6 +658,26 @@ export function describeYamlError(
     lower.includes("could not find expected ':'") ||
     lower.includes("expected <block end>")
   ) {
+    // A dash stuck to its key (`-platform:`) produces these same errors but
+    // needs a space, not an indent change — check it before the indent walk.
+    const dash = readLine ? missingDashSpace(readLine, line) : null;
+    if (dash) {
+      return {
+        text: localize("yaml_editor.error_dash_space_fix", {
+          line: dash.line,
+          key: dash.key,
+        }),
+        jumpLine: dash.line,
+        fix: {
+          line: dash.line,
+          indent: 0,
+          key: `-${dash.key}`,
+          fromIndent: dash.fromIndent,
+          kind: "dash-space",
+        },
+        squiggleLine: dash.line,
+      };
+    }
     const fix = readLine ? analyzeIndentMismatch(readLine, line) : null;
     if (fix) {
       // "- key" for a list marker, plain "key" for a property line, so the

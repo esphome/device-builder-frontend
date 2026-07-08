@@ -622,7 +622,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   }
 
   /**
-   * Validate a proposed indentation fix, then apply it. When the proposed
+   * Validate a proposed one-line auto-fix, then apply it. When the proposed
    * document validates cleanly the fix applies straight away; when errors
    * remain `confirm` decides whether to apply anyway. Applied as a real,
    * undoable transaction.
@@ -630,24 +630,26 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    * The re-validation is the real safety net against a stale banner: the
    * `- <key>` re-check (before and after the async step) is a cheap filter,
    * but the key is often a shared token (`platform`), so validating the
-   * proposed document is what actually catches indenting the wrong item or
-   * double-indenting one already fixed. A validation failure rejects (the
+   * proposed document is what actually catches fixing the wrong item or
+   * double-fixing one already repaired. A validation failure rejects (the
    * caller surfaces it) rather than silently applying.
    */
-  async applyIndentFix(
+  async applyAutoFix(
     fix: YamlAutoFix,
     confirm?: () => Promise<boolean>
   ): Promise<AutoFixOutcome> {
     const view = this._view;
-    if (!view || !this._api || fix.indent === 0) return "unavailable";
-    // Resolve the target only when the line the fix wants to move is still
+    if (!view || !this._api || (fix.kind !== "dash-space" && fix.indent === 0)) {
+      return "unavailable";
+    }
+    // Resolve the target only when the line the fix wants to edit is still
     // the line the analysis saw — same key, same indent — so a stale click
     // after edits shifted line numbers, or on a line the user already
-    // re-indented by hand, can't move the wrong line. The check is
-    // structural rather than a re-run of the analysis: the diagnosis can be
-    // anchored on a different line than the one it repairs (a continuation
-    // error blames the line below the pair that moves), so re-analyzing at
-    // the fix line can't reproduce every shape.
+    // repaired by hand, can't edit the wrong line. The check is structural
+    // rather than a re-run of the analysis: the diagnosis can be anchored
+    // on a different line than the one it repairs (a continuation error
+    // blames the line below the pair that moves), so re-analyzing at the
+    // fix line can't reproduce every shape.
     const targetFrom = (): number | null => {
       const doc = view.state.doc;
       if (fix.line < 1 || fix.line > doc.lines) return null;
@@ -663,14 +665,19 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     if (from === null) return "stale";
 
     const doc = view.state.doc;
-    const changeAt = (at: number) =>
-      fix.indent > 0
-        ? { from: at, insert: " ".repeat(fix.indent) }
-        : { from: at, to: at - fix.indent };
+    // The dash-space repair inserts after the stuck dash; indent repairs
+    // insert or remove leading spaces at the line start.
+    const changeAt = (at: number): { from: number; to?: number; insert?: string } =>
+      fix.kind === "dash-space"
+        ? { from: at + fix.fromIndent + 1, insert: " " }
+        : fix.indent > 0
+          ? { from: at, insert: " ".repeat(fix.indent) }
+          : { from: at, to: at - fix.indent };
+    const change = changeAt(from);
     const proposed =
-      fix.indent > 0
-        ? doc.sliceString(0, from) + " ".repeat(fix.indent) + doc.sliceString(from)
-        : doc.sliceString(0, from) + doc.sliceString(from - fix.indent);
+      doc.sliceString(0, change.from) +
+      (change.insert ?? "") +
+      doc.sliceString(change.to ?? change.from);
     // A validation failure propagates: don't apply blindly, and let the caller
     // surface it rather than swallowing the click.
     const res = await this._api.validateYaml(this.configuration, proposed);

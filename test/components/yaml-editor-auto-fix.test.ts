@@ -47,13 +47,13 @@ async function mountEditor(
   return el;
 }
 
-describe("yaml-editor applyIndentFix (#1884)", () => {
+describe("yaml-editor applyAutoFix (#1884)", () => {
   it("applies when the proposed fix produces clean YAML", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
     const el = await mountEditor(validateYaml);
     const view = viewOf(el);
 
-    expect(await el.applyIndentFix(FIX)).toBe("applied");
+    expect(await el.applyAutoFix(FIX)).toBe("applied");
 
     expect(view.state.doc.toString()).toBe(FIXED);
     expect(validateYaml).toHaveBeenCalledWith("x.yaml", FIXED);
@@ -68,7 +68,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml);
     const confirm = vi.fn(async () => true);
 
-    await el.applyIndentFix(FIX, confirm);
+    await el.applyAutoFix(FIX, confirm);
 
     expect(confirm).not.toHaveBeenCalled();
     expect(viewOf(el).state.doc.toString()).toBe(FIXED);
@@ -80,7 +80,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
     const confirm = vi.fn(async () => true);
 
-    await el.applyIndentFix(FIX, confirm);
+    await el.applyAutoFix(FIX, confirm);
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(view.state.doc.toString()).toBe(FIXED);
@@ -92,7 +92,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
     const confirm = vi.fn(async () => false);
 
-    expect(await el.applyIndentFix(FIX, confirm)).toBe("declined");
+    expect(await el.applyAutoFix(FIX, confirm)).toBe("declined");
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(view.state.doc.toString()).toBe(BROKEN);
@@ -102,7 +102,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const validateYaml = vi.fn(async () => STILL_INVALID);
     const el = await mountEditor(validateYaml);
 
-    await el.applyIndentFix(FIX);
+    await el.applyAutoFix(FIX);
 
     expect(viewOf(el).state.doc.toString()).toBe(BROKEN);
   });
@@ -114,7 +114,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml);
     const view = viewOf(el);
 
-    await expect(el.applyIndentFix(FIX)).rejects.toThrow("WS down");
+    await expect(el.applyAutoFix(FIX)).rejects.toThrow("WS down");
     expect(view.state.doc.toString()).toBe(BROKEN);
   });
 
@@ -124,7 +124,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
 
     // A fix that points at line 2 but expects a different key.
-    expect(await el.applyIndentFix({ ...FIX, key: "uptime" })).toBe("stale");
+    expect(await el.applyAutoFix({ ...FIX, key: "uptime" })).toBe("stale");
 
     expect(view.state.doc.toString()).toBe(BROKEN);
     expect(validateYaml).not.toHaveBeenCalled(); // bailed before validating
@@ -137,7 +137,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml, FIXED);
     const view = viewOf(el);
 
-    expect(await el.applyIndentFix(FIX)).toBe("stale");
+    expect(await el.applyAutoFix(FIX)).toBe("stale");
 
     expect(view.state.doc.toString()).toBe(FIXED);
     expect(validateYaml).not.toHaveBeenCalled();
@@ -155,7 +155,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
 
     expect(
-      await el.applyIndentFix({ line: 6, indent: -1, key: "pulse", fromIndent: 7 })
+      await el.applyAutoFix({ line: 6, indent: -1, key: "pulse", fromIndent: 7 })
     ).toBe("applied");
 
     expect(view.state.doc.toString()).toBe(fixed);
@@ -172,7 +172,47 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml, doc);
 
     expect(
-      await el.applyIndentFix({ line: 6, indent: -1, key: "pulse", fromIndent: 7 })
+      await el.applyAutoFix({ line: 6, indent: -1, key: "pulse", fromIndent: 7 })
+    ).toBe("stale");
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
+
+  it("applies a dash-space fix by inserting the space after the dash", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const broken = "switch:\n  -platform: gpio\n    id: accessory_power\n";
+    const fixed = "switch:\n  - platform: gpio\n    id: accessory_power\n";
+    const el = await mountEditor(validateYaml, broken);
+    const view = viewOf(el);
+
+    expect(
+      await el.applyAutoFix({
+        line: 2,
+        indent: 0,
+        key: "-platform",
+        fromIndent: 2,
+        kind: "dash-space",
+      })
+    ).toBe("applied");
+
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
+    undo(view);
+    expect(view.state.doc.toString()).toBe(broken);
+  });
+
+  it("no-ops a stale dash-space fix whose line was already repaired", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const doc = "switch:\n  - platform: gpio\n    id: accessory_power\n";
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(
+      await el.applyAutoFix({
+        line: 2,
+        indent: 0,
+        key: "-platform",
+        fromIndent: 2,
+        kind: "dash-space",
+      })
     ).toBe("stale");
     expect(validateYaml).not.toHaveBeenCalled();
   });
@@ -193,7 +233,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
 
     expect(
-      await el.applyIndentFix({ line: 6, indent: 2, key: "input", fromIndent: 6 })
+      await el.applyAutoFix({ line: 6, indent: 2, key: "input", fromIndent: 6 })
     ).toBe("applied");
 
     expect(view.state.doc.toString()).toBe(fixed);
