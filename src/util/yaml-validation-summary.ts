@@ -93,7 +93,11 @@ export function summarizeValidation(
   let message = sanitizeMessage((err.message ?? "Invalid configuration").trim());
   // The cause hint reads the open buffer, so only add it when the error's
   // line refers to that buffer (the ``"<file>"`` sentinel / missing document
-  // means the open config — see ``isOpenConfigFile``).
+  // means the open config — see ``isOpenConfigFile``). Deliberate trade-off:
+  // this anchors on the raw range line, while the banner anchors on its
+  // CodeMirror-retargeted range (which can't live in this pure module) —
+  // when the two diverge the shape check fails and the hint is simply
+  // omitted, never wrong.
   if (!file || file === "<file>") {
     const hint = describeValueTypeCause(readLine, line, localize);
     if (hint) message = `${message} ${hint}`;
