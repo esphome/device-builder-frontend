@@ -244,7 +244,10 @@ export class ESPHomeDeviceTable extends LitElement {
         ...this.initialColumnVisibility,
       };
     }
-    if (changed.has("initialPageSize")) {
+    // The equality guard skips the echo of the table's own
+    // page-size-change dispatch (mirrored back through the host) so
+    // it can't reset the page index mid-session.
+    if (changed.has("initialPageSize") && this.initialPageSize !== this._pageSize) {
       this._pageSize = this.initialPageSize;
       this._pageIndex = 0;
     }

@@ -23,11 +23,17 @@ export async function loadPreferences(host: ESPHomePageDashboard): Promise<void>
   }
 }
 
+/**
+ * Persist a table preference and mirror it onto the host state that
+ * seeds a remounted table, so a Card ↔ List toggle (which destroys
+ * the table element) doesn't reset in-session changes (#1899).
+ */
 export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent): void {
   const type = e.type;
   if (type === "table-sort-change") {
     const sorting = (e as CustomEvent<SortingState>).detail;
     const first = sorting[0] ?? null;
+    host._tableSorting = sorting;
     host._api
       .updatePreferences({
         table_sort_column: first?.id ?? null,
@@ -39,14 +45,12 @@ export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent):
       })
       .catch(() => {});
   } else if (type === "table-visibility-change") {
-    host._api
-      .updatePreferences({
-        table_column_visibility: (e as CustomEvent<VisibilityState>).detail,
-      })
-      .catch(() => {});
+    const visibility = (e as CustomEvent<VisibilityState>).detail;
+    host._tableColumnVisibility = visibility;
+    host._api.updatePreferences({ table_column_visibility: visibility }).catch(() => {});
   } else if (type === "table-page-size-change") {
-    host._api
-      .updatePreferences({ table_page_size: (e as CustomEvent<number>).detail })
-      .catch(() => {});
+    const pageSize = (e as CustomEvent<number>).detail;
+    host._tablePageSize = pageSize;
+    host._api.updatePreferences({ table_page_size: pageSize }).catch(() => {});
   }
 }

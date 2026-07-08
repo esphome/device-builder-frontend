@@ -88,3 +88,40 @@ describe("device-table All rendering", () => {
     expect(pageSizeAttr(el)).toBe("0");
   });
 });
+
+describe("device-table initialPageSize seeding", () => {
+  const pagination = (el: ESPHomeDeviceTable) =>
+    el.shadowRoot!.querySelector("esphome-table-pagination")!;
+  const firstRowConfig = (el: ESPHomeDeviceTable) =>
+    el
+      .shadowRoot!.querySelector("tbody tr[data-configuration]")
+      ?.getAttribute("data-configuration");
+
+  it("ignores the host echo of its own page-size change (keeps the page index)", async () => {
+    const el = await mount(30, 25);
+
+    pagination(el).dispatchEvent(new CustomEvent("page-size-change", { detail: 10 }));
+    await el.updateComplete;
+    pagination(el).dispatchEvent(new CustomEvent("page-change", { detail: 2 }));
+    await el.updateComplete;
+    expect(firstRowConfig(el)).toBe("demo-20.yaml");
+
+    // The dashboard mirrors the change back into initialPageSize.
+    el.initialPageSize = 10;
+    await el.updateComplete;
+    expect(firstRowConfig(el)).toBe("demo-20.yaml");
+    expect(pageSizeAttr(el)).toBe("10");
+  });
+
+  it("applies a genuinely new initialPageSize and resets to the first page", async () => {
+    const el = await mount(30, 25);
+    pagination(el).dispatchEvent(new CustomEvent("page-change", { detail: 1 }));
+    await el.updateComplete;
+    expect(firstRowConfig(el)).toBe("demo-25.yaml");
+
+    el.initialPageSize = 10;
+    await el.updateComplete;
+    expect(firstRowConfig(el)).toBe("demo-0.yaml");
+    expect(rowCount(el)).toBe(10);
+  });
+});
