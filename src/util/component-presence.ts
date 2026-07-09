@@ -1,6 +1,5 @@
-// esphome#17145 renames the rp2040 platform key to rp2; a block spelled
-// either way counts as the other. Swap the two values to flip the
-// catalog's canonical key once 2026.7 is the runtime floor.
+// Canonical and accepted-alias spellings of the RP2 platform key
+// (esphome#17145 rename); a canonical-key flip starts by swapping these.
 export const RP2_CANONICAL_KEY = "rp2040";
 export const RP2_ALIAS_KEY = "rp2";
 
@@ -9,7 +8,7 @@ const PLATFORM_KEY_ALIAS: Readonly<Record<string, string>> = {
   [RP2_CANONICAL_KEY]: RP2_ALIAS_KEY,
 };
 
-/** The catalog's canonical spelling of a platform key (`rp2` → `rp2040`). */
+/** Fold the non-canonical RP2 spelling onto the catalog's canonical key. */
 export const canonicalComponentKey = (id: string): string =>
   id === RP2_ALIAS_KEY ? RP2_CANONICAL_KEY : id;
 
