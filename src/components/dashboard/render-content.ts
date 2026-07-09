@@ -144,7 +144,10 @@ export function renderCardGrid(
 }
 
 export function renderTable(host: ESPHomePageDashboard): TemplateResult {
-  const filteredDevices = host._applyFacetFilters(host._devices);
+  // Sorted input so the no-column-sort default matches the card grid's
+  // collator order instead of the backend's path order (#1917); an active
+  // column sort still re-sorts on top.
+  const filteredDevices = host._applyFacetFilters(host._sortedDevices);
   return html`
     <esphome-device-table
       .devices=${filteredDevices}
