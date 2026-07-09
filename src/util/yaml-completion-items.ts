@@ -112,7 +112,7 @@ export function entryToCompletion(entry: ConfigEntry): Completion {
     type: iconType(entry.type),
     detail: detailParts.join(" · "),
     info: buildEntryInfo(entry),
-    boost: entry.required ? 5 : entry.advanced ? -3 : 0,
+    boost: entry.required ? 5 : entry.advanced || entry.hidden ? -3 : 0,
   };
 }
 

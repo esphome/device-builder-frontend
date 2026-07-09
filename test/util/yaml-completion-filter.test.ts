@@ -47,6 +47,7 @@ const BODIES: Record<
           ],
         }),
         makeConfigEntry({ key: "version" }),
+        makeConfigEntry({ key: "sdkconfig_options", hidden: true }),
       ]),
     ],
   },
@@ -120,6 +121,15 @@ describe("createYamlCompletionSource (already-set key filtering)", () => {
     );
     expect(labels).toContain("advanced");
     expect(labels).toContain("version");
+  });
+
+  it("keeps yaml_only (hidden) fields in YAML key completion", async () => {
+    // ``hidden`` mirrors upstream ``visibility: yaml_only`` (hide from the
+    // visual form); YAML completion is exactly where those must appear.
+    const labels = await labelsAt(
+      ["esp32:", "  board: esp32-poe-iso", "  framework:", "    s"].join("\n")
+    );
+    expect(labels).toContain("sdkconfig_options");
   });
 
   it("offers nested keys on a blank indented line when triggered explicitly (idle)", async () => {
