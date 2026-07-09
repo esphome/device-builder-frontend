@@ -104,9 +104,15 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, undefined)?.code).toBe("validation.required");
   });
 
-  it("ignores hidden fields entirely", () => {
+  it("skips an unset hidden field but validates a set one", () => {
     const entry = makeEntry({ required: true, hidden: true });
     expect(validateEntry(entry, "")).toBeNull();
+    const numeric = makeEntry({
+      hidden: true,
+      type: ConfigEntryType.INTEGER,
+      display_format: "hex",
+    });
+    expect(validateEntry(numeric, "xyz")?.code).toBe("validation.not_a_number");
   });
 
   it("ignores UNKNOWN (YAML-only) fields even when required", () => {
@@ -324,7 +330,7 @@ describe("validateEntries", () => {
     expect(errors.get("temperature.name")?.code).toBe("validation.required");
   });
 
-  it("does not validate inside a hidden NESTED entry", () => {
+  it("does not validate inside an unset hidden NESTED entry", () => {
     const entries = [
       makeEntry({
         key: "temperature",
@@ -333,8 +339,20 @@ describe("validateEntries", () => {
         config_entries: [makeEntry({ key: "name", required: true })],
       }),
     ];
-    const errors = validateEntries(entries, { temperature: {} });
-    expect(errors.size).toBe(0);
+    expect(validateEntries(entries, {}).size).toBe(0);
+  });
+
+  it("validates inside a hidden NESTED entry once the YAML sets it", () => {
+    const entries = [
+      makeEntry({
+        key: "temperature",
+        type: ConfigEntryType.NESTED,
+        hidden: true,
+        config_entries: [makeEntry({ key: "name", required: true })],
+      }),
+    ];
+    const errors = validateEntries(entries, { temperature: { name: "" } });
+    expect(errors.get("temperature.name")?.code).toBe("validation.required");
   });
 
   it("validates each item of a multi_value NESTED entry with index path segments", () => {

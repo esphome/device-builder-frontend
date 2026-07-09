@@ -35,7 +35,9 @@ export function platformSupported(
  * Determine if a config entry is currently visible.
  *
  * Visibility is the AND of four checks:
- *  1. `hidden === false`
+ *  1. `hidden === false`, unless the value is already set — a
+ *     ``yaml_only`` field present in the YAML stays visible so the
+ *     form shows what the config actually contains
  *  2. The `depends_on` predicate against the current form values
  *  3. `depends_on_component` is present in `presentComponents` (when given)
  *  4. The device's target platform is in ``supported_platforms``
@@ -58,7 +60,7 @@ export function isEntryVisible(
   presentComponents?: ReadonlySet<string>,
   targetPlatform?: string | null
 ): boolean {
-  if (entry.hidden) return false;
+  if (entry.hidden && !isValuePresent(values[entry.key])) return false;
 
   // Cross-component dependency: only check when caller provided context.
   if (entry.depends_on_component && presentComponents) {
@@ -177,9 +179,12 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
   // UNKNOWN renders as the YAML-only notice (a mapping-or-list union the
   // form can't edit), so there is nothing to validate; a required one must
   // not block the wizard with an error the user can't clear in the form.
-  if (entry.hidden || entry.type === ConfigEntryType.UNKNOWN) return null;
+  if (entry.type === ConfigEntryType.UNKNOWN) return null;
 
   const isEmpty = !isValuePresent(raw);
+  // An unset hidden field isn't rendered, so never block on it; a set one
+  // is visible and validates normally.
+  if (entry.hidden && isEmpty) return null;
 
   if (entry.required && isEmpty) {
     return { key: entry.key, code: "validation.required" };
