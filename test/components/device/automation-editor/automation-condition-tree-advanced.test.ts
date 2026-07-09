@@ -26,12 +26,14 @@ import type {
 import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
 import { ESPHomeAutomationConditionTree } from "../../../../src/components/device/automation-editor/automation-condition-tree.js";
 
-customElements.define(
-  "esphome-catalog-picker-dialog",
-  class extends HTMLElement {
-    open() {}
-  }
-);
+if (!customElements.get("esphome-catalog-picker-dialog")) {
+  customElements.define(
+    "esphome-catalog-picker-dialog",
+    class extends HTMLElement {
+      open() {}
+    }
+  );
+}
 
 function entry(key: string, advanced: boolean): ConfigEntry {
   return {
