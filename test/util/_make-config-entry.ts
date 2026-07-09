@@ -7,4 +7,13 @@
  * synthesise an entry — currently the ``substitutions:`` section —
  * share one source of truth with the test fixtures.
  */
-export { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
+import { ConfigEntryType, type ConfigEntry } from "../../src/api/types/config-entries.js";
+import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
+
+export { makeConfigEntry };
+
+/** A `nested`-typed entry wrapping *children* — the shape schema groups
+ *  (`api.encryption`, `esp32.framework`) hydrate as. */
+export function makeNestedEntry(key: string, children: ConfigEntry[]): ConfigEntry {
+  return makeConfigEntry({ key, type: ConfigEntryType.NESTED, config_entries: children });
+}

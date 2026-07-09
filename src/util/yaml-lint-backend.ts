@@ -408,7 +408,6 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
           (await describeInvalidOptionFix({
             api: opts.api,
             state: view.state,
-            readLine,
             message,
             blamedLine: squiggleLineNum,
             localize: opts.localize,

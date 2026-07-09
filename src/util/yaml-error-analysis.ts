@@ -620,12 +620,12 @@ export function parseInvalidOptionMessage(
   return hit ? { key: hit[1], parent: hit[2] } : null;
 }
 
-/** A blamed key that reads as dedented out of the value-less opener above
- *  it, with the re-indent that would nest it back. */
+/** A blamed key one indent level away from the value-less opener above it,
+ *  with the signed re-indent that would repair it: positive nests the line
+ *  under a sibling opener, negative dedents it out of its parent. */
 export interface DedentedOptionCandidate {
   openerLine: number;
   openerKey: string;
-  /** Positive leading-space delta nesting the blamed line under the opener. */
   delta: number;
   fromIndent: number;
 }
@@ -669,6 +669,46 @@ export function analyzeDedentedOption(
       openerLine: n,
       openerKey,
       delta: target - blamedIndent,
+      fromIndent: blamedIndent,
+    };
+  }
+  return null;
+}
+
+/**
+ * The mirror shape: the blamed `key:` was over-indented into the block of
+ * the value-less opener above it (`framework:` swallowing `variant:`), so
+ * it reads as the opener's child instead of its sibling. Only offered when
+ * the blamed line closes its block (the next content line sits at or above
+ * the opener's indent) — dedenting a mid-block line would split the block.
+ */
+export function analyzeOverIndentedOption(
+  readLine: ReadLine,
+  blamedLine: number,
+  blamedKey: string
+): DedentedOptionCandidate | null {
+  const text = readLine(blamedLine);
+  if (text === undefined || parseListItemMarker(text)) return null;
+  if (lineKeyToken(text) !== blamedKey) return null;
+  const blamedIndent = indentOf(text);
+  if (blamedIndent === 0) return null;
+  for (let n = blamedLine - 1; n >= 1 && n >= blamedLine - WALK_BOUND; n--) {
+    const above = readLine(n);
+    if (above === undefined) return null;
+    if (isBlankOrComment(above)) continue;
+    if (parseListItemMarker(above)) return null;
+    const indent = indentOf(above);
+    if (indent >= blamedIndent) continue;
+    // The first shallower line is the enclosing opener the blamed key
+    // would dedent out of.
+    const openerKey = valuelessKeyOf(above);
+    if (openerKey === null) return null;
+    const next = contentLineBelow(readLine, blamedLine);
+    if (next !== null && indentOf(next.text) > indent) return null;
+    return {
+      openerLine: n,
+      openerKey,
+      delta: indent - blamedIndent,
       fromIndent: blamedIndent,
     };
   }

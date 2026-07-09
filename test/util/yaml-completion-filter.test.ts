@@ -11,10 +11,7 @@ import { _resetSchemaCacheForTests } from "../../src/util/esphome-schema.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import { createYamlCompletionSource } from "../../src/util/yaml-completion.js";
 import { makeComponentEntry } from "./_make-component-entry.js";
-import { makeConfigEntry } from "./_make-config-entry.js";
-
-const nested = (key: string, children: ReturnType<typeof makeConfigEntry>[]) =>
-  makeConfigEntry({ key, type: ConfigEntryType.NESTED, config_entries: children });
+import { makeConfigEntry, makeNestedEntry as nested } from "./_make-config-entry.js";
 
 const SLIM = [
   ...["esphome", "wifi", "logger", "esp32"].map((id) =>

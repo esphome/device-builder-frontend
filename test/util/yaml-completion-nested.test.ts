@@ -13,10 +13,7 @@ import {
   resolveAvailableEntries,
 } from "../../src/util/yaml-completion-catalog.js";
 import { makeComponentEntry } from "./_make-component-entry.js";
-import { makeConfigEntry } from "./_make-config-entry.js";
-
-const nested = (key: string, children: ReturnType<typeof makeConfigEntry>[]) =>
-  makeConfigEntry({ key, type: ConfigEntryType.NESTED, config_entries: children });
+import { makeConfigEntry, makeNestedEntry as nested } from "./_make-config-entry.js";
 
 // esp32 → framework (nested) → advanced (nested) → compiler_optimization.
 const FRAMEWORK = nested("framework", [

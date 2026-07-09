@@ -6,6 +6,9 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+// Static on purpose (the per-test dynamic imports guard module state;
+// lineAccessorFor is a pure function shared by the walk fixtures below).
+import { lineAccessorFor } from "../../src/util/yaml-error-analysis.js";
 
 afterEach(() => {
   vi.resetModules();
@@ -1063,8 +1066,9 @@ describe("parseInvalidOptionMessage", () => {
   });
 });
 
+const accessor = (lines: string[]) => lineAccessorFor(lines.join("\n"));
+
 describe("analyzeDedentedOption", () => {
-  const accessor = (lines: string[]) => (n: number) => lines[n - 1];
   // The reproduction: `key` dedented to `encryption`'s level.
   const dedented = accessor([
     "api:", // 1
@@ -1220,5 +1224,104 @@ describe("analyzeDedentedOption", () => {
       delta: 2,
       fromIndent: 4,
     });
+  });
+});
+
+describe("analyzeOverIndentedOption", () => {
+  // The reproduction: `variant` over-indented into `framework:`'s block.
+  const overindented = accessor([
+    "esp32:", // 1
+    "  framework:", // 2
+    "    type: esp-idf", // 3
+    "    variant: ESP32", // 4
+  ]);
+
+  it("finds the enclosing opener and the dedent delta", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    expect(analyzeOverIndentedOption(overindented, 4, "variant")).toEqual({
+      openerLine: 2,
+      openerKey: "framework",
+      delta: -2,
+      fromIndent: 4,
+    });
+  });
+
+  it("skips trailing blanks and comments before the closing check", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const gaps = accessor([
+      "esp32:", // 1
+      "  framework:", // 2
+      "    type: esp-idf", // 3
+      "    variant: ESP32", // 4
+      "  ", // 5
+      "      ", // 6
+      "ethernet:", // 7
+    ]);
+    expect(analyzeOverIndentedOption(gaps, 4, "variant")).toEqual({
+      openerLine: 2,
+      openerKey: "framework",
+      delta: -2,
+      fromIndent: 4,
+    });
+  });
+
+  it("returns null for a mid-block line (dedenting it would split the block)", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const mid = accessor([
+      "esp32:",
+      "  framework:",
+      "    variant: ESP32",
+      "    type: esp-idf",
+    ]);
+    expect(analyzeOverIndentedOption(mid, 3, "variant")).toBeNull();
+  });
+
+  it("returns null when the blamed line has children of its own", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const withChildren = accessor([
+      "esp32:",
+      "  framework:",
+      "    variant:",
+      "      deep: x",
+    ]);
+    expect(analyzeOverIndentedOption(withChildren, 3, "variant")).toBeNull();
+  });
+
+  it("returns null when the enclosing line has a value", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const valued = accessor(["esp32:", "  framework: abc", "    variant: x"]);
+    expect(analyzeOverIndentedOption(valued, 3, "variant")).toBeNull();
+  });
+
+  it("returns null when the walk crosses a list-item header", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const crossed = accessor(["sensor:", "  - platform: adc", "    variant: x"]);
+    expect(analyzeOverIndentedOption(crossed, 3, "variant")).toBeNull();
+  });
+
+  it("returns null when the blamed line is a list item", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const item = accessor(["sensor:", "  filters:", "    - offset: 1.0"]);
+    expect(analyzeOverIndentedOption(item, 3, "offset")).toBeNull();
+  });
+
+  it("returns null when the blamed line's key differs from the message's", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    expect(analyzeOverIndentedOption(overindented, 4, "other")).toBeNull();
+  });
+
+  it("returns null for a top-level blamed key", async () => {
+    const { analyzeOverIndentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const top = accessor(["framework:", "variant: x"]);
+    expect(analyzeOverIndentedOption(top, 2, "variant")).toBeNull();
   });
 });
