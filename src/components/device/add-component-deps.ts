@@ -12,6 +12,17 @@ import {
 // pass for a `switch:` dependency. Guards the stem-match branch below.
 const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCategory));
 
+// esphome#17145 renames the rp2040 platform key to rp2; either block
+// satisfies a dependency spelled with the other name (the catalog stays
+// keyed on rp2040 until esphome/backlog#155 flips the canonical key).
+const PLATFORM_KEY_ALIASES: ReadonlyMap<string, string> = new Map([["rp2", "rp2040"]]);
+
+const canonicalKey = (id: string): string => PLATFORM_KEY_ALIASES.get(id) ?? id;
+
+function canonicalKeys(present: ReadonlySet<string>): ReadonlySet<string> {
+  return new Set([...present].map(canonicalKey));
+}
+
 /**
  * Catalog dependencies not yet satisfied by the current YAML.
  *
@@ -32,7 +43,7 @@ export function findMissingDependencies(
 ): string[] {
   // Most components declare no dependencies — skip the YAML scans.
   if (dependencies.length === 0) return [];
-  const present = presentComponents ?? parseTopLevelComponents(yaml);
+  const present = canonicalKeys(presentComponents ?? parseTopLevelComponents(yaml));
   const configured = parseConfiguredPlatforms(yaml);
   const platformStems = new Set<string>();
   for (const id of configured) {
@@ -40,7 +51,7 @@ export function findMissingDependencies(
     if (dot !== -1) platformStems.add(id.slice(dot + 1));
   }
   return dependencies.filter((dep) => {
-    if (present.has(dep)) return false;
+    if (present.has(canonicalKey(dep))) return false;
     if (dep.includes(".")) return !configured.has(dep);
     if (!PLATFORM_DOMAINS.has(dep) && platformStems.has(dep)) return false;
     return true;
@@ -71,6 +82,7 @@ export async function depsSatisfiedByProvides(
   // comes back empty — skip them rather than pay the round trip.
   const resolvable = missing.filter((dep) => !dep.includes("."));
   if (resolvable.length === 0) return satisfied;
+  const presentKeys = canonicalKeys(present);
   await Promise.all(
     resolvable.map(async (dep) => {
       const providers = await providerIds(
@@ -80,7 +92,7 @@ export async function depsSatisfiedByProvides(
         ctx.boardId ?? undefined
       );
       for (const id of providers) {
-        if (present.has(id)) {
+        if (presentKeys.has(canonicalKey(id))) {
           satisfied.add(dep);
           break;
         }
