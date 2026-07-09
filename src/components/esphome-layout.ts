@@ -136,11 +136,9 @@ export class ESPHomeLayout extends LitElement {
         overflow: hidden;
         /* Pinned to the top of the app-shell scrollport so the actions
            menu stays reachable on page-scroll views (card grid, YAML
-           search); inert on views that scroll internally. z-index sits
-           above the dashboard's sticky toolbar (4) and discovered pill
-           (5) so scrolled content slides under, and below the fixed
-           overlays (select bar 20, dropdown menus 100, device drawer
-           998). */
+           search); inert on views that scroll internally. 6 keeps it
+           above the dashboard's sticky toolbar (4) and the discovered
+           pill (5), and under the fixed overlays. */
         position: sticky;
         top: 0;
         z-index: 6;
