@@ -134,6 +134,16 @@ export class ESPHomeLayout extends LitElement {
         height: var(--esphome-header-height);
         box-sizing: border-box;
         overflow: hidden;
+        /* Pinned to the top of the app-shell scrollport so the actions
+           menu stays reachable on page-scroll views (card grid, YAML
+           search); inert on views that scroll internally. z-index sits
+           above the dashboard's sticky toolbar (4) and discovered pill
+           (5) so scrolled content slides under, and below the fixed
+           overlays (select bar 20, dropdown menus 100, device drawer
+           998). */
+        position: sticky;
+        top: 0;
+        z-index: 6;
       }
 
       .header-logos {
