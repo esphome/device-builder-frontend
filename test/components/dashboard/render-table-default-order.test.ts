@@ -12,7 +12,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DashboardView } from "../../../src/api/types/system.js";
 import { renderTable } from "../../../src/components/dashboard/render-content.js";
-import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../../src/util/device-sort.js";
+import { sortDevices } from "../../../src/util/device-sort.js";
 import { renderInto } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { makeDashboardHost } from "./_host.js";
@@ -27,12 +27,9 @@ const BACKEND_ORDER = ["Garland", "ecu Boiler", "plg Servion"].map((name) =>
 );
 
 function makeHost(devices: ConfiguredDevice[]) {
-  const sorted = [...devices].sort((a, b) =>
-    DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
-  );
   return makeDashboardHost({
     _devices: devices,
-    _sortedDevices: sorted,
+    _sortedDevices: sortDevices(devices),
     _applyFacetFilters: (list: ConfiguredDevice[]) => list,
     _activeJobs: new Map(),
     _recentJobs: new Map(),
