@@ -28,6 +28,7 @@ import type {
   ConditionNode,
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
+import type { RequiredGroup } from "../../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
@@ -60,6 +61,10 @@ registerMdiIcons({
   "pencil-outline": mdiPencilOutline,
   plus: mdiPlus,
 });
+
+// Stable identity for group-less defs — a fresh [] per render would
+// defeat Lit's property change detection on the form mount.
+const NO_REQUIRED_GROUPS: RequiredGroup[] = [];
 
 @customElement("esphome-automation-condition-tree")
 export class ESPHomeAutomationConditionTree extends LitElement {
@@ -201,7 +206,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
               ? html`<esphome-config-entry-form
                   .entries=${def.config_entries}
                   .values=${node.params}
-                  .requiredGroups=${def.required_groups ?? []}
+                  .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
                   .board=${this.board}
                   .yaml=${this.yaml}
                   ?disabled=${this.disabled}
