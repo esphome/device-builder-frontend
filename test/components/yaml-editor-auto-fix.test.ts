@@ -239,4 +239,32 @@ describe("yaml-editor applyAutoFix (#1884)", () => {
     expect(view.state.doc.toString()).toBe(fixed);
     expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
   });
+
+  it("applies the schema-gated nest-under fix (dedented api encryption key)", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const broken = "api:\n  encryption:\n  key: !secret x\n";
+    const fixed = "api:\n  encryption:\n    key: !secret x\n";
+    const el = await mountEditor(validateYaml, broken);
+    const view = viewOf(el);
+
+    expect(await el.applyAutoFix({ line: 3, indent: 2, key: "key", fromIndent: 2 })).toBe(
+      "applied"
+    );
+
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
+    undo(view);
+    expect(view.state.doc.toString()).toBe(broken);
+  });
+
+  it("no-ops a stale nest-under fix whose key was already re-indented", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const doc = "api:\n  encryption:\n    key: !secret x\n";
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(await el.applyAutoFix({ line: 3, indent: 2, key: "key", fromIndent: 2 })).toBe(
+      "stale"
+    );
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
 });

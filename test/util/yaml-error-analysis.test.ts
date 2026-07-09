@@ -1024,3 +1024,201 @@ describe("describeYamlError", () => {
     ).toEqual({ text: "mapping values are not allowed here", jumpLine: null });
   });
 });
+
+describe("parseInvalidOptionMessage", () => {
+  it("parses the check-the-indentation variant", async () => {
+    const { parseInvalidOptionMessage } =
+      await import("../../src/util/yaml-error-analysis.js");
+    expect(
+      parseInvalidOptionMessage(
+        "[key] is an invalid option for [api]. Please check the indentation."
+      )
+    ).toEqual({ key: "key", parent: "api" });
+  });
+
+  it("parses the did-you-mean variant", async () => {
+    const { parseInvalidOptionMessage } =
+      await import("../../src/util/yaml-error-analysis.js");
+    expect(
+      parseInvalidOptionMessage(
+        "[sside] is an invalid option for [wifi]. Did you mean [ssid]?"
+      )
+    ).toEqual({ key: "sside", parent: "wifi" });
+  });
+
+  it("parses the bare variant", async () => {
+    const { parseInvalidOptionMessage } =
+      await import("../../src/util/yaml-error-analysis.js");
+    expect(parseInvalidOptionMessage("[foo] is an invalid option for [bar].")).toEqual({
+      key: "foo",
+      parent: "bar",
+    });
+  });
+
+  it("rejects other option messages", async () => {
+    const { parseInvalidOptionMessage } =
+      await import("../../src/util/yaml-error-analysis.js");
+    expect(parseInvalidOptionMessage("'key' is a required option for [api].")).toBeNull();
+    expect(parseInvalidOptionMessage("expected a dictionary.")).toBeNull();
+  });
+});
+
+describe("analyzeDedentedOption", () => {
+  const accessor = (lines: string[]) => (n: number) => lines[n - 1];
+  // The reproduction: `key` dedented to `encryption`'s level.
+  const dedented = accessor([
+    "api:", // 1
+    "  encryption:", // 2
+    "  key: !secret x", // 3
+  ]);
+
+  it("finds the value-less opener above and the re-indent delta", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    expect(analyzeDedentedOption(dedented, 3, "key")).toEqual({
+      openerLine: 2,
+      openerKey: "encryption",
+      delta: 2,
+      fromIndent: 2,
+    });
+  });
+
+  it("returns null when the blamed line's key differs from the message's", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    expect(analyzeDedentedOption(dedented, 3, "other")).toBeNull();
+  });
+
+  it("returns null when the opener has a value", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const valued = accessor(["api:", "  encryption: abc", "  key: !secret x"]);
+    expect(analyzeDedentedOption(valued, 3, "key")).toBeNull();
+  });
+
+  it("returns null when a block-scalar owner sits above", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const scalar = accessor([
+      "api:",
+      "  description: |",
+      "    some text",
+      "  key: !secret x",
+    ]);
+    expect(analyzeDedentedOption(scalar, 4, "key")).toBeNull();
+  });
+
+  it("returns null when the nearest same-indent line is a valued sibling", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const sibling = accessor([
+      "api:",
+      "  encryption:",
+      "  reboot_timeout: 0s",
+      "  key: !secret x",
+    ]);
+    expect(analyzeDedentedOption(sibling, 4, "key")).toBeNull();
+  });
+
+  it("returns null when the walk hits a shallower line first", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const shallower = accessor(["api:", "  key: !secret x"]);
+    expect(analyzeDedentedOption(shallower, 2, "key")).toBeNull();
+  });
+
+  it("returns null for a top-level blamed key", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const top = accessor(["encryption:", "key: !secret x"]);
+    expect(analyzeDedentedOption(top, 2, "key")).toBeNull();
+  });
+
+  it("targets the opener's existing child indent over the canonical step", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const children = accessor([
+      "esp32:", // 1
+      "  framework:", // 2
+      "      type: esp-idf", // 3
+      "  version: recommended", // 4
+    ]);
+    expect(analyzeDedentedOption(children, 4, "version")).toEqual({
+      openerLine: 2,
+      openerKey: "framework",
+      delta: 4,
+      fromIndent: 2,
+    });
+  });
+
+  it("uses the shallowest deeper line, not a grandchild's indent", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const grandchildren = accessor([
+      "esp32:", // 1
+      "  framework:", // 2
+      "    advanced:", // 3
+      "      ignore_efuse_custom_mac: true", // 4
+      "  version: recommended", // 5
+    ]);
+    expect(analyzeDedentedOption(grandchildren, 5, "version")).toEqual({
+      openerLine: 2,
+      openerKey: "framework",
+      delta: 2,
+      fromIndent: 2,
+    });
+  });
+
+  it("skips blanks and comments between the blamed line and the opener", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const gaps = accessor([
+      "api:", // 1
+      "  encryption:", // 2
+      "", // 3
+      "  # the key", // 4
+      "  key: !secret x", // 5
+    ]);
+    expect(analyzeDedentedOption(gaps, 5, "key")).toEqual({
+      openerLine: 2,
+      openerKey: "encryption",
+      delta: 2,
+      fromIndent: 2,
+    });
+  });
+
+  it("returns null when the blamed line is a list item", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const item = accessor(["sensor:", "  filters:", "  - offset: 1.0"]);
+    expect(analyzeDedentedOption(item, 3, "offset")).toBeNull();
+  });
+
+  it("returns null when the walk crosses a list-item header", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const crossed = accessor([
+      "sensor:", // 1
+      "  - platform: adc", // 2
+      "  update_interval: 60s", // 3
+    ]);
+    expect(analyzeDedentedOption(crossed, 3, "update_interval")).toBeNull();
+  });
+
+  it("finds an opener inside a list-item body", async () => {
+    const { analyzeDedentedOption } =
+      await import("../../src/util/yaml-error-analysis.js");
+    const inItem = accessor([
+      "sensor:", // 1
+      "  - platform: adc", // 2
+      "    filters:", // 3
+      "    multiply: 3.3", // 4
+    ]);
+    expect(analyzeDedentedOption(inItem, 4, "multiply")).toEqual({
+      openerLine: 3,
+      openerKey: "filters",
+      delta: 2,
+      fromIndent: 4,
+    });
+  });
+});

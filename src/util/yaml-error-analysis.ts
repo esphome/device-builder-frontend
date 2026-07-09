@@ -608,6 +608,73 @@ export function describeValueTypeCause(
   return null;
 }
 
+/** Matches `[X] is an invalid option for [Y].` with any trailing hint
+ *  ("Please check the indentation." / "Did you mean …?" / none). */
+const INVALID_OPTION_RE = /^\[([^\]]+)\] is an invalid option for \[([^\]]+)\]\./;
+
+/** Parse an ESPHome invalid-option message into its key and parent. */
+export function parseInvalidOptionMessage(
+  message: string
+): { key: string; parent: string } | null {
+  const hit = message.match(INVALID_OPTION_RE);
+  return hit ? { key: hit[1], parent: hit[2] } : null;
+}
+
+/** A blamed key that reads as dedented out of the value-less opener above
+ *  it, with the re-indent that would nest it back. */
+export interface DedentedOptionCandidate {
+  openerLine: number;
+  openerKey: string;
+  /** Positive leading-space delta nesting the blamed line under the opener. */
+  delta: number;
+  fromIndent: number;
+}
+
+/**
+ * Detect the dedented-option shape behind an invalid-option error: the
+ * blamed `key:` sits at the same indent as a value-less opener above it
+ * (`encryption:` then `key:`), separated only by the opener's deeper
+ * children, blanks, or comments. Anything else between them — a valued
+ * sibling, a list marker, a shallower line — means a one-line re-indent
+ * would nest the key under the wrong node, so return null.
+ */
+export function analyzeDedentedOption(
+  readLine: ReadLine,
+  blamedLine: number,
+  blamedKey: string
+): DedentedOptionCandidate | null {
+  const text = readLine(blamedLine);
+  if (text === undefined || parseListItemMarker(text)) return null;
+  if (lineKeyToken(text) !== blamedKey) return null;
+  const blamedIndent = indentOf(text);
+  if (blamedIndent === 0) return null;
+  let minDeeper: number | null = null;
+  for (let n = blamedLine - 1; n >= 1 && n >= blamedLine - WALK_BOUND; n--) {
+    const above = readLine(n);
+    if (above === undefined) return null;
+    if (isBlankOrComment(above)) continue;
+    if (parseListItemMarker(above)) return null;
+    const indent = indentOf(above);
+    if (indent > blamedIndent) {
+      minDeeper = minDeeper === null ? indent : Math.min(minDeeper, indent);
+      continue;
+    }
+    if (indent < blamedIndent) return null;
+    const openerKey = valuelessKeyOf(above);
+    if (openerKey === null) return null;
+    // The opener's existing children set the target indent; a childless
+    // opener gets the canonical step.
+    const target = minDeeper ?? blamedIndent + YAML_INDENT_STEP;
+    return {
+      openerLine: n,
+      openerKey,
+      delta: target - blamedIndent,
+      fromIndent: blamedIndent,
+    };
+  }
+  return null;
+}
+
 /** ReadLine over an in-memory buffer; splits once, indexes 1-based. */
 export function lineAccessorFor(content: string): ReadLine {
   const lines = content.split("\n");
