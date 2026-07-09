@@ -94,7 +94,7 @@ describe("describeInvalidOptionFix", () => {
 
   it("offers the re-indent when the schema confirms the opener owns the key", async () => {
     expect(await run(DEDENTED_KEY, KEY_MESSAGE, 3)).toEqual({
-      text: 'yaml_editor.error_nest_under_fix:{"line":3,"key":"key","parent":"encryption","target":"encryption","spaces":2}',
+      text: 'yaml_editor.error_nest_under_fix:{"line":3,"key":"key","parent":"api","target":"encryption","spaces":2}',
       fix: { line: 3, indent: 2, key: "key", fromIndent: 2 },
     });
   });
@@ -124,6 +124,17 @@ describe("describeInvalidOptionFix", () => {
   it("offers the dedent when the key belongs to the grandparent", async () => {
     expect(await run(OVERINDENTED_VARIANT, VARIANT_MESSAGE, 4)).toEqual({
       text: 'yaml_editor.error_unnest_fix:{"line":4,"key":"variant","parent":"framework","target":"esp32","spaces":2}',
+      fix: { line: 4, indent: -2, key: "variant", fromIndent: 4 },
+    });
+  });
+
+  it("falls through to the dedent when the sibling opener's gate rejects", async () => {
+    // `advanced:` above makes the nest walk fire first, but `variant` is
+    // not an advanced option; the dedent out of `framework` then wins.
+    const yaml = ["esp32:", "  framework:", "    advanced:", "    variant: ESP32"].join(
+      "\n"
+    );
+    expect(await run(yaml, VARIANT_MESSAGE, 4)).toMatchObject({
       fix: { line: 4, indent: -2, key: "variant", fromIndent: 4 },
     });
   });

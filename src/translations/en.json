@@ -1129,7 +1129,7 @@
     "error_flow_hint": "Unclosed bracket near line {line}; a \"[\" list or \"{\" mapping is missing its closing \"]\" or \"}\".",
     "error_go_to_line": "Go to line {line}",
     "error_dash_space_fix": "Missing space: line {line} \"-{key}\" is a list item missing the space after its \"-\". Add the space so it reads \"- {key}\".",
-    "error_nest_under_fix": "Indentation mismatch: line {line} \"{key}\" is not an option of the block it sits in, but it is a valid option of \"{parent}\". Indent line {line} by {spaces, plural, one {# space} other {# spaces}} to nest it under \"{parent}\".",
+    "error_nest_under_fix": "Indentation mismatch: line {line} \"{key}\" is not an option of the block it sits in, but it is a valid option of \"{target}\". Indent line {line} by {spaces, plural, one {# space} other {# spaces}} to nest it under \"{target}\".",
     "error_unnest_fix": "Indentation mismatch: line {line} \"{key}\" is not an option of \"{parent}\", but it is a valid option of \"{target}\". Remove {spaces, plural, one {# space} other {# spaces}} from the start of line {line} to move it out of \"{parent}\".",
     "error_auto_fix": "Try auto-fix",
     "error_auto_fix_hint": "Best-effort guess: it edits only the marked line. Review the result and undo it if that is not the fix you wanted.",

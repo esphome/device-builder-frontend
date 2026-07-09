@@ -94,7 +94,8 @@ async function gateCandidate(
     ? [...blamedPath.slice(0, -1), cand.openerKey]
     : blamedPath.slice(0, -1);
   if (
-    blamedPath.length < (nest ? 2 : 3) ||
+    // Only the dedent needs a depth floor: its target is the grandparent.
+    (!nest && blamedPath.length < 3) ||
     blamedPath[blamedPath.length - 1] !== parsed.key ||
     parsed.parent !== blamedPath[blamedPath.length - 2] ||
     openerPath.length !== expectedOpener.length ||
@@ -118,11 +119,11 @@ async function gateCandidate(
       topLevelKey,
       () => nestedPath
     );
-  // Where the key would move to: the opener (nest) or the grandparent.
-  const targetKey = nest ? cand.openerKey : blamedPath[blamedPath.length - 3];
-  const targetPath = nest ? openerPath.slice(1) : blamedPath.slice(1, -2);
+  // Where the key would move to: the opener (nest) or the opener's parent.
+  const targetFull = nest ? openerPath : openerPath.slice(0, -1);
+  const targetKey = targetFull[targetFull.length - 1];
   const [targetEntries, parentEntries] = await Promise.all([
-    entriesFor(targetKey, targetPath),
+    entriesFor(targetKey, targetFull.slice(1)),
     entriesFor(parsed.parent, blamedPath.slice(1, -1)),
   ]);
   if (!targetEntries.some((e) => e.key === parsed.key)) return null;
@@ -134,7 +135,7 @@ async function gateCandidate(
       {
         line: ctx.blamedLine,
         key: parsed.key,
-        parent: nest ? cand.openerKey : parsed.parent,
+        parent: parsed.parent,
         target: targetKey,
         spaces: Math.abs(cand.delta),
       }

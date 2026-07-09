@@ -630,19 +630,33 @@ export interface DedentedOptionCandidate {
   fromIndent: number;
 }
 
+/** A value-less opener located by ``findValuelessOpener``, with the walk
+ *  facts the two misnested-option analyzers derive their deltas from. */
+interface OpenerAbove {
+  openerLine: number;
+  openerKey: string;
+  openerIndent: number;
+  blamedIndent: number;
+  /** Shallowest strictly-deeper indent passed on the way up — the opener's
+   *  existing children — or null when none. */
+  minDeeper: number | null;
+}
+
 /**
- * Detect the dedented-option shape behind an invalid-option error: the
- * blamed `key:` sits at the same indent as a value-less opener above it
- * (`encryption:` then `key:`), separated only by the opener's deeper
- * children, blanks, or comments. Anything else between them — a valued
- * sibling, a list marker, a shallower line — means a one-line re-indent
- * would nest the key under the wrong node, so return null.
+ * Shared walk behind the misnested-option analyzers: from the blamed
+ * `key:` line, scan upward past blanks, comments, and deeper lines to the
+ * value-less opener the key is one level away from — the *sibling* at the
+ * blamed indent (nest) or the enclosing *parent* at a shallower one
+ * (dedent). Bails on list markers, valued deciders, and (sibling mode) a
+ * shallower line first: each means a one-line re-indent would attach the
+ * key to the wrong node.
  */
-export function analyzeDedentedOption(
+function findValuelessOpener(
   readLine: ReadLine,
   blamedLine: number,
-  blamedKey: string
-): DedentedOptionCandidate | null {
+  blamedKey: string,
+  opener: "sibling" | "parent"
+): OpenerAbove | null {
   const text = readLine(blamedLine);
   if (text === undefined || parseListItemMarker(text)) return null;
   if (lineKeyToken(text) !== blamedKey) return null;
@@ -659,20 +673,40 @@ export function analyzeDedentedOption(
       minDeeper = minDeeper === null ? indent : Math.min(minDeeper, indent);
       continue;
     }
-    if (indent < blamedIndent) return null;
+    if (indent === blamedIndent) {
+      if (opener === "parent") continue;
+    } else if (opener === "sibling") {
+      return null;
+    }
     const openerKey = valuelessKeyOf(above);
     if (openerKey === null) return null;
-    // The opener's existing children set the target indent; a childless
-    // opener gets the canonical step.
-    const target = minDeeper ?? blamedIndent + YAML_INDENT_STEP;
-    return {
-      openerLine: n,
-      openerKey,
-      delta: target - blamedIndent,
-      fromIndent: blamedIndent,
-    };
+    return { openerLine: n, openerKey, openerIndent: indent, blamedIndent, minDeeper };
   }
   return null;
+}
+
+/**
+ * Detect the dedented-option shape behind an invalid-option error: the
+ * blamed `key:` sits at the same indent as a value-less opener above it
+ * (`encryption:` then `key:`), separated only by the opener's deeper
+ * children, blanks, or comments.
+ */
+export function analyzeDedentedOption(
+  readLine: ReadLine,
+  blamedLine: number,
+  blamedKey: string
+): DedentedOptionCandidate | null {
+  const hit = findValuelessOpener(readLine, blamedLine, blamedKey, "sibling");
+  if (hit === null) return null;
+  // The opener's existing children set the target indent; a childless
+  // opener gets the canonical step.
+  const target = hit.minDeeper ?? hit.blamedIndent + YAML_INDENT_STEP;
+  return {
+    openerLine: hit.openerLine,
+    openerKey: hit.openerKey,
+    delta: target - hit.blamedIndent,
+    fromIndent: hit.blamedIndent,
+  };
 }
 
 /**
@@ -687,32 +721,16 @@ export function analyzeOverIndentedOption(
   blamedLine: number,
   blamedKey: string
 ): DedentedOptionCandidate | null {
-  const text = readLine(blamedLine);
-  if (text === undefined || parseListItemMarker(text)) return null;
-  if (lineKeyToken(text) !== blamedKey) return null;
-  const blamedIndent = indentOf(text);
-  if (blamedIndent === 0) return null;
-  for (let n = blamedLine - 1; n >= 1 && n >= blamedLine - WALK_BOUND; n--) {
-    const above = readLine(n);
-    if (above === undefined) return null;
-    if (isBlankOrComment(above)) continue;
-    if (parseListItemMarker(above)) return null;
-    const indent = indentOf(above);
-    if (indent >= blamedIndent) continue;
-    // The first shallower line is the enclosing opener the blamed key
-    // would dedent out of.
-    const openerKey = valuelessKeyOf(above);
-    if (openerKey === null) return null;
-    const next = contentLineBelow(readLine, blamedLine);
-    if (next !== null && indentOf(next.text) > indent) return null;
-    return {
-      openerLine: n,
-      openerKey,
-      delta: indent - blamedIndent,
-      fromIndent: blamedIndent,
-    };
-  }
-  return null;
+  const hit = findValuelessOpener(readLine, blamedLine, blamedKey, "parent");
+  if (hit === null) return null;
+  const next = contentLineBelow(readLine, blamedLine);
+  if (next !== null && indentOf(next.text) > hit.openerIndent) return null;
+  return {
+    openerLine: hit.openerLine,
+    openerKey: hit.openerKey,
+    delta: hit.openerIndent - hit.blamedIndent,
+    fromIndent: hit.blamedIndent,
+  };
 }
 
 /** ReadLine over an in-memory buffer; splits once, indexes 1-based. */
