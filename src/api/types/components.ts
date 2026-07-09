@@ -49,6 +49,7 @@ export enum ComponentCategory {
   AUDIO_ADC = "audio_adc",
   AUDIO_DAC = "audio_dac",
   CANBUS = "canbus",
+  IMAGE = "image",
   INFRARED = "infrared",
   MEDIA_SOURCE = "media_source",
   MOTION = "motion",
