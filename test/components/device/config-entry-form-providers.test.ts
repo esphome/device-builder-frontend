@@ -2,9 +2,9 @@
  * @vitest-environment happy-dom
  *
  * ``_resolveInterfaceProviders`` backs the id-reference dropdown's
- * cross-domain lookup: a per-form cache fed by one ``provides`` fetch,
- * deduped while in flight, and — crucially — NOT poisoned with ``[]`` on a
- * failed fetch so a later render can retry.
+ * cross-domain lookup: a per-form cache fed by one paged ``provides``
+ * fetch, deduped while in flight, and — crucially — NOT poisoned with
+ * ``[]`` on a failed fetch so a later render can retry.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -77,6 +77,24 @@ describe("config-entry-form _resolveInterfaceProviders", () => {
     expect(resolve(form, "i2c")).toEqual([]);
     // Cached: no refetch.
     expect(getComponents).toHaveBeenCalledTimes(1);
+  });
+
+  it("collects every page when the provider set exceeds one page", async () => {
+    const all = Array.from({ length: 501 }, (_, i) => `sensor.c${i}`);
+    const getComponents = vi.fn(async (args: { offset?: number; limit?: number }) => ({
+      ...response(all.slice(args.offset ?? 0, (args.offset ?? 0) + (args.limit ?? 50))),
+      total: all.length,
+      offset: args.offset ?? 0,
+    }));
+    const form = withApi(getComponents as unknown as ReturnType<typeof vi.fn>);
+
+    resolve(form, "sensor");
+    await flushMicrotasks(8);
+
+    expect(getComponents).toHaveBeenCalledTimes(2);
+    const providers = resolve(form, "sensor");
+    expect(providers).toHaveLength(501);
+    expect(providers?.[500]).toEqual({ domain: "sensor", stem: "c500" });
   });
 
   it("does not cache [] on a failed fetch, so a later render retries", async () => {
