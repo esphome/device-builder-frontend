@@ -62,6 +62,7 @@ function action(id: string): AutomationAction {
     description: "",
     config_entries: [entry("plain", false), entry("secret", true)],
     accepts_action_list: [],
+    required_groups: [{ kind: "exactly_one", keys: ["plain", "secret"] }],
   } as unknown as AutomationAction;
 }
 
@@ -111,6 +112,14 @@ describe("automation-action-node view-state reset on rebind", () => {
     const el = await mountNode(node("set_variable"));
     expect(collapseButton(el).getAttribute("aria-expanded")).toBe("true");
     expect(bodyPresent(el)).toBe(true);
+  });
+
+  it("forwards the definition's required_groups to the params form", async () => {
+    const el = await mountNode(node("set_variable"));
+    const form = paramsForm(el) as Element & { requiredGroups?: unknown };
+    expect(form.requiredGroups).toEqual([
+      { kind: "exactly_one", keys: ["plain", "secret"] },
+    ]);
   });
 
   it("resets collapsed state when rebound to a different action_id", async () => {
