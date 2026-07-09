@@ -65,7 +65,11 @@ const fakeApi = {
   getComponent: async () => null,
 } as never;
 
-async function labelsAt(yaml: string, explicit = false): Promise<string[]> {
+async function labelsAt(
+  yaml: string,
+  explicit = false,
+  pos = yaml.length
+): Promise<string[]> {
   // Drive a real view + full parse so the AST helpers see the same tree a
   // live editor does (a bare state parses lazily and misses the cursor's tail).
   const view = new EditorView({
@@ -73,7 +77,7 @@ async function labelsAt(yaml: string, explicit = false): Promise<string[]> {
   });
   try {
     forceParsing(view, yaml.length, 60000);
-    const ctx = new CompletionContext(view.state, yaml.length, explicit);
+    const ctx = new CompletionContext(view.state, pos, explicit);
     const result = await createYamlCompletionSource(fakeApi)(ctx);
     return (result?.options ?? []).map((o) => o.label);
   } finally {
@@ -191,6 +195,17 @@ describe("createYamlCompletionSource (already-set key filtering)", () => {
       ["esp32:", "  framework:", "    advanced:", "      verbose: "].join("\n")
     );
     expect(labels).toEqual(["true", "false"]);
+  });
+
+  it("completes a trailing-space value mid-document (idle popup case)", async () => {
+    // Same shape with content below the caret: the whitespace resolves into
+    // an enclosing container instead of the root, so the re-anchor must fire
+    // for the idle popup to surface options.
+    const head = ["esp32:", "  framework:", "    advanced:", "      verbose: "].join(
+      "\n"
+    );
+    const doc = head + "\n" + ["wifi:", "  ssid: x"].join("\n");
+    expect(await labelsAt(doc, true, head.length)).toEqual(["true", "false"]);
   });
 
   it("auto-offers platform at a fresh list-item dash (no partial typed)", async () => {
