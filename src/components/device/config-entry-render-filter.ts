@@ -82,6 +82,13 @@ export interface RenderFilterOptions {
    * add-component dialog when no board is selected yet.
    */
   targetPlatform?: string | null;
+  /**
+   * The component-root value map, forwarded to ``isEntryVisible`` so a
+   * nested entry's ``depends_on`` can resolve a top-level field (e.g.
+   * esp32 ``framework.advanced.sram1_as_iram`` gated on ``variant``).
+   * Omit and ``depends_on`` stays sibling-scoped.
+   */
+  rootValues?: Record<string, unknown>;
 }
 
 /** The form-level inputs to ``filterRenderable``. Both the form element
@@ -158,7 +165,15 @@ export function filterRenderable(
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
   for (const entry of entries) {
-    if (!isEntryVisible(entry, values, opts.presentComponents, opts.targetPlatform)) {
+    if (
+      !isEntryVisible(
+        entry,
+        values,
+        opts.presentComponents,
+        opts.targetPlatform,
+        opts.rootValues
+      )
+    ) {
       continue;
     }
     if (entry.advanced && !opts.showAdvanced && !hasMaterialValue(entry, values)) {

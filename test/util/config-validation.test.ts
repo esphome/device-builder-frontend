@@ -3,6 +3,7 @@ import type { ConfigValueOption } from "../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import {
   getDeviceNameWarning,
+  isEntryVisible,
   nearCanonicalOption,
   platformSupported,
   validateDeviceName,
@@ -61,6 +62,45 @@ describe("getDeviceNameWarning", () => {
   it("returns null for clean hyphenated names", () => {
     expect(getDeviceNameWarning("my-device")).toBeNull();
     expect(getDeviceNameWarning("device42")).toBeNull();
+  });
+});
+
+describe("isEntryVisible depends_on resolution", () => {
+  const gated = makeEntry({
+    key: "sram1_as_iram",
+    depends_on: "variant",
+    depends_on_value_any: ["esp32", "ESP32"],
+  });
+
+  it("resolves depends_on against a sibling in the local scope", () => {
+    expect(isEntryVisible(gated, { variant: "esp32" })).toBe(true);
+    expect(isEntryVisible(gated, { variant: "esp32c2" })).toBe(false);
+  });
+
+  it("falls back to rootValues when the dependency isn't a local sibling", () => {
+    // sram1_as_iram is nested under framework.advanced; `variant` lives at
+    // the component root, so the local (advanced-group) scope lacks it.
+    expect(isEntryVisible(gated, {}, undefined, undefined, { variant: "esp32" })).toBe(
+      true
+    );
+    expect(isEntryVisible(gated, {}, undefined, undefined, { variant: "ESP32" })).toBe(
+      true
+    );
+    expect(isEntryVisible(gated, {}, undefined, undefined, { variant: "esp32c2" })).toBe(
+      false
+    );
+  });
+
+  it("prefers a local sibling over rootValues when both carry the key", () => {
+    expect(
+      isEntryVisible(gated, { variant: "esp32c2" }, undefined, undefined, {
+        variant: "esp32",
+      })
+    ).toBe(false);
+  });
+
+  it("without rootValues, an unresolved cross-scope dependency hides the entry", () => {
+    expect(isEntryVisible(gated, {})).toBe(false);
   });
 });
 
