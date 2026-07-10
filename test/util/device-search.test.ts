@@ -1,34 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
-import { DeviceState } from "../../src/api/types/devices.js";
 import {
   matchesDeviceName,
   matchesDeviceRow,
   matchesMacAddress,
   type DeviceRowSearchFields,
 } from "../../src/util/device-search.js";
+import {
+  type ConfiguredDeviceOverrides,
+  makeConfiguredDevice,
+} from "../_make-configured-device.js";
 
-function _device(overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice {
-  return {
-    name: "kitchen",
-    friendly_name: "Kitchen Lamp",
-    configuration: "kitchen.yaml",
-    address: "kitchen.local",
-    ip_addresses: [],
-    state: DeviceState.ONLINE,
-    target_platform: "esp32",
-    target_variant: "",
-    deployed_version: null,
-    deployed_config_hash: null,
-    expected_config_hash: null,
-    api_encryption_active: null,
-    has_pending_changes: null,
-    last_seen: null,
-    just_created: null,
-    loaded_integrations: [],
-    archived: false,
-    ...overrides,
-  } as ConfiguredDevice;
+function _device(overrides: ConfiguredDeviceOverrides = {}): ConfiguredDevice {
+  return makeConfiguredDevice({ friendly_name: "Kitchen Lamp", ...overrides });
 }
 
 describe("matchesDeviceName", () => {
