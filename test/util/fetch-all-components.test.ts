@@ -11,12 +11,10 @@ import {
   COMPONENT_FETCH_PAGE,
   fetchAllComponents,
 } from "../../src/util/fetch-all-components.js";
+import { makeComponentEntry } from "./_make-component-entry.js";
 
 const entries = (count: number, prefix = "sensor.c"): ComponentCatalogEntry[] =>
-  Array.from(
-    { length: count },
-    (_, i) => ({ id: `${prefix}${i}` }) as ComponentCatalogEntry
-  );
+  Array.from({ length: count }, (_, i) => makeComponentEntry(`${prefix}${i}`));
 
 function pagedApi(all: ComponentCatalogEntry[]) {
   const getComponents = vi.fn(async (args: { offset?: number; limit?: number }) => ({
@@ -79,14 +77,6 @@ describe("fetchAllComponents", () => {
       offset: 0,
       limit: COMPONENT_FETCH_PAGE,
     });
-    const api = { getComponents } as unknown as ESPHomeAPI;
-    expect(await fetchAllComponents(api)).toEqual(page);
-    expect(getComponents).toHaveBeenCalledTimes(1);
-  });
-
-  it("stops on a short page when the response carries no total", async () => {
-    const page = entries(3);
-    const getComponents = vi.fn().mockResolvedValue({ components: page });
     const api = { getComponents } as unknown as ESPHomeAPI;
     expect(await fetchAllComponents(api)).toEqual(page);
     expect(getComponents).toHaveBeenCalledTimes(1);

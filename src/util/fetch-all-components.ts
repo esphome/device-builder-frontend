@@ -1,8 +1,10 @@
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 
-/** Page size for the fetch-all sweeps below; a stride, not a ceiling. */
-export const COMPONENT_FETCH_PAGE = 500;
+/** Page size for the fetch-all sweeps below — a stride, not a ceiling.
+ *  Sized so today's full catalog (~940 entries) still lands in one
+ *  round trip; growth past it pages instead of truncating. */
+export const COMPONENT_FETCH_PAGE = 1000;
 
 type ComponentQuery = Omit<
   NonNullable<Parameters<ESPHomeAPI["getComponents"]>[0]>,

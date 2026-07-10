@@ -15,6 +15,7 @@ vi.mock("sonner-js", () => ({
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ESPHomeConfigEntryForm } from "../../../src/components/device/config-entry-form.js";
 import type { ComponentProvider } from "../../../src/util/config-entry-yaml-scan.js";
+import { COMPONENT_FETCH_PAGE } from "../../../src/util/fetch-all-components.js";
 import { flushMicrotasks } from "../../_dom.js";
 
 const resolve = (
@@ -80,7 +81,8 @@ describe("config-entry-form _resolveInterfaceProviders", () => {
   });
 
   it("collects every page when the provider set exceeds one page", async () => {
-    const all = Array.from({ length: 501 }, (_, i) => `sensor.c${i}`);
+    const count = COMPONENT_FETCH_PAGE + 1;
+    const all = Array.from({ length: count }, (_, i) => `sensor.c${i}`);
     const getComponents = vi.fn(async (args: { offset?: number; limit?: number }) => ({
       ...response(all.slice(args.offset ?? 0, (args.offset ?? 0) + (args.limit ?? 50))),
       total: all.length,
@@ -93,8 +95,11 @@ describe("config-entry-form _resolveInterfaceProviders", () => {
 
     expect(getComponents).toHaveBeenCalledTimes(2);
     const providers = resolve(form, "sensor");
-    expect(providers).toHaveLength(501);
-    expect(providers?.[500]).toEqual({ domain: "sensor", stem: "c500" });
+    expect(providers).toHaveLength(count);
+    expect(providers?.[count - 1]).toEqual({
+      domain: "sensor",
+      stem: `c${count - 1}`,
+    });
   });
 
   it("does not cache [] on a failed fetch, so a later render retries", async () => {
