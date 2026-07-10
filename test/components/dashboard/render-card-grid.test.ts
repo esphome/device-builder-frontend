@@ -43,7 +43,6 @@ describe("renderCardGrid", () => {
       update_available: true,
       runtime_state: {
         state: DeviceState.ONLINE,
-        active_source: "mdns",
         deployed_version: "2026.6.1",
         queued_update: true,
         api_encryption_active: cipher,

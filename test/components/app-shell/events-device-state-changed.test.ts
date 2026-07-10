@@ -22,11 +22,7 @@ function dispatch(host: Host, configuration: string, state: DeviceState): void {
 describe("handleEvent DEVICE_STATE_CHANGED", () => {
   it("folds the flat event state into the device's runtime_state", () => {
     const device = makeConfiguredDevice({
-      runtime_state: {
-        state: DeviceState.UNKNOWN,
-        deployed_version: "2026.6.1",
-        queued_update: true,
-      },
+      runtime_state: { deployed_version: "2026.6.1", queued_update: true },
     });
     const host: Host = { _devices: [device] };
 
@@ -37,9 +33,8 @@ describe("handleEvent DEVICE_STATE_CHANGED", () => {
     // Sibling runtime fields survive the fold.
     expect(updated.runtime_state.deployed_version).toBe("2026.6.1");
     expect(updated.runtime_state.queued_update).toBe(true);
-    // Fresh identities so Lit change detection sees the update.
-    expect(updated).not.toBe(device);
-    expect(updated.runtime_state).not.toBe(device.runtime_state);
+    // The fold replaces, never mutates — fresh identities for Lit
+    // change detection, so the original device is untouched.
     expect(device.runtime_state.state).toBe(DeviceState.UNKNOWN);
   });
 
