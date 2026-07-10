@@ -99,6 +99,12 @@ export interface RenderFilterSource {
   showAdvanced: boolean;
   presentComponents: ReadonlySet<string>;
   board: BoardCatalogEntry | null;
+  /** The component-root value map, forwarded as ``rootValues`` so a nested
+   *  entry's ``depends_on`` can resolve a top-level field. Sourced here (not
+   *  per call site) so every caller — the form, the add-component filter — is
+   *  covered without remembering to pass it. A nested-scope caller whose local
+   *  ``values`` isn't the root passes an explicit ``rootValues`` override. */
+  values?: Record<string, unknown>;
 }
 
 /** Build ``RenderFilterOptions`` from a *source*, with optional overrides
@@ -112,6 +118,7 @@ export function renderFilterOptions(
     showAdvanced: source.showAdvanced,
     presentComponents: source.presentComponents,
     targetPlatform: source.board?.esphome.platform ?? null,
+    rootValues: source.values,
     ...overrides,
   };
 }

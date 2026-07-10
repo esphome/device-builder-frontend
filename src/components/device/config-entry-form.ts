@@ -327,12 +327,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _filterRenderable = (
     entries: ConfigEntry[],
     values: Record<string, unknown>
-  ): ConfigEntry[] =>
-    filterRenderable(
-      entries,
-      values,
-      renderFilterOptions(this, { rootValues: this.values })
-    );
+  ): ConfigEntry[] => filterRenderable(entries, values, renderFilterOptions(this));
 
   protected render() {
     const ctx = this._buildCtx();
@@ -359,7 +354,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       entries,
       this.values,
       this.requiredGroups,
-      renderFilterOptions(this, { rootValues: this.values })
+      renderFilterOptions(this)
     );
     const renderItem = this._makeItemRenderer(plan, ctx);
     return html`${this._renderConstraintBanners(ctx, plan.memberKeys)}${plan.ordered.map(
@@ -378,7 +373,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       entries,
       this.values,
       this.requiredGroups,
-      renderFilterOptions(this, { showAdvanced: true, rootValues: this.values })
+      renderFilterOptions(this, { showAdvanced: true })
     );
     const renderItem = this._makeItemRenderer(plan, ctx);
     const isAdvanced = this._advancedUnitClassifier(plan);

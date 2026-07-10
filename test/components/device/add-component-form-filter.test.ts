@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { addFormNeedsUserInput } from "../../../src/components/device/add-component-form-filter.js";
-import { makeConfigEntry } from "../../util/_make-config-entry.js";
+import {
+  addFormNeedsUserInput,
+  addFormRenderablePaths,
+} from "../../../src/components/device/add-component-form-filter.js";
+import { makeConfigEntry, makeNestedEntry } from "../../util/_make-config-entry.js";
 
 const NONE = new Set<string>();
 
@@ -97,5 +100,42 @@ describe("addFormNeedsUserInput", () => {
       }),
     ];
     expect(addFormNeedsUserInput(entries, {}, [], ESP32, NONE)).toBe(false);
+  });
+});
+
+describe("addFormRenderablePaths resolves a root-scoped depends_on", () => {
+  // A nested field gated on a top-level sibling (the esp32 sram1_as_iram /
+  // variant case): the add-form paint mirror must resolve `variant` against
+  // the component root, not the empty nested scope, or it drifts from
+  // validateEntries and bails the submit silently.
+  const entries = [
+    makeNestedEntry("advanced", [
+      makeConfigEntry({
+        key: "sram1_as_iram",
+        required: true,
+        depends_on: "variant",
+        depends_on_value_any: ["esp32"],
+      }),
+    ]),
+  ];
+
+  it("paints the nested field when the root variant matches", () => {
+    const paths = addFormRenderablePaths(
+      entries,
+      { variant: "esp32", advanced: {} },
+      null,
+      NONE
+    );
+    expect(paths.has("advanced.sram1_as_iram")).toBe(true);
+  });
+
+  it("drops it when the root variant doesn't match", () => {
+    const paths = addFormRenderablePaths(
+      entries,
+      { variant: "esp32c2", advanced: {} },
+      null,
+      NONE
+    );
+    expect(paths.has("advanced.sram1_as_iram")).toBe(false);
   });
 });
