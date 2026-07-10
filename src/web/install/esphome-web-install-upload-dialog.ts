@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
@@ -26,18 +26,19 @@ export class ESPHomeWebInstallUploadDialog extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  @state() private _hasFile = false;
-
-  @query("input[type=file]") private _input!: HTMLInputElement;
+  // Hold the picked file in state rather than reading it from the <input> via
+  // @query: the input is unrendered during the flashing phase, so a query would
+  // resolve to null and a retry after a failed flash would throw.
+  @state() private _file?: File;
 
   private _flow = new InstallFlowController(this);
 
-  private _onFileChange(): void {
-    this._hasFile = (this._input.files?.length ?? 0) > 0;
+  private _onFileChange(e: Event): void {
+    this._file = (e.currentTarget as HTMLInputElement).files?.[0];
   }
 
   private async _install(): Promise<void> {
-    const file = this._input.files?.[0];
+    const file = this._file;
     if (!file) return;
     const data = new Uint8Array(await file.arrayBuffer());
     await this._flow.start(this.port, {
@@ -48,7 +49,7 @@ export class ESPHomeWebInstallUploadDialog extends LitElement {
 
   private _onAfterHide(): void {
     this._flow.reset();
-    this._hasFile = false;
+    this._file = undefined;
     this.dispatchEvent(new CustomEvent("after-hide", { bubbles: true }));
   }
 
@@ -85,7 +86,7 @@ export class ESPHomeWebInstallUploadDialog extends LitElement {
               ? nothing
               : html`<wa-button
                   variant="brand"
-                  ?disabled=${this._flow.busy || (!inProgress && !this._hasFile)}
+                  ?disabled=${this._flow.busy || (!inProgress && !this._file)}
                   @click=${this._install}
                 >
                   ${this._localize("web.install.install")}

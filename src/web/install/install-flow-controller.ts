@@ -5,8 +5,10 @@ import { runFlash, type FlashPlan, type FlashStep } from "./run-flash.js";
 /**
  * Drives a single flash operation for an install dialog and exposes the
  * reactive state its render reads. Wraps ``runFlash`` so the dialog stays
- * declarative: call ``start(port, plan)`` and render from ``step`` /
- * ``progress`` / ``statusMessage`` / ``errorMessage`` / ``logLines``.
+ * declarative: call ``start(port, plan)`` and render from the ``step`` /
+ * ``progress`` / ``errorMessage`` / ``logLines`` fields plus the
+ * ``busy`` / ``done`` / ``errored`` getters. The human-readable status text is
+ * derived from ``step`` in ``install-progress.ts``, not stored here.
  */
 export class InstallFlowController implements ReactiveController {
   step: FlashStep | "idle" = "idle";

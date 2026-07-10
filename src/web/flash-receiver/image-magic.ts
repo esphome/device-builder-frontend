@@ -10,8 +10,8 @@ export const ESP_IMAGE_MAGIC = 0xe9;
  * Reject anything that isn't an ESP image before the chip is erased. The magic
  * sits at byte 0 for ESP8266 and native-USB ESP32 parts (S3/C3/C6, bootloader
  * at 0x0); the classic ESP32 / ESP32-S2 merged factory image pads 0x0–0xFFF
- * with 0xFF and puts the bootloader (magic) at 0x1000. Returns an error
- * message key context, or null when it looks valid.
+ * with 0xFF and puts the bootloader (magic) at 0x1000. Returns ``true`` when
+ * the payload looks like ESP firmware, ``false`` otherwise.
  */
 export function validateEspImage(files: FlashPart[]): boolean {
   const boot = files.find((f) => f.address === 0);
