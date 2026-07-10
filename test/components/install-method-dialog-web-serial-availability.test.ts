@@ -152,7 +152,7 @@ describe("install-method-dialog USB row availability", () => {
     expect(open).toHaveBeenCalledWith(
       "https://web.esphome.io/?dashboard_logs",
       "_blank",
-      "noopener"
+      "noopener,noreferrer"
     );
     // Logs still have a serial path via server-serial.
     expect(serialRow(dialog)).not.toBeUndefined();

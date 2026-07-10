@@ -79,7 +79,7 @@ describe("install-method-dialog logs → ESPHome Web (insecure origin)", () => {
     expect(open).toHaveBeenCalledWith(
       "https://web.esphome.io/?dashboard_logs",
       "_blank",
-      "noopener"
+      "noopener,noreferrer"
     );
   });
 

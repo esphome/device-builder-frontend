@@ -327,7 +327,10 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     return html`
       <div
         class="option"
-        @click=${() => window.open(esphomeWebUrl("logs"), "_blank", "noopener")}
+        @click=${() =>
+          // noreferrer as well as noopener: this runs on the insecure/local
+          // add-on origin, so don't leak that URL to web.esphome.io as referrer.
+          window.open(esphomeWebUrl("logs"), "_blank", "noopener,noreferrer")}
       >
         <wa-icon library="mdi" name="usb"></wa-icon>
         <div class="info">
