@@ -18,6 +18,7 @@ import {
   ALL_PAGE_SIZE,
   effectiveTablePageSize,
 } from "../../../src/components/dashboard/pagination.js";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
 
 describe("effectiveTablePageSize", () => {
   it("passes a normal page size through unchanged", () => {
@@ -34,32 +35,14 @@ describe("effectiveTablePageSize", () => {
 });
 
 function makeDevices(n: number): ConfiguredDevice[] {
-  return Array.from({ length: n }, (_, i) => ({
-    name: `demo-${i}`,
-    friendly_name: `Demo ${i}`,
-    configuration: `demo-${i}.yaml`,
-    address: `demo-${i}.local`,
-    ip: "",
-    mac_address: "",
-    target_platform: "ESP32",
-    build_size_bytes: 0,
-    comment: "",
-    area: "",
-    labels: [],
-    has_pending_changes: false,
-    update_available: false,
-    api_enabled: true,
-    api_encrypted: false,
-    runtime_state: {
-      state: "ONLINE",
-      active_source: "unknown",
-      ip_addresses: [],
-      deployed_version: "",
-      deployed_config_hash: "",
-      queued_update: false,
-      api_encryption_active: null,
-    },
-  })) as unknown as ConfiguredDevice[];
+  return Array.from({ length: n }, (_, i) =>
+    makeConfiguredDevice({
+      name: `demo-${i}`,
+      friendly_name: `Demo ${i}`,
+      configuration: `demo-${i}.yaml`,
+      address: `demo-${i}.local`,
+    })
+  );
 }
 
 async function mount(

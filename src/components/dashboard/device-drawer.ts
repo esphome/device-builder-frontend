@@ -303,8 +303,9 @@ export class ESPHomeDeviceDrawer extends LitElement {
     const device = this.device;
     if (!device) return nothing;
 
-    const online = device.runtime_state.state === DeviceState.ONLINE;
-    const offline = device.runtime_state.state === DeviceState.OFFLINE;
+    const rt = device.runtime_state;
+    const online = rt.state === DeviceState.ONLINE;
+    const offline = rt.state === DeviceState.OFFLINE;
     const stateClass = online ? "online" : offline ? "offline" : "unknown";
     // Transport-agnostic network icons — wifi/wifi-off implied a
     // wireless link, but plenty of devices on the network are on
@@ -368,7 +369,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
                   @click=${() => this._emitAction("update-device")}
                   title=${updateButtonTitle(
                     this._localize,
-                    device.runtime_state.deployed_version,
+                    rt.deployed_version,
                     device.current_version,
                     "dashboard.drawer_update"
                   )}

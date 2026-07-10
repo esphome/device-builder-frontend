@@ -262,42 +262,45 @@ export class ESPHomeDeviceTable extends LitElement {
       changed.has("recentJobs") ||
       changed.has("_labelCatalog")
     ) {
-      this._rows = this.devices.map((d) => ({
-        status: d.runtime_state.state,
-        name: d.name,
-        friendly_name: d.friendly_name,
-        address: d.address || "",
-        ip: d.ip || "",
-        ip_addresses: d.runtime_state.ip_addresses,
-        mac_address: d.mac_address || "",
-        // ``ethernet_mac`` / ``bluetooth_mac`` aren't surfaced in
-        // the device list — those are drawer-only fields. The table
-        // column shows the primary MAC (``mac_address``) since
-        // that's the universally-meaningful identifier; the per-
-        // interface derived values are diagnostic detail that
-        // belongs in the per-device drawer.
-        platform: d.target_platform || "",
-        version: d.runtime_state.deployed_version || "",
-        build_size_bytes: d.build_size_bytes || 0,
-        comment: d.comment || "",
-        area: d.area || "",
-        // Resolve labels here once per render rather than from the
-        // cell renderer — TanStack's sortingFn / filterFn read the
-        // accessor value, so they need the resolved objects rather
-        // than opaque ids.
-        labels: resolveLabelIds(d.labels, this._labelCatalog),
-        config: d.configuration,
-        hasPendingChanges: d.has_pending_changes === true,
-        showModified: showPendingChanges(d),
-        showUpdate: showUpdateAvailable(d),
-        hasQueuedUpdate: d.runtime_state.queued_update,
-        api_enabled: d.api_enabled === true,
-        api_encrypted: d.api_encrypted === true,
-        api_encryption_active: d.runtime_state.api_encryption_active,
-        busy: this.activeJobs.has(d.configuration),
-        recentJob: this.recentJobs.get(d.configuration) ?? null,
-        _device: d,
-      }));
+      this._rows = this.devices.map((d) => {
+        const rt = d.runtime_state;
+        return {
+          status: rt.state,
+          name: d.name,
+          friendly_name: d.friendly_name,
+          address: d.address || "",
+          ip: d.ip || "",
+          ip_addresses: rt.ip_addresses,
+          mac_address: d.mac_address || "",
+          // ``ethernet_mac`` / ``bluetooth_mac`` aren't surfaced in
+          // the device list — those are drawer-only fields. The table
+          // column shows the primary MAC (``mac_address``) since
+          // that's the universally-meaningful identifier; the per-
+          // interface derived values are diagnostic detail that
+          // belongs in the per-device drawer.
+          platform: d.target_platform || "",
+          version: rt.deployed_version,
+          build_size_bytes: d.build_size_bytes || 0,
+          comment: d.comment || "",
+          area: d.area || "",
+          // Resolve labels here once per render rather than from the
+          // cell renderer — TanStack's sortingFn / filterFn read the
+          // accessor value, so they need the resolved objects rather
+          // than opaque ids.
+          labels: resolveLabelIds(d.labels, this._labelCatalog),
+          config: d.configuration,
+          hasPendingChanges: d.has_pending_changes === true,
+          showModified: showPendingChanges(d),
+          showUpdate: showUpdateAvailable(d),
+          hasQueuedUpdate: rt.queued_update,
+          api_enabled: d.api_enabled === true,
+          api_encrypted: d.api_encrypted === true,
+          api_encryption_active: rt.api_encryption_active,
+          busy: this.activeJobs.has(d.configuration),
+          recentJob: this.recentJobs.get(d.configuration) ?? null,
+          _device: d,
+        };
+      });
     }
   }
 

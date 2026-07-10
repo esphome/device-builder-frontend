@@ -6,22 +6,16 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facets.js";
 import { identityLocalize } from "../_dom.js";
-import {
-  type ConfiguredDeviceOverrides,
-  makeConfiguredDevice,
-} from "../_make-configured-device.js";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 // computeUpdateFacet reads update_available / has_pending_changes, gated on
 // active_source via showUpdateAvailable / showPendingChanges. The shared
 // fixture defaults to a live mDNS source so update/modified buckets surface;
 // mDNS-dark cases pass runtime_state.active_source explicitly.
-function device(over: ConfiguredDeviceOverrides): ConfiguredDevice {
-  return makeConfiguredDevice(over);
-}
+const device = makeConfiguredDevice;
 
 // Echo the key so assertions key off the i18n id, not display copy.
 const localize = identityLocalize as unknown as LocalizeFunc;
