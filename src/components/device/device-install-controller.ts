@@ -28,7 +28,7 @@ export class DeviceInstallController implements ReactiveController {
   }
 
   get deviceState(): DeviceState {
-    return this._host.device?.state ?? DeviceState.UNKNOWN;
+    return this._host.device?.runtime_state.state ?? DeviceState.UNKNOWN;
   }
 
   get deviceTargetPlatform(): string {

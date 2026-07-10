@@ -23,7 +23,7 @@ describe("device-drawer footer Update title", () => {
       open: true,
       device: makeConfiguredDevice({
         update_available: true,
-        deployed_version: "2024.6.0",
+        runtime_state: { deployed_version: "2024.6.0" },
         current_version: "2024.12.0",
       }),
     });
@@ -35,7 +35,7 @@ describe("device-drawer footer Update title", () => {
       open: true,
       device: makeConfiguredDevice({
         update_available: true,
-        deployed_version: "2024.6.0",
+        runtime_state: { deployed_version: "2024.6.0" },
       }),
     });
     expect(footerAccentTitle(el)).toBe("dashboard.drawer_update");

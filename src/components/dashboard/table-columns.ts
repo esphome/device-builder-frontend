@@ -355,7 +355,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
                   aria-label=${localize("dashboard.table_action_update")}
                   title=${updateButtonTitle(
                     localize,
-                    device.deployed_version,
+                    device.runtime_state.deployed_version,
                     device.current_version,
                     "dashboard.table_action_update"
                   )}

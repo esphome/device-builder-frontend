@@ -263,12 +263,12 @@ export class ESPHomeDeviceTable extends LitElement {
       changed.has("_labelCatalog")
     ) {
       this._rows = this.devices.map((d) => ({
-        status: d.state,
+        status: d.runtime_state.state,
         name: d.name,
         friendly_name: d.friendly_name,
         address: d.address || "",
         ip: d.ip || "",
-        ip_addresses: d.ip_addresses,
+        ip_addresses: d.runtime_state.ip_addresses,
         mac_address: d.mac_address || "",
         // ``ethernet_mac`` / ``bluetooth_mac`` aren't surfaced in
         // the device list — those are drawer-only fields. The table
@@ -277,7 +277,7 @@ export class ESPHomeDeviceTable extends LitElement {
         // interface derived values are diagnostic detail that
         // belongs in the per-device drawer.
         platform: d.target_platform || "",
-        version: d.deployed_version || "",
+        version: d.runtime_state.deployed_version || "",
         build_size_bytes: d.build_size_bytes || 0,
         comment: d.comment || "",
         area: d.area || "",
@@ -290,10 +290,10 @@ export class ESPHomeDeviceTable extends LitElement {
         hasPendingChanges: d.has_pending_changes === true,
         showModified: showPendingChanges(d),
         showUpdate: showUpdateAvailable(d),
-        hasQueuedUpdate: d.queued_update === true,
+        hasQueuedUpdate: d.runtime_state.queued_update,
         api_enabled: d.api_enabled === true,
         api_encrypted: d.api_encrypted === true,
-        api_encryption_active: d.api_encryption_active ?? null,
+        api_encryption_active: d.runtime_state.api_encryption_active,
         busy: this.activeJobs.has(d.configuration),
         recentJob: this.recentJobs.get(d.configuration) ?? null,
         _device: d,

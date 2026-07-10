@@ -17,6 +17,53 @@ export enum DeviceState {
   OFFLINE = "offline",
 }
 
+/** Monitor-observed runtime state, nested under
+ *  ``ConfiguredDevice.runtime_state`` on every device payload
+ *  (initial_state, device_added/updated events, devices/list). */
+export interface DeviceRuntimeState {
+  state: DeviceState;
+  /** Reachability channel currently driving the device's online state
+   *  (``mdns`` > ``mqtt`` > ``ping``). The deployed version / config
+   *  hash come only from the mDNS broadcast, so the out-of-sync /
+   *  update indicators are gated on ``active_source === "mdns"`` (see
+   *  ``src/util/device-sync.ts``): when mDNS is dark those values are
+   *  stale. ``"unknown"`` means no source has claimed the device yet,
+   *  which reads as "not mDNS". */
+  active_source: ReachabilitySource;
+  /** All resolved addresses from mDNS (IPv4 + IPv6) — empty array until
+   *  the device is seen online. ``ip_addresses[0]`` matches the flat
+   *  ``ip`` when populated. */
+  ip_addresses: string[];
+  deployed_version: string;
+  /**
+   * 8-char hex hash the running firmware reports via the
+   * ``config_hash`` TXT record on its ``_esphomelib._tcp`` mDNS
+   * broadcast. Drives ``has_pending_changes`` together with
+   * ``expected_config_hash``. Empty string when the device hasn't
+   * announced yet, or runs firmware older than the broadcast
+   * (esphome/esphome#16145) — the dashboard then falls back to
+   * mtime-based change detection.
+   */
+  deployed_config_hash: string;
+  /** Indicates if an offline update has been compiled and is waiting for the device to wake up */
+  queued_update: boolean;
+  /**
+   * Encryption state observed from the device's
+   * ``_esphomelib._tcp.local.`` mDNS broadcast.
+   *
+   * - ``null`` — mDNS not seen yet. Trust ``api_encrypted`` verbatim
+   *   (assume the device matches the YAML).
+   * - ``""`` — mDNS seen, ``api_encryption`` TXT absent. The device
+   *   is broadcasting plaintext API.
+   * - non-empty (e.g. ``"Noise_NNpsk0_25519_ChaChaPoly_SHA256"``) —
+   *   encryption is confirmed live on the device.
+   *
+   * Drives the four-state lock indicator: active / pending-flash /
+   * mismatch / plaintext.
+   */
+  api_encryption_active: string | null;
+}
+
 /** A configured ESPHome device. */
 export interface ConfiguredDevice {
   name: string;
@@ -37,17 +84,12 @@ export interface ConfiguredDevice {
    *  Prefers IPv4 when both are available. Used for OTA cache args, and as
    *  the Visit-web-UI fallback when ``address`` (mDNS hostname) is empty. */
   ip: string;
-  /** All resolved addresses from mDNS (IPv4 + IPv6) — empty array until
-   *  the device is seen online. ``ip_addresses[0]`` matches ``ip`` when
-   *  populated. */
-  ip_addresses: string[];
   web_port: number | null;
   /** Resolved `logger: baud_rate` for the Web Serial log port. `null` means
    *  unset (open at the 115200 default); `0` means UART logging is disabled;
    *  a positive value is the baud to open at. */
   logger_baud_rate: number | null;
   current_version: string;
-  deployed_version: string;
   loaded_integrations: string[];
   /**
    * Subset of ``loaded_integrations`` the user directly wrote in
@@ -68,9 +110,10 @@ export interface ConfiguredDevice {
    * accepts ``null`` / ``undefined`` / ``[]`` interchangeably.
    */
   directly_referenced_integrations?: string[];
-  state: DeviceState;
-  /** Indicates if an offline update has been compiled and is waiting for the device to wake up */
-  queued_update?: boolean;
+  /** Monitor-observed live state (reachability, deployed firmware,
+   *  encryption-on-the-wire). Nested so the flat fields stay
+   *  YAML/metadata-derived. */
+  runtime_state: DeviceRuntimeState;
   /** esp32 whose `ota: platform: esphome` sets `allow_partition_access` —
    *  the YAML half of the OTA bootloader-update gate (see
    *  `util/bootloader-flash.ts` for the deployed-firmware half). */
@@ -85,24 +128,6 @@ export interface ConfiguredDevice {
    * compiled — the drawer renders an em-dash for that.
    */
   expected_config_hash: string;
-  /**
-   * 8-char hex hash the running firmware reports via the
-   * ``config_hash`` TXT record on its ``_esphomelib._tcp`` mDNS
-   * broadcast. Drives ``has_pending_changes`` together with
-   * ``expected_config_hash``. Empty string when the device hasn't
-   * announced yet, or runs firmware older than the broadcast
-   * (esphome/esphome#16145) — the dashboard then falls back to
-   * mtime-based change detection.
-   */
-  deployed_config_hash: string;
-  /** Reachability channel currently driving the device's online state
-   *  (``mdns`` > ``mqtt`` > ``ping``). The deployed version / config
-   *  hash come only from the mDNS broadcast, so the out-of-sync /
-   *  update indicators are gated on ``active_source === "mdns"`` (see
-   *  ``src/util/device-sync.ts``): when mDNS is dark those values are
-   *  stale. Optional on the wire — absent / ``"unknown"`` means no
-   *  source has claimed the device yet, which reads as "not mDNS". */
-  active_source?: ReachabilitySource;
   /** True until successfully compiled + deployed */
   has_pending_changes: boolean;
   /** True when ``has_pending_changes`` came from the mDNS-sourced
@@ -131,21 +156,6 @@ export interface ConfiguredDevice {
    * ``devices/get_api_key``.
    */
   api_encrypted: boolean;
-  /**
-   * Encryption state observed from the device's
-   * ``_esphomelib._tcp.local.`` mDNS broadcast.
-   *
-   * - ``null`` — mDNS not seen yet. Trust ``api_encrypted`` verbatim
-   *   (assume the device matches the YAML).
-   * - ``""`` — mDNS seen, ``api_encryption`` TXT absent. The device
-   *   is broadcasting plaintext API.
-   * - non-empty (e.g. ``"Noise_NNpsk0_25519_ChaChaPoly_SHA256"``) —
-   *   encryption is confirmed live on the device.
-   *
-   * Drives the four-state lock indicator: active / pending-flash /
-   * mismatch / plaintext.
-   */
-  api_encryption_active: string | null;
   /** Canonical ``XX:XX:XX:XX:XX:XX`` MAC observed in the device's
    *  ``_esphomelib._tcp.local.`` ``mac`` TXT record (e.g.
    *  ``"94:C9:60:1F:8C:F1"``). Empty string when mDNS hasn't surfaced

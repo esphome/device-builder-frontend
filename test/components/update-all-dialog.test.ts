@@ -62,17 +62,17 @@ function primaryButton(el: ESPHomeUpdateAllDialog): HTMLButtonElement {
 
 const onlineUpdatable = makeConfiguredDevice({
   configuration: "a.yaml",
-  state: DeviceState.ONLINE,
+  runtime_state: { state: DeviceState.ONLINE },
   update_available: true,
 });
 const onlineCurrent = makeConfiguredDevice({
   configuration: "b.yaml",
-  state: DeviceState.ONLINE,
+  runtime_state: { state: DeviceState.ONLINE },
   update_available: false,
 });
 const offlineUpdatable = makeConfiguredDevice({
   configuration: "c.yaml",
-  state: DeviceState.OFFLINE,
+  runtime_state: { state: DeviceState.OFFLINE },
   update_available: true,
 });
 

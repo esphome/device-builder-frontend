@@ -148,9 +148,13 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       break;
     }
     case DeviceEventType.DEVICE_STATE_CHANGED: {
+      // Narrow event stays flat on the wire; fold it into runtime_state.
+      // New runtime_state object so Lit change detection sees the update.
       const { configuration, state } = data as DeviceStateChangedEventData;
       host._devices = host._devices.map((d) =>
-        d.configuration === configuration ? { ...d, state: state as DeviceState } : d
+        d.configuration === configuration
+          ? { ...d, runtime_state: { ...d.runtime_state, state: state as DeviceState } }
+          : d
       );
       break;
     }

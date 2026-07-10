@@ -21,14 +21,14 @@ import { makeConfiguredDevice } from "../../_make-configured-device.js";
 const DEVICES = [
   makeConfiguredDevice({
     configuration: "a.yaml",
-    state: DeviceState.ONLINE,
+    runtime_state: { state: DeviceState.ONLINE },
     update_available: true,
     target_platform: "esp32",
     area: "Kitchen",
   }),
   makeConfiguredDevice({
     configuration: "b.yaml",
-    state: DeviceState.OFFLINE,
+    runtime_state: { state: DeviceState.OFFLINE },
     has_pending_changes: true,
     target_platform: "esp8266",
     area: "",

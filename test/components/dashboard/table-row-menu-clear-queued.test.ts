@@ -21,7 +21,7 @@ function findClearItem(el: ESPHomeTableRowMenu): Element | undefined {
 describe("table-row-menu clear-queued-update item", () => {
   it("emits clear-queued-update for a device with a queued update", async () => {
     const el = await mount(new ESPHomeTableRowMenu(), {
-      device: makeConfiguredDevice({ queued_update: true }),
+      device: makeConfiguredDevice({ runtime_state: { queued_update: true } }),
       position: { x: 10, y: 10 },
     });
     const item = findClearItem(el);
@@ -35,7 +35,7 @@ describe("table-row-menu clear-queued-update item", () => {
 
   it("hides the item when no update is queued", async () => {
     const el = await mount(new ESPHomeTableRowMenu(), {
-      device: makeConfiguredDevice({ queued_update: false }),
+      device: makeConfiguredDevice({ runtime_state: { queued_update: false } }),
       position: { x: 10, y: 10 },
     });
     expect(findClearItem(el)).toBeUndefined();

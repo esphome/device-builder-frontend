@@ -1068,7 +1068,7 @@ export class ESPHomePageDevice extends LitElement {
             ?saving=${this._saving}
             ?showModified=${this._device ? showPendingChanges(this._device) : false}
             ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
-            .installedVersion=${this._device?.deployed_version ?? ""}
+            .installedVersion=${this._device?.runtime_state.deployed_version ?? ""}
             .availableVersion=${this._device?.current_version ?? ""}
             ?busy=${this._activeJobs.has(this.id)}
           >

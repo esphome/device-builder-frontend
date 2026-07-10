@@ -38,13 +38,10 @@ function makeDevices(n: number): ConfiguredDevice[] {
     name: `demo-${i}`,
     friendly_name: `Demo ${i}`,
     configuration: `demo-${i}.yaml`,
-    state: "ONLINE",
     address: `demo-${i}.local`,
     ip: "",
-    ip_addresses: [],
     mac_address: "",
     target_platform: "ESP32",
-    deployed_version: "",
     build_size_bytes: 0,
     comment: "",
     area: "",
@@ -53,7 +50,15 @@ function makeDevices(n: number): ConfiguredDevice[] {
     update_available: false,
     api_enabled: true,
     api_encrypted: false,
-    api_encryption_active: null,
+    runtime_state: {
+      state: "ONLINE",
+      active_source: "unknown",
+      ip_addresses: [],
+      deployed_version: "",
+      deployed_config_hash: "",
+      queued_update: false,
+      api_encryption_active: null,
+    },
   })) as unknown as ConfiguredDevice[];
 }
 

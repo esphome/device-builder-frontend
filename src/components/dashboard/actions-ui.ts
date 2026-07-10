@@ -93,7 +93,7 @@ export async function executeRename(
   // reachable device. Route offline/unknown devices to a confirm before a
   // config-only rename (renames the YAML now; the device keeps its old name
   // until reflashed, which the prompt spells out).
-  if (device.state !== DeviceState.ONLINE) {
+  if (device.runtime_state.state !== DeviceState.ONLINE) {
     host._openConfirm({ kind: "rename-config-only", device, newName });
     return;
   }

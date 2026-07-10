@@ -211,7 +211,7 @@ export class ESPHomeTableRowMenu extends LitElement {
           ${this._localize("dashboard.action_install")}
         </div>
         ${
-          this.device?.queued_update
+          this.device?.runtime_state.queued_update
             ? html`<div
                 class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
                 @click=${this.busy ? undefined : () => this._emit("clear-queued-update")}
