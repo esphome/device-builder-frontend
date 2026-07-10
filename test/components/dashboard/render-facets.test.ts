@@ -75,7 +75,12 @@ describe("renderFacets", () => {
 
   it("renders the Updates section when a device needs an update", () => {
     const host = makeHost({
-      _devices: [{ update_available: true, runtime_state: { active_source: "mdns" } }],
+      _devices: [
+        {
+          update_available: true,
+          runtime_state: { state: "online", active_source: "mdns" },
+        },
+      ],
     });
     expect(updatesSection(renderInto(renderFacets(host)))).not.toBeUndefined();
   });
@@ -92,7 +97,12 @@ describe("renderFacets", () => {
 
   it("suppresses the Updates section in YAML-search mode", () => {
     const host = makeHost({
-      _devices: [{ has_pending_changes: true, runtime_state: { active_source: "mdns" } }],
+      _devices: [
+        {
+          has_pending_changes: true,
+          runtime_state: { state: "online", active_source: "mdns" },
+        },
+      ],
       _yamlMode: true,
     });
     expect(updatesSection(renderInto(renderFacets(host)))).toBeUndefined();
