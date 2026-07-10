@@ -85,10 +85,9 @@ export function isEntryVisible(
   // check order below is immaterial. Resolve the dependency in the
   // local scope first, then fall back to the component root so a
   // nested entry can gate on a top-level field.
-  const depValue =
-    entry.depends_on in values
-      ? values[entry.depends_on]
-      : rootValues?.[entry.depends_on];
+  const depValue = Object.prototype.hasOwnProperty.call(values, entry.depends_on)
+    ? values[entry.depends_on]
+    : rootValues?.[entry.depends_on];
   if (entry.depends_on_value !== null && entry.depends_on_value !== undefined) {
     return depValue === entry.depends_on_value;
   }
