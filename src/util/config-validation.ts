@@ -55,6 +55,14 @@ export function platformSupported(
  * falls back to ``rootValues``. Omit it and ``depends_on`` stays
  * sibling-scoped as before.
  *
+ * Resolution is by key name: a *set* local sibling always wins, but a
+ * key absent from ``values`` falls through to ``rootValues``. So a
+ * ``depends_on`` names either a local sibling or a component-root field
+ * — not both. The backend keeps ``depends_on`` targets from colliding
+ * across nesting levels, so an unset sibling can't be mistaken for a
+ * same-named root field. (A future explicit root-vs-sibling scope
+ * marker on the gate would remove the reliance on name uniqueness.)
+ *
  * Used by both ``filterRenderable`` (deciding what to paint) and
  * ``validateEntries`` (deciding what to validate). Keeping the
  * predicate in one place means a hidden-by-platform field can't be
