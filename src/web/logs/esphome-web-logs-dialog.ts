@@ -48,7 +48,16 @@ export async function openPortForLogs(
   try {
     await port.open({ baudRate: LOG_BAUD_RATE });
   } catch (err) {
-    if (err instanceof DOMException && err.name === "InvalidStateError") return true;
+    // ``InvalidStateError`` means the port is already open. That's fine ONLY if
+    // nothing else holds its reader — streamSerialLines() calls getReader(), so
+    // a locked readable stream (another action mid-op) would fail. Bail loudly.
+    if (err instanceof DOMException && err.name === "InvalidStateError") {
+      if (port.readable?.locked) {
+        toast.error(localize("web.logs.port_busy"));
+        return false;
+      }
+      return true;
+    }
     toast.error(
       localize("web.logs.open_failed", {
         error: err instanceof Error ? err.message : String(err),

@@ -49,7 +49,16 @@ export async function openImprovDialog(
     }
   }
 
-  await import("improv-wifi-serial-sdk/dist/serial-provision-dialog");
+  // The SDK loads as a lazy chunk; a chunk-load / CSP / network failure here
+  // would otherwise throw out of a ``void openImprovDialog(...)`` call as an
+  // unhandled rejection and leave the port we opened dangling.
+  try {
+    await import("improv-wifi-serial-sdk/dist/serial-provision-dialog");
+  } catch {
+    void port.close().catch(() => {});
+    toast.error(localize("web.improv.load_failed"));
+    return false;
+  }
   const dialog = document.createElement("improv-wifi-serial-provision-dialog");
   dialog.port = port;
 

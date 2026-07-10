@@ -1538,7 +1538,8 @@
     },
     "improv": {
       "open_failed": "Could not open the serial port for Wi-Fi setup: {error}",
-      "port_busy": "The device is busy with another operation. Close it and try again."
+      "port_busy": "The device is busy with another operation. Close it and try again.",
+      "load_failed": "Could not load the Wi-Fi setup dialog. Check your connection and try again."
     },
     "flash": {
       "title": "Install firmware",
@@ -1601,7 +1602,8 @@
       "download": "Download logs",
       "clear": "Clear",
       "open_failed": "Could not open the serial port: {error}",
-      "reset_failed": "Could not reset the device."
+      "reset_failed": "Could not reset the device.",
+      "port_busy": "The device is busy with another operation. Close it and try again."
     },
     "dashboard_hint": {
       "logs": "Connect your device below, then click Logs to view its output.",

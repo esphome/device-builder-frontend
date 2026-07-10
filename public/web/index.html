@@ -13,7 +13,8 @@
           "prepare for first use" and Pico install flows fetch the
           esphome-web firmware manifest and binary parts from there. No
           backend WebSocket exists here (this is a static site), so ws:/wss:
-          are dropped.
+          are dropped in the prod build. The dev server injects ws:/wss: back
+          for its HMR socket — see build-scripts/rspack.cjs.
         * img-src keeps 'self' data: https: for the runtime-built MDI icon
           data: URIs and any remote logos.
       script-src falls back to default-src 'self' so injected

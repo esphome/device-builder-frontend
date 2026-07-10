@@ -270,8 +270,18 @@ const createWebRspackConfig = ({ isProdBuild = false } = {}) => ({
   optimization: optimizationConfig(isProdBuild),
   plugins: [
     definePlugin(isProdBuild),
+    // The prod CSP has no ws:/wss: — ESPHome Web is a static site with no
+    // WebSocket. But the dev server's HMR client connects over ws://.../hmr-ws,
+    // so widen connect-src to allow it in dev only (prod ships the tight CSP).
     new rspack.HtmlRspackPlugin({
-      template: path.resolve(WEB_PUBLIC_DIR, "index.html"),
+      templateContent: fs
+        .readFileSync(path.resolve(WEB_PUBLIC_DIR, "index.html"), "utf-8")
+        .replace(
+          "connect-src 'self' data: https://firmware.esphome.io",
+          isProdBuild
+            ? "connect-src 'self' data: https://firmware.esphome.io"
+            : "connect-src 'self' data: https://firmware.esphome.io ws: wss:"
+        ),
       inject: "body",
     }),
     new rspack.CopyRspackPlugin({

@@ -57,6 +57,10 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   private _hasOpener = false;
   private _stopLogs = false;
   private _logCancel?: () => void;
+  // Batched log buffer flushed on the next animation frame (mirrors the logs
+  // dialog): a boot-log flood would otherwise trigger a Lit render per line.
+  private _pendingLog: string[] = [];
+  private _flushScheduled = 0;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -79,6 +83,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     super.disconnectedCallback();
     this._handshake?.stop();
     this._logCancel?.();
+    if (this._flushScheduled) cancelAnimationFrame(this._flushScheduled);
   }
 
   private _onFirmware(msg: FirmwareMessage): void {
@@ -103,10 +108,35 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._handshake?.postProgress(pct);
   }
 
-  private _appendLog(line: string): void {
-    const merged = [...this._logLines, line];
+  // Buffer a log line; flush on the next animation frame so a flood renders
+  // once per frame instead of per line.
+  private _enqueueLog(line: string): void {
+    this._pendingLog.push(line);
+    if (this._pendingLog.length > 2 * MAX_LOG_LINES) {
+      this._pendingLog = this._pendingLog.slice(-MAX_LOG_LINES);
+    }
+    if (this._flushScheduled) return;
+    this._flushScheduled = requestAnimationFrame(() => {
+      this._flushScheduled = 0;
+      this._flushLog();
+    });
+  }
+
+  private _flushLog(): void {
+    if (this._pendingLog.length === 0) return;
+    const merged = [...this._logLines, ...this._pendingLog];
     this._logLines =
       merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+    this._pendingLog = [];
+  }
+
+  private _resetLog(): void {
+    this._pendingLog = [];
+    if (this._flushScheduled) {
+      cancelAnimationFrame(this._flushScheduled);
+      this._flushScheduled = 0;
+    }
+    this._logLines = [];
   }
 
   private _onFileChange(): void {
@@ -120,6 +150,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       this._logCancel?.();
       this._logCancel = undefined;
       this._streaming = false;
+      this._flushLog(); // surface any buffered tail before we stop
       return;
     }
     if (this._flashDone) {
@@ -153,7 +184,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._flashDone = false;
     this._stopLogs = false;
     this._progress = null;
-    this._logLines = [];
+    this._resetLog();
 
     let port: SerialPort;
     try {
@@ -191,7 +222,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           }
         },
         onProgress: (pct) => this._setProgress(pct),
-        onLog: (line) => this._appendLog(line),
+        onLog: (line) => this._enqueueLog(line),
         onError: (message) => this._setState("error", message),
       }
     );
@@ -229,7 +260,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         }
       }
       if (!this._stopLogs) {
-        this._appendLog(
+        this._enqueueLog(
           this._localize("web.flash.logs_unavailable", {
             error: error ?? this._localize("web.flash.no_reenumerate"),
           })
@@ -245,7 +276,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       // tolerate; the chip may already be fine
     }
     this._logCancel = streamSerialLines(port, {
-      onLine: (line) => this._appendLog(line),
+      onLine: (line) => this._enqueueLog(line),
     });
   }
 
