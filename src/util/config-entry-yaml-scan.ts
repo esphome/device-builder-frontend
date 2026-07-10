@@ -389,10 +389,13 @@ export function findComponentsByProviders(
   for (const section of parseYamlTopLevelSections(yaml)) {
     const provs = byDomain.get(section.parentKey ?? section.key);
     if (!provs) continue;
+    let ownIdMatched = false;
+    let hasIdPathProvider = false;
     for (const p of provs) {
       // ``stem === ""`` matches every id in the domain block.
       if (p.stem !== "" && p.stem !== section.platform) continue;
       if (p.idPaths?.length) {
+        hasIdPathProvider = true;
         // The interface id is nested (usb_uart channels[].id): collect the
         // ids at those paths, not the section's own (non-interface) id.
         lines ??= yaml.split("\n");
@@ -400,9 +403,17 @@ export function findComponentsByProviders(
           for (const inst of collectIdsAtPath(lines, section, path))
             add(inst.id, inst.name);
         }
-      } else if (section.id) {
-        add(section.id, section.name ?? "");
+      } else {
+        ownIdMatched = true;
       }
+    }
+    // An idPaths provider enumerates every interface id in this section, so
+    // the stemless catch-all provider findReferenceCandidates injects must
+    // not add the section's own id on top: for a multi-entity platform it is
+    // the hub (the wrong type for the reference), and a hybrid's root entity
+    // already arrived through its ["id"] path.
+    if (ownIdMatched && !hasIdPathProvider && section.id) {
+      add(section.id, section.name ?? "");
     }
   }
   providerMemo.set(probe, result);

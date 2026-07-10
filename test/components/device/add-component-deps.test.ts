@@ -80,6 +80,16 @@ describe("findMissingDependencies", () => {
     // would otherwise report ld2410 missing.
     expect(findMissingDependencies(["ld2410"], "", new Set(["ld2410"]))).toEqual([]);
   });
+
+  it("satisfies a rp2040 dep from a rp2 block", () => {
+    // esphome 2026.7 renames the platform key; a config already migrated
+    // to `rp2:` must not prompt for a duplicate rp2040 platform block.
+    expect(findMissingDependencies(["rp2040"], "rp2:\n  board: rpipicow\n")).toEqual([]);
+  });
+
+  it("satisfies a rp2 dep from a rp2040 block", () => {
+    expect(findMissingDependencies(["rp2"], "rp2040:\n  board: rpipicow\n")).toEqual([]);
+  });
 });
 
 describe("depsSatisfiedByProvides", () => {
@@ -143,6 +153,19 @@ describe("depsSatisfiedByProvides", () => {
       { platform: "esp32", boardId: null }
     );
     expect([...satisfied]).toEqual(["uart"]);
+  });
+
+  it("matches a rp2040 provider against a rp2 block and canonicalizes the platform", async () => {
+    const getComponents = vi.fn().mockResolvedValue(providersResponse(["rp2040"]));
+    const satisfied = await depsSatisfiedByProvides(
+      stubApi(getComponents),
+      ["pico_w"],
+      new Set(["rp2", "logger"]),
+      { platform: "rp2", boardId: null }
+    );
+    expect([...satisfied]).toEqual(["pico_w"]);
+    // The provides index is keyed on the catalog's canonical platform key.
+    expect(getComponents.mock.calls[0][0]).toMatchObject({ platform: "rp2040" });
   });
 
   it("short-circuits an empty missing list without an API call", async () => {

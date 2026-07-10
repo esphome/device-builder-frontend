@@ -89,12 +89,28 @@ export const dashboardStyles = css`
 
   /* ─── Search toolbar ─── */
 
+  /* Pins below the sticky app header so search / view toggle stay
+     reachable on a long card grid or YAML hit list (#1923). Only the
+     page-scroll views render .toolbar (table view slots
+     .toolbar-stack into the device-table, and its fixed-height host
+     never scrolls), so no per-view scoping is needed. top tracks
+     --esphome-header-height so the compact mobile header stacks
+     correctly. Opaque background so cards don't show through while
+     stuck; the bottom padding keeps scrolled-under content off the
+     count row (the grid's own top padding scrolls away with it).
+     z-index stays below the discovered pill (5,
+     device-grid-styles.ts) whose expanded panel hangs over the
+     toolbar, and above the unpositioned grid/list content. */
   .toolbar {
     display: flex;
     flex-direction: column;
     gap: var(--toolbar-row-gap);
-    padding: var(--toolbar-pad-top) var(--content-gutter) 0;
+    padding: var(--toolbar-pad-top) var(--content-gutter) var(--toolbar-row-gap);
     flex-shrink: 0;
+    position: sticky;
+    top: var(--esphome-header-height);
+    z-index: 4;
+    background: var(--wa-color-surface-default);
   }
 
   /* Table-view counterpart to .toolbar (sits inside the

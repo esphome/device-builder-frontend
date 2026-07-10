@@ -5,24 +5,6 @@ export const deviceEditorStyles = css`
     display: contents;
   }
 
-  .invalid-banner-goto {
-    appearance: none;
-    margin-left: 0.35em;
-    padding: 0;
-    border: none;
-    background: none;
-    color: inherit;
-    font: inherit;
-    font-weight: var(--wa-font-weight-semibold);
-    text-decoration: underline;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .invalid-banner-goto:hover {
-    text-decoration: none;
-  }
-
   .card {
     background: var(--wa-color-surface-default);
     border-radius: var(--editor-border-radius, var(--wa-border-radius-l));
@@ -380,8 +362,7 @@ export const deviceEditorStyles = css`
   /* The code editor brings its own line-number gutter, so the full
      var(--wa-space-m) inset the config form needs reads as wasted padding that
      shrinks the text area. Trim the editor pane to a tighter, even inset on the
-     top + sides; the bottom keeps the action-row reserve above. Also the
-     positioning context for the floating invalid banner. */
+     top + sides; the bottom keeps the action-row reserve above. */
   .editor-pane--right {
     position: relative;
     padding-top: var(--wa-space-xs);
@@ -392,25 +373,6 @@ export const deviceEditorStyles = css`
     margin: 0;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
-  }
-
-  /* Document-level "configuration invalid" banner (shape from
-     dangerBannerStyles). Floats over the bottom of the code pane (just
-     above the action-row reserve) instead of sitting in flow above the
-     editor — a lint pass adding or clearing it must not reflow the code
-     under the user's cursor. */
-  .invalid-banner {
-    position: absolute;
-    left: var(--wa-space-xs);
-    right: var(--wa-space-xs);
-    bottom: calc(2.25rem + var(--wa-space-xs) * 2);
-    z-index: 9;
-    box-shadow: var(--wa-elevation-02);
-  }
-
-  .invalid-banner-more {
-    font-size: var(--wa-font-size-2xs);
-    opacity: 0.85;
   }
 
   .editor-pane-body {

@@ -52,6 +52,34 @@ describe("getKeyPath", () => {
     ]);
   });
 
+  it("resolves a trailing-space empty value mid-document (lines follow)", () => {
+    // With content below, the whitespace after ``key: `` resolves into an
+    // enclosing container that HAS an ancestor pair (the top-level block),
+    // so the re-anchor must fire on trailing whitespace, not only when no
+    // enclosing pair exists.
+    const doc = [
+      "esp32:",
+      "  framework:",
+      "    advanced:",
+      "      minimum_chip_revision: ",
+      "  variant: ESP32",
+      "",
+      "api:",
+      "  encryption:",
+      "    key: x",
+    ].join("\n");
+    const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
+    ensureSyntaxTree(state, state.doc.length);
+    const marker = "minimum_chip_revision: ";
+    const pos = doc.indexOf(marker) + marker.length;
+    expect(getKeyPath(state, pos)).toEqual([
+      "esp32",
+      "framework",
+      "advanced",
+      "minimum_chip_revision",
+    ]);
+  });
+
   it("returns [] outside any mapping pair", () => {
     expect(pathAt("# comment\n", "comment")).toEqual([]);
   });

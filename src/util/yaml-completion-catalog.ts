@@ -15,6 +15,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
+import { fetchAllComponents } from "./fetch-all-components.js";
 import { getKeyPath, resolveBundleContext } from "./yaml-ast.js";
 import {
   blankLineContext,
@@ -133,16 +134,16 @@ let catalogPromise: Promise<CatalogIndex> | null = null;
 export function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
   if (catalogPromise) return catalogPromise;
   catalogPromise = (async () => {
-    const res = await api.getComponents({ limit: 2000 });
+    const components = await fetchAllComponents(api);
     const byId = new Map<string, ComponentCatalogEntry>();
     const byCategory = new Map<string, ComponentCatalogEntry[]>();
-    for (const c of res.components) {
+    for (const c of components) {
       byId.set(c.id, c);
       const list = byCategory.get(c.category) ?? [];
       list.push(c);
       byCategory.set(c.category, list);
     }
-    return { components: res.components, byId, byCategory };
+    return { components, byId, byCategory };
   })().catch((err) => {
     console.debug("[yaml-completion] failed to load catalog:", err);
     catalogPromise = null;

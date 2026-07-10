@@ -82,8 +82,9 @@ export const espHomeStyles = css`
      sidebar-collapse breakpoint, so embedded in the HA panel this
      fires exactly when HA swaps to its own 40px top bar — matching
      its height avoids a chunky doubled-up bar. Defined on the shared
-     token so the header element, the content-area height calcs, and
-     the actions-menu top offset all shrink together. */
+     token so the header element, the content-area height calcs, the
+     actions-menu top offset, and the dashboard toolbar's sticky top
+     all shrink together. */
   @media (max-width: 870px) {
     :host {
       --esphome-header-height: 40px;

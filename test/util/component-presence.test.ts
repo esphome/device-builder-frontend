@@ -16,4 +16,10 @@ describe("isComponentPresent", () => {
     );
     expect(isComponentPresent("time.sntp", present, presentPlatforms)).toBe(false);
   });
+
+  it("matches rp2 and rp2040 against either block spelling", () => {
+    expect(isComponentPresent("rp2040", new Set(["rp2"]), presentPlatforms)).toBe(true);
+    expect(isComponentPresent("rp2", new Set(["rp2040"]), presentPlatforms)).toBe(true);
+    expect(isComponentPresent("rp2040", present, presentPlatforms)).toBe(false);
+  });
 });

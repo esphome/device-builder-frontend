@@ -29,6 +29,7 @@ import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../../src/api/types/automations.js";
 import { ESPHomeScriptEditor } from "../../../../src/components/device/automation-editor/script-editor.js";
 import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
+import { flushMicrotasks } from "../../../_dom.js";
 
 const slimWithLoggerAction = (): AvailableAutomations =>
   ({
@@ -46,10 +47,6 @@ const loggerBodies = () => ({
   },
 });
 
-async function flushPending(times = 30): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
-
 async function mountEditor(
   api: ESPHomeAPI,
   configuration?: string
@@ -60,7 +57,7 @@ async function mountEditor(
   if (configuration !== undefined) editor.configuration = configuration;
   document.body.appendChild(editor);
   await editor.updateComplete;
-  await flushPending();
+  await flushMicrotasks(30);
   return editor;
 }
 

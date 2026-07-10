@@ -28,6 +28,7 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../src/api/esphome-api.js";
 import { ESPHomeSecretValue } from "../../../src/components/device/secret-value.js";
 import { _resetSecretKeysCache } from "../../../src/util/secrets-cache.js";
+import { flush } from "../../_dom.js";
 
 async function mount(
   api: Partial<ESPHomeAPI>,
@@ -43,14 +44,14 @@ async function mount(
   document.body.appendChild(el);
   await el.updateComplete;
   // Present mode prefills the field from secrets.yaml via an async load.
-  await new Promise((r) => setTimeout(r, 0));
+  await flush();
   await el.updateComplete;
   return el;
 }
 
 const click = async (el: ESPHomeSecretValue, selector: string): Promise<void> => {
   (el.shadowRoot!.querySelector(selector) as HTMLElement).click();
-  await new Promise((r) => setTimeout(r, 0));
+  await flush();
   await el.updateComplete;
 };
 
@@ -108,7 +109,7 @@ describe("esphome-secret-value", () => {
     el.shadowRoot!.querySelector("esphome-password-input")!.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true })
     );
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     expect(api.updateConfig).not.toHaveBeenCalled();
 
     await typeValue(el, "real");
@@ -182,7 +183,7 @@ describe("esphome-secret-value", () => {
     el.shadowRoot!.querySelector("esphome-confirm-dialog")!.dispatchEvent(
       new CustomEvent("confirm")
     );
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     await el.updateComplete;
 
     expect(api.setSecret).toHaveBeenCalledWith("wifi_password", "newpass", true);
@@ -228,7 +229,7 @@ describe("esphome-secret-value", () => {
     expect(copyBtn().disabled).toBe(true);
 
     resolveGet("api_key: stored\n");
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     await el.updateComplete;
 
     expect(pwInput(el).value).toBe("stored");
@@ -254,7 +255,7 @@ describe("esphome-secret-value", () => {
 
     // Retry re-fetches and recovers.
     await click(el, ".retry");
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     await el.updateComplete;
     expect(pwInput(el).value).toBe("real");
   });
@@ -281,7 +282,7 @@ describe("esphome-secret-value", () => {
     expect((api.getConfig as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
 
     resolveGet("api_key: stored\n");
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     await el.updateComplete;
     expect(pwInput(el).value).toBe("stored");
   });
@@ -318,13 +319,13 @@ describe("esphome-secret-value", () => {
     // The stale write A resolves — must NOT clear B's busy (else B's button
     // re-enables mid-write). Without the op-token guard this would be enabled.
     resolveA();
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     await el.updateComplete;
     expect(saveBtn().disabled).toBe(true);
 
     // B completes normally (both writes were issued).
     resolveB();
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     await el.updateComplete;
     expect((api.setSecret as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2);
   });
@@ -341,7 +342,7 @@ describe("esphome-secret-value", () => {
     await el.updateComplete;
     el.present = true;
     await el.updateComplete;
-    await new Promise((r) => setTimeout(r, 0));
+    await flush();
     await el.updateComplete;
 
     // Back to the freshly-loaded stored value, not the abandoned draft.

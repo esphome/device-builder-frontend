@@ -32,13 +32,21 @@ function res(
   return { yaml_errors, validation_errors };
 }
 
+// Echo the key + interpolated values so a humanized hit is distinguishable.
+const localize = (key: string, values?: Record<string, string | number>): string =>
+  values ? `${key}:${JSON.stringify(values)}` : key;
+
+/** Summarize against an (optionally empty) buffer with the echo localizer. */
+const summarize = (r: EditorValidateResponse, content = "") =>
+  summarizeValidation(r, content, localize);
+
 describe("summarizeValidation", () => {
   it("returns count 0 when neither bucket has entries", () => {
-    expect(summarizeValidation(res())).toEqual({ count: 0, first: null });
+    expect(summarize(res())).toEqual({ count: 0, first: null });
   });
 
   it("extracts line + column from a yaml-error message", () => {
-    const summary = summarizeValidation(
+    const summary = summarize(
       res([{ message: "mapping values not allowed at line 7, column 12" }])
     );
     expect(summary.count).toBe(1);
@@ -50,7 +58,7 @@ describe("summarizeValidation", () => {
   });
 
   it("falls back to bare 'line N' when the column is absent", () => {
-    const summary = summarizeValidation(
+    const summary = summarize(
       res([{ message: "while parsing block mapping at line 4" }])
     );
     expect(summary.first?.line).toBe(4);
@@ -62,14 +70,14 @@ describe("summarizeValidation", () => {
     // info; "Go to error" should disable rather than jump to a
     // bogus line. Dialog reads ``firstErrorLine === 0`` as
     // "no jump target".
-    const summary = summarizeValidation(res([{ message: "Unknown YAML failure" }]));
+    const summary = summarize(res([{ message: "Unknown YAML failure" }]));
     expect(summary.first?.line).toBe(0);
     expect(summary.first?.col).toBe(0);
     expect(summary.first?.message).toBe("Unknown YAML failure");
   });
 
   it("converts a 0-indexed validation-error range to 1-indexed line/col", () => {
-    const summary = summarizeValidation(
+    const summary = summarize(
       res(
         [],
         [
@@ -93,7 +101,7 @@ describe("summarizeValidation", () => {
     // error (which the user MUST fix first; the validation
     // errors below it are usually downstream noise from the
     // broken parse).
-    const summary = summarizeValidation(
+    const summary = summarize(
       res(
         [{ message: "block sequence entries are not allowed at line 3, column 5" }],
         [
@@ -113,7 +121,7 @@ describe("summarizeValidation", () => {
   });
 
   it("carries the validation-error source document as first.file", () => {
-    const summary = summarizeValidation(
+    const summary = summarize(
       res(
         [],
         [
@@ -134,7 +142,7 @@ describe("summarizeValidation", () => {
   });
 
   it("leaves first.file null when the validator reports no document", () => {
-    const summary = summarizeValidation(
+    const summary = summarize(
       res(
         [],
         [
@@ -149,12 +157,110 @@ describe("summarizeValidation", () => {
   });
 
   it("leaves first.file null for yaml parse errors", () => {
-    const summary = summarizeValidation(res([{ message: "boom at line 3, column 1" }]));
+    const summary = summarize(res([{ message: "boom at line 3, column 1" }]));
     expect(summary.first?.file).toBeNull();
   });
 
+  it("jumps to the problem mark, humanized, never the context mark (line 3 bug)", () => {
+    // A dedented list marker deep in the file: PyYAML's context mark points
+    // at the enclosing block's start (line 1), the problem mark at the
+    // marker itself (line 5). The dialog must land on 5 with the same
+    // indent-fix wording as the banner, with the absolute path collapsed.
+    const content = [
+      "sensor:", // 1
+      "  # Uptime sensor.", // 2
+      "  - platform: uptime", // 3
+      "    name: Ethernet Uptime", // 4
+      "- platform: template", // 5
+      "    name: Free Memory", // 6
+    ].join("\n");
+    const message =
+      "while parsing a block mapping\n" +
+      '  in "/Users/bdraco/esphome/smallgarage.yaml", line 1, column 1\n' +
+      "expected <block end>, but found '-'\n" +
+      '  in "/Users/bdraco/esphome/smallgarage.yaml", line 5, column 1';
+    const summary = summarize(res([{ message }]), content);
+    expect(summary.first?.line).toBe(5);
+    expect(summary.first?.message).toContain("yaml_editor.error_indent_fix:");
+    expect(summary.first?.message).toContain('"line":5');
+    expect(summary.first?.message).not.toContain("/Users/bdraco");
+  });
+
+  it("drops the column when the jump retargets off the problem mark", () => {
+    // The over-indented-property shape: the scanner blames the property
+    // (line 3 col 10), the fix site is the marker (line 2) — the original
+    // column is meaningless against the retargeted line.
+    const content = "sensor:\n- platform: dht\n    model: DHT11\n";
+    const message =
+      'mapping values are not allowed here\n  in "x.yaml", line 3, column 10';
+    const summary = summarize(res([{ message }]), content);
+    expect(summary.first?.line).toBe(2);
+    expect(summary.first?.col).toBe(0);
+    expect(summary.first?.message).toContain("yaml_editor.error_indent_fix:");
+  });
+
+  it("collapses absolute paths in an unhumanized fallback message", () => {
+    const summary = summarize(
+      res([{ message: 'found a tab in "/Users/me/esphome/foo.yaml", line 2, column 3' }])
+    );
+    expect(summary.first?.message).toContain('"foo.yaml"');
+    expect(summary.first?.message).not.toContain("/Users/me");
+  });
+
+  it("adds the value-type cause hint for an open-buffer validation error", () => {
+    const content = "logger:\n  le\n";
+    const summary = summarize(
+      res(
+        [],
+        [
+          {
+            message: "expected a dictionary.",
+            range: { start_line: 1, start_col: 2, end_line: 1, end_col: 4 },
+          },
+        ]
+      ),
+      content
+    );
+    expect(summary.first?.message).toContain("expected a dictionary.");
+    expect(summary.first?.message).toContain("yaml_editor.error_missing_colon_hint");
+  });
+
+  it("skips the cause hint when the error lives in an included file", () => {
+    const content = "logger:\n  le\n";
+    const summary = summarize(
+      res(
+        [],
+        [
+          {
+            message: "expected a dictionary.",
+            range: {
+              document: "/config/esphome/common/base.yaml",
+              start_line: 1,
+              start_col: 2,
+              end_line: 1,
+              end_col: 4,
+            },
+          },
+        ]
+      ),
+      content
+    );
+    expect(summary.first?.message).toBe("expected a dictionary.");
+  });
+
+  it("disables navigation for a validation error without a range", () => {
+    // The linter path already treats a null range as unplaceable; the
+    // dialog reads line 0 as "no jump target" rather than jumping to 1:1.
+    const summary = summarize(
+      res([], [{ message: "Component not found: foo", range: null }])
+    );
+    expect(summary.first?.line).toBe(0);
+    expect(summary.first?.col).toBe(0);
+    expect(summary.first?.message).toBe("Component not found: foo");
+  });
+
   it("counts every error across both buckets", () => {
-    const summary = summarizeValidation(
+    const summary = summarize(
       res(
         [{ message: "y1 line 1, column 1" }],
         [

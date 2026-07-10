@@ -14,6 +14,7 @@ import {
 } from "../../../src/components/dashboard/render-dialogs.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
+import { makeDashboardHost } from "./_host.js";
 
 const { toastError, toastSuccess } = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -47,7 +48,7 @@ function makeHost(
   state: DeviceState = DeviceState.ONLINE
 ): { host: ESPHomePageDashboard; openConfirm: ReturnType<typeof vi.fn> } {
   const openConfirm = vi.fn();
-  const host = {
+  const host = makeDashboardHost({
     _actionDevice: {
       name: "rename_test",
       friendly_name: "Rename_Test",
@@ -57,7 +58,7 @@ function makeHost(
     _api: { renameDevice } as unknown as ESPHomeAPI,
     _localize: localize,
     _openConfirm: openConfirm,
-  } as unknown as ESPHomePageDashboard;
+  });
   return { host, openConfirm };
 }
 
@@ -77,7 +78,7 @@ describe("openLogsWithMethod web-serial", () => {
 
   it("blocks serial logs and notifies when logging is disabled (baud_rate 0)", async () => {
     vi.stubGlobal("navigator", { serial: {} });
-    const host = { _localize: localize } as unknown as ESPHomePageDashboard;
+    const host = makeDashboardHost();
     const device = {
       configuration: "x.yaml",
       name: "x",
@@ -201,10 +202,10 @@ describe("clear-queued-update confirm", () => {
   function makeClearHost(
     firmwareClearQueuedUpdate: ESPHomeAPI["firmwareClearQueuedUpdate"]
   ): ESPHomePageDashboard {
-    return {
+    return makeDashboardHost({
       _api: { firmwareClearQueuedUpdate } as unknown as ESPHomeAPI,
       _localize: localize,
-    } as unknown as ESPHomePageDashboard;
+    });
   }
 
   it("is a non-destructive confirm naming the device", () => {

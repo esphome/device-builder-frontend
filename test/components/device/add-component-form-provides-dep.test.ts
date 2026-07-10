@@ -16,6 +16,7 @@ import type { ComponentCatalogEntry } from "../../../src/api/types/components.js
 import { ESPHomeAddComponentForm } from "../../../src/components/device/add-component-form.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { _clearProvidesCache } from "../../../src/util/provides-cache.js";
+import { flushMicrotasks } from "../../_dom.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 function providersResponse(ids: string[]) {
@@ -55,7 +56,7 @@ async function mountForm(
   // provides lookup settles (a few microtask hops through the cache), a
   // re-render clears it. Flush generously, then await the final update.
   await el.updateComplete;
-  for (let i = 0; i < 10; i++) await Promise.resolve();
+  await flushMicrotasks(10);
   await el.updateComplete;
   return el;
 }
@@ -136,7 +137,7 @@ describe("add-component-form provides-satisfied dependency", () => {
 
     // A finally resolves with libretiny providers, after the seq moved on.
     resolveA(providersResponse(["bk72xx"]));
-    for (let i = 0; i < 10; i++) await Promise.resolve();
+    await flushMicrotasks(10);
     await el.updateComplete;
 
     const inst = el as unknown as { _providedDeps: ReadonlySet<string> };
@@ -174,7 +175,7 @@ describe("add-component-form provides-satisfied dependency", () => {
     const providedRef = inst._providedDeps;
 
     // Let the provides lookup settle.
-    for (let i = 0; i < 10; i++) await Promise.resolve();
+    await flushMicrotasks(10);
     await el.updateComplete;
 
     expect(getComponents).toHaveBeenCalled(); // the lookup did run

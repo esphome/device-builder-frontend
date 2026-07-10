@@ -12,7 +12,8 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 import type { YamlSearchHit } from "../../../src/api/types/devices.js";
 import { renderYamlMode } from "../../../src/components/dashboard/render-yaml.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
+import { renderInto } from "../../_dom.js";
+import { makeDashboardHost } from "./_host.js";
 
 function makeHit(): YamlSearchHit {
   return {
@@ -31,11 +32,7 @@ function makeHit(): YamlSearchHit {
 }
 
 function makeHost(hits: YamlSearchHit[]): ESPHomePageDashboard {
-  return {
-    _localize: identityLocalize,
-    _search: "living",
-    _yamlSearch: { hits },
-  } as unknown as ESPHomePageDashboard;
+  return makeDashboardHost({ _search: "living", _yamlSearch: { hits } });
 }
 
 describe("renderYamlMode hit header", () => {

@@ -787,7 +787,7 @@ export class ESPHomePageDevice extends LitElement {
           const res =
             getLastValidatedResult(this.id, this._yaml) ??
             (await this._api.validateYaml(this.id, this._yaml));
-          const summary = summarizeValidation(res);
+          const summary = summarizeValidation(res, this._yaml, this._localize);
           if (summary.count > 0) {
             this._validationErrorCount = summary.count;
             this._validationFirstLine = summary.first?.line ?? 0;

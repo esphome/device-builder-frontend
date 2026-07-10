@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import type { EditorValidateResponse } from "../../src/api/types/editor.js";
 import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
-import type { YamlAutoFix } from "../../src/util/yaml-lint-backend.js";
+import type { YamlAutoFix } from "../../src/util/yaml-error-analysis.js";
 import { mount } from "../_dom.js";
 
 const viewOf = (el: ESPHomeYamlEditor): EditorView =>
@@ -23,7 +23,7 @@ const viewOf = (el: ESPHomeYamlEditor): EditorView =>
 // indents line 2 (`- platform`) by 2 so it lines up with its properties.
 const BROKEN = "sensor:\n- platform: dht\n    model: DHT11\n";
 const FIXED = "sensor:\n  - platform: dht\n    model: DHT11\n";
-const FIX: YamlAutoFix = { line: 2, indent: 2, key: "platform" };
+const FIX: YamlAutoFix = { line: 2, indent: 2, key: "platform", fromIndent: 0 };
 
 const CLEAN: EditorValidateResponse = { yaml_errors: [], validation_errors: [] };
 // Proposed document still has an error after the fix.
@@ -47,13 +47,13 @@ async function mountEditor(
   return el;
 }
 
-describe("yaml-editor applyIndentFix (#1884)", () => {
+describe("yaml-editor applyAutoFix (#1884)", () => {
   it("applies when the proposed fix produces clean YAML", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
     const el = await mountEditor(validateYaml);
     const view = viewOf(el);
 
-    expect(await el.applyIndentFix(FIX)).toBe("applied");
+    expect(await el.applyAutoFix(FIX)).toBe("applied");
 
     expect(view.state.doc.toString()).toBe(FIXED);
     expect(validateYaml).toHaveBeenCalledWith("x.yaml", FIXED);
@@ -68,7 +68,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml);
     const confirm = vi.fn(async () => true);
 
-    await el.applyIndentFix(FIX, confirm);
+    await el.applyAutoFix(FIX, confirm);
 
     expect(confirm).not.toHaveBeenCalled();
     expect(viewOf(el).state.doc.toString()).toBe(FIXED);
@@ -80,7 +80,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
     const confirm = vi.fn(async () => true);
 
-    await el.applyIndentFix(FIX, confirm);
+    await el.applyAutoFix(FIX, confirm);
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(view.state.doc.toString()).toBe(FIXED);
@@ -92,7 +92,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
     const confirm = vi.fn(async () => false);
 
-    expect(await el.applyIndentFix(FIX, confirm)).toBe("declined");
+    expect(await el.applyAutoFix(FIX, confirm)).toBe("declined");
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(view.state.doc.toString()).toBe(BROKEN);
@@ -102,7 +102,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const validateYaml = vi.fn(async () => STILL_INVALID);
     const el = await mountEditor(validateYaml);
 
-    await el.applyIndentFix(FIX);
+    await el.applyAutoFix(FIX);
 
     expect(viewOf(el).state.doc.toString()).toBe(BROKEN);
   });
@@ -114,7 +114,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml);
     const view = viewOf(el);
 
-    await expect(el.applyIndentFix(FIX)).rejects.toThrow("WS down");
+    await expect(el.applyAutoFix(FIX)).rejects.toThrow("WS down");
     expect(view.state.doc.toString()).toBe(BROKEN);
   });
 
@@ -124,7 +124,7 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const view = viewOf(el);
 
     // A fix that points at line 2 but expects a different key.
-    expect(await el.applyIndentFix({ ...FIX, key: "uptime" })).toBe("stale");
+    expect(await el.applyAutoFix({ ...FIX, key: "uptime" })).toBe("stale");
 
     expect(view.state.doc.toString()).toBe(BROKEN);
     expect(validateYaml).not.toHaveBeenCalled(); // bailed before validating
@@ -137,24 +137,134 @@ describe("yaml-editor applyIndentFix (#1884)", () => {
     const el = await mountEditor(validateYaml, FIXED);
     const view = viewOf(el);
 
-    expect(await el.applyIndentFix(FIX)).toBe("stale");
+    expect(await el.applyAutoFix(FIX)).toBe("stale");
 
     expect(view.state.doc.toString()).toBe(FIXED);
     expect(validateYaml).not.toHaveBeenCalled();
   });
 
-  it("no-ops when the item is followed by a shallower sibling, not a property", async () => {
+  it("applies a negative fix by removing leading spaces (sibling dedent)", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
-    // `- platform: dht` (contentCol 2) followed by a top-level sibling, not a
-    // property: the delta re-check must treat that as "no property" (null),
-    // not a spurious negative delta, and bail.
-    const doc = "sensor:\n- platform: dht\nbinary_sensor:\n  - platform: gpio\n";
-    const el = await mountEditor(validateYaml, doc);
+    const broken =
+      "light:\n  - platform: x\n    effects:\n" +
+      "      - addressable_twinkle:\n      - flicker:\n       - pulse:\n";
+    const fixed =
+      "light:\n  - platform: x\n    effects:\n" +
+      "      - addressable_twinkle:\n      - flicker:\n      - pulse:\n";
+    const el = await mountEditor(validateYaml, broken);
     const view = viewOf(el);
 
-    expect(await el.applyIndentFix(FIX)).toBe("stale");
+    expect(
+      await el.applyAutoFix({ line: 6, indent: -1, key: "pulse", fromIndent: 7 })
+    ).toBe("applied");
 
-    expect(view.state.doc.toString()).toBe(doc);
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
+    undo(view);
+    expect(view.state.doc.toString()).toBe(broken);
+  });
+
+  it("no-ops a stale dedent whose line already lines up", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const doc =
+      "light:\n  - platform: x\n    effects:\n" +
+      "      - addressable_twinkle:\n      - flicker:\n      - pulse:\n";
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(
+      await el.applyAutoFix({ line: 6, indent: -1, key: "pulse", fromIndent: 7 })
+    ).toBe("stale");
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
+
+  it("applies a dash-space fix by inserting the space after the dash", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const broken = "switch:\n  -platform: gpio\n    id: accessory_power\n";
+    const fixed = "switch:\n  - platform: gpio\n    id: accessory_power\n";
+    const el = await mountEditor(validateYaml, broken);
+    const view = viewOf(el);
+
+    expect(
+      await el.applyAutoFix({
+        line: 2,
+        indent: 0,
+        key: "-platform",
+        fromIndent: 2,
+        kind: "dash-space",
+      })
+    ).toBe("applied");
+
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
+    undo(view);
+    expect(view.state.doc.toString()).toBe(broken);
+  });
+
+  it("no-ops a stale dash-space fix whose line was already repaired", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const doc = "switch:\n  - platform: gpio\n    id: accessory_power\n";
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(
+      await el.applyAutoFix({
+        line: 2,
+        indent: 0,
+        key: "-platform",
+        fromIndent: 2,
+        kind: "dash-space",
+      })
+    ).toBe("stale");
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
+
+  it("applies a fix whose diagnosis was anchored on a different line", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    // The continuation shape: `input: true` dedented out of `mode:`, blamed
+    // by the scanner on the deeper `pullup` line below it. The fix targets
+    // the `input` line; the guard must accept it on the line's own key +
+    // indent, not by re-running the analysis anchored there.
+    const broken =
+      "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: true\n" +
+      "      mode:\n      input: true\n        pullup: true\n      number: 9\n";
+    const fixed =
+      "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: true\n" +
+      "      mode:\n        input: true\n        pullup: true\n      number: 9\n";
+    const el = await mountEditor(validateYaml, broken);
+    const view = viewOf(el);
+
+    expect(
+      await el.applyAutoFix({ line: 6, indent: 2, key: "input", fromIndent: 6 })
+    ).toBe("applied");
+
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
+  });
+
+  it("applies the schema-gated nest-under fix (dedented api encryption key)", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const broken = "api:\n  encryption:\n  key: !secret x\n";
+    const fixed = "api:\n  encryption:\n    key: !secret x\n";
+    const el = await mountEditor(validateYaml, broken);
+    const view = viewOf(el);
+
+    expect(await el.applyAutoFix({ line: 3, indent: 2, key: "key", fromIndent: 2 })).toBe(
+      "applied"
+    );
+
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
+    undo(view);
+    expect(view.state.doc.toString()).toBe(broken);
+  });
+
+  it("no-ops a stale nest-under fix whose key was already re-indented", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const doc = "api:\n  encryption:\n    key: !secret x\n";
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(await el.applyAutoFix({ line: 3, indent: 2, key: "key", fromIndent: 2 })).toBe(
+      "stale"
+    );
     expect(validateYaml).not.toHaveBeenCalled();
   });
 });

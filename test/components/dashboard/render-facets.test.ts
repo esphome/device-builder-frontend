@@ -11,18 +11,16 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { renderFacets } from "../../../src/components/dashboard/render-facets.js";
-import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
-import { identityLocalize, renderInto } from "../../_dom.js";
+import { renderInto } from "../../_dom.js";
+import { makeDashboardHost } from "./_host.js";
 
 // Minimal host-shaped fake. Empty _devices means the Area/Platform
 // facets compute no options and self-suppress, so the popover
 // reduces to the always-present labels + status sections — enough to
 // assert the wrapper choice without standing up the page.
 function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
-  return {
+  return makeDashboardHost({
     _devices: [],
-    _localize: identityLocalize,
-    _yamlMode: false,
     _selectedLabels: [],
     _selectedAreas: [],
     _selectedPlatforms: [],
@@ -36,7 +34,7 @@ function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
     _labelDialogOpen: false,
     _labelDialogEditing: null,
     ...overrides,
-  } as unknown as ESPHomePageDashboard;
+  });
 }
 
 const sectionByName = (root: HTMLElement, name: string) =>

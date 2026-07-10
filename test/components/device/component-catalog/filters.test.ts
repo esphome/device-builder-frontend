@@ -69,6 +69,16 @@ describe("visibleComponents platform gate", () => {
     expect(ids).toEqual(["async_tcp", "bk72xx"]);
   });
 
+  it("hides a single-instance component whose alias block is configured", () => {
+    // A `rp2:` block counts as the shipped rp2040 entry, so the card must
+    // not offer a duplicate platform block.
+    const cat = [entry("rp2040", ["rp2040"], [], false)];
+    const ids = visibleComponents(
+      host(cat, "rp2040", { yaml: "rp2:\n  board: rpipicow\n" })
+    ).map((c) => c.id);
+    expect(ids).toEqual([]);
+  });
+
   it("does not count a platform-incompatible dep as satisfied when core-locked", () => {
     // The variant's only dep is hidden by the platform gate, so it can't be
     // satisfied from this dialog and the variant must drop too.

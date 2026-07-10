@@ -15,6 +15,7 @@ import type { SerialPort } from "../../src/api/types/system.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 import { SERIAL_PORTS_POLL_INTERVAL_MS } from "../../src/util/serial-ports-poll-controller.js";
+import { flushTimers } from "../_dom.js";
 import { makeSerialPort } from "../_make-serial-port.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -48,7 +49,7 @@ describe("install-method-dialog port polling", () => {
     const getSerialPorts = vi.fn(async () => ports);
     const dialog = await mount(getSerialPorts);
 
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     await dialog.updateComplete;
     expect(portRows(dialog)).toHaveLength(1);
 
@@ -72,7 +73,7 @@ describe("install-method-dialog port polling", () => {
       makeSerialPort("/dev/ttyUSB0", "CP2102", { vid: 0x10c4, hint: "bridge" }),
     ];
     const dialog = await mount(async () => ports);
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     await dialog.updateComplete;
 
     const rows = portRows(dialog);
@@ -83,7 +84,7 @@ describe("install-method-dialog port polling", () => {
 
   it("omits the replug hint when a single port leaves no room for doubt", async () => {
     const dialog = await mount(async () => [makeSerialPort("/dev/ttyUSB0", "CP2102")]);
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     await dialog.updateComplete;
 
     expect(dialog.shadowRoot!.querySelector(".port-hint")).toBeNull();
@@ -92,7 +93,7 @@ describe("install-method-dialog port polling", () => {
   it("stops polling when the dialog closes", async () => {
     const getSerialPorts = vi.fn(async () => [] as SerialPort[]);
     const dialog = await mount(getSerialPorts);
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     expect(getSerialPorts).toHaveBeenCalledTimes(1);
 
     dialog.open = false;

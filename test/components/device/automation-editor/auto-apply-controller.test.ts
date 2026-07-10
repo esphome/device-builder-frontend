@@ -27,6 +27,7 @@ import {
   type AutoApplyHost,
   type AutoApplyOptions,
 } from "../../../../src/components/device/automation-editor/auto-apply-controller.js";
+import { flushTimers } from "../../../_dom.js";
 
 const SCRIPT: AutomationLocation = {
   kind: "script",
@@ -189,7 +190,7 @@ describe("AutoApplyController auto-apply", () => {
     expect(upsertAutomation).toHaveBeenCalledTimes(1);
 
     resolveFirst({ yaml_diff: DIFF });
-    await vi.advanceTimersByTimeAsync(0);
+    await flushTimers();
     // Exactly one re-run so the latest value wins.
     expect(upsertAutomation).toHaveBeenCalledTimes(2);
     expect(controller.inFlightWrite).toBe(false);

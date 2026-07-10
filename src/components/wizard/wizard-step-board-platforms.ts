@@ -19,6 +19,7 @@
  * - ``label`` is the user-facing chip text.
  */
 import { chipPlatformFamily } from "../../util/chip-variant.js";
+import { RP2_CANONICAL_KEY } from "../../util/component-presence.js";
 
 export interface WizardBoardPlatform {
   readonly platform: string;
@@ -43,8 +44,8 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
   // the newer RP2350; split into two chips (mirroring the per-variant
   // ESP32 chips) so users pick their actual silicon. The backend
   // filters the shared platform by 'mcu'.
-  { platform: "rp2040", variant: "", mcu: "rp2040", label: "RP2040" },
-  { platform: "rp2040", variant: "", mcu: "rp2350", label: "RP2350" },
+  { platform: RP2_CANONICAL_KEY, variant: "", mcu: "rp2040", label: "RP2040" },
+  { platform: RP2_CANONICAL_KEY, variant: "", mcu: "rp2350", label: "RP2350" },
   // LibreTiny platforms bundle genuinely different silicon; split each
   // by 'mcu' (the chip series the backend stamps on every board) the
   // same way rp2040 is. BK7231N/T/Q share the one 'bk7231' filter.

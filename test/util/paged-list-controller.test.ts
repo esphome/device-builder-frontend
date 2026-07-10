@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PagedListController } from "../../src/util/paged-list-controller.js";
+import { flushTimers } from "../_dom.js";
 import { FakeHost } from "../_fake-host.js";
-
-const flush = () => vi.advanceTimersByTimeAsync(0);
 
 // A fetcher over a fixed dataset that slices by offset/limit.
 function datasetFetch(total: number) {
@@ -38,7 +37,7 @@ describe("PagedListController", () => {
     ctrl.reset(fetchPage);
     expect(ctrl.loading).toBe(true);
     expect(ctrl.hasLoaded).toBe(false);
-    await flush();
+    await flushTimers();
 
     expect(fetchPage).toHaveBeenCalledWith(0, 50);
     expect(ctrl.items).toHaveLength(50);
@@ -52,18 +51,18 @@ describe("PagedListController", () => {
     const { ctrl } = make();
     const { fetchPage } = datasetFetch(120);
     ctrl.reset(fetchPage);
-    await flush();
+    await flushTimers();
 
     ctrl.loadMore();
     expect(ctrl.loadingMore).toBe(true);
-    await flush();
+    await flushTimers();
     expect(fetchPage).toHaveBeenLastCalledWith(50, 50);
     expect(ctrl.items).toHaveLength(100);
     expect(ctrl.items[50]).toBe(50);
     expect(ctrl.hasMore).toBe(true);
 
     ctrl.loadMore();
-    await flush();
+    await flushTimers();
     expect(ctrl.items).toHaveLength(120);
     expect(ctrl.hasMore).toBe(false);
   });
@@ -76,23 +75,23 @@ describe("PagedListController", () => {
     // Painted immediately, before the fetch resolves, so the loading state
     // shows even when reset comes off a debounced (non-reactive) callback.
     expect(host.updates).toBe(1);
-    await flush();
+    await flushTimers();
     const afterFirstPage = host.updates;
 
     ctrl.loadMore();
     expect(host.updates).toBe(afterFirstPage + 1);
-    await flush();
+    await flushTimers();
   });
 
   it("loadMore is a no-op when the list is already full", async () => {
     const { ctrl } = make();
     const { fetchPage } = datasetFetch(30);
     ctrl.reset(fetchPage);
-    await flush();
+    await flushTimers();
     expect(ctrl.hasMore).toBe(false);
 
     ctrl.loadMore();
-    await flush();
+    await flushTimers();
     expect(fetchPage).toHaveBeenCalledTimes(1);
   });
 
@@ -107,13 +106,13 @@ describe("PagedListController", () => {
 
     const { fetchPage: fast } = datasetFetch(10);
     ctrl.reset(fast);
-    await flush();
+    await flushTimers();
     expect(ctrl.items).toHaveLength(10);
     expect(ctrl.total).toBe(10);
 
     // The superseded first page resolves late — it must not clobber the list.
     release({ items: [999, 998, 997], total: 999 });
-    await flush();
+    await flushTimers();
     expect(ctrl.items).toHaveLength(10);
     expect(ctrl.total).toBe(10);
   });
@@ -128,7 +127,7 @@ describe("PagedListController", () => {
         : new Promise<{ items: number[]; total: number }>((r) => (release = r))
     );
     ctrl.reset(fetchPage);
-    await flush();
+    await flushTimers();
     expect(ctrl.items).toEqual([0, 1, 2]);
 
     ctrl.loadMore();
@@ -136,13 +135,13 @@ describe("PagedListController", () => {
 
     const { fetchPage: fast } = datasetFetch(5);
     ctrl.reset(fast);
-    await flush();
+    await flushTimers();
     expect(ctrl.items).toEqual([0, 1, 2, 3, 4]);
     expect(ctrl.loadingMore).toBe(false);
 
     // The stale loadMore resolves; it must not append onto the new query.
     release({ items: [100, 101], total: 9 });
-    await flush();
+    await flushTimers();
     expect(ctrl.items).toEqual([0, 1, 2, 3, 4]);
   });
 
@@ -152,7 +151,7 @@ describe("PagedListController", () => {
     ctrl.reset(async () => {
       throw boom;
     });
-    await flush();
+    await flushTimers();
     expect(ctrl.error).toBe(boom);
     expect(ctrl.loading).toBe(false);
     expect(ctrl.items).toEqual([]);

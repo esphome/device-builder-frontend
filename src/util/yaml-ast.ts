@@ -227,18 +227,23 @@ export function getKeyPathWithListIndices(
 
 /**
  * The deepest node at *pos*, re-anchored for the empty-value case: a
- * cursor in an empty value / trailing whitespace (``key: ``) resolves to
- * the document root, not the pair, so re-resolve on the line's last
- * non-space char (the ``:`` or key) when *pos* has no enclosing pair.
+ * cursor in an empty value / trailing whitespace (``key: ``) resolves
+ * past the line's own pair — to the document root at EOF, or to an
+ * enclosing container mid-document — so re-resolve on the line's last
+ * non-space char (the ``:`` or key). The enclosing-pair check alone
+ * can't detect the mid-document case: the container has an ancestor
+ * pair, just the wrong one.
  */
 function resolveAnchoredNode(state: EditorState, pos: number): SyntaxNode | null {
   const tree = syntaxTree(state);
   const node: SyntaxNode | null = tree.resolveInner(pos, -1);
-  if (findEnclosingPair(node)) return node;
   const line = state.doc.lineAt(pos);
   const upto = line.text.slice(0, pos - line.from).trimEnd();
   if (!upto) return node;
-  return tree.resolveInner(line.from + upto.length - 1, -1);
+  const anchor = line.from + upto.length - 1;
+  if (pos - line.from > upto.length) return tree.resolveInner(anchor, -1);
+  if (findEnclosingPair(node)) return node;
+  return tree.resolveInner(anchor, -1);
 }
 
 /**

@@ -17,12 +17,9 @@ vi.mock("../../src/components/dashboard/actions.js", async (importActual) => ({
 
 import { detectAndOpenWizard } from "../../src/components/dashboard/actions.js";
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
+import { flushMicrotasks } from "../_dom.js";
 
 const fakePort = {} as SerialPort;
-
-async function flushPending(times = 8): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
 
 async function mountDashboard(
   hideDeviceCreation: boolean
@@ -36,7 +33,7 @@ async function mountDashboard(
   (page as any)._remoteComputeOnly = hideDeviceCreation;
   document.body.appendChild(page);
   await page.updateComplete;
-  await flushPending();
+  await flushMicrotasks(8);
   return page;
 }
 
@@ -78,7 +75,7 @@ describe("dashboard pending serial setup", () => {
     document.body.appendChild(page); // connectedCallback consumes + schedules
     page.remove(); // disconnect before updateComplete resolves
     await page.updateComplete;
-    await flushPending();
+    await flushMicrotasks(8);
     expect(detectAndOpenWizard).not.toHaveBeenCalled();
   });
 });

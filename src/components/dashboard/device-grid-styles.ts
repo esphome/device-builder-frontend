@@ -159,13 +159,14 @@ export const deviceGridStyles = css`
     padding: var(--wa-space-l) var(--content-gutter);
   }
 
-  /* When the grid follows the toolbar's count row (whether directly
-     or with the empty-search pivot wedged between), the count row
-     already provides spacing above the first card. Tighten the
-     grid's top padding so the two rows don't double up. */
+  /* When the grid follows the toolbar (whether directly or with the
+     empty-search pivot wedged between), the toolbar's own bottom
+     padding owns the seam — it has to live on the toolbar side so it
+     survives sticking. Zero the grid's top padding so the gap isn't
+     paid twice. */
   .toolbar + .devices-grid,
   .toolbar + .empty-search + .devices-grid {
-    padding-top: var(--wa-space-xs);
+    padding-top: 0;
   }
 
   /* Only the configured-device grid needs FAB clearance: it's the

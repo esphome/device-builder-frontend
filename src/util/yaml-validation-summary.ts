@@ -10,17 +10,22 @@
  *  - one representative line/column to deep-link the editor at;
  *  - the message of that representative error.
  *
- * Mirrors ``yaml-lint-backend.ts``'s line/column extraction so the
- * dialog points at the same diagnostic the inline wavy underlines
- * would point at — yaml parse errors come from a regex against
- * the message string, validation errors carry an explicit
- * ``range``.
+ * Position extraction, path sanitizing, and the plain-language
+ * rewrite come from ``yaml-error-analysis.ts`` — the same functions
+ * the inline linter uses — so the dialog names the same line and
+ * shows the same wording as the banner and squiggles.
  */
 
 import type { EditorValidateResponse } from "../api/types/editor.js";
+import type { LocalizeFunc } from "../common/localize.js";
+import {
+  describeValueTypeCause,
+  describeYamlError,
+  lineAccessorFor,
+  parseYamlErrorPosition,
+  sanitizeMessage,
+} from "./yaml-error-analysis.js";
 
-const YAML_LINE_COL_RE = /line\s+(\d+)\s*,\s*column\s+(\d+)/i;
-const YAML_LINE_RE = /line\s+(\d+)/i;
 /** Windows path separators, normalized to ``/`` before comparison. */
 const BACKSLASH_RE = /\\/g;
 
@@ -49,40 +54,58 @@ export interface ValidationSummary {
  * case anyway. When parse errors are absent, take the first
  * validation error's range.
  */
-export function summarizeValidation(res: EditorValidateResponse): ValidationSummary {
+export function summarizeValidation(
+  res: EditorValidateResponse,
+  content: string,
+  localize: LocalizeFunc
+): ValidationSummary {
   const yamlErrors = res.yaml_errors ?? [];
   const validationErrors = res.validation_errors ?? [];
   const count = yamlErrors.length + validationErrors.length;
   if (count === 0) return { count: 0, first: null };
 
+  const readLine = lineAccessorFor(content);
   if (yamlErrors.length > 0) {
-    const err = yamlErrors[0];
-    const message = (err.message ?? "").trim();
-    let line = 0;
-    let col = 0;
-    const both = message.match(YAML_LINE_COL_RE);
-    if (both) {
-      line = Number.parseInt(both[1], 10);
-      col = Number.parseInt(both[2], 10);
-    } else {
-      const lineOnly = message.match(YAML_LINE_RE);
-      if (lineOnly) line = Number.parseInt(lineOnly[1], 10);
-    }
-    if (!Number.isFinite(line) || line < 1) line = 0;
-    if (!Number.isFinite(col) || col < 1) col = 0;
+    const msg = (yamlErrors[0].message ?? "").trim();
+    const pos = parseYamlErrorPosition(msg);
+    const { text, jumpLine } = describeYamlError(msg, pos, localize, readLine);
+    const line = jumpLine ?? 0;
+    // A jump retargeted off the problem mark (onto the fix site or the
+    // context line) has no meaningful column in the original message.
+    const col = pos !== null && pos.line === line && pos.col !== null ? pos.col : 0;
     return {
       count,
-      first: { line, col, message: message || "Invalid YAML", file: null },
+      first: {
+        line,
+        col: col >= 1 ? col : 0,
+        message: text || "Invalid YAML",
+        file: null,
+      },
     };
   }
 
   const err = validationErrors[0];
-  // ``range.start_line`` / ``start_col`` are 0-indexed upstream;
-  // convert to the 1-indexed shape the editor + URL helpers use.
-  const line = Math.max(1, (err.range?.start_line ?? 0) + 1);
-  const col = Math.max(1, (err.range?.start_col ?? 0) + 1);
-  const message = (err.message ?? "Invalid configuration").trim();
-  return { count, first: { line, col, message, file: err.range?.document ?? null } };
+  // ``range.start_line`` / ``start_col`` are 0-indexed upstream; convert to
+  // the 1-indexed shape the editor + URL helpers use. A missing range means
+  // the validator couldn't place the error — line 0 disables "Go to error"
+  // rather than jumping to the top of the file.
+  const hasRange = err.range != null;
+  const line = hasRange ? Math.max(1, (err.range?.start_line ?? 0) + 1) : 0;
+  const col = hasRange ? Math.max(1, (err.range?.start_col ?? 0) + 1) : 0;
+  const file = err.range?.document ?? null;
+  let message = sanitizeMessage((err.message ?? "Invalid configuration").trim());
+  // The cause hint reads the open buffer, so only add it when the error's
+  // line refers to that buffer (the ``"<file>"`` sentinel / missing document
+  // means the open config — see ``isOpenConfigFile``). Deliberate trade-off:
+  // this anchors on the raw range line, while the banner anchors on its
+  // CodeMirror-retargeted range (which can't live in this pure module) —
+  // when the two diverge the shape check fails and the hint is simply
+  // omitted, never wrong.
+  if (hasRange && (!file || file === "<file>")) {
+    const cause = describeValueTypeCause(readLine, line, localize);
+    if (cause) message = `${message} ${cause.text}`;
+  }
+  return { count, first: { line, col, message, file } };
 }
 
 /** Last path segment of a ``/``- or ``\``-separated path. */

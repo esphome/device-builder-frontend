@@ -15,10 +15,7 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
-
-async function flushPending(times = 5): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
+import { flushMicrotasks } from "../_dom.js";
 
 async function mountWithOtaCardOpen(
   mode: "install" | "logs"
@@ -42,7 +39,7 @@ async function mountWithOtaCardOpen(
   (dialog as any)._otaAddressCardExpanded = true;
   document.body.appendChild(dialog);
   await dialog.updateComplete;
-  await flushPending();
+  await flushMicrotasks(5);
   return dialog;
 }
 

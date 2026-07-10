@@ -1,3 +1,4 @@
+import { RP2_ALIAS_KEY, RP2_CANONICAL_KEY } from "./component-presence.js";
 import { parseYamlAutomations } from "./yaml-automations.js";
 import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 import {
@@ -51,9 +52,9 @@ export const CORE_KEYS = new Set([
   // Target platforms
   "esp32",
   "esp8266",
-  "rp2040",
+  RP2_CANONICAL_KEY,
   // esphome#17145 renames the rp2040 platform key to rp2; keep both
-  "rp2",
+  RP2_ALIAS_KEY,
   "bk72xx",
   "rtl87xx",
   "ln882x",

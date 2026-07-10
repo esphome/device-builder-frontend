@@ -21,11 +21,9 @@ vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../src/api/types/automations.js";
 import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-automation-dialog.js";
-import { identityLocalize } from "../../_dom.js";
+import { flushMicrotasks, identityLocalize } from "../../_dom.js";
 
-async function flushPending(times = 5): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
+const flush = () => flushMicrotasks(5);
 
 function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
   let resolve!: (v: T) => void;
@@ -52,7 +50,7 @@ async function mountDialog(api: ESPHomeAPI): Promise<ESPHomeAddAutomationDialog>
   dialog.configuration = "device.yaml";
   document.body.appendChild(dialog);
   await dialog.updateComplete;
-  await flushPending();
+  await flush();
   return dialog;
 }
 
@@ -68,7 +66,7 @@ describe("add-automation-dialog render gate (behavioral)", () => {
     const dialog = await mountDialog(api);
     dialog.open();
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
 
     // First load in flight: spinner up, form (and its selects) absent.
     expect(dialog.shadowRoot?.querySelector("wa-spinner")).not.toBeNull();
@@ -76,7 +74,7 @@ describe("add-automation-dialog render gate (behavioral)", () => {
 
     first.resolve(slimAvailable());
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
 
     // Data landed: form rendered, spinner gone.
     expect(dialog.shadowRoot?.querySelector("wa-spinner")).toBeNull();
@@ -95,10 +93,10 @@ describe("add-automation-dialog render gate (behavioral)", () => {
     const dialog = await mountDialog(api);
     dialog.open();
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
     first.resolve(slimAvailable());
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
 
     const selectBeforeReopen = kindSelect(dialog);
     expect(selectBeforeReopen).not.toBeNull();
@@ -108,13 +106,13 @@ describe("add-automation-dialog render gate (behavioral)", () => {
     // wa-select element must survive rather than be recreated.
     dialog.open();
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
 
     expect(dialog.shadowRoot?.querySelector("wa-spinner")).toBeNull();
     expect(kindSelect(dialog)).toBe(selectBeforeReopen);
 
     second.resolve(slimAvailable());
-    await flushPending();
+    await flush();
   });
 
   it("scopes available automations off the unsaved draft yaml (#1348)", async () => {
@@ -125,7 +123,7 @@ describe("add-automation-dialog render gate (behavioral)", () => {
     dialog.yaml = "esphome:\n  name: drafty\n";
     dialog.open();
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
 
     expect(getAvailableAutomations).toHaveBeenCalledWith(
       "device.yaml",
@@ -175,7 +173,7 @@ describe("add-automation-dialog list-shaped triggers (#1080)", () => {
     const dialog = await mountDialog(api);
     dialog.open();
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
     dialog.yaml = ON_TIME_YAML;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dialog as any)._kind = "component_on";
@@ -262,7 +260,7 @@ describe("add-automation-dialog device-level list triggers (#1283)", () => {
     const dialog = await mountDialog(api);
     dialog.open();
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
     dialog.yaml = ON_BOOT_LIST_YAML;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dialog as any)._kind = "device_on";
@@ -333,7 +331,7 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
     const dialog = await mountDialog(api);
     dialog.open();
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dialog as any)._kind = "component_on";
     await dialog.updateComplete;
@@ -407,7 +405,7 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
     const dialog = await mountDialog(api);
     dialog.open({ kind: "component_on", componentId: "aht20" });
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
     await dialog.updateComplete;
 
     // Landed on the first sub-entity, not the container.
@@ -452,7 +450,7 @@ describe("add-automation-dialog sub-entity targets (#1263)", () => {
     const dialog = await mountDialog(api);
     dialog.open({ kind: "component_on", componentId: "aht20" });
     await dialog.updateComplete;
-    await flushPending();
+    await flush();
     await dialog.updateComplete;
 
     expect(dialog.shadowRoot!.textContent).toContain(

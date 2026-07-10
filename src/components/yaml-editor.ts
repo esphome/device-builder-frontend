@@ -1,9 +1,9 @@
-import { autocompletion } from "@codemirror/autocomplete";
+import { autocompletion, completionStatus } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { forceLinting } from "@codemirror/lint";
-import { StateEffect, StateField, Transaction, type Text } from "@codemirror/state";
-import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
+import { StateEffect, StateField, Transaction } from "@codemirror/state";
+import { Decoration, keymap, tooltips, type DecorationSet } from "@codemirror/view";
 import { consume } from "@lit/context";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { basicSetup, EditorView } from "codemirror";
@@ -31,19 +31,18 @@ import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { idleCompletion } from "../util/idle-completion.js";
 import { getKeyPath, isInsideBlockScalar } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
+import { lineKeyToken, type YamlAutoFix } from "../util/yaml-error-analysis.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   blankLineContext,
   fieldPathByIndent,
   indentOf,
   keyPathByIndent,
-  parseListItemMarker,
 } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
   relintEffect,
-  type YamlAutoFix,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
 import type { YamlSection } from "../util/yaml-sections.js";
@@ -168,6 +167,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    *  churning on plain column moves. */
   private _lastReportedPathKey = "";
 
+  /** Last completion-popup visibility emitted as `yaml-completion-open`. */
+  private _lastCompletionOpen = false;
+
   static styles = css`
     :host {
       display: block;
@@ -208,6 +210,12 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         colors: INDENT_GUIDE_COLORS,
       }),
       highlightField,
+      // Keep every tooltip (lint hover, docs hover, completion) inside the
+      // code pane: near the bottom they flip above the line instead of
+      // spilling over the invalid banner / action row below the editor.
+      tooltips({
+        tooltipSpace: (view) => view.scrollDOM.getBoundingClientRect(),
+      }),
       sensitiveValueMaskExtension(this.revealSensitive, this.maskAllValues),
       yamlStickyScroll({
         highlightStyle: this._darkMode ? darkHighlight : lightHighlight,
@@ -419,6 +427,19 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         },
       }),
       EditorView.updateListener.of((update) => {
+        // Surface completion-popup visibility so the host can hold the
+        // invalid banner while the user is still picking an option.
+        const completionOpen = completionStatus(update.state) === "active";
+        if (completionOpen !== this._lastCompletionOpen) {
+          this._lastCompletionOpen = completionOpen;
+          this.dispatchEvent(
+            new CustomEvent("yaml-completion-open", {
+              detail: { open: completionOpen },
+              bubbles: true,
+              composed: true,
+            })
+          );
+        }
         // LOAD-BEARING ORDER: `yaml-change` MUST be dispatched
         // before `yaml-cursor-line` within a single update.
         // The page's `_onYamlChange` writes `_yaml` from the
@@ -541,6 +562,14 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
                 composed: true,
               })
             ),
+          onAutoFix: (fix) =>
+            this.dispatchEvent(
+              new CustomEvent<{ fix: YamlAutoFix }>("yaml-auto-fix", {
+                detail: { fix },
+                bubbles: true,
+                composed: true,
+              })
+            ),
         }),
         lintErrorLineGutter
       );
@@ -557,6 +586,19 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
           icons: true,
           closeOnBlur: true,
           maxRenderedOptions: 60,
+          // Pin the option-docs panel beside the list, or flush below it
+          // when the side lacks room — the default "narrow" placement lays
+          // the panel over the options themselves.
+          positionInfo: (view, list, option) => {
+            const space = view.scrollDOM.getBoundingClientRect();
+            const listW = list.right - list.left;
+            if (space.right - list.right >= 320) {
+              return {
+                style: `top: ${Math.max(0, option.top - list.top)}px; left: ${listW}px`,
+              };
+            }
+            return { style: `top: ${list.bottom - list.top}px; left: 0px` };
+          },
         }),
         // Open the popup when the caret idles on a blank/empty line, so
         // keys/values are discoverable without typing a partial first.
@@ -580,7 +622,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   }
 
   /**
-   * Validate a proposed indentation fix, then apply it. When the proposed
+   * Validate a proposed one-line auto-fix, then apply it. When the proposed
    * document validates cleanly the fix applies straight away; when errors
    * remain `confirm` decides whether to apply anyway. Applied as a real,
    * undoable transaction.
@@ -588,37 +630,54 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    * The re-validation is the real safety net against a stale banner: the
    * `- <key>` re-check (before and after the async step) is a cheap filter,
    * but the key is often a shared token (`platform`), so validating the
-   * proposed document is what actually catches indenting the wrong item or
-   * double-indenting one already fixed. A validation failure rejects (the
+   * proposed document is what actually catches fixing the wrong item or
+   * double-fixing one already repaired. A validation failure rejects (the
    * caller surfaces it) rather than silently applying.
    */
-  async applyIndentFix(
+  async applyAutoFix(
     fix: YamlAutoFix,
     confirm?: () => Promise<boolean>
   ): Promise<AutoFixOutcome> {
     const view = this._view;
-    if (!view || !this._api || fix.indent <= 0) return "unavailable";
-    // Resolve the target only when it is still the same `- <key>` item that
-    // still needs exactly `fix.indent` — recomputing the delta from its first
-    // property bails on an item the user already fixed by hand (whose key still
-    // matches), so a stale click can't double-indent it.
+    if (!view || !this._api || (fix.kind !== "dash-space" && fix.indent === 0)) {
+      return "unavailable";
+    }
+    // Resolve the target only when the line the fix wants to edit is still
+    // the line the analysis saw — same key, same indent — so a stale click
+    // after edits shifted line numbers, or on a line the user already
+    // repaired by hand, can't edit the wrong line. The check is structural
+    // rather than a re-run of the analysis: the diagnosis can be anchored
+    // on a different line than the one it repairs (a continuation error
+    // blames the line below the pair that moves), so re-analyzing at the
+    // fix line can't reproduce every shape.
     const targetFrom = (): number | null => {
       const doc = view.state.doc;
       if (fix.line < 1 || fix.line > doc.lines) return null;
       const t = doc.line(fix.line);
-      const marker = parseListItemMarker(t.text);
-      if (!marker || marker.key !== fix.key) return null;
-      if (this._firstPropertyDelta(doc, fix.line, marker.contentCol) !== fix.indent) {
+      if (lineKeyToken(t.text) !== fix.key || indentOf(t.text) !== fix.fromIndent) {
         return null;
       }
+      // A dedent must have the spaces it wants to remove.
+      if (fix.indent < 0 && fix.fromIndent + fix.indent < 0) return null;
       return t.from;
     };
     const from = targetFrom();
     if (from === null) return "stale";
 
     const doc = view.state.doc;
-    const spaces = " ".repeat(fix.indent);
-    const proposed = doc.sliceString(0, from) + spaces + doc.sliceString(from);
+    // The dash-space repair inserts after the stuck dash; indent repairs
+    // insert or remove leading spaces at the line start.
+    const changeAt = (at: number): { from: number; to?: number; insert?: string } =>
+      fix.kind === "dash-space"
+        ? { from: at + fix.fromIndent + 1, insert: " " }
+        : fix.indent > 0
+          ? { from: at, insert: " ".repeat(fix.indent) }
+          : { from: at, to: at - fix.indent };
+    const change = changeAt(from);
+    const proposed =
+      doc.sliceString(0, change.from) +
+      (change.insert ?? "") +
+      doc.sliceString(change.to ?? change.from);
     // A validation failure propagates: don't apply blindly, and let the caller
     // surface it rather than swallowing the click.
     const res = await this._api.validateYaml(this.configuration, proposed);
@@ -631,29 +690,11 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     const settled = targetFrom();
     if (settled === null) return "stale";
     view.dispatch({
-      changes: { from: settled, insert: spaces },
+      changes: changeAt(settled),
       scrollIntoView: true,
     });
     view.focus();
     return "applied";
-  }
-
-  /** Indent of the list item's first property line minus `contentCol` (where
-   *  its key starts), or null when the item has no property line — the next
-   *  content is a shallower sibling/dedent (indent below `contentCol`), not a
-   *  property, so it never reports a spurious negative delta. */
-  private _firstPropertyDelta(
-    doc: Text,
-    line: number,
-    contentCol: number
-  ): number | null {
-    for (let n = line + 1; n <= doc.lines; n++) {
-      const text = doc.line(n).text;
-      if (!text.trim() || text.trimStart().startsWith("#")) continue;
-      const indent = indentOf(text);
-      return indent < contentCol ? null : indent - contentCol;
-    }
-    return null;
   }
 
   /** Set (or clear) the highlight mark and scroll it into view. */
@@ -689,6 +730,19 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     this._container.innerHTML = "";
     this._lastReportedCursorLine = 0;
     this._lastReportedPathKey = "";
+    // A remount destroys any open completion popup without a state
+    // transition the update listener could see — emit the close ourselves
+    // or the host would hold the invalid banner forever.
+    if (this._lastCompletionOpen) {
+      this._lastCompletionOpen = false;
+      this.dispatchEvent(
+        new CustomEvent("yaml-completion-open", {
+          detail: { open: false },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
     this._mountEditor();
   }
 

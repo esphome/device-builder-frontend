@@ -1,13 +1,16 @@
 /**
- * Shared DOM helpers for the happy-dom test suites.
+ * Shared DOM and settle helpers for the test suites.
  *
  * Nearly every component/dialog test used to hand-roll the same snippets:
  * an async mount (append + settle), a render-into-a-container helper for
- * pure template functions, and an identity localize stub for host fakes.
- * They live here once instead; ``test/_setup-dom.ts`` owns the matching
- * ``document.body`` cleanup between tests.
+ * pure template functions, an identity localize stub for host fakes, and
+ * a flush helper in one of three shapes (zero-delay timeout, microtask
+ * drain, fake-timer advance). They live here once instead;
+ * ``test/_setup-dom.ts`` owns the matching ``document.body`` cleanup
+ * between tests.
  */
 import { render } from "lit";
+import { vi } from "vitest";
 
 /**
  * Append ``el`` to ``document.body`` and wait for its first render.
@@ -62,4 +65,19 @@ export async function baseDialogSettled(el: HTMLElement): Promise<void> {
   await (el as { updateComplete?: Promise<unknown> }).updateComplete;
   const base = el.shadowRoot?.querySelector("esphome-base-dialog");
   await (base as { updateComplete?: Promise<unknown> } | null)?.updateComplete;
+}
+
+/** Resolve after a zero-delay timeout so queued real-timer callbacks run. */
+export const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+/** Drain ``times`` microtask turns — one per await/``.then`` link the chain under test needs. */
+export async function flushMicrotasks(times: number): Promise<void> {
+  for (let i = 0; i < times; i++) {
+    await Promise.resolve();
+  }
+}
+
+/** ``flush`` for suites under ``vi.useFakeTimers``: run zero-delay fake timers. */
+export async function flushTimers(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0);
 }

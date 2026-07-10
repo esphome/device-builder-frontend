@@ -1,4 +1,5 @@
 import type { ESPHomeAPI } from "../api/index.js";
+import { fetchAllComponents } from "./fetch-all-components.js";
 import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 
 /** Ids of the components that provide an interface, board-scoped and cached
@@ -16,16 +17,11 @@ export function providerIds(
 ): Promise<ReadonlySet<string>> {
   const key = `${interfaceName}|${platform ?? ""}|${boardId ?? ""}`;
   return _cache.fetch(key, () =>
-    api
-      .getComponents({
-        provides: interfaceName,
-        platform: platform ?? undefined,
-        board_id: boardId ?? undefined,
-        // One page holds every provider; an interface has at most a handful,
-        // so this never truncates (mirrors config-entry-form's provider fetch).
-        limit: 200,
-      })
-      .then((resp): ReadonlySet<string> => new Set(resp.components.map((c) => c.id)))
+    fetchAllComponents(api, {
+      provides: interfaceName,
+      platform: platform ?? undefined,
+      board_id: boardId ?? undefined,
+    }).then((components): ReadonlySet<string> => new Set(components.map((c) => c.id)))
   );
 }
 

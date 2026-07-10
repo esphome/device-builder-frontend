@@ -34,6 +34,7 @@ import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
+import { flushMicrotasks } from "../_dom.js";
 
 const board = (overrides: Partial<BoardCatalogEntry> = {}): BoardCatalogEntry =>
   ({
@@ -86,12 +87,8 @@ async function mountPage(
   page.id = id;
   document.body.appendChild(page);
   await page.updateComplete;
-  await flushPending();
+  await flushMicrotasks(8);
   return page;
-}
-
-async function flushPending(times = 8): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
 }
 
 function readPlatformReady(page: ESPHomePageDevice): boolean {
@@ -155,7 +152,7 @@ describe("device page _platformReady lifecycle", () => {
     (page as any)._devices = [device({ board_id: "rp2040-rpi-pico" })];
     page.requestUpdate();
     await page.updateComplete;
-    await flushPending();
+    await flushMicrotasks(8);
 
     expect(readPlatformReady(page)).toBe(true);
     expect(readBoard(page)).toBeNull();
@@ -192,7 +189,7 @@ describe("device page _platformReady lifecycle", () => {
     (page as any)._devicesLoaded = true;
     page.requestUpdate();
     await page.updateComplete;
-    await flushPending();
+    await flushMicrotasks(8);
 
     expect(readPlatformReady(page)).toBe(true);
     expect(readBoard(page)?.id).toBe("esp32cam");
@@ -220,7 +217,7 @@ describe("device page _platformReady lifecycle", () => {
     (page as any)._devices = [device({ configuration: "bedroom.yaml", name: "bedroom" })];
     page.requestUpdate();
     await page.updateComplete;
-    await flushPending();
+    await flushMicrotasks(8);
 
     // Eventually true again after the new board fetch resolves.
     expect(readPlatformReady(page)).toBe(true);

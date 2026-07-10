@@ -17,8 +17,7 @@ import {
   createBackendYamlLinter,
   relintEffect,
 } from "../../src/util/yaml-lint-backend.js";
-
-const flush = () => new Promise((r) => setTimeout(r, 0));
+import { flush } from "../_dom.js";
 
 function mountView(validateYaml: ESPHomeAPI["validateYaml"]): EditorView {
   const api = { validateYaml } as unknown as ESPHomeAPI;

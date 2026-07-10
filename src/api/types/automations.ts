@@ -3,7 +3,7 @@
  *
  * Part of the src/api/types.ts barrel split.
  */
-import type { ConfigEntry } from "./config-entries.js";
+import type { ConfigEntry, RequiredGroup } from "./config-entries.js";
 
 // ─── Automations ─────────────────────────────────────────────
 //
@@ -59,6 +59,10 @@ export interface AutomationAction {
    *  frontend renders them as recursive action lists, not as form
    *  fields. */
   accepts_action_list: string[];
+  /** Cross-field cardinality constraints over ``config_entries``
+   *  (``homeassistant.service`` requires exactly one of ``service`` /
+   *  ``action``). Members are never advanced. */
+  required_groups?: RequiredGroup[] | null;
 }
 
 /** A condition usable inside an automation's ``if`` / ``while`` /
@@ -74,6 +78,9 @@ export interface AutomationCondition {
    *  ``xor`` — the condition embeds a recursive list of child
    *  conditions. */
   accepts_condition_list: boolean;
+  /** See ``AutomationAction.required_groups`` — e.g. ``sensor.in_range``
+   *  requires at least one of ``above`` / ``below``. */
+  required_groups?: RequiredGroup[] | null;
 }
 
 /** Scalar primitives a polymorphic registry entry can take at the

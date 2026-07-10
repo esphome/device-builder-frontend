@@ -41,6 +41,7 @@ import {
 import { type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { fetchAllComponents } from "../../util/fetch-all-components.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   fetchPinRegistryModes,
@@ -1026,15 +1027,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (cached) return cached;
     if (this._api && !this._interfaceProvidersPending.has(interfaceName)) {
       this._interfaceProvidersPending.add(interfaceName);
-      // ``limit: 200`` captures every provider of the interface in one shot
-      // (interfaces have at most a couple dozen); this is the full dropdown
-      // candidate set, distinct from the Add-component picker's paginated grid.
-      this._api
-        .getComponents({ provides: interfaceName, limit: 200 })
-        .then((resp) => {
+      // The full dropdown candidate set, distinct from the
+      // Add-component picker's paginated grid.
+      fetchAllComponents(this._api, { provides: interfaceName })
+        .then((components) => {
           this._interfaceProviders.set(
             interfaceName,
-            resp.components.map((c) => catalogEntryToProvider(c, interfaceName))
+            components.map((c) => catalogEntryToProvider(c, interfaceName))
           );
           this.requestUpdate();
         })

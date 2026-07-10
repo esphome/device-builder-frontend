@@ -95,8 +95,7 @@ interface KeyPositionProvider {
 
 /** Resolve the catalog config-entries for the cursor's parent
  *  exactly once per turn. Both ``catalogEntriesProvider`` and
- *  ``schemaBundleKeyProvider`` need the answer, and the
- *  ``hidden:`` filter is render-time concern — so the providers
+ *  ``schemaBundleKeyProvider`` need the answer, so the providers
  *  read off this memo on the per-turn ``KeyPositionCtx``. The
  *  catalog index plus the in-memory ``fetchComponent`` cache
  *  make this a no-network call, but skipping the duplicate
@@ -128,8 +127,11 @@ async function resolveCatalogEntries(k: KeyPositionCtx): Promise<ConfigEntry[]> 
 const catalogEntriesProvider: KeyPositionProvider = {
   name: "catalog-entries",
   fetch: async (k) => {
+    // ``hidden`` mirrors upstream's ``visibility: yaml_only`` — hide the
+    // field from the visual form, not from YAML. This completion is the
+    // one place those fields are editable, so they stay in (demoted).
     const entries = await resolveCatalogEntries(k);
-    return entries.filter((e) => !e.hidden).map(entryToCompletion);
+    return entries.map(entryToCompletion);
   },
 };
 

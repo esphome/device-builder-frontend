@@ -24,3 +24,11 @@ export const deviceSortKey = (d: {
   name?: string;
   configuration?: string;
 }): string => d.friendly_name || d.name || d.configuration || "";
+
+/** Copy of *devices* in collator order of their sort keys. */
+export const sortDevices = <T extends Parameters<typeof deviceSortKey>[0]>(
+  devices: readonly T[]
+): T[] =>
+  [...devices].sort((a, b) =>
+    DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
+  );

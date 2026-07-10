@@ -1,5 +1,6 @@
 import type { ESPHomeAPI } from "../../api/index.js";
 import { ComponentCategory } from "../../api/types/components.js";
+import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
 import { providerIds } from "../../util/provides-cache.js";
 import {
   parseConfiguredPlatforms,
@@ -40,7 +41,7 @@ export function findMissingDependencies(
     if (dot !== -1) platformStems.add(id.slice(dot + 1));
   }
   return dependencies.filter((dep) => {
-    if (present.has(dep)) return false;
+    if (hasComponentKey(present, dep)) return false;
     if (dep.includes(".")) return !configured.has(dep);
     if (!PLATFORM_DOMAINS.has(dep) && platformStems.has(dep)) return false;
     return true;
@@ -71,16 +72,13 @@ export async function depsSatisfiedByProvides(
   // comes back empty — skip them rather than pay the round trip.
   const resolvable = missing.filter((dep) => !dep.includes("."));
   if (resolvable.length === 0) return satisfied;
+  // The provides index is keyed on the catalog's canonical platform key.
+  const platform = ctx.platform ? canonicalComponentKey(ctx.platform) : undefined;
   await Promise.all(
     resolvable.map(async (dep) => {
-      const providers = await providerIds(
-        api,
-        dep,
-        ctx.platform ?? undefined,
-        ctx.boardId ?? undefined
-      );
+      const providers = await providerIds(api, dep, platform, ctx.boardId ?? undefined);
       for (const id of providers) {
-        if (present.has(id)) {
+        if (hasComponentKey(present, id)) {
           satisfied.add(dep);
           break;
         }

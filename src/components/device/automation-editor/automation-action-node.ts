@@ -33,6 +33,7 @@ import type {
   ConditionNode,
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
+import type { RequiredGroup } from "../../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
@@ -74,6 +75,10 @@ registerMdiIcons({
   delete: mdiDelete,
   "pencil-outline": mdiPencilOutline,
 });
+
+// Stable identity for group-less defs — a fresh [] per render would
+// defeat Lit's property change detection on the form mount.
+const NO_REQUIRED_GROUPS: RequiredGroup[] = [];
 
 @customElement("esphome-automation-action-node")
 export class ESPHomeAutomationActionNode extends LitElement {
@@ -397,6 +402,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
     return html`<esphome-config-entry-form
       .entries=${def.config_entries}
       .values=${this.value.params}
+      .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
       .board=${this.board}
       .yaml=${this.yaml}
       ?disabled=${this.disabled}

@@ -18,7 +18,7 @@ import {
   setSecretWithToast,
 } from "../../src/util/ensure-secret-with-toast.js";
 import { _resetSecretKeysCache } from "../../src/util/secrets-cache.js";
-import { identityLocalize } from "../_dom.js";
+import { flush, identityLocalize } from "../_dom.js";
 
 const localize = identityLocalize as (key: string, args?: unknown) => string;
 const messages = {
@@ -26,7 +26,6 @@ const messages = {
   errorKey: "device.error",
   logLabel: "create failed",
 };
-const flush = () => new Promise((r) => setTimeout(r, 0));
 
 /** Stub API whose ``setSecret`` reports the given create/overwrite outcome. */
 function apiWith(created: boolean, keys: string[]) {

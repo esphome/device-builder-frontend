@@ -110,7 +110,7 @@ import {
   type FacetSelection,
 } from "../util/device-filter.js";
 import { matchesDeviceName } from "../util/device-search.js";
-import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
+import { sortDevices } from "../util/device-sort.js";
 import { normalizeUpdateBuckets } from "../util/facets.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
@@ -281,11 +281,7 @@ export class ESPHomePageDashboard extends LitElement {
   _pendingAdoptScroll: string | null = null;
   _actionDevice: ConfiguredDevice | null = null;
 
-  private _sortDevices = memoizeOne((source: ConfiguredDevice[]) =>
-    [...source].sort((a, b) =>
-      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
-    )
-  );
+  private _sortDevices = memoizeOne((source: ConfiguredDevice[]) => sortDevices(source));
   private _computeLabelUsageMemo = memoizeOne(computeLabelUsage);
   /** id → name map rebuilt once per labels-catalog reference change.
    *  ``_syncUrl`` looks up the names for every selected label id; the
