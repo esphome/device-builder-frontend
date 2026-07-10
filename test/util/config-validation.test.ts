@@ -279,6 +279,21 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, "2")).toBeNull();
   });
 
+  it("accepts a case-only difference against the options (upper=True enums)", () => {
+    // esp32 `variant` options are uppercase (`ESP32`) but boards write `esp32`;
+    // cv.one_of(..., upper=True) accepts it, so it must not hard-fail.
+    const entry = makeEntry({
+      type: ConfigEntryType.SELECT,
+      options: [
+        { label: "ESP32", value: "ESP32" },
+        { label: "ESP32C2", value: "ESP32C2" },
+      ],
+    });
+    expect(validateEntry(entry, "esp32")).toBeNull();
+    expect(validateEntry(entry, "esp32c2")).toBeNull();
+    expect(validateEntry(entry, "esp32xx")?.code).toBe("validation.invalid_option");
+  });
+
   it("flags empty array when required", () => {
     const entry = makeEntry({ required: true, multi_value: true });
     expect(validateEntry(entry, [])?.code).toBe("validation.required");

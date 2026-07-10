@@ -288,8 +288,15 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
   // for fields that opt into custom values (combobox-style entries treat
   // `options` as suggestions, not a fixed set).
   if (entry.options && entry.options.length > 0 && !entry.allow_custom_value) {
+    const rawStr = String(raw);
     const allowed = entry.options.map((o) => o.value);
-    if (!allowed.includes(String(raw))) {
+    // A case-only difference is accepted: esphome's `cv.one_of(..., upper=True)`
+    // normalizes case, so a board-written `esp32` against a catalog `ESP32`
+    // option compiles fine and the form already resolves it case-insensitively.
+    if (
+      !allowed.includes(rawStr) &&
+      nearCanonicalOption(rawStr, entry.options) === null
+    ) {
       return { key: entry.key, code: "validation.invalid_option" };
     }
   }
