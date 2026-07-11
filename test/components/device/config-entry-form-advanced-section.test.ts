@@ -306,6 +306,39 @@ describe("config-entry-form advanced-section", () => {
     expect(text).not.toContain("Gated");
   });
 
+  it("auto-opens an off-flag form whose only painting unit is advanced", () => {
+    // A non-painting basic unit (hidden, no value) alongside a painting advanced
+    // field is effectively all-advanced: an automation node (gate off) should
+    // auto-open it inline rather than gate the only visible field behind a
+    // control. The non-painting basic must not keep basic.length > 0.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [
+      makeConfigEntry({
+        key: "hidden_basic",
+        type: ConfigEntryType.STRING,
+        label: "Hidden Basic",
+        hidden: true,
+      }),
+      makeConfigEntry({
+        key: "adv",
+        type: ConfigEntryType.STRING,
+        label: "Adv Field",
+        advanced: true,
+      }),
+    ];
+    form.values = {};
+    form.advancedSection = true;
+    form.gateAllAdvanced = false;
+    form.showAdvanced = false;
+    const container = document.createElement("div");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render((form as any).render(), container);
+    // All-advanced auto-open: no control, the advanced field paints inline.
+    expect(control(container)).toBeNull();
+    expect(container.textContent ?? "").toContain("Adv Field");
+    expect(container.textContent ?? "").not.toContain("Hidden Basic");
+  });
+
   it("emits advanced-toggle when the control is clicked", () => {
     const form = new ESPHomeConfigEntryForm();
     form.entries = [BASIC, ADVANCED];
