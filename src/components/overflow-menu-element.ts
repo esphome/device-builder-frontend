@@ -6,12 +6,12 @@ import { EscapeController } from "../util/escape-controller.js";
  * Base for self-triggering kebab / toggle popover menus: owns the open
  * flag, Escape-to-close, keyboard activation of `role="menuitem"` rows, and
  * bubbling-event emit.
-
+ *
  * Subclasses render their own trigger button, menu body, and styles (pairing
  * `dropdownMenuStyles`), wiring `_toggle`/`_close` on the trigger/backdrop,
  * `_onItemKeydown` on focusable rows, and `_emit` for actions. Override
  * `willUpdate` only if you also `super.willUpdate(changed)`.
-
+ *
  * Not for externally-positioned context menus whose open state derives from
  * props and whose close has side effects (see `table-row-menu`).
  */
@@ -35,7 +35,12 @@ export abstract class OverflowMenuElement extends LitElement {
     this._open = false;
   };
 
-  /** Enter/Space activates a focusable `role="menuitem"` row (reuses its @click). */
+  /**
+   * Enter/Space activates a focusable row, re-dispatching its `@click`. Rows
+   * are `role="menuitem"` divs (not `<button>`s) so they sit flush with the
+   * checkbox / icon-label styling; this restores the keyboard path buttons
+   * would give for free.
+   */
   protected _onItemKeydown = (e: KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
