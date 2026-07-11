@@ -115,4 +115,15 @@ describe("esphome-select-bar update split button", () => {
       el.shadowRoot!.querySelector<HTMLButtonElement>(".update-split__main")!.disabled
     ).toBe(true);
   });
+
+  it("closes an open menu when the selection empties", async () => {
+    const el = await mount();
+    await openMenu(el);
+
+    el.selectedCount = 0;
+    await el.updateComplete;
+
+    expect(el.shadowRoot!.querySelector('[role="menu"]')).toBeNull();
+    expect(caretOf(el).getAttribute("aria-expanded")).toBe("false");
+  });
 });

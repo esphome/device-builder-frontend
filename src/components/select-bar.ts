@@ -460,6 +460,11 @@ export class ESPHomeSelectBar extends LitElement {
   }
 
   protected willUpdate() {
+    // An emptied selection disables the caret; take the open menu with
+    // it so the disabled state can't leave a live "Compile only" row.
+    if (this.selectedCount === 0) {
+      this._menuOpen = false;
+    }
     this._escape.set(this._menuOpen);
   }
 
