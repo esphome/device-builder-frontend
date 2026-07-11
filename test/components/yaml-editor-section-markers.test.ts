@@ -1,0 +1,68 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * Pins the always-on section markers: every top-level section header carries
+ * its domain glyph (the same one the navigator row shows), independent of any
+ * selection, and the set tracks doc edits.
+ */
+import type { EditorView } from "@codemirror/view";
+import { describe, expect, it } from "vitest";
+
+import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
+
+const YAML = [
+  "esphome:",
+  "  name: x",
+  "wifi:",
+  "  ssid: y",
+  "switch:",
+  "  - platform: gpio",
+  "",
+].join("\n");
+
+async function mount(value: string): Promise<ESPHomeYamlEditor> {
+  const el = new ESPHomeYamlEditor();
+  document.body.appendChild(el);
+  await el.updateComplete;
+  el.value = value;
+  await el.updateComplete;
+  return el;
+}
+
+const viewOf = (el: ESPHomeYamlEditor): EditorView =>
+  (el as unknown as { _view: EditorView })._view;
+
+function markerNames(el: ESPHomeYamlEditor): string[] {
+  return Array.from(
+    viewOf(el).dom.querySelectorAll<HTMLElement>(".cm-section-marker")
+  ).map((m) => m.getAttribute("name") ?? "");
+}
+
+describe("yaml-editor section markers", () => {
+  it("marks every top-level section header with its domain glyph", async () => {
+    const el = await mount(YAML);
+    // esphome → chip, wifi → wifi, switch → toggle-switch-outline.
+    expect(markerNames(el)).toEqual(["chip", "wifi", "toggle-switch-outline"]);
+  });
+
+  it("shows markers with no selection active", async () => {
+    const el = await mount(YAML);
+    expect(el.highlightRange).toBeNull();
+    expect(markerNames(el)).toHaveLength(3);
+  });
+
+  it("tracks a section added by editing the doc", async () => {
+    const el = await mount(YAML);
+    const view = viewOf(el);
+    view.dispatch({
+      changes: { from: view.state.doc.length, insert: "logger:\n" },
+    });
+    await el.updateComplete;
+    expect(markerNames(el)).toEqual([
+      "chip",
+      "wifi",
+      "toggle-switch-outline",
+      "card-text-outline",
+    ]);
+  });
+});

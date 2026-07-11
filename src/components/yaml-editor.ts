@@ -2,8 +2,20 @@ import { autocompletion, completionStatus } from "@codemirror/autocomplete";
 import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { forceLinting } from "@codemirror/lint";
-import { StateEffect, StateField, Transaction } from "@codemirror/state";
-import { Decoration, keymap, tooltips, type DecorationSet } from "@codemirror/view";
+import {
+  type Range,
+  StateEffect,
+  StateField,
+  type Text,
+  Transaction,
+} from "@codemirror/state";
+import {
+  Decoration,
+  keymap,
+  tooltips,
+  WidgetType,
+  type DecorationSet,
+} from "@codemirror/view";
 import { consume } from "@lit/context";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { basicSetup, EditorView } from "codemirror";
@@ -45,6 +57,7 @@ import {
   relintEffect,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
+import { TOP_LEVEL_KEY_RE } from "../util/yaml-section-lexer.js";
 import type { YamlSection } from "../util/yaml-sections.js";
 import {
   sensitiveValueMaskExtension,
@@ -52,6 +65,7 @@ import {
 } from "../util/yaml-sensitive-mask.js";
 import { yamlStickyScroll } from "../util/yaml-sticky-scroll.js";
 import { CodeMirrorEditorElement } from "./codemirror-editor-element.js";
+import { iconForDomain } from "./device/navigator-row-icons.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 
@@ -102,6 +116,64 @@ const highlightField = StateField.define<DecorationSet>({
     }
     return deco.map(tr.changes);
   },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+// Quiet domain glyph pinned to the end of every top-level section header, so
+// each section carries the same icon it has in the navigator. Icon only, in a
+// muted tone — the section key is already on the line. Lives in the content
+// flow (not the gutter), so it never shifts the line-number column, and is
+// sized to the line so the row can't grow.
+class SectionMarkerWidget extends WidgetType {
+  constructor(readonly domain: string) {
+    super();
+  }
+
+  eq(other: SectionMarkerWidget) {
+    return other.domain === this.domain;
+  }
+
+  toDOM() {
+    const icon = document.createElement("wa-icon");
+    icon.className = "cm-section-marker";
+    icon.setAttribute("aria-hidden", "true");
+    icon.setAttribute("library", "mdi");
+    icon.setAttribute("name", iconForDomain(this.domain));
+    return icon;
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
+
+function buildSectionMarkers(doc: Text): DecorationSet {
+  const marks: Range<Decoration>[] = [];
+  // Column-0 `key:` lines are the top-level section headers; the anchor keeps
+  // indented block-scalar content from false-matching. One marker per header,
+  // on the header line itself (not the expanded list-item lines the section
+  // parser would return for `switch:` / `sensor:`).
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n);
+    const match = TOP_LEVEL_KEY_RE.exec(line.text);
+    if (!match) continue;
+    marks.push(
+      Decoration.widget({
+        widget: new SectionMarkerWidget(match[1]),
+        side: 1,
+      }).range(line.to)
+    );
+  }
+  return Decoration.set(marks, true);
+}
+
+// Always-on section markers, recomputed from the doc rather than driven by
+// selection, so every section header carries its glyph whether or not it's the
+// active one.
+const sectionMarkersField = StateField.define<DecorationSet>({
+  create: (state) => buildSectionMarkers(state.doc),
+  update: (deco, tr) =>
+    tr.docChanged ? buildSectionMarkers(tr.state.doc) : deco.map(tr.changes),
   provide: (f) => EditorView.decorations.from(f),
 });
 
@@ -210,6 +282,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         colors: INDENT_GUIDE_COLORS,
       }),
       highlightField,
+      sectionMarkersField,
       // Keep every tooltip (lint hover, docs hover, completion) inside the
       // code pane: near the bottom they flip above the line instead of
       // spilling over the invalid banner / action row below the editor.
@@ -241,6 +314,15 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
           background: this._darkMode
             ? "rgba(99, 179, 237, 0.2)"
             : "rgba(59, 130, 246, 0.1)",
+        },
+        // Quiet domain glyph on each section header. Muted so it reads as a
+        // marker, not code; sized to the line so it can't grow the row.
+        ".cm-section-marker": {
+          marginLeft: "8px",
+          fontSize: "1.05em",
+          verticalAlign: "middle",
+          color: this._darkMode ? "rgba(235, 235, 245, 0.4)" : "rgba(60, 60, 67, 0.45)",
+          userSelect: "none",
         },
         // ─── Diagnostics: red wavy underline + gutter marker ────────
         ".cm-lintRange-error": {
