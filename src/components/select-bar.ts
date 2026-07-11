@@ -255,11 +255,12 @@ export class ESPHomeSelectBar extends LitElement {
       }
 
       /* With all five labels showing, the action row's min-content is
-         ~640px (more in longer locales); below ~860px it collides with
-         the Select-all + count group, so the buttons go icon-only here
-         rather than at a phone-only width. The left group's ellipsis
-         is the backstop for locales whose labels push past this. */
-      @media (max-width: 860px) {
+         ~640px in headless Chrome and wider under Safari's fonts and
+         in longer locales, so anywhere under ~1000px it collides with
+         the Select-all + count group. Go icon-only below that; the
+         left group's ellipsis is the backstop for locales whose
+         labels push past it. */
+      @media (max-width: 1000px) {
         .select-bar {
           padding: var(--wa-space-m);
         }
