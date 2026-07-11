@@ -258,6 +258,54 @@ describe("config-entry-form advanced-section", () => {
     expect(text).not.toContain("Show advanced settings (2)");
   });
 
+  it("does not count a constraint cluster whose members are all gated off", () => {
+    // The cluster renderer paints nothing when every member is hidden/gated, so
+    // it must not add to the count. One shown advanced field + a fully-hidden
+    // cluster ⇒ count is 1, not 2.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [
+      makeConfigEntry({
+        key: "shown",
+        type: ConfigEntryType.STRING,
+        label: "Shown Adv",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "g1",
+        type: ConfigEntryType.STRING,
+        label: "Gated 1",
+        advanced: true,
+        group: "grp",
+        hidden: true,
+      }),
+      makeConfigEntry({
+        key: "g2",
+        type: ConfigEntryType.STRING,
+        label: "Gated 2",
+        advanced: true,
+        group: "grp",
+        hidden: true,
+      }),
+    ];
+    form.values = {};
+    form.advancedSection = true;
+    form.gateAllAdvanced = true;
+    form.showAdvanced = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._localize = (key: string, params?: { count?: number }) =>
+      key === "device.show_advanced_count"
+        ? `Show advanced settings (${params?.count})`
+        : key;
+    const container = document.createElement("div");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render((form as any).render(), container);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Show advanced settings (1)");
+    expect(text).not.toContain("Show advanced settings (2)");
+    expect(text).toContain("Shown Adv");
+    expect(text).not.toContain("Gated");
+  });
+
   it("emits advanced-toggle when the control is clicked", () => {
     const form = new ESPHomeConfigEntryForm();
     form.entries = [BASIC, ADVANCED];

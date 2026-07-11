@@ -38,7 +38,7 @@ import {
   catalogEntryToProvider,
   type ComponentProvider,
 } from "../../util/config-entry-yaml-scan.js";
-import { type ValidationError } from "../../util/config-validation.js";
+import { isEntryVisible, type ValidationError } from "../../util/config-validation.js";
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { fetchAllComponents } from "../../util/fetch-all-components.js";
@@ -389,12 +389,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // ``plan.visible`` (advanced+hidden like captive_portal's setup_priority, or
     // a depends_on that isn't met) renders nothing, so it must not inflate the
     // "(N)" count or tip the all-advanced check. An exclusive group is one
-    // dropdown; a constraint cluster is one box painted at its *first* member's
-    // slot (the other member slots render nothing), so it counts once.
-    const clusterFirstKeys = new Set(plan.clusters.map((c) => c.members[0].key));
+    // dropdown. A constraint cluster is one box painted at its *first* member's
+    // slot, and only when a member is renderable — ``renderConstraintClusterField``
+    // returns nothing when every member is gated off, so mirror that predicate
+    // here or a fully-gated cluster still counts.
+    const targetPlatform = ctx.board?.esphome.platform ?? null;
+    const clusterRenders = (cluster: (typeof plan.clusters)[number]): boolean =>
+      cluster.members.some(
+        (m) =>
+          getIn(this.values, [m.key]) !== undefined ||
+          isEntryVisible(m, this.values, this.presentComponents, targetPlatform)
+      );
+    const renderedClusterKeys = new Set(
+      plan.clusters.filter(clusterRenders).map((c) => c.members[0].key)
+    );
     const willRender = (item: ConfigEntry | ConfigEntry[]): boolean => {
       if (Array.isArray(item)) return true;
-      if (plan.memberKeys.has(item.key)) return clusterFirstKeys.has(item.key);
+      if (plan.memberKeys.has(item.key)) return renderedClusterKeys.has(item.key);
       return plan.visible.has(item);
     };
     const rendered = plan.ordered.filter(willRender);
