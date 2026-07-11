@@ -67,7 +67,12 @@ describe("esphome-device-actions-menu", () => {
     const [logs, clean] = await openMenu(el);
     expect(clean.classList.contains("menu-item--disabled")).toBe(true);
     expect(clean.getAttribute("aria-disabled")).toBe("true");
+    // Out of the tab order and no keyboard activation while disabled.
+    expect(clean.getAttribute("tabindex")).toBe("-1");
     clean.click();
+    clean.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })
+    );
     expect(onClean).not.toHaveBeenCalled();
     // Logs stays live even while busy.
     const onLogs = vi.fn();

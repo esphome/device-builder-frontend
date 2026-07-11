@@ -109,7 +109,7 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                 <div
                   class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
                   role="menuitem"
-                  tabindex="0"
+                  tabindex=${this.busy ? "-1" : "0"}
                   aria-disabled=${this.busy ? "true" : "false"}
                   title=${
                     this.busy
@@ -117,7 +117,7 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                       : nothing
                   }
                   @click=${this.busy ? undefined : this._onCleanBuild}
-                  @keydown=${this._onItemKeydown}
+                  @keydown=${this.busy ? undefined : this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="broom"></wa-icon>
                   <span class="menu-item-label"
