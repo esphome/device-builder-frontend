@@ -100,16 +100,31 @@ export class ESPHomeSelectBar extends LitElement {
         white-space: nowrap;
       }
 
+      /* The action buttons keep their size; the left group absorbs the
+         squeeze at tight widths (or with long translations) by
+         ellipsizing — the count first (it restates the selection the
+         checkboxes already show), then the Select-all label. Without
+         min-width: 0 the nowrap texts set a floor and the row overlaps
+         instead of shrinking. */
       .left {
         display: flex;
         align-items: center;
         gap: var(--wa-space-m);
+        min-width: 0;
+      }
+
+      .right {
+        flex-shrink: 0;
       }
 
       .count {
         font-size: var(--wa-font-size-s);
         color: var(--wa-color-text-quiet);
         font-weight: var(--wa-font-weight-semibold);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        flex-shrink: 4;
       }
 
       .toggle {
@@ -123,6 +138,9 @@ export class ESPHomeSelectBar extends LitElement {
         padding: 6px 12px;
         border-radius: var(--wa-border-radius-m);
         transition: background 0.12s;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
       }
 
       .toggle:hover {
@@ -200,8 +218,8 @@ export class ESPHomeSelectBar extends LitElement {
         border-top-left-radius: 0;
         border-bottom-left-radius: 0;
         margin-left: calc(-1 * var(--wa-border-width-s));
-        padding-left: 8px;
-        padding-right: 8px;
+        padding-left: var(--wa-space-xs);
+        padding-right: var(--wa-space-xs);
         gap: 0;
       }
 
@@ -216,7 +234,7 @@ export class ESPHomeSelectBar extends LitElement {
         /* Anchored to the split button; the bar is fixed to the bottom
            edge, so the menu opens upward. */
         position: absolute;
-        bottom: calc(100% + 6px);
+        bottom: calc(100% + var(--wa-space-2xs));
         right: 0;
         min-width: 160px;
       }
@@ -236,7 +254,12 @@ export class ESPHomeSelectBar extends LitElement {
         }
       }
 
-      @media (max-width: 700px) {
+      /* With all five labels showing, the action row's min-content is
+         ~640px (more in longer locales); below ~860px it collides with
+         the Select-all + count group, so the buttons go icon-only here
+         rather than at a phone-only width. The left group's ellipsis
+         is the backstop for locales whose labels push past this. */
+      @media (max-width: 860px) {
         .select-bar {
           padding: var(--wa-space-m);
         }
@@ -250,7 +273,7 @@ export class ESPHomeSelectBar extends LitElement {
         }
 
         .update-split__caret {
-          padding: 8px 6px;
+          padding: var(--wa-space-xs) 6px;
         }
 
         .btn-label {
@@ -273,7 +296,7 @@ export class ESPHomeSelectBar extends LitElement {
         }
 
         .left {
-          gap: 2px;
+          gap: var(--wa-space-2xs);
         }
 
         .toggle {
@@ -285,15 +308,15 @@ export class ESPHomeSelectBar extends LitElement {
         }
 
         .right {
-          gap: 2px;
+          gap: var(--wa-space-2xs);
         }
 
         .btn {
-          padding: 8px 5px;
+          padding: var(--wa-space-xs) var(--wa-space-2xs);
         }
 
         .update-split__caret {
-          padding: 8px 3px;
+          padding: var(--wa-space-xs) var(--wa-space-3xs);
         }
       }
     `,
