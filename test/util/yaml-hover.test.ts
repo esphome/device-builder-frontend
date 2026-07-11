@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../../src/api/types/components.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
-import * as componentCache from "../../src/util/component-name-cache.js";
+import { _clearComponentCache } from "../../src/util/component-name-cache.js";
 import * as schema from "../../src/util/esphome-schema.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import type { CatalogIndex } from "../../src/util/yaml-completion.js";
@@ -25,12 +25,6 @@ vi.mock("../../src/util/esphome-schema.js", async (importOriginal) => ({
   getConfigVarDocsAtPath: vi.fn(),
 }));
 
-// Stub the body hydration the catalog field fallback goes through.
-vi.mock("../../src/util/component-name-cache.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/util/component-name-cache.js")>()),
-  fetchComponent: vi.fn(),
-}));
-
 // Build the slim catalog index the resolver consumes — used for
 // component / field descriptions once the schema walk comes up empty.
 function catalog(entries: ComponentCatalogEntry[]): CatalogIndex {
@@ -46,27 +40,29 @@ function catalog(entries: ComponentCatalogEntry[]): CatalogIndex {
 }
 
 // The slim index the resolver holds is body-less in production — no
-// ``config_entries`` here; field docs hydrate through fetchComponent.
-const CATALOG: CatalogIndex = catalog([
-  makeComponentEntry("ethernet", {
-    name: "Ethernet",
-    description: "Wired networking for the node.",
-    docs_url: "https://esphome.io/components/ethernet",
-  }),
-  makeComponentEntry("binary_sensor.gpio", {
-    name: "GPIO Binary Sensor",
-    description: "A binary sensor reading a GPIO pin.",
-    docs_url: "https://esphome.io/components/binary_sensor/gpio",
-  }),
-]);
+// ``config_entries`` here; field docs hydrate through get_component_bodies.
+const SLIM_ETHERNET = makeComponentEntry("ethernet", {
+  name: "Ethernet",
+  description: "Wired networking for the node.",
+  docs_url: "https://esphome.io/components/ethernet",
+});
+const SLIM_GPIO = makeComponentEntry("binary_sensor.gpio", {
+  name: "GPIO Binary Sensor",
+  description: "A binary sensor reading a GPIO pin.",
+  docs_url: "https://esphome.io/components/binary_sensor/gpio",
+});
+const SLIM_ESP32 = makeComponentEntry("esp32", {
+  name: "ESP32",
+  docs_url: "https://esphome.io/components/esp32",
+});
+const CATALOG: CatalogIndex = catalog([SLIM_ETHERNET, SLIM_GPIO, SLIM_ESP32]);
 
-// Hydrated component bodies served by the mocked fetchComponent.
+// Hydrated component bodies served by the stubbed WS command.
 const BODIES = new Map<string, ComponentCatalogEntry>([
   [
     "ethernet",
-    makeComponentEntry("ethernet", {
-      name: "Ethernet",
-      docs_url: "https://esphome.io/components/ethernet",
+    {
+      ...SLIM_ETHERNET,
       config_entries: [
         makeConfigEntry({
           key: "type",
@@ -75,13 +71,12 @@ const BODIES = new Map<string, ComponentCatalogEntry>([
           help_link: "https://esphome.io/components/ethernet#type",
         }),
       ],
-    }),
+    },
   ],
   [
     "esp32",
-    makeComponentEntry("esp32", {
-      name: "ESP32",
-      docs_url: "https://esphome.io/components/esp32",
+    {
+      ...SLIM_ESP32,
       config_entries: [
         makeNestedEntry("framework", [
           makeConfigEntry({ key: "type", type: ConfigEntryType.STRING }),
@@ -95,13 +90,12 @@ const BODIES = new Map<string, ComponentCatalogEntry>([
           ]),
         ]),
       ],
-    }),
+    },
   ],
   [
     "binary_sensor.gpio",
-    makeComponentEntry("binary_sensor.gpio", {
-      name: "GPIO Binary Sensor",
-      docs_url: "https://esphome.io/components/binary_sensor/gpio",
+    {
+      ...SLIM_GPIO,
       // Flat entry; the YAML nests it under a pin wrapper the body
       // doesn't model, so lookup must fall back to the leaf-key search.
       config_entries: [
@@ -111,11 +105,16 @@ const BODIES = new Map<string, ComponentCatalogEntry>([
           description: "Invert the reported state.",
         }),
       ],
-    }),
+    },
   ],
 ]);
 
-const API = {} as unknown as ESPHomeAPI;
+const getComponentBodies = vi.fn(async (ids: string[]) =>
+  Object.fromEntries(
+    ids.filter((id) => BODIES.has(id)).map((id) => [id, BODIES.get(id)!])
+  )
+);
+const API = { getComponentBodies } as unknown as ESPHomeAPI;
 
 function stateFor(doc: string): EditorState {
   const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
@@ -140,9 +139,7 @@ beforeEach(() => {
   vi.mocked(schema.getRegistryEntries).mockResolvedValue([]);
   vi.mocked(schema.lookupRegistryRef).mockResolvedValue(null);
   vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue(null);
-  vi.mocked(componentCache.fetchComponent).mockImplementation(
-    async (_api, id) => BODIES.get(id) ?? null
-  );
+  _clearComponentCache();
 });
 
 describe("resolveHoverTarget — docs on every documented key (legacy parity)", () => {
@@ -216,10 +213,7 @@ describe("resolveHoverTarget — docs on every documented key (legacy parity)", 
     const target = await hover("ethernet:\n  type: W5500\n", "type");
     expect(target?.description).toBe("**string**: The Ethernet chip type.");
     expect(target?.docsUrl).toBe("https://esphome.io/components/ethernet#type");
-    expect(vi.mocked(componentCache.fetchComponent)).toHaveBeenCalledWith(
-      API,
-      "ethernet"
-    );
+    expect(getComponentBodies).toHaveBeenCalledWith(["ethernet"], undefined, undefined);
   });
 
   it("hydrates the body for a deeply nested catalog-only key", async () => {
@@ -235,22 +229,24 @@ describe("resolveHoverTarget — docs on every documented key (legacy parity)", 
       "**boolean**: Use the SRAM1 memory region as additional IRAM."
     );
     expect(target?.docsUrl).toBe("https://esphome.io/components/esp32");
-    expect(vi.mocked(componentCache.fetchComponent)).toHaveBeenCalledWith(API, "esp32");
+    expect(getComponentBodies).toHaveBeenCalledWith(["esp32"], undefined, undefined);
   });
 
   it("falls back to a leaf-key search when the body doesn't mirror the YAML nesting", async () => {
     const doc = "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: false\n";
     const target = await hover(doc, "inverted");
     expect(target?.description).toBe("**boolean**: Invert the reported state.");
-    expect(vi.mocked(componentCache.fetchComponent)).toHaveBeenCalledWith(
-      API,
-      "binary_sensor.gpio"
+    expect(getComponentBodies).toHaveBeenCalledWith(
+      ["binary_sensor.gpio"],
+      undefined,
+      undefined
     );
   });
 
-  it("returns null for a nested key when the catalog has no such component", async () => {
-    const target = await hover("mystery:\n  nested:\n    knob: 1\n", "knob");
+  it("fetches nothing for a nested key under a non-component block", async () => {
+    const target = await hover("substitutions:\n  nested:\n    knob: 1\n", "knob");
     expect(target).toBeNull();
+    expect(getComponentBodies).not.toHaveBeenCalled();
   });
 
   it("shows a bare-domain description for a platform domain", async () => {

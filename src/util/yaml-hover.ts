@@ -36,7 +36,10 @@ import {
   isUnderAutomationItem,
   resolveBundleContext,
 } from "./yaml-ast.js";
-import { descendNestedEntries } from "./yaml-completion-catalog.js";
+import {
+  descendNestedEntries,
+  type CompletionTarget,
+} from "./yaml-completion-catalog.js";
 import { bundleFor, loadCatalog, type CatalogIndex } from "./yaml-completion.js";
 import {
   findParentKey,
@@ -124,7 +127,8 @@ export async function resolveHoverTarget(
   state: EditorState,
   pos: number,
   api: ESPHomeAPI,
-  catalog: CatalogIndex
+  catalog: CatalogIndex,
+  deviceTarget?: CompletionTarget
 ): Promise<HoverTarget | null> {
   const line = state.doc.lineAt(pos);
   const stripped = stripComment(line.text);
@@ -218,11 +222,21 @@ export async function resolveHoverTarget(
   // Catalog fallback. The catalog keys platforms as ``<domain>.<stem>``
   // (``binary_sensor.gpio``), the reverse of the schema bundle's
   // ``<stem>.<domain>`` componentKey — use the catalog form here. The
-  // slim index carries no config_entries, so hydrate the full body;
-  // then prefer the entry at the exact nested path, falling back to a
-  // leaf-key search for YAML structure the body nesting doesn't mirror.
+  // slim index carries no config_entries, so hydrate the full body
+  // (the device target keeps this in the cache bucket the completion
+  // source and structured editor already fill); then prefer the entry
+  // at the exact nested path, falling back to a leaf-key search for
+  // YAML structure the body nesting doesn't mirror. The byId guard
+  // keeps non-component blocks (``substitutions:``, typos) from ever
+  // reaching the wire, mirroring the completion source.
   const catalogId = platformValue ? `${topLevelKey}.${platformValue}` : topLevelKey;
-  const comp = await fetchComponent(api, catalogId);
+  if (!catalog.byId.has(catalogId)) return null;
+  const comp = await fetchComponent(
+    api,
+    catalogId,
+    deviceTarget?.platform,
+    deviceTarget?.boardId
+  );
   if (!comp) return null;
   const entries = comp.config_entries ?? [];
   const entry =
@@ -269,9 +283,14 @@ function inComment(state: EditorState, pos: number): boolean {
 /**
  * CodeMirror hover-tooltip extension backed by the component catalog.
  * ``getSeeAlsoLabel`` is read per-tooltip so a locale switch is picked
- * up without rebuilding the editor.
+ * up without rebuilding the editor; ``getTarget`` likewise, so it
+ * tracks the device's platform/board as they load.
  */
-export function createYamlHoverTooltip(api: ESPHomeAPI, getSeeAlsoLabel: () => string) {
+export function createYamlHoverTooltip(
+  api: ESPHomeAPI,
+  getSeeAlsoLabel: () => string,
+  getTarget?: () => CompletionTarget
+) {
   return hoverTooltip(
     async (view, pos): Promise<Tooltip | null> => {
       if (inComment(view.state, pos)) return null;
@@ -280,7 +299,7 @@ export function createYamlHoverTooltip(api: ESPHomeAPI, getSeeAlsoLabel: () => s
       let target: HoverTarget | null;
       try {
         const catalog = await loadCatalog(api);
-        target = await resolveHoverTarget(view.state, pos, api, catalog);
+        target = await resolveHoverTarget(view.state, pos, api, catalog, getTarget?.());
       } catch (err) {
         // The catalog/schema fetches degrade gracefully on their own, so
         // reaching here is an unexpected error — warn (visible by default,

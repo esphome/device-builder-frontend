@@ -573,15 +573,16 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         }),
         lintErrorLineGutter
       );
+      // The device's platform/board, read per invocation so completion
+      // and hover share the structured editor's hydrated-body cache bucket.
+      const getDeviceTarget = () => ({
+        platform: this.board?.esphome.platform,
+        boardId: this.board?.id,
+      });
       // Schema-driven completion off the components catalog.
       extensions.push(
         autocompletion({
-          override: [
-            createYamlCompletionSource(this._api, () => ({
-              platform: this.board?.esphome.platform,
-              boardId: this.board?.id,
-            })),
-          ],
+          override: [createYamlCompletionSource(this._api, getDeviceTarget)],
           activateOnTyping: true,
           icons: true,
           closeOnBlur: true,
@@ -606,7 +607,11 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       );
       // Catalog-backed hover docs (description + "See also" link).
       extensions.push(
-        createYamlHoverTooltip(this._api, () => this._localize("device.see_also"))
+        createYamlHoverTooltip(
+          this._api,
+          () => this._localize("device.see_also"),
+          getDeviceTarget
+        )
       );
     }
 
