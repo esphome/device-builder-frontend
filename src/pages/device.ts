@@ -323,6 +323,15 @@ export class ESPHomePageDevice extends LitElement {
       get firmwareDialog() {
         return page._firmwareDialog ?? null;
       },
+      get logsDialog() {
+        return page._logsDialog ?? null;
+      },
+      get api() {
+        return page._api;
+      },
+      get localize() {
+        return page._localize;
+      },
     });
   }
 
@@ -961,11 +970,22 @@ export class ESPHomePageDevice extends LitElement {
    *  build files for this device" link works the same way on
    *  the device page. */
   private _onCleanBuild = (e: CustomEvent<ConfiguredDevice>) => {
-    const device = e.detail;
+    this._cleanBuild(e.detail);
+  };
+
+  /** "Logs" from the editor's device-actions menu. */
+  private _onEditorOpenLogs = () => this._installCtrl.onLogs();
+
+  /** "Clean build files" from the editor's device-actions menu. */
+  private _onEditorCleanBuild = () => {
+    if (this._device) this._cleanBuild(this._device);
+  };
+
+  private _cleanBuild(device: ConfiguredDevice) {
     this._commandDialog.configuration = device.configuration;
     this._commandDialog.name = device.friendly_name || device.name;
     this._commandDialog.open("clean");
-  };
+  }
 
   /** Catch ``request-open-editor`` from the post-validation-failure
    *  hint. ``stopPropagation`` to prevent any future higher-level
@@ -1064,6 +1084,8 @@ export class ESPHomePageDevice extends LitElement {
             @just-created-dismiss=${this._dismissJustCreated}
             @goto-line=${this._onEditorGoToLine}
             @change-board=${this._onChangeBoard}
+            @open-logs=${this._onEditorOpenLogs}
+            @clean-build=${this._onEditorCleanBuild}
             ?hasUnsavedEdits=${this._isDirty}
             ?saving=${this._saving}
             ?showModified=${this._device ? showPendingChanges(this._device) : false}
@@ -1126,6 +1148,7 @@ export class ESPHomePageDevice extends LitElement {
           .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
           .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
           .canFlashBootloader=${this._installCtrl.canFlashBootloader}
+          .mode=${this._installCtrl.methodMode}
           @close=${this._installCtrl.onInstallMethodClose}
           @select-method=${this._installCtrl.onInstallMethodSelect}
         ></esphome-install-method-dialog>

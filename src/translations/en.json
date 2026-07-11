@@ -945,6 +945,8 @@
     "back": "Back",
     "hide_navigator": "Hide navigator",
     "show_navigator": "Show navigator",
+    "actions_menu": "Device actions",
+    "show_logs": "Logs",
     "yaml_preview": "YAML preview",
     "yaml_preview_toggle": "Show YAML",
     "diff_view_diff": "Show diff against saved",

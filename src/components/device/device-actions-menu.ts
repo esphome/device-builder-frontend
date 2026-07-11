@@ -1,0 +1,150 @@
+import { consume } from "@lit/context";
+import { mdiBroom, mdiDotsVertical, mdiTextBoxOutline } from "@mdi/js";
+import { css, html, nothing } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
+import type { LocalizeFunc } from "../../common/localize.js";
+import { localizeContext } from "../../context/index.js";
+import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
+import { espHomeStyles } from "../../styles/shared.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
+import { OverflowMenuElement } from "../overflow-menu-element.js";
+
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+
+registerMdiIcons({
+  broom: mdiBroom,
+  "dots-vertical": mdiDotsVertical,
+  "text-box-outline": mdiTextBoxOutline,
+});
+
+/** Editor bottom-bar overflow menu: device-scoped actions (Logs, Clean build). */
+@customElement("esphome-device-actions-menu")
+export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
+  /** A build is in flight — cleaning its files mid-build would corrupt it. */
+  @property({ type: Boolean }) busy = false;
+
+  static styles = [
+    espHomeStyles,
+    dropdownMenuStyles,
+    css`
+      :host {
+        position: relative;
+        display: inline-flex;
+      }
+      .menu-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-m);
+        background: transparent;
+        color: var(--wa-color-text-normal);
+        cursor: pointer;
+        transition:
+          background 0.12s,
+          border-color 0.12s;
+      }
+      .menu-btn:hover {
+        background: var(--esphome-tint);
+      }
+      .menu-btn wa-icon {
+        font-size: 18px;
+      }
+      /* Bottom action bar sits at the viewport foot — open upward. */
+      .menu {
+        position: absolute;
+        bottom: calc(100% + var(--wa-space-xs));
+        right: 0;
+        min-width: 200px;
+      }
+      .menu-item--disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .menu-item--disabled:hover {
+        background-color: transparent;
+      }
+    `,
+  ];
+
+  protected render() {
+    const menuLabel = this._localize("device.actions_menu");
+    return html`
+      <button
+        type="button"
+        class="menu-btn"
+        @click=${this._toggle}
+        title=${menuLabel}
+        aria-label=${menuLabel}
+        aria-haspopup="menu"
+        aria-expanded=${this._open ? "true" : "false"}
+      >
+        <wa-icon library="mdi" name="dots-vertical"></wa-icon>
+      </button>
+      ${
+        this._open
+          ? html`
+              <div class="backdrop" @click=${this._close}></div>
+              <div class="menu" role="menu">
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._onLogs}
+                  @keydown=${this._onItemKeydown}
+                >
+                  <wa-icon library="mdi" name="text-box-outline"></wa-icon>
+                  <span class="menu-item-label"
+                    >${this._localize("device.show_logs")}</span
+                  >
+                </div>
+                <div
+                  class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+                  role="menuitem"
+                  tabindex="0"
+                  aria-disabled=${this.busy ? "true" : "false"}
+                  title=${
+                    this.busy
+                      ? this._localize("dashboard.action_clean_build_busy")
+                      : nothing
+                  }
+                  @click=${this.busy ? undefined : this._onCleanBuild}
+                  @keydown=${this._onItemKeydown}
+                >
+                  <wa-icon library="mdi" name="broom"></wa-icon>
+                  <span class="menu-item-label"
+                    >${this._localize("dashboard.action_clean_build")}</span
+                  >
+                </div>
+              </div>
+            `
+          : nothing
+      }
+    `;
+  }
+
+  private _onLogs = () => {
+    this._close();
+    this._emit("open-logs");
+  };
+
+  private _onCleanBuild = () => {
+    if (this.busy) return;
+    this._close();
+    this._emit("clean-build");
+  };
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "esphome-device-actions-menu": ESPHomeDeviceActionsMenu;
+  }
+}

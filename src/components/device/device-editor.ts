@@ -49,6 +49,7 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../confirm-dialog.js";
 import "../yaml-diff.js";
 import "../yaml-editor.js";
+import "./device-actions-menu.js";
 import "./device-board-info.js";
 import "./editor-invalid-banner.js";
 
@@ -300,6 +301,9 @@ export class ESPHomeDeviceEditor extends LitElement {
         </header>
         <div class="card-body">
           <div class="editor-floating-actions">
+            <!-- Leftmost so it stays clear of Save in the lower-right corner:
+                 a mis-tap on Save must not land on the overflow menu. -->
+            <esphome-device-actions-menu ?busy=${this.busy}></esphome-device-actions-menu>
             ${this._renderPrimaryAction()}
             <!-- Span wrapper carries the title because a disabled
                  button isn't focusable and most browsers won't

@@ -1,9 +1,17 @@
 import { type ReactiveController, type ReactiveControllerHost } from "lit";
+import type { ESPHomeAPI } from "../../api/index.js";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
+import type { LocalizeFunc } from "../../common/localize.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
+import {
+  launchLogs,
+  launchLogsWithMethod,
+  type LogsLaunchHost,
+} from "../../util/logs-launch.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
+import type { ESPHomeLogsDialog } from "../logs-dialog.js";
 
 export interface DeviceInstallControllerHost extends ReactiveControllerHost {
   /** Currently displayed device, or null when not yet loaded. */
@@ -12,11 +20,18 @@ export interface DeviceInstallControllerHost extends ReactiveControllerHost {
   readonly commandDialog: ESPHomeCommandDialog | null;
   /** Resolve the mounted firmware-install-dialog instance. */
   readonly firmwareDialog: ESPHomeFirmwareInstallDialog | null;
+  /** Resolve the mounted logs-dialog instance. */
+  readonly logsDialog: ESPHomeLogsDialog | null;
+  readonly api: ESPHomeAPI;
+  readonly localize: LocalizeFunc;
 }
 
 export class DeviceInstallController implements ReactiveController {
   private _host: DeviceInstallControllerHost;
   installMethodOpen = false;
+  /** Which action the shared method picker is serving; drives its `.mode` so
+   *  Logs shows the logs title/rows, not install. */
+  methodMode: "install" | "logs" = "install";
 
   constructor(host: DeviceInstallControllerHost) {
     this._host = host;
@@ -46,8 +61,21 @@ export class DeviceInstallController implements ReactiveController {
   /** "Install" entry point — opens the install-method picker. */
   onInstall = () => {
     if (!this._host.device) return;
+    this.methodMode = "install";
     this.installMethodOpen = true;
     this._host.requestUpdate();
+  };
+
+  /** "Logs" entry point — picker in logs mode when a serial path exists, else OTA logs. */
+  onLogs = () => {
+    const device = this._host.device;
+    const logsDialog = this._host.logsDialog;
+    if (!device || !logsDialog) return;
+    void launchLogs(this._logsHost(logsDialog), device, () => {
+      this.methodMode = "logs";
+      this.installMethodOpen = true;
+      this._host.requestUpdate();
+    });
   };
 
   /** "Update" entry point — bypasses the picker, runs install via OTA/server. */
@@ -59,21 +87,34 @@ export class DeviceInstallController implements ReactiveController {
 
   onInstallMethodClose = () => {
     this.installMethodOpen = false;
+    this.methodMode = "install";
     this._host.requestUpdate();
   };
 
   onInstallMethodSelect = (e: CustomEvent<{ method: string; port?: string }>) => {
     const device = this._host.device;
+    const mode = this.methodMode;
     this.installMethodOpen = false;
+    this.methodMode = "install";
     this._host.requestUpdate();
     if (!device) return;
     const { method, port } = e.detail;
+    if (mode === "logs") {
+      const logsDialog = this._host.logsDialog;
+      if (!logsDialog) return;
+      void launchLogsWithMethod(this._logsHost(logsDialog), device, method, port);
+      return;
+    }
     applyInstallMethod(method, port, {
       device,
       firmwareDialog: this._host.firmwareDialog,
       openInstall: (p, options) => this._openCommand(device, "install", p, options),
     });
   };
+
+  private _logsHost(logsDialog: ESPHomeLogsDialog): LogsLaunchHost {
+    return { api: this._host.api, logsDialog, localize: this._host.localize };
+  }
 
   private _openCommand(
     device: ConfiguredDevice,
