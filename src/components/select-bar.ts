@@ -282,14 +282,10 @@ export class ESPHomeSelectBar extends LitElement {
         }
       }
 
-      /* Phone widths: 5 icon-only action buttons (cancel, labels,
-         archive, delete, update) plus the split caret and the
-         Select-all + count on the left don't fit at the
-         700px-breakpoint padding/gap. Tighten the buttons and gaps
-         and hide the now-redundant count text (Select-all is the
-         meaningful affordance) so the trailing split button stays
-         on-screen at 320px. The bar's own horizontal padding stays
-         at --wa-space-s: it is what keeps the edge controls clear of
+      /* Phone widths: hide the now-redundant count text (Select-all
+         is the meaningful affordance) and tighten the buttons enough
+         for a 375px screen. The bar's own horizontal padding stays at
+         --wa-space-s: it is what keeps the edge controls clear of
          phone rounded-corner / safe-area cutins. */
       @media (max-width: 480px) {
         .select-bar {
@@ -310,6 +306,26 @@ export class ESPHomeSelectBar extends LitElement {
 
         .right {
           gap: var(--wa-space-2xs);
+        }
+
+        .btn {
+          padding: var(--wa-space-xs) 10px;
+        }
+
+        .update-split__caret {
+          padding: var(--wa-space-xs) var(--wa-space-2xs);
+        }
+      }
+
+      /* The smallest screens (320px) need the compact sizing the
+         wider phones above shouldn't pay for. */
+      @media (max-width: 360px) {
+        .left {
+          gap: var(--wa-space-3xs);
+        }
+
+        .right {
+          gap: var(--wa-space-3xs);
         }
 
         .btn {
