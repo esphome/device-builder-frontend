@@ -156,6 +156,25 @@ describe("config-entry-form advanced-section", () => {
     expect(expanded.textContent ?? "").toContain("Only Advanced");
   });
 
+  it("auto-opens a gated all-advanced form, locked, when a value is pre-filled", () => {
+    // A pre-filled advanced value forces the section open even under
+    // gate-all-advanced; the control stays visible but its switch is locked
+    // (can't collapse while a value is set).
+    const onlyAdvanced = makeConfigEntry({
+      key: "a",
+      type: ConfigEntryType.STRING,
+      label: "Only Advanced",
+      advanced: true,
+    });
+    const c = renderForm([onlyAdvanced], {
+      gateAllAdvanced: true,
+      values: { a: "set" },
+    });
+    expect(control(c)).toBeTruthy();
+    expect(c.textContent ?? "").toContain("Only Advanced");
+    expect(c.querySelector("wa-switch")!.hasAttribute("disabled")).toBe(true);
+  });
+
   it("counts only rendered advanced fields, not hidden ones, in the control label", () => {
     // captive_portal shape: two shown advanced fields + one advanced+hidden
     // field (setup_priority) that renders nothing. The "(N)" count must be 2.
