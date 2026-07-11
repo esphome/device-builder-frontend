@@ -89,17 +89,24 @@ describe("OverflowMenuElement", () => {
     expect(item(el)).toBeNull();
   });
 
-  it("activates a row on Enter and Space", async () => {
+  it("activates a row on Enter and Space, but ignores other keys", async () => {
     const el = await mount();
     trigger(el).click();
     await el.updateComplete;
     const onChosen = vi.fn();
     el.addEventListener("chosen", onChosen);
+    const row = item(el)!;
+    const press = (key: string) =>
+      row.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true })
+      );
 
-    item(el)!.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })
-    );
-    expect(onChosen).toHaveBeenCalledTimes(1);
+    press("Enter");
+    press(" ");
+    expect(onChosen).toHaveBeenCalledTimes(2);
+
+    press("a");
+    expect(onChosen).toHaveBeenCalledTimes(2);
   });
 
   it("emits a bubbling, composed event carrying detail", async () => {
