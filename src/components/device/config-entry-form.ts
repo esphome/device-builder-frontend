@@ -385,8 +385,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
     );
     const renderItem = this._makeItemRenderer(plan, ctx);
     const isAdvanced = this._advancedUnitClassifier(plan);
-    const basic = plan.ordered.filter((item) => !isAdvanced(item));
-    const advanced = plan.ordered.filter((item) => isAdvanced(item));
+    // Split only units that actually paint: a plain entry filtered out of
+    // ``plan.visible`` (advanced+hidden like captive_portal's setup_priority, or
+    // a depends_on that isn't met) renders nothing, so it must not inflate the
+    // "(N)" count or tip the all-advanced check. Groups/clusters paint via their
+    // own path, so they always count.
+    const willRender = (item: ConfigEntry | ConfigEntry[]): boolean =>
+      Array.isArray(item) || plan.memberKeys.has(item.key) || plan.visible.has(item);
+    const rendered = plan.ordered.filter(willRender);
+    const basic = rendered.filter((item) => !isAdvanced(item));
+    const advanced = rendered.filter((item) => isAdvanced(item));
     // Control visibility is recursive: a nested advanced field reveals in place
     // (it can't move to the bottom section), so the control must surface even
     // when no top-level unit is advanced, or that field stays unreachable.

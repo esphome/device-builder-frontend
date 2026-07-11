@@ -156,6 +156,52 @@ describe("config-entry-form advanced-section", () => {
     expect(expanded.textContent ?? "").toContain("Only Advanced");
   });
 
+  it("counts only rendered advanced fields, not hidden ones, in the control label", () => {
+    // captive_portal shape: two shown advanced fields + one advanced+hidden
+    // field (setup_priority) that renders nothing. The "(N)" count must be 2.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [
+      makeConfigEntry({
+        key: "a",
+        type: ConfigEntryType.STRING,
+        label: "Adv A",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "b",
+        type: ConfigEntryType.STRING,
+        label: "Adv B",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "setup_priority",
+        type: ConfigEntryType.STRING,
+        label: "Hidden Adv",
+        advanced: true,
+        hidden: true,
+      }),
+    ];
+    form.values = {};
+    form.advancedSection = true;
+    form.gateAllAdvanced = true;
+    form.showAdvanced = true;
+    // Default _localize returns the key; interpolate so the count is observable.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._localize = (key: string, params?: { count?: number }) =>
+      key === "device.show_advanced_count"
+        ? `Show advanced settings (${params?.count})`
+        : key;
+    const container = document.createElement("div");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render((form as any).render(), container);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Show advanced settings (2)");
+    expect(text).not.toContain("Show advanced settings (3)");
+    expect(text).toContain("Adv A");
+    expect(text).toContain("Adv B");
+    expect(text).not.toContain("Hidden Adv");
+  });
+
   it("emits advanced-toggle when the control is clicked", () => {
     const form = new ESPHomeConfigEntryForm();
     form.entries = [BASIC, ADVANCED];
