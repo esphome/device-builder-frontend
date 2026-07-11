@@ -3,9 +3,10 @@
  *
  * advanced-section mode: basic fields, then a "Show advanced settings" switch,
  * then the advanced fields below it (revealed when on). All-advanced forms
- * render with no control by default (automation nodes); with gate-all-advanced
- * (the device section editor) they keep the control and stay collapsed. The
- * control emits ``advanced-toggle``.
+ * render with no control by default (automation nodes). With gate-advanced (the
+ * device section editor) the YAML-present fields — basic or advanced — paint
+ * inline, and only the empty advanced fields stay behind the control (off by
+ * default, a real unlocked switch). The control emits ``advanced-toggle``.
  */
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
@@ -36,7 +37,7 @@ function renderForm(
     showAdvanced?: boolean;
     values?: Record<string, unknown>;
     forceAdvancedControl?: boolean;
-    gateAllAdvanced?: boolean;
+    gateAdvanced?: boolean;
   } = {}
 ): HTMLElement {
   const form = new ESPHomeConfigEntryForm();
@@ -45,7 +46,7 @@ function renderForm(
   form.advancedSection = true;
   form.showAdvanced = opts.showAdvanced ?? false;
   form.forceAdvancedControl = opts.forceAdvancedControl ?? false;
-  form.gateAllAdvanced = opts.gateAllAdvanced ?? false;
+  form.gateAdvanced = opts.gateAdvanced ?? false;
   const container = document.createElement("div");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render((form as any).render(), container);
@@ -135,8 +136,8 @@ describe("config-entry-form advanced-section", () => {
     expect(c.textContent ?? "").toContain("Only Advanced");
   });
 
-  it("gates an all-advanced form behind the control with gate-all-advanced", () => {
-    // The device section editor sets gate-all-advanced so an all-advanced
+  it("gates an all-advanced form behind the control with gate-advanced", () => {
+    // The device section editor sets gate-advanced so an all-advanced
     // component (captive_portal) shows just the control, fields hidden until
     // toggled — instead of the automation-node auto-open above.
     const onlyAdvanced = makeConfigEntry({
@@ -145,21 +146,20 @@ describe("config-entry-form advanced-section", () => {
       label: "Only Advanced",
       advanced: true,
     });
-    const collapsed = renderForm([onlyAdvanced], { gateAllAdvanced: true });
+    const collapsed = renderForm([onlyAdvanced], { gateAdvanced: true });
     expect(control(collapsed)).toBeTruthy();
     expect(collapsed.textContent ?? "").not.toContain("Only Advanced");
     const expanded = renderForm([onlyAdvanced], {
-      gateAllAdvanced: true,
+      gateAdvanced: true,
       showAdvanced: true,
     });
     expect(control(expanded)).toBeTruthy();
     expect(expanded.textContent ?? "").toContain("Only Advanced");
   });
 
-  it("auto-opens a gated all-advanced form, locked, when a value is pre-filled", () => {
-    // A pre-filled advanced value forces the section open even under
-    // gate-all-advanced; the control stays visible but its switch is locked
-    // (can't collapse while a value is set).
+  it("surfaces a pre-filled advanced field inline under gate-advanced, switch unlocked", () => {
+    // A YAML-present advanced field paints inline (not gated); the switch is a
+    // real toggle, never locked open, and it isn't forced on.
     const onlyAdvanced = makeConfigEntry({
       key: "a",
       type: ConfigEntryType.STRING,
@@ -167,12 +167,172 @@ describe("config-entry-form advanced-section", () => {
       advanced: true,
     });
     const c = renderForm([onlyAdvanced], {
-      gateAllAdvanced: true,
+      gateAdvanced: true,
       values: { a: "set" },
     });
-    expect(control(c)).toBeTruthy();
     expect(c.textContent ?? "").toContain("Only Advanced");
-    expect(c.querySelector("wa-switch")!.hasAttribute("disabled")).toBe(true);
+    const sw = c.querySelector("wa-switch");
+    // The only advanced field is pre-filled, so nothing is gated — the control
+    // may or may not paint, but if it does its switch must be unlocked and off.
+    if (sw) {
+      expect(sw.hasAttribute("disabled")).toBe(false);
+      expect((sw as HTMLElement & { checked?: boolean }).checked ?? false).toBe(false);
+    }
+  });
+
+  it("shows only YAML-present advanced fields, gating the empty ones, under gate-advanced", () => {
+    // The starter-kit switch.gpio shape: basic fields, one pre-filled advanced
+    // field (id/internal), and several empty advanced fields. Only the filled
+    // one surfaces; the empty ones stay behind the control, off by default —
+    // one filled advanced field must NOT drag the rest on screen.
+    const entries = [
+      makeConfigEntry({ key: "name", type: ConfigEntryType.STRING, label: "Name Field" }),
+      makeConfigEntry({
+        key: "internal",
+        type: ConfigEntryType.STRING,
+        label: "Internal Field",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "command_retain",
+        type: ConfigEntryType.STRING,
+        label: "Empty Adv One",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "device_id",
+        type: ConfigEntryType.STRING,
+        label: "Empty Adv Two",
+        advanced: true,
+      }),
+    ];
+    const c = renderForm(entries, {
+      gateAdvanced: true,
+      values: { name: "sw", internal: "true" },
+    });
+    const text = c.textContent ?? "";
+    expect(text).toContain("Name Field");
+    expect(text).toContain("Internal Field"); // YAML-present advanced → inline
+    expect(text).not.toContain("Empty Adv One");
+    expect(text).not.toContain("Empty Adv Two");
+    const sw = c.querySelector<HTMLElement & { checked?: boolean }>("wa-switch")!;
+    expect(sw.hasAttribute("disabled")).toBe(false);
+    expect(sw.checked ?? false).toBe(false);
+  });
+
+  it("counts only the gated (empty) advanced fields, not the inline ones", () => {
+    // Under gate-advanced, the "(N)" count is the empty advanced fields the
+    // toggle reveals; the pre-filled advanced field is already shown inline.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [
+      makeConfigEntry({
+        key: "internal",
+        type: ConfigEntryType.STRING,
+        label: "Filled Adv",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "command_retain",
+        type: ConfigEntryType.STRING,
+        label: "Empty Adv One",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "device_id",
+        type: ConfigEntryType.STRING,
+        label: "Empty Adv Two",
+        advanced: true,
+      }),
+    ];
+    form.values = { internal: "true" };
+    form.advancedSection = true;
+    form.gateAdvanced = true;
+    form.showAdvanced = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._localize = (key: string, params?: { count?: number }) =>
+      key === "device.show_advanced_count"
+        ? `Show advanced settings (${params?.count})`
+        : key;
+    const container = document.createElement("div");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render((form as any).render(), container);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Show advanced settings (2)");
+    expect(text).not.toContain("Show advanced settings (3)");
+    expect(text).toContain("Filled Adv");
+  });
+
+  it("reveals the gated advanced fields when the toggle is turned on", () => {
+    const entries = [
+      makeConfigEntry({ key: "name", type: ConfigEntryType.STRING, label: "Name Field" }),
+      makeConfigEntry({
+        key: "internal",
+        type: ConfigEntryType.STRING,
+        label: "Internal Field",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "command_retain",
+        type: ConfigEntryType.STRING,
+        label: "Empty Adv",
+        advanced: true,
+      }),
+    ];
+    const c = renderForm(entries, {
+      gateAdvanced: true,
+      showAdvanced: true,
+      values: { name: "sw", internal: "true" },
+    });
+    const text = c.textContent ?? "";
+    expect(text).toContain("Internal Field");
+    expect(text).toContain("Empty Adv");
+  });
+
+  it("counts a pre-filled constraint-cluster member as inline, not gated", () => {
+    // Two advanced fields sharing an inclusive group fold into one cluster box.
+    // A value on either member makes the cluster YAML-present, so it paints
+    // inline and is not counted behind the control.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [
+      makeConfigEntry({
+        key: "a",
+        type: ConfigEntryType.STRING,
+        label: "Clu A",
+        advanced: true,
+        group: "grp",
+      }),
+      makeConfigEntry({
+        key: "b",
+        type: ConfigEntryType.STRING,
+        label: "Clu B",
+        advanced: true,
+        group: "grp",
+      }),
+      makeConfigEntry({
+        key: "empty",
+        type: ConfigEntryType.STRING,
+        label: "Empty Adv",
+        advanced: true,
+      }),
+    ];
+    form.values = { a: "set" };
+    form.advancedSection = true;
+    form.gateAdvanced = true;
+    form.showAdvanced = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._localize = (key: string, params?: { count?: number }) =>
+      key === "device.show_advanced_count"
+        ? `Show advanced settings (${params?.count})`
+        : key;
+    const container = document.createElement("div");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render((form as any).render(), container);
+    const text = container.textContent ?? "";
+    // The pre-filled cluster surfaces inline; only the lone empty field is gated.
+    expect(text).toContain("Clu A");
+    expect(text).toContain("Show advanced settings (1)");
+    expect(text).not.toContain("Show advanced settings (2)");
+    expect(text).not.toContain("Empty Adv");
   });
 
   it("counts only rendered advanced fields, not hidden ones, in the control label", () => {
@@ -202,7 +362,7 @@ describe("config-entry-form advanced-section", () => {
     ];
     form.values = {};
     form.advancedSection = true;
-    form.gateAllAdvanced = true;
+    form.gateAdvanced = true;
     form.showAdvanced = true;
     // Default _localize returns the key; interpolate so the count is observable.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -243,7 +403,7 @@ describe("config-entry-form advanced-section", () => {
     ];
     form.values = {};
     form.advancedSection = true;
-    form.gateAllAdvanced = true;
+    form.gateAdvanced = true;
     form.showAdvanced = true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (form as any)._localize = (key: string, params?: { count?: number }) =>
@@ -289,7 +449,7 @@ describe("config-entry-form advanced-section", () => {
     ];
     form.values = {};
     form.advancedSection = true;
-    form.gateAllAdvanced = true;
+    form.gateAdvanced = true;
     form.showAdvanced = true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (form as any)._localize = (key: string, params?: { count?: number }) =>
@@ -328,7 +488,7 @@ describe("config-entry-form advanced-section", () => {
     ];
     form.values = {};
     form.advancedSection = true;
-    form.gateAllAdvanced = false;
+    form.gateAdvanced = false;
     form.showAdvanced = false;
     const container = document.createElement("div");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -337,6 +497,45 @@ describe("config-entry-form advanced-section", () => {
     expect(control(container)).toBeNull();
     expect(container.textContent ?? "").toContain("Adv Field");
     expect(container.textContent ?? "").not.toContain("Hidden Basic");
+  });
+
+  it("does not force the section open under gate-advanced when a pre-filled advanced field exists", () => {
+    // The bug: the form's updated() mirrors force-open onto the host by emitting
+    // advanced-toggle(true), which flips showAdvanced and reveals every empty
+    // advanced field. Under gate-advanced the pre-filled field paints inline, so
+    // the form must NOT emit — the toggle stays off.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [ADVANCED];
+    form.values = { reboot_timeout: "5min" };
+    form.advancedSection = true;
+    form.gateAdvanced = true;
+    form.showAdvanced = false;
+    let emitted = false;
+    form.addEventListener("advanced-toggle", () => {
+      emitted = true;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(emitted).toBe(false);
+  });
+
+  it("still force-opens (emits advanced-toggle) without gate-advanced", () => {
+    // Automation / script hosts keep the mirror: a pre-filled advanced field
+    // emits advanced-toggle(true) so an externally-gated sibling tracks the open
+    // section.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [ADVANCED];
+    form.values = { reboot_timeout: "5min" };
+    form.advancedSection = true;
+    form.gateAdvanced = false;
+    form.showAdvanced = false;
+    let detail: { show: boolean } | null = null;
+    form.addEventListener("advanced-toggle", (e) => {
+      detail = (e as CustomEvent<{ show: boolean }>).detail;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(detail).toEqual({ show: true });
   });
 
   it("emits advanced-toggle when the control is clicked", () => {
