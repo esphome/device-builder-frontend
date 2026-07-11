@@ -7,8 +7,8 @@ import {
   type DeviceRowSearchFields,
 } from "../../src/util/device-search.js";
 import {
-  type ConfiguredDeviceOverrides,
   makeConfiguredDevice,
+  type ConfiguredDeviceOverrides,
 } from "../_make-configured-device.js";
 
 function _device(overrides: ConfiguredDeviceOverrides = {}): ConfiguredDevice {
