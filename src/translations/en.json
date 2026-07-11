@@ -778,7 +778,6 @@
     "save": "Save",
     "save_yaml": "Save YAML",
     "validate": "Validate",
-    "validate_yaml": "Validate YAML",
     "validate_disabled_pending": "Save changes first to validate",
     "loading_config_catalog": "Loading configuration catalog…",
     "loading_automation_catalog": "Loading automation catalog…",

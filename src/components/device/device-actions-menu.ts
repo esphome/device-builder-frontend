@@ -1,5 +1,10 @@
 import { consume } from "@lit/context";
-import { mdiBroom, mdiDotsVertical, mdiTextBoxOutline } from "@mdi/js";
+import {
+  mdiBroom,
+  mdiCheckCircleOutline,
+  mdiDotsVertical,
+  mdiTextBoxOutline,
+} from "@mdi/js";
 import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -13,11 +18,12 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   broom: mdiBroom,
+  "check-circle-outline": mdiCheckCircleOutline,
   "dots-vertical": mdiDotsVertical,
   "text-box-outline": mdiTextBoxOutline,
 });
 
-/** Editor bottom-bar overflow menu: device-scoped actions (Logs, Clean build). */
+/** Editor bottom-bar overflow menu: device-scoped actions (Logs, Validate, Clean build). */
 @customElement("esphome-device-actions-menu")
 export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -26,6 +32,9 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
 
   /** A build is in flight — cleaning its files mid-build would corrupt it. */
   @property({ type: Boolean }) busy = false;
+
+  /** Unsaved edits block validation (Install validates too); disable the row. */
+  @property({ type: Boolean, attribute: "validate-disabled" }) validateDisabled = false;
 
   static styles = [
     espHomeStyles,
@@ -107,6 +116,24 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                   >
                 </div>
                 <div
+                  class="menu-item ${this.validateDisabled ? "menu-item--disabled" : ""}"
+                  role="menuitem"
+                  tabindex=${this.validateDisabled ? "-1" : "0"}
+                  aria-disabled=${this.validateDisabled ? "true" : "false"}
+                  title=${
+                    this.validateDisabled
+                      ? this._localize("device.validate_disabled_pending")
+                      : nothing
+                  }
+                  @click=${this.validateDisabled ? undefined : this._onValidate}
+                  @keydown=${this.validateDisabled ? undefined : this._onItemKeydown}
+                >
+                  <wa-icon library="mdi" name="check-circle-outline"></wa-icon>
+                  <span class="menu-item-label"
+                    >${this._localize("device.validate")}</span
+                  >
+                </div>
+                <div
                   class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
                   role="menuitem"
                   tabindex=${this.busy ? "-1" : "0"}
@@ -134,6 +161,12 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
   private _onLogs = () => {
     this._close();
     this._emit("open-logs");
+  };
+
+  private _onValidate = () => {
+    if (this.validateDisabled) return;
+    this._close();
+    this._emit("validate");
   };
 
   private _onCleanBuild = () => {
