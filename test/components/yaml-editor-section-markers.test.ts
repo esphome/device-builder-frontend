@@ -32,23 +32,29 @@ async function mount(value: string): Promise<ESPHomeYamlEditor> {
 const viewOf = (el: ESPHomeYamlEditor): EditorView =>
   (el as unknown as { _view: EditorView })._view;
 
-function markerNames(el: ESPHomeYamlEditor): string[] {
+/** Glyph per marker: the mdi ``name``, or ``logo:esphome`` for the core
+ *  section's brand mark (which uses ``src`` rather than a library glyph). */
+function markerGlyphs(el: ESPHomeYamlEditor): string[] {
   return Array.from(
     viewOf(el).dom.querySelectorAll<HTMLElement>(".cm-section-marker")
-  ).map((m) => m.getAttribute("name") ?? "");
+  ).map((m) => {
+    const name = m.getAttribute("name");
+    if (name) return name;
+    return m.getAttribute("src")?.includes("esphome-mono") ? "logo:esphome" : "";
+  });
 }
 
 describe("yaml-editor section markers", () => {
   it("marks every top-level section header with its domain glyph", async () => {
     const el = await mount(YAML);
-    // esphome → chip, wifi → wifi, switch → toggle-switch-outline.
-    expect(markerNames(el)).toEqual(["chip", "wifi", "toggle-switch-outline"]);
+    // esphome → brand logo, wifi → wifi, switch → toggle-switch-outline.
+    expect(markerGlyphs(el)).toEqual(["logo:esphome", "wifi", "toggle-switch-outline"]);
   });
 
   it("shows markers with no selection active", async () => {
     const el = await mount(YAML);
     expect(el.highlightRange).toBeNull();
-    expect(markerNames(el)).toHaveLength(3);
+    expect(markerGlyphs(el)).toHaveLength(3);
   });
 
   it("tracks a section added by editing the doc", async () => {
@@ -58,8 +64,8 @@ describe("yaml-editor section markers", () => {
       changes: { from: view.state.doc.length, insert: "logger:\n" },
     });
     await el.updateComplete;
-    expect(markerNames(el)).toEqual([
-      "chip",
+    expect(markerGlyphs(el)).toEqual([
+      "logo:esphome",
       "wifi",
       "toggle-switch-outline",
       "card-text-outline",

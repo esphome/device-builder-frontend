@@ -57,6 +57,7 @@ import {
   relintEffect,
   type YamlDiagnosticsDetail,
 } from "../util/yaml-lint-backend.js";
+import { withBase } from "../util/base-path.js";
 import { TOP_LEVEL_KEY_RE } from "../util/yaml-section-lexer.js";
 import type { YamlSection } from "../util/yaml-sections.js";
 import {
@@ -120,10 +121,13 @@ const highlightField = StateField.define<DecorationSet>({
 });
 
 // Quiet domain glyph pinned to the end of every top-level section header, so
-// each section carries the same icon it has in the navigator. Icon only, in a
-// muted tone — the section key is already on the line. Lives in the content
+// each section carries the same icon it has in the navigator (the ``esphome``
+// brand mark for the core section, mirroring the navigator row). Icon only, in
+// a muted tone — the section key is already on the line. Lives in the content
 // flow (not the gutter), so it never shifts the line-number column, and is
-// sized to the line so the row can't grow.
+// sized to the line so the row can't grow. ``pointer-events: none`` (in the CSS)
+// makes it inert: a click falls through to the text beneath and lands the caret
+// at the line end, and the caret cursor shows instead of a pointer.
 class SectionMarkerWidget extends WidgetType {
   constructor(readonly domain: string) {
     super();
@@ -137,13 +141,13 @@ class SectionMarkerWidget extends WidgetType {
     const icon = document.createElement("wa-icon");
     icon.className = "cm-section-marker";
     icon.setAttribute("aria-hidden", "true");
-    icon.setAttribute("library", "mdi");
-    icon.setAttribute("name", iconForDomain(this.domain));
+    if (this.domain === "esphome") {
+      icon.setAttribute("src", withBase("/assets/logo/esphome-mono.svg"));
+    } else {
+      icon.setAttribute("library", "mdi");
+      icon.setAttribute("name", iconForDomain(this.domain));
+    }
     return icon;
-  }
-
-  ignoreEvent() {
-    return true;
   }
 }
 
@@ -317,11 +321,15 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         },
         // Quiet domain glyph on each section header. Muted so it reads as a
         // marker, not code; sized to the line so it can't grow the row.
+        // ``pointer-events: none`` makes it inert — a click falls through to the
+        // text so the caret lands at the line end and the caret cursor shows,
+        // instead of the widget swallowing the click behind a pointer cursor.
         ".cm-section-marker": {
           marginLeft: "8px",
           fontSize: "1.05em",
           verticalAlign: "middle",
           color: this._darkMode ? "rgba(235, 235, 245, 0.4)" : "rgba(60, 60, 67, 0.45)",
+          pointerEvents: "none",
           userSelect: "none",
         },
         // ─── Diagnostics: red wavy underline + gutter marker ────────
