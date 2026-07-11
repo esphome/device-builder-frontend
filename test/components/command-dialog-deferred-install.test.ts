@@ -1,4 +1,4 @@
-// A deferred install's COMPILE has no dependent flash; is_deferred_install on
+// A deferred install's COMPILE has no dependent flash; queued_update_armed on
 // the terminal result reports queued success instead of the missing-flash error.
 import { describe, expect, it, vi } from "vitest";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
@@ -19,7 +19,7 @@ describe("command-dialog deferred install follow", () => {
     follows.c1.onResult({
       status: JobStatus.COMPLETED,
       exit_code: 0,
-      is_deferred_install: true,
+      queued_update_armed: true,
     });
 
     expect(host._state).toBe("success");
@@ -60,7 +60,7 @@ describe("command-dialog deferred install follow", () => {
     follows.c1.onResult({
       status: JobStatus.COMPLETED,
       exit_code: 0,
-      is_deferred_install: true,
+      queued_update_armed: true,
     });
 
     expect(host._state).toBe("success");
@@ -76,7 +76,7 @@ describe("command-dialog deferred install follow", () => {
     follows.u1.onResult({
       status: JobStatus.FAILED,
       exit_code: 1,
-      is_deferred_install: true,
+      queued_update_armed: true,
     });
 
     expect(host._state).toBe("success");

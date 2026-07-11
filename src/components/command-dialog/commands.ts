@@ -1,6 +1,12 @@
 import { APIError } from "../../api/api-error.js";
-import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
+import {
+  type FirmwareJob,
+  type FirmwareJobResult,
+  JobStatus,
+  JobType,
+} from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
+import { effectiveJobType } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
@@ -23,17 +29,12 @@ export function deriveFollowCommandType(
   jobs: Map<string, FirmwareJob>,
   job: FirmwareJob
 ): CommandType {
-  if (job.job_type === JobType.COMPILE) {
-    // A deferred install is a lone COMPILE; the flag is its only install
-    // marker (live or terminal — there is no flash log to chain into).
-    if (job.is_deferred_install) return "install";
-    if (!isTerminalJobStatus(job.status)) {
-      const dependent = [...jobs.values()].find((j) => j.depends_on === job.job_id);
-      if (dependent?.job_type === JobType.RENAME) return "rename";
-      if (dependent?.job_type === JobType.UPLOAD) return "install";
-    }
+  if (job.job_type === JobType.COMPILE && !isTerminalJobStatus(job.status)) {
+    const dependent = [...jobs.values()].find((j) => j.depends_on === job.job_id);
+    if (dependent?.job_type === JobType.RENAME) return "rename";
+    if (dependent?.job_type === JobType.UPLOAD) return "install";
   }
-  return JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
+  return JOB_TYPE_TO_COMMAND[effectiveJobType(job)] ?? "install";
 }
 
 // An install chain is followed via its COMPILE head, but the flash target
@@ -206,19 +207,13 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
     onResult: (data) => {
       host._streamId = "";
       host._flushPendingLines();
-      const result = data as unknown as Pick<
-        FirmwareJob,
-        "status" | "exit_code" | "is_deferred_install"
-      >;
+      const result = data as unknown as FirmwareJobResult;
       const success = result.status === JobStatus.COMPLETED;
 
-      // The backend sets the flag only when a queued update was actually
-      // armed: a finished deferred compile, a chain converted at release
-      // because the device went offline mid-build, or an OTA upload that
-      // failed against an offline device. Queued is the outcome in every
-      // shape, so check it before chaining into a dependent flash — a
-      // converted chain's upload is already cancelled.
-      if (result.is_deferred_install) {
+      // Queued is the outcome regardless of which job carried it; check
+      // before chaining into a dependent flash — a converted chain's
+      // upload is already cancelled.
+      if (result.queued_update_armed) {
         host._state = "success";
         host._statusMessage = host._localize("dashboard.queued_successfully");
         host._jobId = "";

@@ -133,6 +133,18 @@ export interface FirmwareJob {
   device_friendly_name: string;
 }
 
+/** Terminal frame of a ``firmware/follow_job`` stream. */
+export interface FirmwareJobResult {
+  status: JobStatus;
+  exit_code: number | null;
+  /** Human-readable failure reason; null for successful jobs. */
+  error: string | null;
+  /** True only when the finished job armed a queued update (the device
+   *  flashes on its next wake) — unlike the job row's raw
+   *  ``is_deferred_install``, a failed deferred compile reports false. */
+  queued_update_armed: boolean;
+}
+
 export interface FirmwareBinary {
   title: string;
   file: string;

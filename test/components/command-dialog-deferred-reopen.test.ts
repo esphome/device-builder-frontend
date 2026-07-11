@@ -8,35 +8,16 @@
  * queued-update message, not "Compilation complete!".
  */
 import { describe, expect, it } from "vitest";
-import {
-  type FirmwareJob,
-  JobStatus,
-  JobType,
-} from "../../src/api/types/firmware-jobs.js";
+import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
+import { deriveFollowCommandType } from "../../src/components/command-dialog/commands.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
+import type { StreamCbs } from "./_command-dialog-host.js";
 
-interface StreamCbs {
-  onOutput: (line: string) => void;
-  onResult: (data: unknown) => void;
-  onError: (error: string) => void;
-}
-
-interface Harness {
-  _commandType: string;
-  _state: string;
-  _statusMessage: string;
-  _jobs: Map<string, FirmwareJob>;
-  _streamId: string;
-  _api: unknown;
-  followJob: (job: FirmwareJob, displayName: string) => void;
-}
-
-function mount(jobs: FirmwareJob[]) {
+function mount(jobs: ReturnType<typeof makeFirmwareJob>[]) {
   const follows: Record<string, StreamCbs> = {};
-  const el = new ESPHomeCommandDialog() as unknown as Harness;
+  const el = new ESPHomeCommandDialog();
   el._jobs = new Map(jobs.map((j) => [j.job_id, j]));
-  el._streamId = "";
   el._api = {
     firmwareFollowJob: (jobId: string, cbs: StreamCbs): string => {
       follows[jobId] = cbs;
@@ -48,7 +29,7 @@ function mount(jobs: FirmwareJob[]) {
 }
 
 describe("command-dialog reopen of a deferred install", () => {
-  it("derives install for a live deferred compile and finishes queued", () => {
+  it("reopens as an install and finishes queued", () => {
     const compile = makeFirmwareJob({
       job_id: "c1",
       job_type: JobType.COMPILE,
@@ -63,36 +44,31 @@ describe("command-dialog reopen of a deferred install", () => {
     follows.c1.onResult({
       status: JobStatus.COMPLETED,
       exit_code: 0,
-      is_deferred_install: true,
+      queued_update_armed: true,
     });
     expect(el._state).toBe("success");
     expect(el._statusMessage).toBe("dashboard.queued_successfully");
   });
+});
 
-  it("derives install for a terminal deferred compile too", () => {
+describe("deriveFollowCommandType for deferred installs", () => {
+  it.each([JobStatus.RUNNING, JobStatus.COMPLETED, JobStatus.FAILED])(
+    "derives install for a %s deferred compile",
+    (status) => {
+      const compile = makeFirmwareJob({
+        job_type: JobType.COMPILE,
+        status,
+        is_deferred_install: true,
+      });
+      expect(deriveFollowCommandType(new Map(), compile)).toBe("install");
+    }
+  );
+
+  it("keeps a plain compile deriving compile", () => {
     const compile = makeFirmwareJob({
-      job_id: "c1",
-      job_type: JobType.COMPILE,
-      status: JobStatus.COMPLETED,
-      is_deferred_install: true,
-    });
-    const { el } = mount([compile]);
-
-    el.followJob(compile, "gen8266");
-
-    expect(el._commandType).toBe("install");
-  });
-
-  it("keeps a plain live compile deriving compile", () => {
-    const compile = makeFirmwareJob({
-      job_id: "c1",
       job_type: JobType.COMPILE,
       status: JobStatus.RUNNING,
     });
-    const { el } = mount([compile]);
-
-    el.followJob(compile, "gen8266");
-
-    expect(el._commandType).toBe("compile");
+    expect(deriveFollowCommandType(new Map(), compile)).toBe("compile");
   });
 });
