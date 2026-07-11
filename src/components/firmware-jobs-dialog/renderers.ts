@@ -62,8 +62,11 @@ export function renderGroups(
 
 function renderJob(host: ESPHomeFirmwareJobsDialog, job: FirmwareJob): TemplateResult {
   const name = host._jobDisplayName(job);
-  const typeIcon = TYPE_ICONS[job.job_type] ?? "hammer-wrench";
-  const typeLabel = host._localize(`firmware_jobs.type_${job.job_type}`);
+  // A deferred install is a lone COMPILE carrying the whole install
+  // intent; list it as the Install the dialog it opens claims to be.
+  const effectiveType = job.is_deferred_install ? JobType.INSTALL : job.job_type;
+  const typeIcon = TYPE_ICONS[effectiveType] ?? "hammer-wrench";
+  const typeLabel = host._localize(`firmware_jobs.type_${effectiveType}`);
   const showProgress =
     job.status === JobStatus.RUNNING && typeof job.progress === "number";
   const terminal = isTerminal(job);
