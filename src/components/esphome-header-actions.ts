@@ -14,7 +14,7 @@ import {
   mdiUpdate,
   mdiWifiCog,
 } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
@@ -31,11 +31,11 @@ import {
 } from "../context/index.js";
 import { dropdownMenuStyles } from "../styles/dropdown-menu.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-actions.js";
 import { headerActionsStyles } from "./esphome-header-actions.styles.js";
+import { OverflowMenuElement } from "./overflow-menu-element.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -68,7 +68,7 @@ function isApplePlatform(): boolean {
 }
 
 @customElement("esphome-header-actions")
-export class ESPHomeHeaderActions extends LitElement {
+export class ESPHomeHeaderActions extends OverflowMenuElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
@@ -85,9 +85,6 @@ export class ESPHomeHeaderActions extends LitElement {
   @consume({ context: buildOffloadAlertsContext, subscribe: true })
   @state()
   private _offloaderAlerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
-
-  @state()
-  private _open = false;
 
   /** True on the dashboard route. Dashboard-only menu entries
    *  (Archived Devices) hide elsewhere; their dialog is hosted on the
@@ -201,7 +198,7 @@ export class ESPHomeHeaderActions extends LitElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openFirmwareJobs}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="playlist-check"></wa-icon>
                   <span class="menu-item-label"
@@ -218,7 +215,7 @@ export class ESPHomeHeaderActions extends LitElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openSecrets}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="key-variant"></wa-icon>
                   <span class="menu-item-label">${this._localize("layout.secrets")}</span>
@@ -228,7 +225,7 @@ export class ESPHomeHeaderActions extends LitElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openOnboarding}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="wifi-cog"></wa-icon>
                   <span class="menu-item-label"
@@ -246,7 +243,7 @@ export class ESPHomeHeaderActions extends LitElement {
                         role="menuitem"
                         tabindex="0"
                         @click=${this._openArchivedDevices}
-                        @keydown=${this._onMenuItemKeydown}
+                        @keydown=${this._onItemKeydown}
                       >
                         <wa-icon library="mdi" name="archive-outline"></wa-icon>
                         ${this._localize("layout.archived_devices")}
@@ -261,7 +258,7 @@ export class ESPHomeHeaderActions extends LitElement {
                         tabindex="0"
                         aria-checked=${this._showIgnored ? "true" : "false"}
                         @click=${this._toggleShowIgnoredDiscoveries}
-                        @keydown=${this._onMenuItemKeydown}
+                        @keydown=${this._onItemKeydown}
                       >
                         <wa-icon
                           library="mdi"
@@ -284,7 +281,7 @@ export class ESPHomeHeaderActions extends LitElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openResetBuildEnv}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="cog-refresh"></wa-icon>
                   ${this._localize("layout.reset_build_env")}
@@ -295,7 +292,7 @@ export class ESPHomeHeaderActions extends LitElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openSettings}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="cog"></wa-icon>
                   <span class="menu-item-label"
@@ -316,7 +313,7 @@ export class ESPHomeHeaderActions extends LitElement {
                         role="menuitem"
                         tabindex="0"
                         @click=${this._openCheckForUpdates}
-                        @keydown=${this._onMenuItemKeydown}
+                        @keydown=${this._onItemKeydown}
                       >
                         <wa-icon library="mdi" name="update"></wa-icon>
                         <span class="menu-item-label"
@@ -330,7 +327,7 @@ export class ESPHomeHeaderActions extends LitElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openSearch}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="magnify"></wa-icon>
                   <span class="menu-item-label">${this._localize("layout.search")}</span>
@@ -342,7 +339,7 @@ export class ESPHomeHeaderActions extends LitElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openFeedback}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="comment-question-outline"></wa-icon>
                   ${this._localize("layout.feedback_menu")}
@@ -353,36 +350,6 @@ export class ESPHomeHeaderActions extends LitElement {
       }
     `;
   }
-
-  private _toggle() {
-    this._open = !this._open;
-  }
-
-  private _close() {
-    this._open = false;
-  }
-
-  private _escape = new EscapeController(this, (e) => {
-    e.preventDefault();
-    this._close();
-  });
-
-  protected willUpdate(changed: Map<string, unknown>) {
-    if (changed.has("_open")) this._escape.set(this._open);
-  }
-
-  private _onMenuItemKeydown = (e: KeyboardEvent) => {
-    /* The kebab menu items are ``<div role="menuitem">`` rather than
-       <button>s so they sit visually flush with the checkbox-style
-       toggle below. role + tabindex make them focusable; this handler
-       maps Enter / Space to the same click the mouse would dispatch.
-       ``e.currentTarget.click()`` re-uses the @click handler bound on
-       the same element, so any per-item logic stays where it lives. */
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      (e.currentTarget as HTMLElement).click();
-    }
-  };
 
   private _openArchivedDevices = () => {
     /* Dashboard hosts the dialog instance and listens for this
