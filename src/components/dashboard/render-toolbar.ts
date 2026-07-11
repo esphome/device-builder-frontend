@@ -267,6 +267,7 @@ export function renderSelectBarOrFab(
           host._selectedDevices = new Set();
         }}
         @update-selected=${host._updateSelected}
+        @compile-selected=${host._compileSelected}
         @archive-selected=${host._archiveSelected}
         @delete-selected=${host._deleteSelected}
         @labels-selected=${host._labelsSelected}

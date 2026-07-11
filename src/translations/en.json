@@ -93,6 +93,8 @@
     "deselect_all": "Deselect all",
     "selected_count": "{count} selected",
     "update_selected": "Update",
+    "compile_selected": "Compile only",
+    "update_more_options_aria": "More update options",
     "delete_selected": "Delete",
     "delete_selected_title": "Delete devices",
     "delete_selected_desc": "Are you sure you want to delete {count, plural, one {# device} other {# devices}}? This will remove their configuration files and cannot be undone.",
@@ -341,6 +343,7 @@
     "status_modified": "Modified",
     "status_update_available": "Update available",
     "status_installing": "Installing…",
+    "status_compiling": "Compiling…",
     "status_renaming": "Renaming…",
     "status_queued_update": "Update queued; installs when the device comes back online",
     "action_clear_queued": "Clear queued update",
@@ -372,7 +375,8 @@
     "labels_bulk_aria": "Labels on {count} selected",
     "archive_selected_aria": "Archive {count} selected",
     "delete_selected_aria": "Delete {count} selected",
-    "update_selected_aria": "Update {count} selected"
+    "update_selected_aria": "Update {count} selected",
+    "compile_selected_aria": "Compile {count} selected without installing"
   },
   "command": {
     "install_title": "Install — {name}",
@@ -1016,6 +1020,9 @@
     "update_all_started": "{count, plural, one {# device update started} other {# device updates started}}",
     "update_all_none": "No online devices to update",
     "update_all_error": "Failed to start updates",
+    "compile_all_started": "{count, plural, one {# device compile started} other {# device compiles started}}",
+    "compile_all_none": "No devices selected to compile",
+    "compile_all_error": "Failed to start compiles",
     "update_all_no_compatible_peer_offline": "Paired build servers are offline — wait for one to reconnect, or relax the policy in Settings → Build server.",
     "update_all_no_compatible_peer_version": "No paired build server runs ESPHome {local} — update one, or relax the policy in Settings → Build server.",
     "update_all_no_compatible_peer_mixed": "No compatible build server (you're on {local}) — wait for a reconnect, or relax the policy in Settings → Build server.",

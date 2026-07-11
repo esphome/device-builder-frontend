@@ -1,25 +1,31 @@
 import { consume } from "@lit/context";
 import {
   mdiArchiveOutline,
+  mdiChevronDown,
   mdiClose,
   mdiDelete,
+  mdiHammerWrench,
   mdiTagMultiple,
   mdiUpdate,
 } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
+import { dropdownMenuStyles } from "../styles/dropdown-menu.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EscapeController } from "../util/escape-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   "archive-outline": mdiArchiveOutline,
+  "chevron-down": mdiChevronDown,
   close: mdiClose,
   delete: mdiDelete,
+  "hammer-wrench": mdiHammerWrench,
   "tag-multiple": mdiTagMultiple,
   update: mdiUpdate,
 });
@@ -40,11 +46,22 @@ export class ESPHomeSelectBar extends LitElement {
   @property({ type: Boolean, attribute: "all-visible-selected" })
   allVisibleSelected = false;
 
+  @state()
+  private _menuOpen = false;
+
+  private _escape = new EscapeController(this, (e) => {
+    e.preventDefault();
+    this._menuOpen = false;
+  });
+
   static styles = [
     espHomeStyles,
     // Shared .btn / .btn--cancel / .btn--primary chrome; the local
     // block below layers the bar-specific deltas on top.
     dialogActionButtonStyles,
+    // Popover chrome (.backdrop / .menu / .menu-item) for the Update
+    // split button's menu; the local block repositions the menu.
+    dropdownMenuStyles,
     css`
       @keyframes slide-in {
         from {
@@ -159,6 +176,66 @@ export class ESPHomeSelectBar extends LitElement {
         font-size: 16px;
       }
 
+      .update-split {
+        position: relative;
+        display: inline-flex;
+        align-items: stretch;
+      }
+
+      /* Join the two halves into one split control: square the inner
+         corners and overlap the seam by one border width so both
+         buttons keep a full border. The hovered / focused half is
+         raised so it owns a single, consistent seam colour. */
+      .update-split__main,
+      .update-split__caret {
+        position: relative;
+      }
+
+      .update-split__main {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+      }
+
+      .update-split__caret {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+        margin-left: calc(-1 * var(--wa-border-width-s));
+        padding-left: 8px;
+        padding-right: 8px;
+        gap: 0;
+      }
+
+      .update-split__main:hover:not(:disabled),
+      .update-split__caret:hover:not(:disabled),
+      .update-split__main:focus-visible,
+      .update-split__caret:focus-visible {
+        z-index: 1;
+      }
+
+      .menu {
+        /* Anchored to the split button; the bar is fixed to the bottom
+           edge, so the menu opens upward. */
+        position: absolute;
+        bottom: calc(100% + 6px);
+        right: 0;
+        min-width: 160px;
+      }
+
+      /* Redefines the shared menu-in on purpose: this menu rises from
+         its bottom anchor instead of scaling in. The last @keyframes
+         definition with a given name wins, and this block comes after
+         dropdownMenuStyles in the styles array. */
+      @keyframes menu-in {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
       @media (max-width: 700px) {
         .select-bar {
           padding: var(--wa-space-m);
@@ -172,24 +249,33 @@ export class ESPHomeSelectBar extends LitElement {
           padding: 8px 12px;
         }
 
+        .update-split__caret {
+          padding: 8px 6px;
+        }
+
         .btn-label {
           display: none;
         }
       }
 
       /* Phone widths: 5 icon-only action buttons (cancel, labels,
-         archive, delete, update) plus the Select-all + count on the
-         left don't fit at the 700px-breakpoint padding/gap. Tighten
-         both, hide the now-redundant count text (Select-all is the
-         meaningful affordance), and pull the bar's horizontal
-         padding down so the trailing Update button stays on-screen. */
+         archive, delete, update) plus the split caret and the
+         Select-all + count on the left don't fit at the
+         700px-breakpoint padding/gap. Tighten everything, hide the
+         now-redundant count text (Select-all is the meaningful
+         affordance), and pull the bar's horizontal padding down so
+         the trailing split button stays on-screen at 320px. */
       @media (max-width: 480px) {
         .select-bar {
-          padding: var(--wa-space-s);
+          padding: var(--wa-space-s) var(--wa-space-2xs);
         }
 
         .left {
-          gap: var(--wa-space-s);
+          gap: 2px;
+        }
+
+        .toggle {
+          padding: 6px;
         }
 
         .count {
@@ -197,11 +283,15 @@ export class ESPHomeSelectBar extends LitElement {
         }
 
         .right {
-          gap: 4px;
+          gap: 2px;
         }
 
         .btn {
-          padding: 8px 10px;
+          padding: 8px 7px;
+        }
+
+        .update-split__caret {
+          padding: 8px 3px;
         }
       }
     `,
@@ -223,6 +313,9 @@ export class ESPHomeSelectBar extends LitElement {
     const deleteAriaLabel = this._localize("dashboard.delete_selected_aria", { count });
     const updateLabel = this._localize("dashboard.update_selected");
     const updateAriaLabel = this._localize("dashboard.update_selected_aria", { count });
+    const moreOptionsLabel = this._localize("dashboard.update_more_options_aria");
+    const compileLabel = this._localize("dashboard.compile_selected");
+    const compileAriaLabel = this._localize("dashboard.compile_selected_aria", { count });
 
     return html`
       <div class="select-bar">
@@ -277,19 +370,79 @@ export class ESPHomeSelectBar extends LitElement {
             <wa-icon library="mdi" name="delete"></wa-icon>
             <span class="btn-label">${deleteLabel}</span>
           </button>
-          <button
-            class="btn btn--primary"
-            aria-label=${updateAriaLabel}
-            ?disabled=${count === 0}
-            @click=${() => this._emit("update-selected")}
-          >
-            <wa-icon library="mdi" name="update"></wa-icon>
-            <span class="btn-label">${updateLabel}</span>
-          </button>
+          <div class="update-split">
+            <button
+              class="btn btn--primary update-split__main"
+              aria-label=${updateAriaLabel}
+              ?disabled=${count === 0}
+              @click=${() => this._emit("update-selected")}
+            >
+              <wa-icon library="mdi" name="update"></wa-icon>
+              <span class="btn-label">${updateLabel}</span>
+            </button>
+            <button
+              class="btn btn--primary update-split__caret"
+              aria-label=${moreOptionsLabel}
+              title=${moreOptionsLabel}
+              aria-haspopup="true"
+              aria-expanded=${this._menuOpen}
+              ?disabled=${count === 0}
+              @click=${this._toggleMenu}
+            >
+              <wa-icon library="mdi" name="chevron-down"></wa-icon>
+            </button>
+            ${
+              this._menuOpen
+                ? html`
+                    <div class="backdrop" @click=${this._closeMenu}></div>
+                    <div class="menu" role="menu">
+                      <div
+                        class="menu-item"
+                        role="menuitem"
+                        tabindex="0"
+                        aria-label=${compileAriaLabel}
+                        @click=${this._onCompile}
+                        @keydown=${this._onItemKeydown}
+                      >
+                        <wa-icon library="mdi" name="hammer-wrench"></wa-icon>
+                        ${compileLabel}
+                      </div>
+                    </div>
+                  `
+                : nothing
+            }
+          </div>
         </div>
       </div>
     `;
   }
+
+  protected willUpdate() {
+    this._escape.set(this._menuOpen);
+  }
+
+  private _toggleMenu() {
+    this._menuOpen = !this._menuOpen;
+  }
+
+  private _closeMenu() {
+    this._menuOpen = false;
+  }
+
+  private _onCompile() {
+    this._menuOpen = false;
+    this._emit("compile-selected");
+  }
+
+  /* role + tabindex make the menu row focusable; this maps Enter /
+     Space to the same click the mouse would dispatch (mirrors
+     esphome-table-column-toggle). */
+  private _onItemKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).click();
+    }
+  };
 
   private _emit(name: string) {
     this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true }));

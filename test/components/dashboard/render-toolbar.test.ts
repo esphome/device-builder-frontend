@@ -13,6 +13,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 import { DashboardView } from "../../../src/api/types/system.js";
 import {
   renderSearchInput,
+  renderSelectBarOrFab,
   renderViewToggle,
 } from "../../../src/components/dashboard/render-toolbar.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
@@ -80,5 +81,45 @@ describe("renderViewToggle Expert Mode gating", () => {
     const container = renderToggle(makeToggleHost(true));
     expect(container.querySelectorAll(".view-toggle-btn").length).toBe(3);
     expect(container.querySelector('wa-icon[name="code-braces"]')).not.toBeNull();
+  });
+});
+
+describe("renderSelectBarOrFab bulk action wiring", () => {
+  function makeSelectHost(overrides: Partial<Record<string, unknown>> = {}) {
+    return makeHost({
+      _selectMode: true,
+      _selectedDevices: new Set(["a.yaml"]),
+      _allVisibleSelected: false,
+      _updateSelected: vi.fn(),
+      _compileSelected: vi.fn(),
+      _archiveSelected: vi.fn(),
+      _deleteSelected: vi.fn(),
+      _labelsSelected: vi.fn(),
+      ...overrides,
+    });
+  }
+
+  function dispatchFromBar(host: ESPHomePageDashboard, event: string) {
+    renderInto(renderSelectBarOrFab(host))
+      .querySelector("esphome-select-bar")!
+      .dispatchEvent(new CustomEvent(event, { bubbles: true, composed: true }));
+  }
+
+  it("wires compile-selected to the host's _compileSelected handler", () => {
+    const compileSelected = vi.fn();
+    dispatchFromBar(
+      makeSelectHost({ _compileSelected: compileSelected }),
+      "compile-selected"
+    );
+    expect(compileSelected).toHaveBeenCalledOnce();
+  });
+
+  it("keeps update-selected wired to _updateSelected", () => {
+    const updateSelected = vi.fn();
+    dispatchFromBar(
+      makeSelectHost({ _updateSelected: updateSelected }),
+      "update-selected"
+    );
+    expect(updateSelected).toHaveBeenCalledOnce();
   });
 });
