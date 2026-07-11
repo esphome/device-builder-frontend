@@ -19,6 +19,7 @@ import { html, nothing, render } from "lit";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { ComponentCatalogEntry } from "../api/types/components.js";
 import type { ConfigEntry } from "../api/types/config-entries.js";
+import { fetchComponent } from "./component-name-cache.js";
 import {
   getActions,
   getComponentDocs,
@@ -35,6 +36,7 @@ import {
   isUnderAutomationItem,
   resolveBundleContext,
 } from "./yaml-ast.js";
+import { descendNestedEntries } from "./yaml-completion-catalog.js";
 import { bundleFor, loadCatalog, type CatalogIndex } from "./yaml-completion.js";
 import {
   findParentKey,
@@ -215,10 +217,17 @@ export async function resolveHoverTarget(
   if (schemaDocs) return docsTarget(schemaDocs);
   // Catalog fallback. The catalog keys platforms as ``<domain>.<stem>``
   // (``binary_sensor.gpio``), the reverse of the schema bundle's
-  // ``<stem>.<domain>`` componentKey — use the catalog form here.
+  // ``<stem>.<domain>`` componentKey — use the catalog form here. The
+  // slim index carries no config_entries, so hydrate the full body;
+  // then prefer the entry at the exact nested path, falling back to a
+  // leaf-key search for YAML structure the body nesting doesn't mirror.
   const catalogId = platformValue ? `${topLevelKey}.${platformValue}` : topLevelKey;
-  const comp = catalog.byId.get(catalogId);
-  const entry = comp ? findConfigEntry(comp.config_entries ?? [], key) : undefined;
+  const comp = await fetchComponent(api, catalogId);
+  if (!comp) return null;
+  const entries = comp.config_entries ?? [];
+  const entry =
+    descendNestedEntries(entries, path.slice(1, -1))?.find((e) => e.key === key) ??
+    findConfigEntry(entries, key);
   return entry ? fieldTarget(entry, comp) : null;
 }
 
