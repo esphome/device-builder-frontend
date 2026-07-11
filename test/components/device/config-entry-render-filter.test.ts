@@ -4,6 +4,8 @@ import {
   ALWAYS_SHOWN_KEYS,
   collectRenderablePaths,
   filterRenderable,
+  renderFilterOptions,
+  type RenderFilterSource,
 } from "../../../src/components/device/config-entry-render-filter.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 import { makeConfigEntry as makeEntry } from "../../util/_make-config-entry.js";
@@ -847,5 +849,75 @@ describe("filterRenderable — NESTED with a scalar value", () => {
       { requiredOnly: false, showAdvanced: false }
     );
     expect(out.map((e) => e.key)).toEqual(["mode"]);
+  });
+});
+
+describe("renderFilterOptions board-implied variant seeding", () => {
+  // esp32 framework.advanced.sram1_as_iram gated on the top-level variant.
+  const sram1 = () =>
+    makeEntry({
+      key: "framework",
+      type: ConfigEntryType.NESTED,
+      config_entries: [
+        makeEntry({
+          key: "advanced",
+          type: ConfigEntryType.NESTED,
+          config_entries: [
+            makeEntry({
+              key: "sram1_as_iram",
+              depends_on: "variant",
+              depends_on_value_any: ["esp32", "ESP32"],
+            }),
+          ],
+        }),
+      ],
+    });
+
+  const boardEsp32 = { esphome: { platform: "esp32", variant: "esp32" } } as never;
+
+  const source = (over: Partial<RenderFilterSource>): RenderFilterSource => ({
+    requiredOnly: false,
+    showAdvanced: true,
+    presentComponents: new Set<string>(),
+    board: null,
+    sectionKey: "esp32",
+    ...over,
+  });
+
+  const sramVisible = (src: RenderFilterSource): boolean => {
+    const fw = filterRenderable([sram1()], src.values ?? {}, renderFilterOptions(src));
+    const adv = fw[0]?.config_entries?.[0]?.config_entries ?? [];
+    // filterRenderable is applied per nested scope by the renderer; re-run it
+    // on the leaf with the same (seeded) opts to mirror the recursion.
+    return (
+      filterRenderable(adv, {}, renderFilterOptions(src)).some(
+        (e) => e.key === "sram1_as_iram"
+      ) && fw.length > 0
+    );
+  };
+
+  it("shows a variant-gated field on the platform section when the board fixes the variant", () => {
+    // board: esp32-poe-iso implies variant esp32; no explicit variant in YAML.
+    expect(sramVisible(source({ board: boardEsp32, values: {} }))).toBe(true);
+  });
+
+  it("keeps the field hidden with no board and no explicit variant", () => {
+    expect(sramVisible(source({ board: null, values: {} }))).toBe(false);
+  });
+
+  it("does not seed the variant outside the platform section", () => {
+    // A different section (sensor) must not inherit the board's variant.
+    expect(
+      sramVisible(source({ board: boardEsp32, sectionKey: "sensor", values: {} }))
+    ).toBe(false);
+  });
+
+  it("lets an explicit YAML variant override the board", () => {
+    // Board says esp32, YAML says esp32s3 → gate fails (s3 not in the any-list).
+    expect(
+      sramVisible(source({ board: boardEsp32, values: { variant: "esp32s3" } }))
+    ).toBe(false);
+    // Explicit matching variant with no board still resolves.
+    expect(sramVisible(source({ board: null, values: { variant: "ESP32" } }))).toBe(true);
   });
 });
