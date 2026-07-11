@@ -388,10 +388,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // Split only units that actually paint: a plain entry filtered out of
     // ``plan.visible`` (advanced+hidden like captive_portal's setup_priority, or
     // a depends_on that isn't met) renders nothing, so it must not inflate the
-    // "(N)" count or tip the all-advanced check. Groups/clusters paint via their
-    // own path, so they always count.
-    const willRender = (item: ConfigEntry | ConfigEntry[]): boolean =>
-      Array.isArray(item) || plan.memberKeys.has(item.key) || plan.visible.has(item);
+    // "(N)" count or tip the all-advanced check. An exclusive group is one
+    // dropdown; a constraint cluster is one box painted at its *first* member's
+    // slot (the other member slots render nothing), so it counts once.
+    const clusterFirstKeys = new Set(plan.clusters.map((c) => c.members[0].key));
+    const willRender = (item: ConfigEntry | ConfigEntry[]): boolean => {
+      if (Array.isArray(item)) return true;
+      if (plan.memberKeys.has(item.key)) return clusterFirstKeys.has(item.key);
+      return plan.visible.has(item);
+    };
     const rendered = plan.ordered.filter(willRender);
     const basic = rendered.filter((item) => !isAdvanced(item));
     const advanced = rendered.filter((item) => isAdvanced(item));

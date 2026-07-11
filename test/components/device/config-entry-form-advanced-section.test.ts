@@ -221,6 +221,43 @@ describe("config-entry-form advanced-section", () => {
     expect(text).not.toContain("Hidden Adv");
   });
 
+  it("counts a constraint cluster as one advanced unit, not per member", () => {
+    // Two advanced fields sharing an inclusive group fold into one cluster box
+    // painted at the first member's slot; the "(N)" count must be 1, not 2.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [
+      makeConfigEntry({
+        key: "a",
+        type: ConfigEntryType.STRING,
+        label: "Clu A",
+        advanced: true,
+        group: "grp",
+      }),
+      makeConfigEntry({
+        key: "b",
+        type: ConfigEntryType.STRING,
+        label: "Clu B",
+        advanced: true,
+        group: "grp",
+      }),
+    ];
+    form.values = {};
+    form.advancedSection = true;
+    form.gateAllAdvanced = true;
+    form.showAdvanced = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._localize = (key: string, params?: { count?: number }) =>
+      key === "device.show_advanced_count"
+        ? `Show advanced settings (${params?.count})`
+        : key;
+    const container = document.createElement("div");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render((form as any).render(), container);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Show advanced settings (1)");
+    expect(text).not.toContain("Show advanced settings (2)");
+  });
+
   it("emits advanced-toggle when the control is clicked", () => {
     const form = new ESPHomeConfigEntryForm();
     form.entries = [BASIC, ADVANCED];
