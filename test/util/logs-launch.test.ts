@@ -106,4 +106,10 @@ describe("launchLogsWithMethod", () => {
     await launchLogsWithMethod(host, makeDevice(), "server-serial", "/dev/ttyUSB0");
     expect(host.logsDialog.open).toHaveBeenCalledWith("/dev/ttyUSB0");
   });
+
+  it("ignores server-serial with no port instead of silently opening OTA logs", async () => {
+    const host = makeHost(async () => []);
+    await launchLogsWithMethod(host, makeDevice(), "server-serial");
+    expect(host.logsDialog.open).not.toHaveBeenCalled();
+  });
 });

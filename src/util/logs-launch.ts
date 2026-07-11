@@ -65,6 +65,10 @@ export async function launchLogsWithMethod(
     host.logsDialog.name = device.friendly_name || device.name;
     host.logsDialog.open();
   } else if (method === "server-serial") {
+    // server-serial always carries the chosen port; guard rather than let a
+    // missing one fall through to open()'s OTA-sentinel default and silently
+    // stream OTA logs (mirrors applyInstallMethod's server-serial guard).
+    if (!port) return;
     host.logsDialog.configuration = device.configuration;
     host.logsDialog.name = device.friendly_name || device.name;
     host.logsDialog.open(port);
