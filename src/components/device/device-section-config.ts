@@ -555,6 +555,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                 .focusFieldPath=${this.focusFieldPath}
                 .presentComponents=${this._presentComponents}
                 advanced-section
+                gate-all-advanced
                 ?show-advanced=${showAdvanced}
                 @value-change=${this._onValueChange}
                 @advanced-toggle=${this._onAdvancedToggle}

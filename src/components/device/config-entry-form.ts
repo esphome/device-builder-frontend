@@ -200,6 +200,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property({ type: Boolean, attribute: "force-advanced-control" })
   forceAdvancedControl = false;
 
+  /** Keep an all-advanced form gated behind the "Advanced settings" control
+   *  instead of auto-opening it. The device section editor sets this so an
+   *  all-advanced component (captive_portal) hides its fields with the toggle
+   *  off; automation action/trigger/condition nodes leave it off so their
+   *  all-advanced params still show inline. */
+  @property({ type: Boolean, attribute: "gate-all-advanced" })
+  gateAllAdvanced = false;
+
   /** Added to the advanced-section "(N)" count for that external content. */
   @property({ type: Number, attribute: "advanced-extra-count" })
   advancedExtraCount = 0;
@@ -392,11 +400,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const forceOpen = this._advancedForceOpen();
     // all-advanced auto-opens (an all-advanced action shows its fields with no
     // control) EXCEPT when the owner gates external content (script Parameters)
-    // through the control: there the user must drive it, or the host's
-    // showAdvanced never flips and the external block stays unreachable.
-    const open =
-      this.showAdvanced || forceOpen || (allAdvanced && !this.forceAdvancedControl);
-    const showControl = this.forceAdvancedControl || (hasAdvanced && !allAdvanced);
+    // through the control, or the device section editor opts out via
+    // gateAllAdvanced so an all-advanced component (captive_portal) still hides
+    // its fields behind the control instead of painting them open.
+    const autoOpenAllAdvanced =
+      allAdvanced && !this.forceAdvancedControl && !this.gateAllAdvanced;
+    const open = this.showAdvanced || forceOpen || autoOpenAllAdvanced;
+    const showControl =
+      this.forceAdvancedControl || (hasAdvanced && !autoOpenAllAdvanced);
     const count = advanced.length + this.advancedExtraCount;
     return html`${this._renderConstraintBanners(ctx, plan.memberKeys)}${basic.map(
       renderItem

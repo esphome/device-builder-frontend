@@ -3,7 +3,9 @@
  *
  * advanced-section mode: basic fields, then a "Show advanced settings" switch,
  * then the advanced fields below it (revealed when on). All-advanced forms
- * render with no control; the control emits ``advanced-toggle``.
+ * render with no control by default (automation nodes); with gate-all-advanced
+ * (the device section editor) they keep the control and stay collapsed. The
+ * control emits ``advanced-toggle``.
  */
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
@@ -34,6 +36,7 @@ function renderForm(
     showAdvanced?: boolean;
     values?: Record<string, unknown>;
     forceAdvancedControl?: boolean;
+    gateAllAdvanced?: boolean;
   } = {}
 ): HTMLElement {
   const form = new ESPHomeConfigEntryForm();
@@ -42,6 +45,7 @@ function renderForm(
   form.advancedSection = true;
   form.showAdvanced = opts.showAdvanced ?? false;
   form.forceAdvancedControl = opts.forceAdvancedControl ?? false;
+  form.gateAllAdvanced = opts.gateAllAdvanced ?? false;
   const container = document.createElement("div");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render((form as any).render(), container);
@@ -129,6 +133,27 @@ describe("config-entry-form advanced-section", () => {
     ]);
     expect(control(c)).toBeNull();
     expect(c.textContent ?? "").toContain("Only Advanced");
+  });
+
+  it("gates an all-advanced form behind the control with gate-all-advanced", () => {
+    // The device section editor sets gate-all-advanced so an all-advanced
+    // component (captive_portal) shows just the control, fields hidden until
+    // toggled — instead of the automation-node auto-open above.
+    const onlyAdvanced = makeConfigEntry({
+      key: "a",
+      type: ConfigEntryType.STRING,
+      label: "Only Advanced",
+      advanced: true,
+    });
+    const collapsed = renderForm([onlyAdvanced], { gateAllAdvanced: true });
+    expect(control(collapsed)).toBeTruthy();
+    expect(collapsed.textContent ?? "").not.toContain("Only Advanced");
+    const expanded = renderForm([onlyAdvanced], {
+      gateAllAdvanced: true,
+      showAdvanced: true,
+    });
+    expect(control(expanded)).toBeTruthy();
+    expect(expanded.textContent ?? "").toContain("Only Advanced");
   });
 
   it("emits advanced-toggle when the control is clicked", () => {
