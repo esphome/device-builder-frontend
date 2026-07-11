@@ -4,6 +4,17 @@ import { JobType } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /**
+ * The job type a job presents as: a deferred install is a lone COMPILE
+ * carrying the whole install intent, so it surfaces as an Install.
+ *
+ * Deliberately NOT used by the device card's busy badge — "Compiling"
+ * during a deferred install matches a normal chain's compile phase.
+ */
+export function effectiveJobType(job: FirmwareJob): JobType {
+  return job.is_deferred_install ? JobType.INSTALL : job.job_type;
+}
+
+/**
  * Resolve the human-readable label for a firmware job.
  *
  * Used by both the firmware-tasks dialog and the command dialog's
@@ -30,17 +41,6 @@ import type { LocalizeFunc } from "../common/localize.js";
  * - Otherwise prefer the configured device's friendly name → fall
  *   back to ``name`` → fall back to the raw configuration filename.
  */
-/**
- * The job type a job presents as: a deferred install is a lone COMPILE
- * carrying the whole install intent, so it surfaces as an Install.
- *
- * Deliberately NOT used by the device card's busy badge — "Compiling"
- * during a deferred install matches a normal chain's compile phase.
- */
-export function effectiveJobType(job: FirmwareJob): JobType {
-  return job.is_deferred_install ? JobType.INSTALL : job.job_type;
-}
-
 export function firmwareJobDisplayName(
   job: FirmwareJob,
   devices: ConfiguredDevice[],

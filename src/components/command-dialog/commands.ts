@@ -1,10 +1,5 @@
 import { APIError } from "../../api/api-error.js";
-import {
-  type FirmwareJob,
-  type FirmwareJobResult,
-  JobStatus,
-  JobType,
-} from "../../api/types/firmware-jobs.js";
+import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
 import { effectiveJobType } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
@@ -204,10 +199,9 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       host._enqueueLine(line);
       if (isValidationFailureLine(line)) host._failedDuringValidate = true;
     },
-    onResult: (data) => {
+    onResult: (result) => {
       host._streamId = "";
       host._flushPendingLines();
-      const result = data as unknown as FirmwareJobResult;
       const success = result.status === JobStatus.COMPLETED;
 
       // Queued is the outcome regardless of which job carried it; check

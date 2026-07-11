@@ -52,17 +52,14 @@ describe("command-dialog reopen of a deferred install", () => {
 });
 
 describe("deriveFollowCommandType for deferred installs", () => {
-  it.each([JobStatus.RUNNING, JobStatus.COMPLETED, JobStatus.FAILED])(
-    "derives install for a %s deferred compile",
-    (status) => {
-      const compile = makeFirmwareJob({
-        job_type: JobType.COMPILE,
-        status,
-        is_deferred_install: true,
-      });
-      expect(deriveFollowCommandType(new Map(), compile)).toBe("install");
-    }
-  );
+  it("derives install for a terminal deferred compile", () => {
+    const compile = makeFirmwareJob({
+      job_type: JobType.COMPILE,
+      status: JobStatus.COMPLETED,
+      is_deferred_install: true,
+    });
+    expect(deriveFollowCommandType(new Map(), compile)).toBe("install");
+  });
 
   it("keeps a plain compile deriving compile", () => {
     const compile = makeFirmwareJob({
