@@ -121,9 +121,14 @@ export function renderCard(
         <div class="component-card-header-text">
           <h3 class="component-title">${component.name}</h3>
           ${
-            categoryLabel
-              ? html`<span class="component-category-chip">${categoryLabel}</span>`
-              : nothing
+            featured
+              ? html`<span
+                  class="component-category-chip component-category-chip--recommended"
+                  >${localize("device.component_category_featured")}</span
+                >`
+              : categoryLabel
+                ? html`<span class="component-category-chip">${categoryLabel}</span>`
+                : nothing
           }
           ${
             platform

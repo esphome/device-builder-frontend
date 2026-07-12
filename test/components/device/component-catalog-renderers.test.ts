@@ -1,12 +1,67 @@
 // @vitest-environment happy-dom
+import { render } from "lit";
 import { describe, expect, it } from "vitest";
-import { shouldHandleCardClick } from "../../../src/components/device/component-catalog/renderers.js";
+import {
+  ComponentCategory,
+  type ComponentCatalogEntry,
+} from "../../../src/api/types/components.js";
+import type { ESPHomeComponentCatalog } from "../../../src/components/device/component-catalog.js";
+import {
+  renderCard,
+  shouldHandleCardClick,
+} from "../../../src/components/device/component-catalog/renderers.js";
 
 function clickFrom(target: Element): MouseEvent {
   const ev = new MouseEvent("click", { bubbles: true });
   Object.defineProperty(ev, "target", { value: target });
   return ev;
 }
+
+function makeHost(): ESPHomeComponentCatalog {
+  return {
+    _imageFailed: new Set<string>(),
+    _category: "all",
+    _onAdd: () => {},
+    _onToggleExpand: () => {},
+    _onImageError: () => {},
+  } as unknown as ESPHomeComponentCatalog;
+}
+
+function makeEntry(overrides: Partial<ComponentCatalogEntry>): ComponentCatalogEntry {
+  return {
+    id: "spi",
+    name: "SPI Bus",
+    description: "",
+    category: ComponentCategory.BUS,
+    docs_url: "",
+    image_url: "",
+    ...overrides,
+  } as ComponentCatalogEntry;
+}
+
+const localize = (key: string) =>
+  key === "device.component_category_featured" ? "Recommended" : key;
+
+describe("renderCard", () => {
+  it("marks a featured card with the prominent Recommended chip", () => {
+    const container = document.createElement("div");
+    const entry = makeEntry({
+      id: "featured.board.lcd_spi",
+      category: ComponentCategory.FEATURED,
+    });
+    render(renderCard(makeHost(), entry, false, true, localize), container);
+    const chip = container.querySelector(".component-category-chip--recommended");
+    expect(chip?.textContent?.trim()).toBe("Recommended");
+    expect(container.querySelector(".component-card--featured")).not.toBeNull();
+  });
+
+  it("keeps the muted category chip on a regular card", () => {
+    const container = document.createElement("div");
+    render(renderCard(makeHost(), makeEntry({}), false, false, localize), container);
+    expect(container.querySelector(".component-category-chip--recommended")).toBeNull();
+    expect(container.querySelector(".component-category-chip")?.textContent).toBe("Bus");
+  });
+});
 
 describe("shouldHandleCardClick", () => {
   it("adds when the click landed on a non-interactive part of the card", () => {
