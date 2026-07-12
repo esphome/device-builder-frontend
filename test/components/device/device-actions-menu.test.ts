@@ -1,8 +1,8 @@
 /**
  * @vitest-environment happy-dom
  *
- * The editor bottom-bar device-actions menu: renders Logs / Validate / Clean
- * build, emits the matching events, gates Validate (unsaved edits) and
+ * The editor bottom-bar device-actions menu: renders Clean build / Validate /
+ * Logs, emits the matching events, gates Validate (unsaved edits) and
  * Clean build (busy) with disabled + out-of-tab-order semantics, and shows
  * Visit web UI only when the page passed a web-UI URL.
  */
@@ -38,11 +38,12 @@ function link(el: ESPHomeDeviceActionsMenu): HTMLAnchorElement | null {
   return el.shadowRoot!.querySelector<HTMLAnchorElement>(".menu-item--link");
 }
 
-// Paint order: Logs, Validate, Clean build. A webUiUrl mount inserts Visit
-// web UI after Logs; those tests select by class, not index.
-const LOGS = 0;
+// Paint order (menu opens upward; frequent actions sit nearest the trigger):
+// Clean build, divider, Validate, Logs. A webUiUrl mount inserts Visit web UI
+// after the divider; those tests select by class, not index.
+const CLEAN = 0;
 const VALIDATE = 1;
-const CLEAN = 2;
+const LOGS = 2;
 
 async function openMenu(el: ESPHomeDeviceActionsMenu): Promise<HTMLElement[]> {
   el.shadowRoot!.querySelector<HTMLElement>(".menu-btn")!.click();
@@ -141,6 +142,19 @@ describe("esphome-device-actions-menu", () => {
     expect(a.getAttribute("href")).toBe("http://kitchen.local/");
     expect(a.getAttribute("role")).toBe("menuitem");
     expect(a.textContent).toContain("dashboard.action_visit_web_ui");
+  });
+
+  it("paints Clean build, divider, Visit web UI, Validate, Logs", async () => {
+    const el = await mount({ webUiUrl: "http://kitchen.local/" });
+    const labels = (await openMenu(el)).map((row) => row.textContent!.trim());
+    expect(labels).toEqual([
+      "dashboard.action_clean_build",
+      "dashboard.action_visit_web_ui",
+      "device.validate",
+      "device.show_logs",
+    ]);
+    const divider = el.shadowRoot!.querySelector(".menu-divider")!;
+    expect(divider.previousElementSibling).toBe(items(el)[CLEAN]);
   });
 
   it("closes the menu when the Visit web UI link is activated", async () => {

@@ -26,7 +26,7 @@ registerMdiIcons({
   "text-box-outline": mdiTextBoxOutline,
 });
 
-/** Editor bottom-bar overflow menu: device-scoped actions (Logs, Validate, Clean build). */
+/** Editor bottom-bar overflow menu: device-scoped actions (Clean build, Visit web UI, Validate, Logs). */
 @customElement("esphome-device-actions-menu")
 export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -109,19 +109,29 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
         this._open
           ? html`
               <div class="backdrop" @click=${this._close}></div>
+              <!-- Opens upward, so DOM order inverts distance from the
+                   trigger: frequent actions (Logs) last / nearest the
+                   click, rare ones (Clean build) first / furthest. -->
               <div class="menu" role="menu">
                 <div
-                  class="menu-item"
+                  class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
                   role="menuitem"
-                  tabindex="0"
-                  @click=${this._onLogs}
-                  @keydown=${this._onItemKeydown}
+                  tabindex=${this.busy ? "-1" : "0"}
+                  aria-disabled=${this.busy ? "true" : "false"}
+                  title=${
+                    this.busy
+                      ? this._localize("dashboard.action_clean_build_busy")
+                      : nothing
+                  }
+                  @click=${this.busy ? undefined : this._onCleanBuild}
+                  @keydown=${this.busy ? undefined : this._onItemKeydown}
                 >
-                  <wa-icon library="mdi" name="text-box-outline"></wa-icon>
+                  <wa-icon library="mdi" name="broom"></wa-icon>
                   <span class="menu-item-label"
-                    >${this._localize("device.show_logs")}</span
+                    >${this._localize("dashboard.action_clean_build")}</span
                   >
                 </div>
+                <div class="menu-divider" role="separator"></div>
                 ${
                   this.webUiUrl
                     ? renderVisitWebUiLink(this.webUiUrl, this._localize, {
@@ -152,21 +162,15 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                   >
                 </div>
                 <div
-                  class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+                  class="menu-item"
                   role="menuitem"
-                  tabindex=${this.busy ? "-1" : "0"}
-                  aria-disabled=${this.busy ? "true" : "false"}
-                  title=${
-                    this.busy
-                      ? this._localize("dashboard.action_clean_build_busy")
-                      : nothing
-                  }
-                  @click=${this.busy ? undefined : this._onCleanBuild}
-                  @keydown=${this.busy ? undefined : this._onItemKeydown}
+                  tabindex="0"
+                  @click=${this._onLogs}
+                  @keydown=${this._onItemKeydown}
                 >
-                  <wa-icon library="mdi" name="broom"></wa-icon>
+                  <wa-icon library="mdi" name="text-box-outline"></wa-icon>
                   <span class="menu-item-label"
-                    >${this._localize("dashboard.action_clean_build")}</span
+                    >${this._localize("device.show_logs")}</span
                   >
                 </div>
               </div>

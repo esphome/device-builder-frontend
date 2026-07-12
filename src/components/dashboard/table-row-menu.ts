@@ -124,12 +124,6 @@ export class ESPHomeTableRowMenu extends LitElement {
         color: var(--esphome-primary);
       }
 
-      .menu-divider {
-        height: 1px;
-        background: var(--wa-color-surface-border);
-        margin: var(--wa-space-2xs) 0;
-      }
-
       .menu-item--disabled {
         opacity: 0.4;
         cursor: not-allowed;

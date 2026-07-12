@@ -21,6 +21,7 @@ import { css } from "lit";
  *   .menu-item--link    — anchor reset for items rendered as
  *                         ``<a>`` (``renderVisitWebUiLink``) so
  *                         they match the ``<div>`` rows.
+ *   .menu-divider       — 1px separator row between item groups.
  *
  * Consumers drop this fragment into their ``static styles``
  * array BEFORE their local ``css`` block so local rules of equal
@@ -79,5 +80,11 @@ export const dropdownMenuStyles = css`
   .menu-item--link {
     text-decoration: none;
     color: inherit;
+  }
+
+  .menu-divider {
+    height: 1px;
+    background: var(--wa-color-surface-border);
+    margin: var(--wa-space-2xs) 0;
   }
 `;
