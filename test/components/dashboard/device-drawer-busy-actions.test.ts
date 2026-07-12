@@ -36,6 +36,18 @@ describe("device-drawer busy footer actions", () => {
     ]);
   });
 
+  it("idle Install emits install-device", async () => {
+    const el = await mountDrawer({
+      busy: false,
+      device: makeConfiguredDevice({ has_pending_changes: true }),
+    });
+    const btn = footerAccent(el);
+    expect(btn.textContent).toContain("dashboard.install");
+    expect(clickCollect(el, btn, ["show-progress", "install-device"])).toEqual([
+      "install-device",
+    ]);
+  });
+
   it("busy Install stays enabled, reads view-progress, and emits show-progress", async () => {
     const el = await mountDrawer({
       busy: true,

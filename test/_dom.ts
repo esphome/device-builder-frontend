@@ -63,10 +63,15 @@ export function clickCollect(
   names: string[]
 ): string[] {
   const fired: string[] = [];
-  for (const name of names) {
-    listenOn.addEventListener(name, () => fired.push(name));
-  }
+  const handlers = names.map((name) => {
+    const handler = () => fired.push(name);
+    listenOn.addEventListener(name, handler);
+    return [name, handler] as const;
+  });
   target.click();
+  for (const [name, handler] of handlers) {
+    listenOn.removeEventListener(name, handler);
+  }
   return fired;
 }
 
