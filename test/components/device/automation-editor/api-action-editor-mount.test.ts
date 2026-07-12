@@ -111,4 +111,24 @@ describe("api-action-editor action-catalog hydration (#1286)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((list as any).focusTarget).toEqual({ node: [0], field: ["format"] });
   });
+
+  it("routes a variables cursor path to the params editor", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "api_action", action_name: "ring_bell" },
+      value: {
+        trigger_id: null,
+        trigger_params: { variables: { times: "int" } },
+        actions: [],
+      },
+      focusYamlPath: ["api", "actions", 0, "variables", "times"],
+    });
+
+    const params = editor.shadowRoot!.querySelector("esphome-callable-params-editor");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((params as any).focusParam).toBe("times");
+  });
 });

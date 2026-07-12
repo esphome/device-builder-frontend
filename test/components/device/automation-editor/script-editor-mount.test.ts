@@ -136,4 +136,26 @@ describe("script-editor action-catalog hydration (#1286)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((form as any).focusFieldPath).toEqual(["mode"]);
   });
+
+  it("reveals the advanced-gated parameters block for a parameter target", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "script", id: "my_script" },
+      value: {
+        trigger_id: null,
+        trigger_params: { id: "my_script", parameters: { pin: "int" } },
+        actions: [],
+      },
+      focusYamlPath: ["script", 0, "parameters", "pin"],
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((editor as any)._showAdvanced).toBe(true);
+    const params = editor.shadowRoot!.querySelector("esphome-callable-params-editor");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((params as any).focusParam).toBe("pin");
+  });
 });
