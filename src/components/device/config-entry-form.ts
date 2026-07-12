@@ -475,8 +475,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // While the section is open both buckets are on screen, so live
       // reclassification only moves fields around mid-edit; freeze each
       // unit's placement at first sight and re-classify live once closed
-      // (under gateAdvanced ``open`` is exactly ``showAdvanced``).
-      if (!this.showAdvanced) this._openAdvancedPlacement.clear();
+      // (under gateAdvanced ``open`` is exactly ``showAdvanced``). The
+      // ``set`` is a memo-cache write, not reactive state — the units it
+      // keys on exist only inside this render plan; ``willUpdate`` owns
+      // every clear.
       gatedAdvanced = [];
       for (const item of advanced) {
         let inline: boolean;
@@ -570,7 +572,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         ?disabled=${locked}
         .checked=${open}
         @change=${(e: Event) => {
-          const sw = e.currentTarget as HTMLInputElement & { checked: boolean };
+          const sw = e.currentTarget as HTMLElement & { checked: boolean };
           const row = sw.parentElement;
           if (row) {
             this._advancedControlAnchor = {
@@ -654,6 +656,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // Re-seed disclosures for the new component; a key like "pin:pin-advanced"
       // recurs across sections, and the form instance is reused.
       this._seededNestedOpen.clear();
+    }
+    // Closing the advanced section drops the frozen placement so the next
+    // open re-freezes from the then-current YAML state.
+    if (changed.has("showAdvanced") && !this.showAdvanced) {
+      this._openAdvancedPlacement.clear();
     }
   }
 

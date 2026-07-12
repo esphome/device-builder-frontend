@@ -661,6 +661,14 @@ describe("config-entry-form advanced-section", () => {
     expect(text.indexOf("Test Card")).toBeLessThan(text.indexOf("Show advanced"));
     expect(text).toContain("Show advanced settings (2)");
     expect(text).not.toContain("Empty Adv");
+    // willUpdate's close-clear dropped the mid-open placement, so reopening
+    // re-freezes from the current values: the filled field is now inline.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).willUpdate(new Map([["showAdvanced", true]]));
+    form.showAdvanced = true;
+    const reopened = paint();
+    expect(reopened.indexOf("Test Card")).toBeLessThan(reopened.indexOf("Show advanced"));
+    expect(reopened).toContain("Show advanced settings (2)");
   });
 
   // Toggle scroll anchor (#1977): flipping the control reveals nested
