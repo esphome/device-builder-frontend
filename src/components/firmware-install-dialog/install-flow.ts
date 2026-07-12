@@ -350,15 +350,7 @@ export async function startArtifactDownload(
   const device = host._device;
   if (!device) return;
 
-  // A running build is rewriting the artifacts this download would read,
-  // and compiling now would supersede it (cancel + restart). Follow it to
-  // a terminal state first, then continue to fresh artifacts (#1200).
-  const running = host._activeJobs.get(device.configuration);
-  if (running) {
-    host._statusMessage = host._localize("firmware.status_waiting_build");
-    if (!(await waitForRunningJob(host, running.job_id))) return;
-    host._statusMessage = host._localize("firmware.status_downloading");
-  }
+  if (!(await artifactsSettled(host, device.configuration))) return;
 
   let binaries = await fetchBinaries(host, device.configuration);
   if (!binaries) return;
@@ -382,12 +374,15 @@ export async function startArtifactDownload(
 
 // Fetch one binary and hand it to the browser. Shared by the auto-select
 // paths and the picker; leaves _binaries intact for "download another format".
+// Re-settles at select time: the picker (or download-ready's "another
+// format") can sit open while a new build starts rewriting the file.
 export async function downloadSelectedBinary(
   host: ESPHomeFirmwareInstallDialog,
   file: string
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
+  if (!(await artifactsSettled(host, device.configuration))) return;
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).
@@ -523,6 +518,26 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   // after a lost/never-ready tab recompiles, which is incremental and cheap.
   host._usbFirmware = null;
   host._usbFlashTeardown = teardown;
+}
+
+/**
+ * Wait out any running job for *configuration* before touching its
+ * artifacts — a running build both rewrites the files a download would
+ * read and would be superseded (cancelled + restarted) by a fresh
+ * compile (#1200).
+ *
+ * True to proceed; false when the dialog was dismissed mid-wait.
+ */
+async function artifactsSettled(
+  host: ESPHomeFirmwareInstallDialog,
+  configuration: string
+): Promise<boolean> {
+  const running = host._activeJobs.get(configuration);
+  if (!running) return true;
+  host._statusMessage = host._localize("firmware.status_waiting_build");
+  if (!(await waitForRunningJob(host, running.job_id))) return false;
+  host._statusMessage = host._localize("firmware.status_downloading");
+  return true;
 }
 
 /**

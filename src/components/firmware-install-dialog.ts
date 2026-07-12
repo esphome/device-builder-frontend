@@ -99,9 +99,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _jobs: Map<string, FirmwareJob> = new Map();
 
   // Active job per configuration — the download flow waits for a running
-  // build instead of reading artifacts it's rewriting (#1200).
+  // build instead of reading artifacts it's rewriting (#1200). Not @state:
+  // read imperatively at download start, never in render.
   @consume({ context: activeJobsContext, subscribe: true })
-  @state()
   _activeJobs: Map<string, FirmwareJob> = new Map();
 
   // Suppress the "set up a build server" hint once a build server is paired.

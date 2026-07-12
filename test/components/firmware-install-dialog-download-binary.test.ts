@@ -74,6 +74,8 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
+    _activeJobs: new Map<string, unknown>(),
+    _timer: { noteLine: vi.fn() },
     _localize: identityLocalize,
     _fail: vi.fn(),
   };

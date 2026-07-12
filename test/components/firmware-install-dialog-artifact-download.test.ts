@@ -106,6 +106,8 @@ describe("download flow (startArtifactDownload)", () => {
     const { host, api } = makeHost([[FACTORY]]);
     await run(host);
     expect(api.firmwareCompile).not.toHaveBeenCalled();
+    // With no active job there's nothing to wait on either.
+    expect(api.firmwareFollowJob).not.toHaveBeenCalled();
     expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
       "device.yaml",
       "firmware.factory.bin"
@@ -211,11 +213,21 @@ describe("download waits for a running build (#1200)", () => {
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 
-  it("skips the wait entirely when no job is running", async () => {
-    const { host, api } = makeHost([[FACTORY]]);
-    await run(host);
-    // followJob is only reached via compileAndWait, which didn't run.
+  it("re-waits at picker-select time for a build that started meanwhile", async () => {
+    const { host, api } = makeHost([[FACTORY, OTA, ELF]]);
+    await run(host); // lands on choose-binary, no job running
     expect(api.firmwareFollowJob).not.toHaveBeenCalled();
+    // The race: a build starts while the picker sits open.
+    host._activeJobs.set("device.yaml", runningJob);
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.ota.bin"
+    );
+    expect(api.firmwareFollowJob).toHaveBeenCalledWith("running-1", expect.anything());
+    expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
+      "device.yaml",
+      "firmware.ota.bin"
+    );
     expect(host._step).toBe("download-ready");
   });
 });
