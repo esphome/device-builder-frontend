@@ -8,44 +8,17 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-// The drawer body renders children that pull in <wa-button> (form-associated,
-// noisy under happy-dom); the footer under test uses plain buttons, so stubbing
-// the body keeps the mount light and quiet.
+// Stub the drawer body; see _device-drawer.ts.
 vi.mock("../../../src/components/dashboard/device-drawer-content.js", () => ({}));
 
-import { ESPHomeDeviceDrawer } from "../../../src/components/dashboard/device-drawer.js";
-import { mount } from "../../_dom.js";
+import { clickCollect } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
-
-function accent(el: ESPHomeDeviceDrawer): HTMLButtonElement {
-  return el.shadowRoot!.querySelector<HTMLButtonElement>(".footer .action--accent")!;
-}
-
-function clickCollect(
-  el: ESPHomeDeviceDrawer,
-  btn: HTMLElement,
-  events: string[]
-): string[] {
-  const fired: string[] = [];
-  for (const name of events) {
-    el.addEventListener(name, () => fired.push(name));
-  }
-  btn.click();
-  return fired;
-}
+import { footerAccent, mountDrawer, updateAvailableDevice } from "./_device-drawer.js";
 
 describe("device-drawer busy footer actions", () => {
   it("busy Update stays enabled, reads view-progress, and emits show-progress", async () => {
-    const el = await mount(new ESPHomeDeviceDrawer(), {
-      open: true,
-      busy: true,
-      device: makeConfiguredDevice({
-        update_available: true,
-        runtime_state: { deployed_version: "2024.6.0" },
-        current_version: "2024.12.0",
-      }),
-    });
-    const btn = accent(el);
+    const el = await mountDrawer({ busy: true, device: updateAvailableDevice() });
+    const btn = footerAccent(el);
     expect(btn.disabled).toBe(false);
     expect(btn.textContent).toContain("dashboard.table_action_view_progress");
     expect(btn.title).toBe("dashboard.table_action_view_progress");
@@ -55,16 +28,8 @@ describe("device-drawer busy footer actions", () => {
   });
 
   it("idle Update emits update-device", async () => {
-    const el = await mount(new ESPHomeDeviceDrawer(), {
-      open: true,
-      busy: false,
-      device: makeConfiguredDevice({
-        update_available: true,
-        runtime_state: { deployed_version: "2024.6.0" },
-        current_version: "2024.12.0",
-      }),
-    });
-    const btn = accent(el);
+    const el = await mountDrawer({ busy: false, device: updateAvailableDevice() });
+    const btn = footerAccent(el);
     expect(btn.textContent).toContain("dashboard.drawer_update");
     expect(clickCollect(el, btn, ["show-progress", "update-device"])).toEqual([
       "update-device",
@@ -72,14 +37,14 @@ describe("device-drawer busy footer actions", () => {
   });
 
   it("busy Install stays enabled, reads view-progress, and emits show-progress", async () => {
-    const el = await mount(new ESPHomeDeviceDrawer(), {
-      open: true,
+    const el = await mountDrawer({
       busy: true,
       device: makeConfiguredDevice({ has_pending_changes: true }),
     });
-    const btn = accent(el);
+    const btn = footerAccent(el);
     expect(btn.disabled).toBe(false);
     expect(btn.textContent).toContain("dashboard.table_action_view_progress");
+    expect(btn.title).toBe("dashboard.table_action_view_progress");
     expect(clickCollect(el, btn, ["show-progress", "install-device"])).toEqual([
       "show-progress",
     ]);

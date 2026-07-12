@@ -18,7 +18,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { updateActionTitle } from "../../util/update-tooltip.js";
+import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./device-drawer-content.js";
@@ -376,24 +376,17 @@ export class ESPHomeDeviceDrawer extends LitElement {
                   )}
                 >
                   <wa-icon library="mdi" name="upload"></wa-icon>
-                  ${this._localize(
-                    this.busy
-                      ? "dashboard.table_action_view_progress"
-                      : "dashboard.drawer_update"
-                  )}
+                  ${busyActionLabel(this._localize, this.busy, "dashboard.drawer_update")}
                 </button>`
               : showPendingChanges(device)
                 ? html`<button
                     class="action action--accent"
                     @click=${() =>
                       this._emitAction(this.busy ? "show-progress" : "install-device")}
+                    title=${busyActionLabel(this._localize, this.busy, "dashboard.install")}
                   >
                     <wa-icon library="mdi" name="upload"></wa-icon>
-                    ${this._localize(
-                      this.busy
-                        ? "dashboard.table_action_view_progress"
-                        : "dashboard.install"
-                    )}
+                    ${busyActionLabel(this._localize, this.busy, "dashboard.install")}
                   </button>`
                 : nothing
           }

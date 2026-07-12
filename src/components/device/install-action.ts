@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { updateActionTitle } from "../../util/update-tooltip.js";
+import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
 
 export interface InstallActionProps {
   localize: LocalizeFunc;
@@ -45,9 +45,7 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
         )}
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
-        ${p.localize(
-          p.busy ? "dashboard.table_action_view_progress" : "dashboard.update"
-        )}
+        ${busyActionLabel(p.localize, p.busy, "dashboard.update")}
       </button>
       <button
         type="button"
@@ -61,9 +59,7 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
       </button>
     </div>`;
   }
-  const installLabel = p.localize(
-    p.busy ? "dashboard.table_action_view_progress" : "dashboard.install"
-  );
+  const installLabel = busyActionLabel(p.localize, p.busy, "dashboard.install");
   return html`<button
     type="button"
     class="install-fab ${p.showModified ? "" : "install-fab--muted"}"

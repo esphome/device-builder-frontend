@@ -29,7 +29,7 @@ import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { updateActionTitle } from "../util/update-tooltip.js";
+import { busyActionLabel, updateActionTitle } from "../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
@@ -270,9 +270,7 @@ export class ESPHomeDeviceCard extends LitElement {
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
         @click=${() => this._emit(this.busy ? "show-progress" : "update-device")}
-        aria-label=${this._localize(
-          this.busy ? "dashboard.table_action_view_progress" : "dashboard.update"
-        )}
+        aria-label=${busyActionLabel(this._localize, this.busy, "dashboard.update")}
         title=${updateActionTitle(
           this._localize,
           this.busy,
@@ -285,9 +283,7 @@ export class ESPHomeDeviceCard extends LitElement {
       </button>`;
     }
     if (this.showModified) {
-      const label = this._localize(
-        this.busy ? "dashboard.table_action_view_progress" : "dashboard.install"
-      );
+      const label = busyActionLabel(this._localize, this.busy, "dashboard.install");
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
         @click=${() => this._emit(this.busy ? "show-progress" : "install-device")}

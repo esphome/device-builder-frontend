@@ -11,6 +11,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
 import type { ESPHomeDeviceCard } from "../../src/components/device-card.js";
+import { clickCollect } from "../_dom.js";
 import { mountDeviceCard as mount } from "./_device-card.js";
 
 function accentButton(el: ESPHomeDeviceCard): HTMLButtonElement {
@@ -19,39 +20,36 @@ function accentButton(el: ESPHomeDeviceCard): HTMLButtonElement {
   return btn!;
 }
 
-function clickEmits(el: ESPHomeDeviceCard, events: string[]): string[] {
-  const fired: string[] = [];
-  for (const name of events) {
-    el.addEventListener(name, () => fired.push(name));
-  }
-  accentButton(el).click();
-  return fired;
-}
-
 describe("device-card busy update/install actions", () => {
   it("busy update button is enabled and emits show-progress", async () => {
     const el = await mount({ busy: true, showUpdate: true });
-    expect(accentButton(el).disabled).toBe(false);
-    expect(clickEmits(el, ["show-progress", "update-device"])).toEqual(["show-progress"]);
+    const btn = accentButton(el);
+    expect(btn.disabled).toBe(false);
+    expect(clickCollect(el, btn, ["show-progress", "update-device"])).toEqual([
+      "show-progress",
+    ]);
   });
 
   it("idle update button emits update-device", async () => {
     const el = await mount({ busy: false, showUpdate: true });
-    expect(clickEmits(el, ["show-progress", "update-device"])).toEqual(["update-device"]);
+    expect(
+      clickCollect(el, accentButton(el), ["show-progress", "update-device"])
+    ).toEqual(["update-device"]);
   });
 
   it("busy install button is enabled and emits show-progress", async () => {
     const el = await mount({ busy: true, showModified: true });
-    expect(accentButton(el).disabled).toBe(false);
-    expect(clickEmits(el, ["show-progress", "install-device"])).toEqual([
+    const btn = accentButton(el);
+    expect(btn.disabled).toBe(false);
+    expect(clickCollect(el, btn, ["show-progress", "install-device"])).toEqual([
       "show-progress",
     ]);
   });
 
   it("idle install button emits install-device", async () => {
     const el = await mount({ busy: false, showModified: true });
-    expect(clickEmits(el, ["show-progress", "install-device"])).toEqual([
-      "install-device",
-    ]);
+    expect(
+      clickCollect(el, accentButton(el), ["show-progress", "install-device"])
+    ).toEqual(["install-device"]);
   });
 });

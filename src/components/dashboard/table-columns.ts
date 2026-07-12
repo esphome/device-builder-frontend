@@ -9,7 +9,7 @@ import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
-import { updateActionTitle } from "../../util/update-tooltip.js";
+import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
@@ -317,10 +317,10 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
            free side-effect. Mirrors the legacy dashboard. */
         const showUpdate = row.showUpdate;
         const showInstall = !showUpdate && row.showModified;
-        const installLabel = localize(
-          row.busy
-            ? "dashboard.table_action_view_progress"
-            : "dashboard.table_action_install"
+        const installLabel = busyActionLabel(
+          localize,
+          row.busy,
+          "dashboard.table_action_install"
         );
         const visitUrl = buildWebUiUrl(device);
         const showVisit = visitUrl !== "";
@@ -361,10 +361,10 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             showUpdate
               ? html`<button
                   class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
-                  aria-label=${localize(
-                    row.busy
-                      ? "dashboard.table_action_view_progress"
-                      : "dashboard.table_action_update"
+                  aria-label=${busyActionLabel(
+                    localize,
+                    row.busy,
+                    "dashboard.table_action_update"
                   )}
                   title=${updateActionTitle(
                     localize,
