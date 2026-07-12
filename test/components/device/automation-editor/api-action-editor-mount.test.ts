@@ -112,6 +112,26 @@ describe("api-action-editor action-catalog hydration (#1286)", () => {
     expect((list as any).focusTarget).toEqual({ node: [0], field: ["format"] });
   });
 
+  it("flashes the name field for an action-key cursor path", async () => {
+    const scrolled = vi
+      .spyOn(HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "api_action", action_name: "ring_bell" },
+      value: { trigger_id: null, trigger_params: {}, actions: [] },
+      focusYamlPath: ["api", "actions", 0, "action"],
+    });
+
+    expect(scrolled).toHaveBeenCalledTimes(1);
+    const field = editor.shadowRoot!.querySelector("#api-action-name")!.closest(".field");
+    expect(scrolled.mock.instances[0]).toBe(field);
+    vi.restoreAllMocks();
+  });
+
   it("routes a variables cursor path to the params editor", async () => {
     const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
     const getAutomationBodies = vi.fn().mockResolvedValue({});
