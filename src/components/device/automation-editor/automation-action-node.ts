@@ -38,6 +38,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { pathIsAdvanced } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
@@ -45,6 +46,7 @@ import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import "../config-entry-renderers/lambda-editor.js";
 import { lambdaBodyOf } from "../config-entry-renderers/lambda.js";
 import { literalLambdaToggleStyles } from "../config-entry-renderers/literal-lambda-toggle.js";
+import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import "./automation-condition-tree.js";
 import {
   delayLambdaOf,
@@ -55,6 +57,12 @@ import {
   writeDelayParams,
 } from "./automation-delay-params.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import {
+  type AutomationFocus,
+  childFocus,
+  focusKey,
+  scrollFlashRow,
+} from "./automation-focus.js";
 import "./catalog-picker-dialog.js";
 import type {
   CatalogPickedDetail,
@@ -122,6 +130,12 @@ export class ESPHomeAutomationActionNode extends LitElement {
   @property({ type: Boolean })
   last = false;
 
+  /** Cursor focus target routed to this node: ``"conditions"`` head →
+   *  the boolean gate, a child-list key → that nested list, empty →
+   *  this node's params form or the row itself. */
+  @property({ attribute: false })
+  focusTarget: AutomationFocus | null = null;
+
   @query("esphome-catalog-picker-dialog")
   private _picker!: ESPHomeCatalogPickerDialog;
 
@@ -150,7 +164,15 @@ export class ESPHomeAutomationActionNode extends LitElement {
     inputStyles,
     automationEditorStyles,
     literalLambdaToggleStyles,
+    fieldHighlightStyles,
   ];
+
+  /** ``focusKey`` of the last target applied, so a same-valued object
+   *  re-sliced by the parent's render doesn't re-run the side effects. */
+  private _lastFocusKey?: string;
+
+  /** Row-level scroll already performed for the current target. */
+  private _focusScrolled = false;
 
   /**
    * The list reuses nodes by DOM position (plain actions.map, no keyed
@@ -161,14 +183,62 @@ export class ESPHomeAutomationActionNode extends LitElement {
    * on that would snap the card shut mid-edit.
    */
   protected willUpdate(changed: PropertyValues<this>): void {
-    if (!changed.has("value")) return;
-    const previous = changed.get("value") as ActionNode | undefined;
-    if (previous && previous.action_id !== this.value.action_id) {
-      this._collapsed = false;
-      this._showAdvanced = false;
-      this._delayLambdaStash = "";
-      this._delayLiteralStash = null;
+    if (changed.has("value")) {
+      const previous = changed.get("value") as ActionNode | undefined;
+      if (previous && previous.action_id !== this.value.action_id) {
+        this._collapsed = false;
+        this._showAdvanced = false;
+        this._delayLambdaStash = "";
+        this._delayLiteralStash = null;
+      }
     }
+    if (changed.has("focusTarget")) this._applyFocusTarget();
+  }
+
+  /** One-shot per distinct target: un-collapse so the body renders, and
+   *  reveal advanced params when the target field hides behind them. */
+  private _applyFocusTarget(): void {
+    const key = focusKey(this.focusTarget);
+    if (key === this._lastFocusKey) return;
+    this._lastFocusKey = key;
+    if (!key) return;
+    this._focusScrolled = false;
+    this._collapsed = false;
+    const t = this.focusTarget!;
+    if (t.node.length === 0 && t.field.length > 0) {
+      const def = this.catalog.find((a) => a.id === this.value.action_id);
+      if (def && pathIsAdvanced(def.config_entries, t.field)) {
+        this._showAdvanced = true;
+      }
+    }
+  }
+
+  protected updated(): void {
+    this._maybeScrollSelf();
+  }
+
+  /** Scroll + flash this row when the target terminates here — a
+   *  node-level target, or one the rendered surface can't forward
+   *  (no gate/child list/params form for the remaining path). */
+  private _maybeScrollSelf(): void {
+    const t = this.focusTarget;
+    if (!t || this._focusScrolled || !this._isTerminalFocus(t)) return;
+    this._focusScrolled = true;
+    const row = this.shadowRoot?.querySelector<HTMLElement>(".ae-row");
+    if (row) scrollFlashRow(row);
+  }
+
+  private _isTerminalFocus(t: AutomationFocus): boolean {
+    const def = this.catalog.find((a) => a.id === this.value.action_id);
+    const head = t.node[0];
+    if (head === "conditions") return !(def?.id === "if" || def?.id === "wait_until");
+    if (typeof head === "string") {
+      return !(def?.accepts_action_list ?? []).includes(head);
+    }
+    if (t.field.length === 0) return true;
+    // Field target with no catalog form to arm (bespoke delay widget,
+    // entry-less action) — degrade to the row flash.
+    return !def || def.id === "delay" || def.config_entries.length === 0;
   }
 
   protected render() {
@@ -315,6 +385,9 @@ export class ESPHomeAutomationActionNode extends LitElement {
       <esphome-automation-condition-tree
         no-header
         .conditions=${this.value.conditions ?? []}
+        .focusTarget=${
+          this.focusTarget?.node[0] === "conditions" ? childFocus(this.focusTarget) : null
+        }
         .catalog=${this.conditionCatalog}
         .devices=${this.devices}
         .board=${this.board}
@@ -358,6 +431,9 @@ export class ESPHomeAutomationActionNode extends LitElement {
           <esphome-automation-action-list
             no-header
             .actions=${this.value.children?.[key] ?? []}
+            .focusTarget=${
+              this.focusTarget?.node[0] === key ? childFocus(this.focusTarget) : null
+            }
             .catalog=${this.catalog}
             .conditionCatalog=${this.conditionCatalog}
             .scripts=${this.scripts}
@@ -399,12 +475,16 @@ export class ESPHomeAutomationActionNode extends LitElement {
     // The form owns the advanced section; an all-advanced action (no basic
     // fields) renders everything with no control, matching the old
     // force-open-no-toggle behaviour.
+    const t = this.focusTarget;
     return html`<esphome-config-entry-form
       .entries=${def.config_entries}
       .values=${this.value.params}
       .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
       .board=${this.board}
       .yaml=${this.yaml}
+      .focusFieldPath=${
+        t && t.node.length === 0 && t.field.length > 0 ? t.field : undefined
+      }
       ?disabled=${this.disabled}
       advanced-section
       ?show-advanced=${this._showAdvanced}

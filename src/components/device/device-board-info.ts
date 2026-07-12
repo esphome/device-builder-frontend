@@ -106,6 +106,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   @property({ attribute: false })
   focusFieldPath?: string[];
 
+  /** Indexed key path at the cursor, for automation deep-targeting. */
+  @property({ attribute: false })
+  focusYamlPath?: (string | number)[];
+
   /** The selected section's backend errors; forwarded to the section editor. */
   @property({ attribute: false })
   backendErrors: InstanceBackendErrors = NO_INSTANCE_ERRORS;
@@ -426,6 +430,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .platform=${this.board?.esphome.platform ?? ""}
         .location=${location}
         .yaml=${this.yaml}
+        .focusYamlPath=${this.focusYamlPath}
       ></esphome-automation-editor>`;
     }
     return html`<esphome-device-section-config

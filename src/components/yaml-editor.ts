@@ -29,7 +29,11 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { editorSearchPhrases } from "../util/editor-search-phrases.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { idleCompletion } from "../util/idle-completion.js";
-import { getKeyPath, isInsideBlockScalar } from "../util/yaml-ast.js";
+import {
+  getKeyPath,
+  getKeyPathWithListIndices,
+  isInsideBlockScalar,
+} from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { lineKeyToken, type YamlAutoFix } from "../util/yaml-error-analysis.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
@@ -533,9 +537,18 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
           ) {
             this._lastReportedCursorLine = line;
             this._lastReportedPathKey = pathKey;
+            // AST-only sibling of ``path`` carrying block-sequence list
+            // indices — what the automation editor needs to resolve a
+            // node inside a handler body. Empty (omitted) on lines only
+            // the indent walkers can anchor.
+            const indexedPath = getKeyPathWithListIndices(update.state, head);
             this.dispatchEvent(
               new CustomEvent("yaml-cursor-line", {
-                detail: { line, path },
+                detail: {
+                  line,
+                  path,
+                  indexedPath: indexedPath.length ? indexedPath : undefined,
+                },
                 bubbles: true,
                 composed: true,
               })

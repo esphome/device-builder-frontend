@@ -30,6 +30,7 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "./automation-action-node.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import { type AutomationFocus, childFocus } from "./automation-focus.js";
 import "./catalog-picker-dialog.js";
 import type {
   CatalogPickedDetail,
@@ -80,6 +81,11 @@ export class ESPHomeAutomationActionList extends LitElement {
 
   @property({ type: Boolean, attribute: "hide-add" })
   hideAdd = false;
+
+  /** Cursor focus target whose ``node`` head indexes this list; the
+   *  matching row gets the sliced remainder. */
+  @property({ attribute: false })
+  focusTarget: AutomationFocus | null = null;
 
   @query("esphome-catalog-picker-dialog")
   private _picker!: ESPHomeCatalogPickerDialog;
@@ -136,6 +142,9 @@ export class ESPHomeAutomationActionList extends LitElement {
   private _renderRow(node: ActionNode, idx: number, isLast: boolean) {
     return html`<esphome-automation-action-node
       .value=${node}
+      .focusTarget=${
+        this.focusTarget?.node[0] === idx ? childFocus(this.focusTarget) : null
+      }
       .catalog=${this.catalog}
       .conditionCatalog=${this.conditionCatalog}
       .scripts=${this.scripts}

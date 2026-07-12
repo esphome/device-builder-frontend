@@ -177,6 +177,11 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _focusFieldPath?: string[];
 
+  /** Document-absolute indexed key path at the cursor — the automation
+   *  editor resolves it against its tree to deep-target a nested node. */
+  @state()
+  private _focusYamlPath?: (string | number)[];
+
   /** Backend validation errors resolved onto section instances, refreshed
    *  on every lint pass. Feeds the navigator badges and the selected
    *  section's inline form errors. */
@@ -1092,6 +1097,7 @@ export class ESPHomePageDevice extends LitElement {
             .selectedSection=${this._selectedSection}
             .selectedFromLine=${this._selectedFromLine}
             .focusFieldPath=${this._focusFieldPath}
+            .focusYamlPath=${this._focusYamlPath}
             .backendErrors=${this._instanceBackendErrors(
               this._backendErrors,
               this._selectedSection,
@@ -1386,7 +1392,13 @@ export class ESPHomePageDevice extends LitElement {
    * `if` blocks in `yaml-editor.ts:_buildExtensions`'s
    * `updateListener`.
    */
-  private _onYamlCursorLine(e: CustomEvent<{ line: number; path?: string[] }>) {
+  private _onYamlCursorLine(
+    e: CustomEvent<{
+      line: number;
+      path?: string[];
+      indexedPath?: (string | number)[];
+    }>
+  ) {
     // The user is driving from the YAML pane now — drop any pending
     // form-field retry so it can't re-highlight after they've moved on.
     this._clearPendingFieldLine();
@@ -1407,6 +1419,7 @@ export class ESPHomePageDevice extends LitElement {
       // Same section: update the field target directly for intra-section
       // moves (the switch below would early-return and freeze it).
       this._focusFieldPath = rel;
+      this._focusYamlPath = e.detail.indexedPath;
       return;
     }
     // Cross-section: set the field path only when the switch actually
@@ -1416,6 +1429,7 @@ export class ESPHomePageDevice extends LitElement {
       this._selectedSection = sectionKey;
       this._selectedFromLine = match.fromLine;
       this._focusFieldPath = rel;
+      this._focusYamlPath = e.detail.indexedPath;
       // The navigator selection follows the caret; a block highlight
       // left on the previously clicked component would disagree with
       // it (#1885). The highlight is a navigator/form affordance —

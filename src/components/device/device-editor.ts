@@ -146,6 +146,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ attribute: false })
   focusFieldPath?: string[];
 
+  /** Indexed key path at the cursor, for automation deep-targeting. */
+  @property({ attribute: false })
+  focusYamlPath?: (string | number)[];
+
   /** The selected section's backend errors; forwarded to the section editor. */
   @property({ attribute: false })
   backendErrors: InstanceBackendErrors = NO_INSTANCE_ERRORS;
@@ -346,6 +350,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 .selectedSection=${this.selectedSection}
                 .selectedFromLine=${this.selectedFromLine}
                 .focusFieldPath=${this.focusFieldPath}
+                .focusYamlPath=${this.focusYamlPath}
                 .backendErrors=${this.backendErrors}
                 .justCreated=${this.justCreated}
                 .yamlPaneVisible=${effectiveLayout !== "left"}

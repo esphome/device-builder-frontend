@@ -17,6 +17,7 @@ import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
 interface CursorLineDetail {
   line: number;
   path: string[];
+  indexedPath?: (string | number)[];
 }
 
 async function mount(value: string): Promise<ESPHomeYamlEditor> {
@@ -186,6 +187,49 @@ describe("yaml-editor cursor-line emission (#946)", () => {
     view.dispatch({ changes: { from: at, insert: "G" } }); // no selection
     parseAll(view);
     expect(events).toHaveLength(0);
+  });
+
+  it("carries list indices on indexedPath for a nested automation line", async () => {
+    const el = await mount(
+      "binary_sensor:\n" +
+        "  - platform: gpio\n" +
+        "    on_click:\n" +
+        "      - then:\n" +
+        "          - if:\n" +
+        "              condition:\n" +
+        "                - sensor.in_range:\n" +
+        "                    above: 20\n"
+    );
+    const view = viewOf(el);
+    parseAll(view);
+    const events = record(el);
+
+    caretToLineEnd(view, 8); // the `above: 20` line
+    expect(events).toHaveLength(1);
+    expect(events[0].indexedPath).toEqual([
+      "binary_sensor",
+      0,
+      "on_click",
+      0,
+      "then",
+      0,
+      "if",
+      "condition",
+      0,
+      "sensor.in_range",
+      "above",
+    ]);
+  });
+
+  it("omits indexedPath on a line only the indent walkers anchor", async () => {
+    const el = await mount("esp32:\n  board: a\nhttp_request:\n  \n");
+    const view = viewOf(el);
+    parseAll(view);
+    const events = record(el);
+
+    caretToLineEnd(view, 4); // blank child line — no AST anchor
+    expect(events).toHaveLength(1);
+    expect(events[0].indexedPath).toBeUndefined();
   });
 
   it("still emits on an ordinary line change", async () => {
