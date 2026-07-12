@@ -50,7 +50,12 @@ import { parseSubstitutions } from "../../../util/substitutions.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
-import { createFocusResolver, type YamlPathSegment } from "./automation-focus.js";
+import {
+  actionsFocus,
+  createFocusResolver,
+  entryFieldFocus,
+  type YamlPathSegment,
+} from "./automation-focus.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { loadIntervalComponent } from "./load-interval-component.js";
 import { ParseErrorController } from "./parse-error-controller.js";
@@ -426,7 +431,7 @@ export class ESPHomeAutomationEditor extends LitElement {
               yaml: this.yaml,
               disabled,
               showAdvanced: this._showAdvanced,
-              focusFieldPath: focus && focus.node.length === 0 ? focus.field : undefined,
+              focusFieldPath: entryFieldFocus(focus),
               onValueChange: this._onTriggerParamsValueChange,
               onAdvancedToggle: this._onAdvancedToggle,
             })}`
@@ -441,7 +446,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         yaml: this.yaml,
         disabled,
         localize: this._localize,
-        focusTarget: focus && focus.node.length > 0 ? focus : null,
+        focusTarget: actionsFocus(focus),
         onOpenPicker: () => this._actionList?.openPicker(),
         onActionsChange: this._onActionsChange,
       })}

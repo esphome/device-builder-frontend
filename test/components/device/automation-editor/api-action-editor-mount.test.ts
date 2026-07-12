@@ -46,12 +46,14 @@ const loggerBodies = () => ({
 
 async function mountEditor(
   api: ESPHomeAPI,
-  configuration?: string
+  configuration?: string,
+  props: object = {}
 ): Promise<ESPHomeApiActionEditor> {
   const editor = new ESPHomeApiActionEditor();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (editor as any)._api = api;
   if (configuration !== undefined) editor.configuration = configuration;
+  Object.assign(editor, props);
   document.body.appendChild(editor);
   await editor.updateComplete;
   await flushMicrotasks(30);
@@ -95,20 +97,15 @@ describe("api-action-editor action-catalog hydration (#1286)", () => {
     const getAutomationBodies = vi.fn().mockResolvedValue(loggerBodies());
     const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
 
-    const editor = new ESPHomeApiActionEditor();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (editor as any)._api = api;
-    editor.configuration = "device.yaml";
-    editor.location = { kind: "api_action", action_name: "ring_bell" };
-    editor.value = {
-      trigger_id: null,
-      trigger_params: {},
-      actions: [{ action_id: "logger.log", params: {}, children: {}, conditions: [] }],
-    };
-    editor.focusYamlPath = ["api", "actions", 0, "then", 0, "logger.log", "format"];
-    document.body.appendChild(editor);
-    await editor.updateComplete;
-    await flushMicrotasks(30);
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "api_action", action_name: "ring_bell" },
+      value: {
+        trigger_id: null,
+        trigger_params: {},
+        actions: [{ action_id: "logger.log", params: {}, children: {}, conditions: [] }],
+      },
+      focusYamlPath: ["api", "actions", 0, "then", 0, "logger.log", "format"],
+    });
 
     const list = editor.shadowRoot!.querySelector("esphome-automation-action-list");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

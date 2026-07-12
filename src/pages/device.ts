@@ -1588,6 +1588,11 @@ export class ESPHomePageDevice extends LitElement {
       }
       this._selectedSection = sectionKey;
       this._selectedFromLine = fromLine;
+      // A navigator click carries no field intent — a stale cursor path
+      // would scroll/flash a target in the newly mounted editor that the
+      // user never pointed at.
+      this._focusFieldPath = undefined;
+      this._focusYamlPath = undefined;
       this._drawerOpen = false;
       this._updateUrl();
     });

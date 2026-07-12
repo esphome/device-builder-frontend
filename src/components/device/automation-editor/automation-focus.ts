@@ -95,6 +95,18 @@ export function childFocus(focus: AutomationFocus): AutomationFocus {
   return { node: focus.node.slice(1), field: focus.field };
 }
 
+/** The editor-level routing rule: a non-empty ``node`` path belongs to
+ *  the actions list. */
+export function actionsFocus(focus: AutomationFocus | null): AutomationFocus | null {
+  return focus && focus.node.length > 0 ? focus : null;
+}
+
+/** The counterpart: an empty ``node`` path targets the editor's
+ *  entry-params form. */
+export function entryFieldFocus(focus: AutomationFocus | null): string[] | undefined {
+  return focus && focus.node.length === 0 ? focus.field : undefined;
+}
+
 /** Value key for dedupe — the parent re-slices a fresh object per render. */
 export function focusKey(focus: AutomationFocus | null | undefined): string | undefined {
   return focus ? JSON.stringify([focus.node, focus.field]) : undefined;
@@ -107,25 +119,21 @@ export function focusTargetHasChanged(a: unknown, b: unknown): boolean {
   return focusKey(a as AutomationFocus | null) !== focusKey(b as AutomationFocus | null);
 }
 
-/** Memoized cursor-path → focus resolver, one per editor instance —
- *  keyed on (value, location, path) so it self-heals once the async
- *  hydrate lands the tree. */
-export function createFocusResolver(): (
+function resolveFocus(
   value: AutomationTree | null,
   location: AutomationLocation | null,
   path?: YamlPathSegment[]
-) => AutomationFocus | null {
-  return memoizeOne(
-    (
-      value: AutomationTree | null,
-      location: AutomationLocation | null,
-      path?: YamlPathSegment[]
-    ): AutomationFocus | null => {
-      if (!value || !path?.length) return null;
-      const rel = automationRelativePath(path, location);
-      return rel ? resolveAutomationFocus(value, rel) : null;
-    }
-  );
+): AutomationFocus | null {
+  if (!value || !path?.length) return null;
+  const rel = automationRelativePath(path, location);
+  return rel ? resolveAutomationFocus(value, rel) : null;
+}
+
+/** Memoized cursor-path → focus resolver, one per editor instance —
+ *  keyed on (value, location, path) so it self-heals once the async
+ *  hydrate lands the tree. */
+export function createFocusResolver(): typeof resolveFocus {
+  return memoizeOne(resolveFocus);
 }
 
 /**

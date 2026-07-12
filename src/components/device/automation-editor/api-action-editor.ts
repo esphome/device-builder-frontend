@@ -46,7 +46,11 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
-import { createFocusResolver, type YamlPathSegment } from "./automation-focus.js";
+import {
+  actionsFocus,
+  createFocusResolver,
+  type YamlPathSegment,
+} from "./automation-focus.js";
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
@@ -221,7 +225,7 @@ export class ESPHomeApiActionEditor extends LitElement {
         </p>
         <esphome-automation-action-list
           no-header
-          .focusTarget=${focus && focus.node.length > 0 ? focus : null}
+          .focusTarget=${actionsFocus(focus)}
           .actions=${automation.actions}
           .catalog=${actions}
           .conditionCatalog=${conditions}

@@ -8,6 +8,7 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -402,9 +403,13 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    * key into a typed location here so the editors don't have to
    * know about navigator routing.
    */
+  /** Key → location, memoized: a fresh object per render would defeat
+   *  the editors' focus-resolver memoization on every parent render. */
+  private _locationForKey = memoizeOne(locationFromSectionKey);
+
   private _renderSelectedSection() {
     const key = this.selectedSection!;
-    const location = key.startsWith("automation:") ? locationFromSectionKey(key) : null;
+    const location = key.startsWith("automation:") ? this._locationForKey(key) : null;
     if (location?.kind === "script") {
       return html`<esphome-script-editor
         .configuration=${this.configuration}

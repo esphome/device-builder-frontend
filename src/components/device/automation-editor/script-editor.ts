@@ -53,8 +53,10 @@ import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
+  actionsFocus,
   type AutomationFocus,
   createFocusResolver,
+  entryFieldFocus,
   type YamlPathSegment,
 } from "./automation-focus.js";
 import "./callable-params-editor.js";
@@ -325,7 +327,7 @@ export class ESPHomeScriptEditor extends LitElement {
         <esphome-automation-action-list
           no-header
           hide-add
-          .focusTarget=${focus && focus.node.length > 0 ? focus : null}
+          .focusTarget=${actionsFocus(focus)}
           .actions=${automation.actions}
           .catalog=${actions}
           .conditionCatalog=${conditions}
@@ -423,7 +425,7 @@ export class ESPHomeScriptEditor extends LitElement {
         .values=${automation.trigger_params}
         .board=${this.board}
         .yaml=${this.yaml}
-        .focusFieldPath=${focus && focus.node.length === 0 ? focus.field : undefined}
+        .focusFieldPath=${entryFieldFocus(focus)}
         ?disabled=${disabled}
         advanced-section
         ?force-advanced-control=${hasParameters}
