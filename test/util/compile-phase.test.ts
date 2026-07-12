@@ -36,7 +36,9 @@ describe("isCompilePhaseLine", () => {
     expect(
       isCompilePhaseLine("[7/1247] Generating ../../partition_table/partition-table.bin")
     ).toBe(true);
-    expect(isCompilePhaseLine("[ 17%] Building CXX object")).toBe(true);
+    expect(isCompilePhaseLine("[ 17%] Compiling .pio/build/uno/src/main.cpp.o")).toBe(
+      true
+    );
     // Real captured esp-idf ninja chunks (CR-split, trailing erase-to-eol).
     expect(
       isCompilePhaseLine("[1/1547] Generating project_elf_src_esp32s3.c\x1b[K")
@@ -48,14 +50,30 @@ describe("isCompilePhaseLine", () => {
     ).toBe(true);
   });
 
-  it("ignores the ninja reconfigure / globbed-dir counters (small denominator)", () => {
-    expect(isCompilePhaseLine("[1/2] Re-running CMake...")).toBe(false);
-    expect(isCompilePhaseLine("[0/4] Re-checking globbed directories...\x1b[K")).toBe(
-      false
+  it("starts on the first ninja counter, incl. the reconfigure re-check", () => {
+    // Download precedes ninja, so the first counter is the build start — no
+    // total floor. These used to be excluded; the clock now starts here.
+    expect(isCompilePhaseLine("[0/2] Re-checking globbed directories...\x1b[K")).toBe(
+      true
     );
+    expect(isCompilePhaseLine("[1/2] Re-running CMake...")).toBe(true);
     expect(isCompilePhaseLine("[3/97] Performing build step for 'bootloader'")).toBe(
-      false
+      true
     );
+  });
+
+  it("does not start on a stray download / flash / OTA percentage", () => {
+    for (const line of [
+      "Unpacking  [------------------------------------]    0%",
+      "Writing at 0x00010000... (45 %)",
+      "Writing at 0x000cf943 [=>  ]  84.8% 491520/579918 bytes...",
+      "Uploading: [====      ] 35% ...",
+      "RAM:   [====      ]  37.7% (used 30900 bytes from 81920 bytes)",
+      "Flash: [====      ]  41.8% (used 428199 bytes from 1023984 bytes)",
+      "Downloading toolchain (45%)",
+    ]) {
+      expect(isCompilePhaseLine(line)).toBe(false);
+    }
   });
 
   it("tolerates a leading ANSI colour reset", () => {

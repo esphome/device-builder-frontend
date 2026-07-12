@@ -137,24 +137,76 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   return live?.source_label || primed?.source_label || null;
 }
 
+// Show the offload nudge in the timer detail once a local compile passes this
+// mark. Higher than the inline suggestion's threshold — the popover is an
+// on-demand detail, so it only bothers naming offloading for a properly long
+// build.
+const TIMER_HINT_MS = 5 * 60 * 1000;
+
 // Compile-elapsed counter, pinned lower-left in place of the streaming dot.
 // Appears when the compile phase starts (download excluded), pulses while it
 // runs, then freezes at the final compile time (still shown through the flash
-// phase and the terminal state).
+// phase and the terminal state). Clicking opens a detail popover that
+// reconciles it with PlatformIO's whole-run "Took N seconds".
 export function renderCompileTimer(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   const elapsed = host._compileElapsedMs;
   if (elapsed === null) return nothing;
   return html`
-    <div
-      class="compile-timer ${host._isCompiling ? "compile-timer--live" : ""}"
-      role="status"
-      slot="toolbar-left"
-      title=${host._localize("command.compile_elapsed_title")}
-    >
-      <wa-icon library="mdi" name="timer-outline"></wa-icon>
-      <span>${formatElapsed(elapsed)}</span>
+    <div class="compile-timer-wrap" slot="toolbar-left">
+      <button
+        class="compile-timer ${host._isCompiling ? "compile-timer--live" : ""}"
+        aria-expanded=${host._showTimerDetail ? "true" : "false"}
+        title=${host._localize("command.compile_elapsed_title")}
+        @click=${host._toggleTimerDetail}
+      >
+        <wa-icon library="mdi" name="timer-outline"></wa-icon>
+        <span>${formatElapsed(elapsed)}</span>
+      </button>
+      ${host._showTimerDetail ? renderTimerDetail(host, elapsed) : nothing}
+    </div>
+  `;
+}
+
+// The compile-vs-total breakdown that explains why the timer reads less than
+// PlatformIO's "Took" (which includes the download + configure the timer omits).
+function renderTimerDetail(
+  host: ESPHomeCommandDialog,
+  compileMs: number
+): TemplateResult {
+  const total = host._totalRunElapsedMs;
+  const source =
+    (host._jobId ? host._jobs.get(host._jobId)?.source : undefined) ??
+    host._primedSource?.source ??
+    JobSource.LOCAL;
+  const hasOffloadSetUp =
+    host._remoteBuildsEnabled === true || (host._pairings?.size ?? 0) > 0;
+  const showHint =
+    source === JobSource.LOCAL && !hasOffloadSetUp && compileMs >= TIMER_HINT_MS;
+  return html`
+    <div class="compile-timer-detail" role="dialog">
+      <div class="compile-timer-row">
+        <span>${host._localize("command.compile_time_label")}</span>
+        <span>${formatElapsed(compileMs)}</span>
+      </div>
+      <div class="compile-timer-row">
+        <span>${host._localize("command.total_run_time_label")}</span>
+        <span>${total === null ? "—" : formatElapsed(total)}</span>
+      </div>
+      ${
+        showHint
+          ? html`<div class="compile-timer-hint">
+              ${host._localize("command.timer_offload_hint")}
+              <button
+                class="reset-suggestion-link"
+                @click=${host._tryOpenBuildOffloadSettings}
+              >
+                ${host._localize("command.offload_hint_action")}
+              </button>
+            </div>`
+          : nothing
+      }
     </div>
   `;
 }

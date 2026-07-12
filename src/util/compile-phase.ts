@@ -17,22 +17,23 @@ const WORD_MARKERS = new RegExp(
   `^${ANSI}(?:Compiling |Archiving |Linking |Indexing |Generating |Building in )`
 );
 
-// Arduino / CMake percent gauge: ``[ 17%]``.
+// Arduino per-file gauge: ``[ 17%] Compiling …`` — percent *inside* the
+// brackets. Distinct from the download ``Unpacking [----] 0%`` bar and the
+// memory report ``RAM: [====] 37.7%`` (percent *outside*), and from esptool
+// ``(45 %)`` / OTA ``Uploading … 35%`` — none of which mean "compiling", so a
+// stray percentage during the download never trips it.
 const PIO_PERCENT = new RegExp(`^${ANSI}\\[\\s*\\d{1,3}\\s*%\\s*\\]`);
 
 // Raw ninja per-target counter: ``[117/1247] Building C object …``. esp-idf's
-// native build prints only these — no ``Compiling`` word. The tiny ``[1/2]
-// Re-running CMake…`` reconfigure and the ~97-step bootloader sub-build are
-// configuration, not the app compile, so require a large denominator (mirrors
-// the backend's ``_NINJA_MIN_TOTAL``).
-const NINJA_COUNTER = new RegExp(`^${ANSI}\\[\\s*\\d+\\s*/\\s*(\\d+)\\s*\\]`);
-const NINJA_MIN_TOTAL = 100;
+// native build prints only these — no ``Compiling`` word. The download always
+// precedes ninja, so the first counter (even the tiny ``[1/2] Re-running
+// CMake`` re-check) marks the build start; no total floor here. (The floor
+// still applies to the *progress gauge* backend-side, a separate concern.)
+const NINJA_COUNTER = new RegExp(`^${ANSI}\\[\\s*\\d+\\s*/\\s*\\d+\\s*\\]`);
 
 /** True once a streamed build line shows compilation has begun. */
 export function isCompilePhaseLine(line: string): boolean {
-  if (WORD_MARKERS.test(line) || PIO_PERCENT.test(line)) return true;
-  const counter = NINJA_COUNTER.exec(line);
-  return counter !== null && Number(counter[1]) >= NINJA_MIN_TOTAL;
+  return WORD_MARKERS.test(line) || PIO_PERCENT.test(line) || NINJA_COUNTER.test(line);
 }
 
 // PlatformIO closes each environment with a summary banner —

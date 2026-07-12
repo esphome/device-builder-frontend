@@ -20,6 +20,9 @@ interface Harness {
   _api: { firmwareFollowJob: () => string };
   _compileStartedAt: number | null;
   _compileEndedAt: number | null;
+  _jobId: string;
+  _now: number;
+  readonly _totalRunElapsedMs: number | null;
   followJob: (job: FirmwareJob, displayName: string) => void;
 }
 
@@ -117,5 +120,44 @@ describe("command-dialog followJob restores the compile timer across reopen", ()
     el.followJob(job, "device");
     expect(el._compileStartedAt).toBeNull();
     expect(el._compileEndedAt).toBeNull();
+  });
+});
+
+describe("command-dialog total run time (for the timer detail popover)", () => {
+  it("spans a running job's start to now", () => {
+    const job = makeFirmwareJob({
+      job_id: "run1",
+      job_type: JobType.COMPILE,
+      started_at: "2026-01-01T00:00:00Z",
+      completed_at: null,
+    });
+    const el = mount([job]);
+    el._jobId = "run1";
+    el._now = Date.parse("2026-01-01T00:00:29Z");
+    expect(el._totalRunElapsedMs).toBe(29_000);
+  });
+
+  it("freezes a finished job at start-to-completion", () => {
+    const job = makeFirmwareJob({
+      job_id: "run2",
+      job_type: JobType.COMPILE,
+      started_at: "2026-01-01T00:00:00Z",
+      completed_at: "2026-01-01T00:00:29Z",
+    });
+    const el = mount([job]);
+    el._jobId = "run2";
+    el._now = Date.parse("2026-01-01T01:00:00Z");
+    expect(el._totalRunElapsedMs).toBe(29_000);
+  });
+
+  it("is null before the job starts running", () => {
+    const job = makeFirmwareJob({
+      job_id: "run3",
+      job_type: JobType.COMPILE,
+      started_at: null,
+    });
+    const el = mount([job]);
+    el._jobId = "run3";
+    expect(el._totalRunElapsedMs).toBeNull();
   });
 });

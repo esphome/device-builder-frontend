@@ -201,6 +201,9 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() _now = Date.now();
   private _tickHandle: ReturnType<typeof setInterval> | null = null;
 
+  // Whether the timer's detail popover (compile vs total run time) is open.
+  @state() _showTimerDetail = false;
+
   // True while "Build locally instead" override is mid-flight.
   @state() _switchingToLocal = false;
 
@@ -303,6 +306,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._primedSource = null;
     this._compileStartedAt = null;
     this._compileEndedAt = null;
+    this._showTimerDetail = false;
     this._failedDuringValidate = false;
     // Always start with secrets redacted on a fresh open — opt-in per session.
     this._showSecrets = false;
@@ -380,6 +384,20 @@ export class ESPHomeCommandDialog extends LitElement {
   get _isCompiling(): boolean {
     return this._compileStartedAt !== null && this._compileEndedAt === null;
   }
+
+  // Whole-job wall time (queue excluded): download + configure + compile + link,
+  // and for an install the flash too — the number PlatformIO prints as "Took".
+  // Freezes at completion. Null before the job starts running.
+  get _totalRunElapsedMs(): number | null {
+    const job = this._jobId ? this._jobs.get(this._jobId) : undefined;
+    const start = parseIsoMs(job?.started_at);
+    if (start === null) return null;
+    return (parseIsoMs(job?.completed_at) ?? this._now) - start;
+  }
+
+  _toggleTimerDetail = () => {
+    this._showTimerDetail = !this._showTimerDetail;
+  };
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
