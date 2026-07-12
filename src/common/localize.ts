@@ -200,11 +200,14 @@ function invalidateActiveLocale(): void {
   cachedActiveLocale = null;
 }
 
-// Browser-language and cross-tab-storage changes invalidate too; same-tab
-// writes go through write/clearStoredLocale below.
+// Browser-language and cross-tab locale changes invalidate too (a storage
+// event's null key is a full clear); same-tab writes go through
+// write/clearStoredLocale below.
 if (typeof window !== "undefined") {
   window.addEventListener("languagechange", invalidateActiveLocale);
-  window.addEventListener("storage", invalidateActiveLocale);
+  window.addEventListener("storage", (e) => {
+    if (e.key === LOCALE_STORAGE_KEY || e.key === null) invalidateActiveLocale();
+  });
 }
 
 /** The active locale: stored override, else browser detection. */
