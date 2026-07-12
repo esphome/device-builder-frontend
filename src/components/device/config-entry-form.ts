@@ -577,7 +577,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
           if (row) {
             this._advancedControlAnchor = {
               top: row.getBoundingClientRect().top,
-              at: Date.now(),
+              at: performance.now(),
             };
           }
           this._emitAdvancedToggle(sw.checked);
@@ -596,7 +596,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const anchor = this._advancedControlAnchor;
     if (!anchor || !changed.has("showAdvanced")) return;
     this._advancedControlAnchor = undefined;
-    if (Date.now() - anchor.at > 2000) return;
+    if (performance.now() - anchor.at > 2000) return;
     const row = this.shadowRoot?.querySelector<HTMLElement>(".advanced-toggle-row");
     if (!row) return;
     const scroller = nearestScrollContainer(row);

@@ -721,7 +721,7 @@ describe("config-entry-form advanced-section", () => {
     expect(scroller.scrollTop).toBe(0);
     // Expired anchor: consumed without scrolling.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (form as any)._advancedControlAnchor = { top: 500, at: Date.now() - 3000 };
+    (form as any)._advancedControlAnchor = { top: 500, at: performance.now() - 3000 };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (form as any)._restoreAdvancedControlAnchor(new Map([["showAdvanced", false]]));
     expect(scroller.scrollTop).toBe(0);
