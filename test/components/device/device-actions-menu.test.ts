@@ -157,6 +157,27 @@ describe("esphome-device-actions-menu", () => {
     expect(divider.previousElementSibling).toBe(items(el)[CLEAN]);
   });
 
+  it("activates Visit web UI on Space, leaving Enter to the anchor", async () => {
+    const el = await mount({ webUiUrl: "http://kitchen.local/" });
+    await openMenu(el);
+    const a = link(el)!;
+    let clicks = 0;
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      clicks++;
+    });
+    const press = (key: string) => {
+      const ev = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      a.dispatchEvent(ev);
+      return ev;
+    };
+    expect(press(" ").defaultPrevented).toBe(true);
+    expect(clicks).toBe(1);
+    // Enter synthesized too would double-activate a native anchor.
+    expect(press("Enter").defaultPrevented).toBe(false);
+    expect(clicks).toBe(1);
+  });
+
   it("closes the menu when the Visit web UI link is activated", async () => {
     const el = await mount({ webUiUrl: "http://kitchen.local/" });
     await openMenu(el);

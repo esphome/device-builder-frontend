@@ -139,7 +139,6 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                         onClick: this._close,
                         withLabel: true,
                         role: "menuitem",
-                        onKeydown: this._onItemKeydown,
                       })
                     : nothing
                 }
