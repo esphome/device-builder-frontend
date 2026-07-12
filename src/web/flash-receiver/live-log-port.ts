@@ -7,7 +7,7 @@
  * already authorized. Ported from the device-builder flasher reference.
  */
 
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+import { sleep } from "../../util/sleep.js";
 
 /** Same USB device by vendor/product id; both ids must be present. */
 function matchesDevice(a: SerialPortInfo, b: SerialPortInfo): boolean {
