@@ -40,9 +40,13 @@ describe("pathsForYamlLine", () => {
   });
 
   it("does not treat block-scalar content as fields", () => {
-    // ``id: looks_like_a_key`` inside the lambda body is literal text.
-    const got = pathsForYamlLine(YAML, 13)!;
-    expect(got.path).not.toContain("id");
+    // ``id: looks_like_a_key`` inside the lambda body is literal text;
+    // the AST attributes it to the enclosing ``lambda`` pair instead of
+    // letting the indent walker mint a phantom ``id`` field.
+    expect(pathsForYamlLine(YAML, 13)).toEqual({
+      path: ["sensor", "lambda"],
+      indexedPath: ["sensor", 0, "lambda"],
+    });
   });
 
   it("resolves a blank indented line to its ancestor chain", () => {
