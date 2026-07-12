@@ -58,6 +58,8 @@ describe("renderCard", () => {
     render(renderCard(makeHost(), entry, false, true, localize), container);
     const chip = container.querySelector(".component-category-chip--recommended");
     expect(chip?.textContent?.trim()).toBe("Recommended");
+    // Focusable so keyboard users can raise the tooltip (focus trigger).
+    expect(chip?.getAttribute("tabindex")).toBe("0");
     // Native title tooltips don't render inside the dialog's top layer,
     // so the explanation rides a wa-tooltip targeting the chip's id.
     const tooltip = container.querySelector("wa-tooltip");

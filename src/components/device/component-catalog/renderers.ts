@@ -135,6 +135,7 @@ export function renderCard(
               ? html`<span
                     id=${`recommended-chip-${component.id}`}
                     class="component-category-chip component-category-chip--recommended"
+                    tabindex="0"
                     >${categoryChipLabel("featured")}</span
                   >
                   <wa-tooltip for=${`recommended-chip-${component.id}`}
