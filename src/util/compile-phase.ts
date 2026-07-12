@@ -1,14 +1,20 @@
+import { stripAnsi } from "./ansi-escapes.js";
+
 // Compile-phase detection over streamed build output. The clock the dashboard
 // shows should count compilation only — not the Tool/Library Manager download
 // that precedes it — so these match the first line that proves the toolchain is
 // building and the line that closes it.
-
+//
+// Keep the marker set in sync with the backend's authoritative copy in
+// esphome_device_builder/controllers/firmware/constants.py — the backend stamps
+// compile_started_at/compile_ended_at from the same grammar; this mirror only
+// drives the live (per-second) UX before those fields land over the stream.
+//
 // PlatformIO colourises and repaints its output, so escapes appear not only as
 // a leading colour reset but *inside* tokens — the summary banner is literally
 // ``[<green><bold>SUCCESS<reset>] Took`` — which would defeat an anchored match.
-// Strip them first, then match against the clean text.
-const ANSI_ESCAPE = /\x1b\[[0-9;?]*[A-Za-z]/g;
-const stripAnsi = (line: string): string => line.replace(ANSI_ESCAPE, "");
+// Strip them first (shared helper, handles the literal ``\033`` form too), then
+// match against the clean text.
 
 // Word-form build steps. ``Compiling <path>`` is emitted by PlatformIO for
 // esp32-arduino / esp8266 / libretiny and esp-idf-via-pio; ``Reading CMake

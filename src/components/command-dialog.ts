@@ -95,6 +95,10 @@ export type CommandType =
 
 export type CommandState = "running" | "success" | "error";
 
+// Don't show the run timer until it would read at least "1s" — below that it
+// degrades to the streaming dot rather than a bare "0s".
+const MIN_RUN_TIMER_MS = 1000;
+
 @customElement("esphome-command-dialog")
 export class ESPHomeCommandDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -435,7 +439,7 @@ export class ESPHomeCommandDialog extends LitElement {
       return false;
     }
     const total = this._totalRunElapsedMs;
-    return total !== null && total >= 1000;
+    return total !== null && total >= MIN_RUN_TIMER_MS;
   }
 
   _toggleTimerDetail = () => {

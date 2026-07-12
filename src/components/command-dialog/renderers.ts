@@ -173,10 +173,7 @@ export function renderCompileTimer(
 // offload nudge attached to it (a long local compile is what offloading fixes).
 function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): TemplateResult {
   const compile = host._compileDetailMs;
-  const source =
-    (host._jobId ? host._jobs.get(host._jobId)?.source : undefined) ??
-    host._primedSource?.source ??
-    JobSource.LOCAL;
+  const source = resolveJobSource(host);
   const hasOffloadSetUp = (host._pairings?.size ?? 0) > 0;
   const showHint =
     // While the compile is live the inline suggestion already carries this
@@ -227,16 +224,22 @@ export function renderOffloadHintSlot(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   if (!host._isCompiling) return nothing;
-  const source =
-    (host._jobId ? host._jobs.get(host._jobId)?.source : undefined) ??
-    host._primedSource?.source ??
-    JobSource.LOCAL;
   const visible = shouldShowOffloadHint({
     elapsedMs: host._compileElapsedMs ?? 0,
-    source,
+    source: resolveJobSource(host),
     pairings: host._pairings,
   });
   return visible ? renderOffloadHint(host) : nothing;
+}
+
+// The job's build source (LOCAL / REMOTE / REMOTE_PENDING): the live jobs-context
+// entry wins, then the locally-primed snapshot for the gap before it lands.
+function resolveJobSource(host: ESPHomeCommandDialog): JobSource {
+  return (
+    (host._jobId ? host._jobs.get(host._jobId)?.source : undefined) ??
+    host._primedSource?.source ??
+    JobSource.LOCAL
+  );
 }
 
 // --show-secrets is an `esphome config` flag — hide the toggle on every other
