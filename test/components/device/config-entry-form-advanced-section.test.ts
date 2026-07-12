@@ -9,7 +9,7 @@
  * default, a real unlocked switch). The control emits ``advanced-toggle``.
  */
 import { render } from "lit";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
@@ -677,6 +677,7 @@ describe("config-entry-form advanced-section", () => {
       clientHeight: { value: 300 },
     });
     document.body.appendChild(scroller);
+    onTestFinished(() => scroller.remove());
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render((form as any)._renderAdvancedControl(false, 2, false), scroller);
     const row = scroller.querySelector<HTMLElement>(".advanced-toggle-row")!;
