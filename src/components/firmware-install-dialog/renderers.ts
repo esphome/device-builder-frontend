@@ -236,6 +236,9 @@ export function renderStatusExtra(
 }
 
 function downloadInstallLogs(host: ESPHomeFirmwareInstallDialog): void {
+  // Land the pending rAF batch so a mid-stream download can't drop the
+  // last frame of lines (mirrors command-dialog's _downloadOutput).
+  host._flushLogLines();
   const stem = configurationStem(host._device?.configuration, "install");
   downloadAnsiText(host._logLines, `${stem}-install.txt`);
 }
