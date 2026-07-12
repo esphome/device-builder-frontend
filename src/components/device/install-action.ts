@@ -20,8 +20,11 @@ export interface InstallActionProps {
  * install-method picker (Web Serial / OTA / manual) so a re-flash or
  * replacement chip still has a path. Otherwise a plain Install opens the
  * picker — highlighted when there are pending changes, muted but still usable
- * when the config already matches the deployed firmware. Rendered into the
- * device-editor shadow root, so its `.install-fab` styles apply.
+ * when the config already matches the deployed firmware. While a job runs
+ * (`busy`) the main buttons stay clickable — the page routes the click to the
+ * running job's progress dialog — and only the caret disables, since picking
+ * a method for a *new* job is exactly what can't start mid-job. Rendered into
+ * the device-editor shadow root, so its `.install-fab` styles apply.
  */
 export function renderInstallAction(p: InstallActionProps): TemplateResult {
   if (p.showUpdate) {
@@ -29,14 +32,17 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
       <button
         type="button"
         class="install-fab install-split__main"
-        ?disabled=${p.busy}
         @click=${p.onUpdate}
-        title=${updateButtonTitle(
-          p.localize,
-          p.installedVersion,
-          p.availableVersion,
-          "dashboard.update"
-        )}
+        title=${
+          p.busy
+            ? p.localize("dashboard.table_action_view_progress")
+            : updateButtonTitle(
+                p.localize,
+                p.installedVersion,
+                p.availableVersion,
+                "dashboard.update"
+              )
+        }
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
         ${p.localize("dashboard.update")}
@@ -56,9 +62,10 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
   return html`<button
     type="button"
     class="install-fab ${p.showModified ? "" : "install-fab--muted"}"
-    ?disabled=${p.busy}
     @click=${p.onInstall}
-    title=${p.localize("dashboard.install")}
+    title=${p.localize(
+      p.busy ? "dashboard.table_action_view_progress" : "dashboard.install"
+    )}
   >
     <wa-icon library="mdi" name="upload"></wa-icon>
     ${p.localize("dashboard.install")}

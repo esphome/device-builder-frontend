@@ -339,10 +339,22 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             showInstall
               ? html`<button
                   class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
-                  aria-label=${localize("dashboard.table_action_install")}
-                  title=${localize("dashboard.table_action_install")}
-                  ?disabled=${row.busy}
-                  @click=${(e: Event) => dispatchRowEvent(e, "install-device", device)}
+                  aria-label=${localize(
+                    row.busy
+                      ? "dashboard.table_action_view_progress"
+                      : "dashboard.table_action_install"
+                  )}
+                  title=${localize(
+                    row.busy
+                      ? "dashboard.table_action_view_progress"
+                      : "dashboard.table_action_install"
+                  )}
+                  @click=${(e: Event) =>
+                    dispatchRowEvent(
+                      e,
+                      row.busy ? "show-progress" : "install-device",
+                      device
+                    )}
                 >
                   <wa-icon library="mdi" name="upload"></wa-icon>
                 </button>`
@@ -352,15 +364,27 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             showUpdate
               ? html`<button
                   class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
-                  aria-label=${localize("dashboard.table_action_update")}
-                  title=${updateButtonTitle(
-                    localize,
-                    device.runtime_state.deployed_version,
-                    device.current_version,
-                    "dashboard.table_action_update"
+                  aria-label=${localize(
+                    row.busy
+                      ? "dashboard.table_action_view_progress"
+                      : "dashboard.table_action_update"
                   )}
-                  ?disabled=${row.busy}
-                  @click=${(e: Event) => dispatchRowEvent(e, "update-device", device)}
+                  title=${
+                    row.busy
+                      ? localize("dashboard.table_action_view_progress")
+                      : updateButtonTitle(
+                          localize,
+                          device.runtime_state.deployed_version,
+                          device.current_version,
+                          "dashboard.table_action_update"
+                        )
+                  }
+                  @click=${(e: Event) =>
+                    dispatchRowEvent(
+                      e,
+                      row.busy ? "show-progress" : "update-device",
+                      device
+                    )}
                 >
                   <wa-icon library="mdi" name="upload"></wa-icon>
                 </button>`

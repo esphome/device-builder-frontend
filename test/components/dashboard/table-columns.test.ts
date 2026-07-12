@@ -94,6 +94,50 @@ describe("device table actions", () => {
   });
 });
 
+function clickInstallAction(container: HTMLElement): string[] {
+  const btn = container.querySelector<HTMLButtonElement>(".cell-action-btn--install");
+  expect(btn).not.toBeNull();
+  expect(btn!.disabled).toBe(false);
+  const fired: string[] = [];
+  for (const name of ["show-progress", "install-device", "update-device"]) {
+    container.addEventListener(name, () => fired.push(name));
+  }
+  btn!.click();
+  return fired;
+}
+
+describe("device table busy install/update actions", () => {
+  it("busy install button stays enabled and dispatches show-progress", () => {
+    const container = renderInto(renderActionsCell({ busy: true, showModified: true }));
+    expect(clickInstallAction(container)).toEqual(["show-progress"]);
+  });
+
+  it("busy update button stays enabled and dispatches show-progress", () => {
+    const container = renderInto(renderActionsCell({ busy: true, showUpdate: true }));
+    expect(clickInstallAction(container)).toEqual(["show-progress"]);
+  });
+
+  it("idle install button dispatches install-device", () => {
+    const container = renderInto(renderActionsCell({ busy: false, showModified: true }));
+    expect(clickInstallAction(container)).toEqual(["install-device"]);
+  });
+
+  it("idle update button dispatches update-device", () => {
+    const container = renderInto(
+      renderActionsCell({
+        busy: false,
+        showUpdate: true,
+        _device: {
+          web_port: null,
+          current_version: "2026.6.0",
+          runtime_state: { deployed_version: "2026.5.0" },
+        } as unknown as DeviceRow["_device"],
+      })
+    );
+    expect(clickInstallAction(container)).toEqual(["update-device"]);
+  });
+});
+
 function renderNameCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResult {
   const col = columns.find((c) => "accessorKey" in c && c.accessorKey === "name");
   if (!col?.cell || typeof col.cell !== "function") {

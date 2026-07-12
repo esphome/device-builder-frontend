@@ -269,15 +269,20 @@ export class ESPHomeDeviceCard extends LitElement {
     if (this.showUpdate) {
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
-        ?disabled=${this.busy}
-        @click=${() => this._emit("update-device")}
-        aria-label=${this._localize("dashboard.update")}
-        title=${updateButtonTitle(
-          this._localize,
-          this.installedVersion,
-          this.availableVersion,
-          "dashboard.update"
+        @click=${() => this._emit(this.busy ? "show-progress" : "update-device")}
+        aria-label=${this._localize(
+          this.busy ? "dashboard.table_action_view_progress" : "dashboard.update"
         )}
+        title=${
+          this.busy
+            ? this._localize("dashboard.table_action_view_progress")
+            : updateButtonTitle(
+                this._localize,
+                this.installedVersion,
+                this.availableVersion,
+                "dashboard.update"
+              )
+        }
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
       </button>`;
@@ -285,10 +290,13 @@ export class ESPHomeDeviceCard extends LitElement {
     if (this.showModified) {
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
-        ?disabled=${this.busy}
-        @click=${() => this._emit("install-device")}
-        aria-label=${this._localize("dashboard.install")}
-        title=${this._localize("dashboard.install")}
+        @click=${() => this._emit(this.busy ? "show-progress" : "install-device")}
+        aria-label=${this._localize(
+          this.busy ? "dashboard.table_action_view_progress" : "dashboard.install"
+        )}
+        title=${this._localize(
+          this.busy ? "dashboard.table_action_view_progress" : "dashboard.install"
+        )}
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
       </button>`;
