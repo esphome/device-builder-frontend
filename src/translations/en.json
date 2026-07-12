@@ -407,6 +407,7 @@
     "offload_hint": "Compiling is taking a while. You can send builds to a faster machine on your network to speed this up. {action}.",
     "offload_hint_action": "Set up a build server",
     "run_elapsed_title": "Total build time. Click for the compile-only breakdown",
+    "timer_detail_title": "Build time breakdown",
     "compile_time_label": "Compile time",
     "total_run_time_label": "Total run time",
     "timer_offload_hint": "This compile is taking a while. Send builds to a faster machine on your network to speed it up.",

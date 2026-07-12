@@ -158,6 +158,8 @@ export function renderCompileTimer(
       <button
         class="compile-timer ${host._isRunFrozen ? "" : "compile-timer--live"}"
         aria-expanded=${host._showTimerDetail ? "true" : "false"}
+        aria-haspopup="dialog"
+        aria-label="${formatElapsed(total)}. ${host._localize("command.run_elapsed_title")}"
         title=${host._localize("command.run_elapsed_title")}
         @click=${host._toggleTimerDetail}
       >
@@ -184,7 +186,11 @@ function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): Templat
     compile !== null &&
     compile >= TIMER_HINT_MS;
   return html`
-    <div class="compile-timer-detail" role="dialog">
+    <div
+      class="compile-timer-detail"
+      role="dialog"
+      aria-label=${host._localize("command.timer_detail_title")}
+    >
       ${
         // An old build from before compile timing existed doesn't know its
         // compile time — show only the total rather than a bogus "0s".

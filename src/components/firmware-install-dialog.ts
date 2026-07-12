@@ -365,9 +365,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._tickHandle = null;
   }
 
-  // Close the dialog and open Settings → Send builds. The compile keeps running
-  // in the background queue.
+  // Close the dialog and open Settings → Send builds. The install flow ends
+  // (the flash needs this dialog), but the compile itself is left running in
+  // the background queue — clearing _jobId first keeps _detachStream from
+  // cancelling it, so the finished artifacts warm the next install.
   _tryOpenBuildOffloadSettings = () => {
+    this._jobId = "";
     this._close();
     this.dispatchEvent(
       new CustomEvent("open-settings", {
