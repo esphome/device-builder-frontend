@@ -5,6 +5,7 @@ import {
 } from "../../api/types/firmware-jobs.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
+import { isCompilePhaseLine } from "../../util/compile-phase.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
@@ -537,6 +538,9 @@ export function compileAndWait(
           if (host._step === "queued") {
             host._step = "compiling";
             host._statusMessage = host._localize("firmware.status_compiling");
+          }
+          if (host._compileStartedAt === null && isCompilePhaseLine(line)) {
+            host._compileStartedAt = Date.now();
           }
           host._logLines = [...host._logLines, line];
           if (isValidationFailureLine(line)) host._failedDuringValidate = true;

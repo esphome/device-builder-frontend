@@ -13,7 +13,6 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
-import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -21,7 +20,6 @@ import {
   apiContext,
   buildOffloadPairingsContext,
   darkModeContext,
-  firmwareJobsContext,
   localizeContext,
   offloaderRemoteBuildsEnabledContext,
 } from "../context/index.js";
@@ -90,12 +88,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode =
     initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
-
-  // Live job snapshot — read the followed compile's progress to detect when the
-  // compile phase begins (download/prep never latches progress).
-  @consume({ context: firmwareJobsContext, subscribe: true })
-  @state()
-  _jobs: Map<string, FirmwareJob> = new Map();
 
   // Suppress the "set up a build server" hint once offloading is in place.
   @consume({ context: buildOffloadPairingsContext, subscribe: true })
@@ -307,13 +299,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     }
     if (changedProperties.has("_logsExpanded")) {
       this.toggleAttribute("expanded", this._logsExpanded);
-    }
-    // Latch the compile-phase start on the followed job's first progress
-    // report — the download/prep phase never latches, so the elapsed readout
-    // counts compilation only.
-    if (this._compileStartedAt === null && this._jobId) {
-      const progress = this._jobs.get(this._jobId)?.progress;
-      if (progress != null) this._compileStartedAt = Date.now();
     }
   }
 

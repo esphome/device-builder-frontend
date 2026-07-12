@@ -34,6 +34,7 @@ import {
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { isCompilePhaseLine } from "../util/compile-phase.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
@@ -223,13 +224,6 @@ export class ESPHomeCommandDialog extends LitElement {
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
-    }
-    // Latch the compile-phase start the first time the followed job reports
-    // progress. The download/prep phase never latches progress, so the timer
-    // it drives counts compilation only.
-    if (this._compileStartedAt === null && this._jobId) {
-      const progress = this._jobs.get(this._jobId)?.progress;
-      if (progress != null) this._compileStartedAt = Date.now();
     }
     // When a job ends, the success/error banner takes ~56px of flex space
     // below the log; the container shrinks, scrollTop is preserved, and
@@ -460,6 +454,11 @@ export class ESPHomeCommandDialog extends LitElement {
 
   // Buffer a streamed line; flushed on the next animation frame.
   _enqueueLine(line: string): void {
+    // Latch the compile-phase start on the first build line — download/prep
+    // lines never match, so the timer it drives counts compilation only.
+    if (this._compileStartedAt === null && isCompilePhaseLine(line)) {
+      this._compileStartedAt = Date.now();
+    }
     this._pendingLines.push(line);
     if (this._flushScheduled) return;
     this._flushScheduled = requestAnimationFrame(() => {
