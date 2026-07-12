@@ -2,8 +2,9 @@
  * @vitest-environment happy-dom
  *
  * The editor bottom-bar device-actions menu: renders Logs / Validate / Clean
- * build, emits the matching events, and gates Validate (unsaved edits) and
- * Clean build (busy) with disabled + out-of-tab-order semantics.
+ * build, emits the matching events, gates Validate (unsaved edits) and
+ * Clean build (busy) with disabled + out-of-tab-order semantics, and shows
+ * Visit web UI only when the page passed a web-UI URL.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,12 +18,13 @@ afterEach(() => {
 });
 
 async function mount(
-  opts: { busy?: boolean; validateDisabled?: boolean } = {}
+  opts: { busy?: boolean; validateDisabled?: boolean; webUiUrl?: string } = {}
 ): Promise<ESPHomeDeviceActionsMenu> {
   const el = new ESPHomeDeviceActionsMenu();
   (el as unknown as { _localize: typeof identityLocalize })._localize = identityLocalize;
   el.busy = opts.busy ?? false;
   el.validateDisabled = opts.validateDisabled ?? false;
+  el.webUiUrl = opts.webUiUrl ?? "";
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -32,7 +34,12 @@ function items(el: ESPHomeDeviceActionsMenu): HTMLElement[] {
   return Array.from(el.shadowRoot!.querySelectorAll<HTMLElement>(".menu-item"));
 }
 
-// Paint order: Logs, Validate, Clean build.
+function link(el: ESPHomeDeviceActionsMenu): HTMLAnchorElement | null {
+  return el.shadowRoot!.querySelector<HTMLAnchorElement>(".menu-item--link");
+}
+
+// Paint order: Logs, Validate, Clean build. A webUiUrl mount inserts Visit
+// web UI after Logs; those tests select by class, not index.
 const LOGS = 0;
 const VALIDATE = 1;
 const CLEAN = 2;
@@ -116,6 +123,32 @@ describe("esphome-device-actions-menu", () => {
   it("closes after an item is chosen", async () => {
     const el = await mount();
     (await openMenu(el))[LOGS].click();
+    await el.updateComplete;
+    expect(items(el)).toHaveLength(0);
+  });
+
+  it("omits Visit web UI without a URL", async () => {
+    const el = await mount();
+    await openMenu(el);
+    expect(link(el)).toBeNull();
+  });
+
+  it("renders Visit web UI as a role'd menu anchor when a URL is set", async () => {
+    const el = await mount({ webUiUrl: "http://kitchen.local/" });
+    await openMenu(el);
+    const a = link(el)!;
+    expect(a).not.toBeNull();
+    expect(a.getAttribute("href")).toBe("http://kitchen.local/");
+    expect(a.getAttribute("role")).toBe("menuitem");
+    expect(a.textContent).toContain("dashboard.action_visit_web_ui");
+  });
+
+  it("closes the menu when the Visit web UI link is activated", async () => {
+    const el = await mount({ webUiUrl: "http://kitchen.local/" });
+    await openMenu(el);
+    // Block the real navigation; the menu's own click handling still runs.
+    el.shadowRoot!.addEventListener("click", (e) => e.preventDefault(), true);
+    link(el)!.click();
     await el.updateComplete;
     expect(items(el)).toHaveLength(0);
   });

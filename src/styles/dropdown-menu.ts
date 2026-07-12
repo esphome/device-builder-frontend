@@ -26,8 +26,10 @@ import { css } from "lit";
  * array BEFORE their local ``css`` block so local rules of equal
  * specificity (min-width, z-index tweaks, an alternative
  * ``@keyframes menu-in``) override the shared ones in cascade
- * order. Item modifiers (--danger, --disabled, --active, icon
- * colouring) stay in the consumer's local styles.
+ * order. State-flavour item modifiers (--danger, --disabled,
+ * --active, icon colouring) stay in the consumer's local styles;
+ * structural resets tied to shared render helpers (--link) live
+ * here.
  */
 export const dropdownMenuStyles = css`
   .backdrop {

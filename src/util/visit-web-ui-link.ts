@@ -8,6 +8,13 @@ export interface VisitWebUiLinkOptions {
   /** Render the label as visible text (menu item) instead of an icon-only
    *  link carrying it on aria-label/title. */
   withLabel?: boolean;
+  /** Set when the anchor sits inside a ``role="menu"`` container, whose
+   *  children must be menuitem-family for AT menu navigation. */
+  role?: "menuitem";
+  /** Keyboard activation hook — pass the host menu's row handler so Space
+   *  activates the anchor like its sibling rows (native anchors only
+   *  respond to Enter). */
+  onKeydown?: (e: KeyboardEvent) => void;
 }
 
 /**
@@ -31,9 +38,11 @@ export function renderVisitWebUiLink(
     href=${url}
     target="_blank"
     rel="noopener noreferrer"
+    role=${options.role ?? nothing}
     aria-label=${a11yLabel}
     title=${a11yLabel}
     @click=${options.onClick}
+    @keydown=${options.onKeydown}
   >
     <wa-icon library="mdi" name="open-in-new"></wa-icon>${
       options.withLabel ? html` ${label}` : nothing
