@@ -381,6 +381,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    * is to teach the user that the navigator is where you manage
    * these things, rather than handing them an add-button right here.
    */
+  /** Key → location, memoized: a fresh object per render would defeat
+   *  the editors' focus-resolver memoization on every parent render. */
+  private _locationForKey = memoizeOne(locationFromSectionKey);
+
   /**
    * Route an automation / script section key into the right
    * structured editor; everything else lands in the regular
@@ -403,10 +407,6 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    * key into a typed location here so the editors don't have to
    * know about navigator routing.
    */
-  /** Key → location, memoized: a fresh object per render would defeat
-   *  the editors' focus-resolver memoization on every parent render. */
-  private _locationForKey = memoizeOne(locationFromSectionKey);
-
   private _renderSelectedSection() {
     const key = this.selectedSection!;
     const location = key.startsWith("automation:") ? this._locationForKey(key) : null;

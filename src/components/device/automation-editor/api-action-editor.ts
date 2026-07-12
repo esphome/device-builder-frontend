@@ -49,7 +49,7 @@ import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   actionsFocus,
   createFocusResolver,
-  entryFieldFocus,
+  paramFocus,
   type YamlPathSegment,
 } from "./automation-focus.js";
 import "./callable-params-editor.js";
@@ -208,12 +208,11 @@ export class ESPHomeApiActionEditor extends LitElement {
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
     const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
-    const entryField = entryFieldFocus(focus);
     return html`
       ${this._renderHeader()} ${this._renderActionNameField(disabled)}
       <esphome-callable-params-editor
         .value=${(automation.trigger_params.variables ?? {}) as Record<string, string>}
-        .focusParam=${entryField?.[0] === "variables" ? (entryField[1] ?? "") : null}
+        .focusParam=${paramFocus(focus, "variables")}
         ?disabled=${disabled}
         .fieldLabel=${this._localize("device.api_action_variables")}
         .description=${this._localize("device.api_action_variables_description")}

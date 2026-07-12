@@ -192,20 +192,22 @@ export class ESPHomeCallableParamsEditor extends LitElement {
 
   private _maybeScrollToParam(): void {
     if (this.focusParam === null || this._focusScrolled) return;
-    const idx = this._params.findIndex((p) => p.name === this.focusParam);
-    if (idx >= 0) {
-      const row =
-        this.shadowRoot?.querySelectorAll<HTMLElement>(".script-param-row")[idx];
-      // The wire sync above may have just filled ``_params``; the rows
-      // render next pass — hold the shot rather than mis-flash.
-      if (!row) return;
+    if (this.focusParam === "") {
+      // Block-level target — checked first so it can't alias an
+      // in-progress unnamed draft row.
       this._focusScrolled = true;
-      scrollFlashRow(row);
+      const block = this.shadowRoot?.querySelector<HTMLElement>(".field");
+      if (block) scrollFlashRow(block);
       return;
     }
+    const idx = this._params.findIndex((p) => p.name === this.focusParam);
+    if (idx < 0) return;
+    const row = this.shadowRoot?.querySelectorAll<HTMLElement>(".script-param-row")[idx];
+    // The wire sync above may have just filled ``_params``; the rows
+    // render next pass — hold the shot rather than mis-flash.
+    if (!row) return;
     this._focusScrolled = true;
-    const block = this.shadowRoot?.querySelector<HTMLElement>(".field");
-    if (block) scrollFlashRow(block);
+    scrollFlashRow(row);
   }
 
   private _readFromWire(): ParameterDecl[] {

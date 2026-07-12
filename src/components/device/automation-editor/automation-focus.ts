@@ -107,6 +107,14 @@ export function entryFieldFocus(focus: AutomationFocus | null): string[] | undef
   return focus && focus.node.length === 0 ? focus.field : undefined;
 }
 
+/** Entry-field focus routed to a callable-params block (``parameters``
+ *  / ``variables``): the targeted name, ``""`` for the block itself,
+ *  ``null`` when the focus points elsewhere. */
+export function paramFocus(focus: AutomationFocus | null, key: string): string | null {
+  const field = entryFieldFocus(focus);
+  return field?.[0] === key ? (field[1] ?? "") : null;
+}
+
 /** Value key for dedupe — the parent re-slices a fresh object per render. */
 export function focusKey(focus: AutomationFocus | null | undefined): string | undefined {
   return focus ? JSON.stringify([focus.node, focus.field]) : undefined;

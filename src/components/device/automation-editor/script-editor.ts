@@ -58,6 +58,7 @@ import {
   createFocusResolver,
   entryFieldFocus,
   focusKey,
+  paramFocus,
   type YamlPathSegment,
 } from "./automation-focus.js";
 import "./callable-params-editor.js";
@@ -129,13 +130,12 @@ export class ESPHomeScriptEditor extends LitElement {
 
   /** The Parameters block hides behind the advanced toggle; reveal it
    *  when the cursor targets a parameter so the row can render. */
-  protected willUpdate(changed: PropertyValues): void {
-    if (!changed.has("focusYamlPath") && !changed.has("value")) return;
+  protected willUpdate(): void {
     const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
     const key = focusKey(focus);
     if (key === this._paramsRevealKey) return;
     this._paramsRevealKey = key;
-    if (entryFieldFocus(focus)?.[0] === "parameters") this._showAdvanced = true;
+    if (paramFocus(focus, "parameters") !== null) this._showAdvanced = true;
   }
 
   @state() private _available: AvailableAutomations | null = null;
@@ -445,7 +445,9 @@ export class ESPHomeScriptEditor extends LitElement {
         .values=${automation.trigger_params}
         .board=${this.board}
         .yaml=${this.yaml}
-        .focusFieldPath=${entryFieldFocus(focus)}
+        .focusFieldPath=${
+          paramFocus(focus, "parameters") === null ? entryFieldFocus(focus) : undefined
+        }
         ?disabled=${disabled}
         advanced-section
         ?force-advanced-control=${hasParameters}
@@ -516,10 +518,9 @@ export class ESPHomeScriptEditor extends LitElement {
     focus: AutomationFocus | null
   ) {
     const value = (automation.trigger_params.parameters ?? {}) as Record<string, string>;
-    const entryField = entryFieldFocus(focus);
     return html`<esphome-callable-params-editor
       .value=${value}
-      .focusParam=${entryField?.[0] === "parameters" ? (entryField[1] ?? "") : null}
+      .focusParam=${paramFocus(focus, "parameters")}
       ?disabled=${disabled}
       .fieldLabel=${this._localize("device.automation_script_parameters")}
       .description=${this._localize("device.script_parameters_description")}

@@ -34,8 +34,10 @@ describe("callable-params-editor focus", () => {
     const rows = el.shadowRoot!.querySelectorAll(".script-param-row");
     expect(scrolled.mock.instances[0]).toBe(rows[1]);
 
-    // Same target re-rendered: no re-scroll.
-    el.focusParam = "loud";
+    // A real re-render with the target unchanged must not re-scroll —
+    // the one-shot guard, not Lit's string dedupe, is what holds it.
+    el.value = { ...el.value };
+    await el.updateComplete;
     await el.updateComplete;
     expect(scrolled).toHaveBeenCalledTimes(1);
   });
