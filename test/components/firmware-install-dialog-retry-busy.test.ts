@@ -39,6 +39,7 @@ function makeDialog(busy: boolean) {
     _device: { configuration: "device.yaml" } as ConfiguredDevice,
     _installer: "web-serial",
     _step: "error",
+    _logLines: ["old failure line"],
     _localize: identityLocalize,
     _activeJobs: busy ? new Map([["device.yaml", runningJob]]) : new Map(),
     _api: { firmwareFollowJob: followJob },
@@ -58,6 +59,8 @@ describe("install-dialog Retry while a foreign build runs", () => {
     expect(installWebSerial).toHaveBeenCalledTimes(1);
     // Never claims the foreign job: dismissal must not cancel it.
     expect(dialog._jobId).toBe("");
+    // The failed run's log was dropped, not concatenated with the wait's.
+    expect(dialog._logLines).not.toContain("old failure line");
   });
 
   it("routes a web-flash retry through the USB flow after the wait", async () => {
