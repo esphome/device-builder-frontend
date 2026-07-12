@@ -13,6 +13,7 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -20,6 +21,7 @@ import {
   apiContext,
   buildOffloadPairingsContext,
   darkModeContext,
+  firmwareJobsContext,
   localizeContext,
   offloaderRemoteBuildsEnabledContext,
 } from "../context/index.js";
@@ -88,6 +90,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode =
     initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
+
+  // Live job snapshot — the compile job's progress gauge is the second
+  // compile-start signal beside the log scanner (covers raw ninja builds).
+  @consume({ context: firmwareJobsContext, subscribe: true })
+  @state()
+  _jobs: Map<string, FirmwareJob> = new Map();
 
   // Suppress the "set up a build server" hint once offloading is in place.
   @consume({ context: buildOffloadPairingsContext, subscribe: true })
@@ -303,6 +311,15 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     }
     if (changedProperties.has("_logsExpanded")) {
       this.toggleAttribute("expanded", this._logsExpanded);
+    }
+    // Second compile-start signal beside the log scanner: the backend progress
+    // gauge, which latches for raw ninja builds that print no "Compiling" word.
+    if (
+      this._compileStartedAt === null &&
+      this._jobId &&
+      this._jobs.get(this._jobId)?.progress != null
+    ) {
+      this._compileStartedAt = Date.now();
     }
     // Backstop the freeze: once the step leaves compiling (flash / download /
     // done / error) the compile is over, even if no summary banner was seen.

@@ -35,6 +35,11 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { isCompileEndLine, isCompilePhaseLine } from "../util/compile-phase.js";
+import {
+  getCompileTiming,
+  markCompileEnded,
+  markCompileStarted,
+} from "../util/compile-timing.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
@@ -229,6 +234,12 @@ export class ESPHomeCommandDialog extends LitElement {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
     }
+    // Second compile-start signal beside the log scanner: the backend's
+    // progress gauge. It latches for raw ninja ([N/M]) builds but not for the
+    // "Compiling <path>" pio output, so the two together cover every toolchain.
+    if (this._compileStartedAt === null && this._jobId) {
+      if (this._jobs.get(this._jobId)?.progress != null) this._markCompileStarted();
+    }
     // When a job ends, the success/error banner takes ~56px of flex space
     // below the log; the container shrinks, scrollTop is preserved, and
     // the bottom slides out of view — which trips ansi-log's _isUserScrolled
@@ -247,8 +258,24 @@ export class ESPHomeCommandDialog extends LitElement {
       this._compileEndedAt === null &&
       (this._state === "success" || this._state === "error")
     ) {
-      this._compileEndedAt = Date.now();
+      this._markCompileEnded();
     }
+  }
+
+  // Latch the compile start once, mirroring it to the cross-open timing store.
+  private _markCompileStarted(): void {
+    if (this._compileStartedAt !== null) return;
+    const now = Date.now();
+    this._compileStartedAt = now;
+    markCompileStarted(this._jobId, now);
+  }
+
+  // Freeze the compile end once, mirroring it to the cross-open timing store.
+  private _markCompileEnded(): void {
+    if (this._compileStartedAt === null || this._compileEndedAt !== null) return;
+    const now = Date.now();
+    this._compileEndedAt = now;
+    markCompileEnded(this._jobId, now);
   }
 
   /** Point the dialog at *device* and open — the shared host entry point. */
@@ -318,10 +345,12 @@ export class ESPHomeCommandDialog extends LitElement {
       source_label: job.source_label,
       source_esphome_version: job.source_esphome_version,
     };
-    // Reattaching mid-build can't recover the true compile start; let the line
-    // scanner re-derive it from the stream it's about to replay.
-    this._compileStartedAt = null;
-    this._compileEndedAt = null;
+    // Reattaching to a still-running (or finished) build: restore the true
+    // compile clock recorded when it first started, so the replayed buffer
+    // doesn't restart the timer from now.
+    const timing = getCompileTiming(job.job_id);
+    this._compileStartedAt = timing?.startedAt ?? null;
+    this._compileEndedAt = timing?.endedAt ?? null;
     // Cancel any prior follow before starting a new one — without this,
     // every reopen layered fresh streams while previous ones still pumped
     // onOutput into _lines (lines duplicated per leaked subscription).
@@ -481,9 +510,9 @@ export class ESPHomeCommandDialog extends LitElement {
     // lines never match, so the timer it drives counts compilation only —
     // then freeze it on the summary banner so an install's flash isn't counted.
     if (this._compileStartedAt === null) {
-      if (isCompilePhaseLine(line)) this._compileStartedAt = Date.now();
+      if (isCompilePhaseLine(line)) this._markCompileStarted();
     } else if (this._compileEndedAt === null && isCompileEndLine(line)) {
-      this._compileEndedAt = Date.now();
+      this._markCompileEnded();
     }
     this._pendingLines.push(line);
     if (this._flushScheduled) return;
