@@ -21,6 +21,7 @@ import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
+import { LineBatcher } from "../util/line-batcher.js";
 import { notifyError } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
@@ -116,9 +117,11 @@ export class ESPHomeLogsDialog extends LitElement {
   // rAF batch buffer: coalesce per-line appends into one render per frame
   // instead of one per line (mirrors command-dialog, #348). A fast serial
   // stream would otherwise schedule a full re-render of the whole list per
-  // line and freeze the tab.
-  private _pendingLines: string[] = [];
-  private _flushScheduled = 0;
+  // line and freeze the tab. maxLines bounds the pending buffer while the
+  // tab is hidden; _appendCapped bounds the visible one.
+  private _lineBatch = new LineBatcher((batch) => this._appendCapped(batch), {
+    maxLines: MAX_LOG_LINES,
+  });
 
   @state()
   private _open = false;
@@ -521,18 +524,7 @@ export class ESPHomeLogsDialog extends LitElement {
   // Buffer a streamed line; flushed on the next animation frame. The serial
   // reader (streamSerialToDialog) and the OTA stream both feed through here.
   _enqueueLine(line: string): void {
-    this._pendingLines.push(line);
-    // rAF doesn't fire while the tab is hidden, so a flood can pile up here
-    // unflushed. Trim with headroom (so we slice once per MAX_LOG_LINES pushes,
-    // not every push) to keep the pending buffer bounded too.
-    if (this._pendingLines.length > 2 * MAX_LOG_LINES) {
-      this._pendingLines = this._pendingLines.slice(-MAX_LOG_LINES);
-    }
-    if (this._flushScheduled) return;
-    this._flushScheduled = requestAnimationFrame(() => {
-      this._flushScheduled = 0;
-      this._flushPendingLines();
-    });
+    this._lineBatch.enqueue(line);
   }
 
   // Append to the visible buffer, trimmed to the newest MAX_LOG_LINES. The
@@ -547,19 +539,13 @@ export class ESPHomeLogsDialog extends LitElement {
   // MAX_LOG_LINES. Called from teardown / clear / download so consumers
   // don't race the rAF.
   _flushPendingLines(): void {
-    if (this._pendingLines.length === 0) return;
-    this._appendCapped(this._pendingLines);
-    this._pendingLines = [];
+    this._lineBatch.flush();
   }
 
   // Drop the pending batch and cancel any scheduled flush. Paired with every
   // ``_lines = []`` reset.
   _resetPendingLines(): void {
-    this._pendingLines = [];
-    if (this._flushScheduled) {
-      cancelAnimationFrame(this._flushScheduled);
-      this._flushScheduled = 0;
-    }
+    this._lineBatch.reset();
   }
 
   // Reset Device button (Web Serial only). Pulses RTS (wired to EN on the

@@ -79,4 +79,19 @@ describe("LineBatcher", () => {
     raf.fire();
     expect(lines).toEqual(["a", "b", "c"]);
   });
+
+  it("maxLines bounds the pending buffer when frames never fire (hidden tab)", () => {
+    const raf = withManualRaf();
+    const append = vi.fn();
+    const batcher = new LineBatcher(append, { maxLines: 100 });
+    for (let i = 0; i < 250; i++) batcher.enqueue(String(i));
+    raf.fire();
+    expect(append).toHaveBeenCalledTimes(1);
+    const batch = append.mock.calls[0][0] as string[];
+    // Trimmed once at 201 pushes (headroom = 2 × maxLines) down to the
+    // newest 100, then grew again: 101..249 survive, 0..100 dropped.
+    expect(batch).toHaveLength(149);
+    expect(batch[0]).toBe("101");
+    expect(batch[batch.length - 1]).toBe("249");
+  });
 });
