@@ -47,7 +47,10 @@ import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
-import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
+import {
+  resolveSectionForUrlLine,
+  resolveUrlLineFocus,
+} from "../util/url-line-resolver.js";
 import { buildWebUiUrl } from "../util/web-ui-url.js";
 import {
   getLastValidatedResult,
@@ -675,9 +678,14 @@ export class ESPHomePageDevice extends LitElement {
     }
   }
 
+  /** ``true`` once the URL's ``?line=`` has been resolved against the
+   *  loaded YAML. ``_updateUrl`` round-trips and later ``_loadYaml``
+   *  calls (board swap) must not re-derive focus from a stale line. */
+  private _urlLineConsumed = false;
+
   /**
-   * Resolve a ``?line=N`` URL parameter to a concrete section
-   * once the YAML has loaded.
+   * Resolve a ``?line=N`` URL parameter to a concrete section and
+   * field focus once the YAML has loaded. Runs once per navigation.
    *
    * Direct-link arrivals from the dashboard's YAML hit list
    * carry only ``?line=N`` (not ``?section=``); the navigator's
@@ -686,16 +694,22 @@ export class ESPHomePageDevice extends LitElement {
    * the just-loaded YAML to find the section that contains line
    * N and pin both ``_selectedSection`` and ``_scrollToHighlight``
    * — the navigator's existing emit-on-update logic then fires
-   * the scroll-into-view dispatch in CodeMirror.
+   * the scroll-into-view dispatch in CodeMirror. The focus paths
+   * deep-target the line's field in the structured editor, the
+   * same as a live caret move onto it.
    */
   private _maybeResolveLineFromUrl() {
-    const resolved = resolveSectionForUrlLine(
+    if (this._urlLineConsumed) return;
+    this._urlLineConsumed = true;
+    const resolved = resolveUrlLineFocus(
       this._yaml,
       this._selectedFromLine,
       this._selectedSection
     );
     if (!resolved) return;
     this._selectedSection = resolved.sectionKey;
+    this._focusFieldPath = resolved.fieldPath;
+    this._focusYamlPath = resolved.yamlPath;
     // ``_highlightRange`` is what the editor reads to drive
     // scroll-into-view; the user-click path sets it via
     // ``_onYamlHighlight`` from the navigator's ``yaml-highlight``
@@ -926,7 +940,7 @@ export class ESPHomePageDevice extends LitElement {
       this._cacheLayout("both");
     }
     this._setHighlight({ fromLine: line, toLine: line }, true, true);
-    const resolved = resolveSectionForUrlLine(this._yaml, line, null);
+    const resolved = resolveSectionForUrlLine(this._yaml, line);
     if (resolved) {
       this._selectedSection = resolved.sectionKey;
     }

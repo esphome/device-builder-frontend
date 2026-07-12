@@ -29,20 +29,12 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { editorSearchPhrases } from "../util/editor-search-phrases.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { idleCompletion } from "../util/idle-completion.js";
-import {
-  getKeyPath,
-  getKeyPathWithListIndices,
-  isInsideBlockScalar,
-} from "../util/yaml-ast.js";
+import { getKeyPathWithListIndices } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
+import { cursorKeyPathAt } from "../util/yaml-cursor-paths.js";
 import { lineKeyToken, type YamlAutoFix } from "../util/yaml-error-analysis.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
-import {
-  blankLineContext,
-  fieldPathByIndent,
-  indentOf,
-  keyPathByIndent,
-} from "../util/yaml-line-walker.js";
+import { indentOf } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
@@ -505,31 +497,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
           // moves with no edit.
           if (line === this._lastReportedCursorLine && !update.docChanged) return;
           // Resolve the caret's key path field-first (the page derives the
-          // form-relative path from it). The AST can't anchor an empty-value
-          // `key:` (Lezer leaves the Pair open) and yields nothing on a blank
-          // line, so prefer the indent walkers there: fieldPathByIndent gives
-          // the field path including the leaf key for an empty-value pair, else
-          // fall back to the AST, else the ancestor chain from a blank line.
-          // `skipListItems` keeps an anonymous `- ` dash from masquerading as a
-          // container key.
-          let path = fieldPathByIndent(update.state.doc, line - 1);
-          // Inside a block scalar (a `lambda: |-` body) a `key:`-looking
-          // content line is literal text, not a field; the regex can't tell,
-          // so defer to the AST there.
-          if (path && isInsideBlockScalar(update.state, head)) path = null;
-          if (!path) {
-            path = getKeyPath(update.state, head);
-            if (path.length === 0) {
-              const blank = blankLineContext(update.state.doc, head);
-              if (blank)
-                path = keyPathByIndent(
-                  update.state.doc,
-                  blank.lineIdx,
-                  blank.indent,
-                  true
-                );
-            }
-          }
+          // form-relative path from it). The indent-walker/AST fallback
+          // chain is shared with the URL deep-link load path.
+          const path = cursorKeyPathAt(update.state, head);
           const pathKey = JSON.stringify(path);
           if (
             line !== this._lastReportedCursorLine ||
