@@ -153,4 +153,34 @@ export const commandDialogStyles = css`
     text-decoration-thickness: 2px;
     outline: none;
   }
+
+  /* Compile-elapsed counter, slotted lower-left where the streaming dot
+     sits. Shares the dot's accent + a gentle pulse so the "still working"
+     cue reads the same once download gives way to compilation. */
+  .compile-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--term-mono-font);
+    font-size: 12px;
+    color: var(--term-accent);
+    animation: compile-timer-pulse 1.5s ease-in-out infinite;
+  }
+  .compile-timer wa-icon {
+    font-size: 14px;
+  }
+  @keyframes compile-timer-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .compile-timer {
+      animation: none;
+    }
+  }
 `;

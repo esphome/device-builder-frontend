@@ -9,6 +9,7 @@ import {
   mdiServerNetwork,
   mdiStop,
   mdiTextBoxOutline,
+  mdiTimerOutline,
   mdiTimerSand,
 } from "@mdi/js";
 import { LitElement, html } from "lit";
@@ -28,6 +29,7 @@ import {
   devicesContext,
   firmwareJobsContext,
   localizeContext,
+  offloaderRemoteBuildsEnabledContext,
   versionContext,
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
@@ -48,6 +50,8 @@ import {
   toggleShowSecrets,
 } from "./command-dialog/commands.js";
 import {
+  renderCompileTimer,
+  renderOffloadHintSlot,
   renderQueuedOverlay,
   renderRemoteBuilderSubLine,
   renderResetSuggestion,
@@ -77,6 +81,7 @@ registerMdiIcons({
   "playlist-check": mdiPlaylistCheck,
   "server-network": mdiServerNetwork,
   "timer-sand": mdiTimerSand,
+  "timer-outline": mdiTimerOutline,
 });
 
 export type CommandType =
@@ -119,6 +124,12 @@ export class ESPHomeCommandDialog extends LitElement {
   @consume({ context: buildOffloadPairingsContext, subscribe: true })
   @state()
   _pairings: Map<string, PairingSummary> | null = null;
+
+  // Whether auto-route-to-remote-build is on. With a pairing, it suppresses the
+  // "set up a build server" hint — the user already offloads.
+  @consume({ context: offloaderRemoteBuildsEnabledContext, subscribe: true })
+  @state()
+  _remoteBuildsEnabled: boolean | null = null;
 
   @consume({ context: versionContext, subscribe: true })
   @state()
@@ -170,6 +181,15 @@ export class ESPHomeCommandDialog extends LitElement {
     source_esphome_version: string;
   } | null = null;
 
+  // Wall-clock the compile phase began — set when the followed job's progress
+  // first latches non-null (the download/prep phase never latches, so this
+  // excludes it). Drives the compile-elapsed timer + offload-hint threshold.
+  @state() _compileStartedAt: number | null = null;
+
+  // Clock driving the live elapsed readout. Ticks each second while a job runs.
+  @state() _now = Date.now();
+  private _tickHandle: ReturnType<typeof setInterval> | null = null;
+
   // True while "Build locally instead" override is mid-flight.
   @state() _switchingToLocal = false;
 
@@ -203,6 +223,13 @@ export class ESPHomeCommandDialog extends LitElement {
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
+    }
+    // Latch the compile-phase start the first time the followed job reports
+    // progress. The download/prep phase never latches progress, so the timer
+    // it drives counts compilation only.
+    if (this._compileStartedAt === null && this._jobId) {
+      const progress = this._jobs.get(this._jobId)?.progress;
+      if (progress != null) this._compileStartedAt = Date.now();
     }
     // When a job ends, the success/error banner takes ~56px of flex space
     // below the log; the container shrinks, scrollTop is preserved, and
@@ -239,6 +266,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobId = "";
     this._jobStatus = null;
     this._primedSource = null;
+    this._compileStartedAt = null;
     this._failedDuringValidate = false;
     // Always start with secrets redacted on a fresh open — opt-in per session.
     this._showSecrets = false;
@@ -282,6 +310,9 @@ export class ESPHomeCommandDialog extends LitElement {
       source_label: job.source_label,
       source_esphome_version: job.source_esphome_version,
     };
+    // Reattaching mid-build can't recover the true compile start; let willUpdate
+    // re-derive it from the first progress it observes on this stream.
+    this._compileStartedAt = null;
     // Cancel any prior follow before starting a new one — without this,
     // every reopen layered fresh streams while previous ones still pumped
     // onOutput into _lines (lines duplicated per leaked subscription).
@@ -294,6 +325,48 @@ export class ESPHomeCommandDialog extends LitElement {
   public close = () => {
     void detachStream(this);
     this._open = false;
+  };
+
+  // Compile time so far (download excluded), or null before the compile phase.
+  get _compileElapsedMs(): number | null {
+    return this._compileStartedAt === null ? null : this._now - this._compileStartedAt;
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._stopTicker();
+  }
+
+  protected updated(): void {
+    if (this._open && this._state === "running") this._startTicker();
+    else this._stopTicker();
+  }
+
+  private _startTicker(): void {
+    if (this._tickHandle !== null) return;
+    this._now = Date.now();
+    this._tickHandle = setInterval(() => {
+      this._now = Date.now();
+    }, 1000);
+  }
+
+  private _stopTicker(): void {
+    if (this._tickHandle === null) return;
+    clearInterval(this._tickHandle);
+    this._tickHandle = null;
+  }
+
+  // Close the terminal and open Settings → Send builds so the user can pair a
+  // faster machine. The build keeps running in the background queue.
+  _tryOpenBuildOffloadSettings = () => {
+    this.close();
+    this.dispatchEvent(
+      new CustomEvent("open-settings", {
+        detail: { section: "build_offload" },
+        bubbles: true,
+        composed: true,
+      })
+    );
   };
 
   // Reopen without clearing line buffer / status. Used by logs-dialog's
@@ -447,12 +520,13 @@ export class ESPHomeCommandDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._lines}
           ?light=${!this._darkMode}
-          ?streaming=${this._state === "running"}
+          ?streaming=${this._state === "running" && this._compileStartedAt === null}
           .state=${this._state}
           .statusMessage=${this._statusMessage}
         >
           ${renderRemoteBuilderSubLine(this)} ${renderQueuedOverlay(this)}
-          ${renderResetSuggestion(this)}
+          ${renderResetSuggestion(this)} ${renderOffloadHintSlot(this)}
+          ${renderCompileTimer(this)}
           <div class="toolbar-slot" slot="toolbar-right">${renderToolbar(this)}</div>
         </esphome-process-terminal>
       </esphome-base-dialog>

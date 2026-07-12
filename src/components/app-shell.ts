@@ -113,6 +113,7 @@ import "./onboarding-wifi-dialog.js";
 import "./onboarding/onboarding-wizard-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
+import type { Section } from "./settings-dialog/types.js";
 import "./update-all-dialog.js";
 import type { ESPHomeUpdateAllDialog } from "./update-all-dialog.js";
 
@@ -577,7 +578,8 @@ export class ESPHomeApp extends LitElement {
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
-        @open-settings=${() => this._settingsDialog?.open()}
+        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) =>
+          this._settingsDialog?.open(e.detail?.section)}
         @open-firmware-jobs=${() => this._firmwareJobsDialog?.open()}
         @open-reset-build-env=${() => this._firmwareJobsDialog?.openResetBuildEnv()}
         @open-feedback=${() => this._feedbackDialog?.open()}

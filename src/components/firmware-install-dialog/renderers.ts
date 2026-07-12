@@ -2,7 +2,12 @@ import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
 import { FLASHER_HOST } from "../../common/docs.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
+import { formatElapsed } from "../../util/format-job-time.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
+import {
+  renderOffloadHint,
+  shouldShowOffloadHint,
+} from "../process-terminal/offload-hint.js";
 import type { ProcessTerminalState } from "../process-terminal/process-terminal.js";
 import {
   renderBuildFailureSuggestion,
@@ -149,7 +154,26 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
         : "firmware.flashing_keep_visible"
     );
   }
+  // Once compilation begins, surface the elapsed so a slow build reads as slow.
+  if (host._step === "compiling" && host._compileElapsedMs !== null) {
+    return formatElapsed(host._compileElapsedMs);
+  }
   return "";
+}
+
+// Nudge a slow local compile toward "send builds to a faster machine". Same
+// gate as the command-dialog: compile elapsed past the threshold, suppressed
+// for remote builds and when offloading is already set up.
+export function renderOffloadHintSlot(
+  host: ESPHomeFirmwareInstallDialog
+): TemplateResult | typeof nothing {
+  const visible = shouldShowOffloadHint({
+    elapsedMs: host._compileElapsedMs ?? 0,
+    source: host._jobSource,
+    remoteBuildsEnabled: host._remoteBuildsEnabled,
+    pairings: host._pairings,
+  });
+  return visible ? renderOffloadHint(host) : nothing;
 }
 
 // ── status-extra slot ────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatAbsoluteTime,
+  formatElapsed,
   formatRelativeTime,
 } from "../../src/util/format-job-time.js";
 
@@ -29,6 +30,24 @@ describe("formatRelativeTime", () => {
 
   it("uses 'now' phrasing for sub-second deltas", () => {
     expect(formatRelativeTime(new Date(NOW).toISOString(), NOW, "en")).toBe("now");
+  });
+});
+
+describe("formatElapsed", () => {
+  it("renders sub-minute durations in seconds", () => {
+    expect(formatElapsed(45 * 1000)).toBe("45s");
+  });
+
+  it("renders minutes and seconds", () => {
+    expect(formatElapsed((4 * 60 + 32) * 1000)).toBe("4m 32s");
+  });
+
+  it("renders hours and zero-padded minutes", () => {
+    expect(formatElapsed((1 * 3600 + 5 * 60) * 1000)).toBe("1h 05m");
+  });
+
+  it("clamps negative deltas to zero", () => {
+    expect(formatElapsed(-1000)).toBe("0s");
   });
 });
 

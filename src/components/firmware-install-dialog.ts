@@ -13,9 +13,18 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import {
+  apiContext,
+  buildOffloadPairingsContext,
+  darkModeContext,
+  firmwareJobsContext,
+  localizeContext,
+  offloaderRemoteBuildsEnabledContext,
+} from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
@@ -36,6 +45,7 @@ import {
   cardStatusDetail,
   cardStatusMessage,
   renderFooter,
+  renderOffloadHintSlot,
   renderResetSuggestion,
   renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
@@ -81,6 +91,20 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
+  // Live job snapshot — read the followed compile's progress to detect when the
+  // compile phase begins (download/prep never latches progress).
+  @consume({ context: firmwareJobsContext, subscribe: true })
+  @state()
+  _jobs: Map<string, FirmwareJob> = new Map();
+
+  // Suppress the "set up a build server" hint once offloading is in place.
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  _pairings: Map<string, PairingSummary> | null = null;
+  @consume({ context: offloaderRemoteBuildsEnabledContext, subscribe: true })
+  @state()
+  _remoteBuildsEnabled: boolean | null = null;
+
   @state() _open = false;
   @state() _step: InstallStep = "installing";
   @state() _title = "";
@@ -124,6 +148,15 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _device: ConfiguredDevice | null = null;
   _jobId = "";
   _streamId = "";
+
+  // Wall-clock the compile phase began (download excluded); set once the
+  // followed job first reports progress. Drives the compiling-step elapsed
+  // readout + offload-hint threshold.
+  @state() _compileStartedAt: number | null = null;
+
+  // Clock for the live elapsed readout. Ticks each second while compiling.
+  @state() _now = Date.now();
+  private _tickHandle: ReturnType<typeof setInterval> | null = null;
 
   // The compiled factory image for the "web-flash" installer, held between the
   // download-ready step and the user clicking "Open USB flasher". Detached
@@ -234,6 +267,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._failedDuringValidate = false;
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
+    this._compileStartedAt = null;
     this._usbFirmware = null;
     this._usbFirmwareName = "";
     // _detachStream already cleared _jobId / _streamId / _compileReject.
@@ -274,7 +308,56 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (changedProperties.has("_logsExpanded")) {
       this.toggleAttribute("expanded", this._logsExpanded);
     }
+    // Latch the compile-phase start on the followed job's first progress
+    // report — the download/prep phase never latches, so the elapsed readout
+    // counts compilation only.
+    if (this._compileStartedAt === null && this._jobId) {
+      const progress = this._jobs.get(this._jobId)?.progress;
+      if (progress != null) this._compileStartedAt = Date.now();
+    }
   }
+
+  protected updated(): void {
+    if (this._open && this._step === "compiling") this._startTicker();
+    else this._stopTicker();
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._stopTicker();
+  }
+
+  // Compile time so far (download excluded), or null before the compile phase.
+  get _compileElapsedMs(): number | null {
+    return this._compileStartedAt === null ? null : this._now - this._compileStartedAt;
+  }
+
+  private _startTicker(): void {
+    if (this._tickHandle !== null) return;
+    this._now = Date.now();
+    this._tickHandle = setInterval(() => {
+      this._now = Date.now();
+    }, 1000);
+  }
+
+  private _stopTicker(): void {
+    if (this._tickHandle === null) return;
+    clearInterval(this._tickHandle);
+    this._tickHandle = null;
+  }
+
+  // Close the dialog and open Settings → Send builds. The compile keeps running
+  // in the background queue.
+  _tryOpenBuildOffloadSettings = () => {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-settings", {
+        detail: { section: "build_offload" },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   // Drop into red error state. detail is optional — render skips it entirely
   // when empty so a single-string call doesn't paint the same text twice.
@@ -396,7 +479,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           .statusDetail=${cardStatusDetail(this)}
           .progress=${this._step === "flashing" ? this._flashPercent : null}
         >
-          ${renderResetSuggestion(this)} ${renderStatusExtra(this)}
+          ${renderResetSuggestion(this)} ${renderOffloadHintSlot(this)}
+          ${renderStatusExtra(this)}
           <div slot="toolbar-right">${renderFooter(this)}</div>
         </esphome-process-terminal>
       </esphome-base-dialog>

@@ -82,8 +82,8 @@ export class ESPHomeSettingsDialog extends LitElement {
     fullscreenMobileDialog("esphome-base-dialog", SETTINGS_DIALOG_BREAKPOINT),
   ];
 
-  open() {
-    this._section = "appearance";
+  open(section: Section = "appearance") {
+    this._section = section;
     this._open = true;
   }
 

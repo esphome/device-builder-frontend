@@ -2,7 +2,12 @@ import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware-jobs.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { formatElapsed } from "../../util/format-job-time.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
+import {
+  renderOffloadHint,
+  shouldShowOffloadHint,
+} from "../process-terminal/offload-hint.js";
 import {
   renderBuildFailureSuggestion,
   renderValidationFailureSuggestion,
@@ -130,6 +135,40 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   const primed = host._primedSource;
   if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
   return live?.source_label || primed?.source_label || null;
+}
+
+// Live compile-elapsed counter, pinned lower-left in place of the streaming
+// dot. Only shows once the compile phase has started (download excluded).
+export function renderCompileTimer(
+  host: ESPHomeCommandDialog
+): TemplateResult | typeof nothing {
+  const elapsed = host._compileElapsedMs;
+  if (elapsed === null || host._state !== "running") return nothing;
+  return html`
+    <div class="compile-timer" role="status" slot="toolbar-left">
+      <wa-icon library="mdi" name="timer-outline"></wa-icon>
+      <span>${formatElapsed(elapsed)}</span>
+    </div>
+  `;
+}
+
+// Nudge a slow local compile toward "send builds to a faster machine". Gated
+// on compile elapsed past the threshold; suppressed for remote builds and when
+// offloading is already set up.
+export function renderOffloadHintSlot(
+  host: ESPHomeCommandDialog
+): TemplateResult | typeof nothing {
+  const source =
+    (host._jobId ? host._jobs.get(host._jobId)?.source : undefined) ??
+    host._primedSource?.source ??
+    JobSource.LOCAL;
+  const visible = shouldShowOffloadHint({
+    elapsedMs: host._compileElapsedMs ?? 0,
+    source,
+    remoteBuildsEnabled: host._remoteBuildsEnabled,
+    pairings: host._pairings,
+  });
+  return visible ? renderOffloadHint(host) : nothing;
 }
 
 // --show-secrets is an `esphome config` flag — hide the toggle on every other
