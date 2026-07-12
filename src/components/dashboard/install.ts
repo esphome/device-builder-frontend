@@ -1,6 +1,6 @@
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
-import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
+import { followActiveJob } from "../../util/firmware-job-display.js";
 import { launchLogs } from "../../util/logs-launch.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType } from "../command-dialog.js";
@@ -28,8 +28,9 @@ export function onInstallMethodSelect(
     void openLogsWithMethod(host, device, method, port);
     return;
   }
-  // A job may have started while the picker sat open (second tab, a
-  // deferred queued update firing); enqueuing now would supersede it.
+  // A job may have started while the picker sat open; enqueuing now
+  // would supersede it. Covers the firmwareDialog methods too, which
+  // never reach openCommand's guard.
   if (showJobProgress(host, device)) return;
   applyInstallMethod(method, port, {
     device,
@@ -49,24 +50,18 @@ export function openCommand(
   host._commandDialog.openForDevice(device, type, { port, ...options });
 }
 
-/**
- * Re-attach the command dialog to the device's running job.
- *
- * Returns true when a job was open — the install seams bail on it,
- * since enqueuing would supersede: the backend cancels and restarts
- * the configuration's in-flight jobs.
- */
+/** Re-attach the command dialog to the device's running job; true when one existed. */
 export function showJobProgress(
   host: ESPHomePageDashboard,
   device: ConfiguredDevice
 ): boolean {
-  const job = host._activeJobs.get(device.configuration);
-  if (!job) return false;
-  host._commandDialog.followJob(
-    job,
-    firmwareJobDisplayName(job, host._devices, host._localize)
+  return followActiveJob(
+    host._activeJobs,
+    device.configuration,
+    host._commandDialog,
+    host._devices,
+    host._localize
   );
-  return true;
 }
 
 export function openLogs(

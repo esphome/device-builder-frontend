@@ -92,3 +92,24 @@ export function firmwareJobDisplayName(
   const device = devices.find((d) => d.configuration === job.configuration);
   return device?.friendly_name || device?.name || job.configuration;
 }
+
+/**
+ * Re-attach *dialog* to the configuration's running job, if any.
+ *
+ * Returns true when an active job existed (the dialog now follows it) —
+ * the install seams bail on true, since enqueuing instead would
+ * supersede: the backend cancels and restarts the configuration's
+ * in-flight jobs ("one active job per device").
+ */
+export function followActiveJob(
+  activeJobs: Map<string, FirmwareJob>,
+  configuration: string,
+  dialog: { followJob(job: FirmwareJob, displayName: string): void },
+  devices: ConfiguredDevice[],
+  localize: LocalizeFunc
+): boolean {
+  const job = activeJobs.get(configuration);
+  if (!job) return false;
+  dialog.followJob(job, firmwareJobDisplayName(job, devices, localize));
+  return true;
+}

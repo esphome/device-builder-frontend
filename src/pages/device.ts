@@ -41,7 +41,7 @@ import { withBase } from "../util/base-path.js";
 import { fetchBoard } from "../util/board-body-cache.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
-import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -969,17 +969,15 @@ export class ESPHomePageDevice extends LitElement {
   private _saveThenInstall = () => this._installAfterSave(this._installCtrl.onInstall);
   private _saveThenUpdate = () => this._installAfterSave(this._installCtrl.onUpdate);
 
-  /** Re-attach the command dialog to this device's running job, if any —
-   *  the Update/Install buttons stay clickable mid-job and open the
-   *  in-progress stream instead of saving and starting another job. */
+  /** Re-attach the command dialog to this device's running job; true when one existed. */
   private _showActiveJobProgress(): boolean {
-    const job = this._activeJobs.get(this.id);
-    if (!job) return false;
-    this._commandDialog.followJob(
-      job,
-      firmwareJobDisplayName(job, this._devices, this._localize)
+    return followActiveJob(
+      this._activeJobs,
+      this.id,
+      this._commandDialog,
+      this._devices,
+      this._localize
     );
-    return true;
   }
 
   /** Catch ``clean-build`` from the install dialog's post-failure

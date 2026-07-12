@@ -92,8 +92,7 @@ describe("DeviceInstallController.methodMode", () => {
   });
 });
 
-// Enqueuing over a running job supersedes it (the backend cancels and
-// restarts), so every install seam re-attaches to the job instead (#1194).
+// Pins the controller's install seams' busy guard (#1194).
 describe("DeviceInstallController busy seam guard", () => {
   function makeBusyParts(busy: boolean) {
     const openForDevice = vi.fn();
