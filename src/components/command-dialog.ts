@@ -312,7 +312,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._primedSource = null;
     this._compileStartedAt = null;
     this._compileEndedAt = null;
-    this._showTimerDetail = false;
+    this._closeTimerDetail();
     this._failedDuringValidate = false;
     // Always start with secrets redacted on a fresh open — opt-in per session.
     this._showSecrets = false;
@@ -357,6 +357,7 @@ export class ESPHomeCommandDialog extends LitElement {
       source_label: job.source_label,
       source_esphome_version: job.source_esphome_version,
     };
+    this._closeTimerDetail();
     // Reattaching to a still-running (or finished) build: restore the true
     // compile clock so the replayed buffer doesn't restart the timer from now.
     // The backend fields win — they survive a full page reload / reconnect —
@@ -376,6 +377,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   public close = () => {
     void detachStream(this);
+    this._closeTimerDetail();
     this._open = false;
   };
 
@@ -441,12 +443,34 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   _toggleTimerDetail = () => {
-    this._showTimerDetail = !this._showTimerDetail;
+    if (this._showTimerDetail) {
+      this._closeTimerDetail();
+      return;
+    }
+    this._showTimerDetail = true;
+    // Dismiss on the next click anywhere outside the timer (the toolbar, the
+    // log, elsewhere in the dialog). Capture-phase so it fires before other
+    // handlers; registered after this opening click so it doesn't self-close.
+    document.addEventListener("click", this._onOutsideTimerClick, true);
+  };
+
+  private _closeTimerDetail(): void {
+    if (!this._showTimerDetail) return;
+    this._showTimerDetail = false;
+    document.removeEventListener("click", this._onOutsideTimerClick, true);
+  }
+
+  private _onOutsideTimerClick = (e: MouseEvent) => {
+    // The timer button toggles itself; only outside clicks close here.
+    const wrap = this.renderRoot?.querySelector(".compile-timer-wrap");
+    if (wrap && e.composedPath().includes(wrap)) return;
+    this._closeTimerDetail();
   };
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._stopTicker();
+    this._closeTimerDetail();
   }
 
   protected updated(): void {
@@ -631,6 +655,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   private _onDialogHide = () => {
     this._open = false;
+    this._closeTimerDetail();
     void detachStream(this);
   };
 

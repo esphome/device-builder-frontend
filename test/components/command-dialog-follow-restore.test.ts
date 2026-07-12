@@ -31,6 +31,9 @@ interface Harness {
   readonly _compileDetailMs: number | null;
   readonly _isRunFrozen: boolean;
   readonly _showRunTimer: boolean;
+  _showTimerDetail: boolean;
+  _toggleTimerDetail: () => void;
+  _onOutsideTimerClick: (e: MouseEvent) => void;
   followJob: (job: FirmwareJob, displayName: string) => void;
 }
 
@@ -265,5 +268,24 @@ describe("command-dialog run timer visibility", () => {
     el2._timerJobId = "t4";
     el2._commandType = "compile";
     expect(el2._showRunTimer).toBe(false);
+  });
+});
+
+describe("command-dialog timer detail popover dismissal", () => {
+  it("toggles open then closed", () => {
+    const el = mount([]);
+    el._toggleTimerDetail();
+    expect(el._showTimerDetail).toBe(true);
+    el._toggleTimerDetail();
+    expect(el._showTimerDetail).toBe(false);
+  });
+
+  it("closes on a click outside the timer", () => {
+    const el = mount([]);
+    el._toggleTimerDetail();
+    expect(el._showTimerDetail).toBe(true);
+    // A click whose composed path doesn't include the timer wrap closes it.
+    el._onOutsideTimerClick({ composedPath: () => [] } as unknown as MouseEvent);
+    expect(el._showTimerDetail).toBe(false);
   });
 });
