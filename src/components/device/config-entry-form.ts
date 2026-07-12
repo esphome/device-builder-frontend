@@ -123,6 +123,10 @@ export interface ConfigEntryValueChange {
   value: unknown;
 }
 
+/** How long a clicked advanced-control anchor stays valid awaiting the
+ *  host's ``showAdvanced`` round-trip (normally one render, milliseconds). */
+export const ADVANCED_ANCHOR_TTL_MS = 2000;
+
 @customElement("esphome-config-entry-form")
 export class ESPHomeConfigEntryForm extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -596,7 +600,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const anchor = this._advancedControlAnchor;
     if (!anchor || !changed.has("showAdvanced")) return;
     this._advancedControlAnchor = undefined;
-    if (performance.now() - anchor.at > 2000) return;
+    if (performance.now() - anchor.at > ADVANCED_ANCHOR_TTL_MS) return;
     const row = this.shadowRoot?.querySelector<HTMLElement>(".advanced-toggle-row");
     if (!row) return;
     const scroller = nearestScrollContainer(row);
