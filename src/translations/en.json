@@ -406,7 +406,6 @@
     "try_open_editor_button": "opening this device in the editor",
     "offload_hint": "Compiling is taking a while. You can send builds to a faster machine on your network to speed this up. {action}.",
     "offload_hint_action": "Set up a build server",
-    "compile_elapsed_title": "Time spent compiling (excludes downloads). Click for details",
     "run_elapsed_title": "Total build time. Click for the compile-only breakdown",
     "compile_time_label": "Compile time",
     "total_run_time_label": "Total run time",
