@@ -179,7 +179,10 @@ function actionBodyFocus(
         here
       );
     }
-    if (a.children && head in a.children) {
+    // Own-property check, not `in`: the wire tree's `children` is a plain
+    // object, so a param key like ``constructor`` would match via the
+    // prototype and route into a non-array (see yaml-section-values.ts).
+    if (a.children && Object.prototype.hasOwnProperty.call(a.children, head)) {
       return listFocus(
         a.children[head],
         actionId,

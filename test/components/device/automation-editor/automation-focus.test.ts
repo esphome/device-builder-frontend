@@ -317,6 +317,15 @@ describe("resolveAutomationFocus", () => {
     expect(resolveAutomationFocus(tree([]), ["then", 5])).toBeNull();
   });
 
+  it("treats a prototype-named param key as a field, not a child list", () => {
+    // ``constructor`` is inherited by every plain object; ``in`` on the
+    // wire tree's children would route into Object.prototype and crash.
+    expect(resolveAutomationFocus(REPRO, ["then", 0, "if", "constructor", 0])).toEqual({
+      node: [0],
+      field: ["constructor", "0"],
+    });
+  });
+
   it("returns null on an empty relative path", () => {
     expect(resolveAutomationFocus(REPRO, [])).toBeNull();
   });
