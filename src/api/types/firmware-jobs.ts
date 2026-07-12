@@ -56,7 +56,8 @@ export interface FirmwareJob {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
-  /** Compile-phase bounds (download and configure excluded), stamped by the
+  /** Compile-phase bounds (CMake configure counts, the download doesn't),
+   *  stamped by the
    *  backend so the compile timer stays correct across a reload / reconnect.
    *  Null before the compile phase begins / finishes; absent entirely on jobs
    *  from a backend that predates them, so callers must degrade gracefully. */

@@ -186,7 +186,8 @@ export class ESPHomeCommandDialog extends LitElement {
   } | null = null;
 
   // Wall-clock the compile phase began — set on the first build line (download
-  // and configure never match), so the timer it drives counts compilation only.
+  // never matches), so the timer it drives counts the build itself — CMake
+  // configure included, it's CPU+I/O work — but never the dependency download.
   @state() _compileStartedAt: number | null = null;
 
   // Wall-clock the compile finished — set on the PlatformIO [SUCCESS]/[FAILED]
@@ -396,7 +397,7 @@ export class ESPHomeCommandDialog extends LitElement {
     return this._compileStartedAt !== null && this._compileEndedAt === null;
   }
 
-  // Whole-job wall time (queue excluded): download + configure + compile + link,
+  // Whole-job wall time (queue excluded): download + compile + link,
   // and for an install the flash — the number PlatformIO prints as "Took". This
   // is the primary figure shown on the terminal. Freezes at completion; null
   // before the job starts running.

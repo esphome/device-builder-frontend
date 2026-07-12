@@ -82,7 +82,7 @@ describe("isCompilePhaseLine", () => {
     expect(isCompilePhaseLine("\x1b[0mCompiling src/main.cpp.o")).toBe(true);
   });
 
-  it("ignores the dependency-download and configure lines", () => {
+  it("ignores the dependency-download and setup narration lines", () => {
     for (const line of [
       "Tool Manager: Installing file:///Users/bdraco/esphome/.esphome/build",
       "Library Manager: Installing esphome/noise-c @ 0.1.11",
