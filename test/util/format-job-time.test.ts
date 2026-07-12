@@ -63,6 +63,12 @@ describe("formatElapsed", () => {
   it("clamps negative deltas to zero", () => {
     expect(formatElapsed(-1000)).toBe("0s");
   });
+
+  it("forwards the language for locale-aware digits", () => {
+    expect(formatElapsed((4 * 60 + 32) * 1000, "en")).toBe("4m 32s");
+    // Arabic-Egypt shapes digits as Arabic-Indic numerals.
+    expect(formatElapsed(45 * 1000, "ar-EG")).toBe("\u0664\u0665s");
+  });
 });
 
 describe("formatAbsoluteTime", () => {

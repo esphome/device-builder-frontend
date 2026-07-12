@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
 import { FLASHER_HOST } from "../../common/docs.js";
+import { activeLocale } from "../../common/localize.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -156,7 +157,7 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
   }
   // Once compilation begins, surface the elapsed so a slow build reads as slow.
   if (host._step === "compiling" && host._timer.compileElapsedMs !== null) {
-    return formatElapsed(host._timer.compileElapsedMs);
+    return formatElapsed(host._timer.compileElapsedMs, activeLocale());
   }
   return "";
 }

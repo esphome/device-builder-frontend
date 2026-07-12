@@ -31,10 +31,12 @@ export function parseIsoMs(iso: string | null | undefined): number | null {
 /**
  * :func:`formatDuration` for a running millisecond counter — ``45s``,
  * ``4m 32s``, ``1h 05m``. Negative deltas clamp to ``0s`` so a clock skew
- * never prints a leading minus.
+ * never prints a leading minus. Pass the app locale as *language* (render
+ * call sites use ``activeLocale()``) so digits match the UI language
+ * rather than the browser default.
  */
-export function formatElapsed(ms: number): string {
-  return formatDuration(ms / 1000, { showSeconds: true });
+export function formatElapsed(ms: number, language?: string): string {
+  return formatDuration(ms / 1000, { showSeconds: true, language });
 }
 
 /**

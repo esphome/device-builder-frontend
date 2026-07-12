@@ -126,7 +126,8 @@ export function remainingOf(
 }
 
 /**
- * Memoized ``Intl.NumberFormat`` per (locale, fraction-digits) key.
+ * Memoized ``Intl.NumberFormat`` per (locale, fraction-digits,
+ * integer-padding) key.
  *
  * Both the drawer's RTT row ("4.2 ms", 1 fraction digit) and TTL
  * row ("38s", 0 fraction digits) need a locale-aware number
@@ -135,9 +136,11 @@ export function remainingOf(
  * has up to three Reachability rows visible, so that's 3
  * allocations/sec for what should be a stable lookup.
  *
- * Mirrors the ``RelativeTimeFormat`` cache above, just keyed on
- * the joint of language + ``maximumFractionDigits`` so the two
- * call sites don't share each other's precision.
+ * Mirrors the ``RelativeTimeFormat`` cache above, just keyed on the
+ * joint of language + ``maximumFractionDigits`` +
+ * ``minimumIntegerDigits`` so call sites don't share each other's
+ * precision or padding (padded and unpadded formatters are distinct
+ * instances).
  */
 const numberFormatterCache = new Map<string, Intl.NumberFormat>();
 

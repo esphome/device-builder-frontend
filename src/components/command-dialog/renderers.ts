@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware-jobs.js";
+import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { formatElapsed } from "../../util/format-job-time.js";
@@ -167,18 +168,19 @@ export function renderCompileTimer(
 ): TemplateResult | typeof nothing {
   if (!showRunTimer(host)) return nothing;
   const total = host._timer.totalRunElapsedMs!;
+  const lang = activeLocale();
   return html`
     <div class="compile-timer-wrap" slot="toolbar-left">
       <button
         class="compile-timer ${host._timer.isRunFrozen ? "" : "compile-timer--live"}"
         aria-expanded=${host._timer.showDetail ? "true" : "false"}
         aria-haspopup="dialog"
-        aria-label="${formatElapsed(total)}. ${host._localize("command.run_elapsed_title")}"
+        aria-label="${formatElapsed(total, lang)}. ${host._localize("command.run_elapsed_title")}"
         title=${host._localize("command.run_elapsed_title")}
         @click=${host._timer.toggleDetail}
       >
         <wa-icon library="mdi" name="timer-outline"></wa-icon>
-        <span>${formatElapsed(total)}</span>
+        <span>${formatElapsed(total, lang)}</span>
       </button>
       ${host._timer.showDetail ? renderTimerDetail(host, total) : nothing}
     </div>
@@ -189,6 +191,7 @@ export function renderCompileTimer(
 // offload nudge attached to it (a long local compile is what offloading fixes).
 function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): TemplateResult {
   const compile = host._timer.compileDetailMs;
+  const lang = activeLocale();
   const showHint =
     // While the compile is live the inline suggestion already carries this
     // nudge; only add it here once that's gone, so they never double up.
@@ -212,12 +215,12 @@ function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): Templat
           ? nothing
           : html`<div class="compile-timer-row">
               <span>${host._localize("command.compile_time_label")}</span>
-              <span>${formatElapsed(compile)}</span>
+              <span>${formatElapsed(compile, lang)}</span>
             </div>`
       }
       <div class="compile-timer-row">
         <span>${host._localize("command.total_run_time_label")}</span>
-        <span>${formatElapsed(totalMs)}</span>
+        <span>${formatElapsed(totalMs, lang)}</span>
       </div>
       ${
         showHint
