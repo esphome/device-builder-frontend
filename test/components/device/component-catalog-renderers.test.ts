@@ -58,7 +58,11 @@ describe("renderCard", () => {
     render(renderCard(makeHost(), entry, false, true, localize), container);
     const chip = container.querySelector(".component-category-chip--recommended");
     expect(chip?.textContent?.trim()).toBe("Recommended");
-    expect(chip?.getAttribute("title")).toBe(
+    // Native title tooltips don't render inside the dialog's top layer,
+    // so the explanation rides a wa-tooltip targeting the chip's id.
+    const tooltip = container.querySelector("wa-tooltip");
+    expect(tooltip?.getAttribute("for")).toBe(chip?.id);
+    expect(tooltip?.textContent?.trim()).toBe(
       "Pre-configured for the Guition Smart Screen"
     );
     const chips = [...container.querySelectorAll(".component-category-chip")].map((c) =>

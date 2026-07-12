@@ -95,6 +95,14 @@ export function renderCard(
   // Surfaced only when this card shares a name with another in the same
   // category; the category chip can't tell same-domain platforms apart.
   const platform = showPlatform ? platformLabel(component.id) : "";
+  // Native title tooltips don't render inside the dialog's top layer
+  // (Chromium suppresses them over showModal dialogs), so the
+  // recommendation explainer rides a wa-tooltip anchored to the chip.
+  const recommendedTooltip = featured
+    ? localize("device.recommended_chip_tooltip", {
+        board: host.board?.name || "board",
+      })
+    : "";
   return html`
     <article
       class="component-card ${expanded ? "component-card--expanded" : ""} ${
@@ -125,12 +133,13 @@ export function renderCard(
           ${
             featured
               ? html`<span
-                  class="component-category-chip component-category-chip--recommended"
-                  title=${localize("device.recommended_chip_tooltip", {
-                    board: host.board?.name || "board",
-                  })}
-                  >${localize("device.component_category_featured")}</span
-                >`
+                    id=${`recommended-chip-${component.id}`}
+                    class="component-category-chip component-category-chip--recommended"
+                    >${localize("device.component_category_featured")}</span
+                  >
+                  <wa-tooltip for=${`recommended-chip-${component.id}`}
+                    >${recommendedTooltip}</wa-tooltip
+                  >`
               : nothing
           }
           ${

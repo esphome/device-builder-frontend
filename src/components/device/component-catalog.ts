@@ -36,6 +36,7 @@ import { componentCatalogStyles } from "./component-catalog/styles.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({
   "arrow-collapse-all": mdiArrowCollapseAll,
