@@ -5,7 +5,6 @@ import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 import {
-  OFFLOAD_HINT_THRESHOLD_MS,
   renderOffloadHint,
   shouldShowOffloadHint,
 } from "../process-terminal/offload-hint.js";
@@ -190,16 +189,16 @@ export function renderCompileTimer(
 // offload nudge attached to it (a long local compile is what offloading fixes).
 function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): TemplateResult {
   const compile = host._timer.compileDetailMs;
-  const source = resolveJobSource(host);
-  const hasOffloadSetUp = (host._pairings?.size ?? 0) > 0;
   const showHint =
     // While the compile is live the inline suggestion already carries this
     // nudge; only add it here once that's gone, so they never double up.
     !host._timer.isCompiling &&
-    source === JobSource.LOCAL &&
-    !hasOffloadSetUp &&
     compile !== null &&
-    compile >= OFFLOAD_HINT_THRESHOLD_MS;
+    shouldShowOffloadHint({
+      elapsedMs: compile,
+      source: resolveJobSource(host),
+      pairings: host._pairings,
+    });
   return html`
     <div
       class="compile-timer-detail"

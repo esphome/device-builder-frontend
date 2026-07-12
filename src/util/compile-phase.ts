@@ -54,5 +54,9 @@ const COMPILE_END_LINE = /\[(?:SUCCESS|FAILED)\] Took /;
 
 /** True once a streamed line shows the compile has finished (or failed). */
 export function isCompileEndLine(line: string): boolean {
+  // Runs per streamed line for the whole compile window; "Took " is plain
+  // text in the banner (only the [SUCCESS]/[FAILED] token carries inline
+  // ANSI), so this skips the strip + regex on essentially every other line.
+  if (!line.includes("Took ")) return false;
   return COMPILE_END_LINE.test(stripAnsi(line));
 }

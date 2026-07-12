@@ -275,8 +275,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Tear down active follow_job: client-side (drop local handler) and
   // backend-side (stop pushing lines). Settles a pending _compileAndWait so
   // the parent flow doesn't hang. Cancels the underlying job so the backend
-  // stops working for a dismissed dialog.
-  _detachStream() {
+  // stops working for a dismissed dialog, unless ``cancelJob: false`` —
+  // then the job is released to finish in the background queue.
+  _detachStream({ cancelJob = true }: { cancelJob?: boolean } = {}) {
     // Tear down an in-flight USB-flasher hand-off (message listener + timers)
     // too, so closing or reusing the dialog can't leak it or let a stale
     // flasher tab mutate the next install's state. Pure teardown, no _fail.
@@ -294,7 +295,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       reject(new Error("Install dialog dismissed"));
     }
     if (this._jobId) {
-      this._api.firmwareCancel(this._jobId).catch(() => {});
+      if (cancelJob) this._api.firmwareCancel(this._jobId).catch(() => {});
       this._jobId = "";
     }
   }
@@ -309,11 +310,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   }
 
   // Close the dialog and open Settings → Send builds. The install flow ends
-  // (the flash needs this dialog), but the compile itself is left running in
-  // the background queue — clearing _jobId first keeps _detachStream from
-  // cancelling it, so the finished artifacts warm the next install.
+  // (the flash needs this dialog), but the compile itself is released to
+  // finish in the background queue, so its artifacts warm the next install.
   _tryOpenBuildOffloadSettings = () => {
-    this._jobId = "";
+    this._detachStream({ cancelJob: false });
     this._close();
     this.dispatchEvent(
       new CustomEvent("open-settings", {

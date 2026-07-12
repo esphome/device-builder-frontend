@@ -144,13 +144,6 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       .policy-selected-desc {
         margin-top: var(--wa-space-2xs);
       }
-      .desktop-inline-link {
-        color: var(--esphome-primary);
-        text-decoration: none;
-      }
-      .desktop-inline-link:hover {
-        text-decoration: underline;
-      }
     `,
   ];
 
@@ -162,7 +155,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       "{desktop_link}"
     );
     return html`${before}<a
-        class="desktop-inline-link"
+        class="settings-inline-link"
         href=${desktopDocsUrl()}
         target="_blank"
         rel="noopener noreferrer"
