@@ -54,7 +54,14 @@ export function renderExclusiveGroupField(members: ConfigEntry[], ctx: RenderCtx
   const options = members.filter(
     (m) =>
       ctx.getAt([m.key]) !== undefined ||
-      isEntryVisible(m, rootValues, ctx.presentComponents, targetPlatform)
+      isEntryVisible(
+        m,
+        rootValues,
+        ctx.presentComponents,
+        targetPlatform,
+        undefined,
+        ctx.entries
+      )
   );
 
   // Every *rendered* option board-locked → the choice is fixed; render the

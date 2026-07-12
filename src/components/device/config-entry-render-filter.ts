@@ -205,7 +205,8 @@ export function filterRenderable(
         values,
         opts.presentComponents,
         opts.targetPlatform,
-        opts.rootValues
+        opts.rootValues,
+        entries
       )
     ) {
       continue;

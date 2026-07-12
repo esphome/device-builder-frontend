@@ -404,7 +404,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
       cluster.members.some(
         (m) =>
           getIn(this.values, [m.key]) !== undefined ||
-          isEntryVisible(m, this.values, this.presentComponents, targetPlatform)
+          isEntryVisible(
+            m,
+            this.values,
+            this.presentComponents,
+            targetPlatform,
+            undefined,
+            this.entries
+          )
       );
     const renderedClusterKeys = new Set(
       plan.clusters.filter(clusterRenders).map((c) => c.members[0].key)

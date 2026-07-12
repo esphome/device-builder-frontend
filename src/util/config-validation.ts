@@ -65,6 +65,13 @@ export function platformSupported(
  * root-vs-sibling scope marker would remove the reliance on name
  * uniqueness.)
  *
+ * When the dependency resolves to nothing in either scope, its
+ * ``default_value`` (looked up in `siblings`, the schema list `entry`
+ * belongs to) stands in — YAML omits fields sitting at their default, so
+ * an absent ``spi.type`` still means ``single`` and must keep
+ * ``miso_pin``/``mosi_pin`` visible (#1972). Omit `siblings` and an
+ * unresolved dependency hides the entry as before.
+ *
  * Used by both ``filterRenderable`` (deciding what to paint) and
  * ``validateEntries`` (deciding what to validate). Keeping the
  * predicate in one place means a hidden-by-platform field can't be
@@ -76,7 +83,8 @@ export function isEntryVisible(
   values: Record<string, unknown>,
   presentComponents?: ReadonlySet<string>,
   targetPlatform?: string | null,
-  rootValues?: Record<string, unknown>
+  rootValues?: Record<string, unknown>,
+  siblings?: readonly ConfigEntry[]
 ): boolean {
   if (entry.hidden && !isValuePresent(values[entry.key])) return false;
 
@@ -95,9 +103,12 @@ export function isEntryVisible(
   // check order below is immaterial. Resolve the dependency in the
   // local scope first, then fall back to the component root so a
   // nested entry can gate on a top-level field.
-  const depValue = Object.prototype.hasOwnProperty.call(values, entry.depends_on)
+  let depValue = Object.prototype.hasOwnProperty.call(values, entry.depends_on)
     ? values[entry.depends_on]
     : rootValues?.[entry.depends_on];
+  if (depValue == null) {
+    depValue = siblings?.find((s) => s.key === entry.depends_on)?.default_value;
+  }
   if (entry.depends_on_value !== null && entry.depends_on_value !== undefined) {
     return depValue === entry.depends_on_value;
   }
@@ -366,7 +377,16 @@ function _validateEntriesRecursive(
   for (const entry of entries) {
     // Skip hidden entries and those whose visibility predicates fail —
     // we don't want to require fields the user can't even see.
-    if (!isEntryVisible(entry, values, presentComponents, targetPlatform, rootValues))
+    if (
+      !isEntryVisible(
+        entry,
+        values,
+        presentComponents,
+        targetPlatform,
+        rootValues,
+        entries
+      )
+    )
       continue;
 
     if (entry.type === ConfigEntryType.NESTED) {

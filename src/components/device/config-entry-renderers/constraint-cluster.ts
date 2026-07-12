@@ -181,7 +181,14 @@ export function renderConstraintRadioField(cluster: ConstraintCluster, ctx: Rend
   const targetPlatform = ctx.board?.esphome.platform ?? null;
   const isRenderable = (m: ConfigEntry): boolean =>
     ctx.getAt([m.key]) !== undefined ||
-    isEntryVisible(m, values, ctx.presentComponents, targetPlatform);
+    isEntryVisible(
+      m,
+      values,
+      ctx.presentComponents,
+      targetPlatform,
+      undefined,
+      ctx.entries
+    );
 
   // Gate alternatives on renderability (a board / platform / depends_on can hide
   // a side at runtime) and fall back to the static box when fewer than two real
@@ -273,7 +280,14 @@ export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: Re
   const visibleMembers = cluster.members.filter(
     (m) =>
       ctx.getAt([m.key]) !== undefined ||
-      isEntryVisible(m, values, ctx.presentComponents, targetPlatform)
+      isEntryVisible(
+        m,
+        values,
+        ctx.presentComponents,
+        targetPlatform,
+        undefined,
+        ctx.entries
+      )
   );
   // All members gated off (depends_on / platform / hidden): skip the box rather
   // than render an empty bordered card with just a header.

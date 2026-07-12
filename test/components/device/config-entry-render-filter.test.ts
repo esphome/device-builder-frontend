@@ -416,6 +416,29 @@ describe("filterRenderable", () => {
     ).toEqual(["mode", "advanced_opt"]);
   });
 
+  it("keeps depends_on fields visible when the dependency sits at its default (#1972)", () => {
+    // spi: `type` defaults to "single" and is omitted from YAML, so
+    // miso_pin/mosi_pin must render without the user re-selecting "single".
+    const entries = [
+      makeEntry({ key: "type", default_value: "single" }),
+      makeEntry({
+        key: "miso_pin",
+        depends_on: "type",
+        depends_on_value_any: ["single"],
+      }),
+      makeEntry({
+        key: "data_pins",
+        depends_on: "type",
+        depends_on_value_any: ["quad", "octal"],
+      }),
+    ];
+    expect(
+      filterRenderable(entries, {}, { requiredOnly: false, showAdvanced: false }).map(
+        (e) => e.key
+      )
+    ).toEqual(["type", "miso_pin"]);
+  });
+
   it("respects depends_on_value_any subset gating", () => {
     // Typed-schema shape (ethernet): one entry per unique field, gated
     // on the set of variants carrying it.

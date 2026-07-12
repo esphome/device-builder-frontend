@@ -75,7 +75,8 @@ export function addFormNeedsUserInput(
       values,
       opts.presentComponents,
       opts.targetPlatform ?? null,
-      opts.rootValues
+      opts.rootValues,
+      entries
     );
   if (planNeedsUserInput(plan, isVisible)) return true;
   // Pure-cardinality groups with no cluster box surface a banner only when

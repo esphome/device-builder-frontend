@@ -104,6 +104,53 @@ describe("isEntryVisible depends_on resolution", () => {
   });
 });
 
+describe("isEntryVisible depends_on default fallback", () => {
+  // The spi shape from #1972: `type` defaults to "single" and YAML omits
+  // defaulted fields, so miso_pin/mosi_pin must stay visible with `type` unset.
+  const type = makeEntry({ key: "type", default_value: "single" });
+  const misoPin = makeEntry({
+    key: "miso_pin",
+    depends_on: "type",
+    depends_on_value_any: ["single"],
+  });
+  const dataPins = makeEntry({
+    key: "data_pins",
+    depends_on: "type",
+    depends_on_value_any: ["quad", "octal"],
+  });
+  const siblings = [type, misoPin, dataPins];
+
+  it("an unset dependency reads as its sibling's default_value", () => {
+    expect(isEntryVisible(misoPin, {}, undefined, undefined, undefined, siblings)).toBe(
+      true
+    );
+    expect(isEntryVisible(dataPins, {}, undefined, undefined, undefined, siblings)).toBe(
+      false
+    );
+  });
+
+  it("an explicit value beats the default", () => {
+    const values = { type: "quad" };
+    expect(
+      isEntryVisible(misoPin, values, undefined, undefined, undefined, siblings)
+    ).toBe(false);
+    expect(
+      isEntryVisible(dataPins, values, undefined, undefined, undefined, siblings)
+    ).toBe(true);
+  });
+
+  it("without siblings an unset dependency hides the entry as before", () => {
+    expect(isEntryVisible(misoPin, {})).toBe(false);
+  });
+
+  it("a dependency without a default_value still hides the entry", () => {
+    const noDefault = [makeEntry({ key: "type" }), misoPin];
+    expect(isEntryVisible(misoPin, {}, undefined, undefined, undefined, noDefault)).toBe(
+      false
+    );
+  });
+});
+
 describe("nearCanonicalOption", () => {
   const opt = (value: string, label = value): ConfigValueOption => ({ label, value });
   const units = [opt("L"), opt("L/s"), opt("m³")];
