@@ -16,3 +16,19 @@ export function updateButtonTitle(
     ? localize("dashboard.update_available_version", { installed, target })
     : localize(fallbackKey);
 }
+
+/**
+ * Title for an Update action button: the view-progress hint while a job
+ * runs (the click re-attaches to it), the update tooltip otherwise.
+ */
+export function installActionTitle(
+  localize: LocalizeFunc,
+  busy: boolean,
+  installed: string,
+  target: string,
+  fallbackKey: string
+): string {
+  return busy
+    ? localize("dashboard.table_action_view_progress")
+    : updateButtonTitle(localize, installed, target, fallbackKey);
+}

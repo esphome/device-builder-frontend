@@ -11,17 +11,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
 import { DeviceState } from "../../src/api/types/devices.js";
-import { ESPHomeDeviceCard } from "../../src/components/device-card.js";
-
-async function mount(props: Partial<ESPHomeDeviceCard>): Promise<ESPHomeDeviceCard> {
-  const el = new ESPHomeDeviceCard();
-  el.name = "kitchen";
-  el.configuration = "kitchen.yaml";
-  Object.assign(el, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { mountDeviceCard as mount } from "./_device-card.js";
 
 describe("device-card queued-update indicator", () => {
   it("shows the clock and keeps the offline status badge", async () => {

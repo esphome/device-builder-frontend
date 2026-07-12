@@ -10,17 +10,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
-import { ESPHomeDeviceCard } from "../../src/components/device-card.js";
-
-async function mount(props: Partial<ESPHomeDeviceCard>): Promise<ESPHomeDeviceCard> {
-  const el = new ESPHomeDeviceCard();
-  el.name = "kitchen";
-  el.configuration = "kitchen.yaml";
-  Object.assign(el, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import type { ESPHomeDeviceCard } from "../../src/components/device-card.js";
+import { mountDeviceCard as mount } from "./_device-card.js";
 
 function accentButton(el: ESPHomeDeviceCard): HTMLButtonElement {
   const btn = el.shadowRoot!.querySelector<HTMLButtonElement>(".action-btn--accent");

@@ -9,7 +9,7 @@ import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
-import { updateButtonTitle } from "../../util/update-tooltip.js";
+import { installActionTitle } from "../../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
@@ -317,6 +317,11 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
            free side-effect. Mirrors the legacy dashboard. */
         const showUpdate = row.showUpdate;
         const showInstall = !showUpdate && row.showModified;
+        const installLabel = localize(
+          row.busy
+            ? "dashboard.table_action_view_progress"
+            : "dashboard.table_action_install"
+        );
         const visitUrl = buildWebUiUrl(device);
         const showVisit = visitUrl !== "";
         // Priority order (highest → lowest, last to drop on narrow
@@ -339,16 +344,8 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             showInstall
               ? html`<button
                   class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
-                  aria-label=${localize(
-                    row.busy
-                      ? "dashboard.table_action_view_progress"
-                      : "dashboard.table_action_install"
-                  )}
-                  title=${localize(
-                    row.busy
-                      ? "dashboard.table_action_view_progress"
-                      : "dashboard.table_action_install"
-                  )}
+                  aria-label=${installLabel}
+                  title=${installLabel}
                   @click=${(e: Event) =>
                     dispatchRowEvent(
                       e,
@@ -369,16 +366,13 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
                       ? "dashboard.table_action_view_progress"
                       : "dashboard.table_action_update"
                   )}
-                  title=${
-                    row.busy
-                      ? localize("dashboard.table_action_view_progress")
-                      : updateButtonTitle(
-                          localize,
-                          device.runtime_state.deployed_version,
-                          device.current_version,
-                          "dashboard.table_action_update"
-                        )
-                  }
+                  title=${installActionTitle(
+                    localize,
+                    row.busy,
+                    device.runtime_state.deployed_version,
+                    device.current_version,
+                    "dashboard.table_action_update"
+                  )}
                   @click=${(e: Event) =>
                     dispatchRowEvent(
                       e,

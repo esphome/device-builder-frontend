@@ -12,18 +12,8 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
 import { JobType } from "../../src/api/types/firmware-jobs.js";
-import { ESPHomeDeviceCard } from "../../src/components/device-card.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
-
-async function mount(props: Partial<ESPHomeDeviceCard>): Promise<ESPHomeDeviceCard> {
-  const el = new ESPHomeDeviceCard();
-  el.name = "kitchen";
-  el.configuration = "kitchen.yaml";
-  Object.assign(el, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { mountDeviceCard as mount } from "./_device-card.js";
 
 describe("device-card encryption indicator uses the raw pending flag", () => {
   it("shows encryption-pending but hides the modified dot when the gate is off", async () => {

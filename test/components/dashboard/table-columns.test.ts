@@ -51,7 +51,11 @@ function renderActionsCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResul
     busy: false,
     showUpdate: false,
     showModified: false,
-    _device: { web_port: null },
+    _device: {
+      web_port: null,
+      current_version: "",
+      runtime_state: { deployed_version: "" },
+    },
     ...rowOverrides,
   } as unknown as DeviceRow;
   const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;

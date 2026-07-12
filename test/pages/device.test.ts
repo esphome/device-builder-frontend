@@ -187,8 +187,8 @@ interface InstallView {
   _activeJobs: Map<string, FirmwareJob>;
   _commandDialog: { followJob(job: FirmwareJob, displayName: string): void };
   _saveYaml(): Promise<boolean>;
-  _saveThenInstall(): Promise<void> | undefined;
-  _saveThenUpdate(): Promise<void> | undefined;
+  _saveThenInstall(): Promise<void>;
+  _saveThenUpdate(): Promise<void>;
 }
 
 function makeInstallView(saveResult: boolean): {

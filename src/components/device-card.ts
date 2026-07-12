@@ -29,7 +29,7 @@ import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { updateButtonTitle } from "../util/update-tooltip.js";
+import { installActionTitle } from "../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
@@ -273,30 +273,26 @@ export class ESPHomeDeviceCard extends LitElement {
         aria-label=${this._localize(
           this.busy ? "dashboard.table_action_view_progress" : "dashboard.update"
         )}
-        title=${
-          this.busy
-            ? this._localize("dashboard.table_action_view_progress")
-            : updateButtonTitle(
-                this._localize,
-                this.installedVersion,
-                this.availableVersion,
-                "dashboard.update"
-              )
-        }
+        title=${installActionTitle(
+          this._localize,
+          this.busy,
+          this.installedVersion,
+          this.availableVersion,
+          "dashboard.update"
+        )}
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
       </button>`;
     }
     if (this.showModified) {
+      const label = this._localize(
+        this.busy ? "dashboard.table_action_view_progress" : "dashboard.install"
+      );
       return html`<button
         class="action-btn action-btn--accent action-btn--tile"
         @click=${() => this._emit(this.busy ? "show-progress" : "install-device")}
-        aria-label=${this._localize(
-          this.busy ? "dashboard.table_action_view_progress" : "dashboard.install"
-        )}
-        title=${this._localize(
-          this.busy ? "dashboard.table_action_view_progress" : "dashboard.install"
-        )}
+        aria-label=${label}
+        title=${label}
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
       </button>`;

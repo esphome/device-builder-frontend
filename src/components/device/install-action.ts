@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { updateButtonTitle } from "../../util/update-tooltip.js";
+import { installActionTitle } from "../../util/update-tooltip.js";
 
 export interface InstallActionProps {
   localize: LocalizeFunc;
@@ -33,16 +33,13 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
         type="button"
         class="install-fab install-split__main"
         @click=${p.onUpdate}
-        title=${
-          p.busy
-            ? p.localize("dashboard.table_action_view_progress")
-            : updateButtonTitle(
-                p.localize,
-                p.installedVersion,
-                p.availableVersion,
-                "dashboard.update"
-              )
-        }
+        title=${installActionTitle(
+          p.localize,
+          p.busy,
+          p.installedVersion,
+          p.availableVersion,
+          "dashboard.update"
+        )}
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
         ${p.localize("dashboard.update")}

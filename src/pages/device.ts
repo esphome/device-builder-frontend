@@ -948,8 +948,11 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   // Persist the editor buffer before building — install/compile build the
-  // on-disk file, so an unsaved edit would flash the previous version.
+  // on-disk file, so an unsaved edit would flash the previous version. A
+  // click while a job already runs re-attaches to it instead: no save (the
+  // edit stays in the buffer), no second job.
   private _installAfterSave = async (run: () => void): Promise<void> => {
+    if (this._showActiveJobProgress()) return;
     let saved: boolean;
     try {
       saved = await this._saveYaml();
@@ -962,14 +965,8 @@ export class ESPHomePageDevice extends LitElement {
     }
     if (saved) run();
   };
-  private _saveThenInstall = (): Promise<void> | undefined => {
-    if (this._showActiveJobProgress()) return;
-    return this._installAfterSave(this._installCtrl.onInstall);
-  };
-  private _saveThenUpdate = (): Promise<void> | undefined => {
-    if (this._showActiveJobProgress()) return;
-    return this._installAfterSave(this._installCtrl.onUpdate);
-  };
+  private _saveThenInstall = () => this._installAfterSave(this._installCtrl.onInstall);
+  private _saveThenUpdate = () => this._installAfterSave(this._installCtrl.onUpdate);
 
   /** Re-attach the command dialog to this device's running job, if any —
    *  the Update/Install buttons stay clickable mid-job and open the
