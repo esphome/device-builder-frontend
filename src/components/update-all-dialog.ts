@@ -166,11 +166,17 @@ export class ESPHomeUpdateAllDialog extends LitElement {
 
   // Bulk update deliberately supersedes: the backend cancels and restarts a
   // configuration's in-flight jobs on enqueue (#1195). Warn when it will
-  // actually happen. Memoized like the sibling tallies — _activeJobs churns
-  // on every job-progress event while the dialog sits open.
+  // actually happen. Memoized like the sibling tallies, but _activeJobs is
+  // rebuilt on every job-progress event, so the memo misses on each tick
+  // while the dialog sits open — count with a plain loop, no allocation.
   private _buildingCountMemo = memoizeOne(
-    (matched: ConfiguredDevice[], activeJobs: Map<string, FirmwareJob>) =>
-      matched.filter((d) => activeJobs.has(d.configuration)).length
+    (matched: ConfiguredDevice[], activeJobs: Map<string, FirmwareJob>) => {
+      let building = 0;
+      for (const d of matched) {
+        if (activeJobs.has(d.configuration)) building += 1;
+      }
+      return building;
+    }
   );
 
   private _renderSupersedeNote(matched: ConfiguredDevice[]) {
