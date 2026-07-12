@@ -143,39 +143,61 @@ const numberFormatterCache = new Map<string, Intl.NumberFormat>();
 
 export function getNumberFormatter(
   language: string | undefined,
-  maximumFractionDigits: number
+  maximumFractionDigits: number,
+  minimumIntegerDigits?: number
 ): Intl.NumberFormat {
-  const key = `${language ?? "default"}|${maximumFractionDigits}`;
+  const key = `${language ?? "default"}|${maximumFractionDigits}|${minimumIntegerDigits ?? ""}`;
   let formatter = numberFormatterCache.get(key);
   if (formatter === undefined) {
-    formatter = new Intl.NumberFormat(language, { maximumFractionDigits });
+    formatter = new Intl.NumberFormat(language, {
+      maximumFractionDigits,
+      minimumIntegerDigits,
+    });
     numberFormatterCache.set(key, formatter);
   }
   return formatter;
 }
 
 /**
- * Format a remaining-seconds countdown as a compact duration:
- * ``45s`` / ``8m`` / ``1h 14m`` / ``0s``. Locale-aware digits via
- * the shared number formatter; the unit letters aren't localized
- * (matches the drawer's other compact readouts).
- *
- * Pairs with :func:`remainingOf` for the device drawer's mDNS
- * expiry fold-down, recomputed each 1Hz tick against ``Date.now()``.
- * ``null`` / ``undefined`` → empty string (caller gates the row).
+ * Format a duration in seconds as a compact readout — ``45s`` / ``8m`` /
+ * ``1h 14m`` (zero minutes dropped: ``1h``). With ``showSeconds`` it keeps
+ * the finer unit for a live ticking counter: ``4m 32s``, and ``1h 05m`` with
+ * minutes padded so the counter's width stays stable across ticks.
+ * Locale-aware digits via the shared number formatter; the unit letters
+ * aren't localized. Negative input clamps to ``0s``.
+ */
+export function formatDuration(
+  seconds: number,
+  { showSeconds = false, language }: { showSeconds?: boolean; language?: string } = {}
+): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const fmt = getNumberFormatter(language, 0);
+  if (total < 60) return `${fmt.format(total)}s`;
+  if (total < 3600) {
+    const minutes = Math.floor(total / 60);
+    return showSeconds
+      ? `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`
+      : `${fmt.format(minutes)}m`;
+  }
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (showSeconds) {
+    return `${fmt.format(hours)}h ${getNumberFormatter(language, 0, 2).format(minutes)}m`;
+  }
+  return minutes > 0
+    ? `${fmt.format(hours)}h ${fmt.format(minutes)}m`
+    : `${fmt.format(hours)}h`;
+}
+
+/**
+ * :func:`formatDuration` with the null-gating the device drawer's mDNS
+ * expiry fold-down needs: ``null`` / ``undefined`` → empty string (caller
+ * gates the row). Pairs with :func:`remainingOf`, recomputed each 1Hz tick.
  */
 export function formatCountdown(
   seconds: number | null | undefined,
   language?: string
 ): string {
   if (seconds === null || seconds === undefined) return "";
-  const total = Math.max(0, Math.floor(seconds));
-  const fmt = getNumberFormatter(language, 0);
-  if (total < 60) return `${fmt.format(total)}s`;
-  if (total < 3600) return `${fmt.format(Math.floor(total / 60))}m`;
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  return minutes > 0
-    ? `${fmt.format(hours)}h ${fmt.format(minutes)}m`
-    : `${fmt.format(hours)}h`;
+  return formatDuration(seconds, { language });
 }

@@ -1,3 +1,5 @@
+import { formatDuration } from "./relative-time.js";
+
 /**
  * Render an ISO timestamp as a short relative phrase ("2m ago",
  * "in 30s") via Intl.RelativeTimeFormat. Picks the coarsest unit that
@@ -27,20 +29,12 @@ export function parseIsoMs(iso: string | null | undefined): number | null {
 }
 
 /**
- * Render a running duration in milliseconds as a compact counter —
- * ``45s``, ``4m 32s``, ``1h 05m``. Negative deltas clamp to ``0s`` so a
- * clock skew never prints a leading minus.
+ * :func:`formatDuration` for a running millisecond counter — ``45s``,
+ * ``4m 32s``, ``1h 05m``. Negative deltas clamp to ``0s`` so a clock skew
+ * never prints a leading minus.
  */
 export function formatElapsed(ms: number): string {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  if (totalSec < 60) return `${totalSec}s`;
-  if (totalSec < 3600) {
-    const m = Math.floor(totalSec / 60);
-    return `${m}m ${totalSec % 60}s`;
-  }
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  return `${h}h ${String(m).padStart(2, "0")}m`;
+  return formatDuration(ms / 1000, { showSeconds: true });
 }
 
 /**
