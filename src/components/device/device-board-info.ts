@@ -373,14 +373,6 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     `;
   }
 
-  /**
-   * Render one of the three numbered "next steps" panels in the
-   * unselected content pane (Core / Components / Automations). Each
-   * has a heading, a longer description, and a CTA that expands the
-   * matching section in the device navigator on the left — the goal
-   * is to teach the user that the navigator is where you manage
-   * these things, rather than handing them an add-button right here.
-   */
   /** Key → location, memoized: a fresh object per render would defeat
    *  the editors' focus-resolver memoization on every parent render. */
   private _locationForKey = memoizeOne(locationFromSectionKey);
@@ -453,6 +445,14 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     ></esphome-device-section-config>`;
   }
 
+  /**
+   * Render one of the three numbered "next steps" panels in the
+   * unselected content pane (Core / Components / Automations). Each
+   * has a heading, a longer description, and a CTA that expands the
+   * matching section in the device navigator on the left — the goal
+   * is to teach the user that the navigator is where you manage
+   * these things, rather than handing them an add-button right here.
+   */
   private _renderStepSection(opts: {
     title: string;
     desc: string;
