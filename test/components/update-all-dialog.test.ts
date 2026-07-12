@@ -27,6 +27,7 @@ interface DialogInternals {
   _devices: ReturnType<typeof makeConfiguredDevice>[];
   _api: ESPHomeAPI;
   _selection: FacetSelection;
+  _activeJobs: Map<string, unknown>;
   _localize: (key: string, args?: { count?: number }) => string;
 }
 
@@ -139,5 +140,24 @@ describe("update-all-dialog", () => {
     await el.updateComplete;
     primaryButton(el).click();
     expect(firmwareInstallBulk).toHaveBeenCalledWith(["c.yaml"]);
+  });
+
+  it("warns how many matched devices are building (their builds restart)", async () => {
+    const { api } = fakeApi();
+    const el = await mount([onlineUpdatable, onlineCurrent, offlineUpdatable], api);
+    (el as unknown as DialogInternals)._activeJobs = new Map([["a.yaml", {}]]);
+    await el.updateComplete;
+    const note = el.shadowRoot!.querySelector(".summary-note");
+    expect(note).not.toBeNull();
+    expect(note!.textContent).toContain("update_all_dialog.supersede_note:1");
+  });
+
+  it("renders no supersede note when nothing matched is building", async () => {
+    const { api } = fakeApi();
+    const el = await mount([onlineUpdatable, onlineCurrent, offlineUpdatable], api);
+    // b.yaml is building but doesn't match the filter, so no note.
+    (el as unknown as DialogInternals)._activeJobs = new Map([["b.yaml", {}]]);
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector(".summary-note")).toBeNull();
   });
 });

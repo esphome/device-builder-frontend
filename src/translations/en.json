@@ -1119,6 +1119,7 @@
   "update_all_dialog": {
     "title": "Update All",
     "count": "{count, plural, one {# device will be updated} other {# devices will be updated}}",
+    "supersede_note": "{count, plural, one {# device is building now — its build will restart} other {# devices are building now — their builds will restart}}",
     "confirm": "Update"
   },
   "yaml_search": {
