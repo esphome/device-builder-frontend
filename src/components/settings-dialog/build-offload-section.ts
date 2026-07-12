@@ -18,6 +18,7 @@ import {
   buildOffloadDiscoveredHostsContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
+  desktopVersionContext,
   localizeContext,
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
@@ -78,6 +79,10 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   @consume({ context: versionContext, subscribe: true })
   @state()
   private _appVersion = "";
+
+  @consume({ context: desktopVersionContext, subscribe: true })
+  @state()
+  private _desktopVersion = "";
 
   @consume({ context: buildOffloadDiscoveredHostsContext, subscribe: true })
   @state()
@@ -148,8 +153,12 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   ];
 
   // Intro copy with "ESPHome Desktop" itself linked to the app's docs, so a
-  // reader learns how to get it inline rather than via a separate CTA.
+  // reader learns how to get it inline rather than via a separate CTA. On
+  // Desktop that link is self-referential, so a plain variant renders instead.
   private _renderPairedServersDesc() {
+    if (this._desktopVersion) {
+      return html`${this._localize("settings.paired_build_servers_desc_desktop")}`;
+    }
     const [before, after] = splitTemplate(
       this._localize("settings.paired_build_servers_desc"),
       "{desktop_link}"

@@ -1265,6 +1265,7 @@
     "pair_build_server_row_aria": "Pair with {name}",
     "paired_build_servers_heading": "Paired build servers",
     "paired_build_servers_desc": "Compiling firmware is CPU-heavy and can take a while on a low-power system. Pair a faster machine on your network, another dashboard or {desktop_link}, to cut compile times; flashing still happens here. Pending rows are waiting for the receiver's admin to accept.",
+    "paired_build_servers_desc_desktop": "Pair a faster machine on your network running another Device Builder to cut compile times; flashing still happens here. Pending rows are waiting for the receiver's admin to accept.",
     "esphome_desktop": "ESPHome Desktop",
     "paired_build_servers_loading": "Loading pairings…",
     "paired_build_servers_empty": "No build servers paired yet.",
