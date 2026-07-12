@@ -49,7 +49,7 @@ function makePage(
   page.id = "kitchen.yaml";
   internals(page)._yaml = YAML;
   internals(page)._savedYaml = YAML;
-  internals(page)._selectedFromLine = opts.line;
+  internals(page)._pendingUrlLine = opts.line;
   internals(page)._selectedSection = opts.section ?? null;
   return page;
 }
@@ -69,6 +69,15 @@ describe("URL ?line= deep focus on load (#1212)", () => {
     expect(internals(page)._scrollToHighlight).toBe(true);
   });
 
+  it("pins _selectedFromLine to the section start, as a live caret move would", () => {
+    // Line 7 sits in the sensor item instance starting at line 5; the
+    // raw line stays in the highlight range only.
+    const page = makePage({ line: 7 });
+    internals(page)._maybeResolveLineFromUrl();
+    expect(internals(page)._selectedFromLine).toBe(5);
+    expect(internals(page)._highlightRange).toEqual({ fromLine: 7, toLine: 7 });
+  });
+
   it("a section+line arrival keeps the section and still derives focus", () => {
     const page = makePage({ line: 7, section: "sensor.aht10" });
     internals(page)._maybeResolveLineFromUrl();
@@ -85,14 +94,25 @@ describe("URL ?line= deep focus on load (#1212)", () => {
     expect(internals(page)._focusYamlPath).toBeUndefined();
   });
 
-  it("runs once per navigation — a later _loadYaml (board swap) can't re-derive", () => {
+  it("consumes the intent — a later _loadYaml (board swap) can't re-derive", () => {
     const page = makePage({ line: 2 });
     internals(page)._maybeResolveLineFromUrl();
+    expect(internals(page)._pendingUrlLine).toBeUndefined();
     internals(page)._focusFieldPath = undefined;
     internals(page)._focusYamlPath = undefined;
     internals(page)._maybeResolveLineFromUrl();
     expect(internals(page)._focusFieldPath).toBeUndefined();
     expect(internals(page)._focusYamlPath).toBeUndefined();
+  });
+
+  it("keeps the intent pending while the YAML hasn't loaded", () => {
+    const page = makePage({ line: 2 });
+    internals(page)._yaml = "";
+    internals(page)._maybeResolveLineFromUrl();
+    expect(internals(page)._pendingUrlLine).toBe(2);
+    internals(page)._yaml = YAML;
+    internals(page)._maybeResolveLineFromUrl();
+    expect(internals(page)._focusFieldPath).toEqual(["sda"]);
   });
 
   it("no line param is a no-op", () => {

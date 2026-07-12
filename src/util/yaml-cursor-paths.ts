@@ -41,11 +41,21 @@ export function cursorKeyPathAt(state: EditorState, pos: number): string[] {
   return path;
 }
 
+/** ``getKeyPathWithListIndices`` under the ``yaml-cursor-line`` event's
+ *  convention: ``undefined`` (omitted) on lines only the indent walkers
+ *  can anchor. */
+export function indexedKeyPathAt(
+  state: EditorState,
+  pos: number
+): YamlPathSegment[] | undefined {
+  const indexed = getKeyPathWithListIndices(state, pos);
+  return indexed.length ? indexed : undefined;
+}
+
 /** The key path plus its indexed (AST-only) sibling, as carried by the
  *  editor's ``yaml-cursor-line`` event. */
 export interface YamlLinePaths {
   path: string[];
-  /** ``undefined`` on lines only the indent walkers can anchor. */
   indexedPath?: YamlPathSegment[];
 }
 
@@ -57,13 +67,13 @@ export interface YamlLinePaths {
 export function pathsForYamlLine(yaml: string, line: number): YamlLinePaths | null {
   const state = EditorState.create({ doc: yaml, extensions: [esphomeYaml()] });
   if (line < 1 || line > state.doc.lines) return null;
-  // Runs once per navigation; a device YAML parses in single-digit ms.
-  // A null return (budget exhausted) still leaves a usable partial tree.
-  ensureSyntaxTree(state, state.doc.length, 1000);
   const pos = state.doc.line(line).to;
-  const indexedPath = getKeyPathWithListIndices(state, pos);
+  // Runs once per navigation; parsing to the target line is single-digit
+  // ms. The path walks only read ancestors of ``pos``, so nothing past it
+  // is needed, and a partial tree (budget exhausted) still resolves.
+  ensureSyntaxTree(state, pos, 1000);
   return {
     path: cursorKeyPathAt(state, pos),
-    indexedPath: indexedPath.length ? indexedPath : undefined,
+    indexedPath: indexedKeyPathAt(state, pos),
   };
 }

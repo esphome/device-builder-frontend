@@ -173,7 +173,14 @@ export class ESPHomePageDevice extends LitElement {
   private _selectedSection: string | null = this._readUrlParam("section", null);
 
   @state()
-  private _selectedFromLine?: number = this._readUrlLine();
+  private _selectedFromLine?: number;
+
+  /** One-shot ``?line=`` deep-link intent, consumed (cleared) by
+   *  ``_maybeResolveLineFromUrl`` once the YAML is loaded. Kept apart
+   *  from ``_selectedFromLine`` — that field is durable section-instance
+   *  state the URL round-trips, so parking the intent there would
+   *  re-derive focus on every later ``_loadYaml`` (board swap). */
+  private _pendingUrlLine?: number = this._readUrlLine();
 
   /** Instance-relative field path the YAML cursor is on, for the form to
    *  scroll into view; empty on a section header / non-field line. */
@@ -678,14 +685,8 @@ export class ESPHomePageDevice extends LitElement {
     }
   }
 
-  /** ``true`` once the URL's ``?line=`` has been resolved against the
-   *  loaded YAML. ``_updateUrl`` round-trips and later ``_loadYaml``
-   *  calls (board swap) must not re-derive focus from a stale line. */
-  private _urlLineConsumed = false;
-
   /**
-   * Resolve a ``?line=N`` URL parameter to a concrete section and
-   * field focus once the YAML has loaded. Runs once per navigation.
+   * Consume the one-shot ``?line=`` intent once the YAML has loaded.
    *
    * Direct-link arrivals from the dashboard's YAML hit list
    * carry only ``?line=N`` (not ``?section=``); the navigator's
@@ -695,19 +696,19 @@ export class ESPHomePageDevice extends LitElement {
    * N and pin both ``_selectedSection`` and ``_scrollToHighlight``
    * — the navigator's existing emit-on-update logic then fires
    * the scroll-into-view dispatch in CodeMirror. The focus paths
-   * deep-target the line's field in the structured editor, the
-   * same as a live caret move onto it.
+   * deep-target the line's field in the structured editor, and
+   * ``_selectedFromLine`` is pinned to the section's own start so
+   * the arrival is state-identical to a live caret move onto the
+   * line (instance disambiguation, same-section move checks).
    */
   private _maybeResolveLineFromUrl() {
-    if (this._urlLineConsumed) return;
-    this._urlLineConsumed = true;
-    const resolved = resolveUrlLineFocus(
-      this._yaml,
-      this._selectedFromLine,
-      this._selectedSection
-    );
+    if (this._pendingUrlLine === undefined || !this._yaml) return;
+    const line = this._pendingUrlLine;
+    this._pendingUrlLine = undefined;
+    const resolved = resolveUrlLineFocus(this._yaml, line, this._selectedSection);
     if (!resolved) return;
     this._selectedSection = resolved.sectionKey;
+    this._selectedFromLine = resolved.sectionFromLine;
     this._focusFieldPath = resolved.fieldPath;
     this._focusYamlPath = resolved.yamlPath;
     // ``_highlightRange`` is what the editor reads to drive

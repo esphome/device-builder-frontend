@@ -21,6 +21,10 @@ import { sectionAtLine, sectionKeyOf } from "./yaml-sections.js";
 export interface ResolvedUrlLine {
   /** Section key (e.g. ``"esphome"``, ``"sensor.dht"``) the line falls within. */
   sectionKey: string;
+  /** First line of the section *instance* containing the URL line — what a
+   *  live caret move would pin as ``selectedFromLine`` (duplicate-key
+   *  sections resolve their instance by it). */
+  sectionFromLine: number;
   /**
    * Highlight range fed to the YAML editor.
    *
@@ -77,6 +81,7 @@ export function resolveSectionForUrlLine(
   if (!match) return null;
   return {
     sectionKey: sectionKeyOf(match),
+    sectionFromLine: match.fromLine,
     range: { fromLine: line, toLine: line },
   };
 }
@@ -95,11 +100,10 @@ export function resolveUrlLineFocus(
   line: number | undefined,
   currentSection: string | null
 ): ResolvedUrlLineFocus | null {
-  if (line === undefined) return null;
   const resolved = resolveSectionForUrlLine(yaml, line);
   if (!resolved) return null;
   if (currentSection !== null && currentSection !== resolved.sectionKey) return null;
-  const paths = pathsForYamlLine(yaml, line);
+  const paths = pathsForYamlLine(yaml, resolved.range.fromLine);
   return {
     ...resolved,
     fieldPath: paths ? formRelativePath(paths.path) : [],

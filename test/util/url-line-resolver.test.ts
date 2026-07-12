@@ -65,6 +65,7 @@ describe("resolveSectionForUrlLine", () => {
     const got = resolveSectionForUrlLine(SAMPLE_YAML, 2);
     expect(got).not.toBeNull();
     expect(got!.sectionKey).toBe("esphome");
+    expect(got!.sectionFromLine).toBe(1);
     expect(got!.range).toEqual({ fromLine: 2, toLine: 2 });
   });
 
@@ -150,6 +151,7 @@ describe("resolveUrlLineFocus", () => {
     const got = resolveUrlLineFocus(SCRIPT_YAML, 9, null);
     expect(got).not.toBeNull();
     expect(got!.sectionKey).toBe("automation:script:blink");
+    expect(got!.sectionFromLine).toBe(5);
     expect(got!.yamlPath).toEqual(["script", 0, "then", 0, "logger.log", "format"]);
   });
 
