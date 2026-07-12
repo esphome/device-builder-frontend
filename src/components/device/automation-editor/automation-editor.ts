@@ -27,7 +27,7 @@
  * is outstanding.
  */
 import { consume } from "@lit/context";
-import { html, LitElement, nothing, type PropertyValues } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 
@@ -35,7 +35,6 @@ import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
-  AutomationTrigger,
   AvailableAutomations,
   AvailableComponentInstance,
   AvailableScript,
@@ -46,10 +45,8 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import { pathIsAdvanced } from "../../../util/config-entry-tree.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { parseSubstitutions } from "../../../util/substitutions.js";
-import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -206,17 +203,6 @@ export class ESPHomeAutomationEditor extends LitElement {
     }
   );
 
-  /** The catalog trigger currently in effect — shared by render and the
-   *  focus-driven advanced reveal. */
-  private _activeTrigger(automation: AutomationTree): AutomationTrigger | null {
-    const id = effectiveTriggerIdFor(
-      automation,
-      this.location,
-      this._available?.devices ?? []
-    );
-    return id ? (this._available?.triggers.find((t) => t.id === id) ?? null) : null;
-  }
-
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   connectedCallback(): void {
@@ -233,25 +219,6 @@ export class ESPHomeAutomationEditor extends LitElement {
     // the page-level save guard hold a direct ref and call
     // flushPending() before its global save) is dispatched by the
     // shared engine's hostConnected.
-  }
-
-  /** Reveal hidden advanced trigger params when the cursor targets one,
-   *  so the form's scroll-to-field can reach it. */
-  protected willUpdate(changed: PropertyValues): void {
-    if (
-      this._showAdvanced ||
-      !(changed.has("focusYamlPath") || changed.has("value") || changed.has("_available"))
-    ) {
-      return;
-    }
-    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
-    if (!focus || focus.node.length > 0 || focus.field.length === 0) return;
-    const entries = triggerParamFormEntries(
-      this.location,
-      this._intervalComponent,
-      this._activeTrigger(this.value ?? emptyAutomationTree())
-    );
-    if (pathIsAdvanced(entries, focus.field)) this._showAdvanced = true;
   }
 
   protected updated(changed: Map<string, unknown>) {
@@ -435,7 +402,9 @@ export class ESPHomeAutomationEditor extends LitElement {
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
     const effectiveTriggerId = effectiveTriggerIdFor(automation, target, devices);
-    const activeTrigger = this._activeTrigger(automation);
+    const activeTrigger = effectiveTriggerId
+      ? (triggers.find((t) => t.id === effectiveTriggerId) ?? null)
+      : null;
     const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
     return html`
       ${renderAutomationHeader(

@@ -33,7 +33,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
-import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
+import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import {
   catalogEntryToProvider,
   type ComponentProvider,
@@ -256,6 +256,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /** Instance-relative field path to scroll into view, from the YAML cursor. */
   @property({ attribute: false })
   focusFieldPath?: string[];
+
+  /** ``focusFieldPath`` key already advanced-revealed — one-shot per
+   *  target so a later deliberate collapse sticks. */
+  private _focusRevealKey?: string;
 
   @state()
   private _nestedOpenSections: Set<string> = new Set();
@@ -614,6 +618,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // field paints inline, so nothing needs the section forced open — and flipping
     // showAdvanced would reveal every empty advanced field, the bug this guards.
     if (this.advancedSection && !this.showAdvanced && this._effectiveForceOpen()) {
+      this._emitAdvancedToggle(true);
+    }
+    this._maybeRevealForFocus();
+  }
+
+  /** When the YAML cursor targets a hidden advanced field, ask the host
+   *  to open the section (once per target) so the scroll can reach it. */
+  private _maybeRevealForFocus(): void {
+    if (!this.advancedSection || this.showAdvanced || !this.focusFieldPath?.length) {
+      return;
+    }
+    // Entries can land after the path (async catalog) — hold the shot.
+    if (this.entries.length === 0) return;
+    const key = fieldKeyAttr(this.focusFieldPath);
+    if (key === this._focusRevealKey) return;
+    this._focusRevealKey = key;
+    if (pathIsAdvanced(this.entries, this.focusFieldPath)) {
       this._emitAdvancedToggle(true);
     }
   }

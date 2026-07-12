@@ -279,10 +279,13 @@ describe("resolveAutomationFocus", () => {
   });
 
   it("terminates at node level on a scalar shorthand", () => {
-    // ``- logger.log: warm`` — the cursor path ends at the action id.
-    expect(
-      resolveAutomationFocus(REPRO, ["then", 0, "if", "then", 0, "logger.log"])
-    ).toEqual({ node: [0, "then", 0], field: [] });
+    // ``- logger.log: warm`` — the cursor path ends at the action id key,
+    // never reaching the shorthand-mapped param.
+    const t = tree([action("logger.log", { params: { format: "warm" } })]);
+    expect(resolveAutomationFocus(t, ["then", 0, "logger.log"])).toEqual({
+      node: [0],
+      field: [],
+    });
   });
 
   it("falls back to an id search when a multi-key item shifted indices", () => {

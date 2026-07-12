@@ -538,6 +538,60 @@ describe("config-entry-form advanced-section", () => {
     expect(detail).toEqual({ show: true });
   });
 
+  it("asks the host to open the section once when the cursor targets a hidden advanced field", () => {
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [BASIC, ADVANCED];
+    form.values = {};
+    form.advancedSection = true;
+    form.showAdvanced = false;
+    form.focusFieldPath = ["reboot_timeout"];
+    let count = 0;
+    form.addEventListener("advanced-toggle", () => count++);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(1);
+    // One-shot: a host decline (or a deliberate re-collapse) sticks.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(1);
+  });
+
+  it("does not ask for a basic-field focus target", () => {
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [BASIC, ADVANCED];
+    form.values = {};
+    form.advancedSection = true;
+    form.showAdvanced = false;
+    form.focusFieldPath = ["name"];
+    let emitted = false;
+    form.addEventListener("advanced-toggle", () => {
+      emitted = true;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(emitted).toBe(false);
+  });
+
+  it("holds the focus-reveal shot until entries land", () => {
+    // The path can arrive before the async catalog; the target must not be
+    // consumed against an empty schema.
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [];
+    form.values = {};
+    form.advancedSection = true;
+    form.showAdvanced = false;
+    form.focusFieldPath = ["reboot_timeout"];
+    let count = 0;
+    form.addEventListener("advanced-toggle", () => count++);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(0);
+    form.entries = [BASIC, ADVANCED];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any).updated(new Map());
+    expect(count).toBe(1);
+  });
+
   it("emits advanced-toggle when the control is clicked", () => {
     const form = new ESPHomeConfigEntryForm();
     form.entries = [BASIC, ADVANCED];

@@ -17,8 +17,9 @@ import type {
   AutomationTree,
   ConditionNode,
 } from "../../../api/types/automations.js";
+import type { YamlPathSegment } from "../../../util/yaml-ast.js";
 
-export type YamlPathSegment = string | number;
+export type { YamlPathSegment };
 
 /** Tree coordinates for one focus target inside an automation. */
 export interface AutomationFocus {
@@ -103,16 +104,11 @@ export function focusKey(focus: AutomationFocus | null | undefined): string | un
   return focus ? JSON.stringify([focus.node, focus.field]) : undefined;
 }
 
-/** Scroll a node row into view with the shared one-shot cursor glow. */
-export function scrollFlashRow(row: HTMLElement): void {
-  row.scrollIntoView({ block: "center" });
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-  row.classList.remove("field--highlight");
-  void row.offsetWidth;
-  row.classList.add("field--highlight");
-  row.addEventListener("animationend", () => row.classList.remove("field--highlight"), {
-    once: true,
-  });
+/** ``@property`` comparator for ``focusTarget``: parents mint a fresh
+ *  (deep-equal) slice per render; only a value change should dirty the
+ *  subtree. */
+export function focusTargetHasChanged(a: unknown, b: unknown): boolean {
+  return focusKey(a as AutomationFocus | null) !== focusKey(b as AutomationFocus | null);
 }
 
 function actionListFocus(

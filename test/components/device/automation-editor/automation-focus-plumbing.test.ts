@@ -41,7 +41,7 @@ import { ESPHomeAutomationActionNode } from "../../../../src/components/device/a
 import { ESPHomeAutomationConditionTree } from "../../../../src/components/device/automation-editor/automation-condition-tree.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
 import type { AutomationFocus } from "../../../../src/components/device/automation-editor/automation-focus.js";
-import { flushMicrotasks } from "../../../_dom.js";
+import { flushMicrotasks, mount } from "../../../_dom.js";
 
 const entry = (key: string, advanced = false) =>
   ({ key, type: "string", label: key, advanced }) as unknown as ConfigEntry;
@@ -84,14 +84,7 @@ const inRange = (params: Record<string, unknown> = {}): ConditionNode => ({
   children: [],
 });
 
-async function settle(el: HTMLElement & { updateComplete: Promise<boolean> }) {
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
-
 afterEach(() => {
-  document.body.innerHTML = "";
   vi.restoreAllMocks();
 });
 
@@ -105,7 +98,7 @@ describe("action-list focus slicing", () => {
     list.catalog = [IF_DEF, LOG_DEF];
     list.conditionCatalog = [IN_RANGE_DEF];
     list.focusTarget = { node: [1, "conditions", 0], field: ["above"] };
-    await settle(list);
+    await mount(list);
 
     const rows = list.shadowRoot!.querySelectorAll("esphome-automation-action-node");
     expect((rows[0] as ESPHomeAutomationActionNode).focusTarget).toBeNull();
@@ -126,7 +119,7 @@ describe("action-node focus routing", () => {
     el.catalog = [IF_DEF, LOG_DEF];
     el.conditionCatalog = [IN_RANGE_DEF, OR_DEF];
     el.focusTarget = focusTarget;
-    await settle(el);
+    await mount(el);
     return el;
   }
 
@@ -160,7 +153,9 @@ describe("action-node focus routing", () => {
     expect(byLabel("action").focusTarget).toBeNull();
   });
 
-  it("arms the params form and reveals advanced for a hidden advanced field", async () => {
+  it("arms the params form's focusFieldPath for a field target", async () => {
+    // The advanced reveal itself is the form's job (one-shot
+    // advanced-toggle, pinned in config-entry-form-advanced-section).
     const el = await mountNode(
       { action_id: "logger.log", params: {}, children: {}, conditions: [] },
       { node: [], field: ["level"] }
@@ -168,8 +163,6 @@ describe("action-node focus routing", () => {
     const form = el.shadowRoot!.querySelector("esphome-config-entry-form");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((form as any).focusFieldPath).toEqual(["level"]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((el as any)._showAdvanced).toBe(true);
   });
 
   it("un-collapses a collapsed card so the target can render", async () => {
@@ -209,7 +202,7 @@ describe("condition-tree focus routing", () => {
     tree.conditions = [inRange({ above: 20 }), inRange({ above: 30 })];
     tree.catalog = [IN_RANGE_DEF];
     tree.focusTarget = { node: [1], field: ["above"] };
-    await settle(tree);
+    await mount(tree);
 
     const forms = tree.shadowRoot!.querySelectorAll("esphome-config-entry-form");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -225,7 +218,7 @@ describe("condition-tree focus routing", () => {
     ];
     tree.catalog = [IN_RANGE_DEF, OR_DEF];
     tree.focusTarget = { node: [0, 1], field: ["below"] };
-    await settle(tree);
+    await mount(tree);
 
     const nested = tree.shadowRoot!.querySelector(
       "esphome-automation-condition-tree"
@@ -278,7 +271,7 @@ describe("automation-editor focus resolution", () => {
       "sensor.in_range",
       "above",
     ];
-    await settle(editor);
+    await mount(editor);
     await flushMicrotasks(5);
 
     const list = editor.shadowRoot!.querySelector(

@@ -33,18 +33,17 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import { pathIsAdvanced } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
+import { scrollFlashRow } from "../field-highlight.js";
 import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   type AutomationFocus,
   childFocus,
-  focusKey,
-  scrollFlashRow,
+  focusTargetHasChanged,
 } from "./automation-focus.js";
 import "./catalog-picker-dialog.js";
 import type {
@@ -112,7 +111,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   /** Cursor focus target — ``node`` here is condition-list indices
    *  only: ``[idx]`` targets a row (or its params via ``field``),
    *  deeper indices recurse into a combinator's child tree. */
-  @property({ attribute: false })
+  @property({ attribute: false, hasChanged: focusTargetHasChanged })
   focusTarget: AutomationFocus | null = null;
 
   @query("esphome-catalog-picker-dialog")
@@ -137,29 +136,12 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     fieldHighlightStyles,
   ];
 
-  /** ``focusKey`` of the last target applied — the parent re-slices a
-   *  fresh object per render, so key by value. */
-  private _lastFocusKey?: string;
-
-  /** Row-level scroll already performed for the current target. */
+  /** Row-level scroll spent on the current target (``hasChanged`` keys
+   *  the property by value, so a reset means a genuinely new target). */
   private _focusScrolled = false;
 
-  /** One-shot per distinct target: reveal a row's advanced params when
-   *  the target field hides behind them. */
   protected willUpdate(changed: PropertyValues<this>): void {
-    if (!changed.has("focusTarget")) return;
-    const key = focusKey(this.focusTarget);
-    if (key === this._lastFocusKey) return;
-    this._lastFocusKey = key;
-    if (!key) return;
-    this._focusScrolled = false;
-    const t = this.focusTarget!;
-    const idx = t.node[0];
-    if (typeof idx !== "number" || t.node.length > 1 || t.field.length === 0) return;
-    const def = this.catalog.find((c) => c.id === this.conditions[idx]?.condition_id);
-    if (def && pathIsAdvanced(def.config_entries, t.field)) {
-      this._setRowAdvanced(idx, true);
-    }
+    if (changed.has("focusTarget")) this._focusScrolled = false;
   }
 
   protected updated(): void {
@@ -390,6 +372,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   private _maybeScrollRow(): void {
     const t = this.focusTarget;
     if (!t || this._focusScrolled) return;
+    this._focusScrolled = true;
     const idx = t.node[0];
     if (typeof idx !== "number") return;
     const def = this.catalog.find((c) => c.id === this.conditions[idx]?.condition_id);
@@ -398,7 +381,6 @@ export class ESPHomeAutomationConditionTree extends LitElement {
         ? !def?.accepts_condition_list
         : t.field.length === 0 || !def || def.config_entries.length === 0;
     if (!terminal) return;
-    this._focusScrolled = true;
     const row = this.shadowRoot?.querySelectorAll<HTMLElement>(".ae-row")[idx];
     if (row) scrollFlashRow(row);
   }

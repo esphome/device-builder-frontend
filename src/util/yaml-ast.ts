@@ -199,6 +199,10 @@ export function getKeyPath(state: EditorState, pos: number): string[] {
   return keys.reverse();
 }
 
+/** One segment of an indexed key path: a mapping key or a
+ *  block-sequence index. */
+export type YamlPathSegment = string | number;
+
 /**
  * Like ``getKeyPath``, but block-sequence items contribute their
  * numeric index, so a field inside ``esphome: areas: - id:`` yields
@@ -208,8 +212,8 @@ export function getKeyPath(state: EditorState, pos: number): string[] {
 export function getKeyPathWithListIndices(
   state: EditorState,
   pos: number
-): (string | number)[] {
-  const segs: (string | number)[] = [];
+): YamlPathSegment[] {
+  const segs: YamlPathSegment[] = [];
   for (let node = resolveAnchoredNode(state, pos); node; node = node.parent) {
     if (node.name === "Pair") {
       const k = getPairKey(state, node);
