@@ -57,7 +57,16 @@ export async function openLiveLogPort(
       oldPort,
     ];
     for (const p of candidates) {
-      if (p.readable) return { port: p }; // already open (reset race left it usable)
+      if (p.readable) {
+        // Open but locked by an existing reader → unusable: streamSerialLines'
+        // getReader() would throw "already locked". Skip it and try the next
+        // candidate rather than handing back a port that can't be read.
+        if (p.readable.locked) {
+          lastError = "port stream already locked";
+          continue;
+        }
+        return { port: p }; // already open (reset race left it usable)
+      }
       try {
         // 8k buffer (vs Chrome's 255-byte default) so bursty boot logs in a
         // throttled tab don't overrun — matches the logs/improv paths.
