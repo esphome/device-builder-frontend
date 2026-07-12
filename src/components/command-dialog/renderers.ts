@@ -5,6 +5,7 @@ import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 import {
+  OFFLOAD_HINT_THRESHOLD_MS,
   renderOffloadHint,
   shouldShowOffloadHint,
 } from "../process-terminal/offload-hint.js";
@@ -137,12 +138,6 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   return live?.source_label || primed?.source_label || null;
 }
 
-// Show the offload nudge in the timer detail once a local compile passes this
-// mark. Higher than the inline suggestion's threshold — the popover is an
-// on-demand detail, so it only bothers naming offloading for a properly long
-// build.
-const TIMER_HINT_MS = 5 * 60 * 1000;
-
 // Whole-run timer pinned lower-left — the number that matches PlatformIO's
 // "Took N seconds", so it never reads shorter than the log and never
 // disappears once the job has started (it stays through a queued/deferred
@@ -184,7 +179,7 @@ function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): Templat
     source === JobSource.LOCAL &&
     !hasOffloadSetUp &&
     compile !== null &&
-    compile >= TIMER_HINT_MS;
+    compile >= OFFLOAD_HINT_THRESHOLD_MS;
   return html`
     <div
       class="compile-timer-detail"

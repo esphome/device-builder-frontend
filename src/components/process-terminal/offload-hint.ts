@@ -12,8 +12,10 @@ import { splitTemplate } from "../../util/template-split.js";
  * the build-offload section.
  */
 
-/** Show the hint once a local compile passes this mark (ms). */
-export const OFFLOAD_HINT_THRESHOLD_MS = 180_000;
+/** Show the hint once a local compile passes this mark (ms). Five minutes:
+ *  heavy-but-normal builds (voice satellites, BT proxy) take 3+ minutes even
+ *  on fast hardware and shouldn't trip it. */
+export const OFFLOAD_HINT_THRESHOLD_MS = 5 * 60 * 1000;
 
 export interface OffloadHintHost {
   _localize: LocalizeFunc;
