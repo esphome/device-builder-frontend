@@ -27,15 +27,15 @@ export interface InstallActionProps {
  * the device-editor shadow root, so its `.install-fab` styles apply.
  */
 export function renderInstallAction(p: InstallActionProps): TemplateResult {
+  // The visible text is the accessible name (no aria-label), and it flips to
+  // view-progress while busy — one honest label for sighted, screen-reader,
+  // and voice-control users alike (WCAG 2.5.3 Label in Name).
   if (p.showUpdate) {
     return html`<div class="install-split">
       <button
         type="button"
         class="install-fab install-split__main"
         @click=${p.onUpdate}
-        aria-label=${p.localize(
-          p.busy ? "dashboard.table_action_view_progress" : "dashboard.update"
-        )}
         title=${updateActionTitle(
           p.localize,
           p.busy,
@@ -45,7 +45,9 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
         )}
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
-        ${p.localize("dashboard.update")}
+        ${p.localize(
+          p.busy ? "dashboard.table_action_view_progress" : "dashboard.update"
+        )}
       </button>
       <button
         type="button"
@@ -66,10 +68,9 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
     type="button"
     class="install-fab ${p.showModified ? "" : "install-fab--muted"}"
     @click=${p.onInstall}
-    aria-label=${installLabel}
     title=${installLabel}
   >
     <wa-icon library="mdi" name="upload"></wa-icon>
-    ${p.localize("dashboard.install")}
+    ${installLabel}
   </button>`;
 }
