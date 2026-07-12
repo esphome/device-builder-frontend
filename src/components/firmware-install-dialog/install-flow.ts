@@ -548,15 +548,17 @@ async function artifactsSettled(
  * Deliberately never sets ``host._jobId``: the dialog doesn't own this
  * job, so dismissing the download must not cancel it — teardown only
  * stops the follow stream. Resolves true on ANY terminal outcome (a
- * failed or cancelled build just means the download compiles fresh
+ * failed or cancelled build just means the caller compiles fresh
  * afterwards); false when the dialog was dismissed mid-wait, or on a
  * follow-stream error — a dead stream says nothing about the job, so
  * proceeding could still read torn artifacts or supersede it. The error
- * case fails the dialog; a retry re-reads the active-jobs map.
+ * case fails the dialog with *failKey*; a retry re-reads the active-jobs
+ * map.
  */
-function waitForRunningJob(
+export function waitForRunningJob(
   host: ESPHomeFirmwareInstallDialog,
-  jobId: string
+  jobId: string,
+  failKey = "firmware.download_failed"
 ): Promise<boolean> {
   return new Promise((resolve) => {
     host._compileReject = () => resolve(false);
@@ -574,7 +576,7 @@ function waitForRunningJob(
       onError: () => {
         host._streamId = "";
         host._compileReject = null;
-        host._fail(host._localize("firmware.download_failed"));
+        host._fail(host._localize(failKey));
         resolve(false);
       },
     });

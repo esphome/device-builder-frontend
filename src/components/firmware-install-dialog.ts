@@ -40,6 +40,7 @@ import {
   startDownload,
   startUsbFlash,
   startWebSerialInstall,
+  waitForRunningJob,
 } from "./firmware-install-dialog/install-flow.js";
 import {
   cardState,
@@ -392,10 +393,26 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // build/flash, so a transient error (serial noise, the external flasher's
   // chip-init failing, a closed flasher tab) can be retried in place. Routes by
   // installer since web-flash hands off to the external tab again.
-  _retry = () => {
-    if (!this._device) return;
-    if (this._installer === "web-flash") this.installUsbFlash(this._device);
-    else this.installWebSerial(this._device);
+  _retry = async () => {
+    const device = this._device;
+    if (!device) return;
+    // A foreign build may have started while the error screen sat open;
+    // Retry bypasses the page-level seam guards, so re-running now would
+    // supersede it (#1202). Wait it out like the download flow instead.
+    const running = this._activeJobs.get(device.configuration);
+    if (running) {
+      this._step = "queued";
+      this._errorMessage = "";
+      this._statusMessage = this._localize("firmware.status_waiting_build");
+      const settled = await waitForRunningJob(
+        this,
+        running.job_id,
+        "firmware.install_failed"
+      );
+      if (!settled) return;
+    }
+    if (this._installer === "web-flash") this.installUsbFlash(device);
+    else this.installWebSerial(device);
   };
 
   _cancel = async () => {
