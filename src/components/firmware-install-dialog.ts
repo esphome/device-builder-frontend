@@ -28,6 +28,7 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
+import { LineBatcher } from "../util/line-batcher.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import type { DetectedChip } from "../util/web-serial.js";
@@ -153,6 +154,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _jobId = "";
   _streamId = "";
 
+  // rAF batch buffer for streamed output — coalesce per-line writes into
+  // one render per frame instead of one per line (#1203).
+  private _lineBatch = new LineBatcher((batch) => {
+    this._logLines = [...this._logLines, ...batch];
+  });
+
   // Build compile clocks — drives the compiling-step elapsed readout + the
   // offload hint. The step-based runEnded backstop freezes the span when the
   // flow leaves compiling without a summary banner.
@@ -261,6 +268,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     });
     this._statusMessage = "";
     this._errorMessage = "";
+    this._lineBatch.reset();
     this._logLines = [];
     this._logsExpanded = false;
     this._flashPercent = 0;
@@ -285,6 +293,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // stops working for a dismissed dialog, unless ``cancelJob: false`` —
   // then the job is released to finish in the background queue.
   _detachStream({ cancelJob = true }: { cancelJob?: boolean } = {}) {
+    // Land any buffered lines before teardown so nothing streamed is lost.
+    this._flushLogLines();
     // Tear down an in-flight USB-flasher hand-off (message listener + timers)
     // too, so closing or reusing the dialog can't leak it or let a stale
     // flasher tab mutate the next install's state. Pure teardown, no _fail.
@@ -334,10 +344,23 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Drop into red error state. detail is optional — render skips it entirely
   // when empty so a single-string call doesn't paint the same text twice.
   _fail(title: string, detail = "") {
+    // The expanded log must show every line up to the failure, not race the rAF.
+    this._flushLogLines();
     this._step = "error";
     this._statusMessage = title;
     this._errorMessage = detail;
     this._logsExpanded = true;
+  }
+
+  // Buffer a streamed line; flushed on the next animation frame.
+  _enqueueLogLine(line: string): void {
+    this._lineBatch.enqueue(line);
+  }
+
+  // Drain pending lines into ``_logLines`` now — terminal callbacks and
+  // teardown call this so consumers don't race the rAF.
+  _flushLogLines(): void {
+    this._lineBatch.flush();
   }
 
   // Close + navigate to /device/<configuration>. Same payload shape as

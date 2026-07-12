@@ -36,6 +36,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LightDismissController } from "../util/light-dismiss-controller.js";
+import { LineBatcher } from "../util/line-batcher.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
@@ -142,8 +143,9 @@ export class ESPHomeCommandDialog extends LitElement {
 
   // rAF batch buffer for streamed output — coalesce per-line writes
   // into one render per frame instead of one per line (#348).
-  private _pendingLines: string[] = [];
-  private _flushScheduled = 0;
+  private _lineBatch = new LineBatcher((batch) => {
+    this._lines = [...this._lines, ...batch];
+  });
 
   // Distinguishes user-stopped from backend-failed. Both flip _state to "error"
   // but only real failures get the reset-build-env hint.
@@ -463,31 +465,20 @@ export class ESPHomeCommandDialog extends LitElement {
   // Buffer a streamed line; flushed on the next animation frame.
   _enqueueLine(line: string): void {
     this._timer.noteLine(line);
-    this._pendingLines.push(line);
-    if (this._flushScheduled) return;
-    this._flushScheduled = requestAnimationFrame(() => {
-      this._flushScheduled = 0;
-      this._flushPendingLines();
-    });
+    this._lineBatch.enqueue(line);
   }
 
   // Drain pending lines into ``_lines`` now. Called from terminal
   // callbacks, detachStream, and _downloadOutput so consumers
   // don't race the rAF.
   _flushPendingLines(): void {
-    if (this._pendingLines.length === 0) return;
-    this._lines = [...this._lines, ...this._pendingLines];
-    this._pendingLines = [];
+    this._lineBatch.flush();
   }
 
   // Drop the pending batch and cancel any scheduled flush. Paired
   // with every ``_lines = []`` reset.
   _resetPendingLines(): void {
-    this._pendingLines = [];
-    if (this._flushScheduled) {
-      cancelAnimationFrame(this._flushScheduled);
-      this._flushScheduled = 0;
-    }
+    this._lineBatch.reset();
   }
 
   _downloadOutput = () => {

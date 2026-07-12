@@ -1,0 +1,82 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * Pins the LineBatcher contract: one append per frame regardless of line
+ * count, flush drains immediately, reset drops pending lines and cancels
+ * the scheduled frame.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { LineBatcher } from "../../src/util/line-batcher.js";
+
+function withManualRaf() {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    frames.push(cb);
+    return frames.length;
+  });
+  const cancelled: number[] = [];
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+    cancelled.push(id);
+  });
+  return {
+    frames,
+    cancelled,
+    fire: () => {
+      const pending = frames.splice(0);
+      for (const cb of pending) cb(0);
+    },
+  };
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("LineBatcher", () => {
+  it("coalesces many enqueues into one append per frame", () => {
+    const raf = withManualRaf();
+    const append = vi.fn();
+    const batcher = new LineBatcher(append);
+    batcher.enqueue("a");
+    batcher.enqueue("b");
+    batcher.enqueue("c");
+    expect(append).not.toHaveBeenCalled();
+    expect(raf.frames).toHaveLength(1); // one frame scheduled, not three
+    raf.fire();
+    expect(append).toHaveBeenCalledTimes(1);
+    expect(append).toHaveBeenCalledWith(["a", "b", "c"]);
+  });
+
+  it("flush drains immediately and the later frame is a no-op", () => {
+    const raf = withManualRaf();
+    const append = vi.fn();
+    const batcher = new LineBatcher(append);
+    batcher.enqueue("a");
+    batcher.flush();
+    expect(append).toHaveBeenCalledWith(["a"]);
+    raf.fire();
+    expect(append).toHaveBeenCalledTimes(1); // nothing left to append
+  });
+
+  it("reset drops pending lines and cancels the scheduled frame", () => {
+    const raf = withManualRaf();
+    const append = vi.fn();
+    const batcher = new LineBatcher(append);
+    batcher.enqueue("a");
+    batcher.reset();
+    expect(raf.cancelled).toHaveLength(1);
+    raf.fire();
+    batcher.flush();
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it("keeps batching across frames", () => {
+    const raf = withManualRaf();
+    const lines: string[] = [];
+    const batcher = new LineBatcher((batch) => lines.push(...batch));
+    batcher.enqueue("a");
+    raf.fire();
+    batcher.enqueue("b");
+    batcher.enqueue("c");
+    raf.fire();
+    expect(lines).toEqual(["a", "b", "c"]);
+  });
+});

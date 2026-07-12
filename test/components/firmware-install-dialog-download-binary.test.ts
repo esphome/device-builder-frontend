@@ -67,6 +67,11 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _binaries: [] as FirmwareBinary[],
     _downloadedFilename: "",
     _logLines: [] as string[],
+    // Synchronous stand-ins for the dialog's rAF-batched log sink.
+    _enqueueLogLine(line: string) {
+      this._logLines = [...this._logLines, line];
+    },
+    _flushLogLines() {},
     _failedDuringCompile: false,
     _failedDuringValidate: false,
     _jobId: "",

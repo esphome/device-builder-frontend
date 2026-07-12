@@ -58,6 +58,11 @@ function makeHost() {
     _statusMessage: "",
     _flashPercent: 0,
     _logLines: [] as string[],
+    // Synchronous stand-ins for the dialog's rAF-batched log sink.
+    _enqueueLogLine(line: string) {
+      this._logLines = [...this._logLines, line];
+    },
+    _flushLogLines() {},
     _open: true,
     _showLogsAfterInstall: false,
     _detected: null as unknown,
