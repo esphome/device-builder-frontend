@@ -59,7 +59,6 @@ export class ESPHomeFiltersPopover extends LitElement {
   private _dismiss = new LightDismissController(this, () => this._close(), {
     onEscape: (e) => {
       e.preventDefault();
-      this._close();
       // Focus usually sits on a row inside the popover; hand it back
       // to the trigger so keyboard flow doesn't dead-end.
       this._triggerEl?.focus();

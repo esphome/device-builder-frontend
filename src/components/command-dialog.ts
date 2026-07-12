@@ -212,7 +212,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   // The timer's detail popover: open flag here, dismissal shared. Escape is
   // capture-phase and claimed, so the hosting dialog doesn't also close.
-  _timerDetailOpen = false;
+  @state() _timerDetailOpen = false;
   private _timerDetailDismiss = new LightDismissController(
     this,
     () => this._closeTimerDetail(),
@@ -224,26 +224,20 @@ export class ESPHomeCommandDialog extends LitElement {
       onEscape: (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this._closeTimerDetail();
       },
     }
   );
 
+  // Dismissal binds imperatively (not from willUpdate) so it works on a
+  // not-yet-connected host, where Lit defers updates.
   _toggleTimerDetail = () => {
-    if (this._timerDetailOpen) {
-      this._closeTimerDetail();
-      return;
-    }
-    this._timerDetailOpen = true;
-    this._timerDetailDismiss.set(true);
-    this.requestUpdate();
+    this._timerDetailOpen = !this._timerDetailOpen;
+    this._timerDetailDismiss.set(this._timerDetailOpen);
   };
 
   _closeTimerDetail() {
-    if (!this._timerDetailOpen) return;
     this._timerDetailOpen = false;
     this._timerDetailDismiss.set(false);
-    this.requestUpdate();
   }
 
   @query("esphome-process-terminal") _terminal?: ESPHomeProcessTerminal;

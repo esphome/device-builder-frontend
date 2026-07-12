@@ -140,18 +140,23 @@ describe("LightDismissController Escape", () => {
     expect(esc.defaultPrevented).toBe(true);
   });
 
-  it("routes Escape through the onEscape override", () => {
+  it("runs the onEscape hook before dismissing", () => {
     const host = makeHost();
-    const onDismiss = vi.fn();
-    const onEscape = vi.fn();
+    const order: string[] = [];
+    const onDismiss = vi.fn(() => order.push("dismiss"));
+    const onEscape = vi.fn(() => order.push("hook"));
     const ctrl = track(new LightDismissController(host, onDismiss, { onEscape }));
     ctrl.set(true);
 
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
-    );
-    expect(onEscape).toHaveBeenCalledTimes(1);
-    expect(onDismiss).not.toHaveBeenCalled();
+    const esc = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(esc);
+    expect(order).toEqual(["hook", "dismiss"]);
+    // The hook owns claiming; the controller adds no preventDefault of its own.
+    expect(esc.defaultPrevented).toBe(false);
   });
 });
 

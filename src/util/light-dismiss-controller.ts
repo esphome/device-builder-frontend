@@ -12,9 +12,9 @@ export interface LightDismissOptions {
   /** Bind Escape in the capture phase (claim it ahead of a hosting
    *  dialog's own Escape handling). */
   escapeCapture?: boolean;
-  /** Escape handling override. The default claims the event
-   *  (``preventDefault``) and dismisses; override for extras like
-   *  ``stopPropagation`` or returning focus to the trigger. */
+  /** Pre-dismiss Escape hook: how to claim the event (default
+   *  ``preventDefault``) plus per-site extras like ``stopPropagation``
+   *  or returning focus to the trigger. Dismissal always follows. */
   onEscape?: (e: KeyboardEvent) => void;
 }
 
@@ -42,11 +42,11 @@ export class LightDismissController implements ReactiveController {
   ) {
     this._escape = new EscapeController(
       _host,
-      _options.onEscape ??
-        ((e) => {
-          e.preventDefault();
-          _onDismiss();
-        }),
+      (e) => {
+        if (_options.onEscape) _options.onEscape(e);
+        else e.preventDefault();
+        _onDismiss();
+      },
       { target: _options.escapeTarget, capture: _options.escapeCapture }
     );
     _host.addController(this);

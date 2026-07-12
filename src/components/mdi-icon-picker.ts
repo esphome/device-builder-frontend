@@ -135,10 +135,7 @@ export class ESPHomeMdiIconPicker extends LitElement {
      also close on the same keypress. */
   private _dismiss = new LightDismissController(this, () => this._close(), {
     escapeTarget: document,
-    onEscape: (e) => {
-      e.stopPropagation();
-      this._close();
-    },
+    onEscape: (e) => e.stopPropagation(),
   });
 
   private async _toggle() {
