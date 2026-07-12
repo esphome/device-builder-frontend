@@ -8,7 +8,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { type FirmwareJob, JobType } from "../../src/api/types/firmware-jobs.js";
-import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
+import {
+  type CommandType,
+  ESPHomeCommandDialog,
+} from "../../src/components/command-dialog.js";
 import { markCompileStarted } from "../../src/util/compile-timing.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
 
@@ -22,10 +25,12 @@ interface Harness {
   _compileEndedAt: number | null;
   _jobId: string;
   _timerJobId: string;
+  _commandType: CommandType;
   _now: number;
   readonly _totalRunElapsedMs: number | null;
   readonly _compileDetailMs: number | null;
   readonly _isRunFrozen: boolean;
+  readonly _showRunTimer: boolean;
   followJob: (job: FirmwareJob, displayName: string) => void;
 }
 
@@ -220,5 +225,45 @@ describe("command-dialog compile detail (total never shorter than compile)", () 
     el._compileStartedAt = 1000;
     el._compileEndedAt = 6000;
     expect(el._compileDetailMs).toBe(5000);
+  });
+});
+
+describe("command-dialog run timer visibility", () => {
+  const timedJob = (id: string, seconds: number): FirmwareJob =>
+    makeFirmwareJob({
+      job_id: id,
+      job_type: JobType.COMPILE,
+      started_at: "2026-01-01T00:00:00Z",
+      completed_at: `2026-01-01T00:00:${String(seconds).padStart(2, "0")}Z`,
+    });
+
+  it("shows for a build command with a real total", () => {
+    const el = mount([timedJob("t1", 7)]);
+    el._timerJobId = "t1";
+    el._commandType = "compile";
+    expect(el._showRunTimer).toBe(true);
+  });
+
+  it("hides for clean and validate (not builds)", () => {
+    const el = mount([timedJob("t2", 7)]);
+    el._timerJobId = "t2";
+    el._commandType = "clean";
+    expect(el._showRunTimer).toBe(false);
+    el._commandType = "validate";
+    expect(el._showRunTimer).toBe(false);
+  });
+
+  it("degrades (no bare 0s) for a sub-second or untimed job", () => {
+    const el = mount([timedJob("t3", 0)]); // started == completed → 0ms
+    el._timerJobId = "t3";
+    el._commandType = "compile";
+    expect(el._showRunTimer).toBe(false);
+
+    const untimed = makeFirmwareJob({ job_id: "t4", job_type: JobType.COMPILE });
+    untimed.started_at = null;
+    const el2 = mount([untimed]);
+    el2._timerJobId = "t4";
+    el2._commandType = "compile";
+    expect(el2._showRunTimer).toBe(false);
   });
 });

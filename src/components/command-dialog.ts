@@ -423,6 +423,23 @@ export class ESPHomeCommandDialog extends LitElement {
     return parseIsoMs(this._timerJob?.completed_at) !== null;
   }
 
+  // Whether to show the run timer at all. Only the build commands have a
+  // meaningful build time (not clean / validate), and only once the run has
+  // accrued at least a second — a sub-second or untimed job (e.g. one compiled
+  // before this feature existed) degrades to the plain streaming dot rather
+  // than reading a bare "0s".
+  get _showRunTimer(): boolean {
+    if (
+      this._commandType !== "install" &&
+      this._commandType !== "compile" &&
+      this._commandType !== "rename"
+    ) {
+      return false;
+    }
+    const total = this._totalRunElapsedMs;
+    return total !== null && total >= 1000;
+  }
+
   _toggleTimerDetail = () => {
     this._showTimerDetail = !this._showTimerDetail;
   };
@@ -628,7 +645,7 @@ export class ESPHomeCommandDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._lines}
           ?light=${!this._darkMode}
-          ?streaming=${this._state === "running" && this._totalRunElapsedMs === null}
+          ?streaming=${this._state === "running" && !this._showRunTimer}
           .state=${this._state}
           .statusMessage=${this._statusMessage}
         >

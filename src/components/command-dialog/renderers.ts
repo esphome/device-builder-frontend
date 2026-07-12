@@ -151,8 +151,8 @@ const TIMER_HINT_MS = 5 * 60 * 1000;
 export function renderCompileTimer(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
-  const total = host._totalRunElapsedMs;
-  if (total === null) return nothing;
+  if (!host._showRunTimer) return nothing;
+  const total = host._totalRunElapsedMs!;
   return html`
     <div class="compile-timer-wrap" slot="toolbar-left">
       <button
