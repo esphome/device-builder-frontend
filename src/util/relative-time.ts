@@ -164,8 +164,8 @@ export function getNumberFormatter(
  * Format a duration in seconds as a compact readout. The ``compact``
  * variant (default) reads as a static value: ``45s`` / ``8m`` / ``1h 14m``
  * (zero minutes dropped: ``1h``). The ``counter`` variant is for a live
- * ticking readout whose width must not jitter: seconds kept in the minute
- * range (``4m 32s``) and hour-range minutes padded (``1h 05m``).
+ * ticking readout: seconds kept in the minute range (``4m 32s``) and
+ * hour-range minutes zero-padded (``1h 05m``, stable width per minute tick).
  * Locale-aware digits via the shared number formatter; the unit letters
  * aren't localized. Negative input clamps to ``0s``.
  */
