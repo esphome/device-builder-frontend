@@ -67,6 +67,7 @@ import { isExpert } from "../util/experience.js";
 import { notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
+import { closeOpenDialogs } from "./base-dialog.js";
 import {
   loadIntegrationDocs,
   loadLabels,
@@ -579,10 +580,10 @@ export class ESPHomeApp extends LitElement {
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) => {
-          // Close the firmware-tasks dialog first — a build's offload link
-          // opens settings from a terminal reopened over it, and it would
-          // otherwise stay stacked on top and hide the settings dialog.
-          this._firmwareJobsDialog?.close();
+          // Cross-dialog navigation: close whatever modal the event came
+          // from (firmware tasks, a terminal reopened over it, ...) so
+          // settings can't paint underneath a still-open sibling.
+          closeOpenDialogs(this._settingsDialog ?? undefined);
           this._settingsDialog?.open(e.detail?.section);
         }}
         @open-firmware-jobs=${() => this._firmwareJobsDialog?.open()}
