@@ -23,7 +23,8 @@ beforeEach(() => {
 
 afterEach(() => {
   clearStoredLocale();
-  AVAILABLE_LOCALES.splice(AVAILABLE_LOCALES.indexOf(TEST_LOCALE), 1);
+  const i = AVAILABLE_LOCALES.indexOf(TEST_LOCALE);
+  if (i !== -1) AVAILABLE_LOCALES.splice(i, 1);
 });
 
 describe("activeLocale caching", () => {
