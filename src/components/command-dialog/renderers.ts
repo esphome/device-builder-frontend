@@ -204,6 +204,7 @@ function renderTimerDetail(
       elapsedMs: compile,
       source: resolveJobSource(host),
       pairings: host._pairings,
+      desktop: Boolean(host._desktopVersion),
     });
   return html`
     <div
@@ -254,6 +255,7 @@ export function renderOffloadHintSlot(
     elapsedMs: host._timer.compileElapsedMs ?? 0,
     source: resolveJobSource(host),
     pairings: host._pairings,
+    desktop: Boolean(host._desktopVersion),
   });
   return visible ? renderOffloadHint(host) : nothing;
 }

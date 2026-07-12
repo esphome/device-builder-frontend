@@ -26,6 +26,7 @@ interface OffloadHintState {
   elapsedMs: number;
   source: JobSource;
   pairings: ReadonlyMap<string, unknown> | null;
+  desktop: boolean;
 }
 
 /**
@@ -34,9 +35,12 @@ interface OffloadHintState {
  * suppresses it. The "auto-route to remote build" toggle is *not* consulted —
  * it defaults on, so gating on it would hide this nudge from every default
  * dashboard; only an actual pairing means offload is set up. ``null`` pairings
- * (still loading) counts as "not set up".
+ * (still loading) counts as "not set up". The Desktop app is also suppressed:
+ * the build machine already is the user's computer, so there's likely no
+ * faster machine to offload to.
  */
 export function shouldShowOffloadHint(state: OffloadHintState): boolean {
+  if (state.desktop) return false;
   if (state.source !== JobSource.LOCAL) return false;
   if (state.elapsedMs < OFFLOAD_HINT_THRESHOLD_MS) return false;
   if ((state.pairings?.size ?? 0) > 0) return false;

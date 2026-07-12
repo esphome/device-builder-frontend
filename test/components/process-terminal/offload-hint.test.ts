@@ -15,6 +15,7 @@ const base = {
   elapsedMs: OVER,
   source: JobSource.LOCAL,
   pairings: null,
+  desktop: false,
 };
 
 describe("shouldShowOffloadHint", () => {
@@ -31,6 +32,10 @@ describe("shouldShowOffloadHint", () => {
     expect(shouldShowOffloadHint({ ...base, source: JobSource.REMOTE_PENDING })).toBe(
       false
     );
+  });
+
+  it("stays hidden on the Desktop app (no faster machine to offload to)", () => {
+    expect(shouldShowOffloadHint({ ...base, desktop: true })).toBe(false);
   });
 
   it("stays hidden when a build server is paired", () => {

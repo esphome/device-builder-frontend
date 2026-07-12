@@ -173,6 +173,7 @@ export function renderOffloadHintSlot(
     elapsedMs: host._timer.compileElapsedMs ?? 0,
     source: host._jobSource,
     pairings: host._pairings,
+    desktop: Boolean(host._desktopVersion),
   });
   return visible ? renderOffloadHint(host) : nothing;
 }
