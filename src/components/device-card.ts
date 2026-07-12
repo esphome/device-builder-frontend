@@ -224,7 +224,6 @@ export class ESPHomeDeviceCard extends LitElement {
                 <div class="device-actions" @click=${(e: Event) => e.stopPropagation()}>
                   <button
                     class="action-btn action-btn--primary"
-                    ?disabled=${this.busy}
                     @click=${() => this._emit("edit-device")}
                   >
                     <wa-icon library="mdi" name="pencil"></wa-icon>

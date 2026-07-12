@@ -139,6 +139,14 @@ describe("device table busy install/update actions", () => {
     expect(clickInstallAction(container).fired).toEqual(["show-progress"]);
   });
 
+  it("busy row keeps Edit clickable", () => {
+    // Edit only navigates; the editor is designed for mid-job use (#1196).
+    const container = renderInto(renderActionsCell({ busy: true }));
+    expect(
+      container.querySelector<HTMLButtonElement>(".cell-action-btn--edit")!.disabled
+    ).toBe(false);
+  });
+
   it("idle install button dispatches install-device", () => {
     const container = renderInto(renderActionsCell({ busy: false, showModified: true }));
     expect(clickInstallAction(container).fired).toEqual(["install-device"]);

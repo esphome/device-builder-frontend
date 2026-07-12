@@ -355,7 +355,6 @@ export class ESPHomeDeviceDrawer extends LitElement {
         <div class="footer">
           <button
             class="action action--primary"
-            ?disabled=${this.busy}
             @click=${() => this._emitAction("edit-device")}
           >
             <wa-icon library="mdi" name="pencil"></wa-icon>

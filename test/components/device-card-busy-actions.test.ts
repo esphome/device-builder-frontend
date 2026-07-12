@@ -52,4 +52,12 @@ describe("device-card busy update/install actions", () => {
       clickCollect(el, accentButton(el), ["show-progress", "install-device"])
     ).toEqual(["install-device"]);
   });
+
+  it("busy card keeps Edit clickable", async () => {
+    // Edit only navigates; the editor is designed for mid-job use (#1196).
+    const el = await mount({ busy: true, showUpdate: true });
+    const edit = el.shadowRoot!.querySelector<HTMLButtonElement>(".action-btn--primary")!;
+    expect(edit.disabled).toBe(false);
+    expect(clickCollect(el, edit, ["edit-device"])).toEqual(["edit-device"]);
+  });
 });

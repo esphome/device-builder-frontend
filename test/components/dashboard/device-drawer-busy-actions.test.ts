@@ -3,7 +3,8 @@
  *
  * While a job runs, the drawer footer's Update/Install button stays
  * clickable, reads view-progress, and emits show-progress instead of
- * update-device / install-device. Edit keeps disabling.
+ * update-device / install-device. Edit stays clickable too — the editor
+ * is designed for mid-job use (#1196).
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -60,10 +61,11 @@ describe("device-drawer busy footer actions", () => {
     expect(clickCollect(el, btn, ["show-progress", "install-device"])).toEqual([
       "show-progress",
     ]);
-    // Edit keeps disabling: editing mid-job stays gated.
+    // Edit stays clickable: it only navigates, and the editor handles
+    // mid-job use (#1196).
     expect(
       el.shadowRoot!.querySelector<HTMLButtonElement>(".footer .action--primary")!
         .disabled
-    ).toBe(true);
+    ).toBe(false);
   });
 });
