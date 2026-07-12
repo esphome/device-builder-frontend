@@ -166,21 +166,14 @@ export class ESPHomeUpdateAllDialog extends LitElement {
 
   // Bulk update deliberately supersedes: the backend cancels and restarts a
   // configuration's in-flight jobs on enqueue (#1195). Warn when it will
-  // actually happen. Memoized like the sibling tallies, but _activeJobs is
-  // rebuilt on every job-progress event, so the memo misses on each tick
-  // while the dialog sits open — count with a plain loop, no allocation.
-  private _buildingCountMemo = memoizeOne(
-    (matched: ConfiguredDevice[], activeJobs: Map<string, FirmwareJob>) => {
-      let building = 0;
-      for (const d of matched) {
-        if (activeJobs.has(d.configuration)) building += 1;
-      }
-      return building;
-    }
-  );
-
+  // actually happen. Deliberately not memoized: the note only renders while
+  // jobs run, which is exactly when _activeJobs is rebuilt per progress
+  // event — a cache would always miss when it matters.
   private _renderSupersedeNote(matched: ConfiguredDevice[]) {
-    const building = this._buildingCountMemo(matched, this._activeJobs);
+    let building = 0;
+    for (const d of matched) {
+      if (this._activeJobs.has(d.configuration)) building += 1;
+    }
     return building > 0
       ? html`<div class="summary-note">
           ${this._localize("update_all_dialog.supersede_note", { count: building })}
