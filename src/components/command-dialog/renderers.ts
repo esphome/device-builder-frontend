@@ -138,6 +138,26 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   return live?.source_label || primed?.source_label || null;
 }
 
+// Don't show the run timer until it would read at least "1s" — below that it
+// degrades to the streaming dot rather than a bare "0s".
+const MIN_RUN_TIMER_MS = 1000;
+
+// Whether to show the run timer at all. Only the build commands have a
+// meaningful build time (not clean / validate), and only once the run has
+// accrued at least a second — a sub-second or untimed job (e.g. one compiled
+// before this feature existed) degrades to the plain streaming dot.
+export function showRunTimer(host: ESPHomeCommandDialog): boolean {
+  if (
+    host._commandType !== "install" &&
+    host._commandType !== "compile" &&
+    host._commandType !== "rename"
+  ) {
+    return false;
+  }
+  const total = host._timer.totalRunElapsedMs;
+  return total !== null && total >= MIN_RUN_TIMER_MS;
+}
+
 // Whole-run timer pinned lower-left — the number that matches PlatformIO's
 // "Took N seconds", so it never reads shorter than the log and never
 // disappears once the job has started (it stays through a queued/deferred
@@ -146,22 +166,22 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
 export function renderCompileTimer(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
-  if (!host._showRunTimer) return nothing;
-  const total = host._totalRunElapsedMs!;
+  if (!showRunTimer(host)) return nothing;
+  const total = host._timer.totalRunElapsedMs!;
   return html`
     <div class="compile-timer-wrap" slot="toolbar-left">
       <button
-        class="compile-timer ${host._isRunFrozen ? "" : "compile-timer--live"}"
-        aria-expanded=${host._showTimerDetail ? "true" : "false"}
+        class="compile-timer ${host._timer.isRunFrozen ? "" : "compile-timer--live"}"
+        aria-expanded=${host._timer.showDetail ? "true" : "false"}
         aria-haspopup="dialog"
         aria-label="${formatElapsed(total)}. ${host._localize("command.run_elapsed_title")}"
         title=${host._localize("command.run_elapsed_title")}
-        @click=${host._toggleTimerDetail}
+        @click=${host._timer.toggleDetail}
       >
         <wa-icon library="mdi" name="timer-outline"></wa-icon>
         <span>${formatElapsed(total)}</span>
       </button>
-      ${host._showTimerDetail ? renderTimerDetail(host, total) : nothing}
+      ${host._timer.showDetail ? renderTimerDetail(host, total) : nothing}
     </div>
   `;
 }
@@ -169,13 +189,13 @@ export function renderCompileTimer(
 // The breakdown revealed on click: the compile-only slice of the run, and the
 // offload nudge attached to it (a long local compile is what offloading fixes).
 function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): TemplateResult {
-  const compile = host._compileDetailMs;
+  const compile = host._timer.compileDetailMs;
   const source = resolveJobSource(host);
   const hasOffloadSetUp = (host._pairings?.size ?? 0) > 0;
   const showHint =
     // While the compile is live the inline suggestion already carries this
     // nudge; only add it here once that's gone, so they never double up.
-    !host._isCompiling &&
+    !host._timer.isCompiling &&
     source === JobSource.LOCAL &&
     !hasOffloadSetUp &&
     compile !== null &&
@@ -224,9 +244,9 @@ function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): Templat
 export function renderOffloadHintSlot(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
-  if (!host._isCompiling) return nothing;
+  if (!host._timer.isCompiling) return nothing;
   const visible = shouldShowOffloadHint({
-    elapsedMs: host._compileElapsedMs ?? 0,
+    elapsedMs: host._timer.compileElapsedMs ?? 0,
     source: resolveJobSource(host),
     pairings: host._pairings,
   });

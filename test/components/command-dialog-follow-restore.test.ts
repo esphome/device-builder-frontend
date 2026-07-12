@@ -4,7 +4,8 @@
  * The public followJob attaches to an install chain via its COMPILE head, but
  * the flash target lives on the dependent UPLOAD — port and bootloader must
  * restore from the dependent so a "Build locally instead" resubmit keeps the
- * typed address and keeps flashing the bootloader.
+ * typed address and keeps flashing the bootloader. The run-timer controller's
+ * clocks restore alongside (backend stamps → store → live detection).
  */
 import { describe, expect, it } from "vitest";
 import { type FirmwareJob, JobType } from "../../src/api/types/firmware-jobs.js";
@@ -12,7 +13,9 @@ import {
   type CommandType,
   ESPHomeCommandDialog,
 } from "../../src/components/command-dialog.js";
+import { showRunTimer } from "../../src/components/command-dialog/renderers.js";
 import { markCompileStarted } from "../../src/util/compile-timing.js";
+import type { RunTimerController } from "../../src/util/run-timer-controller.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 interface Harness {
@@ -21,19 +24,10 @@ interface Harness {
   _jobs: Map<string, FirmwareJob>;
   _streamId: string;
   _api: { firmwareFollowJob: () => string };
-  _compileStartedAt: number | null;
-  _compileEndedAt: number | null;
   _jobId: string;
   _timerJobId: string;
   _commandType: CommandType;
-  _now: number;
-  readonly _totalRunElapsedMs: number | null;
-  readonly _compileDetailMs: number | null;
-  readonly _isRunFrozen: boolean;
-  readonly _showRunTimer: boolean;
-  _showTimerDetail: boolean;
-  _toggleTimerDetail: () => void;
-  _onOutsideTimerClick: (e: MouseEvent) => void;
+  _timer: RunTimerController;
   followJob: (job: FirmwareJob, displayName: string) => void;
 }
 
@@ -102,13 +96,17 @@ describe("command-dialog followJob restores the compile timer across reopen", ()
     const job = makeFirmwareJob({
       job_id: "be1",
       job_type: JobType.COMPILE,
+      started_at: "2026-01-01T00:00:00Z",
+      completed_at: null,
       compile_started_at: "2026-01-01T00:00:10Z",
       compile_ended_at: "2026-01-01T00:02:30Z",
     });
     const el = mount([job]);
     el.followJob(job, "device");
-    expect(el._compileStartedAt).toBe(Date.parse("2026-01-01T00:00:10Z"));
-    expect(el._compileEndedAt).toBe(Date.parse("2026-01-01T00:02:30Z"));
+    el._timer.now = Date.parse("2026-01-01T00:03:00Z");
+    // 2:30 - 0:10 = 2m20s of compile, frozen.
+    expect(el._timer.compileElapsedMs).toBe(140_000);
+    expect(el._timer.isCompiling).toBe(false);
   });
 
   it("falls back to the in-memory store when the backend fields are absent", () => {
@@ -119,8 +117,9 @@ describe("command-dialog followJob restores the compile timer across reopen", ()
     markCompileStarted("store1", 12345);
     const el = mount([job]);
     el.followJob(job, "device");
-    expect(el._compileStartedAt).toBe(12345);
-    expect(el._compileEndedAt).toBeNull();
+    el._timer.now = 20_345;
+    expect(el._timer.compileElapsedMs).toBe(8000);
+    expect(el._timer.isCompiling).toBe(true);
   });
 
   it("degrades to no timing when neither backend nor store has it", () => {
@@ -129,8 +128,8 @@ describe("command-dialog followJob restores the compile timer across reopen", ()
     delete job.compile_ended_at;
     const el = mount([job]);
     el.followJob(job, "device");
-    expect(el._compileStartedAt).toBeNull();
-    expect(el._compileEndedAt).toBeNull();
+    expect(el._timer.compileElapsedMs).toBeNull();
+    expect(el._timer.isCompiling).toBe(false);
   });
 });
 
@@ -144,8 +143,8 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
     });
     const el = mount([job]);
     el._timerJobId = "run1";
-    el._now = Date.parse("2026-01-01T00:00:29Z");
-    expect(el._totalRunElapsedMs).toBe(29_000);
+    el._timer.now = Date.parse("2026-01-01T00:00:29Z");
+    expect(el._timer.totalRunElapsedMs).toBe(29_000);
   });
 
   it("freezes a finished job at start-to-completion", () => {
@@ -157,8 +156,8 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
     });
     const el = mount([job]);
     el._timerJobId = "run2";
-    el._now = Date.parse("2026-01-01T01:00:00Z");
-    expect(el._totalRunElapsedMs).toBe(29_000);
+    el._timer.now = Date.parse("2026-01-01T01:00:00Z");
+    expect(el._timer.totalRunElapsedMs).toBe(29_000);
   });
 
   it("is null before the job starts running", () => {
@@ -169,7 +168,7 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
     });
     const el = mount([job]);
     el._timerJobId = "run3";
-    expect(el._totalRunElapsedMs).toBeNull();
+    expect(el._timer.totalRunElapsedMs).toBeNull();
   });
 
   it("survives the stream clearing _jobId after an install's compile", () => {
@@ -182,8 +181,8 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
     const el = mount([job]);
     el._timerJobId = "run4";
     el._jobId = ""; // stream ended; the flash then failed
-    el._now = Date.parse("2026-01-01T00:01:30Z");
-    expect(el._totalRunElapsedMs).toBe(29_000);
+    el._timer.now = Date.parse("2026-01-01T00:01:30Z");
+    expect(el._timer.totalRunElapsedMs).toBe(29_000);
   });
 
   it("stays visible (total non-null) for a completed/queued install", () => {
@@ -195,8 +194,8 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
     });
     const el = mount([job]);
     el._timerJobId = "run5";
-    expect(el._isRunFrozen).toBe(true);
-    expect(el._totalRunElapsedMs).not.toBeNull();
+    expect(el._timer.isRunFrozen).toBe(true);
+    expect(el._timer.totalRunElapsedMs).not.toBeNull();
   });
 });
 
@@ -212,11 +211,13 @@ describe("command-dialog compile detail (total never shorter than compile)", () 
     });
     const el = mount([job]);
     el._timerJobId = "d1";
-    el._now = Date.parse("2026-01-01T01:00:00Z");
-    expect(el._compileDetailMs).toBe(33_000);
+    el._timer.now = Date.parse("2026-01-01T01:00:00Z");
+    expect(el._timer.compileDetailMs).toBe(33_000);
     // The invariant the redesign guarantees: total >= compile.
-    expect(el._totalRunElapsedMs).toBe(50_000);
-    expect(el._totalRunElapsedMs!).toBeGreaterThanOrEqual(el._compileDetailMs!);
+    expect(el._timer.totalRunElapsedMs).toBe(50_000);
+    expect(el._timer.totalRunElapsedMs!).toBeGreaterThanOrEqual(
+      el._timer.compileDetailMs!
+    );
   });
 
   it("falls back to live frontend detection while a stampless run is going", () => {
@@ -227,11 +228,11 @@ describe("command-dialog compile detail (total never shorter than compile)", () 
     });
     delete job.compile_started_at;
     delete job.compile_ended_at;
+    markCompileStarted("d2", 1000);
     const el = mount([job]);
-    el._timerJobId = "d2";
-    el._compileStartedAt = 1000;
-    el._compileEndedAt = 6000;
-    expect(el._compileDetailMs).toBe(5000);
+    el.followJob(job, "device");
+    el._timer.now = 6000;
+    expect(el._timer.compileDetailMs).toBe(5000);
   });
 
   it("is null for an old finished job with no backend stamps (not shown)", () => {
@@ -245,12 +246,9 @@ describe("command-dialog compile detail (total never shorter than compile)", () 
     delete job.compile_ended_at;
     const el = mount([job]);
     el._timerJobId = "d3";
-    // Even if the replayed log left a bogus live span, a frozen stampless job
-    // reports unknown so the popover omits the compile row.
-    el._compileStartedAt = 100;
-    el._compileEndedAt = 200;
-    expect(el._compileDetailMs).toBeNull();
-    expect(el._totalRunElapsedMs).toBe(7000);
+    // A frozen stampless job reports unknown so the popover omits the row.
+    expect(el._timer.compileDetailMs).toBeNull();
+    expect(el._timer.totalRunElapsedMs).toBe(7000);
   });
 });
 
@@ -267,48 +265,49 @@ describe("command-dialog run timer visibility", () => {
     const el = mount([timedJob("t1", 7)]);
     el._timerJobId = "t1";
     el._commandType = "compile";
-    expect(el._showRunTimer).toBe(true);
+    expect(showRunTimer(el as unknown as ESPHomeCommandDialog)).toBe(true);
   });
 
   it("hides for clean and validate (not builds)", () => {
     const el = mount([timedJob("t2", 7)]);
     el._timerJobId = "t2";
     el._commandType = "clean";
-    expect(el._showRunTimer).toBe(false);
+    expect(showRunTimer(el as unknown as ESPHomeCommandDialog)).toBe(false);
     el._commandType = "validate";
-    expect(el._showRunTimer).toBe(false);
+    expect(showRunTimer(el as unknown as ESPHomeCommandDialog)).toBe(false);
   });
 
   it("degrades (no bare 0s) for a sub-second or untimed job", () => {
     const el = mount([timedJob("t3", 0)]); // started == completed → 0ms
     el._timerJobId = "t3";
     el._commandType = "compile";
-    expect(el._showRunTimer).toBe(false);
+    expect(showRunTimer(el as unknown as ESPHomeCommandDialog)).toBe(false);
 
     const untimed = makeFirmwareJob({ job_id: "t4", job_type: JobType.COMPILE });
     untimed.started_at = null;
     const el2 = mount([untimed]);
     el2._timerJobId = "t4";
     el2._commandType = "compile";
-    expect(el2._showRunTimer).toBe(false);
+    expect(showRunTimer(el2 as unknown as ESPHomeCommandDialog)).toBe(false);
   });
 });
 
 describe("command-dialog timer detail popover dismissal", () => {
   it("toggles open then closed", () => {
     const el = mount([]);
-    el._toggleTimerDetail();
-    expect(el._showTimerDetail).toBe(true);
-    el._toggleTimerDetail();
-    expect(el._showTimerDetail).toBe(false);
+    el._timer.toggleDetail();
+    expect(el._timer.showDetail).toBe(true);
+    el._timer.toggleDetail();
+    expect(el._timer.showDetail).toBe(false);
   });
 
   it("closes on a click outside the timer", () => {
     const el = mount([]);
-    el._toggleTimerDetail();
-    expect(el._showTimerDetail).toBe(true);
-    // A click whose composed path doesn't include the timer wrap closes it.
-    el._onOutsideTimerClick({ composedPath: () => [] } as unknown as MouseEvent);
-    expect(el._showTimerDetail).toBe(false);
+    el._timer.toggleDetail();
+    expect(el._timer.showDetail).toBe(true);
+    // A document-level click whose composed path doesn't include the timer
+    // wrap dismisses the popover.
+    document.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(el._timer.showDetail).toBe(false);
   });
 });

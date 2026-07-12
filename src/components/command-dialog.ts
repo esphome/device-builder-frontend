@@ -33,13 +33,6 @@ import {
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { isCompileEndLine, isCompilePhaseLine } from "../util/compile-phase.js";
-import {
-  getCompileTiming,
-  markCompileEnded,
-  markCompileStarted,
-} from "../util/compile-timing.js";
-import { parseIsoMs } from "../util/format-job-time.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
@@ -55,6 +48,7 @@ import {
   stopCommand,
   toggleShowSecrets,
 } from "./command-dialog/commands.js";
+import { RunTimerController } from "../util/run-timer-controller.js";
 import {
   renderCompileTimer,
   renderOffloadHintSlot,
@@ -62,6 +56,7 @@ import {
   renderRemoteBuilderSubLine,
   renderResetSuggestion,
   renderToolbar,
+  showRunTimer,
 } from "./command-dialog/renderers.js";
 import { commandDialogStyles } from "./command-dialog/styles.js";
 import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
@@ -94,10 +89,6 @@ export type CommandType =
   "install" | "compile" | "validate" | "clean" | "reset" | "rename";
 
 export type CommandState = "running" | "success" | "error";
-
-// Don't show the run timer until it would read at least "1s" — below that it
-// degrades to the streaming dot rather than a bare "0s".
-const MIN_RUN_TIMER_MS = 1000;
 
 @customElement("esphome-command-dialog")
 export class ESPHomeCommandDialog extends LitElement {
@@ -185,23 +176,6 @@ export class ESPHomeCommandDialog extends LitElement {
     source_esphome_version: string;
   } | null = null;
 
-  // Wall-clock the compile phase began — set on the first build line (download
-  // never matches), so the timer it drives counts the build itself — CMake
-  // configure included, it's CPU+I/O work — but never the dependency download.
-  @state() _compileStartedAt: number | null = null;
-
-  // Wall-clock the compile finished — set on the PlatformIO [SUCCESS]/[FAILED]
-  // banner (or a terminal state). Freezes the timer at the compile duration so
-  // an install's flash phase, which streams after, isn't counted.
-  @state() _compileEndedAt: number | null = null;
-
-  // Clock driving the live elapsed readout. Ticks each second while compiling.
-  @state() _now = Date.now();
-  private _tickHandle: ReturnType<typeof setInterval> | null = null;
-
-  // Whether the timer's detail popover (compile vs total run time) is open.
-  @state() _showTimerDetail = false;
-
   // True while "Build locally instead" override is mid-flight.
   @state() _switchingToLocal = false;
 
@@ -224,6 +198,18 @@ export class ESPHomeCommandDialog extends LitElement {
   // started_at/completed_at for the total run time after an install's flash.
   _timerJobId = "";
 
+  // Build run/compile clocks + the timer's detail popover.
+  _timer = new RunTimerController(this, {
+    job: () => (this._timerJobId ? this._jobs.get(this._timerJobId) : undefined),
+    jobId: () => this._timerJobId,
+    runEnded: () => this._state === "success" || this._state === "error",
+    // Tick while the run is live so both the total and the compile detail
+    // advance; stop once it freezes at completion.
+    tick: () =>
+      this._open && this._timer.totalRunElapsedMs !== null && !this._timer.isRunFrozen,
+    popoverWrapSelector: ".compile-timer-wrap",
+  });
+
   @query("esphome-process-terminal") _terminal?: ESPHomeProcessTerminal;
 
   static styles = [
@@ -241,12 +227,6 @@ export class ESPHomeCommandDialog extends LitElement {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
     }
-    // Second compile-start signal beside the log scanner: the backend's
-    // progress gauge. It latches for raw ninja ([N/M]) builds but not for the
-    // "Compiling <path>" pio output, so the two together cover every toolchain.
-    if (this._compileStartedAt === null && this._jobId) {
-      if (this._jobs.get(this._jobId)?.progress != null) this._markCompileStarted();
-    }
     // When a job ends, the success/error banner takes ~56px of flex space
     // below the log; the container shrinks, scrollTop is preserved, and
     // the bottom slides out of view — which trips ansi-log's _isUserScrolled
@@ -258,31 +238,6 @@ export class ESPHomeCommandDialog extends LitElement {
         this._resetAnsiLogScroll();
       }
     }
-    // Backstop the freeze: if the job settles without a summary banner in the
-    // stream, stop the clock at the terminal transition.
-    if (
-      this._compileStartedAt !== null &&
-      this._compileEndedAt === null &&
-      (this._state === "success" || this._state === "error")
-    ) {
-      this._markCompileEnded();
-    }
-  }
-
-  // Latch the compile start once, mirroring it to the cross-open timing store.
-  private _markCompileStarted(): void {
-    if (this._compileStartedAt !== null) return;
-    const now = Date.now();
-    this._compileStartedAt = now;
-    markCompileStarted(this._jobId, now);
-  }
-
-  // Freeze the compile end once, mirroring it to the cross-open timing store.
-  private _markCompileEnded(): void {
-    if (this._compileStartedAt === null || this._compileEndedAt !== null) return;
-    const now = Date.now();
-    this._compileEndedAt = now;
-    markCompileEnded(this._jobId, now);
   }
 
   /** Point the dialog at *device* and open — the shared host entry point. */
@@ -308,9 +263,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._timerJobId = "";
     this._jobStatus = null;
     this._primedSource = null;
-    this._compileStartedAt = null;
-    this._compileEndedAt = null;
-    this._closeTimerDetail();
+    this._timer.reset();
     this._failedDuringValidate = false;
     // Always start with secrets redacted on a fresh open — opt-in per session.
     this._showSecrets = false;
@@ -355,15 +308,9 @@ export class ESPHomeCommandDialog extends LitElement {
       source_label: job.source_label,
       source_esphome_version: job.source_esphome_version,
     };
-    this._closeTimerDetail();
     // Reattaching to a still-running (or finished) build: restore the true
     // compile clock so the replayed buffer doesn't restart the timer from now.
-    // The backend fields win — they survive a full page reload / reconnect —
-    // and the in-memory store covers a same-session reopen before they land.
-    const timing = getCompileTiming(job.job_id);
-    this._compileStartedAt =
-      parseIsoMs(job.compile_started_at) ?? timing?.startedAt ?? null;
-    this._compileEndedAt = parseIsoMs(job.compile_ended_at) ?? timing?.endedAt ?? null;
+    this._timer.attach(job);
     // Cancel any prior follow before starting a new one — without this,
     // every reopen layered fresh streams while previous ones still pumped
     // onOutput into _lines (lines duplicated per leaked subscription).
@@ -375,128 +322,9 @@ export class ESPHomeCommandDialog extends LitElement {
 
   public close = () => {
     void detachStream(this);
-    this._closeTimerDetail();
+    this._timer.closeDetail();
     this._open = false;
   };
-
-  // The job the on-screen timer reports on. Survives the stream ending.
-  get _timerJob(): FirmwareJob | undefined {
-    return this._timerJobId ? this._jobs.get(this._timerJobId) : undefined;
-  }
-
-  // Live-detected compile span (frontend clock). Drives the inline offload
-  // suggestion and the compile-time detail before the backend field lands.
-  get _compileElapsedMs(): number | null {
-    if (this._compileStartedAt === null) return null;
-    return (this._compileEndedAt ?? this._now) - this._compileStartedAt;
-  }
-
-  // True while the compile is actively running — drives the inline offload
-  // suggestion (a finished compile hands the slot back to the reset hint).
-  get _isCompiling(): boolean {
-    return this._compileStartedAt !== null && this._compileEndedAt === null;
-  }
-
-  // Whole-job wall time (queue excluded): download + compile + link,
-  // and for an install the flash — the number PlatformIO prints as "Took". This
-  // is the primary figure shown on the terminal. Freezes at completion; null
-  // before the job starts running.
-  get _totalRunElapsedMs(): number | null {
-    const start = parseIsoMs(this._timerJob?.started_at);
-    if (start === null) return null;
-    return (parseIsoMs(this._timerJob?.completed_at) ?? this._now) - start;
-  }
-
-  // Compile-only time for the detail popover, or null when it's unknown. Uses
-  // the backend's stamps (same job clock as the total, so total >= compile
-  // always holds once both are set). Without them it trusts live frontend
-  // detection only while the run is still going — a finished job with no
-  // stamps is an old build from before this feature, whose compile time we
-  // genuinely can't recover from the replayed log, so it stays hidden.
-  get _compileDetailMs(): number | null {
-    const beStart = parseIsoMs(this._timerJob?.compile_started_at);
-    if (beStart !== null) {
-      return (parseIsoMs(this._timerJob?.compile_ended_at) ?? this._now) - beStart;
-    }
-    return this._isRunFrozen ? null : this._compileElapsedMs;
-  }
-
-  // The run has settled (job terminal), so the timer freezes and stops pulsing.
-  get _isRunFrozen(): boolean {
-    return parseIsoMs(this._timerJob?.completed_at) !== null;
-  }
-
-  // Whether to show the run timer at all. Only the build commands have a
-  // meaningful build time (not clean / validate), and only once the run has
-  // accrued at least a second — a sub-second or untimed job (e.g. one compiled
-  // before this feature existed) degrades to the plain streaming dot rather
-  // than reading a bare "0s".
-  get _showRunTimer(): boolean {
-    if (
-      this._commandType !== "install" &&
-      this._commandType !== "compile" &&
-      this._commandType !== "rename"
-    ) {
-      return false;
-    }
-    const total = this._totalRunElapsedMs;
-    return total !== null && total >= MIN_RUN_TIMER_MS;
-  }
-
-  _toggleTimerDetail = () => {
-    if (this._showTimerDetail) {
-      this._closeTimerDetail();
-      return;
-    }
-    this._showTimerDetail = true;
-    // Dismiss on the next click anywhere outside the timer (the toolbar, the
-    // log, elsewhere in the dialog). Capture-phase so it fires before other
-    // handlers; registered after this opening click so it doesn't self-close.
-    document.addEventListener("click", this._onOutsideTimerClick, true);
-  };
-
-  private _closeTimerDetail(): void {
-    if (!this._showTimerDetail) return;
-    this._showTimerDetail = false;
-    document.removeEventListener("click", this._onOutsideTimerClick, true);
-  }
-
-  private _onOutsideTimerClick = (e: MouseEvent) => {
-    // The timer button toggles itself; only outside clicks close here.
-    const wrap = this.renderRoot?.querySelector(".compile-timer-wrap");
-    if (wrap && e.composedPath().includes(wrap)) return;
-    this._closeTimerDetail();
-  };
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._stopTicker();
-    this._closeTimerDetail();
-  }
-
-  protected updated(): void {
-    // Tick while the run is live so both the total and the compile detail
-    // advance; stop once it freezes at completion.
-    if (this._open && this._totalRunElapsedMs !== null && !this._isRunFrozen) {
-      this._startTicker();
-    } else {
-      this._stopTicker();
-    }
-  }
-
-  private _startTicker(): void {
-    if (this._tickHandle !== null) return;
-    this._now = Date.now();
-    this._tickHandle = setInterval(() => {
-      this._now = Date.now();
-    }, 1000);
-  }
-
-  private _stopTicker(): void {
-    if (this._tickHandle === null) return;
-    clearInterval(this._tickHandle);
-    this._tickHandle = null;
-  }
 
   // Close the terminal and open Settings → Send builds so the user can pair a
   // faster machine. The build keeps running in the background queue.
@@ -602,14 +430,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   // Buffer a streamed line; flushed on the next animation frame.
   _enqueueLine(line: string): void {
-    // Latch the compile-phase start on the first build line — download/prep
-    // lines never match, so the timer it drives counts compilation only —
-    // then freeze it on the summary banner so an install's flash isn't counted.
-    if (this._compileStartedAt === null) {
-      if (isCompilePhaseLine(line)) this._markCompileStarted();
-    } else if (this._compileEndedAt === null && isCompileEndLine(line)) {
-      this._markCompileEnded();
-    }
+    this._timer.noteLine(line);
     this._pendingLines.push(line);
     if (this._flushScheduled) return;
     this._flushScheduled = requestAnimationFrame(() => {
@@ -656,7 +477,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   private _onDialogHide = () => {
     this._open = false;
-    this._closeTimerDetail();
+    this._timer.closeDetail();
     void detachStream(this);
   };
 
@@ -671,7 +492,7 @@ export class ESPHomeCommandDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._lines}
           ?light=${!this._darkMode}
-          ?streaming=${this._state === "running" && !this._showRunTimer}
+          ?streaming=${this._state === "running" && !showRunTimer(this)}
           .state=${this._state}
           .statusMessage=${this._statusMessage}
         >

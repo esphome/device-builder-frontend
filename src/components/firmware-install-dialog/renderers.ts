@@ -155,8 +155,8 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
     );
   }
   // Once compilation begins, surface the elapsed so a slow build reads as slow.
-  if (host._step === "compiling" && host._compileElapsedMs !== null) {
-    return formatElapsed(host._compileElapsedMs);
+  if (host._step === "compiling" && host._timer.compileElapsedMs !== null) {
+    return formatElapsed(host._timer.compileElapsedMs);
   }
   return "";
 }
@@ -167,9 +167,9 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
 export function renderOffloadHintSlot(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
-  if (!host._isCompiling) return nothing;
+  if (!host._timer.isCompiling) return nothing;
   const visible = shouldShowOffloadHint({
-    elapsedMs: host._compileElapsedMs ?? 0,
+    elapsedMs: host._timer.compileElapsedMs ?? 0,
     source: host._jobSource,
     pairings: host._pairings,
   });

@@ -28,6 +28,7 @@ import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { RunTimerController } from "../util/run-timer-controller.js";
 import type { DetectedChip } from "../util/web-serial.js";
 import {
   downloadSelectedBinary,
@@ -145,17 +146,15 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _jobId = "";
   _streamId = "";
 
-  // Wall-clock the compile phase began (download excluded); set on the first
-  // build line. Drives the compiling-step elapsed readout + offload-hint.
-  @state() _compileStartedAt: number | null = null;
-
-  // Wall-clock the compile finished — the PlatformIO summary banner or the step
-  // leaving "compiling". Freezes the elapsed at the compile duration.
-  @state() _compileEndedAt: number | null = null;
-
-  // Clock for the live elapsed readout. Ticks each second while compiling.
-  @state() _now = Date.now();
-  private _tickHandle: ReturnType<typeof setInterval> | null = null;
+  // Build compile clocks — drives the compiling-step elapsed readout + the
+  // offload hint. The step-based runEnded backstop freezes the span when the
+  // flow leaves compiling without a summary banner.
+  _timer = new RunTimerController(this, {
+    job: () => (this._jobId ? this._jobs.get(this._jobId) : undefined),
+    jobId: () => this._jobId,
+    runEnded: () => this._step !== "compiling" && this._step !== "queued",
+    tick: () => this._open && this._timer.isCompiling,
+  });
 
   // The compiled factory image for the "web-flash" installer, held between the
   // download-ready step and the user clicking "Open USB flasher". Detached
@@ -266,8 +265,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._failedDuringValidate = false;
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
-    this._compileStartedAt = null;
-    this._compileEndedAt = null;
+    this._timer.reset();
     this._usbFirmware = null;
     this._usbFirmwareName = "";
     // _detachStream already cleared _jobId / _streamId / _compileReject.
@@ -308,61 +306,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (changedProperties.has("_logsExpanded")) {
       this.toggleAttribute("expanded", this._logsExpanded);
     }
-    // Second compile-start signal beside the log scanner: the backend progress
-    // gauge, which latches for raw ninja builds that print no "Compiling" word.
-    if (
-      this._compileStartedAt === null &&
-      this._jobId &&
-      this._jobs.get(this._jobId)?.progress != null
-    ) {
-      this._compileStartedAt = Date.now();
-    }
-    // Backstop the freeze: once the step leaves compiling (flash / download /
-    // done / error) the compile is over, even if no summary banner was seen.
-    if (
-      this._compileStartedAt !== null &&
-      this._compileEndedAt === null &&
-      this._step !== "compiling" &&
-      this._step !== "queued"
-    ) {
-      this._compileEndedAt = Date.now();
-    }
-  }
-
-  protected updated(): void {
-    if (this._open && this._isCompiling) this._startTicker();
-    else this._stopTicker();
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._stopTicker();
-  }
-
-  // Compile time (download excluded), frozen once the compile ends; null before
-  // the compile phase.
-  get _compileElapsedMs(): number | null {
-    if (this._compileStartedAt === null) return null;
-    return (this._compileEndedAt ?? this._now) - this._compileStartedAt;
-  }
-
-  // True while the compile is actively running.
-  get _isCompiling(): boolean {
-    return this._compileStartedAt !== null && this._compileEndedAt === null;
-  }
-
-  private _startTicker(): void {
-    if (this._tickHandle !== null) return;
-    this._now = Date.now();
-    this._tickHandle = setInterval(() => {
-      this._now = Date.now();
-    }, 1000);
-  }
-
-  private _stopTicker(): void {
-    if (this._tickHandle === null) return;
-    clearInterval(this._tickHandle);
-    this._tickHandle = null;
   }
 
   // Close the dialog and open Settings → Send builds. The install flow ends
