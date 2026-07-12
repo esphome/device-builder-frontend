@@ -569,7 +569,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         ?disabled=${locked}
         .checked=${open}
         @change=${(e: Event) => {
-          const sw = e.target as HTMLInputElement & { checked: boolean };
+          const sw = e.currentTarget as HTMLInputElement & { checked: boolean };
           const row = sw.parentElement;
           if (row) {
             this._advancedControlAnchor = {
@@ -594,7 +594,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (!anchor || !changed.has("showAdvanced")) return;
     this._advancedControlAnchor = undefined;
     if (Date.now() - anchor.at > 2000) return;
-    const row = this.shadowRoot?.querySelector(".advanced-toggle-row");
+    const row = this.shadowRoot?.querySelector<HTMLElement>(".advanced-toggle-row");
     if (!row) return;
     const scroller = nearestScrollContainer(row);
     if (scroller) scroller.scrollTop += row.getBoundingClientRect().top - anchor.top;

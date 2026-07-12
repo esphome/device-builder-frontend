@@ -6,9 +6,9 @@ export function composedParent(el: Element): Element | null {
 }
 
 /** Nearest composed-tree ancestor that actually scrolls vertically. */
-export function nearestScrollContainer(el: Element): Element | null {
+export function nearestScrollContainer(el: Element): HTMLElement | null {
   for (let n = composedParent(el); n; n = composedParent(n)) {
-    if (n.scrollHeight > n.clientHeight) {
+    if (n instanceof HTMLElement && n.scrollHeight > n.clientHeight) {
       const overflowY = getComputedStyle(n).overflowY;
       if (overflowY === "auto" || overflowY === "scroll") return n;
     }
