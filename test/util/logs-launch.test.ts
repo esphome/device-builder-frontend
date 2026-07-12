@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
-import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
 import type { LogsLaunchHost } from "../../src/util/logs-launch.js";
+import { launchLogs, launchLogsWithMethod } from "../../src/util/logs-launch.js";
 import { withWebSerial } from "../_web-serial.js";
 
 function makeDevice(): ConfiguredDevice {

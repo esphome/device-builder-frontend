@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit";
-import type { LocalizeFunc } from "../../common/localize.js";
 import { JobSource } from "../../api/types/firmware-jobs.js";
+import type { LocalizeFunc } from "../../common/localize.js";
 import { splitTemplate } from "../../util/template-split.js";
 
 /**

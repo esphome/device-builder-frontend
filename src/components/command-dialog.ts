@@ -35,8 +35,10 @@ import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
+import { LightDismissController } from "../util/light-dismiss-controller.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { RunTimerController } from "../util/run-timer-controller.js";
 import {
   deriveFollowCommandType,
   detachStream,
@@ -48,8 +50,6 @@ import {
   stopCommand,
   toggleShowSecrets,
 } from "./command-dialog/commands.js";
-import { LightDismissController } from "../util/light-dismiss-controller.js";
-import { RunTimerController } from "../util/run-timer-controller.js";
 import {
   renderCompileTimer,
   renderOffloadHintSlot,
