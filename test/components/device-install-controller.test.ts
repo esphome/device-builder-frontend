@@ -22,7 +22,8 @@ type LogsDialogStub = {
 
 function makeHost(
   device: ConfiguredDevice | null,
-  logsDialog: LogsDialogStub | null = null
+  logsDialog: LogsDialogStub | null = null,
+  overrides: Partial<DeviceInstallControllerHost> = {}
 ): DeviceInstallControllerHost {
   return {
     device,
@@ -31,10 +32,12 @@ function makeHost(
     logsDialog: logsDialog as DeviceInstallControllerHost["logsDialog"],
     api: {} as ESPHomeAPI,
     localize: (key: string) => key,
+    openActiveJobProgress: () => false,
     addController: vi.fn(),
     removeController: vi.fn(),
     requestUpdate: vi.fn(),
     updateComplete: Promise.resolve(true),
+    ...overrides,
   };
 }
 
@@ -86,5 +89,61 @@ describe("DeviceInstallController.methodMode", () => {
     ctrl.onInstall();
     expect(ctrl.installMethodOpen).toBe(true);
     expect(ctrl.methodMode).toBe("install");
+  });
+});
+
+// Enqueuing over a running job supersedes it (the backend cancels and
+// restarts), so every install seam re-attaches to the job instead (#1194).
+describe("DeviceInstallController busy seam guard", () => {
+  function makeBusyParts(busy: boolean) {
+    const openForDevice = vi.fn();
+    const openActiveJobProgress = vi.fn(() => busy);
+    const host = makeHost(makeConfiguredDevice(), null, {
+      commandDialog: {
+        openForDevice,
+      } as unknown as DeviceInstallControllerHost["commandDialog"],
+      openActiveJobProgress,
+    });
+    return {
+      ctrl: new DeviceInstallController(host),
+      openForDevice,
+      openActiveJobProgress,
+    };
+  }
+
+  it("onInstall re-attaches instead of opening the picker while busy", () => {
+    const { ctrl, openActiveJobProgress } = makeBusyParts(true);
+    ctrl.onInstall();
+    expect(openActiveJobProgress).toHaveBeenCalledTimes(1);
+    expect(ctrl.installMethodOpen).toBe(false);
+  });
+
+  it("onUpdate re-attaches instead of enqueuing while busy", () => {
+    const { ctrl, openForDevice, openActiveJobProgress } = makeBusyParts(true);
+    ctrl.onUpdate();
+    expect(openActiveJobProgress).toHaveBeenCalledTimes(1);
+    expect(openForDevice).not.toHaveBeenCalled();
+  });
+
+  it("a job started while the picker sat open blocks the select from superseding", () => {
+    const { ctrl, openForDevice, openActiveJobProgress } = makeBusyParts(false);
+    ctrl.onInstall();
+    expect(ctrl.installMethodOpen).toBe(true);
+    // The race: a job starts (second tab, deferred update firing) mid-picker.
+    openActiveJobProgress.mockReturnValue(true);
+    ctrl.onInstallMethodSelect(
+      new CustomEvent("select-method", { detail: { method: "ota" } })
+    );
+    expect(ctrl.installMethodOpen).toBe(false);
+    expect(openForDevice).not.toHaveBeenCalled();
+  });
+
+  it("an idle select still enqueues the install", () => {
+    const { ctrl, openForDevice } = makeBusyParts(false);
+    ctrl.onInstall();
+    ctrl.onInstallMethodSelect(
+      new CustomEvent("select-method", { detail: { method: "ota" } })
+    );
+    expect(openForDevice).toHaveBeenCalledTimes(1);
   });
 });

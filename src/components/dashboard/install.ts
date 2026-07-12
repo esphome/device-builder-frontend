@@ -10,6 +10,7 @@ export function openInstallMethod(
   host: ESPHomePageDashboard,
   device: ConfiguredDevice
 ): void {
+  if (showJobProgress(host, device)) return;
   host._installMethodDevice = device;
   host._installMethodMode = "install";
   host._installMethodOpen = true;
@@ -27,6 +28,9 @@ export function onInstallMethodSelect(
     void openLogsWithMethod(host, device, method, port);
     return;
   }
+  // A job may have started while the picker sat open (second tab, a
+  // deferred queued update firing); enqueuing now would supersede it.
+  if (showJobProgress(host, device)) return;
   applyInstallMethod(method, port, {
     device,
     firmwareDialog: host._firmwareDialog,
@@ -41,19 +45,28 @@ export function openCommand(
   port?: string,
   options?: { bootloader?: boolean }
 ): void {
+  if (type === "install" && showJobProgress(host, device)) return;
   host._commandDialog.openForDevice(device, type, { port, ...options });
 }
 
+/**
+ * Re-attach the command dialog to the device's running job.
+ *
+ * Returns true when a job was open — the install seams bail on it,
+ * since enqueuing would supersede: the backend cancels and restarts
+ * the configuration's in-flight jobs.
+ */
 export function showJobProgress(
   host: ESPHomePageDashboard,
   device: ConfiguredDevice
-): void {
+): boolean {
   const job = host._activeJobs.get(device.configuration);
-  if (!job) return;
+  if (!job) return false;
   host._commandDialog.followJob(
     job,
     firmwareJobDisplayName(job, host._devices, host._localize)
   );
+  return true;
 }
 
 export function openLogs(

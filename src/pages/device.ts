@@ -333,6 +333,7 @@ export class ESPHomePageDevice extends LitElement {
       get localize() {
         return page._localize;
       },
+      openActiveJobProgress: () => page._showActiveJobProgress(),
     });
   }
 

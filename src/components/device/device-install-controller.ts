@@ -24,6 +24,13 @@ export interface DeviceInstallControllerHost extends ReactiveControllerHost {
   readonly logsDialog: ESPHomeLogsDialog | null;
   readonly api: ESPHomeAPI;
   readonly localize: LocalizeFunc;
+  /**
+   * Re-attach the command dialog to the device's running job; true when
+   * one was open. The install seams bail on it — enqueuing would
+   * supersede (the backend cancels and restarts the configuration's
+   * in-flight jobs).
+   */
+  openActiveJobProgress(): boolean;
 }
 
 export class DeviceInstallController implements ReactiveController {
@@ -61,6 +68,7 @@ export class DeviceInstallController implements ReactiveController {
   /** "Install" entry point — opens the install-method picker. */
   onInstall = () => {
     if (!this._host.device) return;
+    if (this._host.openActiveJobProgress()) return;
     this.methodMode = "install";
     this.installMethodOpen = true;
     this._host.requestUpdate();
@@ -82,6 +90,7 @@ export class DeviceInstallController implements ReactiveController {
   onUpdate = () => {
     const device = this._host.device;
     if (!device) return;
+    if (this._host.openActiveJobProgress()) return;
     this._openCommand(device, "install");
   };
 
@@ -105,6 +114,9 @@ export class DeviceInstallController implements ReactiveController {
       void launchLogsWithMethod(this._logsHost(logsDialog), device, method, port);
       return;
     }
+    // A job may have started while the picker sat open (second tab, a
+    // deferred queued update firing); enqueuing now would supersede it.
+    if (this._host.openActiveJobProgress()) return;
     applyInstallMethod(method, port, {
       device,
       firmwareDialog: this._host.firmwareDialog,
