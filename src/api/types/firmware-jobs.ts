@@ -56,6 +56,11 @@ export interface FirmwareJob {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  /** Compile-phase bounds (download and configure excluded), stamped by the
+   *  backend so the compile timer stays correct across a reload / reconnect.
+   *  Null before the compile phase begins / finishes. */
+  compile_started_at: string | null;
+  compile_ended_at: string | null;
   exit_code: number | null;
   output: string[];
   error: string | null;

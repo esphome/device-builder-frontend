@@ -40,6 +40,7 @@ import {
   markCompileEnded,
   markCompileStarted,
 } from "../util/compile-timing.js";
+import { parseIsoMs } from "../util/format-job-time.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
@@ -346,11 +347,13 @@ export class ESPHomeCommandDialog extends LitElement {
       source_esphome_version: job.source_esphome_version,
     };
     // Reattaching to a still-running (or finished) build: restore the true
-    // compile clock recorded when it first started, so the replayed buffer
-    // doesn't restart the timer from now.
+    // compile clock so the replayed buffer doesn't restart the timer from now.
+    // The backend fields win — they survive a full page reload / reconnect —
+    // and the in-memory store covers a same-session reopen before they land.
     const timing = getCompileTiming(job.job_id);
-    this._compileStartedAt = timing?.startedAt ?? null;
-    this._compileEndedAt = timing?.endedAt ?? null;
+    this._compileStartedAt =
+      parseIsoMs(job.compile_started_at) ?? timing?.startedAt ?? null;
+    this._compileEndedAt = parseIsoMs(job.compile_ended_at) ?? timing?.endedAt ?? null;
     // Cancel any prior follow before starting a new one — without this,
     // every reopen layered fresh streams while previous ones still pumped
     // onOutput into _lines (lines duplicated per leaked subscription).

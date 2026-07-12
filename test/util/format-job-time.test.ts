@@ -3,6 +3,7 @@ import {
   formatAbsoluteTime,
   formatElapsed,
   formatRelativeTime,
+  parseIsoMs,
 } from "../../src/util/format-job-time.js";
 
 const NOW = new Date("2026-05-01T14:00:00Z").getTime();
@@ -30,6 +31,18 @@ describe("formatRelativeTime", () => {
 
   it("uses 'now' phrasing for sub-second deltas", () => {
     expect(formatRelativeTime(new Date(NOW).toISOString(), NOW, "en")).toBe("now");
+  });
+});
+
+describe("parseIsoMs", () => {
+  it("parses an ISO timestamp to epoch ms", () => {
+    expect(parseIsoMs("2026-05-01T14:00:00Z")).toBe(NOW);
+  });
+
+  it("returns null for null or unparseable input", () => {
+    expect(parseIsoMs(null)).toBeNull();
+    expect(parseIsoMs("")).toBeNull();
+    expect(parseIsoMs("not-a-date")).toBeNull();
   });
 });
 

@@ -19,6 +19,13 @@ export function formatRelativeTime(iso: string, now: number, locale?: string): s
   return rtf.format(diffDay, "day");
 }
 
+/** Parse an ISO timestamp to epoch ms, or null for a null/unparseable value. */
+export function parseIsoMs(iso: string | null): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
 /**
  * Render a running duration in milliseconds as a compact counter —
  * ``45s``, ``4m 32s``, ``1h 05m``. Negative deltas clamp to ``0s`` so a
