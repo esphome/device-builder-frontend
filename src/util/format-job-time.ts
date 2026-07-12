@@ -19,8 +19,8 @@ export function formatRelativeTime(iso: string, now: number, locale?: string): s
   return rtf.format(diffDay, "day");
 }
 
-/** Parse an ISO timestamp to epoch ms, or null for a null/unparseable value. */
-export function parseIsoMs(iso: string | null): number | null {
+/** Parse an ISO timestamp to epoch ms, or null for a nullish/unparseable value. */
+export function parseIsoMs(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime();
   return Number.isNaN(ms) ? null : ms;

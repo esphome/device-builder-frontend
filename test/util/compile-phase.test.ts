@@ -37,10 +37,22 @@ describe("isCompilePhaseLine", () => {
       isCompilePhaseLine("[7/1247] Generating ../../partition_table/partition-table.bin")
     ).toBe(true);
     expect(isCompilePhaseLine("[ 17%] Building CXX object")).toBe(true);
+    // Real captured esp-idf ninja chunks (CR-split, trailing erase-to-eol).
+    expect(
+      isCompilePhaseLine("[1/1547] Generating project_elf_src_esp32s3.c\x1b[K")
+    ).toBe(true);
+    expect(
+      isCompilePhaseLine(
+        "[6/1547] Building C object esp-idf/esp_adc/CMakeFiles/__idf_esp_adc.dir/adc_cali.c.obj\x1b[K"
+      )
+    ).toBe(true);
   });
 
-  it("ignores the ninja reconfigure counter (small denominator)", () => {
+  it("ignores the ninja reconfigure / globbed-dir counters (small denominator)", () => {
     expect(isCompilePhaseLine("[1/2] Re-running CMake...")).toBe(false);
+    expect(isCompilePhaseLine("[0/4] Re-checking globbed directories...\x1b[K")).toBe(
+      false
+    );
     expect(isCompilePhaseLine("[3/97] Performing build step for 'bootloader'")).toBe(
       false
     );

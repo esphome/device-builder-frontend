@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { type FirmwareJob, JobType } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
+import { markCompileStarted } from "../../src/util/compile-timing.js";
 import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 interface Harness {
@@ -17,6 +18,8 @@ interface Harness {
   _jobs: Map<string, FirmwareJob>;
   _streamId: string;
   _api: { firmwareFollowJob: () => string };
+  _compileStartedAt: number | null;
+  _compileEndedAt: number | null;
   followJob: (job: FirmwareJob, displayName: string) => void;
 }
 
@@ -77,5 +80,42 @@ describe("command-dialog followJob restores flash target from the chain", () => 
     const el = mount([upload]);
     el.followJob(upload, "device");
     expect(el._bootloader).toBe(true);
+  });
+});
+
+describe("command-dialog followJob restores the compile timer across reopen", () => {
+  it("prefers the backend compile timestamps (survive a full reload)", () => {
+    const job = makeFirmwareJob({
+      job_id: "be1",
+      job_type: JobType.COMPILE,
+      compile_started_at: "2026-01-01T00:00:10Z",
+      compile_ended_at: "2026-01-01T00:02:30Z",
+    });
+    const el = mount([job]);
+    el.followJob(job, "device");
+    expect(el._compileStartedAt).toBe(Date.parse("2026-01-01T00:00:10Z"));
+    expect(el._compileEndedAt).toBe(Date.parse("2026-01-01T00:02:30Z"));
+  });
+
+  it("falls back to the in-memory store when the backend fields are absent", () => {
+    // Old-backend / old-job shape: no compile_* fields on the wire.
+    const job = makeFirmwareJob({ job_id: "store1", job_type: JobType.COMPILE });
+    delete job.compile_started_at;
+    delete job.compile_ended_at;
+    markCompileStarted("store1", 12345);
+    const el = mount([job]);
+    el.followJob(job, "device");
+    expect(el._compileStartedAt).toBe(12345);
+    expect(el._compileEndedAt).toBeNull();
+  });
+
+  it("degrades to no timing when neither backend nor store has it", () => {
+    const job = makeFirmwareJob({ job_id: "none1", job_type: JobType.COMPILE });
+    delete job.compile_started_at;
+    delete job.compile_ended_at;
+    const el = mount([job]);
+    el.followJob(job, "device");
+    expect(el._compileStartedAt).toBeNull();
+    expect(el._compileEndedAt).toBeNull();
   });
 });

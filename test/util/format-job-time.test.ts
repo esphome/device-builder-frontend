@@ -39,8 +39,9 @@ describe("parseIsoMs", () => {
     expect(parseIsoMs("2026-05-01T14:00:00Z")).toBe(NOW);
   });
 
-  it("returns null for null or unparseable input", () => {
+  it("returns null for nullish or unparseable input (old jobs lack the field)", () => {
     expect(parseIsoMs(null)).toBeNull();
+    expect(parseIsoMs(undefined)).toBeNull();
     expect(parseIsoMs("")).toBeNull();
     expect(parseIsoMs("not-a-date")).toBeNull();
   });
