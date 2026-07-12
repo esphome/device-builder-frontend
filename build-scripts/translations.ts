@@ -502,7 +502,14 @@ function readOrphanFile(inPath: string): OrphanKey[] {
       `Orphans file not found: ${inPath}. Run \`npm run translations:orphans\` first.`
     );
   }
-  const parsed = JSON.parse(raw) as { orphans?: unknown };
+  let parsed: { orphans?: unknown };
+  try {
+    parsed = JSON.parse(raw) as { orphans?: unknown };
+  } catch (err) {
+    throw new LokaliseError(
+      `Orphans file ${inPath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
   if (!Array.isArray(parsed.orphans)) {
     throw new LokaliseError(`Orphans file ${inPath} has no \`orphans\` array.`);
   }
@@ -527,7 +534,9 @@ async function runDeleteOrphans(
 ): Promise<number> {
   const orphans = readOrphanFile(inPath);
   if (orphans.length === 0) {
-    console.log(`No orphans listed in ${relative(REPO_ROOT, inPath)}; nothing to delete.`);
+    console.log(
+      `No orphans listed in ${relative(REPO_ROOT, inPath)}; nothing to delete.`
+    );
     return 0;
   }
 

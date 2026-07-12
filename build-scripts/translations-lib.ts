@@ -156,8 +156,7 @@ export function flattenKeys(value: unknown): Set<string> {
 // object carrying a per-platform name. JSON-imported keys carry the same
 // name across platforms, but read every platform defensively.
 export type LokaliseKeyName =
-  | string
-  | { ios?: string; android?: string; web?: string; other?: string };
+  string | { ios?: string; android?: string; web?: string; other?: string };
 
 export interface LokaliseKey {
   key_id: number;
@@ -168,9 +167,7 @@ export interface LokaliseKey {
 // The distinct, non-empty names a Lokalise key is known by across platforms.
 export function keyNameCandidates(name: LokaliseKeyName): string[] {
   const raw =
-    typeof name === "string"
-      ? [name]
-      : [name.ios, name.android, name.web, name.other];
+    typeof name === "string" ? [name] : [name.ios, name.android, name.web, name.other];
   return [
     ...new Set(raw.filter((n): n is string => typeof n === "string" && n.length > 0)),
   ];
@@ -186,12 +183,10 @@ export interface OrphanKey {
 // key is an orphan when it has at least one name and none of its names exist
 // in the base set — it lingers in Lokalise but en.json no longer defines it.
 // Keys with no resolvable name are skipped (never reported for deletion) so a
-// malformed entry can't be deleted by accident. Sorted by name for a stable,
-// reviewable file.
-export function findOrphans(
-  keys: LokaliseKey[],
-  baseKeys: Set<string>
-): OrphanKey[] {
+// malformed entry can't be deleted by accident. Sorted by name in
+// code-point order (locale-independent) for a stable, reviewable file
+// that doesn't reorder between machines or CI.
+export function findOrphans(keys: LokaliseKey[], baseKeys: Set<string>): OrphanKey[] {
   const orphans: OrphanKey[] = [];
   for (const key of keys) {
     const candidates = keyNameCandidates(key.key_name);
@@ -204,7 +199,9 @@ export function findOrphans(
       created_at: key.created_at,
     });
   }
-  return orphans.sort((a, b) => a.key_name.localeCompare(b.key_name));
+  return orphans.sort((a, b) =>
+    a.key_name < b.key_name ? -1 : a.key_name > b.key_name ? 1 : 0
+  );
 }
 
 export type DownloadSource = "lokalise" | "release";
