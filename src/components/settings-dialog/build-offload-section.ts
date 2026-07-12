@@ -1,9 +1,10 @@
 import { consume } from "@lit/context";
-import { mdiDelete, mdiLanConnect, mdiOpenInNew, mdiPencil } from "@mdi/js";
+import { mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { notify, notifyError, notifySuccess } from "../../util/notify.js";
 import { desktopDocsUrl } from "../../util/release-notes-url.js";
+import { splitTemplate } from "../../util/template-split.js";
 
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
@@ -53,7 +54,6 @@ import "./build-offload-advanced.js";
 registerMdiIcons({
   delete: mdiDelete,
   "lan-connect": mdiLanConnect,
-  "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
 });
 
@@ -144,23 +144,31 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       .policy-selected-desc {
         margin-top: var(--wa-space-2xs);
       }
-      .get-desktop-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25em;
-        margin-top: var(--wa-space-2xs);
+      .desktop-inline-link {
         color: var(--esphome-primary);
         text-decoration: none;
-        white-space: nowrap;
       }
-      .get-desktop-link:hover {
+      .desktop-inline-link:hover {
         text-decoration: underline;
-      }
-      .get-desktop-link wa-icon {
-        font-size: 1em;
       }
     `,
   ];
+
+  // Intro copy with "ESPHome Desktop" itself linked to the app's docs, so a
+  // reader learns how to get it inline rather than via a separate CTA.
+  private _renderPairedServersDesc() {
+    const [before, after] = splitTemplate(
+      this._localize("settings.paired_build_servers_desc"),
+      "{desktop_link}"
+    );
+    return html`${before}<a
+        class="desktop-inline-link"
+        href=${desktopDocsUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        >${this._localize("settings.esphome_desktop")}</a
+      >${after}`;
+  }
 
   protected render() {
     return html`
@@ -169,18 +177,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
       </div>
-      <div class="section-intro">
-        ${this._localize("settings.paired_build_servers_desc")}
-        <a
-          class="get-desktop-link"
-          href=${desktopDocsUrl()}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          ${this._localize("settings.get_esphome_desktop")}
-          <wa-icon library="mdi" name="open-in-new"></wa-icon>
-        </a>
-      </div>
+      <div class="section-intro">${this._renderPairedServersDesc()}</div>
       ${this._renderPairings()}
 
       <div class="section-heading">
