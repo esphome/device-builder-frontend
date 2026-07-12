@@ -52,6 +52,11 @@ import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import {
+  type AutomationFocus,
+  createFocusResolver,
+  type YamlPathSegment,
+} from "./automation-focus.js";
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
@@ -102,11 +107,18 @@ export class ESPHomeScriptEditor extends LitElement {
 
   @property() yaml = "";
 
+  /** Indexed key path at the YAML cursor; resolved against the
+   *  hydrated tree to scroll/highlight the matching node or field. */
+  @property({ attribute: false })
+  focusYamlPath?: YamlPathSegment[];
+
   /** Action-list reference — used by the header-positioned Add
    *  button to open the catalog picker dialog that lives inside
    *  the action-list component. */
   @query("esphome-automation-action-list")
   private _actionList?: ESPHomeAutomationActionList;
+
+  private _resolveFocus = createFocusResolver();
 
   @state() private _available: AvailableAutomations | null = null;
   @state() private _loading = true;
@@ -288,8 +300,9 @@ export class ESPHomeScriptEditor extends LitElement {
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
+    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
     return html`
-      ${this._renderHeader()} ${this._renderConfigForm(automation, disabled)}
+      ${this._renderHeader()} ${this._renderConfigForm(automation, disabled, focus)}
       ${this._showAdvanced ? this._renderParametersField(automation, disabled) : nothing}
       <div class="field">
         <div class="ae-actions-header">
@@ -312,6 +325,7 @@ export class ESPHomeScriptEditor extends LitElement {
         <esphome-automation-action-list
           no-header
           hide-add
+          .focusTarget=${focus && focus.node.length > 0 ? focus : null}
           .actions=${automation.actions}
           .catalog=${actions}
           .conditionCatalog=${conditions}
@@ -388,7 +402,11 @@ export class ESPHomeScriptEditor extends LitElement {
    * and ``then`` is the actions block, rendered by the action-list
    * below the form.
    */
-  private _renderConfigForm(automation: AutomationTree, disabled: boolean) {
+  private _renderConfigForm(
+    automation: AutomationTree,
+    disabled: boolean,
+    focus: AutomationFocus | null
+  ) {
     const comp = this._scriptComponent;
     if (!comp) return nothing;
     const entries = comp.config_entries.filter(
@@ -405,6 +423,7 @@ export class ESPHomeScriptEditor extends LitElement {
         .values=${automation.trigger_params}
         .board=${this.board}
         .yaml=${this.yaml}
+        .focusFieldPath=${focus && focus.node.length === 0 ? focus.field : undefined}
         ?disabled=${disabled}
         advanced-section
         ?force-advanced-control=${hasParameters}

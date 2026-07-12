@@ -412,6 +412,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .platform=${this.board?.esphome.platform ?? ""}
         .location=${location}
         .yaml=${this.yaml}
+        .focusYamlPath=${this.focusYamlPath}
       ></esphome-script-editor>`;
     }
     if (location?.kind === "api_action") {
@@ -421,6 +422,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .platform=${this.board?.esphome.platform ?? ""}
         .location=${location}
         .yaml=${this.yaml}
+        .focusYamlPath=${this.focusYamlPath}
       ></esphome-api-action-editor>`;
     }
     if (location) {

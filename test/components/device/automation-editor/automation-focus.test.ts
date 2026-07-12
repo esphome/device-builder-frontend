@@ -126,14 +126,38 @@ describe("automationRelativePath", () => {
     ).toBeNull();
   });
 
+  it("slices a script entry, trusting the path's entry index", () => {
+    const loc = { kind: "script", id: "s2" } as const;
+    expect(automationRelativePath(["script", 1, "then", 0, "delay"], loc)).toEqual([
+      "then",
+      0,
+      "delay",
+    ]);
+    expect(automationRelativePath(["script", 0, "mode"], loc)).toEqual(["mode"]);
+    // A script block is always a list; a keyed shape never anchors.
+    expect(automationRelativePath(["script", "then"], loc)).toBeNull();
+  });
+
+  it("slices an api action under the two-key anchor", () => {
+    const loc = { kind: "api_action", action_name: "ring" } as const;
+    expect(
+      automationRelativePath(["api", "actions", 1, "then", 0, "logger.log"], loc)
+    ).toEqual(["then", 0, "logger.log"]);
+    expect(automationRelativePath(["api", "actions", 0, "variables", "x"], loc)).toEqual([
+      "variables",
+      "x",
+    ]);
+    // A different api child block never anchors, nor does the bare list key.
+    expect(automationRelativePath(["api", "encryption", "key"], loc)).toBeNull();
+    expect(automationRelativePath(["api", "actions"], loc)).toBeNull();
+  });
+
   it("returns null for kinds that mount other editors", () => {
     expect(
-      automationRelativePath(["script", 0, "then"], { kind: "script", id: "s" })
-    ).toBeNull();
-    expect(
-      automationRelativePath(["api", "actions", 0], {
-        kind: "api_action",
-        action_name: "a",
+      automationRelativePath(["light", 0, "effects", 0, "name"], {
+        kind: "light_effect",
+        component_id: "l1",
+        index: 0,
       })
     ).toBeNull();
   });

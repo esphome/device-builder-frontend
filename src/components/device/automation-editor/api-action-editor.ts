@@ -46,6 +46,7 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import { createFocusResolver, type YamlPathSegment } from "./automation-focus.js";
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
@@ -98,6 +99,13 @@ export class ESPHomeApiActionEditor extends LitElement {
   addMode = false;
 
   @property() yaml = "";
+
+  /** Indexed key path at the YAML cursor; resolved against the
+   *  hydrated tree to scroll/highlight the matching action node. */
+  @property({ attribute: false })
+  focusYamlPath?: YamlPathSegment[];
+
+  private _resolveFocus = createFocusResolver();
 
   /** Scoped catalog response — drives the action / condition / script
    *  / device pickers inside the action list. */
@@ -194,6 +202,7 @@ export class ESPHomeApiActionEditor extends LitElement {
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
+    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
     return html`
       ${this._renderHeader()} ${this._renderActionNameField(disabled)}
       <esphome-callable-params-editor
@@ -212,6 +221,7 @@ export class ESPHomeApiActionEditor extends LitElement {
         </p>
         <esphome-automation-action-list
           no-header
+          .focusTarget=${focus && focus.node.length > 0 ? focus : null}
           .actions=${automation.actions}
           .catalog=${actions}
           .conditionCatalog=${conditions}

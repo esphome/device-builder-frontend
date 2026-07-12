@@ -50,12 +50,7 @@ import { parseSubstitutions } from "../../../util/substitutions.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
-import {
-  type AutomationFocus,
-  automationRelativePath,
-  resolveAutomationFocus,
-  type YamlPathSegment,
-} from "./automation-focus.js";
+import { createFocusResolver, type YamlPathSegment } from "./automation-focus.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { loadIntervalComponent } from "./load-interval-component.js";
 import { ParseErrorController } from "./parse-error-controller.js";
@@ -189,19 +184,7 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  read-only Target field can preview ${...} like the text fields do. */
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
 
-  /** Cursor path → tree focus. Memoized on (value, location, path) so it
-   *  self-heals once the async hydrate lands the tree. */
-  private _resolveFocus = memoizeOne(
-    (
-      value: AutomationTree | null,
-      location: AutomationLocation | null,
-      path?: YamlPathSegment[]
-    ): AutomationFocus | null => {
-      if (!value || !path?.length) return null;
-      const rel = automationRelativePath(path, location);
-      return rel ? resolveAutomationFocus(value, rel) : null;
-    }
-  );
+  private _resolveFocus = createFocusResolver();
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 

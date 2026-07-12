@@ -92,4 +92,57 @@ describe("script-editor action-catalog hydration (#1286)", () => {
     expect(getAvailableAutomations).not.toHaveBeenCalled();
     expect(getAutomationBodies).not.toHaveBeenCalled();
   });
+
+  it("resolves a cursor path into the action list's focus target", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue(loggerBodies());
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = new ESPHomeScriptEditor();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._api = api;
+    editor.configuration = "device.yaml";
+    editor.location = { kind: "script", id: "my_script" };
+    editor.value = {
+      trigger_id: null,
+      trigger_params: { id: "my_script" },
+      actions: [{ action_id: "logger.log", params: {}, children: {}, conditions: [] }],
+    };
+    editor.focusYamlPath = ["script", 0, "then", 0, "logger.log", "format"];
+    document.body.appendChild(editor);
+    await editor.updateComplete;
+    await flushMicrotasks(30);
+
+    const list = editor.shadowRoot!.querySelector("esphome-automation-action-list");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((list as any).focusTarget).toEqual({ node: [0], field: ["format"] });
+  });
+
+  it("routes an entry-param cursor path to the config form", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = new ESPHomeScriptEditor();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._api = api;
+    editor.configuration = "device.yaml";
+    editor.location = { kind: "script", id: "my_script" };
+    editor.value = { trigger_id: null, trigger_params: { id: "my_script" }, actions: [] };
+    editor.focusYamlPath = ["script", 0, "mode"];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._scriptComponent = {
+      config_entries: [
+        { key: "id", type: "string", label: "ID" },
+        { key: "mode", type: "enum", label: "Mode" },
+      ],
+    };
+    document.body.appendChild(editor);
+    await editor.updateComplete;
+    await flushMicrotasks(30);
+
+    const form = editor.shadowRoot!.querySelector("esphome-config-entry-form");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((form as any).focusFieldPath).toEqual(["mode"]);
+  });
 });

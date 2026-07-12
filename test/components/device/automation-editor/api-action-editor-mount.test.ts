@@ -89,4 +89,29 @@ describe("api-action-editor action-catalog hydration (#1286)", () => {
     expect(getAvailableAutomations).not.toHaveBeenCalled();
     expect(getAutomationBodies).not.toHaveBeenCalled();
   });
+
+  it("resolves a cursor path into the action list's focus target", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue(loggerBodies());
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = new ESPHomeApiActionEditor();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._api = api;
+    editor.configuration = "device.yaml";
+    editor.location = { kind: "api_action", action_name: "ring_bell" };
+    editor.value = {
+      trigger_id: null,
+      trigger_params: {},
+      actions: [{ action_id: "logger.log", params: {}, children: {}, conditions: [] }],
+    };
+    editor.focusYamlPath = ["api", "actions", 0, "then", 0, "logger.log", "format"];
+    document.body.appendChild(editor);
+    await editor.updateComplete;
+    await flushMicrotasks(30);
+
+    const list = editor.shadowRoot!.querySelector("esphome-automation-action-list");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((list as any).focusTarget).toEqual({ node: [0], field: ["format"] });
+  });
 });

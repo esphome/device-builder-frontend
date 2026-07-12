@@ -11,6 +11,8 @@
  * ``wait_until``'s gate-less shorthand) and fails soft: an unresolved
  * tail degrades to the deepest resolved node.
  */
+import memoizeOne from "memoize-one";
+
 import type {
   ActionNode,
   AutomationLocation,
@@ -51,10 +53,16 @@ export function automationRelativePath(
 ): YamlPathSegment[] | null {
   const anchor = location && handlerAnchor(location);
   if (!anchor) return null;
-  const at = path.indexOf(anchor.key);
+  const at = path.indexOf(anchor.keys[0]);
   if (at < 0) return null;
-  const rest = path.slice(at + 1);
+  for (let i = 1; i < anchor.keys.length; i++) {
+    if (path[at + i] !== anchor.keys[i]) return null;
+  }
+  const rest = path.slice(at + anchor.keys.length);
   if (anchor.index === undefined) return rest;
+  if (anchor.index === "any") {
+    return typeof rest[0] === "number" ? rest.slice(1) : null;
+  }
   return rest[0] === anchor.index ? rest.slice(1) : null;
 }
 
@@ -99,21 +107,53 @@ export function focusTargetHasChanged(a: unknown, b: unknown): boolean {
   return focusKey(a as AutomationFocus | null) !== focusKey(b as AutomationFocus | null);
 }
 
-/** The list key anchoring a location's handler body in the YAML, plus
- *  the entry index for list-shaped handlers. */
+/** Memoized cursor-path → focus resolver, one per editor instance —
+ *  keyed on (value, location, path) so it self-heals once the async
+ *  hydrate lands the tree. */
+export function createFocusResolver(): (
+  value: AutomationTree | null,
+  location: AutomationLocation | null,
+  path?: YamlPathSegment[]
+) => AutomationFocus | null {
+  return memoizeOne(
+    (
+      value: AutomationTree | null,
+      location: AutomationLocation | null,
+      path?: YamlPathSegment[]
+    ): AutomationFocus | null => {
+      if (!value || !path?.length) return null;
+      const rel = automationRelativePath(path, location);
+      return rel ? resolveAutomationFocus(value, rel) : null;
+    }
+  );
+}
+
+/**
+ * The key sequence anchoring a location's handler body in the YAML,
+ * plus the entry-index policy for list-shaped handlers.
+ *
+ * ``"any"`` consumes whatever entry index the cursor path carries:
+ * script / api-action locations identify their entry by id, not
+ * index, and the caret that produced the path is the same one that
+ * resolved the location, so they agree by construction.
+ */
 function handlerAnchor(
   location: AutomationLocation
-): { key: string; index?: number } | null {
+): { keys: string[]; index?: number | "any" } | null {
   switch (location.kind) {
     case "device_on":
     case "component_on":
-      return { key: location.trigger, index: location.index };
+      return { keys: [location.trigger], index: location.index };
     case "component_action":
-      return { key: location.field };
+      return { keys: [location.field] };
     case "interval":
-      return { key: "interval", index: location.index };
+      return { keys: ["interval"], index: location.index };
+    case "script":
+      return { keys: ["script"], index: "any" };
+    case "api_action":
+      return { keys: ["api", "actions"], index: "any" };
     default:
-      // script / api_action / light_effect mount different editors.
+      // light_effect mounts a different editor.
       return null;
   }
 }
