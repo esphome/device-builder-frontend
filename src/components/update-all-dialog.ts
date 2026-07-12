@@ -164,6 +164,24 @@ export class ESPHomeUpdateAllDialog extends LitElement {
     return this._matchedMemo(this._devices, this._selection);
   }
 
+  // Bulk update deliberately supersedes: the backend cancels and restarts a
+  // configuration's in-flight jobs on enqueue (#1195). Warn when it will
+  // actually happen. Memoized like the sibling tallies — _activeJobs churns
+  // on every job-progress event while the dialog sits open.
+  private _buildingCountMemo = memoizeOne(
+    (matched: ConfiguredDevice[], activeJobs: Map<string, FirmwareJob>) =>
+      matched.filter((d) => activeJobs.has(d.configuration)).length
+  );
+
+  private _renderSupersedeNote(matched: ConfiguredDevice[]) {
+    const building = this._buildingCountMemo(matched, this._activeJobs);
+    return building > 0
+      ? html`<div class="summary-note">
+          ${this._localize("update_all_dialog.supersede_note", { count: building })}
+        </div>`
+      : nothing;
+  }
+
   protected render() {
     // Keep one <esphome-base-dialog> so a close flips ?open reactively and
     // wa-dialog's exit animation plays on every path. Gate only the body +
@@ -196,21 +214,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
                   ${this._localize("update_all_dialog.count", {
                     count: matched.length,
                   })}
-                  ${(() => {
-                    // Bulk update deliberately supersedes: the backend cancels
-                    // and restarts a configuration's in-flight jobs on enqueue
-                    // (#1195). Say so when it will actually happen.
-                    const building = matched.filter((d) =>
-                      this._activeJobs.has(d.configuration)
-                    ).length;
-                    return building > 0
-                      ? html`<div class="summary-note">
-                          ${this._localize("update_all_dialog.supersede_note", {
-                            count: building,
-                          })}
-                        </div>`
-                      : nothing;
-                  })()}
+                  ${this._renderSupersedeNote(matched)}
                 </div>
                 <div class="actions">
                   <button class="btn btn--cancel" @click=${this.close}>
