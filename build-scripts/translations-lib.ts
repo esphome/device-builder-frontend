@@ -48,6 +48,23 @@ export function flagValue(args: string[], name: string): string | undefined {
   return idx === -1 ? undefined : args[idx + 1];
 }
 
+// Like flagValue, but for a flag whose value must be non-empty when the
+// flag is given. Returns undefined only when the flag is entirely absent
+// (so the caller can apply a default); a present-but-empty value (`--out`,
+// `--out=`) throws rather than yielding "" or silently defaulting, matching
+// resolveDownloadSource's strictness.
+export function nonEmptyFlagValue(args: string[], name: string): string | undefined {
+  const present = args.some((a) => a === name || a.startsWith(`${name}=`));
+  if (!present) {
+    return undefined;
+  }
+  const value = flagValue(args, name);
+  if (value === undefined || value === "") {
+    throw new Error(`${name} requires a non-empty file path.`);
+  }
+  return value;
+}
+
 type Messages = Record<string, unknown>;
 
 // Flatten a nested messages object to a map of dot-joined leaf key → string

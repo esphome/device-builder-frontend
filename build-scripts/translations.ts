@@ -41,8 +41,8 @@ import { unzipSync } from "fflate";
 import {
   BASE_LANGUAGE,
   findOrphans,
-  flagValue,
   flattenKeys,
+  nonEmptyFlagValue,
   localeFromZipEntry,
   resolveDownloadSource,
   type LokaliseKey,
@@ -616,11 +616,11 @@ async function main(): Promise<number> {
       return await runUpload(makeLokaliseClient(), args.includes("--cleanup"));
     }
     if (command === "orphans") {
-      const outPath = flagValue(args, "--out") ?? join(REPO_ROOT, ORPHANS_FILE);
+      const outPath = nonEmptyFlagValue(args, "--out") ?? join(REPO_ROOT, ORPHANS_FILE);
       return await runOrphans(makeLokaliseClient(), outPath);
     }
     if (command === "delete-orphans") {
-      const inPath = flagValue(args, "--file") ?? join(REPO_ROOT, ORPHANS_FILE);
+      const inPath = nonEmptyFlagValue(args, "--file") ?? join(REPO_ROOT, ORPHANS_FILE);
       return await runDeleteOrphans(makeLokaliseClient(), inPath, args.includes("--yes"));
     }
     console.error(`error: unknown command '${command}'`);

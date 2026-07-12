@@ -4,6 +4,7 @@ import {
   flagValue,
   localeCompleteness,
   flattenKeys,
+  nonEmptyFlagValue,
   keyNameCandidates,
   localeFromZipEntry,
   resolveDownloadSource,
@@ -61,6 +62,32 @@ describe("flagValue", () => {
 
   it("returns undefined when the flag is absent", () => {
     expect(flagValue(["download"], "--source")).toBeUndefined();
+  });
+});
+
+describe("nonEmptyFlagValue", () => {
+  it("reads a `--flag value` pair", () => {
+    expect(nonEmptyFlagValue(["orphans", "--out", "f.json"], "--out")).toBe("f.json");
+  });
+
+  it("reads a `--flag=value` pair", () => {
+    expect(nonEmptyFlagValue(["orphans", "--out=f.json"], "--out")).toBe("f.json");
+  });
+
+  it("returns undefined when the flag is absent", () => {
+    expect(nonEmptyFlagValue(["orphans"], "--out")).toBeUndefined();
+  });
+
+  it("throws on `--flag=` with an empty value", () => {
+    expect(() => nonEmptyFlagValue(["orphans", "--out="], "--out")).toThrow(
+      /requires a non-empty file path/
+    );
+  });
+
+  it("throws on a valueless `--flag` at the end of argv", () => {
+    expect(() => nonEmptyFlagValue(["orphans", "--out"], "--out")).toThrow(
+      /requires a non-empty file path/
+    );
   });
 });
 
