@@ -232,14 +232,21 @@ export function sectionAtLine(yaml: string, line: number): YamlSection | null {
   );
   const autoHit = smallestContainingSection(autos, line);
   if (autoHit) return autoHit;
+  // ``script:`` / ``interval:`` blocks are wholly owned by their
+  // per-item automation editors — the block's own component form is a
+  // dead end, so any block-level hit routes to the first item.
+  const firstOwnedItem = (key: string) =>
+    AUTOMATION_KEYS.has(key) ? (autos.find((s) => s.parentKey === key) ?? null) : null;
   const tops = parseYamlTopLevelSections(yaml);
   const topHit = smallestContainingSection(tops, line);
-  if (topHit) return topHit;
+  if (topHit) return firstOwnedItem(topHit.key) ?? topHit;
   // A bare top-level sequence (usb_uart:, sensor:, …) expands into per-item
   // ranges that start at the first dash, so the header line itself is covered
   // by nothing. When the click lands exactly on such a header, select the
   // section's first instance instead of leaving the selection unchanged.
-  return _firstItemForListHeader(tops, yaml, line);
+  const headerHit = _firstItemForListHeader(tops, yaml, line);
+  if (headerHit) return firstOwnedItem(headerHit.key) ?? headerHit;
+  return null;
 }
 
 /**
