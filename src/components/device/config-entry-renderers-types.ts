@@ -49,12 +49,14 @@ export interface RenderCtx {
   reactiveConstraintKeys: Set<string>;
   /** The form's top-level config entries, for resolving a label of a key that
    *  isn't in a given cluster's members (a cardinality key that's also an
-   *  ``exclusive_group`` member is dropped from the cluster). Absent in
-   *  lightweight contexts; callers fall back to a narrower lookup. Also fed
-   *  to ``isEntryVisible`` as the ``siblings`` scope for the depends_on
-   *  default fallback — top-level only, matching every defaulted-dependency
-   *  gate in today's catalog; a context without it loses the fallback. */
-  entries?: ConfigEntry[];
+   *  ``exclusive_group`` member is dropped from the cluster), and fed to
+   *  ``isEntryVisible`` as the ``siblings`` scope for the depends_on default
+   *  fallback. Top-level is the *correct* sibling scope for every consumer:
+   *  the cluster / exclusive-group / banner renderers only ever run at the
+   *  top level (their paths are root-anchored), and nested leaves get their
+   *  per-level siblings from ``filterRenderable``'s own recursion. If those
+   *  renderers ever become nested-capable, rebase this alongside the paths. */
+  entries: ConfigEntry[];
   nestedOpenSections: Set<string>;
   getAt: (path: string[]) => unknown;
   errorAt: (path: string[]) => ValidationError | null;

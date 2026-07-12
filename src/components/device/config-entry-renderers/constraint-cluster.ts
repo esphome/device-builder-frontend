@@ -274,7 +274,7 @@ export function renderConstraintClusterField(cluster: ConstraintCluster, ctx: Re
   const message = ctx.localize(`device.constraint_${prompt.kind}`, {
     // Resolve labels against the full entry set so a cardinality key dropped
     // from members (also an exclusive_group member) still localizes.
-    keys: formatConstraintKeys(prompt.keys, ctx.entries ?? cluster.members, ctx),
+    keys: formatConstraintKeys(prompt.keys, ctx.entries, ctx),
   });
 
   const visibleMembers = cluster.members.filter(
