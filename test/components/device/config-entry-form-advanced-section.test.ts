@@ -57,6 +57,15 @@ function control(container: HTMLElement): HTMLElement | null {
   return container.querySelector<HTMLElement>(".advanced-toggle-row");
 }
 
+/** Stub the form's localizer so the control's "(N)" count is observable. */
+function stubCountLocalize(form: ESPHomeConfigEntryForm): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (form as any)._localize = (key: string, params?: { count?: number }) =>
+    key === "device.show_advanced_count"
+      ? `Show advanced settings (${params?.count})`
+      : key;
+}
+
 describe("config-entry-form advanced-section", () => {
   it("renders the control after basic fields, hides advanced until expanded", () => {
     const c = renderForm([BASIC, ADVANCED]);
@@ -248,11 +257,7 @@ describe("config-entry-form advanced-section", () => {
     form.advancedSection = true;
     form.gateAdvanced = true;
     form.showAdvanced = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (form as any)._localize = (key: string, params?: { count?: number }) =>
-      key === "device.show_advanced_count"
-        ? `Show advanced settings (${params?.count})`
-        : key;
+    stubCountLocalize(form);
     const container = document.createElement("div");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render((form as any).render(), container);
@@ -319,11 +324,7 @@ describe("config-entry-form advanced-section", () => {
     form.advancedSection = true;
     form.gateAdvanced = true;
     form.showAdvanced = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (form as any)._localize = (key: string, params?: { count?: number }) =>
-      key === "device.show_advanced_count"
-        ? `Show advanced settings (${params?.count})`
-        : key;
+    stubCountLocalize(form);
     const container = document.createElement("div");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render((form as any).render(), container);
@@ -364,12 +365,7 @@ describe("config-entry-form advanced-section", () => {
     form.advancedSection = true;
     form.gateAdvanced = true;
     form.showAdvanced = true;
-    // Default _localize returns the key; interpolate so the count is observable.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (form as any)._localize = (key: string, params?: { count?: number }) =>
-      key === "device.show_advanced_count"
-        ? `Show advanced settings (${params?.count})`
-        : key;
+    stubCountLocalize(form);
     const container = document.createElement("div");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render((form as any).render(), container);
@@ -405,11 +401,7 @@ describe("config-entry-form advanced-section", () => {
     form.advancedSection = true;
     form.gateAdvanced = true;
     form.showAdvanced = true;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (form as any)._localize = (key: string, params?: { count?: number }) =>
-      key === "device.show_advanced_count"
-        ? `Show advanced settings (${params?.count})`
-        : key;
+    stubCountLocalize(form);
     const container = document.createElement("div");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render((form as any).render(), container);
@@ -451,11 +443,7 @@ describe("config-entry-form advanced-section", () => {
     form.advancedSection = true;
     form.gateAdvanced = true;
     form.showAdvanced = true;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (form as any)._localize = (key: string, params?: { count?: number }) =>
-      key === "device.show_advanced_count"
-        ? `Show advanced settings (${params?.count})`
-        : key;
+    stubCountLocalize(form);
     const container = document.createElement("div");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render((form as any).render(), container);
@@ -610,5 +598,68 @@ describe("config-entry-form advanced-section", () => {
     sw.checked = true;
     sw.dispatchEvent(new Event("change"));
     expect(detail).toEqual({ show: true });
+  });
+
+  // Placement freeze while open (#1977): a value landing mid-edit must not
+  // re-home the field above the switch; live classification resumes on close.
+  function gatedOpenForm(values: Record<string, unknown>) {
+    const form = new ESPHomeConfigEntryForm();
+    form.entries = [
+      makeConfigEntry({
+        key: "internal",
+        type: ConfigEntryType.STRING,
+        label: "Filled Adv",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "show_test_card",
+        type: ConfigEntryType.BOOLEAN,
+        label: "Test Card",
+        advanced: true,
+      }),
+      makeConfigEntry({
+        key: "command_retain",
+        type: ConfigEntryType.STRING,
+        label: "Empty Adv",
+        advanced: true,
+      }),
+    ];
+    form.values = values;
+    form.advancedSection = true;
+    form.gateAdvanced = true;
+    form.showAdvanced = true;
+    stubCountLocalize(form);
+    const container = document.createElement("div");
+    const paint = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      render((form as any).render(), container);
+      return container.textContent ?? "";
+    };
+    return { form, paint };
+  }
+
+  it("keeps a field filled while the section is open below the control", () => {
+    const { form, paint } = gatedOpenForm({ internal: "x" });
+    let text = paint();
+    expect(text.indexOf("Filled Adv")).toBeLessThan(text.indexOf("Show advanced"));
+    expect(text.indexOf("Show advanced")).toBeLessThan(text.indexOf("Test Card"));
+    expect(text).toContain("Show advanced settings (2)");
+    form.values = { ...form.values, show_test_card: true };
+    text = paint();
+    expect(text.indexOf("Show advanced")).toBeLessThan(text.indexOf("Test Card"));
+    expect(text).toContain("Show advanced settings (2)");
+  });
+
+  it("re-homes a mid-open filled field inline once the toggle turns off", () => {
+    const { form, paint } = gatedOpenForm({});
+    paint();
+    form.values = { show_test_card: true };
+    paint();
+    form.showAdvanced = false;
+    const text = paint();
+    expect(text).toContain("Test Card");
+    expect(text.indexOf("Test Card")).toBeLessThan(text.indexOf("Show advanced"));
+    expect(text).toContain("Show advanced settings (2)");
+    expect(text).not.toContain("Empty Adv");
   });
 });
