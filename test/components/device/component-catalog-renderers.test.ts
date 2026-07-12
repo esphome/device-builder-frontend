@@ -74,6 +74,21 @@ describe("renderCard", () => {
     expect(container.querySelector(".component-card--featured")).not.toBeNull();
   });
 
+  it("omits the tooltip until the board body has hydrated", () => {
+    const container = document.createElement("div");
+    const host = makeHost();
+    (host as unknown as { board: null }).board = null;
+    const entry = makeEntry({
+      id: "featured.board.lcd_spi",
+      category: ComponentCategory.FEATURED,
+    });
+    render(renderCard(host, entry, false, true, localize), container);
+    expect(
+      container.querySelector(".component-category-chip--recommended")
+    ).not.toBeNull();
+    expect(container.querySelector("wa-tooltip")).toBeNull();
+  });
+
   it("keeps the muted category chip on a regular card", () => {
     const container = document.createElement("div");
     render(renderCard(makeHost(), makeEntry({}), false, false, localize), container);

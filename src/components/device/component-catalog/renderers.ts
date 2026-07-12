@@ -98,11 +98,12 @@ export function renderCard(
   // Native title tooltips don't render inside the dialog's top layer
   // (Chromium suppresses them over showModal dialogs), so the
   // recommendation explainer rides a wa-tooltip anchored to the chip.
-  const recommendedTooltip = featured
-    ? localize("device.recommended_chip_tooltip", {
-        board: host.board?.name || "board",
-      })
-    : "";
+  // Empty until the board body has hydrated — the chip renders without
+  // a tooltip then, rather than naming a placeholder board.
+  const recommendedTooltip =
+    featured && host.board
+      ? localize("device.recommended_chip_tooltip", { board: host.board.name })
+      : "";
   return html`
     <article
       class="component-card ${expanded ? "component-card--expanded" : ""} ${
@@ -138,9 +139,13 @@ export function renderCard(
                     tabindex="0"
                     >${categoryChipLabel("featured")}</span
                   >
-                  <wa-tooltip for=${`recommended-chip-${component.id}`}
-                    >${recommendedTooltip}</wa-tooltip
-                  >`
+                  ${
+                    recommendedTooltip
+                      ? html`<wa-tooltip for=${`recommended-chip-${component.id}`}
+                          >${recommendedTooltip}</wa-tooltip
+                        >`
+                      : nothing
+                  }`
               : nothing
           }
           ${
