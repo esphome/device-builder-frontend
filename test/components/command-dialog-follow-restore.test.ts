@@ -21,6 +21,7 @@ interface Harness {
   _compileStartedAt: number | null;
   _compileEndedAt: number | null;
   _jobId: string;
+  _timerJobId: string;
   _now: number;
   readonly _totalRunElapsedMs: number | null;
   followJob: (job: FirmwareJob, displayName: string) => void;
@@ -132,7 +133,7 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
       completed_at: null,
     });
     const el = mount([job]);
-    el._jobId = "run1";
+    el._timerJobId = "run1";
     el._now = Date.parse("2026-01-01T00:00:29Z");
     expect(el._totalRunElapsedMs).toBe(29_000);
   });
@@ -145,7 +146,7 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
       completed_at: "2026-01-01T00:00:29Z",
     });
     const el = mount([job]);
-    el._jobId = "run2";
+    el._timerJobId = "run2";
     el._now = Date.parse("2026-01-01T01:00:00Z");
     expect(el._totalRunElapsedMs).toBe(29_000);
   });
@@ -157,7 +158,21 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
       started_at: null,
     });
     const el = mount([job]);
-    el._jobId = "run3";
+    el._timerJobId = "run3";
     expect(el._totalRunElapsedMs).toBeNull();
+  });
+
+  it("survives the stream clearing _jobId after an install's compile", () => {
+    const job = makeFirmwareJob({
+      job_id: "run4",
+      job_type: JobType.COMPILE,
+      started_at: "2026-01-01T00:00:00Z",
+      completed_at: "2026-01-01T00:00:29Z",
+    });
+    const el = mount([job]);
+    el._timerJobId = "run4";
+    el._jobId = ""; // stream ended; the flash then failed
+    el._now = Date.parse("2026-01-01T00:01:30Z");
+    expect(el._totalRunElapsedMs).toBe(29_000);
   });
 });

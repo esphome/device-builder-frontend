@@ -218,8 +218,13 @@ export class ESPHomeCommandDialog extends LitElement {
   _port = "OTA";
   // Install flashes the bootloader image instead of the app (OTA-only).
   _bootloader = false;
-  // Active job id (cancel target). Empty for validate.
+  // Active job id (cancel target). Empty for validate. Cleared when the stream
+  // ends, so it can't back the timer's total-run lookup past a completed job.
   _jobId = "";
+  // The job the timer reports on — the followed (compile) job. Unlike _jobId it
+  // survives the stream ending, so the detail popover can still read the job's
+  // started_at/completed_at for the total run time after an install's flash.
+  _timerJobId = "";
 
   @query("esphome-process-terminal") _terminal?: ESPHomeProcessTerminal;
 
@@ -302,6 +307,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._resetPendingLines();
     this._statusMessage = "";
     this._jobId = "";
+    this._timerJobId = "";
     this._jobStatus = null;
     this._primedSource = null;
     this._compileStartedAt = null;
@@ -344,6 +350,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._showSecrets = false;
     this._showLogsAfterInstall = true;
     this._jobId = job.job_id;
+    this._timerJobId = job.job_id;
     this._jobStatus = job.status;
     this._primedSource = {
       source: job.source,
@@ -389,7 +396,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // and for an install the flash too — the number PlatformIO prints as "Took".
   // Freezes at completion. Null before the job starts running.
   get _totalRunElapsedMs(): number | null {
-    const job = this._jobId ? this._jobs.get(this._jobId) : undefined;
+    const job = this._timerJobId ? this._jobs.get(this._timerJobId) : undefined;
     const start = parseIsoMs(job?.started_at);
     if (start === null) return null;
     return (parseIsoMs(job?.completed_at) ?? this._now) - start;

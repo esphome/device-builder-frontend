@@ -180,6 +180,7 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
 // Leaves _commandType to the caller (the install chain relies on it).
 function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   host._jobId = job.job_id;
+  host._timerJobId = job.job_id;
   host._jobStatus = job.status;
   host._primedSource = {
     source: job.source,

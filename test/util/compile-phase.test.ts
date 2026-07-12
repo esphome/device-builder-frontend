@@ -24,6 +24,8 @@ describe("isCompilePhaseLine", () => {
       "Linking .pio/build/nodemcuv2/firmware.elf",
       "Generating partitions .pio/build/esp32dev/partitions.bin",
       "Building in release mode",
+      // esp-idf: the real start after the download.
+      "Reading CMake configuration...",
     ]) {
       expect(isCompilePhaseLine(line)).toBe(true);
     }
@@ -88,7 +90,6 @@ describe("isCompilePhaseLine", () => {
       "Library Manager: Resolving dependencies...",
       "HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash",
       "- framework-espidf @ 3.50504.0 (5.5.4)",
-      "Reading CMake configuration...",
       "-- Configuring done (3.0s)",
       "-- Building ESP-IDF components for target esp32s3",
       "Executing action: reconfigure",
@@ -111,6 +112,19 @@ describe("isCompileEndLine", () => {
         "========================= [FAILED] Took 4.10 seconds ========================="
       )
     ).toBe(true);
+  });
+
+  it("matches the real ANSI-coloured banner (colours inside the brackets)", () => {
+    // PlatformIO wraps SUCCESS/FAILED in colour codes between the brackets:
+    // `[<green><bold>SUCCESS<reset>] Took`. Must still match once stripped.
+    expect(
+      isCompileEndLine(
+        "\x1b[0m========================= [\x1b[32m\x1b[1mSUCCESS\x1b[0m] Took 14.73 seconds =========================\x1b[0m"
+      )
+    ).toBe(true);
+    expect(isCompileEndLine("[\x1b[31m\x1b[1mFAILED\x1b[0m] Took 4.10 seconds")).toBe(
+      true
+    );
   });
 
   it("does not match ordinary build output", () => {
