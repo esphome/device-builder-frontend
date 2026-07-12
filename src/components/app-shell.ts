@@ -67,7 +67,6 @@ import { isExpert } from "../util/experience.js";
 import { notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
-import { closeOpenDialogs } from "./base-dialog.js";
 import {
   loadIntegrationDocs,
   loadLabels,
@@ -579,13 +578,8 @@ export class ESPHomeApp extends LitElement {
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
-        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) => {
-          // Cross-dialog navigation: close whatever modal the event came
-          // from (firmware tasks, a terminal reopened over it, ...) so
-          // settings can't paint underneath a still-open sibling.
-          closeOpenDialogs(this._settingsDialog ?? undefined);
-          this._settingsDialog?.open(e.detail?.section);
-        }}
+        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) =>
+          this._settingsDialog?.open(e.detail?.section)}
         @open-firmware-jobs=${() => this._firmwareJobsDialog?.open()}
         @open-reset-build-env=${() => this._firmwareJobsDialog?.openResetBuildEnv()}
         @open-feedback=${() => this._feedbackDialog?.open()}

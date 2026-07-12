@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 //
 // Pins the open-dialog registry behind closeOpenDialogs (issue #1185): open
-// wrappers get a request-close (so the host decides, same as Escape), the
-// except subtree is shielded across shadow boundaries, busy dialogs are
-// absorbed, and closed / disconnected wrappers are ignored.
+// wrappers are closed through the inner wa-dialog's Escape codepath, the
+// except subtree is shielded across shadow boundaries, the busy gate absorbs
+// the request, and closed / disconnected wrappers are ignored.
 import { describe, expect, it, vi } from "vitest";
 
 // wa-dialog runs form-validation lifecycle hooks happy-dom doesn't implement;
@@ -12,6 +12,31 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 
 import { closeOpenDialogs, ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 import { mount } from "../_dom.js";
+
+/* The real element registration is stubbed out above; register a stand-in
+   whose requestClose mimics the real one's entry point — fire the cancelable
+   wa-hide and record the outcome — so the wrapper's busy gate and
+   request-close re-emission are exercised for real. */
+class WaDialogStub extends HTMLElement {
+  requestCloseCalls = 0;
+  lastHidePrevented: boolean | null = null;
+
+  requestClose(): void {
+    this.requestCloseCalls++;
+    const ev = new CustomEvent("wa-hide", {
+      cancelable: true,
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(ev);
+    this.lastHidePrevented = ev.defaultPrevented;
+  }
+}
+customElements.define("wa-dialog", WaDialogStub);
+
+function innerStub(el: ESPHomeBaseDialog): WaDialogStub {
+  return el.shadowRoot!.querySelector("wa-dialog") as unknown as WaDialogStub;
+}
 
 function watchRequestClose(el: ESPHomeBaseDialog) {
   const spy = vi.fn();
@@ -24,32 +49,35 @@ describe("closeOpenDialogs", () => {
     const openEl = await mount(new ESPHomeBaseDialog(), { open: true });
     const closedEl = await mount(new ESPHomeBaseDialog(), { open: false });
     const openSpy = watchRequestClose(openEl);
-    const closedSpy = watchRequestClose(closedEl);
 
     closeOpenDialogs();
 
+    expect(innerStub(openEl).requestCloseCalls).toBe(1);
     expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(closedSpy).not.toHaveBeenCalled();
+    expect(innerStub(openEl).lastHidePrevented).toBe(false);
+    expect(innerStub(closedEl).requestCloseCalls).toBe(0);
   });
 
   it("leaves the wrapper's own open flag to the host", async () => {
     const el = await mount(new ESPHomeBaseDialog(), { open: true });
     closeOpenDialogs();
-    // The host flips this from its request-close handler; the sweep only
-    // asks.
+    // The host flips this from its request-close/after-hide handlers; the
+    // sweep only asks.
     expect(el.open).toBe(true);
   });
 
-  it("absorbs the request while busy", async () => {
+  it("absorbs the close while busy, before any host veto", async () => {
     const el = await mount(new ESPHomeBaseDialog(), { open: true, busy: true });
     const spy = watchRequestClose(el);
+
     closeOpenDialogs();
+
+    expect(innerStub(el).lastHidePrevented).toBe(true);
     expect(spy).not.toHaveBeenCalled();
   });
 
   it("shields the except subtree across a shadow boundary", async () => {
     const swept = await mount(new ESPHomeBaseDialog(), { open: true });
-    const sweptSpy = watchRequestClose(swept);
 
     // Stands in for a settings-dialog component: the wrapper lives in its
     // shadow DOM, and the component element is what gets passed as except.
@@ -60,40 +88,37 @@ describe("closeOpenDialogs", () => {
     shielded.open = true;
     shadow.appendChild(shielded);
     await shielded.updateComplete;
-    const shieldedSpy = watchRequestClose(shielded);
 
     closeOpenDialogs(component);
 
-    expect(sweptSpy).toHaveBeenCalledTimes(1);
-    expect(shieldedSpy).not.toHaveBeenCalled();
+    expect(innerStub(swept).requestCloseCalls).toBe(1);
+    expect(innerStub(shielded).requestCloseCalls).toBe(0);
   });
 
   it("drops a dialog from the sweep once it closes", async () => {
     const el = await mount(new ESPHomeBaseDialog(), { open: true });
-    const spy = watchRequestClose(el);
     el.open = false;
     await el.updateComplete;
 
     closeOpenDialogs();
-    expect(spy).not.toHaveBeenCalled();
+    expect(innerStub(el).requestCloseCalls).toBe(0);
   });
 
   it("drops a dialog from the sweep once it disconnects", async () => {
     const el = await mount(new ESPHomeBaseDialog(), { open: true });
-    const spy = watchRequestClose(el);
+    const stub = innerStub(el);
     el.remove();
 
     closeOpenDialogs();
-    expect(spy).not.toHaveBeenCalled();
+    expect(stub.requestCloseCalls).toBe(0);
   });
 
   it("re-registers an open dialog that reconnects", async () => {
     const el = await mount(new ESPHomeBaseDialog(), { open: true });
-    const spy = watchRequestClose(el);
     el.remove();
     document.body.appendChild(el);
 
     closeOpenDialogs();
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(innerStub(el).requestCloseCalls).toBe(1);
   });
 });

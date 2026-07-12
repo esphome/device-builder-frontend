@@ -17,12 +17,9 @@ const openDialogs = new Set<ESPHomeBaseDialog>();
  * Request-close every open dialog except those inside *except*'s composed
  * tree.
  *
- * For when a control inside one modal navigates to another: two open
- * ``wa-dialog``s stack by paint order, so the newly opened one can end up
- * hidden underneath a still-open sibling. Each close is a
- * :meth:`ESPHomeBaseDialog.requestClose`, so busy gates and host
- * ``request-close`` vetoes still apply — a dialog that refuses to close
- * stays open, same as Escape.
+ * Each close is a :meth:`ESPHomeBaseDialog.requestClose`, so busy gates and
+ * host ``request-close`` vetoes still apply — a dialog that refuses to
+ * close stays open, same as Escape.
  */
 export function closeOpenDialogs(except?: Node): void {
   for (const dialog of [...openDialogs]) {
@@ -224,26 +221,21 @@ export class ESPHomeBaseDialog extends LitElement {
   }
 
   /**
-   * Ask the host for a close, honouring the same gates as Escape / the X
-   * button.
+   * Ask for a close through the exact Escape codepath.
    *
-   * Absorbed while ``busy``. Otherwise dispatches ``request-close``; a host
-   * that doesn't veto flips its flag and the reactive ``?open`` binding
-   * runs the actual hide (which re-fires ``request-close`` through
-   * ``wa-hide`` — hosts' handlers are idempotent flips). Poking the inner
-   * ``wa-dialog`` directly instead double-triggers its hide watcher (once
-   * for the property, once for the binding's attribute removal) and it
-   * re-opens itself, so the host flag is the only safe entry point.
+   * Delegates to the inner ``wa-dialog``'s ``requestClose()`` method (what
+   * its own Escape handler calls), so the one ``wa-hide`` → busy gate →
+   * host-veto → hide → ``after-hide`` sequence runs — both host shapes
+   * close (flag flipped from ``request-close`` or from ``after-hide``).
+   * Don't switch this to writing the ``open`` *property*: its watcher
+   * reverts and re-requests, double-triggering the hide.
    */
   requestClose(): void {
-    if (this.busy) return;
-    this.dispatchEvent(
-      new CustomEvent("request-close", {
-        cancelable: true,
-        bubbles: false,
-        composed: false,
-      })
-    );
+    this.shadowRoot
+      ?.querySelector<HTMLElement & { requestClose?: (source?: unknown) => void }>(
+        "wa-dialog"
+      )
+      ?.requestClose?.(this);
   }
 
   // Focus a consumer-marked ``[autofocus]`` control once the dialog has

@@ -18,6 +18,7 @@ import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-even
 import type { LocalizeFunc } from "../common/localize.js";
 import { buildOffloadAlertsContext, localizeContext } from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
+import { closeOpenDialogs } from "./base-dialog.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -83,6 +84,10 @@ export class ESPHomeSettingsDialog extends LitElement {
   ];
 
   open(section: Section = "appearance") {
+    // Opening from inside another modal (a terminal's offload link, the
+    // firmware-tasks list): dismiss open siblings or this one can paint
+    // underneath them.
+    closeOpenDialogs(this);
     this._section = section;
     this._open = true;
   }
