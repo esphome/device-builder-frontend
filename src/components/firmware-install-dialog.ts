@@ -18,6 +18,7 @@ import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
+  activeJobsContext,
   apiContext,
   buildOffloadPairingsContext,
   darkModeContext,
@@ -96,6 +97,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @consume({ context: firmwareJobsContext, subscribe: true })
   @state()
   _jobs: Map<string, FirmwareJob> = new Map();
+
+  // Active job per configuration — the download flow waits for a running
+  // build instead of reading artifacts it's rewriting (#1200).
+  @consume({ context: activeJobsContext, subscribe: true })
+  @state()
+  _activeJobs: Map<string, FirmwareJob> = new Map();
 
   // Suppress the "set up a build server" hint once a build server is paired.
   @consume({ context: buildOffloadPairingsContext, subscribe: true })

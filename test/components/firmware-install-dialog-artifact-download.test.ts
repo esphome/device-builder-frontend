@@ -3,7 +3,8 @@
  * the device's existing build artefacts (firmware images + the ELF) so the
  * user can pick one, and compiles ONLY when nothing is built yet — an existing
  * build is served as-is, with no recompile, so the ELF's debug symbols keep
- * matching the firmware currently flashed on the device.
+ * matching the firmware currently flashed on the device. A running build is
+ * followed to completion first, without claiming it (#1200).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -74,6 +75,8 @@ function makeHost(getBinariesResults: FirmwareBinary[][]) {
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
+    _activeJobs: new Map<string, unknown>(),
+    _timer: { noteLine: vi.fn() },
     _localize: identityLocalize,
     _fail: vi.fn(),
   };
@@ -156,5 +159,63 @@ describe("download flow (startArtifactDownload)", () => {
     expect(host._step).toBe("error");
     expect(host._statusMessage).toBe("firmware.no_binaries_remote");
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe("download waits for a running build (#1200)", () => {
+  const runningJob = { job_id: "running-1", configuration: "device.yaml" };
+
+  it("follows the running job to completion, then serves fresh artefacts", async () => {
+    const { host, api } = makeHost([[FACTORY]]);
+    host._activeJobs.set("device.yaml", runningJob);
+    await run(host);
+    // Waited on the running job (not a new compile), then downloaded.
+    expect(api.firmwareFollowJob).toHaveBeenCalledWith("running-1", expect.anything());
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
+      "device.yaml",
+      "firmware.factory.bin"
+    );
+    // The dialog never claims the job it waited on: dismissing the download
+    // must not cancel a build it doesn't own.
+    expect(host._jobId).toBe("");
+  });
+
+  it("continues to its own compile when the awaited job ends non-completed", async () => {
+    const { host, api } = makeHost([[], [FACTORY]]);
+    host._activeJobs.set("device.yaml", runningJob);
+    api.firmwareFollowJob.mockImplementationOnce(
+      (_id: string, cbs: { onResult: (d: unknown) => void }) => {
+        cbs.onResult({ status: JobStatus.CANCELLED });
+        return "s1";
+      }
+    );
+    await run(host);
+    // The wait resolves regardless of outcome; the empty build dir then
+    // triggers the download's own (no-longer-superseding) compile.
+    expect(api.firmwareCompile).toHaveBeenCalledTimes(1);
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("bails without touching the backend when dismissed mid-wait", async () => {
+    const { host, api } = makeHost([[FACTORY]]);
+    host._activeJobs.set("device.yaml", runningJob);
+    // A follow that never completes: the user closes the dialog instead.
+    api.firmwareFollowJob.mockImplementationOnce(() => "s1");
+    const flow = run(host);
+    expect(host._compileReject).not.toBeNull();
+    host._compileReject!(new Error("Install dialog dismissed"));
+    await flow;
+    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("skips the wait entirely when no job is running", async () => {
+    const { host, api } = makeHost([[FACTORY]]);
+    await run(host);
+    // followJob is only reached via compileAndWait, which didn't run.
+    expect(api.firmwareFollowJob).not.toHaveBeenCalled();
+    expect(host._step).toBe("download-ready");
   });
 });

@@ -454,6 +454,7 @@
     "status_verifying": "Verifying chip…",
     "status_compiling": "Compiling firmware…",
     "status_queued": "Waiting for server…",
+    "status_waiting_build": "Waiting for the current build to finish…",
     "status_installing": "Compiling and installing firmware…",
     "status_downloading": "Downloading firmware…",
     "status_flashing": "Flashing firmware to device…",

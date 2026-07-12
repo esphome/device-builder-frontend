@@ -350,6 +350,16 @@ export async function startArtifactDownload(
   const device = host._device;
   if (!device) return;
 
+  // A running build is rewriting the artifacts this download would read,
+  // and compiling now would supersede it (cancel + restart). Follow it to
+  // a terminal state first, then continue to fresh artifacts (#1200).
+  const running = host._activeJobs.get(device.configuration);
+  if (running) {
+    host._statusMessage = host._localize("firmware.status_waiting_build");
+    if (!(await waitForRunningJob(host, running.job_id))) return;
+    host._statusMessage = host._localize("firmware.status_downloading");
+  }
+
   let binaries = await fetchBinaries(host, device.configuration);
   if (!binaries) return;
   if (binaries.length === 0) {
@@ -513,6 +523,42 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   // after a lost/never-ready tab recompiles, which is incremental and cheap.
   host._usbFirmware = null;
   host._usbFlashTeardown = teardown;
+}
+
+/**
+ * Stream an already-running job into the dialog and wait for it to reach
+ * a terminal state.
+ *
+ * Deliberately never sets ``host._jobId``: the dialog doesn't own this
+ * job, so dismissing the download must not cancel it — teardown only
+ * stops the follow stream. Resolves true on ANY terminal outcome (a
+ * failed or cancelled build just means the download compiles fresh
+ * afterwards), false when the dialog was dismissed mid-wait.
+ */
+function waitForRunningJob(
+  host: ESPHomeFirmwareInstallDialog,
+  jobId: string
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    host._compileReject = () => resolve(false);
+    host._streamId = host._api.firmwareFollowJob(jobId, {
+      onOutput: (line) => {
+        if (host._step === "queued") host._step = "compiling";
+        host._timer.noteLine(line);
+        host._logLines = [...host._logLines, line];
+      },
+      onResult: () => {
+        host._streamId = "";
+        host._compileReject = null;
+        resolve(true);
+      },
+      onError: () => {
+        host._streamId = "";
+        host._compileReject = null;
+        resolve(true);
+      },
+    });
+  });
 }
 
 export function compileAndWait(
