@@ -180,7 +180,13 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
 // Leaves _commandType to the caller (the install chain relies on it).
 function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   host._jobId = job.job_id;
-  host._timerJobId = job.job_id;
+  // Chaining from the compile head into its dependent flash keeps the timer
+  // on the compile — the build time (clocks + backend stamps) lives there;
+  // the flash tail has neither, so re-pointing would reset the readout
+  // mid-install. Any other (re)prime is a fresh run and takes the new job.
+  if (!host._timerJobId || job.depends_on !== host._timerJobId) {
+    host._timerJobId = job.job_id;
+  }
   host._jobStatus = job.status;
   host._primedSource = {
     source: job.source,
@@ -351,9 +357,12 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
     // Keep _commandType "install": the public followJob would derive "compile"
     // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
     // attempt and reset the run state (the public followJob did this), then
-    // re-attach via primeAndFollow.
+    // re-attach via primeAndFollow. The timer restarts with the fresh compile —
+    // clear its id so primeAndFollow re-points it, and drop the old clocks.
     await detachStream(host);
     resetRunState(host);
+    host._timerJobId = "";
+    host._timer.reset();
     primeAndFollow(host, job);
   } catch (err) {
     host._state = "error";

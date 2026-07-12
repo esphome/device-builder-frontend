@@ -50,12 +50,17 @@ describe("command-dialog install chain follow", () => {
 
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     host._jobId = "c1";
+    host._timerJobId = "c1";
     followJob(host, "c1");
     follows.c1.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
 
     // Compile done, but the install is not — it's now following the upload.
     expect(host._state).toBe("running");
     expect(host._jobId).toBe("u1");
+    // The run timer stays on the compile head — the build time (clocks +
+    // backend stamps) lives there; re-pointing at the upload would reset
+    // the readout mid-install.
+    expect(host._timerJobId).toBe("c1");
     expect(follows.u1).toBeDefined();
     expect(flipped()).toBe(false);
 

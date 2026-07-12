@@ -310,4 +310,19 @@ describe("command-dialog timer detail popover dismissal", () => {
     document.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(el._timer.showDetail).toBe(false);
   });
+
+  it("closes on Escape without letting it reach the hosting dialog", () => {
+    const el = mount([]);
+    el._timer.toggleDetail();
+    expect(el._timer.showDetail).toBe(true);
+    const esc = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(esc);
+    expect(el._timer.showDetail).toBe(false);
+    // Claimed, so the dialog's own Escape handling doesn't also close it.
+    expect(esc.defaultPrevented).toBe(true);
+  });
 });

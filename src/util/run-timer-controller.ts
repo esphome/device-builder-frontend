@@ -113,9 +113,11 @@ export class RunTimerController implements ReactiveController {
 
   // Live-detected compile span (frontend clock). Drives the inline offload
   // suggestion and the compile-time detail before the backend field lands.
+  // Clamped so a backwards clock adjustment can't leak a negative duration
+  // into threshold gating.
   get compileElapsedMs(): number | null {
     if (this._compileStartedAt === null) return null;
-    return (this._compileEndedAt ?? this.now) - this._compileStartedAt;
+    return Math.max(0, (this._compileEndedAt ?? this.now) - this._compileStartedAt);
   }
 
   // True while the compile is actively running — drives the inline offload
@@ -131,7 +133,7 @@ export class RunTimerController implements ReactiveController {
     const job = this._options.job();
     const start = parseIsoMs(job?.started_at);
     if (start === null) return null;
-    return (parseIsoMs(job?.completed_at) ?? this.now) - start;
+    return Math.max(0, (parseIsoMs(job?.completed_at) ?? this.now) - start);
   }
 
   // Compile-only time for the detail popover, or null when it's unknown. Uses
@@ -144,7 +146,7 @@ export class RunTimerController implements ReactiveController {
     const job = this._options.job();
     const beStart = parseIsoMs(job?.compile_started_at);
     if (beStart !== null) {
-      return (parseIsoMs(job?.compile_ended_at) ?? this.now) - beStart;
+      return Math.max(0, (parseIsoMs(job?.compile_ended_at) ?? this.now) - beStart);
     }
     return this.isRunFrozen ? null : this.compileElapsedMs;
   }
@@ -164,6 +166,9 @@ export class RunTimerController implements ReactiveController {
     // log, elsewhere in the dialog). Capture-phase so it fires before other
     // handlers; registered after this opening click so it doesn't self-close.
     document.addEventListener("click", this._onOutsideClick, true);
+    // Escape closes just the popover — capture-phase and claimed, so the
+    // hosting dialog's own Escape handling doesn't also close the dialog.
+    document.addEventListener("keydown", this._onEscape, true);
     this._host.requestUpdate();
   };
 
@@ -171,6 +176,7 @@ export class RunTimerController implements ReactiveController {
     if (!this.showDetail) return;
     this.showDetail = false;
     document.removeEventListener("click", this._onOutsideClick, true);
+    document.removeEventListener("keydown", this._onEscape, true);
     this._host.requestUpdate();
   }
 
@@ -198,6 +204,13 @@ export class RunTimerController implements ReactiveController {
       ? this._host.shadowRoot?.querySelector(this._options.popoverWrapSelector)
       : null;
     if (wrap && e.composedPath().includes(wrap)) return;
+    this.closeDetail();
+  };
+
+  private _onEscape = (e: KeyboardEvent): void => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
     this.closeDetail();
   };
 
