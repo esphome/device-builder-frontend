@@ -52,15 +52,31 @@ export function flagValue(args: string[], name: string): string | undefined {
 // flag is given. Returns undefined only when the flag is entirely absent
 // (so the caller can apply a default); a present-but-empty value (`--out`,
 // `--out=`) throws rather than yielding "" or silently defaulting, matching
-// resolveDownloadSource's strictness.
+// resolveDownloadSource's strictness. In the space-separated form a next
+// token that looks like a flag (`--file --yes`) is rejected too, so a
+// following flag is never mistaken for the path; the explicit inline form
+// (`--out=-x`) is taken verbatim.
 export function nonEmptyFlagValue(args: string[], name: string): string | undefined {
-  const present = args.some((a) => a === name || a.startsWith(`${name}=`));
-  if (!present) {
+  const inline = args.find((a) => a.startsWith(`${name}=`));
+  if (inline !== undefined) {
+    const value = inline.slice(name.length + 1);
+    if (value === "") {
+      throw new Error(`${name} requires a non-empty file path.`);
+    }
+    return value;
+  }
+  const idx = args.indexOf(name);
+  if (idx === -1) {
     return undefined;
   }
-  const value = flagValue(args, name);
+  const value = args[idx + 1];
   if (value === undefined || value === "") {
     throw new Error(`${name} requires a non-empty file path.`);
+  }
+  if (value.startsWith("-")) {
+    throw new Error(
+      `${name} requires a file path, but the next argument looks like a flag: ${value}.`
+    );
   }
   return value;
 }
@@ -219,6 +235,27 @@ export function findOrphans(keys: LokaliseKey[], baseKeys: Set<string>): OrphanK
   return orphans.sort((a, b) =>
     a.key_name < b.key_name ? -1 : a.key_name > b.key_name ? 1 : 0
   );
+}
+
+// Guard against deleting keys in the wrong Lokalise project. The orphans
+// working file records the project it was generated for, and keys are deleted
+// by numeric id (not project-scoped), so running delete against a different
+// LOKALISE_PROJECT_ID would hit unrelated keys. Returns the file's project id
+// when it's known and differs from the current one (a mismatch to report), or
+// null when they match or either id is unknown — a file written before the id
+// was recorded, or a missing env id, can't be meaningfully checked.
+export function projectIdMismatch(
+  fileProjectId: unknown,
+  currentProjectId: string
+): string | null {
+  if (
+    typeof fileProjectId !== "string" ||
+    fileProjectId === "" ||
+    currentProjectId === ""
+  ) {
+    return null;
+  }
+  return fileProjectId === currentProjectId ? null : fileProjectId;
 }
 
 export type DownloadSource = "lokalise" | "release";

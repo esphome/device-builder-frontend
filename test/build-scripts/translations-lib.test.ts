@@ -4,6 +4,7 @@ import {
   flagValue,
   localeCompleteness,
   flattenKeys,
+  projectIdMismatch,
   nonEmptyFlagValue,
   keyNameCandidates,
   localeFromZipEntry,
@@ -88,6 +89,38 @@ describe("nonEmptyFlagValue", () => {
     expect(() => nonEmptyFlagValue(["orphans", "--out"], "--out")).toThrow(
       /requires a non-empty file path/
     );
+  });
+
+  it("rejects a next token that looks like a flag in the space form", () => {
+    expect(() =>
+      nonEmptyFlagValue(["delete-orphans", "--file", "--yes"], "--file")
+    ).toThrow(/looks like a flag/);
+  });
+
+  it("takes an explicit inline value verbatim even if it starts with a dash", () => {
+    expect(nonEmptyFlagValue(["orphans", "--out=-weird.json"], "--out")).toBe(
+      "-weird.json"
+    );
+  });
+});
+
+describe("projectIdMismatch", () => {
+  it("returns null when the ids match", () => {
+    expect(projectIdMismatch("proj-1", "proj-1")).toBeNull();
+  });
+
+  it("returns the file id when the ids differ", () => {
+    expect(projectIdMismatch("proj-1", "proj-2")).toBe("proj-1");
+  });
+
+  it("returns null when the file id is missing or non-string", () => {
+    expect(projectIdMismatch(undefined, "proj-2")).toBeNull();
+    expect(projectIdMismatch("", "proj-2")).toBeNull();
+    expect(projectIdMismatch(42, "proj-2")).toBeNull();
+  });
+
+  it("returns null when the current id is unknown", () => {
+    expect(projectIdMismatch("proj-1", "")).toBeNull();
   });
 });
 

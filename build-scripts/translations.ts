@@ -43,6 +43,7 @@ import {
   findOrphans,
   flattenKeys,
   nonEmptyFlagValue,
+  projectIdMismatch,
   localeFromZipEntry,
   resolveDownloadSource,
   type LokaliseKey,
@@ -493,7 +494,7 @@ async function runOrphans(client: LokaliseClient, outPath: string): Promise<numb
 // Parse the reviewed orphans file back into the key ids to delete. Validates
 // shape strictly: a missing `orphans` array or a non-numeric `key_id` is an
 // error, not a silent skip, since the next step deletes by these ids.
-function readOrphanFile(inPath: string): OrphanKey[] {
+function readOrphanFile(inPath: string, currentProjectId: string): OrphanKey[] {
   let raw: string;
   try {
     raw = readFileSync(inPath, "utf-8");
@@ -502,12 +503,20 @@ function readOrphanFile(inPath: string): OrphanKey[] {
       `Orphans file not found: ${inPath}. Run \`npm run translations:orphans\` first.`
     );
   }
-  let parsed: { orphans?: unknown };
+  let parsed: { project_id?: unknown; orphans?: unknown };
   try {
-    parsed = JSON.parse(raw) as { orphans?: unknown };
+    parsed = JSON.parse(raw) as { project_id?: unknown; orphans?: unknown };
   } catch (err) {
     throw new LokaliseError(
       `Orphans file ${inPath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  const mismatch = projectIdMismatch(parsed.project_id, currentProjectId);
+  if (mismatch) {
+    throw new LokaliseError(
+      `Orphans file ${inPath} was generated for Lokalise project ${mismatch}, but ` +
+        `LOKALISE_PROJECT_ID is ${currentProjectId}. Refusing to delete keys by id in a ` +
+        `different project — regenerate it with \`npm run translations:orphans\`.`
     );
   }
   if (!Array.isArray(parsed.orphans)) {
@@ -532,7 +541,7 @@ async function runDeleteOrphans(
   inPath: string,
   confirmed: boolean
 ): Promise<number> {
-  const orphans = readOrphanFile(inPath);
+  const orphans = readOrphanFile(inPath, process.env.LOKALISE_PROJECT_ID ?? "");
   if (orphans.length === 0) {
     console.log(
       `No orphans listed in ${relative(REPO_ROOT, inPath)}; nothing to delete.`
