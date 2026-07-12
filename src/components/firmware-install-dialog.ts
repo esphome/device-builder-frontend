@@ -403,9 +403,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (running) {
       this._step = "queued";
       this._errorMessage = "";
-      // Drop the failed run's log so the wait streams only the foreign
-      // build, not the old failure concatenated with it.
+      // Drop the failed run's log and clocks so the wait streams only the
+      // foreign build, not the old failure's lines or elapsed time.
       this._logLines = [];
+      this._timer.reset();
       this._statusMessage = this._localize("firmware.status_waiting_build");
       const settled = await waitForRunningJob(
         this,

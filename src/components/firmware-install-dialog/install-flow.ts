@@ -546,7 +546,7 @@ async function artifactsSettled(
  * a terminal state.
  *
  * Deliberately never sets ``host._jobId``: the dialog doesn't own this
- * job, so dismissing the download must not cancel it — teardown only
+ * job, so dismissing the dialog must not cancel it — teardown only
  * stops the follow stream. Resolves true on ANY terminal outcome (a
  * failed or cancelled build just means the caller compiles fresh
  * afterwards); false when the dialog was dismissed mid-wait, or on a

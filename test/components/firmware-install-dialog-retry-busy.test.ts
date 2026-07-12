@@ -63,6 +63,13 @@ describe("install-dialog Retry while a foreign build runs", () => {
     expect(dialog._logLines).not.toContain("old failure line");
   });
 
+  it("resets the compile clocks before streaming the foreign build", async () => {
+    const { dialog } = makeDialog(true);
+    const reset = vi.spyOn(dialog._timer, "reset");
+    await dialog._retry();
+    expect(reset).toHaveBeenCalled();
+  });
+
   it("routes a web-flash retry through the USB flow after the wait", async () => {
     const { dialog, installUsbFlash, installWebSerial } = makeDialog(true);
     dialog._installer = "web-flash";
