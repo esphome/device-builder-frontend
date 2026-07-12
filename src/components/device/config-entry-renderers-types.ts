@@ -50,7 +50,10 @@ export interface RenderCtx {
   /** The form's top-level config entries, for resolving a label of a key that
    *  isn't in a given cluster's members (a cardinality key that's also an
    *  ``exclusive_group`` member is dropped from the cluster). Absent in
-   *  lightweight contexts; callers fall back to a narrower lookup. */
+   *  lightweight contexts; callers fall back to a narrower lookup. Also fed
+   *  to ``isEntryVisible`` as the ``siblings`` scope for the depends_on
+   *  default fallback — top-level only, matching every defaulted-dependency
+   *  gate in today's catalog; a context without it loses the fallback. */
   entries?: ConfigEntry[];
   nestedOpenSections: Set<string>;
   getAt: (path: string[]) => unknown;

@@ -106,9 +106,7 @@ export function isEntryVisible(
   let depValue = Object.prototype.hasOwnProperty.call(values, entry.depends_on)
     ? values[entry.depends_on]
     : rootValues?.[entry.depends_on];
-  if (depValue == null) {
-    depValue = siblings?.find((s) => s.key === entry.depends_on)?.default_value;
-  }
+  depValue ??= siblings?.find((s) => s.key === entry.depends_on)?.default_value;
   if (entry.depends_on_value !== null && entry.depends_on_value !== undefined) {
     return depValue === entry.depends_on_value;
   }
