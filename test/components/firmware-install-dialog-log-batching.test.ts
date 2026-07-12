@@ -16,9 +16,16 @@ vi.mock("../../src/util/web-serial.js", () => ({
   resetAndDisconnect: vi.fn(),
   SERIAL_ACTIVITY_WINDOW_MS: 6000,
 }));
+const { downloadAnsiText } = vi.hoisted(() => ({ downloadAnsiText: vi.fn() }));
+vi.mock("../../src/util/download-text.js", () => ({
+  configurationStem: vi.fn(() => "device"),
+  downloadAnsiText,
+  triggerDownload: vi.fn(),
+}));
 
 import { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { identityLocalize } from "../_dom.js";
+import { renderLogs } from "../../src/components/firmware-install-dialog/renderers.js";
+import { identityLocalize, renderInto } from "../_dom.js";
 
 function makeDialog(): ESPHomeFirmwareInstallDialog {
   const dialog = new ESPHomeFirmwareInstallDialog();
@@ -42,5 +49,19 @@ describe("install-dialog log batching wiring", () => {
     dialog._enqueueLogLine("last line");
     dialog._detachStream();
     expect(dialog._logLines).toEqual(["last line"]);
+  });
+
+  it("a mid-stream log download flushes before reading", () => {
+    const dialog = makeDialog();
+    Object.assign(dialog, { _logLines: ["landed line"] });
+    dialog._enqueueLogLine("buffered line");
+    const container = renderInto(renderLogs(dialog));
+    // Second .logs-toggle is the download button (first is the expander).
+    const buttons = container.querySelectorAll<HTMLElement>(".logs-toggle");
+    buttons[1].click();
+    expect(downloadAnsiText).toHaveBeenCalledWith(
+      ["landed line", "buffered line"],
+      "device-install.txt"
+    );
   });
 });
