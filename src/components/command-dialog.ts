@@ -48,6 +48,7 @@ import {
   stopCommand,
   toggleShowSecrets,
 } from "./command-dialog/commands.js";
+import { LightDismissController } from "../util/light-dismiss-controller.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import {
   renderCompileTimer,
@@ -198,7 +199,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // started_at/completed_at for the total run time after an install's flash.
   _timerJobId = "";
 
-  // Build run/compile clocks + the timer's detail popover.
+  // Build run/compile clocks.
   _timer = new RunTimerController(this, {
     job: () => (this._timerJobId ? this._jobs.get(this._timerJobId) : undefined),
     jobId: () => this._timerJobId,
@@ -207,8 +208,43 @@ export class ESPHomeCommandDialog extends LitElement {
     // advance; stop once it freezes at completion.
     tick: () =>
       this._open && this._timer.totalRunElapsedMs !== null && !this._timer.isRunFrozen,
-    popoverWrapSelector: ".compile-timer-wrap",
   });
+
+  // The timer's detail popover: open flag here, dismissal shared. Escape is
+  // capture-phase and claimed, so the hosting dialog doesn't also close.
+  _timerDetailOpen = false;
+  private _timerDetailDismiss = new LightDismissController(
+    this,
+    () => this._closeTimerDetail(),
+    {
+      // The timer button toggles itself; only clicks outside the wrap close.
+      container: () => this.shadowRoot?.querySelector(".compile-timer-wrap"),
+      escapeTarget: document,
+      escapeCapture: true,
+      onEscape: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._closeTimerDetail();
+      },
+    }
+  );
+
+  _toggleTimerDetail = () => {
+    if (this._timerDetailOpen) {
+      this._closeTimerDetail();
+      return;
+    }
+    this._timerDetailOpen = true;
+    this._timerDetailDismiss.set(true);
+    this.requestUpdate();
+  };
+
+  _closeTimerDetail() {
+    if (!this._timerDetailOpen) return;
+    this._timerDetailOpen = false;
+    this._timerDetailDismiss.set(false);
+    this.requestUpdate();
+  }
 
   @query("esphome-process-terminal") _terminal?: ESPHomeProcessTerminal;
 
@@ -264,6 +300,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobStatus = null;
     this._primedSource = null;
     this._timer.reset();
+    this._closeTimerDetail();
     this._failedDuringValidate = false;
     // Always start with secrets redacted on a fresh open — opt-in per session.
     this._showSecrets = false;
@@ -311,6 +348,7 @@ export class ESPHomeCommandDialog extends LitElement {
     // Reattaching to a still-running (or finished) build: restore the true
     // compile clock so the replayed buffer doesn't restart the timer from now.
     this._timer.attach(job);
+    this._closeTimerDetail();
     // Cancel any prior follow before starting a new one — without this,
     // every reopen layered fresh streams while previous ones still pumped
     // onOutput into _lines (lines duplicated per leaked subscription).
@@ -322,7 +360,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   public close = () => {
     void detachStream(this);
-    this._timer.closeDetail();
+    this._closeTimerDetail();
     this._open = false;
   };
 
@@ -477,7 +515,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   private _onDialogHide = () => {
     this._open = false;
-    this._timer.closeDetail();
+    this._closeTimerDetail();
     void detachStream(this);
   };
 

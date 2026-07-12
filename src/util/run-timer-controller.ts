@@ -21,9 +21,6 @@ export interface RunTimerOptions {
   runEnded: () => boolean;
   /** Whether the 1s ticker should run (host visible and the run live). */
   tick: () => boolean;
-  /** Selector for the timer wrap in the host's render root; clicks inside it
-   *  don't dismiss the detail popover. */
-  popoverWrapSelector?: string;
 }
 
 /**
@@ -35,21 +32,18 @@ export interface RunTimerOptions {
  * progress gauge, mirrored to the cross-open store, and — on ``attach`` —
  * restored from the job's backend ``compile_started_at``/``compile_ended_at``
  * stamps first, so it survives reloads. A 1s ticker drives the live readouts
- * while ``tick()`` holds; it stops on freeze and on host disconnect. Also
- * owns the timer's detail popover open state with outside-click dismissal.
+ * while ``tick()`` holds; it stops on freeze and on host disconnect.
  */
 export class RunTimerController implements ReactiveController {
   /** Clock behind the live readouts; ticks each second while the run is live. */
   now = Date.now();
-  /** Whether the timer's detail popover is open. */
-  showDetail = false;
 
   private _compileStartedAt: number | null = null;
   private _compileEndedAt: number | null = null;
   private _tickHandle: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    private readonly _host: ReactiveControllerHost & Element,
+    private readonly _host: ReactiveControllerHost,
     private readonly _options: RunTimerOptions
   ) {
     _host.addController(this);
@@ -77,14 +71,12 @@ export class RunTimerController implements ReactiveController {
 
   hostDisconnected(): void {
     this._stopTicker();
-    this.closeDetail();
   }
 
   /** Reset for a fresh run (the host's open path). */
   reset(): void {
     this._compileStartedAt = null;
     this._compileEndedAt = null;
-    this.closeDetail();
   }
 
   /**
@@ -99,7 +91,6 @@ export class RunTimerController implements ReactiveController {
     this._compileStartedAt =
       parseIsoMs(job.compile_started_at) ?? timing?.startedAt ?? null;
     this._compileEndedAt = parseIsoMs(job.compile_ended_at) ?? timing?.endedAt ?? null;
-    this.closeDetail();
   }
 
   /** Latch the compile span off one streamed build-output line. */
@@ -156,30 +147,6 @@ export class RunTimerController implements ReactiveController {
     return parseIsoMs(this._options.job()?.completed_at) !== null;
   }
 
-  toggleDetail = (): void => {
-    if (this.showDetail) {
-      this.closeDetail();
-      return;
-    }
-    this.showDetail = true;
-    // Dismiss on the next click anywhere outside the timer (the toolbar, the
-    // log, elsewhere in the dialog). Capture-phase so it fires before other
-    // handlers; registered after this opening click so it doesn't self-close.
-    document.addEventListener("click", this._onOutsideClick, true);
-    // Escape closes just the popover — capture-phase and claimed, so the
-    // hosting dialog's own Escape handling doesn't also close the dialog.
-    document.addEventListener("keydown", this._onEscape, true);
-    this._host.requestUpdate();
-  };
-
-  closeDetail(): void {
-    if (!this.showDetail) return;
-    this.showDetail = false;
-    document.removeEventListener("click", this._onOutsideClick, true);
-    document.removeEventListener("keydown", this._onEscape, true);
-    this._host.requestUpdate();
-  }
-
   // Latch the compile start once, mirroring it to the cross-open timing store.
   private _markStarted(): void {
     if (this._compileStartedAt !== null) return;
@@ -197,22 +164,6 @@ export class RunTimerController implements ReactiveController {
     markCompileEnded(this._options.jobId(), now);
     this._host.requestUpdate();
   }
-
-  private _onOutsideClick = (e: MouseEvent): void => {
-    // The timer button toggles itself; only outside clicks close here.
-    const wrap = this._options.popoverWrapSelector
-      ? this._host.shadowRoot?.querySelector(this._options.popoverWrapSelector)
-      : null;
-    if (wrap && e.composedPath().includes(wrap)) return;
-    this.closeDetail();
-  };
-
-  private _onEscape = (e: KeyboardEvent): void => {
-    if (e.key !== "Escape") return;
-    e.preventDefault();
-    e.stopPropagation();
-    this.closeDetail();
-  };
 
   private _startTicker(): void {
     if (this._tickHandle !== null) return;
