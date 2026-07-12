@@ -23,7 +23,6 @@ import {
   darkModeContext,
   firmwareJobsContext,
   localizeContext,
-  offloaderRemoteBuildsEnabledContext,
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -97,13 +96,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state()
   _jobs: Map<string, FirmwareJob> = new Map();
 
-  // Suppress the "set up a build server" hint once offloading is in place.
+  // Suppress the "set up a build server" hint once a build server is paired.
   @consume({ context: buildOffloadPairingsContext, subscribe: true })
   @state()
   _pairings: Map<string, PairingSummary> | null = null;
-  @consume({ context: offloaderRemoteBuildsEnabledContext, subscribe: true })
-  @state()
-  _remoteBuildsEnabled: boolean | null = null;
 
   @state() _open = false;
   @state() _step: InstallStep = "installing";

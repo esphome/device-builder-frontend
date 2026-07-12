@@ -171,7 +171,6 @@ export function renderOffloadHintSlot(
   const visible = shouldShowOffloadHint({
     elapsedMs: host._compileElapsedMs ?? 0,
     source: host._jobSource,
-    remoteBuildsEnabled: host._remoteBuildsEnabled,
     pairings: host._pairings,
   });
   return visible ? renderOffloadHint(host) : nothing;

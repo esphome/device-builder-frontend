@@ -14,12 +14,11 @@ const UNDER = OFFLOAD_HINT_THRESHOLD_MS - 1;
 const base = {
   elapsedMs: OVER,
   source: JobSource.LOCAL,
-  remoteBuildsEnabled: false,
   pairings: null,
 };
 
 describe("shouldShowOffloadHint", () => {
-  it("shows for a slow local build with no offload set up", () => {
+  it("shows for a slow local build with no build server paired", () => {
     expect(shouldShowOffloadHint(base)).toBe(true);
   });
 
@@ -34,19 +33,16 @@ describe("shouldShowOffloadHint", () => {
     );
   });
 
-  it("stays hidden when remote builds are enabled", () => {
-    expect(shouldShowOffloadHint({ ...base, remoteBuildsEnabled: true })).toBe(false);
-  });
-
-  it("stays hidden when a pairing already exists", () => {
+  it("stays hidden when a build server is paired", () => {
     const pairings = new Map([["host:6052", {}]]);
     expect(shouldShowOffloadHint({ ...base, pairings })).toBe(false);
   });
 
-  it("treats loading (null) context as not-set-up", () => {
-    expect(
-      shouldShowOffloadHint({ ...base, remoteBuildsEnabled: null, pairings: null })
-    ).toBe(true);
+  it("still shows on a default dashboard (auto-route toggle is not consulted)", () => {
+    // remote_builds_enabled defaults on; gating on it would hide the nudge
+    // from everyone, so only an actual pairing suppresses it.
+    expect(shouldShowOffloadHint({ ...base, pairings: null })).toBe(true);
+    expect(shouldShowOffloadHint({ ...base, pairings: new Map() })).toBe(true);
   });
 });
 

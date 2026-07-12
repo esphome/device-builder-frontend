@@ -23,20 +23,20 @@ export interface OffloadHintHost {
 interface OffloadHintState {
   elapsedMs: number;
   source: JobSource;
-  remoteBuildsEnabled: boolean | null;
   pairings: ReadonlyMap<string, unknown> | null;
 }
 
 /**
- * Gate the hint: a local compile past the threshold whose user hasn't
- * already set up offloading. A remote (or remote-pending) build, or a
- * dashboard with remote builds enabled or any pairing, suppresses it.
- * ``null`` context (still loading) counts as "not set up".
+ * Gate the hint: a local compile past the threshold on a dashboard with no
+ * build server paired. A remote (or remote-pending) build, or any pairing,
+ * suppresses it. The "auto-route to remote build" toggle is *not* consulted —
+ * it defaults on, so gating on it would hide this nudge from every default
+ * dashboard; only an actual pairing means offload is set up. ``null`` pairings
+ * (still loading) counts as "not set up".
  */
 export function shouldShowOffloadHint(state: OffloadHintState): boolean {
   if (state.source !== JobSource.LOCAL) return false;
   if (state.elapsedMs < OFFLOAD_HINT_THRESHOLD_MS) return false;
-  if (state.remoteBuildsEnabled === true) return false;
   if ((state.pairings?.size ?? 0) > 0) return false;
   return true;
 }

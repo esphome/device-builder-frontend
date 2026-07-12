@@ -177,8 +177,7 @@ function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): Templat
     (host._jobId ? host._jobs.get(host._jobId)?.source : undefined) ??
     host._primedSource?.source ??
     JobSource.LOCAL;
-  const hasOffloadSetUp =
-    host._remoteBuildsEnabled === true || (host._pairings?.size ?? 0) > 0;
+  const hasOffloadSetUp = (host._pairings?.size ?? 0) > 0;
   const showHint =
     source === JobSource.LOCAL &&
     !hasOffloadSetUp &&
@@ -232,7 +231,6 @@ export function renderOffloadHintSlot(
   const visible = shouldShowOffloadHint({
     elapsedMs: host._compileElapsedMs ?? 0,
     source,
-    remoteBuildsEnabled: host._remoteBuildsEnabled,
     pairings: host._pairings,
   });
   return visible ? renderOffloadHint(host) : nothing;

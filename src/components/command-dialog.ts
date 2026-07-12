@@ -29,7 +29,6 @@ import {
   devicesContext,
   firmwareJobsContext,
   localizeContext,
-  offloaderRemoteBuildsEnabledContext,
   versionContext,
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
@@ -131,12 +130,6 @@ export class ESPHomeCommandDialog extends LitElement {
   @consume({ context: buildOffloadPairingsContext, subscribe: true })
   @state()
   _pairings: Map<string, PairingSummary> | null = null;
-
-  // Whether auto-route-to-remote-build is on. With a pairing, it suppresses the
-  // "set up a build server" hint — the user already offloads.
-  @consume({ context: offloaderRemoteBuildsEnabledContext, subscribe: true })
-  @state()
-  _remoteBuildsEnabled: boolean | null = null;
 
   @consume({ context: versionContext, subscribe: true })
   @state()
