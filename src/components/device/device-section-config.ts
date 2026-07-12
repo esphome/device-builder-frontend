@@ -39,6 +39,9 @@ import {
 import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
 
+import { scrollFlashRow } from "./field-highlight.js";
+import { fieldHighlightStyles } from "./field-highlight.styles.js";
+
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../confirm-dialog.js";
@@ -241,6 +244,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     inputStyles,
     dangerBannerStyles,
     deviceSectionConfigStyles,
+    fieldHighlightStyles,
   ];
 
   willUpdate(changedProperties: Map<string, unknown>) {
@@ -309,6 +313,28 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   updated() {
     this._triggerCatalog.ensure();
+    this._maybeFlashApiActionsList();
+  }
+
+  /** ``focusFieldPath`` key already flashed — one-shot per target. */
+  private _apiListFlashKey?: string;
+
+  /** ``api.actions`` / ``services`` are hidden from the form — the
+   *  manage-list below it owns them, so a caret on those keys lands
+   *  there instead of on a field that no longer renders. */
+  private _maybeFlashApiActionsList(): void {
+    if (this.sectionKey !== "api") return;
+    const head = this.focusFieldPath?.[0];
+    if (head !== "actions" && head !== "services") return;
+    const key = JSON.stringify(this.focusFieldPath);
+    if (key === this._apiListFlashKey) return;
+    const list = this.shadowRoot?.querySelector<HTMLElement>(
+      "esphome-section-automation-list"
+    );
+    // The list renders once the section config loads — hold the shot.
+    if (!list) return;
+    this._apiListFlashKey = key;
+    scrollFlashRow(list);
   }
 
   connectedCallback() {

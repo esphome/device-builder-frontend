@@ -53,11 +53,11 @@ export function automationRelativePath(
 ): YamlPathSegment[] | null {
   const anchor = location && handlerAnchor(location);
   if (!anchor) return null;
-  const at = path.indexOf(anchor.keys[0]);
-  if (at < 0) return null;
-  for (let i = 1; i < anchor.keys.length; i++) {
-    if (path[at + i] !== anchor.keys[i]) return null;
+  let at = path.indexOf(anchor.keys[0]);
+  while (at >= 0 && !anchor.keys.every((k, i) => path[at + i] === k)) {
+    at = path.indexOf(anchor.keys[0], at + 1);
   }
+  if (at < 0) return null;
   const rest = path.slice(at + anchor.keys.length);
   if (anchor.index === undefined) return rest;
   if (anchor.index === "any") {

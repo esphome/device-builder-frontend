@@ -22,7 +22,7 @@
  */
 import { consume } from "@lit/context";
 import { mdiDelete, mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
-import { html, LitElement, nothing, type PropertyValues } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";

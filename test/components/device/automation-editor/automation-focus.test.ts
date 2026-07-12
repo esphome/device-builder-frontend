@@ -152,6 +152,17 @@ describe("automationRelativePath", () => {
     expect(automationRelativePath(["api", "actions"], loc)).toBeNull();
   });
 
+  it("scans past a lone first-key occurrence to the full anchor sequence", () => {
+    // A param key equal to the anchor's first key must not block a later
+    // full-sequence match.
+    expect(
+      automationRelativePath(["api", "x", "api", "actions", 0, "then", 0], {
+        kind: "api_action",
+        action_name: "ring",
+      })
+    ).toEqual(["then", 0]);
+  });
+
   it("returns null for kinds that mount other editors", () => {
     expect(
       automationRelativePath(["light", 0, "effects", 0, "name"], {
