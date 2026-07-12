@@ -48,6 +48,7 @@ import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
+import { buildWebUiUrl } from "../util/web-ui-url.js";
 import {
   getLastValidatedResult,
   type YamlDiagnosticsDetail,
@@ -1108,6 +1109,7 @@ export class ESPHomePageDevice extends LitElement {
             ?showUpdate=${this._device ? showUpdateAvailable(this._device) : false}
             .installedVersion=${this._device?.runtime_state.deployed_version ?? ""}
             .availableVersion=${this._device?.current_version ?? ""}
+            .webUiUrl=${this._device ? buildWebUiUrl(this._device) : ""}
             ?busy=${this._activeJobs.has(this.id)}
           >
             ${

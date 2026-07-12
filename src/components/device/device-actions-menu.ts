@@ -3,6 +3,7 @@ import {
   mdiBroom,
   mdiCheckCircleOutline,
   mdiDotsVertical,
+  mdiOpenInNew,
   mdiTextBoxOutline,
 } from "@mdi/js";
 import { css, html, nothing } from "lit";
@@ -12,6 +13,7 @@ import { localizeContext } from "../../context/index.js";
 import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { OverflowMenuElement } from "../overflow-menu-element.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -20,6 +22,7 @@ registerMdiIcons({
   broom: mdiBroom,
   "check-circle-outline": mdiCheckCircleOutline,
   "dots-vertical": mdiDotsVertical,
+  "open-in-new": mdiOpenInNew,
   "text-box-outline": mdiTextBoxOutline,
 });
 
@@ -35,6 +38,10 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
 
   /** Unsaved edits block validation (Install validates too); disable the row. */
   @property({ type: Boolean, attribute: "validate-disabled" }) validateDisabled = false;
+
+  /** Prebuilt ``buildWebUiUrl`` result; empty hides the Visit-web-UI item
+   *  (no ``web_server:`` compiled in, or no host known yet). */
+  @property({ attribute: false }) webUiUrl = "";
 
   static styles = [
     espHomeStyles,
@@ -115,6 +122,15 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                     >${this._localize("device.show_logs")}</span
                   >
                 </div>
+                ${
+                  this.webUiUrl
+                    ? renderVisitWebUiLink(this.webUiUrl, this._localize, {
+                        className: "menu-item menu-item--link",
+                        onClick: this._close,
+                        withLabel: true,
+                      })
+                    : nothing
+                }
                 <div
                   class="menu-item ${this.validateDisabled ? "menu-item--disabled" : ""}"
                   role="menuitem"

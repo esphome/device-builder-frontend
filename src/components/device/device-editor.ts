@@ -96,6 +96,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ type: Boolean })
   justCreated = false;
 
+  /** Prebuilt device web-UI URL; empty hides the actions-menu item. */
+  @property({ attribute: false })
+  webUiUrl = "";
+
   @state()
   private _isMobile = false;
 
@@ -306,6 +310,7 @@ export class ESPHomeDeviceEditor extends LitElement {
             <esphome-device-actions-menu
               ?busy=${this.busy}
               ?validate-disabled=${this.hasUnsavedEdits}
+              .webUiUrl=${this.webUiUrl}
               @validate=${this._onValidate}
             ></esphome-device-actions-menu>
             ${this._renderPrimaryAction()}

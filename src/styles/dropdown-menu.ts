@@ -18,6 +18,9 @@ import { css } from "lit";
  *   @keyframes menu-in  — fade + scale entrance.
  *   .menu-item          — one row: flex, icon gap, padding,
  *                         hover tint.
+ *   .menu-item--link    — anchor reset for items rendered as
+ *                         ``<a>`` (``renderVisitWebUiLink``) so
+ *                         they match the ``<div>`` rows.
  *
  * Consumers drop this fragment into their ``static styles``
  * array BEFORE their local ``css`` block so local rules of equal
@@ -69,5 +72,10 @@ export const dropdownMenuStyles = css`
 
   .menu-item:hover {
     background-color: var(--esphome-tint);
+  }
+
+  .menu-item--link {
+    text-decoration: none;
+    color: inherit;
   }
 `;

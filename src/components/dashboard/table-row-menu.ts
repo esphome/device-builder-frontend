@@ -115,15 +115,6 @@ export class ESPHomeTableRowMenu extends LitElement {
         overflow-y: auto;
       }
 
-      /* The Visit-web-UI item renders as an <a> so the browser
-         enforces rel="noopener noreferrer" instead of relying on a
-         flaky window.open flag. Reset anchor defaults so it visually
-         matches the surrounding <div class="menu-item"> items. */
-      .menu-item--link {
-        text-decoration: none;
-        color: inherit;
-      }
-
       .menu-item wa-icon {
         font-size: 16px;
         color: var(--wa-color-text-quiet);
