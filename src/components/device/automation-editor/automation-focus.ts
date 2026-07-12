@@ -49,26 +49,13 @@ export function automationRelativePath(
   path: readonly YamlPathSegment[],
   location: AutomationLocation | null
 ): YamlPathSegment[] | null {
-  if (!location) return null;
-  switch (location.kind) {
-    case "device_on":
-    case "component_on": {
-      const at = path.indexOf(location.trigger);
-      if (at < 0) return null;
-      const rest = path.slice(at + 1);
-      if (location.index === undefined) return rest;
-      return rest[0] === location.index ? rest.slice(1) : null;
-    }
-    case "component_action": {
-      const at = path.indexOf(location.field);
-      return at < 0 ? null : path.slice(at + 1);
-    }
-    case "interval":
-      return path[0] === "interval" && path[1] === location.index ? path.slice(2) : null;
-    default:
-      // script / api_action / light_effect mount different editors.
-      return null;
-  }
+  const anchor = location && handlerAnchor(location);
+  if (!anchor) return null;
+  const at = path.indexOf(anchor.key);
+  if (at < 0) return null;
+  const rest = path.slice(at + 1);
+  if (anchor.index === undefined) return rest;
+  return rest[0] === anchor.index ? rest.slice(1) : null;
 }
 
 /**
@@ -83,14 +70,15 @@ export function resolveAutomationFocus(
   relPath: readonly YamlPathSegment[]
 ): AutomationFocus | null {
   if (relPath.length === 0) return null;
+  const inActions = (p: readonly YamlPathSegment[]) =>
+    listFocus(tree.actions, actionId, actionBodyFocus, p, [], null);
   const head = relPath[0];
-  if (head === "then") return actionListFocus(tree.actions, relPath.slice(1), [], null);
-  if (typeof head === "number") return actionListFocus(tree.actions, relPath, [], null);
+  if (head === "then") return inActions(relPath.slice(1));
+  if (typeof head === "number") return inActions(relPath);
   // Single-bare-action shortcut: the mapping mixes trigger params and
-  // action ids, so try the actions the decomposer pulled out first.
-  const bare = tree.actions.findIndex((a) => a.action_id === head);
-  if (bare >= 0) return actionBodyFocus(tree.actions[bare], relPath.slice(1), [bare]);
-  return { node: [], field: relPath.map(String) };
+  // action ids, so try the actions the decomposer pulled out before
+  // treating the segment as a trigger param.
+  return inActions(relPath) ?? { node: [], field: relPath.map(String) };
 }
 
 /** Focus slice for the next level down — peels the segment the current
@@ -111,12 +99,46 @@ export function focusTargetHasChanged(a: unknown, b: unknown): boolean {
   return focusKey(a as AutomationFocus | null) !== focusKey(b as AutomationFocus | null);
 }
 
-function actionListFocus(
-  nodes: ActionNode[],
+/** The list key anchoring a location's handler body in the YAML, plus
+ *  the entry index for list-shaped handlers. */
+function handlerAnchor(
+  location: AutomationLocation
+): { key: string; index?: number } | null {
+  switch (location.kind) {
+    case "device_on":
+    case "component_on":
+      return { key: location.trigger, index: location.index };
+    case "component_action":
+      return { key: location.field };
+    case "interval":
+      return { key: "interval", index: location.index };
+    default:
+      // script / api_action / light_effect mount different editors.
+      return null;
+  }
+}
+
+const actionId = (a: ActionNode): string => a.action_id;
+const conditionId = (c: ConditionNode): string => c.condition_id;
+
+/**
+ * One step through an id-keyed node list — the shape actions and
+ * conditions share. ``[n, <id>, …]`` is the list form, a bare string
+ * head the single-mapping (dict) form; *descend* continues into the
+ * matched node's body.
+ */
+function listFocus<T, F extends AutomationFocus | null>(
+  items: T[],
+  idOf: (item: T) => string,
+  descend: (
+    item: T,
+    path: readonly YamlPathSegment[],
+    at: YamlPathSegment[]
+  ) => AutomationFocus,
   path: readonly YamlPathSegment[],
   at: YamlPathSegment[],
-  fallback: AutomationFocus | null
-): AutomationFocus | null {
+  fallback: F
+): AutomationFocus | F {
   if (path.length === 0) return fallback;
   const head = path[0];
   if (typeof head === "number") {
@@ -125,16 +147,16 @@ function actionListFocus(
       // A hand-written multi-key item decomposes to several nodes and
       // shifts later indices, so fall back to an id search on mismatch.
       const idx =
-        nodes[head]?.action_id === wrapper
+        items[head] !== undefined && idOf(items[head]) === wrapper
           ? head
-          : nodes.findIndex((a) => a.action_id === wrapper);
-      if (idx >= 0) return actionBodyFocus(nodes[idx], path.slice(2), [...at, idx]);
+          : items.findIndex((item) => idOf(item) === wrapper);
+      if (idx >= 0) return descend(items[idx], path.slice(2), [...at, idx]);
     }
-    return nodes[head] ? { node: [...at, head], field: [] } : fallback;
+    return items[head] !== undefined ? { node: [...at, head], field: [] } : fallback;
   }
-  // A list-key body given a single mapping instead of a list.
-  const idx = nodes.findIndex((a) => a.action_id === head);
-  if (idx >= 0) return actionBodyFocus(nodes[idx], path.slice(1), [...at, idx]);
+  // Dict form: a single entry carried as a mapping, no list index.
+  const idx = items.findIndex((item) => idOf(item) === head);
+  if (idx >= 0) return descend(items[idx], path.slice(1), [...at, idx]);
   return fallback;
 }
 
@@ -148,50 +170,39 @@ function actionBodyFocus(
   const head = path[0];
   if (typeof head === "string") {
     if (CONDITION_GATE_KEYS.has(head)) {
-      return conditionListFocus(
+      return listFocus(
         a.conditions ?? [],
+        conditionId,
+        conditionBodyFocus,
         path.slice(1),
         [...at, "conditions"],
         here
       );
     }
     if (a.children && head in a.children) {
-      return (
-        actionListFocus(a.children[head], path.slice(1), [...at, head], here) ?? here
+      return listFocus(
+        a.children[head],
+        actionId,
+        actionBodyFocus,
+        path.slice(1),
+        [...at, head],
+        here
       );
     }
     if (a.conditions?.some((c) => c.condition_id === head)) {
       // ``wait_until``'s dict shorthand omits the gate key — the
       // segment is the condition id itself.
-      return conditionListFocus(a.conditions, path, [...at, "conditions"], here);
+      return listFocus(
+        a.conditions,
+        conditionId,
+        conditionBodyFocus,
+        path,
+        [...at, "conditions"],
+        here
+      );
     }
   }
   return { node: at, field: path.map(String) };
-}
-
-function conditionListFocus(
-  conds: ConditionNode[],
-  path: readonly YamlPathSegment[],
-  at: YamlPathSegment[],
-  fallback: AutomationFocus
-): AutomationFocus {
-  if (path.length === 0) return fallback;
-  const head = path[0];
-  if (typeof head === "number") {
-    const wrapper = path[1];
-    if (typeof wrapper === "string") {
-      const idx =
-        conds[head]?.condition_id === wrapper
-          ? head
-          : conds.findIndex((c) => c.condition_id === wrapper);
-      if (idx >= 0) return conditionBodyFocus(conds[idx], path.slice(2), [...at, idx]);
-    }
-    return conds[head] ? { node: [...at, head], field: [] } : fallback;
-  }
-  // Dict form: a single condition carried as a mapping, no list index.
-  const idx = conds.findIndex((c) => c.condition_id === head);
-  if (idx >= 0) return conditionBodyFocus(conds[idx], path.slice(1), [...at, idx]);
-  return fallback;
 }
 
 function conditionBodyFocus(
@@ -209,7 +220,7 @@ function conditionBodyFocus(
   ) {
     // Combinator (``and``/``or``/``not``…) — recurse; from here down the
     // node path is condition-list indices only.
-    return conditionListFocus(kids, path, at, here);
+    return listFocus(kids, conditionId, conditionBodyFocus, path, at, here);
   }
   return { node: at, field: path.map(String) };
 }
