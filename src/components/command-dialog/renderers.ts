@@ -179,6 +179,9 @@ function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): Templat
     JobSource.LOCAL;
   const hasOffloadSetUp = (host._pairings?.size ?? 0) > 0;
   const showHint =
+    // While the compile is live the inline suggestion already carries this
+    // nudge; only add it here once that's gone, so they never double up.
+    !host._isCompiling &&
     source === JobSource.LOCAL &&
     !hasOffloadSetUp &&
     compile !== null &&

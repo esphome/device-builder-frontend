@@ -578,8 +578,13 @@ export class ESPHomeApp extends LitElement {
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
-        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) =>
-          this._settingsDialog?.open(e.detail?.section)}
+        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) => {
+          // Close the firmware-tasks dialog first — a build's offload link
+          // opens settings from a terminal reopened over it, and it would
+          // otherwise stay stacked on top and hide the settings dialog.
+          this._firmwareJobsDialog?.close();
+          this._settingsDialog?.open(e.detail?.section);
+        }}
         @open-firmware-jobs=${() => this._firmwareJobsDialog?.open()}
         @open-reset-build-env=${() => this._firmwareJobsDialog?.openResetBuildEnv()}
         @open-feedback=${() => this._feedbackDialog?.open()}
