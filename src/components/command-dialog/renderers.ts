@@ -173,16 +173,16 @@ export function renderCompileTimer(
     <div class="compile-timer-wrap" slot="toolbar-left">
       <button
         class="compile-timer ${host._timer.isRunFrozen ? "" : "compile-timer--live"}"
-        aria-expanded=${host._timer.showDetail ? "true" : "false"}
+        aria-expanded=${host._timerDetailOpen ? "true" : "false"}
         aria-haspopup="dialog"
         aria-label="${formatElapsed(total, lang)}. ${host._localize("command.run_elapsed_title")}"
         title=${host._localize("command.run_elapsed_title")}
-        @click=${host._timer.toggleDetail}
+        @click=${host._toggleTimerDetail}
       >
         <wa-icon library="mdi" name="timer-outline"></wa-icon>
         <span>${formatElapsed(total, lang)}</span>
       </button>
-      ${host._timer.showDetail ? renderTimerDetail(host, total, lang) : nothing}
+      ${host._timerDetailOpen ? renderTimerDetail(host, total, lang) : nothing}
     </div>
   `;
 }

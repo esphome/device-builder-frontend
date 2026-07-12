@@ -28,6 +28,8 @@ interface Harness {
   _timerJobId: string;
   _commandType: CommandType;
   _timer: RunTimerController;
+  _timerDetailOpen: boolean;
+  _toggleTimerDetail: () => void;
   followJob: (job: FirmwareJob, displayName: string) => void;
 }
 
@@ -295,33 +297,33 @@ describe("command-dialog run timer visibility", () => {
 describe("command-dialog timer detail popover dismissal", () => {
   it("toggles open then closed", () => {
     const el = mount([]);
-    el._timer.toggleDetail();
-    expect(el._timer.showDetail).toBe(true);
-    el._timer.toggleDetail();
-    expect(el._timer.showDetail).toBe(false);
+    el._toggleTimerDetail();
+    expect(el._timerDetailOpen).toBe(true);
+    el._toggleTimerDetail();
+    expect(el._timerDetailOpen).toBe(false);
   });
 
   it("closes on a click outside the timer", () => {
     const el = mount([]);
-    el._timer.toggleDetail();
-    expect(el._timer.showDetail).toBe(true);
+    el._toggleTimerDetail();
+    expect(el._timerDetailOpen).toBe(true);
     // A document-level click whose composed path doesn't include the timer
     // wrap dismisses the popover.
     document.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(el._timer.showDetail).toBe(false);
+    expect(el._timerDetailOpen).toBe(false);
   });
 
   it("closes on Escape without letting it reach the hosting dialog", () => {
     const el = mount([]);
-    el._timer.toggleDetail();
-    expect(el._timer.showDetail).toBe(true);
+    el._toggleTimerDetail();
+    expect(el._timerDetailOpen).toBe(true);
     const esc = new KeyboardEvent("keydown", {
       key: "Escape",
       bubbles: true,
       cancelable: true,
     });
     document.dispatchEvent(esc);
-    expect(el._timer.showDetail).toBe(false);
+    expect(el._timerDetailOpen).toBe(false);
     // Claimed, so the dialog's own Escape handling doesn't also close it.
     expect(esc.defaultPrevented).toBe(true);
   });
