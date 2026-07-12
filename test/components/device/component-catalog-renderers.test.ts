@@ -21,6 +21,7 @@ function makeHost(): ESPHomeComponentCatalog {
   return {
     _imageFailed: new Set<string>(),
     _category: "all",
+    board: { name: "Guition Smart Screen" },
     _onAdd: () => {},
     _onToggleExpand: () => {},
     _onImageError: () => {},
@@ -39,19 +40,31 @@ function makeEntry(overrides: Partial<ComponentCatalogEntry>): ComponentCatalogE
   } as ComponentCatalogEntry;
 }
 
-const localize = (key: string) =>
-  key === "device.component_category_featured" ? "Recommended" : key;
+const localize = (key: string, values?: Record<string, string | number>) => {
+  if (key === "device.component_category_featured") return "Recommended";
+  if (key === "device.recommended_chip_tooltip")
+    return `Pre-configured for the ${values?.board}`;
+  return key;
+};
 
 describe("renderCard", () => {
-  it("marks a featured card with the prominent Recommended chip", () => {
+  it("marks a featured card with the Recommended chip plus its real category", () => {
     const container = document.createElement("div");
     const entry = makeEntry({
       id: "featured.board.lcd_spi",
       category: ComponentCategory.FEATURED,
+      underlying_category: ComponentCategory.BUS,
     });
     render(renderCard(makeHost(), entry, false, true, localize), container);
     const chip = container.querySelector(".component-category-chip--recommended");
     expect(chip?.textContent?.trim()).toBe("Recommended");
+    expect(chip?.getAttribute("title")).toBe(
+      "Pre-configured for the Guition Smart Screen"
+    );
+    const chips = [...container.querySelectorAll(".component-category-chip")].map((c) =>
+      c.textContent?.trim()
+    );
+    expect(chips).toEqual(["Recommended", "Bus"]);
     expect(container.querySelector(".component-card--featured")).not.toBeNull();
   });
 

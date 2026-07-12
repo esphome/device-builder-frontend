@@ -88,7 +88,9 @@ export function renderCard(
   // API regression yielding a whitespace category id) so we don't render
   // a blank pill.
   const categoryLabel = shouldShowCategoryChip(host._category)
-    ? categoryChipLabel(component.category)
+    ? categoryChipLabel(
+        (featured ? component.underlying_category : component.category) ?? ""
+      )
     : "";
   // Surfaced only when this card shares a name with another in the same
   // category; the category chip can't tell same-domain platforms apart.
@@ -124,11 +126,17 @@ export function renderCard(
             featured
               ? html`<span
                   class="component-category-chip component-category-chip--recommended"
+                  title=${localize("device.recommended_chip_tooltip", {
+                    board: host.board?.name || "board",
+                  })}
                   >${localize("device.component_category_featured")}</span
                 >`
-              : categoryLabel
-                ? html`<span class="component-category-chip">${categoryLabel}</span>`
-                : nothing
+              : nothing
+          }
+          ${
+            categoryLabel
+              ? html`<span class="component-category-chip">${categoryLabel}</span>`
+              : nothing
           }
           ${
             platform

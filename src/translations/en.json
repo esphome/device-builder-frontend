@@ -689,6 +689,7 @@
     "component_categories": "Categories",
     "component_category_all": "All",
     "component_category_featured": "Recommended",
+    "recommended_chip_tooltip": "Pre-configured for the {board}",
     "search_components_placeholder": "Search components…",
     "no_components_found": "No components found",
     "components_load_error": "Could not load components. Check your connection and try again.",
