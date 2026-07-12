@@ -662,4 +662,59 @@ describe("config-entry-form advanced-section", () => {
     expect(text).toContain("Show advanced settings (2)");
     expect(text).not.toContain("Empty Adv");
   });
+
+  // Toggle scroll anchor (#1977): flipping the control reveals nested
+  // advanced children in place ABOVE it, so the row's viewport position is
+  // captured at click time and the scroll container compensated after the
+  // ``showAdvanced`` re-render. wa-* controls can't mount under happy-dom,
+  // so geometry is stubbed and each half is driven directly.
+  function anchoredControl(rowTop: number) {
+    const form = new ESPHomeConfigEntryForm();
+    const scroller = document.createElement("div");
+    scroller.style.overflowY = "auto";
+    Object.defineProperties(scroller, {
+      scrollHeight: { value: 1000 },
+      clientHeight: { value: 300 },
+    });
+    document.body.appendChild(scroller);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    render((form as any)._renderAdvancedControl(false, 2, false), scroller);
+    const row = scroller.querySelector<HTMLElement>(".advanced-toggle-row")!;
+    row.getBoundingClientRect = () => ({ top: rowTop }) as DOMRect;
+    // The restore path resolves the row through the form's shadow root;
+    // without a mount, point it at the rendered fragment.
+    Object.defineProperty(form, "shadowRoot", { value: scroller });
+    const sw = row.querySelector<HTMLElement>("wa-switch")!;
+    return { form, scroller, row, sw };
+  }
+
+  it("compensates the scroll container so the toggled control stays put", () => {
+    const { form, scroller, row, sw } = anchoredControl(500);
+    sw.dispatchEvent(new Event("change"));
+    // The re-render grew content above the control by 400px.
+    row.getBoundingClientRect = () => ({ top: 900 }) as DOMRect;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._restoreAdvancedControlAnchor(new Map([["showAdvanced", false]]));
+    expect(scroller.scrollTop).toBe(400);
+    // Consumed: a second showAdvanced change must not re-scroll.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._restoreAdvancedControlAnchor(new Map([["showAdvanced", true]]));
+    expect(scroller.scrollTop).toBe(400);
+  });
+
+  it("holds the anchor for a showAdvanced change and ignores a stale one", () => {
+    const { form, scroller, row, sw } = anchoredControl(500);
+    sw.dispatchEvent(new Event("change"));
+    row.getBoundingClientRect = () => ({ top: 900 }) as DOMRect;
+    // Unrelated update: no scroll, anchor kept for the real toggle render.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._restoreAdvancedControlAnchor(new Map([["values", {}]]));
+    expect(scroller.scrollTop).toBe(0);
+    // Expired anchor: consumed without scrolling.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._advancedControlAnchor = { top: 500, at: Date.now() - 3000 };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (form as any)._restoreAdvancedControlAnchor(new Map([["showAdvanced", false]]));
+    expect(scroller.scrollTop).toBe(0);
+  });
 });
