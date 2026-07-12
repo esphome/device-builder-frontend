@@ -315,10 +315,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  grow. */
   private _constraintClusters = new ConstraintClusterController(this);
 
-  /** gateAdvanced unit placement (key → prefilled) frozen while the section
-   *  is open, so a value landing mid-edit doesn't re-home the field above the
-   *  switch under the user's pointer (#1977). Cleared on close and on
-   *  ``entries`` change; the next closed render classifies live again. */
+  /** gateAdvanced unit placement (key → paints inline, else gated) frozen
+   *  while the section is open, so a value landing mid-edit doesn't re-home
+   *  the field above the switch under the user's pointer (#1977). Cleared on
+   *  close and on ``entries`` change; the next closed render classifies live
+   *  again. */
   private _openAdvancedPlacement: Map<string, boolean> = new Map();
 
   /** Viewport top of the advanced control at click time, consumed when the
