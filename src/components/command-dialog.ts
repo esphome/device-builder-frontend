@@ -129,8 +129,6 @@ export class ESPHomeCommandDialog extends LitElement {
   @state()
   _pairings: Map<string, PairingSummary> | null = null;
 
-  // Suppress the offload hint on the Desktop app — the build machine already
-  // is the user's computer.
   @consume({ context: desktopVersionContext, subscribe: true })
   @state()
   _desktopVersion = "";
