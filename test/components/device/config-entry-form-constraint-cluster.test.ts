@@ -171,6 +171,7 @@ function statefulCtx(initial: Record<string, unknown>) {
     },
     board: null,
     presentComponents: new Set<string>(),
+    entries: ENTRIES,
     renderEntry: (entry: ConfigEntry) => `<entry:${entry.key}>`,
     getClusterChoice: (id: string) => choice.get(id),
     setClusterChoice: (id: string, alt: string) => choice.set(id, alt),
