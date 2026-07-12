@@ -139,8 +139,7 @@ export function remainingOf(
  * Mirrors the ``RelativeTimeFormat`` cache above, just keyed on the
  * joint of language + ``maximumFractionDigits`` +
  * ``minimumIntegerDigits`` so call sites don't share each other's
- * precision or padding (padded and unpadded formatters are distinct
- * instances).
+ * precision or padding.
  */
 const numberFormatterCache = new Map<string, Intl.NumberFormat>();
 
@@ -162,29 +161,34 @@ export function getNumberFormatter(
 }
 
 /**
- * Format a duration in seconds as a compact readout — ``45s`` / ``8m`` /
- * ``1h 14m`` (zero minutes dropped: ``1h``). With ``showSeconds`` it keeps
- * the finer unit for a live ticking counter: ``4m 32s``, and ``1h 05m`` with
- * minutes padded so the counter's width stays stable across ticks.
+ * Format a duration in seconds as a compact readout. The ``compact``
+ * variant (default) reads as a static value: ``45s`` / ``8m`` / ``1h 14m``
+ * (zero minutes dropped: ``1h``). The ``counter`` variant is for a live
+ * ticking readout whose width must not jitter: seconds kept in the minute
+ * range (``4m 32s``) and hour-range minutes padded (``1h 05m``).
  * Locale-aware digits via the shared number formatter; the unit letters
  * aren't localized. Negative input clamps to ``0s``.
  */
 export function formatDuration(
   seconds: number,
-  { showSeconds = false, language }: { showSeconds?: boolean; language?: string } = {}
+  {
+    variant = "compact",
+    language,
+  }: { variant?: "counter" | "compact"; language?: string } = {}
 ): string {
+  const counter = variant === "counter";
   const total = Math.max(0, Math.floor(seconds));
   const fmt = getNumberFormatter(language, 0);
   if (total < 60) return `${fmt.format(total)}s`;
   if (total < 3600) {
     const minutes = Math.floor(total / 60);
-    return showSeconds
+    return counter
       ? `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`
       : `${fmt.format(minutes)}m`;
   }
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
-  if (showSeconds) {
+  if (counter) {
     return `${fmt.format(hours)}h ${getNumberFormatter(language, 0, 2).format(minutes)}m`;
   }
   return minutes > 0

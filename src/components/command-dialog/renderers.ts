@@ -182,16 +182,19 @@ export function renderCompileTimer(
         <wa-icon library="mdi" name="timer-outline"></wa-icon>
         <span>${formatElapsed(total, lang)}</span>
       </button>
-      ${host._timer.showDetail ? renderTimerDetail(host, total) : nothing}
+      ${host._timer.showDetail ? renderTimerDetail(host, total, lang) : nothing}
     </div>
   `;
 }
 
 // The breakdown revealed on click: the compile-only slice of the run, and the
 // offload nudge attached to it (a long local compile is what offloading fixes).
-function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): TemplateResult {
+function renderTimerDetail(
+  host: ESPHomeCommandDialog,
+  totalMs: number,
+  lang: string
+): TemplateResult {
   const compile = host._timer.compileDetailMs;
-  const lang = activeLocale();
   const showHint =
     // While the compile is live the inline suggestion already carries this
     // nudge; only add it here once that's gone, so they never double up.
