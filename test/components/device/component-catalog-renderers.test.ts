@@ -83,10 +83,11 @@ describe("renderCard", () => {
       category: ComponentCategory.FEATURED,
     });
     render(renderCard(host, entry, false, true, localize), container);
-    expect(
-      container.querySelector(".component-category-chip--recommended")
-    ).not.toBeNull();
+    const chip = container.querySelector(".component-category-chip--recommended");
+    expect(chip).not.toBeNull();
     expect(container.querySelector("wa-tooltip")).toBeNull();
+    // No tooltip to raise — the chip must not be a dead tab stop.
+    expect(chip?.getAttribute("tabindex")).toBe("-1");
   });
 
   it("keeps the muted category chip on a regular card", () => {
