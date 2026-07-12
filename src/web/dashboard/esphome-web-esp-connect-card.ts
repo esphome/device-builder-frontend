@@ -13,6 +13,7 @@ import { isPortPickerCancel } from "../../util/web-serial.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 import "./esphome-web-esp-device-card.js";
+import { openNoPortPickedDialog } from "./esphome-web-no-port-picked-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -68,7 +69,11 @@ export class ESPHomeWebEspConnectCard extends LitElement {
     try {
       port = await navigator.serial.requestPort();
     } catch (err) {
-      if (!isPortPickerCancel(err)) {
+      if (isPortPickerCancel(err)) {
+        // Cancelled / no device listed: offer driver help + a retry, matching
+        // the legacy site rather than silently doing nothing.
+        openNoPortPickedDialog(this._localize, () => void this._connect());
+      } else {
         toast.error(
           this._localize("web.connect.failed", {
             error: err instanceof Error ? err.message : String(err),

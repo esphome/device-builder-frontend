@@ -44,6 +44,10 @@ export class ESPHomeWebInstallUploadDialog extends LitElement {
     await this._flow.start(this.port, {
       erase: true,
       filesCallback: async () => [{ data, address: 0 }],
+      messages: {
+        connectFailed: this._localize("web.install.connect_failed_hint"),
+        noFirmware: this._localize("web.install.no_firmware"),
+      },
     });
   }
 

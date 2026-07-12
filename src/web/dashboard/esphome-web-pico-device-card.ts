@@ -47,6 +47,9 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
   }
 
   private _disconnect(): void {
+    // Close the port so it isn't stranded open until the tab closes (legacy
+    // pico-device-card did this). Best-effort — the device may already be gone.
+    void this.port.close().catch(() => {});
     this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   }
 
@@ -82,6 +85,7 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
         .port=${this.port}
         ?open=${this._logsOpen}
         .deviceLabel=${this._localize("web.pico.title")}
+        .isPico=${true}
         @after-hide=${() => (this._logsOpen = false)}
       ></esphome-web-logs-dialog>
     `;

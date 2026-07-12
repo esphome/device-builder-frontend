@@ -1554,6 +1554,8 @@
       "done": "Installed and rebooting. Live logs below; press Stop logs when finished.",
       "done_opener": "Installed and rebooting. Live logs below; close this tab when finished.",
       "malformed": "Received a malformed firmware payload.",
+      "handoff_timeout": "The dashboard didn't send the firmware in time. Return to your ESPHome Device Builder and try again, or pick a factory .bin below.",
+      "tab_title": "Flashing {name} — ESPHome Web",
       "invalid_image": "This does not look like ESP32/ESP8266 firmware.",
       "no_port": "No serial port selected.",
       "choose_file": "Choose a factory .bin file first.",
@@ -1565,6 +1567,20 @@
       "manual": "No firmware received? Flash a factory .bin manually:",
       "logs_unavailable": "[serial logs unavailable: {error}]",
       "no_reenumerate": "the device did not re-enumerate in time"
+    },
+    "no_port": {
+      "title": "No port selected",
+      "intro": "If you didn't select a port because you didn't see your device listed, try the following steps:",
+      "step_connected": "Make sure that the device is connected to this computer (the one that runs the browser that shows this website).",
+      "step_light": "Most devices have a tiny light when it is powered on. If yours has one, make sure it is on.",
+      "step_cable": "Make sure that the USB cable you use can be used for data and is not a power-only cable.",
+      "step_drivers": "Make sure you have the right drivers installed. Below are the drivers for common chips used in ESP devices:",
+      "windows_mac": "Windows & Mac",
+      "windows": "Windows",
+      "mac": "Mac",
+      "try_again": "Try again",
+      "cancel": "Cancel",
+      "close": "Close"
     },
     "esp": {
       "title": "ESP Device",
@@ -1583,6 +1599,7 @@
       "setup_step_2": "Hold the BOOTSEL button and connect the Pico to your computer. It appears as a USB drive named RPI-RP2.",
       "setup_download": "Download ESPHome for Pico",
       "setup_download_loading": "Loading download link…",
+      "setup_download_failed": "Could not load the download link. Close and reopen to try again.",
       "setup_step_4": "Drag the downloaded file onto the RPI-RP2 drive. The install is complete when the drive disappears.",
       "setup_step_5": "Your Pico now runs ESPHome 🎉",
       "setup_continue_hint": "Click Continue to connect it to Wi-Fi. Once connected, it shows up automatically on your ESPHome Device Builder.",
@@ -1603,7 +1620,8 @@
       "clear": "Clear",
       "open_failed": "Could not open the serial port: {error}",
       "reset_failed": "Could not reset the device.",
-      "port_busy": "The device is busy with another operation. Close it and try again."
+      "port_busy": "The device is busy with another operation. Close it and try again.",
+      "terminal_disconnected": "Terminal disconnected"
     },
     "dashboard_hint": {
       "logs": "Connect your device below, then click Logs to view its output.",
@@ -1636,7 +1654,10 @@
       "adoptable_title": "Prepare your device for first use",
       "adoptable_intro": "This installs a basic version of ESPHome on your device and helps you connect it to your network.",
       "adoptable_detail": "Once installed, your ESPHome Device Builder shows the device and lets you take control, creating a local configuration you can manage wirelessly.",
-      "adoptable_done": "Your device is ready. Continue to connect it to Wi-Fi."
+      "adoptable_done": "Your device is ready. Continue to connect it to Wi-Fi.",
+      "continue_wifi": "Continue",
+      "connect_failed_hint": "Failed to initialize. Try resetting your device or holding the BOOT button while selecting your serial port until it starts preparing the installation.",
+      "no_firmware": "No firmware to flash."
     }
   }
 }

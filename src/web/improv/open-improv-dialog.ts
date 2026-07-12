@@ -10,10 +10,37 @@ import type { LocalizeFunc } from "../../common/localize.js";
 
 /** Baud rate the ESPHome Improv serial service speaks at. */
 const IMPROV_BAUD_RATE = 115200;
+// Match the flash/logs paths (and legacy): Chrome's 255-byte default overruns
+// on bursty serial in a throttled tab.
+const IMPROV_BUFFER_SIZE = 8192;
+
+/** Outcome of an Improv provisioning session (mirrors the SDK ``closed`` detail). */
+export interface ImprovResult {
+  /** The device spoke the Improv service (its client was detected). */
+  improv: boolean;
+  /** Wi-Fi credentials were successfully provisioned on the device. */
+  provisioned: boolean;
+}
+
+const NO_IMPROV: ImprovResult = { improv: false, provisioned: false };
+
+/**
+ * Delay before opening Improv after a first-time install/setup. Covers the
+ * native install-dialog's hide animation (so Improv doesn't open behind its
+ * backdrop) and gives a just-reset device time to re-enumerate and boot the new
+ * firmware. Legacy slept 1s post-reset for the same reason.
+ */
+export const IMPROV_OPEN_DELAY_MS = 1000;
+
+// Ports with an Improv session currently mounting/open. Guards a rapid
+// double-click (e.g. "Configure Wi-Fi") from mounting two dialogs on one port —
+// the second would fight the first for the port's reader/writer.
+const activePorts = new WeakSet<SerialPort>();
 
 /**
  * Open the Improv Wi-Fi serial provisioning dialog for an authorized port and
- * resolve once it closes (``true`` = the device was provisioned).
+ * resolve once it closes. Returns whether the device spoke Improv and whether
+ * Wi-Fi was provisioned.
  *
  * The SDK's ``ImprovSerial`` reads ``port.readable`` / ``port.writable``
  * directly and throws "Port is not readable" on a closed port, so — unlike the
@@ -26,9 +53,26 @@ const IMPROV_BAUD_RATE = 115200;
 export async function openImprovDialog(
   port: SerialPort,
   localize: LocalizeFunc
-): Promise<boolean> {
+): Promise<ImprovResult> {
+  if (activePorts.has(port)) return NO_IMPROV;
+  activePorts.add(port);
   try {
-    await port.open({ baudRate: IMPROV_BAUD_RATE });
+    return await runImprov(port, localize);
+  } finally {
+    activePorts.delete(port);
+  }
+}
+
+async function runImprov(
+  port: SerialPort,
+  localize: LocalizeFunc
+): Promise<ImprovResult> {
+  // Track whether *we* opened the port, so on close we only release a port we
+  // own — an already-open port belongs to whoever opened it.
+  let weOpened = false;
+  try {
+    await port.open({ baudRate: IMPROV_BAUD_RATE, bufferSize: IMPROV_BUFFER_SIZE });
+    weOpened = true;
   } catch (err) {
     // ``InvalidStateError`` means the port is already open. That's fine ONLY if
     // nothing else holds its reader/writer — the Improv SDK takes its own
@@ -37,7 +81,7 @@ export async function openImprovDialog(
     if (err instanceof DOMException && err.name === "InvalidStateError") {
       if (port.readable?.locked || port.writable?.locked) {
         toast.error(localize("web.improv.port_busy"));
-        return false;
+        return NO_IMPROV;
       }
     } else {
       toast.error(
@@ -45,7 +89,7 @@ export async function openImprovDialog(
           error: err instanceof Error ? err.message : String(err),
         })
       );
-      return false;
+      return NO_IMPROV;
     }
   }
 
@@ -55,25 +99,27 @@ export async function openImprovDialog(
   try {
     await import("improv-wifi-serial-sdk/dist/serial-provision-dialog");
   } catch {
-    void port.close().catch(() => {});
+    if (weOpened) void port.close().catch(() => {});
     toast.error(localize("web.improv.load_failed"));
-    return false;
+    return NO_IMPROV;
   }
   const dialog = document.createElement("improv-wifi-serial-provision-dialog");
   dialog.port = port;
 
-  return new Promise<boolean>((resolve) => {
+  return new Promise<ImprovResult>((resolve) => {
     dialog.addEventListener(
       "closed",
       (ev: Event) => {
-        const provisioned = Boolean(
-          (ev as CustomEvent<{ provisioned: boolean }>).detail?.provisioned
-        );
-        // Release the port we opened. The SDK already cancelled its reader in
-        // its own close handler, so this just frees the device for the next
-        // action. Best-effort: the device may have been unplugged.
-        void port.close().catch(() => {});
-        resolve(provisioned);
+        const detail = (ev as CustomEvent<Partial<ImprovResult>>).detail ?? {};
+        const result: ImprovResult = {
+          improv: Boolean(detail.improv),
+          provisioned: Boolean(detail.provisioned),
+        };
+        // Release the port only if we opened it. The SDK already cancelled its
+        // reader in its own close handler, so this just frees the device for the
+        // next action. Best-effort: the device may have been unplugged.
+        if (weOpened) void port.close().catch(() => {});
+        resolve(result);
       },
       { once: true }
     );

@@ -28,18 +28,23 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _downloadUrl?: string;
+  @state() private _downloadFailed = false;
 
   protected updated(changed: Map<string, unknown>): void {
+    // Retry on each (re)open while we have no URL yet — a fresh open clears the
+    // prior failure and tries again, giving the user a recovery path.
     if (changed.has("open") && this.open && !this._downloadUrl) {
       void this._loadManifest();
     }
   }
 
   private async _loadManifest(): Promise<void> {
+    this._downloadFailed = false;
     try {
       const manifest = await fetchEsphomeWebManifest();
       this._downloadUrl = picoUf2Url(manifest);
     } catch (err) {
+      this._downloadFailed = true;
       toast.error(
         this._localize("web.pico.manifest_failed", {
           error: err instanceof Error ? err.message : String(err),
@@ -92,7 +97,11 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
                 ? html`<a href=${this._downloadUrl} download
                     >${this._localize("web.pico.setup_download")}</a
                   >`
-                : this._localize("web.pico.setup_download_loading")
+                : this._downloadFailed
+                  ? html`<span class="download-error"
+                      >${this._localize("web.pico.setup_download_failed")}</span
+                    >`
+                  : this._localize("web.pico.setup_download_loading")
             }
           </li>
           <li>${this._localize("web.pico.setup_step_4")}</li>
@@ -119,6 +128,9 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
       }
       a {
         color: var(--esphome-primary);
+      }
+      .download-error {
+        color: var(--esphome-error);
       }
       .actions {
         display: flex;

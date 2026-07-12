@@ -6,7 +6,9 @@ export const SERIAL_PORTS_POLL_INTERVAL_MS = 5000;
 
 const HINT_RANK: Record<SerialPortHint, number> = { esp: 0, bridge: 1 };
 
-const hintRank = (p: SerialPort) => (p.hint !== null ? HINT_RANK[p.hint] : 2);
+// Loose ``!= null`` so a null *or* missing hint degrades to the neutral rank
+// instead of ``HINT_RANK[undefined]`` → NaN poisoning the sort comparator.
+const hintRank = (p: SerialPort) => (p.hint != null ? HINT_RANK[p.hint] : 2);
 
 /** Numeric-aware so COM2 sorts before COM10 (same shape as
  *  DEVICE_SORT_COLLATOR in device-sort.ts). */

@@ -15,6 +15,12 @@ export function formatSerialTimestamp(now: Date): string {
 export interface SerialLineHooks {
   /** One formatted log line (timestamp + parser color/prefix already applied). */
   onLine: (line: string) => void;
+  /**
+   * The device dropped the stream on its own (unplugged / reset / read error) —
+   * i.e. the loop ended without the returned cancel being called. Not fired on a
+   * caller-initiated cancel. ``error`` carries the read exception, if any.
+   */
+  onDisconnect?: (error?: unknown) => void;
 }
 
 /**
@@ -49,10 +55,18 @@ export function streamSerialLines(port: SerialPort, hooks: SerialLineHooks): () 
   const parser = new ESPHomeLogParser();
 
   const readLoop = async (): Promise<void> => {
+    // Set when the stream ends on its own (device drop / read error) rather than
+    // via the caller's cancel — drives the optional onDisconnect notification.
+    let disconnected = false;
+    let disconnectError: unknown;
     try {
       for (;;) {
         const { value, done } = await reader.read();
-        if (done || cancelled) break;
+        if (cancelled) break;
+        if (done) {
+          disconnected = true;
+          break;
+        }
         if (value && value.length) {
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
@@ -72,8 +86,13 @@ export function streamSerialLines(port: SerialPort, hooks: SerialLineHooks): () 
           }
         }
       }
-    } catch {
-      /* Port closed or reader cancelled — both are normal exits. */
+    } catch (err) {
+      // A read error while we weren't cancelling means the device dropped
+      // mid-stream (unplugged, reset). A cancel-induced rejection is normal.
+      if (!cancelled) {
+        disconnected = true;
+        disconnectError = err;
+      }
     } finally {
       try {
         reader.releaseLock();
@@ -81,6 +100,7 @@ export function streamSerialLines(port: SerialPort, hooks: SerialLineHooks): () 
         /* Lock already released — ignore. */
       }
     }
+    if (disconnected) hooks.onDisconnect?.(disconnectError);
   };
 
   const loopDone = readLoop();

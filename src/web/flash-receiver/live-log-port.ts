@@ -59,7 +59,9 @@ export async function openLiveLogPort(
     for (const p of candidates) {
       if (p.readable) return { port: p }; // already open (reset race left it usable)
       try {
-        await p.open({ baudRate: baud });
+        // 8k buffer (vs Chrome's 255-byte default) so bursty boot logs in a
+        // throttled tab don't overrun — matches the logs/improv paths.
+        await p.open({ baudRate: baud, bufferSize: 8192 });
         return { port: p };
       } catch (err) {
         lastError = "open failed: " + String(err);

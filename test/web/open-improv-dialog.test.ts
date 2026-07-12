@@ -26,6 +26,9 @@ function makePort(openImpl?: () => Promise<void>): {
   };
 }
 
+function dialogEls(): NodeListOf<HTMLElement> {
+  return document.querySelectorAll("improv-wifi-serial-provision-dialog");
+}
 function dialogEl(): HTMLElement | null {
   return document.querySelector("improv-wifi-serial-provision-dialog");
 }
@@ -36,30 +39,41 @@ afterEach(() => {
 });
 
 describe("openImprovDialog", () => {
-  it("opens the port at 115200 and mounts the SDK dialog", async () => {
+  it("opens the port at 115200 with an 8k buffer and mounts the SDK dialog", async () => {
     const port = makePort();
     const promise = openImprovDialog(port as unknown as SerialPort, localize);
     await flush();
 
-    expect(port.open).toHaveBeenCalledWith({ baudRate: 115200 });
+    expect(port.open).toHaveBeenCalledWith({ baudRate: 115200, bufferSize: 8192 });
     const el = dialogEl();
     expect(el).toBeTruthy();
     expect((el as unknown as { port: unknown }).port).toBe(port);
 
-    el!.dispatchEvent(new CustomEvent("closed", { detail: { provisioned: true } }));
-    await expect(promise).resolves.toBe(true);
+    el!.dispatchEvent(
+      new CustomEvent("closed", { detail: { improv: true, provisioned: true } })
+    );
+    await expect(promise).resolves.toEqual({ improv: true, provisioned: true });
   });
 
-  it("resolves false and closes the port when not provisioned", async () => {
+  it("reports improv-detected-but-not-provisioned and closes the port", async () => {
     const port = makePort();
     const promise = openImprovDialog(port as unknown as SerialPort, localize);
     await flush();
 
     dialogEl()!.dispatchEvent(
-      new CustomEvent("closed", { detail: { provisioned: false } })
+      new CustomEvent("closed", { detail: { improv: true, provisioned: false } })
     );
-    await expect(promise).resolves.toBe(false);
+    await expect(promise).resolves.toEqual({ improv: true, provisioned: false });
     expect(port.close).toHaveBeenCalledOnce();
+  });
+
+  it("coerces a missing detail to a false/false result", async () => {
+    const port = makePort();
+    const promise = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await expect(promise).resolves.toEqual({ improv: false, provisioned: false });
   });
 
   it("does NOT remove the dialog itself (the SDK owns removal)", async () => {
@@ -74,7 +88,7 @@ describe("openImprovDialog", () => {
     expect(dialogEl()).toBeTruthy();
   });
 
-  it("proceeds when the port is already open with unlocked streams", async () => {
+  it("proceeds when the port is already open, and does NOT close a port it didn't open", async () => {
     const port = makePort(async () => {
       throw new DOMException("already open", "InvalidStateError");
     });
@@ -82,8 +96,35 @@ describe("openImprovDialog", () => {
     await flush();
 
     expect(dialogEl()).toBeTruthy();
-    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    dialogEl()!.dispatchEvent(
+      new CustomEvent("closed", { detail: { improv: true, provisioned: false } })
+    );
     await promise;
+    // We didn't open it, so we must not close it.
+    expect(port.close).not.toHaveBeenCalled();
+  });
+
+  it("ignores a second call on the same port while one is in flight", async () => {
+    const port = makePort();
+    const first = openImprovDialog(port as unknown as SerialPort, localize);
+    const second = await openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+
+    // The guard bailed the second call without mounting a second dialog.
+    expect(second).toEqual({ improv: false, provisioned: false });
+    expect(dialogEls().length).toBe(1);
+
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await first;
+
+    // The real SDK removes its dialog on close; our mock doesn't, so clear the
+    // leftover element before checking that the port is free for a new session.
+    dialogEls().forEach((el) => el.remove());
+    const third = openImprovDialog(port as unknown as SerialPort, localize);
+    await flush();
+    expect(dialogEls().length).toBe(1);
+    dialogEl()!.dispatchEvent(new CustomEvent("closed", { detail: {} }));
+    await third;
   });
 
   it("bails with a toast when the already-open port's streams are locked", async () => {
@@ -93,18 +134,18 @@ describe("openImprovDialog", () => {
     port.readable = { locked: true };
     const result = await openImprovDialog(port as unknown as SerialPort, localize);
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ improv: false, provisioned: false });
     expect(toast.error).toHaveBeenCalledOnce();
     expect(dialogEl()).toBeNull();
   });
 
-  it("toasts and returns false without mounting when open fails", async () => {
+  it("toasts and returns a false result without mounting when open fails", async () => {
     const port = makePort(async () => {
       throw new Error("device gone");
     });
     const result = await openImprovDialog(port as unknown as SerialPort, localize);
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ improv: false, provisioned: false });
     expect(toast.error).toHaveBeenCalledOnce();
     expect(dialogEl()).toBeNull();
   });

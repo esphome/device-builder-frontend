@@ -33,7 +33,7 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
   private _flow = new InstallFlowController(this);
 
   private async _install(): Promise<void> {
-    const ok = await this._flow.start(this.port, {
+    await this._flow.start(this.port, {
       filesCallback: async (chipFamily) => {
         const manifest = await fetchEsphomeWebManifest();
         const build = selectBuild(manifest, chipFamily);
@@ -44,14 +44,24 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
         }
         return downloadBuildParts(build);
       },
+      messages: {
+        connectFailed: this._localize("web.install.connect_failed_hint"),
+        noFirmware: this._localize("web.install.no_firmware"),
+      },
     });
-    if (ok) {
-      // Hand the (now reset, closed) port to the parent so it can launch the
-      // Improv Wi-Fi provisioning dialog once the device has booted.
-      this.dispatchEvent(
-        new CustomEvent("provision-wifi", { bubbles: true, composed: true })
-      );
-    }
+    // On success the dialog stays in its "done" state showing the Continue
+    // button (see render). We do NOT auto-open Improv here: this dialog is a
+    // native modal, and appending the Improv dialog while it's still open would
+    // leave Improv inert behind the backdrop. The hand-off happens on Continue,
+    // once the parent has closed this dialog.
+  }
+
+  // Continue → tell the parent to close this dialog and open Improv Wi-Fi
+  // provisioning on the (now reset) device.
+  private _continue(): void {
+    this.dispatchEvent(
+      new CustomEvent("provision-wifi", { bubbles: true, composed: true })
+    );
   }
 
   private _onAfterHide(): void {
@@ -88,7 +98,9 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
         <div class="actions">
           ${
             this._flow.done
-              ? nothing
+              ? html`<wa-button variant="brand" @click=${this._continue}>
+                  ${this._localize("web.install.continue_wifi")}
+                </wa-button>`
               : html`<wa-button
                   variant="brand"
                   ?disabled=${this._flow.busy}

@@ -101,6 +101,41 @@ describe("FlashHandshake", () => {
     expect(readyFrames(opener).length).toBe(before); // retry stopped
   });
 
+  it("ignores a duplicate firmware frame after hand-off", () => {
+    const { opener, target, env } = makeEnv();
+    const onFirmware = vi.fn();
+    new FlashHandshake(env, { onFirmware, onMalformed: vi.fn() }).start();
+    fireMessage(target, { source: opener, data: firmware() });
+    fireMessage(target, { source: opener, data: firmware() });
+    // A re-sent frame must not re-fire (it would reset the UI mid-flash).
+    expect(onFirmware).toHaveBeenCalledOnce();
+  });
+
+  it("fires onTimeout when no firmware arrives within the ready window", () => {
+    const { env } = makeEnv();
+    const onTimeout = vi.fn();
+    new FlashHandshake(env, {
+      onFirmware: vi.fn(),
+      onMalformed: vi.fn(),
+      onTimeout,
+    }).start();
+    vi.advanceTimersByTime(10000);
+    expect(onTimeout).toHaveBeenCalledOnce();
+  });
+
+  it("does not fire onTimeout once firmware has arrived", () => {
+    const { opener, target, env } = makeEnv();
+    const onTimeout = vi.fn();
+    new FlashHandshake(env, {
+      onFirmware: vi.fn(),
+      onMalformed: vi.fn(),
+      onTimeout,
+    }).start();
+    fireMessage(target, { source: opener, data: firmware() });
+    vi.advanceTimersByTime(20000);
+    expect(onTimeout).not.toHaveBeenCalled();
+  });
+
   it("ignores a wrong nonce", () => {
     const { opener, target, env } = makeEnv();
     const onFirmware = vi.fn();

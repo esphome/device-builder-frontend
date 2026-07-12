@@ -26,9 +26,7 @@ const WEB_PUBLIC_DIR = path.resolve(PUBLIC_DIR, "web");
 // produce an invalid proxy URL. Falls back to 6052.
 const parsedBackendPort = parseInt(process.env.BACKEND_PORT, 10);
 const BACKEND_PORT =
-  Number.isFinite(parsedBackendPort) && parsedBackendPort > 0
-    ? parsedBackendPort
-    : 6052;
+  Number.isFinite(parsedBackendPort) && parsedBackendPort > 0 ? parsedBackendPort : 6052;
 
 // Shared TypeScript + CSS loader rules. Both the wheel dashboard and the
 // standalone web build transpile the same src/ tree the same way.
@@ -128,6 +126,29 @@ const definePlugin = (isProdBuild) =>
 // eval entirely; same line-level fidelity, slower hot reloads (fine for dev).
 const devtoolFor = (isProdBuild) =>
   isProdBuild ? "nosources-source-map" : "cheap-module-source-map";
+
+// The exact connect-src directive in public/web/index.html. Kept as a constant
+// so the dev-only widening below can assert it still matches — a silent
+// string-replace miss would break HMR (no ws:/wss:) with no build error.
+const WEB_CSP_CONNECT_SRC = "connect-src 'self' data: https://firmware.esphome.io";
+
+/**
+ * In prod, ship the tight CSP verbatim. In dev, widen connect-src with ws:/wss:
+ * so the HMR client can connect. Throws if the expected connect-src directive
+ * isn't present, so a reworded CSP fails the build loudly instead of silently
+ * disabling hot reload.
+ */
+const widenDevConnectSrc = (html, isProdBuild) => {
+  if (!html.includes(WEB_CSP_CONNECT_SRC)) {
+    throw new Error(
+      `ESPHome Web: expected CSP directive "${WEB_CSP_CONNECT_SRC}" not found in ` +
+        "public/web/index.html. Update WEB_CSP_CONNECT_SRC in build-scripts/rspack.cjs " +
+        "to match, or dev HMR (ws:/wss:) will silently break."
+    );
+  }
+  if (isProdBuild) return html;
+  return html.replace(WEB_CSP_CONNECT_SRC, `${WEB_CSP_CONNECT_SRC} ws: wss:`);
+};
 
 /**
  * Create the rspack configuration for the ESPHome (wheel) frontend.
@@ -274,14 +295,10 @@ const createWebRspackConfig = ({ isProdBuild = false } = {}) => ({
     // WebSocket. But the dev server's HMR client connects over ws://.../hmr-ws,
     // so widen connect-src to allow it in dev only (prod ships the tight CSP).
     new rspack.HtmlRspackPlugin({
-      templateContent: fs
-        .readFileSync(path.resolve(WEB_PUBLIC_DIR, "index.html"), "utf-8")
-        .replace(
-          "connect-src 'self' data: https://firmware.esphome.io",
-          isProdBuild
-            ? "connect-src 'self' data: https://firmware.esphome.io"
-            : "connect-src 'self' data: https://firmware.esphome.io ws: wss:"
-        ),
+      templateContent: widenDevConnectSrc(
+        fs.readFileSync(path.resolve(WEB_PUBLIC_DIR, "index.html"), "utf-8"),
+        isProdBuild
+      ),
       inject: "body",
     }),
     new rspack.CopyRspackPlugin({
@@ -289,6 +306,13 @@ const createWebRspackConfig = ({ isProdBuild = false } = {}) => ({
         {
           from: path.resolve(WEB_PUBLIC_DIR, "static"),
           to: path.resolve(WEB_OUTPUT_DIR, "static"),
+          noErrorOnMissing: true,
+        },
+        {
+          // Served from the site root so Safari's /favicon.ico fallback resolves
+          // (its <link rel=icon> is SVG-only).
+          from: path.resolve(WEB_PUBLIC_DIR, "favicon.ico"),
+          to: path.resolve(WEB_OUTPUT_DIR, "favicon.ico"),
           noErrorOnMissing: true,
         },
       ],

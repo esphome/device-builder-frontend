@@ -14,7 +14,8 @@ import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { openImprovDialog } from "../improv/open-improv-dialog.js";
+import { sleep } from "../../util/sleep.js";
+import { IMPROV_OPEN_DELAY_MS, openImprovDialog } from "../improv/open-improv-dialog.js";
 import "../install/esphome-web-install-adoptable-dialog.js";
 import "../install/esphome-web-install-upload-dialog.js";
 import { openPortForLogs } from "../logs/esphome-web-logs-dialog.js";
@@ -67,14 +68,21 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
     void openImprovDialog(this.port, this._localize);
   }
 
-  // Fired by the adoptable dialog once the basic firmware is flashed and the
-  // device has reset — go straight into Wi-Fi provisioning so the device shows
-  // up on the user's ESPHome Device Builder ready to adopt.
-  private _onProvisionWifi(): void {
+  // Fired by the adoptable dialog's Continue button after a successful flash.
+  // Close the (native modal) install dialog first, then give the freshly-reset
+  // device a moment to re-enumerate and boot the new firmware before Improv
+  // grabs the port — legacy slept 1s here for the same reason. The delay also
+  // lets the modal finish hiding so Improv doesn't open behind its backdrop.
+  private async _onProvisionWifi(): Promise<void> {
+    this._adoptableOpen = false;
+    await sleep(IMPROV_OPEN_DELAY_MS);
     void openImprovDialog(this.port, this._localize);
   }
 
   private _disconnect(): void {
+    // Close the port so it isn't stranded open until the tab closes (legacy
+    // closed it on disconnect). Best-effort — the device may already be gone.
+    void this.port.close().catch(() => {});
     this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   }
 

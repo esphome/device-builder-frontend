@@ -23,7 +23,7 @@ describe("openImprovDialog — SDK load failure", () => {
 
     const result = await openImprovDialog(port as unknown as SerialPort, (k) => k);
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ improv: false, provisioned: false });
     expect(close).toHaveBeenCalledOnce();
     expect(toast.error).toHaveBeenCalledOnce();
     expect(document.querySelector("improv-wifi-serial-provision-dialog")).toBeNull();

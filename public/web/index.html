@@ -26,11 +26,9 @@
       content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' data: https://firmware.esphome.io; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>ESPHome Web</title>
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="/static/logo/esphome-favicon.svg"
-    />
+    <link rel="icon" type="image/svg+xml" href="/static/logo/esphome-favicon.svg" />
+    <!-- Fallback for browsers that don't render SVG favicons (Safari). -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <style>
       :root {
         /* App palette — the single place to adjust colors. Each is HA's theme

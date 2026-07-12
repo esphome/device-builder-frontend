@@ -36,9 +36,11 @@ export class ESPHomeWebHeader extends LitElement {
   }
 
   protected render() {
-    const targetIsPico = this.mode === "esp";
-    const targetLogo = targetIsPico ? "raspberry" : "espressif";
-    const targetLabel = targetIsPico
+    // True when clicking the switch moves the user to Pico mode (i.e. the
+    // current mode is ESP). Names the toggle's destination, not the current mode.
+    const switchToPico = this.mode === "esp";
+    const targetLogo = switchToPico ? "raspberry" : "espressif";
+    const targetLabel = switchToPico
       ? this._localize("web.header.switch_to_pico")
       : this._localize("web.header.switch_to_esp");
 

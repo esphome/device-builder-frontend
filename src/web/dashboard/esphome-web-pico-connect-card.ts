@@ -9,8 +9,9 @@ import { localizeContext } from "../../context/index.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { sleep } from "../../util/sleep.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
-import { openImprovDialog } from "../improv/open-improv-dialog.js";
+import { IMPROV_OPEN_DELAY_MS, openImprovDialog } from "../improv/open-improv-dialog.js";
 import "../install/esphome-web-install-pico-dialog.js";
 import { picoPortFilters } from "../util/pico-port-filter.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
@@ -73,11 +74,18 @@ export class ESPHomeWebPicoConnectCard extends LitElement {
     `;
   }
 
-  private _onPicoConnected(ev: CustomEvent<SerialPort>): void {
+  private async _onPicoConnected(ev: CustomEvent<SerialPort>): Promise<void> {
+    // First-time setup ends by connecting the freshly-installed Pico to Wi-Fi.
+    // Close the setup dialog and wait for it to finish hiding before opening
+    // Improv (a native modal), or Improv would be inert behind its backdrop.
+    // Only adopt the port once Improv confirms the device actually spoke it
+    // (i.e. it's now running ESPHome) — matching legacy, which gated the card
+    // on the "closed" event's ``improv === true``.
+    const port = ev.detail;
     this._setupOpen = false;
-    this._adoptPort(ev.detail);
-    // First-time setup ends by connecting the freshly-flashed Pico to Wi-Fi.
-    void openImprovDialog(ev.detail, this._localize);
+    await sleep(IMPROV_OPEN_DELAY_MS);
+    const { improv } = await openImprovDialog(port, this._localize);
+    if (improv) this._adoptPort(port);
   }
 
   protected updated(changed: Map<string, unknown>): void {

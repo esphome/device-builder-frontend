@@ -123,19 +123,7 @@ describe("runFlash", () => {
     expect(hooks.progress[hooks.progress.length - 1]).toBe(100);
   });
 
-  it("returns false silently when the user cancels the port picker", async () => {
-    vi.mocked(connectToPort).mockRejectedValue(new Error("picker"));
-    vi.mocked(isPortPickerCancel).mockReturnValue(true);
-    const hooks = makeHooks();
-
-    const ok = await runFlash(port, { filesCallback: async () => [] }, hooks);
-
-    expect(ok).toBe(false);
-    expect(hooks.steps).toEqual(["connecting"]);
-    expect(hooks.errors).toEqual([]);
-  });
-
-  it("reports a connect failure", async () => {
+  it("reports a connect failure, falling back to the raw error without a hint", async () => {
     vi.mocked(connectToPort).mockRejectedValue(new Error("no answer"));
     const hooks = makeHooks();
 
@@ -144,6 +132,34 @@ describe("runFlash", () => {
     expect(ok).toBe(false);
     expect(hooks.steps).toEqual(["connecting", "error"]);
     expect(hooks.errors).toEqual(["no answer"]);
+  });
+
+  it("surfaces the localized BOOT hint on connect failure when provided", async () => {
+    vi.mocked(connectToPort).mockRejectedValue(new Error("no answer"));
+    const hooks = makeHooks();
+
+    const ok = await runFlash(
+      port,
+      { filesCallback: async () => [], messages: { connectFailed: "hold BOOT" } },
+      hooks
+    );
+
+    expect(ok).toBe(false);
+    expect(hooks.errors).toEqual(["hold BOOT"]);
+  });
+
+  it("uses the localized no-firmware message when the plan yields no parts", async () => {
+    vi.mocked(connectToPort).mockResolvedValue(detected() as never);
+    const hooks = makeHooks();
+
+    const ok = await runFlash(
+      port,
+      { filesCallback: async () => [], messages: { noFirmware: "nothing to flash" } },
+      hooks
+    );
+
+    expect(ok).toBe(false);
+    expect(hooks.errors).toEqual(["nothing to flash"]);
   });
 
   it("disconnects and errors when the files callback throws", async () => {
@@ -193,6 +209,27 @@ describe("runFlash", () => {
     expect(hooks.errors).toEqual(["write failed"]);
     expect(disconnect).toHaveBeenCalledOnce();
     expect(resetAndDisconnect).not.toHaveBeenCalled();
+  });
+
+  it("still succeeds when the post-flash reset rejects (native-USB re-enumeration)", async () => {
+    vi.mocked(connectToPort).mockResolvedValue(detected() as never);
+    // Native-USB chips drop/re-enumerate mid-reset, so resetAndDisconnect can
+    // throw even though the write already committed.
+    vi.mocked(resetAndDisconnect).mockRejectedValue(new Error("port gone"));
+    const hooks = makeHooks();
+
+    const ok = await runFlash(
+      port,
+      { filesCallback: async () => [{ data: new Uint8Array(8), address: 0 }] },
+      hooks
+    );
+
+    // Flash succeeded; the reset hiccup must not flip it to error.
+    expect(ok).toBe(true);
+    expect(hooks.steps).toEqual(["connecting", "preparing", "flashing", "done"]);
+    expect(hooks.errors).toEqual([]);
+    expect(resetAndDisconnect).toHaveBeenCalledOnce();
+    expect(disconnect).not.toHaveBeenCalled();
   });
 
   it("falls back to chipName when CHIP_NAME is absent", async () => {

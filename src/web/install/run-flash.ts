@@ -11,7 +11,6 @@ import {
   connectToPort,
   disconnect,
   flashFirmware,
-  isPortPickerCancel,
   resetAndDisconnect,
   type DetectedChip,
 } from "../../util/web-serial.js";
@@ -19,6 +18,21 @@ import type { FlashPart } from "../util/esphome-web-firmware.js";
 
 export type FlashStep =
   "connecting" | "preparing" | "erasing" | "flashing" | "done" | "error";
+
+/**
+ * Localized copy for the engine's own failure states. The engine is DOM- and
+ * i18n-free, so callers pass the strings; when omitted it falls back to the raw
+ * error / an English default.
+ */
+export interface FlashMessages {
+  /**
+   * Shown when the initial connect / chip handshake fails — the actionable
+   * "hold the BOOT button" hint (a bare S2/S3/C3 module needs it).
+   */
+  connectFailed?: string;
+  /** Shown when the plan yields no parts to write. */
+  noFirmware?: string;
+}
 
 export interface FlashPlan {
   /** Whether to erase the whole flash before writing (upload path). */
@@ -28,6 +42,8 @@ export interface FlashPlan {
    * ``ESP32-C3``), return the parts to flash. Throws to abort with a message.
    */
   filesCallback: (chipFamily: string) => Promise<FlashPart[]>;
+  /** Localized failure copy (see :class:`FlashMessages`). */
+  messages?: FlashMessages;
 }
 
 export interface FlashHooks {
@@ -61,9 +77,14 @@ export async function runFlash(
   try {
     detected = await connectToPort(port, hooks.onLog);
   } catch (err) {
-    if (isPortPickerCancel(err)) return false;
+    // The port is already authorized (connectToPort never shows a picker), so a
+    // failure here is the chip handshake — surface the hold-BOOT hint if the
+    // caller gave us one, and keep the raw error in the console for debugging.
+    console.error(err);
     hooks.onStep("error");
-    hooks.onError(err instanceof Error ? err.message : String(err));
+    hooks.onError(
+      plan.messages?.connectFailed ?? (err instanceof Error ? err.message : String(err))
+    );
     return false;
   }
 
@@ -73,7 +94,9 @@ export async function runFlash(
   try {
     hooks.onStep("preparing");
     parts = await plan.filesCallback(chipFamily);
-    if (parts.length === 0) throw new Error("No firmware to flash.");
+    if (parts.length === 0) {
+      throw new Error(plan.messages?.noFirmware ?? "No firmware to flash.");
+    }
   } catch (err) {
     hooks.onStep("error");
     hooks.onError(err instanceof Error ? err.message : String(err));
@@ -98,12 +121,23 @@ export async function runFlash(
     }
     hooks.onProgress(100);
     hooks.onStep("done");
-    await resetAndDisconnect(detected.loader, detected.transport, detected.port);
-    return true;
   } catch (err) {
     hooks.onStep("error");
     hooks.onError(err instanceof Error ? err.message : String(err));
     await safeDisconnect(detected);
     return false;
   }
+
+  // The firmware is already written and committed at this point. The final
+  // reset is best-effort: native-USB chips (C6/H2/P4 → UsbJtagSerialReset)
+  // drop and re-enumerate mid-reset, so resetAndDisconnect can throw even
+  // though the write succeeded. Swallow it — a reset hiccup must not turn a
+  // successful flash into a reported failure (which would also skip the
+  // adoptable flow's Wi-Fi hand-off).
+  try {
+    await resetAndDisconnect(detected.loader, detected.transport, detected.port);
+  } catch {
+    // Device already rebooting into the new firmware; nothing to recover.
+  }
+  return true;
 }

@@ -19,6 +19,12 @@ describe("validateEspImage", () => {
     );
   });
 
+  it("accepts an ESP32-P4/C5/C61 merged image with magic at 0x2000", () => {
+    expect(validateEspImage([{ address: 0, data: withMagicAt(0x2000, 0x3000) }])).toBe(
+      true
+    );
+  });
+
   it("rejects when there's no part at offset 0", () => {
     expect(validateEspImage([{ address: 0x10000, data: withMagicAt(0, 64) }])).toBe(
       false

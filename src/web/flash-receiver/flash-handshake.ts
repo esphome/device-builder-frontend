@@ -29,6 +29,12 @@ export interface FlashHandshakeCallbacks {
   onFirmware: (msg: FirmwareMessage) => void;
   /** The opener attached and sent, but the payload was unusable. */
   onMalformed: () => void;
+  /**
+   * No firmware arrived before the ``ready`` re-announce window elapsed — the
+   * hand-off is dead. Lets the receiver show a terminal "return to the
+   * dashboard" state instead of silently waiting forever.
+   */
+  onTimeout?: () => void;
 }
 
 export interface FlashHandshakeEnv {
@@ -70,9 +76,16 @@ export class FlashHandshake {
     this.env.messageTarget.addEventListener("message", this._onMessage as EventListener);
     this._sendReady();
     this._readyTimer = setInterval(() => {
-      this._waited += READY_RETRY_INTERVAL_MS;
-      if (this._handedOff || this._waited >= READY_RETRY_TOTAL_MS) {
+      if (this._handedOff) {
         this._stopReadyRetry();
+        return;
+      }
+      this._waited += READY_RETRY_INTERVAL_MS;
+      if (this._waited >= READY_RETRY_TOTAL_MS) {
+        // Gave up waiting for the opener — tell the receiver so it can surface
+        // a terminal state rather than silently going quiet.
+        this._stopReadyRetry();
+        this.cb.onTimeout?.();
         return;
       }
       this._sendReady();
@@ -129,6 +142,9 @@ export class FlashHandshake {
     const data = ev.data as Partial<FirmwareMessage> | undefined;
     if (!data || data.type !== MSG_FIRMWARE) return;
     if (data.nonce !== this.env.params.nonce) return;
+    // Ignore a duplicate firmware frame once we've handed off — re-processing
+    // would reset the UI to "connecting" and relay a bogus state mid-flash.
+    if (this._handedOff) return;
     if (!isFlashParts(data.parts)) {
       // The opener has clearly attached; stop re-announcing even though the
       // payload is unusable.

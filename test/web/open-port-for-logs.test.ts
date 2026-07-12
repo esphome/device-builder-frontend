@@ -26,7 +26,7 @@ describe("openPortForLogs", () => {
     await expect(openPortForLogs(port as unknown as SerialPort, localize)).resolves.toBe(
       true
     );
-    expect(port.open).toHaveBeenCalledWith({ baudRate: 115200 });
+    expect(port.open).toHaveBeenCalledWith({ baudRate: 115200, bufferSize: 8192 });
     expect(toast.error).not.toHaveBeenCalled();
   });
 

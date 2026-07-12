@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiDeleteSweep, mdiDownload, mdiRestart } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
@@ -15,6 +15,7 @@ import { localizeContext } from "../../context/index.js";
 import { downloadAnsiText } from "../../util/download-text.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
+import { sleep } from "../../util/sleep.js";
 
 import "../../components/base-dialog.js";
 import "../../components/process-terminal/process-terminal.js";
@@ -46,7 +47,9 @@ export async function openPortForLogs(
   localize: LocalizeFunc
 ): Promise<boolean> {
   try {
-    await port.open({ baudRate: LOG_BAUD_RATE });
+    // 8k buffer (vs Chrome's 255-byte default) so a burst of boot logs in a
+    // throttled/backgrounded tab doesn't overrun — matches the legacy site.
+    await port.open({ baudRate: LOG_BAUD_RATE, bufferSize: 8192 });
   } catch (err) {
     // ``InvalidStateError`` means the port is already open. That's fine ONLY if
     // nothing else holds its reader — streamSerialLines() calls getReader(), so
@@ -87,6 +90,13 @@ export class ESPHomeWebLogsDialog extends LitElement {
   /** Human label used in the dialog title and the download filename. */
   @property() deviceLabel = "";
 
+  /**
+   * Hide the "Reset device" button. A DTR/RTS pulse doesn't reset an RP2040
+   * native-USB CDC device, so the button is a no-op for the Pico — legacy hid
+   * it for the same reason.
+   */
+  @property({ type: Boolean }) isPico = false;
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
@@ -122,7 +132,20 @@ export class ESPHomeWebLogsDialog extends LitElement {
     // returns also closes the port.
     this._cancel = streamSerialLines(this.port, {
       onLine: (line) => this._enqueueLine(line),
+      onDisconnect: (error) => this._onDisconnect(error),
     });
+  }
+
+  // The device dropped the stream on its own (unplugged / reset). Print a
+  // "Terminal disconnected" line and drop the spinner, matching legacy — the
+  // terminal would otherwise look stuck streaming forever.
+  private _onDisconnect(error?: unknown): void {
+    this._enqueueLine("");
+    this._enqueueLine("");
+    const base = this._localize("web.logs.terminal_disconnected");
+    this._enqueueLine(error ? `${base}: ${String(error)}` : base);
+    this._flushPending();
+    this._streaming = false;
   }
 
   private _stop(): void {
@@ -168,15 +191,16 @@ export class ESPHomeWebLogsDialog extends LitElement {
     this._lines = [];
   }
 
-  // Pulse DTR/RTS to reboot the running app so the user can capture boot
-  // logs, matching the legacy ewt-console reset. Best-effort — some USB
-  // bridges don't wire the reset lines.
+  // Pulse RTS to reboot the running app so the user can capture boot logs,
+  // matching legacy ewt-console.reset(): RTS high then low back-to-back, then a
+  // 1s settle for the device to come back up. Best-effort — some USB bridges
+  // don't wire the reset lines.
   private async _resetDevice(): Promise<void> {
     if (!this.port) return;
     try {
       await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
-      await new Promise((resolve) => setTimeout(resolve, 100));
       await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      await sleep(1000);
     } catch {
       toast.error(this._localize("web.logs.reset_failed"));
     }
@@ -215,11 +239,15 @@ export class ESPHomeWebLogsDialog extends LitElement {
           placeholder=${this._localize("web.logs.waiting")}
         >
           <div class="toolbar-slot" slot="toolbar-right">
-            ${renderTermButton({
-              icon: "restart",
-              label: this._localize("web.logs.reset_device"),
-              onClick: () => void this._resetDevice(),
-            })}
+            ${
+              this.isPico
+                ? nothing
+                : renderTermButton({
+                    icon: "restart",
+                    label: this._localize("web.logs.reset_device"),
+                    onClick: () => void this._resetDevice(),
+                  })
+            }
             ${renderTermButton({
               icon: "download",
               title: this._localize("web.logs.download"),
