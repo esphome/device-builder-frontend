@@ -204,11 +204,15 @@ export class ESPHomeTableRowMenu extends LitElement {
           ${this._localize("dashboard.action_validate")}
         </div>
         <div
-          class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
-          @click=${this.busy ? undefined : () => this._emit("install-device")}
+          class="menu-item menu-item--install"
+          @click=${() => this._emit(this.busy ? "show-progress" : "install-device")}
         >
           <wa-icon library="mdi" name="upload"></wa-icon>
-          ${this._localize("dashboard.action_install")}
+          ${this._localize(
+            this.busy
+              ? "dashboard.table_action_view_progress"
+              : "dashboard.action_install"
+          )}
         </div>
         ${
           this.device?.runtime_state.queued_update

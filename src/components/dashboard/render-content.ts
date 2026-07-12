@@ -251,6 +251,10 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
         host._drawerOpen = false;
         host._openInstallMethod(e.detail);
       }}
+      @show-progress=${(e: CustomEvent<ConfiguredDevice>) => {
+        host._drawerOpen = false;
+        host._showJobProgress(e.detail);
+      }}
       @open-logs=${(e: CustomEvent) => {
         host._drawerOpen = false;
         host._openLogs(e.detail);
@@ -286,6 +290,8 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
         host._openCommand(e.detail, "validate")}
       @install-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openInstallMethod(e.detail)}
+      @show-progress=${(e: CustomEvent<ConfiguredDevice>) =>
+        host._showJobProgress(e.detail)}
       @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => host._showApiKey(e.detail)}
       @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
         downloadYaml(e.detail, host._api, host._localize)}

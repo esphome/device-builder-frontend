@@ -432,6 +432,10 @@ export class ESPHomeDeviceTable extends LitElement {
           e.stopPropagation();
           this._forwardEvent("install-device", e.detail);
         }}
+        @show-progress=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("show-progress", e.detail);
+        }}
         @show-api-key=${(e: CustomEvent) => {
           e.stopPropagation();
           this._forwardEvent("show-api-key", e.detail);
