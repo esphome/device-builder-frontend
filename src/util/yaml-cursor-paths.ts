@@ -69,9 +69,10 @@ export function pathsForYamlLine(yaml: string, line: number): YamlLinePaths | nu
   if (line < 1 || line > state.doc.lines) return null;
   const pos = state.doc.line(line).to;
   // Runs once per navigation; parsing to the target line is single-digit
-  // ms. The path walks only read ancestors of ``pos``, so nothing past it
-  // is needed, and a partial tree (budget exhausted) still resolves.
-  ensureSyntaxTree(state, pos, 1000);
+  // ms, so the budget only bites on pathological files — where a partial
+  // tree fails soft (the indent walkers still anchor the key path). The
+  // path walks only read ancestors of ``pos``; nothing past it is needed.
+  ensureSyntaxTree(state, pos, 200);
   return {
     path: cursorKeyPathAt(state, pos),
     indexedPath: indexedKeyPathAt(state, pos),
