@@ -66,7 +66,7 @@ function ctxFor(
     presentComponents: new Set<string>(),
     entries,
     renderEntry: (entry: ConfigEntry) => `<entry:${entry.key}>`,
-  } as unknown as RenderCtx;
+  } satisfies Partial<RenderCtx> as unknown as RenderCtx;
 }
 
 const serialize = (tpl: unknown): string =>
@@ -179,7 +179,7 @@ function statefulCtx(initial: Record<string, unknown>) {
     setClusterStash: (id: string, key: string, v: unknown) =>
       stash.set(`${id} ${key}`, v),
     clearClusterStash: (id: string, key: string) => stash.delete(`${id} ${key}`),
-  } as unknown as RenderCtx;
+  } satisfies Partial<RenderCtx> as unknown as RenderCtx;
   return { ctx, values, stash, choice };
 }
 
