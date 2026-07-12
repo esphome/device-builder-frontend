@@ -219,8 +219,12 @@ describe("command-dialog compile detail (total never shorter than compile)", () 
     expect(el._totalRunElapsedMs!).toBeGreaterThanOrEqual(el._compileDetailMs!);
   });
 
-  it("falls back to live frontend detection before the backend stamps land", () => {
-    const job = makeFirmwareJob({ job_id: "d2", job_type: JobType.COMPILE });
+  it("falls back to live frontend detection while a stampless run is going", () => {
+    const job = makeFirmwareJob({
+      job_id: "d2",
+      job_type: JobType.COMPILE,
+      completed_at: null, // still running
+    });
     delete job.compile_started_at;
     delete job.compile_ended_at;
     const el = mount([job]);
@@ -228,6 +232,25 @@ describe("command-dialog compile detail (total never shorter than compile)", () 
     el._compileStartedAt = 1000;
     el._compileEndedAt = 6000;
     expect(el._compileDetailMs).toBe(5000);
+  });
+
+  it("is null for an old finished job with no backend stamps (not shown)", () => {
+    const job = makeFirmwareJob({
+      job_id: "d3",
+      job_type: JobType.COMPILE,
+      started_at: "2026-06-17T00:00:00Z",
+      completed_at: "2026-06-17T00:00:07Z",
+    });
+    delete job.compile_started_at;
+    delete job.compile_ended_at;
+    const el = mount([job]);
+    el._timerJobId = "d3";
+    // Even if the replayed log left a bogus live span, a frozen stampless job
+    // reports unknown so the popover omits the compile row.
+    el._compileStartedAt = 100;
+    el._compileEndedAt = 200;
+    expect(el._compileDetailMs).toBeNull();
+    expect(el._totalRunElapsedMs).toBe(7000);
   });
 });
 

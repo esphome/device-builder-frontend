@@ -190,10 +190,16 @@ function renderTimerDetail(host: ESPHomeCommandDialog, totalMs: number): Templat
         <span>${host._localize("command.total_run_time_label")}</span>
         <span>${formatElapsed(totalMs)}</span>
       </div>
-      <div class="compile-timer-row">
-        <span>${host._localize("command.compile_time_label")}</span>
-        <span>${compile === null ? "—" : formatElapsed(compile)}</span>
-      </div>
+      ${
+        // An old build from before compile timing existed doesn't know its
+        // compile time — show only the total rather than a bogus "0s".
+        compile === null
+          ? nothing
+          : html`<div class="compile-timer-row">
+              <span>${host._localize("command.compile_time_label")}</span>
+              <span>${formatElapsed(compile)}</span>
+            </div>`
+      }
       ${
         showHint
           ? html`<div class="compile-timer-hint">

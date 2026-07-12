@@ -409,15 +409,18 @@ export class ESPHomeCommandDialog extends LitElement {
     return (parseIsoMs(this._timerJob?.completed_at) ?? this._now) - start;
   }
 
-  // Compile-only time for the detail popover. Prefers the backend's stamps
-  // (same job clock as the total, so total >= compile always holds once both
-  // are set); falls back to the live frontend detection until they land.
+  // Compile-only time for the detail popover, or null when it's unknown. Uses
+  // the backend's stamps (same job clock as the total, so total >= compile
+  // always holds once both are set). Without them it trusts live frontend
+  // detection only while the run is still going — a finished job with no
+  // stamps is an old build from before this feature, whose compile time we
+  // genuinely can't recover from the replayed log, so it stays hidden.
   get _compileDetailMs(): number | null {
     const beStart = parseIsoMs(this._timerJob?.compile_started_at);
     if (beStart !== null) {
       return (parseIsoMs(this._timerJob?.compile_ended_at) ?? this._now) - beStart;
     }
-    return this._compileElapsedMs;
+    return this._isRunFrozen ? null : this._compileElapsedMs;
   }
 
   // The run has settled (job terminal), so the timer freezes and stops pulsing.
