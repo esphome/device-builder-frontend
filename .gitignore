@@ -18,6 +18,9 @@ build/
 # Generated language picker manifest (autonym + flag per locale), built
 # from src/translations/*.json by build-scripts/gen-language-manifest.cjs.
 /src/generated/
+# Throwaway working copy from `npm run translations:orphans` — a live diff
+# against Lokalise that the user prunes before `translations:orphans:delete`.
+/translation-orphans.json
 .DS_Store
 # Editor swap & backup files. Vim rotates .swp/.swo/.swn/.swm/... and a
 # swap such as .secrets.yaml.swp can hold unsaved buffer contents,

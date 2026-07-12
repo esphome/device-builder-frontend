@@ -20,6 +20,8 @@
     "test:watch": "vitest",
     "translations:upload": "node build-scripts/translations.ts upload",
     "translations:download": "node build-scripts/translations.ts download",
+    "translations:orphans": "node build-scripts/translations.ts orphans",
+    "translations:orphans:delete": "node build-scripts/translations.ts delete-orphans",
     "prepare": "husky"
   },
   "dependencies": {

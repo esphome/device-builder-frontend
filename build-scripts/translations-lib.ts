@@ -119,6 +119,94 @@ export function localeCompleteness(base: Messages, locale: Messages): number {
   return Math.min(99, Math.max(1, Math.round((translated / total) * 100)));
 }
 
+// Lokalise stores nested JSON keys as a single flattened key name, joining
+// object levels with `::` (en.json's { dashboard: { title } } becomes the
+// key `dashboard::title`). Mirror that separator when flattening en.json so
+// the local key set lines up with the names Lokalise reports.
+export const KEY_SEPARATOR = "::";
+
+// Flatten a parsed JSON translation object into the set of leaf key names,
+// joining nesting levels with KEY_SEPARATOR to match Lokalise's key naming.
+// Leaves are any non-object value (string/number/boolean/null); arrays are
+// indexed positionally, mirroring how Lokalise flattens JSON arrays.
+export function flattenKeys(value: unknown): Set<string> {
+  const out = new Set<string>();
+  const walk = (node: unknown, path: string): void => {
+    if (Array.isArray(node)) {
+      node.forEach((item, i) =>
+        walk(item, path ? `${path}${KEY_SEPARATOR}${i}` : String(i))
+      );
+      return;
+    }
+    if (node !== null && typeof node === "object") {
+      for (const [k, v] of Object.entries(node)) {
+        walk(v, path ? `${path}${KEY_SEPARATOR}${k}` : k);
+      }
+      return;
+    }
+    if (path) {
+      out.add(path);
+    }
+  };
+  walk(value, "");
+  return out;
+}
+
+// A Lokalise key name as returned by the keys API: a plain string, or an
+// object carrying a per-platform name. JSON-imported keys carry the same
+// name across platforms, but read every platform defensively.
+export type LokaliseKeyName =
+  | string
+  | { ios?: string; android?: string; web?: string; other?: string };
+
+export interface LokaliseKey {
+  key_id: number;
+  key_name: LokaliseKeyName;
+  created_at?: string;
+}
+
+// The distinct, non-empty names a Lokalise key is known by across platforms.
+export function keyNameCandidates(name: LokaliseKeyName): string[] {
+  const raw =
+    typeof name === "string"
+      ? [name]
+      : [name.ios, name.android, name.web, name.other];
+  return [
+    ...new Set(raw.filter((n): n is string => typeof n === "string" && n.length > 0)),
+  ];
+}
+
+export interface OrphanKey {
+  key_id: number;
+  key_name: string;
+  created_at?: string;
+}
+
+// Diff Lokalise's keys against the local base-language key set. A Lokalise
+// key is an orphan when it has at least one name and none of its names exist
+// in the base set — it lingers in Lokalise but en.json no longer defines it.
+// Keys with no resolvable name are skipped (never reported for deletion) so a
+// malformed entry can't be deleted by accident. Sorted by name for a stable,
+// reviewable file.
+export function findOrphans(
+  keys: LokaliseKey[],
+  baseKeys: Set<string>
+): OrphanKey[] {
+  const orphans: OrphanKey[] = [];
+  for (const key of keys) {
+    const candidates = keyNameCandidates(key.key_name);
+    if (candidates.length === 0 || candidates.some((name) => baseKeys.has(name))) {
+      continue;
+    }
+    orphans.push({
+      key_id: key.key_id,
+      key_name: candidates[0],
+      created_at: key.created_at,
+    });
+  }
+  return orphans.sort((a, b) => a.key_name.localeCompare(b.key_name));
+}
+
 export type DownloadSource = "lokalise" | "release";
 
 // Resolve the `download --source`. Absent flag defaults to "lokalise", but
