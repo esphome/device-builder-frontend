@@ -21,7 +21,7 @@ export function updateButtonTitle(
  * Title for an Update action button: the view-progress hint while a job
  * runs (the click re-attaches to it), the update tooltip otherwise.
  */
-export function installActionTitle(
+export function updateActionTitle(
   localize: LocalizeFunc,
   busy: boolean,
   installed: string,

@@ -9,7 +9,7 @@ import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
-import { installActionTitle } from "../../util/update-tooltip.js";
+import { updateActionTitle } from "../../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
@@ -366,7 +366,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
                       ? "dashboard.table_action_view_progress"
                       : "dashboard.table_action_update"
                   )}
-                  title=${installActionTitle(
+                  title=${updateActionTitle(
                     localize,
                     row.busy,
                     device.runtime_state.deployed_version,
