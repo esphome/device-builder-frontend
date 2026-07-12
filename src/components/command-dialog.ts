@@ -379,27 +379,48 @@ export class ESPHomeCommandDialog extends LitElement {
     this._open = false;
   };
 
-  // Compile time (download excluded), frozen once the compile ends; null before
-  // the compile phase.
+  // The job the on-screen timer reports on. Survives the stream ending.
+  get _timerJob(): FirmwareJob | undefined {
+    return this._timerJobId ? this._jobs.get(this._timerJobId) : undefined;
+  }
+
+  // Live-detected compile span (frontend clock). Drives the inline offload
+  // suggestion and the compile-time detail before the backend field lands.
   get _compileElapsedMs(): number | null {
     if (this._compileStartedAt === null) return null;
     return (this._compileEndedAt ?? this._now) - this._compileStartedAt;
   }
 
-  // True while the compile is actively running — drives the pulse, the offload
-  // hint, and whether the timer or the plain "working" dot owns the lower-left.
+  // True while the compile is actively running — drives the inline offload
+  // suggestion (a finished compile hands the slot back to the reset hint).
   get _isCompiling(): boolean {
     return this._compileStartedAt !== null && this._compileEndedAt === null;
   }
 
   // Whole-job wall time (queue excluded): download + configure + compile + link,
-  // and for an install the flash too — the number PlatformIO prints as "Took".
-  // Freezes at completion. Null before the job starts running.
+  // and for an install the flash — the number PlatformIO prints as "Took". This
+  // is the primary figure shown on the terminal. Freezes at completion; null
+  // before the job starts running.
   get _totalRunElapsedMs(): number | null {
-    const job = this._timerJobId ? this._jobs.get(this._timerJobId) : undefined;
-    const start = parseIsoMs(job?.started_at);
+    const start = parseIsoMs(this._timerJob?.started_at);
     if (start === null) return null;
-    return (parseIsoMs(job?.completed_at) ?? this._now) - start;
+    return (parseIsoMs(this._timerJob?.completed_at) ?? this._now) - start;
+  }
+
+  // Compile-only time for the detail popover. Prefers the backend's stamps
+  // (same job clock as the total, so total >= compile always holds once both
+  // are set); falls back to the live frontend detection until they land.
+  get _compileDetailMs(): number | null {
+    const beStart = parseIsoMs(this._timerJob?.compile_started_at);
+    if (beStart !== null) {
+      return (parseIsoMs(this._timerJob?.compile_ended_at) ?? this._now) - beStart;
+    }
+    return this._compileElapsedMs;
+  }
+
+  // The run has settled (job terminal), so the timer freezes and stops pulsing.
+  get _isRunFrozen(): boolean {
+    return parseIsoMs(this._timerJob?.completed_at) !== null;
   }
 
   _toggleTimerDetail = () => {
@@ -412,8 +433,13 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   protected updated(): void {
-    if (this._open && this._isCompiling) this._startTicker();
-    else this._stopTicker();
+    // Tick while the run is live so both the total and the compile detail
+    // advance; stop once it freezes at completion.
+    if (this._open && this._totalRunElapsedMs !== null && !this._isRunFrozen) {
+      this._startTicker();
+    } else {
+      this._stopTicker();
+    }
   }
 
   private _startTicker(): void {
@@ -602,7 +628,7 @@ export class ESPHomeCommandDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._lines}
           ?light=${!this._darkMode}
-          ?streaming=${this._state === "running" && !this._isCompiling}
+          ?streaming=${this._state === "running" && this._totalRunElapsedMs === null}
           .state=${this._state}
           .statusMessage=${this._statusMessage}
         >

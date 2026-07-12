@@ -24,6 +24,8 @@ interface Harness {
   _timerJobId: string;
   _now: number;
   readonly _totalRunElapsedMs: number | null;
+  readonly _compileDetailMs: number | null;
+  readonly _isRunFrozen: boolean;
   followJob: (job: FirmwareJob, displayName: string) => void;
 }
 
@@ -174,5 +176,49 @@ describe("command-dialog total run time (for the timer detail popover)", () => {
     el._jobId = ""; // stream ended; the flash then failed
     el._now = Date.parse("2026-01-01T00:01:30Z");
     expect(el._totalRunElapsedMs).toBe(29_000);
+  });
+
+  it("stays visible (total non-null) for a completed/queued install", () => {
+    const job = makeFirmwareJob({
+      job_id: "run5",
+      job_type: JobType.COMPILE,
+      started_at: "2026-01-01T00:00:00Z",
+      completed_at: "2026-01-01T00:00:50Z",
+    });
+    const el = mount([job]);
+    el._timerJobId = "run5";
+    expect(el._isRunFrozen).toBe(true);
+    expect(el._totalRunElapsedMs).not.toBeNull();
+  });
+});
+
+describe("command-dialog compile detail (total never shorter than compile)", () => {
+  it("derives compile time from the backend stamps, bounded by the run", () => {
+    const job = makeFirmwareJob({
+      job_id: "d1",
+      job_type: JobType.COMPILE,
+      started_at: "2026-01-01T00:00:00Z",
+      completed_at: "2026-01-01T00:00:50Z",
+      compile_started_at: "2026-01-01T00:00:12Z",
+      compile_ended_at: "2026-01-01T00:00:45Z",
+    });
+    const el = mount([job]);
+    el._timerJobId = "d1";
+    el._now = Date.parse("2026-01-01T01:00:00Z");
+    expect(el._compileDetailMs).toBe(33_000);
+    // The invariant the redesign guarantees: total >= compile.
+    expect(el._totalRunElapsedMs).toBe(50_000);
+    expect(el._totalRunElapsedMs!).toBeGreaterThanOrEqual(el._compileDetailMs!);
+  });
+
+  it("falls back to live frontend detection before the backend stamps land", () => {
+    const job = makeFirmwareJob({ job_id: "d2", job_type: JobType.COMPILE });
+    delete job.compile_started_at;
+    delete job.compile_ended_at;
+    const el = mount([job]);
+    el._timerJobId = "d2";
+    el._compileStartedAt = 1000;
+    el._compileEndedAt = 6000;
+    expect(el._compileDetailMs).toBe(5000);
   });
 });
