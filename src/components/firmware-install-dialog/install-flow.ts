@@ -526,7 +526,8 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
  * read and would be superseded (cancelled + restarted) by a fresh
  * compile (#1200).
  *
- * True to proceed; false when the dialog was dismissed mid-wait.
+ * True to proceed; false when the wait didn't complete (dialog dismissed,
+ * or the follow stream errored and the dialog already shows the failure).
  */
 async function artifactsSettled(
   host: ESPHomeFirmwareInstallDialog,
@@ -548,7 +549,10 @@ async function artifactsSettled(
  * job, so dismissing the download must not cancel it — teardown only
  * stops the follow stream. Resolves true on ANY terminal outcome (a
  * failed or cancelled build just means the download compiles fresh
- * afterwards), false when the dialog was dismissed mid-wait.
+ * afterwards); false when the dialog was dismissed mid-wait, or on a
+ * follow-stream error — a dead stream says nothing about the job, so
+ * proceeding could still read torn artifacts or supersede it. The error
+ * case fails the dialog; a retry re-reads the active-jobs map.
  */
 function waitForRunningJob(
   host: ESPHomeFirmwareInstallDialog,
@@ -570,7 +574,8 @@ function waitForRunningJob(
       onError: () => {
         host._streamId = "";
         host._compileReject = null;
-        resolve(true);
+        host._fail(host._localize("firmware.download_failed"));
+        resolve(false);
       },
     });
   });

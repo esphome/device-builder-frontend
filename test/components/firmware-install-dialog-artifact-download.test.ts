@@ -39,6 +39,11 @@ const ELF: FirmwareBinary = {
   description: "Debug symbols for the ESP stack trace decoder.",
 };
 
+type FollowCbs = {
+  onResult?: (d: unknown) => void;
+  onError?: (e: string) => void;
+};
+
 // get_binaries can return a different list on each call (empty before a
 // compile, populated after), so accept a queue of results.
 function makeHost(getBinariesResults: FirmwareBinary[][]) {
@@ -50,8 +55,8 @@ function makeHost(getBinariesResults: FirmwareBinary[][]) {
     firmwareCompile: vi
       .fn()
       .mockResolvedValue({ job_id: "j1", source: JobSource.LOCAL, source_label: "" }),
-    firmwareFollowJob: vi.fn((_id: string, cbs: { onResult: (d: unknown) => void }) => {
-      cbs.onResult({ status: JobStatus.COMPLETED });
+    firmwareFollowJob: vi.fn((_id: string, cbs: FollowCbs) => {
+      cbs.onResult?.({ status: JobStatus.COMPLETED });
       return "s1";
     }),
     firmwareGetBinaries,
@@ -186,17 +191,31 @@ describe("download waits for a running build (#1200)", () => {
   it("continues to its own compile when the awaited job ends non-completed", async () => {
     const { host, api } = makeHost([[], [FACTORY]]);
     host._activeJobs.set("device.yaml", runningJob);
-    api.firmwareFollowJob.mockImplementationOnce(
-      (_id: string, cbs: { onResult: (d: unknown) => void }) => {
-        cbs.onResult({ status: JobStatus.CANCELLED });
-        return "s1";
-      }
-    );
+    api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: FollowCbs) => {
+      cbs.onResult?.({ status: JobStatus.CANCELLED });
+      return "s1";
+    });
     await run(host);
     // The wait resolves regardless of outcome; the empty build dir then
     // triggers the download's own (no-longer-superseding) compile.
     expect(api.firmwareCompile).toHaveBeenCalledTimes(1);
     expect(host._step).toBe("download-ready");
+  });
+
+  it("fails closed when the follow stream errors mid-wait", async () => {
+    // A dead stream says nothing about the job: proceeding could still read
+    // torn artifacts or supersede it, so the flow fails instead.
+    const { host, api } = makeHost([[FACTORY]]);
+    host._activeJobs.set("device.yaml", runningJob);
+    api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: FollowCbs) => {
+      cbs.onError?.("stream lost");
+      return "s1";
+    });
+    await run(host);
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.download_failed");
+    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
   });
 
   it("bails without touching the backend when dismissed mid-wait", async () => {
