@@ -18,10 +18,10 @@ import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-even
 import type { LocalizeFunc } from "../common/localize.js";
 import { buildOffloadAlertsContext, localizeContext } from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
-import { closeOpenDialogs } from "./base-dialog.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { closeOpenDialogs } from "./base-dialog.js";
 import {
   SETTINGS_DIALOG_BREAKPOINT,
   settingsRowStyles,
@@ -30,7 +30,6 @@ import {
 import { SECTIONS, type Section, type SectionDef } from "./settings-dialog/types.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "./base-dialog.js";
 import "./settings-dialog/appearance-section.js";
 import "./settings-dialog/build-offload-section.js";
 import "./settings-dialog/build-server-section.js";
