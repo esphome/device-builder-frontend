@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isCompilePhaseLine } from "../../src/util/compile-phase.js";
+import { isCompileEndLine, isCompilePhaseLine } from "../../src/util/compile-phase.js";
 
 describe("isCompilePhaseLine", () => {
-  it("matches the universal 'Compiling ' line on every toolchain", () => {
+  it("matches the universal 'Compiling ' line on every PlatformIO toolchain", () => {
     for (const line of [
-      // esp32 esp-idf (ninja)
+      // esp32 esp-idf (pio builder)
       "Compiling .pioenvs/apy/esp_hw_support/cpu.c.o",
       // esp32 platformio (arduino)
       "Compiling .pio/build/esp32dev/src/main.cpp.o",
@@ -29,16 +29,28 @@ describe("isCompilePhaseLine", () => {
     }
   });
 
-  it("matches the bracketed Arduino / ninja progress forms", () => {
+  it("matches raw ninja build targets by their large denominator", () => {
+    expect(isCompilePhaseLine("[117/1247] Building C object esp-idf/esp_wifi/…")).toBe(
+      true
+    );
+    expect(
+      isCompilePhaseLine("[7/1247] Generating ../../partition_table/partition-table.bin")
+    ).toBe(true);
     expect(isCompilePhaseLine("[ 17%] Building CXX object")).toBe(true);
-    expect(isCompilePhaseLine("[907/1424] Building C object")).toBe(true);
+  });
+
+  it("ignores the ninja reconfigure counter (small denominator)", () => {
+    expect(isCompilePhaseLine("[1/2] Re-running CMake...")).toBe(false);
+    expect(isCompilePhaseLine("[3/97] Performing build step for 'bootloader'")).toBe(
+      false
+    );
   });
 
   it("tolerates a leading ANSI colour reset", () => {
     expect(isCompilePhaseLine("\x1b[0mCompiling src/main.cpp.o")).toBe(true);
   });
 
-  it("ignores the dependency-download and setup lines", () => {
+  it("ignores the dependency-download and configure lines", () => {
     for (const line of [
       "Tool Manager: Installing file:///Users/bdraco/esphome/.esphome/build",
       "Library Manager: Installing esphome/noise-c @ 0.1.11",
@@ -47,9 +59,32 @@ describe("isCompilePhaseLine", () => {
       "HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash",
       "- framework-espidf @ 3.50504.0 (5.5.4)",
       "Reading CMake configuration...",
-      "LDF Modes: Finder ~ chain, Compatibility ~ soft",
+      "-- Configuring done (3.0s)",
+      "-- Building ESP-IDF components for target esp32s3",
+      "Executing action: reconfigure",
+      "Running ninja in directory /data/build/apollo-r-pro-1-eth-5938e0/build",
     ]) {
       expect(isCompilePhaseLine(line)).toBe(false);
     }
+  });
+});
+
+describe("isCompileEndLine", () => {
+  it("matches the PlatformIO success and failure banners", () => {
+    expect(
+      isCompileEndLine(
+        "========================= [SUCCESS] Took 15.36 seconds ========================="
+      )
+    ).toBe(true);
+    expect(
+      isCompileEndLine(
+        "========================= [FAILED] Took 4.10 seconds ========================="
+      )
+    ).toBe(true);
+  });
+
+  it("does not match ordinary build output", () => {
+    expect(isCompileEndLine("Compiling .pio/build/esp32dev/src/main.cpp.o")).toBe(false);
+    expect(isCompileEndLine("[117/1247] Building C object")).toBe(false);
   });
 });

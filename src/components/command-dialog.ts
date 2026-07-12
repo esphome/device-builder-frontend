@@ -34,7 +34,7 @@ import {
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { isCompilePhaseLine } from "../util/compile-phase.js";
+import { isCompileEndLine, isCompilePhaseLine } from "../util/compile-phase.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
@@ -182,12 +182,16 @@ export class ESPHomeCommandDialog extends LitElement {
     source_esphome_version: string;
   } | null = null;
 
-  // Wall-clock the compile phase began — set when the followed job's progress
-  // first latches non-null (the download/prep phase never latches, so this
-  // excludes it). Drives the compile-elapsed timer + offload-hint threshold.
+  // Wall-clock the compile phase began — set on the first build line (download
+  // and configure never match), so the timer it drives counts compilation only.
   @state() _compileStartedAt: number | null = null;
 
-  // Clock driving the live elapsed readout. Ticks each second while a job runs.
+  // Wall-clock the compile finished — set on the PlatformIO [SUCCESS]/[FAILED]
+  // banner (or a terminal state). Freezes the timer at the compile duration so
+  // an install's flash phase, which streams after, isn't counted.
+  @state() _compileEndedAt: number | null = null;
+
+  // Clock driving the live elapsed readout. Ticks each second while compiling.
   @state() _now = Date.now();
   private _tickHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -236,6 +240,15 @@ export class ESPHomeCommandDialog extends LitElement {
         this._resetAnsiLogScroll();
       }
     }
+    // Backstop the freeze: if the job settles without a summary banner in the
+    // stream, stop the clock at the terminal transition.
+    if (
+      this._compileStartedAt !== null &&
+      this._compileEndedAt === null &&
+      (this._state === "success" || this._state === "error")
+    ) {
+      this._compileEndedAt = Date.now();
+    }
   }
 
   /** Point the dialog at *device* and open — the shared host entry point. */
@@ -261,6 +274,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobStatus = null;
     this._primedSource = null;
     this._compileStartedAt = null;
+    this._compileEndedAt = null;
     this._failedDuringValidate = false;
     // Always start with secrets redacted on a fresh open — opt-in per session.
     this._showSecrets = false;
@@ -304,9 +318,10 @@ export class ESPHomeCommandDialog extends LitElement {
       source_label: job.source_label,
       source_esphome_version: job.source_esphome_version,
     };
-    // Reattaching mid-build can't recover the true compile start; let willUpdate
-    // re-derive it from the first progress it observes on this stream.
+    // Reattaching mid-build can't recover the true compile start; let the line
+    // scanner re-derive it from the stream it's about to replay.
     this._compileStartedAt = null;
+    this._compileEndedAt = null;
     // Cancel any prior follow before starting a new one — without this,
     // every reopen layered fresh streams while previous ones still pumped
     // onOutput into _lines (lines duplicated per leaked subscription).
@@ -321,9 +336,17 @@ export class ESPHomeCommandDialog extends LitElement {
     this._open = false;
   };
 
-  // Compile time so far (download excluded), or null before the compile phase.
+  // Compile time (download excluded), frozen once the compile ends; null before
+  // the compile phase.
   get _compileElapsedMs(): number | null {
-    return this._compileStartedAt === null ? null : this._now - this._compileStartedAt;
+    if (this._compileStartedAt === null) return null;
+    return (this._compileEndedAt ?? this._now) - this._compileStartedAt;
+  }
+
+  // True while the compile is actively running — drives the pulse, the offload
+  // hint, and whether the timer or the plain "working" dot owns the lower-left.
+  get _isCompiling(): boolean {
+    return this._compileStartedAt !== null && this._compileEndedAt === null;
   }
 
   disconnectedCallback(): void {
@@ -332,7 +355,7 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   protected updated(): void {
-    if (this._open && this._state === "running") this._startTicker();
+    if (this._open && this._isCompiling) this._startTicker();
     else this._stopTicker();
   }
 
@@ -455,9 +478,12 @@ export class ESPHomeCommandDialog extends LitElement {
   // Buffer a streamed line; flushed on the next animation frame.
   _enqueueLine(line: string): void {
     // Latch the compile-phase start on the first build line — download/prep
-    // lines never match, so the timer it drives counts compilation only.
-    if (this._compileStartedAt === null && isCompilePhaseLine(line)) {
-      this._compileStartedAt = Date.now();
+    // lines never match, so the timer it drives counts compilation only —
+    // then freeze it on the summary banner so an install's flash isn't counted.
+    if (this._compileStartedAt === null) {
+      if (isCompilePhaseLine(line)) this._compileStartedAt = Date.now();
+    } else if (this._compileEndedAt === null && isCompileEndLine(line)) {
+      this._compileEndedAt = Date.now();
     }
     this._pendingLines.push(line);
     if (this._flushScheduled) return;
@@ -519,7 +545,7 @@ export class ESPHomeCommandDialog extends LitElement {
         <esphome-process-terminal
           .lines=${this._lines}
           ?light=${!this._darkMode}
-          ?streaming=${this._state === "running" && this._compileStartedAt === null}
+          ?streaming=${this._state === "running" && !this._isCompiling}
           .state=${this._state}
           .statusMessage=${this._statusMessage}
         >

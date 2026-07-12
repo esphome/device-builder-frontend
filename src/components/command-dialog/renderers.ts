@@ -137,27 +137,36 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   return live?.source_label || primed?.source_label || null;
 }
 
-// Live compile-elapsed counter, pinned lower-left in place of the streaming
-// dot. Only shows once the compile phase has started (download excluded).
+// Compile-elapsed counter, pinned lower-left in place of the streaming dot.
+// Appears when the compile phase starts (download excluded), pulses while it
+// runs, then freezes at the final compile time (still shown through the flash
+// phase and the terminal state).
 export function renderCompileTimer(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   const elapsed = host._compileElapsedMs;
-  if (elapsed === null || host._state !== "running") return nothing;
+  if (elapsed === null) return nothing;
   return html`
-    <div class="compile-timer" role="status" slot="toolbar-left">
+    <div
+      class="compile-timer ${host._isCompiling ? "compile-timer--live" : ""}"
+      role="status"
+      slot="toolbar-left"
+      title=${host._localize("command.compile_elapsed_title")}
+    >
       <wa-icon library="mdi" name="timer-outline"></wa-icon>
       <span>${formatElapsed(elapsed)}</span>
     </div>
   `;
 }
 
-// Nudge a slow local compile toward "send builds to a faster machine". Gated
-// on compile elapsed past the threshold; suppressed for remote builds and when
-// offloading is already set up.
+// Nudge a slow local compile toward "send builds to a faster machine" while it
+// is still running (a finished compile hands the slot to the reset hint on
+// failure). Gated on compile elapsed past the threshold; suppressed for remote
+// builds and when offloading is already set up.
 export function renderOffloadHintSlot(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
+  if (!host._isCompiling) return nothing;
   const source =
     (host._jobId ? host._jobs.get(host._jobId)?.source : undefined) ??
     host._primedSource?.source ??

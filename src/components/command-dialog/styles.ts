@@ -164,10 +164,13 @@ export const commandDialogStyles = css`
     font-family: var(--term-mono-font);
     font-size: 12px;
     color: var(--term-accent);
-    animation: compile-timer-pulse 1.5s ease-in-out infinite;
+    cursor: default;
   }
   .compile-timer wa-icon {
     font-size: 14px;
+  }
+  .compile-timer--live {
+    animation: compile-timer-pulse 1.5s ease-in-out infinite;
   }
   @keyframes compile-timer-pulse {
     0%,
@@ -179,7 +182,7 @@ export const commandDialogStyles = css`
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .compile-timer {
+    .compile-timer--live {
       animation: none;
     }
   }

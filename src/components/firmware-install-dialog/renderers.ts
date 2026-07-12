@@ -167,6 +167,7 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
 export function renderOffloadHintSlot(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
+  if (!host._isCompiling) return nothing;
   const visible = shouldShowOffloadHint({
     elapsedMs: host._compileElapsedMs ?? 0,
     source: host._jobSource,

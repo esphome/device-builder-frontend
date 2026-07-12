@@ -406,6 +406,7 @@
     "try_open_editor_button": "opening this device in the editor",
     "offload_hint": "Compiling is slow on this machine. You can send builds to a faster one on your network to speed this up. {action}.",
     "offload_hint_action": "Set up a build server",
+    "compile_elapsed_title": "Time spent compiling (excludes downloads)",
     "validate_success": "Configuration is valid!",
     "validate_failed": "Validation failed.",
     "show_secrets": "Show secrets",

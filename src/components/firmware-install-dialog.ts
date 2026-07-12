@@ -141,10 +141,13 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _jobId = "";
   _streamId = "";
 
-  // Wall-clock the compile phase began (download excluded); set once the
-  // followed job first reports progress. Drives the compiling-step elapsed
-  // readout + offload-hint threshold.
+  // Wall-clock the compile phase began (download excluded); set on the first
+  // build line. Drives the compiling-step elapsed readout + offload-hint.
   @state() _compileStartedAt: number | null = null;
+
+  // Wall-clock the compile finished — the PlatformIO summary banner or the step
+  // leaving "compiling". Freezes the elapsed at the compile duration.
+  @state() _compileEndedAt: number | null = null;
 
   // Clock for the live elapsed readout. Ticks each second while compiling.
   @state() _now = Date.now();
@@ -260,6 +263,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
     this._compileStartedAt = null;
+    this._compileEndedAt = null;
     this._usbFirmware = null;
     this._usbFirmwareName = "";
     // _detachStream already cleared _jobId / _streamId / _compileReject.
@@ -300,10 +304,20 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (changedProperties.has("_logsExpanded")) {
       this.toggleAttribute("expanded", this._logsExpanded);
     }
+    // Backstop the freeze: once the step leaves compiling (flash / download /
+    // done / error) the compile is over, even if no summary banner was seen.
+    if (
+      this._compileStartedAt !== null &&
+      this._compileEndedAt === null &&
+      this._step !== "compiling" &&
+      this._step !== "queued"
+    ) {
+      this._compileEndedAt = Date.now();
+    }
   }
 
   protected updated(): void {
-    if (this._open && this._step === "compiling") this._startTicker();
+    if (this._open && this._isCompiling) this._startTicker();
     else this._stopTicker();
   }
 
@@ -312,9 +326,16 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._stopTicker();
   }
 
-  // Compile time so far (download excluded), or null before the compile phase.
+  // Compile time (download excluded), frozen once the compile ends; null before
+  // the compile phase.
   get _compileElapsedMs(): number | null {
-    return this._compileStartedAt === null ? null : this._now - this._compileStartedAt;
+    if (this._compileStartedAt === null) return null;
+    return (this._compileEndedAt ?? this._now) - this._compileStartedAt;
+  }
+
+  // True while the compile is actively running.
+  get _isCompiling(): boolean {
+    return this._compileStartedAt !== null && this._compileEndedAt === null;
   }
 
   private _startTicker(): void {
