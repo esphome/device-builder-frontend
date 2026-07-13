@@ -62,7 +62,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     hintKey: "tour.steps.name.hint",
   },
   {
-    anchors: ["nav"],
+    // The open navigator when visible, else the toggle that reveals it.
+    anchors: ["nav", "nav-toggle"],
     route: "device",
     side: "right",
     kind: "info",

@@ -1142,7 +1142,7 @@ export class ESPHomePageDevice extends LitElement {
                         ? html`<button
                             type="button"
                             class="ghost-icon-btn nav-toggle-btn"
-                            ${tourAnchor("nav")}
+                            ${tourAnchor("nav-toggle")}
                             @click=${this._onNavExpand}
                             title=${this._localize("device.show_navigator")}
                             aria-label=${this._localize("device.show_navigator")}

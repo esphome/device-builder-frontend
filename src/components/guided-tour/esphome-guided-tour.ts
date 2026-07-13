@@ -48,6 +48,7 @@ export class ESPHomeGuidedTour extends LitElement {
   private _resizeObserver?: ResizeObserver;
   private _observedTarget: Element | null = null;
   private _revealRequested = false;
+  private _reflowScheduled = false;
 
   private readonly _skipAffordance = new TourSkipAffordance(this, {
     isDialogStep: () =>
@@ -171,8 +172,15 @@ export class ESPHomeGuidedTour extends LitElement {
     return false;
   }
 
+  // Scroll/resize can fire many times per frame; coalesce the layout reads
+  // in _refresh to one per animation frame.
   private _onReflow = (): void => {
-    if (this._active) this._refresh();
+    if (!this._active || this._reflowScheduled) return;
+    this._reflowScheduled = true;
+    requestAnimationFrame(() => {
+      this._reflowScheduled = false;
+      if (this._active) this._refresh();
+    });
   };
 
   private _onKeydown = (event: KeyboardEvent): void => {

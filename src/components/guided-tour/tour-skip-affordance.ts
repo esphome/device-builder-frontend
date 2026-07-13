@@ -23,6 +23,7 @@ export interface TourSkipAffordanceOptions {
  */
 export class TourSkipAffordance implements ReactiveController {
   private _hover = false;
+  private _prevCursor: string | null = null;
 
   constructor(
     host: ReactiveControllerHost,
@@ -78,7 +79,16 @@ export class TourSkipAffordance implements ReactiveController {
     );
   }
 
+  /** Swap in the pointer cursor, restoring whatever inline value was there. */
   private _setCursor(on: boolean): void {
-    document.documentElement.style.cursor = on ? "pointer" : "";
+    if (on) {
+      if (this._prevCursor === null) {
+        this._prevCursor = document.documentElement.style.cursor;
+      }
+      document.documentElement.style.cursor = "pointer";
+    } else if (this._prevCursor !== null) {
+      document.documentElement.style.cursor = this._prevCursor;
+      this._prevCursor = null;
+    }
   }
 }
