@@ -21,6 +21,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
+import { isVisible } from "../../util/is-visible.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { ResizeController } from "../../util/resize-controller.js";
@@ -400,10 +401,14 @@ export class ESPHomeComponentCatalog extends LitElement {
   // The catalog stays mounted (hidden) inside its dialog: a hidden
   // subtree measures 0/0 for every paragraph, so skip rather than wipe
   // the set on dialog close — the reopen's load() render re-measures.
-  // Feature-detected: happy-dom has no checkVisibility.
   private _measureDescriptionOverflow() {
-    if (this.checkVisibility && !this.checkVisibility()) return;
-    this._overflowingDescriptions = overflowingDescriptionIds(this._clampedDescriptions);
+    if (!isVisible(this)) return;
+    const next = overflowingDescriptionIds(this._clampedDescriptions);
+    // The expanded card's unclamped text is excluded from measurement;
+    // keep its id so collapsing doesn't flash the button out for a
+    // frame before the post-collapse measure re-adds it.
+    if (this._expandedId) next.add(this._expandedId);
+    this._overflowingDescriptions = next;
   }
 
   _onImageError(id: string) {
