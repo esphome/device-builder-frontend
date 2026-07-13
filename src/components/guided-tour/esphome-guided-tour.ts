@@ -22,6 +22,10 @@ import {
   type TourStep,
 } from "./tour-steps.js";
 
+// Focus on one of these means the key is already spoken for — typing in an
+// input, caret movement, native button/link activation.
+const KEY_SELF_HANDLING = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"]);
+
 @customElement("esphome-guided-tour")
 export class ESPHomeGuidedTour extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -223,6 +227,7 @@ export class ESPHomeGuidedTour extends LitElement {
     this._setSkipCursor(false);
     this._teardownClicks();
     this._observeTarget(null);
+    this._resizeObserver?.disconnect();
     this._resizeObserver = undefined;
   }
 
@@ -352,13 +357,15 @@ export class ESPHomeGuidedTour extends LitElement {
       return;
     }
 
-    if (
-      this._step.kind === "info" &&
-      (event.key === "Enter" || event.key === "ArrowRight")
-    ) {
-      event.preventDefault();
-      this._next();
-    }
+    if (this._step.kind !== "info") return;
+    if (event.key !== "Enter" && event.key !== "ArrowRight") return;
+    if (event.isComposing) return;
+    // Don't steal keys from a focused control (mirrors EnterController):
+    // composedPath()[0] is the real focused element across shadow roots.
+    const el = event.composedPath()[0] as HTMLElement | undefined;
+    if (el && (KEY_SELF_HANDLING.has(el.tagName) || el.isContentEditable)) return;
+    event.preventDefault();
+    this._next();
   };
 
   private _presentAnchorEls(): Element[] {
@@ -387,13 +394,14 @@ export class ESPHomeGuidedTour extends LitElement {
       }
     }
 
-    this._observeTarget(present[0] ?? null);
-
     const target =
       present.find((el) => {
         const r = el.getBoundingClientRect();
         return r.width > 0 || r.height > 0;
       }) ?? null;
+    // Observe the element we actually measure; fall back to the first
+    // registered anchor so a reveal-driven resize (0×0 → sized) still fires.
+    this._observeTarget(target ?? present[0] ?? null);
     if (!target) {
       // Anchors registered but zero-sized: the pane is hidden by the current
       // layout (single-pane mobile, YAML-only desktop). Ask the owner to
