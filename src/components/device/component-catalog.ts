@@ -23,11 +23,10 @@ import { isFeaturedId } from "../../util/featured-id.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { ResizeController } from "../../util/resize-controller.js";
+import { setsEqual } from "../../util/set-equal.js";
 import { renderLoadMoreFooter } from "../shared/load-more-footer.js";
-import {
-  overflowingDescriptionIds,
-  sameIdSet,
-} from "./component-catalog/description-overflow.js";
+import { overflowingDescriptionIds } from "./component-catalog/description-overflow.js";
 import {
   ambiguousNameIds,
   availableFeaturedCount,
@@ -108,15 +107,22 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   // Cards whose clamped description actually overflows — the only ones
   // where the expand button reveals anything. Rebuilt after every render
-  // and on host resize (wrap width changes truncation).
-  @state() _overflowingDescriptions: ReadonlySet<string> = new Set();
+  // and on host resize (wrap width changes truncation). The equality
+  // check makes the updated() -> measure -> state cycle converge:
+  // removing a button doesn't change the description's wrap width, so
+  // the second pass measures the same set and stops.
+  @state({
+    hasChanged: (next: ReadonlySet<string>, old?: ReadonlySet<string>) =>
+      !old || !setsEqual(next, old),
+  })
+  _overflowingDescriptions: ReadonlySet<string> = new Set();
 
   @query(".sentinel") private _sentinel?: HTMLElement | null;
 
   @queryAll(".component-description--clamp[data-component-id]")
   private _clampedDescriptions!: NodeListOf<HTMLElement>;
 
-  private _resizeObserver = new ResizeObserver(() => this._measureDescriptionOverflow());
+  private _resize = new ResizeController(this, () => this._measureDescriptionOverflow());
 
   private _intersection = new IntersectionController(this, () => this._list.loadMore());
 
@@ -228,16 +234,6 @@ export class ESPHomeComponentCatalog extends LitElement {
     componentCatalogStyles,
     loadMoreFooterStyles,
   ];
-
-  connectedCallback() {
-    super.connectedCallback();
-    this._resizeObserver.observe(this);
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this._resizeObserver.disconnect();
-  }
 
   protected updated() {
     this._measureDescriptionOverflow();
@@ -394,14 +390,13 @@ export class ESPHomeComponentCatalog extends LitElement {
     this._expandedId = this._expandedId === component.id ? null : component.id;
   }
 
-  // The set-equality guard makes the updated() -> state -> updated() cycle
-  // converge: removing a button doesn't change the description's wrap
-  // width, so the second pass measures the same set and stops.
+  // The catalog stays mounted (hidden) inside its dialog: a hidden
+  // subtree measures 0/0 for every paragraph, so skip rather than wipe
+  // the set on dialog close — the reopen's load() render re-measures.
+  // Feature-detected: happy-dom has no checkVisibility.
   private _measureDescriptionOverflow() {
-    const next = overflowingDescriptionIds(this._clampedDescriptions);
-    if (!sameIdSet(next, this._overflowingDescriptions)) {
-      this._overflowingDescriptions = next;
-    }
+    if (this.checkVisibility && !this.checkVisibility()) return;
+    this._overflowingDescriptions = overflowingDescriptionIds(this._clampedDescriptions);
   }
 
   _onImageError(id: string) {
