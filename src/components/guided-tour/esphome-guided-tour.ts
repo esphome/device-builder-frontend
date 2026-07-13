@@ -310,6 +310,9 @@ export class ESPHomeGuidedTour extends LitElement {
 
   private _goToStep(index: number): void {
     this._teardownClicks();
+    // Consecutive dialog steps keep the affordance active; clear any hover
+    // carried across so the cursor can't stay stuck until the next move.
+    this._skipAffordance.reset();
     this._stepIndex = index;
     this._frame = null;
     this._revealRequested = false;

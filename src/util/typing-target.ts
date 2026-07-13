@@ -9,10 +9,12 @@ export function isTypingTarget(el: HTMLElement | undefined): boolean {
   const tag = el.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
   if (el.isContentEditable) return true;
-  let cur: HTMLElement | null = el;
+  let cur: Element | null = el;
   while (cur) {
     if (cur.tagName === "ESPHOME-YAML-EDITOR") return true;
-    cur = cur.parentElement;
+    // Hop shadow boundaries — CodeMirror mounts inside the editor's root.
+    const root = cur.getRootNode();
+    cur = cur.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
   }
   return false;
 }
