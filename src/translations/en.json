@@ -1004,7 +1004,7 @@
       "continue": "Continue",
       "finish": "Finish",
       "dismiss": "Maybe later",
-      "recommended": "Recommended",
+      "recommended": "RECOMMENDED",
       "saving": "Saving…",
       "ack_failed": "Saved your choices, but the wizard couldn't be marked as completed — it may reappear next time.",
       "use_case": {

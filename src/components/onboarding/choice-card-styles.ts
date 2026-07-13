@@ -52,7 +52,6 @@ export const choiceCardStyles = css`
     transform: translateY(-50%);
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-semibold);
-    text-transform: uppercase;
     letter-spacing: 0.04em;
     line-height: 1;
     padding: 3px 8px;
