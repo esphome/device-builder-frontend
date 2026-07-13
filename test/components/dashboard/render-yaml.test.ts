@@ -48,3 +48,28 @@ describe("renderYamlMode hit header", () => {
     expect(anchor?.textContent?.trim()).toBe("Living Room");
   });
 });
+
+describe("renderYamlMode match count", () => {
+  function countText(hits: YamlSearchHit[]): string {
+    const container = renderInto(renderYamlMode(makeHost(hits)));
+    return container.querySelector(".yaml-hit-group-count")?.textContent ?? "";
+  }
+
+  it("renders the 'of total' unit when total_matches exceeds the shown list", () => {
+    const text = countText([{ ...makeHit(), total_matches: 23 }]);
+    expect(text).toContain("1");
+    expect(text).toContain("yaml_search.match_count_of");
+  });
+
+  it("renders the plain unit when total_matches is absent (older backend)", () => {
+    const text = countText([makeHit()]);
+    expect(text).toContain("yaml_search.match_count");
+    expect(text).not.toContain("match_count_of");
+  });
+
+  it("renders the plain unit when total_matches equals the shown count", () => {
+    const text = countText([{ ...makeHit(), total_matches: 1 }]);
+    expect(text).toContain("yaml_search.match_count");
+    expect(text).not.toContain("match_count_of");
+  });
+});

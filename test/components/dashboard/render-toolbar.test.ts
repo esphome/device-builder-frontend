@@ -15,6 +15,7 @@ import {
   renderSearchInput,
   renderSelectBarOrFab,
   renderViewToggle,
+  renderYamlToolbar,
 } from "../../../src/components/dashboard/render-toolbar.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 import { renderInto } from "../../_dom.js";
@@ -81,6 +82,41 @@ describe("renderViewToggle Expert Mode gating", () => {
     const container = renderToggle(makeToggleHost(true));
     expect(container.querySelectorAll(".view-toggle-btn").length).toBe(3);
     expect(container.querySelector('wa-icon[name="code-braces"]')).not.toBeNull();
+  });
+});
+
+describe("renderYamlToolbar match count", () => {
+  function makeYamlHit(shown: number, total?: number) {
+    return {
+      configuration: "a.yaml",
+      device_name: "a",
+      friendly_name: "A",
+      matches: Array.from({ length: shown }, (_, i) => ({
+        line_number: i + 1,
+        line_text: "wifi:",
+        before: [],
+        after: [],
+      })),
+      ...(total === undefined ? {} : { total_matches: total }),
+    };
+  }
+
+  function countText(hits: unknown[]): string {
+    const host = makeHost({ _search: "wifi", _yamlSearch: { hits } });
+    const container = renderInto(renderYamlToolbar(host as ESPHomePageDashboard));
+    return container.querySelector(".device-count")?.textContent ?? "";
+  }
+
+  it("renders the 'of total' unit when the fleet total exceeds the shown sum", () => {
+    const text = countText([makeYamlHit(5, 23)]);
+    expect(text).toContain("5");
+    expect(text).toContain("yaml_search.match_count_of");
+  });
+
+  it("renders the plain unit when total_matches is absent (older backend)", () => {
+    const text = countText([makeYamlHit(5)]);
+    expect(text).toContain("yaml_search.match_count");
+    expect(text).not.toContain("match_count_of");
   });
 });
 
