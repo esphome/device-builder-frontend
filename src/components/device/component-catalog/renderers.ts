@@ -106,6 +106,11 @@ export function renderCard(
   showPlatform = false
 ): TemplateResult {
   const hasImage = !!component.image_url && !host._imageFailed.has(component.id);
+  // Expanding only unclamps the description (plus a full-row span), so the
+  // button is dead UI unless the clamped text actually overflows. An open
+  // card keeps its button regardless — the unclamped text no longer
+  // measures as overflowing, but it still needs a collapse affordance.
+  const expandable = expanded || host._overflowingDescriptions.has(component.id);
   // Skip the chip entirely when the label is empty (defensive against an
   // API regression yielding a whitespace category id) so we don't render
   // a blank pill.
@@ -167,20 +172,27 @@ export function renderCard(
               : nothing
           }
         </div>
-        <button
-          class="expand-button"
-          type="button"
-          aria-pressed=${expanded}
-          title=${localize("wizard.expand_board")}
-          @click=${() => host._onToggleExpand(component)}
-        >
-          <wa-icon
-            library="mdi"
-            name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
-          ></wa-icon>
-        </button>
+        ${
+          expandable
+            ? html`<button
+                class="expand-button"
+                type="button"
+                aria-pressed=${expanded}
+                title=${localize("wizard.expand_board")}
+                @click=${() => host._onToggleExpand(component)}
+              >
+                <wa-icon
+                  library="mdi"
+                  name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
+                ></wa-icon>
+              </button>`
+            : nothing
+        }
       </div>
-      <p class="component-description ${expanded ? "" : "component-description--clamp"}">
+      <p
+        class="component-description ${expanded ? "" : "component-description--clamp"}"
+        data-component-id=${component.id}
+      >
         ${renderMarkdown(component.description)}
       </p>
       <div class="card-footer">

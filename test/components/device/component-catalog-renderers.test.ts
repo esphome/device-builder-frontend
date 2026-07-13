@@ -22,6 +22,7 @@ function clickFrom(target: Element): MouseEvent {
 function makeHost(): ESPHomeComponentCatalog {
   return {
     _imageFailed: new Set<string>(),
+    _overflowingDescriptions: new Set<string>(),
     _category: "all",
     board: { name: "Guition Smart Screen" },
     _localize: localize,
@@ -108,6 +109,40 @@ describe("renderCard", () => {
     render(renderCard(makeHost(), makeEntry({}), false, false, localize), container);
     expect(container.querySelector(".component-category-chip--recommended")).toBeNull();
     expect(container.querySelector(".component-category-chip")?.textContent).toBe("Bus");
+  });
+
+  it("omits the expand button when the description doesn't overflow its clamp", () => {
+    // Expanding only unclamps the description, so a fitting (or empty)
+    // description makes the button pure dead UI.
+    const container = document.createElement("div");
+    render(renderCard(makeHost(), makeEntry({}), false, false, localize), container);
+    expect(container.querySelector(".expand-button")).toBeNull();
+  });
+
+  it("shows the expand button when the clamped description overflows", () => {
+    const container = document.createElement("div");
+    const host = makeHost();
+    (host._overflowingDescriptions as Set<string>).add("spi");
+    render(renderCard(host, makeEntry({}), false, false, localize), container);
+    expect(container.querySelector(".expand-button")).not.toBeNull();
+  });
+
+  it("keeps the collapse button on an expanded card", () => {
+    // Once open, the unclamped text no longer measures as overflowing; the
+    // card still needs its collapse affordance.
+    const container = document.createElement("div");
+    render(renderCard(makeHost(), makeEntry({}), true, false, localize), container);
+    const button = container.querySelector(".expand-button");
+    expect(button).not.toBeNull();
+    expect(button?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("stamps the component id on the description for overflow measurement", () => {
+    const container = document.createElement("div");
+    render(renderCard(makeHost(), makeEntry({}), false, false, localize), container);
+    const description = container.querySelector<HTMLElement>(".component-description");
+    expect(description?.dataset.componentId).toBe("spi");
+    expect(description?.classList.contains("component-description--clamp")).toBe(true);
   });
 });
 

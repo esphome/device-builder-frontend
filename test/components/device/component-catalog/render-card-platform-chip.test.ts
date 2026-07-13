@@ -16,6 +16,7 @@ import { identityLocalize as localize, renderInto } from "../../../_dom.js";
 function host(category = "stepper"): unknown {
   return {
     _imageFailed: new Set<string>(),
+    _overflowingDescriptions: new Set<string>(),
     _category: category,
     _onAdd: () => {},
     _onToggleExpand: () => {},
