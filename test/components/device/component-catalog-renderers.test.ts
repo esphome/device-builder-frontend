@@ -1,12 +1,14 @@
 // @vitest-environment happy-dom
 import { render } from "lit";
 import { describe, expect, it } from "vitest";
+import type { FeaturedBundle } from "../../../src/api/types/boards.js";
 import {
   ComponentCategory,
   type ComponentCatalogEntry,
 } from "../../../src/api/types/components.js";
 import type { ESPHomeComponentCatalog } from "../../../src/components/device/component-catalog.js";
 import {
+  renderBundleCard,
   renderCard,
   shouldHandleCardClick,
 } from "../../../src/components/device/component-catalog/renderers.js";
@@ -22,7 +24,9 @@ function makeHost(): ESPHomeComponentCatalog {
     _imageFailed: new Set<string>(),
     _category: "all",
     board: { name: "Guition Smart Screen" },
+    _localize: localize,
     _onAdd: () => {},
+    _onAddBundle: () => {},
     _onToggleExpand: () => {},
     _onImageError: () => {},
   } as unknown as ESPHomeComponentCatalog;
@@ -38,6 +42,15 @@ function makeEntry(overrides: Partial<ComponentCatalogEntry>): ComponentCatalogE
     image_url: "",
     ...overrides,
   } as ComponentCatalogEntry;
+}
+
+function makeBundle(): FeaturedBundle {
+  return {
+    id: "rgb_buzzer_module",
+    name: "RGB LED + Buzzer Module",
+    description: "The starter kit's RGB + Buzzer module.",
+    component_ids: ["rgb_leds", "buzzer_output"],
+  };
 }
 
 const localize = (key: string, values?: Record<string, string | number>) => {
@@ -95,6 +108,36 @@ describe("renderCard", () => {
     render(renderCard(makeHost(), makeEntry({}), false, false, localize), container);
     expect(container.querySelector(".component-category-chip--recommended")).toBeNull();
     expect(container.querySelector(".component-category-chip")?.textContent).toBe("Bus");
+  });
+});
+
+describe("renderBundleCard", () => {
+  it("marks the bundle with the Recommended chip beside the Bundle badge", () => {
+    const container = document.createElement("div");
+    render(renderBundleCard(makeHost(), makeBundle()), container);
+    const chip = container.querySelector(".component-category-chip--recommended");
+    expect(chip?.textContent?.trim()).toBe("Recommended");
+    // Focusable so keyboard users can raise the tooltip (focus trigger).
+    expect(chip?.getAttribute("tabindex")).toBe("0");
+    const tooltip = container.querySelector("wa-tooltip");
+    expect(tooltip?.getAttribute("for")).toBe(chip?.id);
+    expect(tooltip?.textContent?.trim()).toBe(
+      "Pre-configured for the Guition Smart Screen"
+    );
+    expect(container.querySelector(".bundle-badge")).not.toBeNull();
+    expect(container.querySelector(".component-card--featured")).not.toBeNull();
+  });
+
+  it("omits the tooltip until the board body has hydrated", () => {
+    const container = document.createElement("div");
+    const host = makeHost();
+    (host as unknown as { board: null }).board = null;
+    render(renderBundleCard(host, makeBundle()), container);
+    const chip = container.querySelector(".component-category-chip--recommended");
+    expect(chip).not.toBeNull();
+    expect(container.querySelector("wa-tooltip")).toBeNull();
+    // No tooltip to raise — the chip must not be a dead tab stop.
+    expect(chip?.getAttribute("tabindex")).toBe("-1");
   });
 });
 

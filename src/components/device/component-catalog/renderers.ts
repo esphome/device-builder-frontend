@@ -17,11 +17,29 @@ export function shouldHandleCardClick(ev: MouseEvent): boolean {
   return !target?.closest("a, button");
 }
 
+// Native title tooltips don't render inside the dialog's top layer
+// (Chromium suppresses them over showModal dialogs), so the
+// recommendation explainer rides a wa-tooltip anchored to the chip.
+// An empty tooltip (board body not yet hydrated) renders the chip
+// alone, rather than naming a placeholder board.
+function renderRecommendedChip(chipId: string, tooltip: string): TemplateResult {
+  return html`<span
+      id=${chipId}
+      class="component-category-chip component-category-chip--recommended"
+      tabindex=${tooltip ? "0" : "-1"}
+      >${categoryChipLabel("featured")}</span
+    >
+    ${tooltip ? html`<wa-tooltip for=${chipId}>${tooltip}</wa-tooltip>` : nothing}`;
+}
+
 export function renderBundleCard(
   host: ESPHomeComponentCatalog,
   bundle: FeaturedBundle
 ): TemplateResult {
   const hasImage = !!bundle.image_url && !host._imageFailed.has(bundle.id);
+  const recommendedTooltip = host.board
+    ? host._localize("device.recommended_chip_tooltip", { board: host.board.name })
+    : "";
   return html`
     <article
       class="component-card component-card--featured"
@@ -47,6 +65,10 @@ export function renderBundleCard(
         }
         <div class="component-card-header-text">
           <h3 class="component-title">${bundle.name}</h3>
+          ${renderRecommendedChip(
+            `recommended-chip-bundle-${bundle.id}`,
+            recommendedTooltip
+          )}
         </div>
         <span class="bundle-badge">
           <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
@@ -95,11 +117,6 @@ export function renderCard(
   // Surfaced only when this card shares a name with another in the same
   // category; the category chip can't tell same-domain platforms apart.
   const platform = showPlatform ? platformLabel(component.id) : "";
-  // Native title tooltips don't render inside the dialog's top layer
-  // (Chromium suppresses them over showModal dialogs), so the
-  // recommendation explainer rides a wa-tooltip anchored to the chip.
-  // Empty until the board body has hydrated — the chip renders without
-  // a tooltip then, rather than naming a placeholder board.
   const recommendedTooltip =
     featured && host.board
       ? localize("device.recommended_chip_tooltip", { board: host.board.name })
@@ -133,19 +150,10 @@ export function renderCard(
           <h3 class="component-title">${component.name}</h3>
           ${
             featured
-              ? html`<span
-                    id=${`recommended-chip-${component.id}`}
-                    class="component-category-chip component-category-chip--recommended"
-                    tabindex=${recommendedTooltip ? "0" : "-1"}
-                    >${categoryChipLabel("featured")}</span
-                  >
-                  ${
-                    recommendedTooltip
-                      ? html`<wa-tooltip for=${`recommended-chip-${component.id}`}
-                          >${recommendedTooltip}</wa-tooltip
-                        >`
-                      : nothing
-                  }`
+              ? renderRecommendedChip(
+                  `recommended-chip-${component.id}`,
+                  recommendedTooltip
+                )
               : nothing
           }
           ${
