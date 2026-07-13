@@ -22,6 +22,26 @@ export function shouldHandleCardClick(ev: MouseEvent): boolean {
 // recommendation explainer rides a wa-tooltip anchored to the chip.
 // An empty tooltip (board body not yet hydrated) renders the chip
 // alone, rather than naming a placeholder board.
+function renderExpandButton(
+  host: ESPHomeComponentCatalog,
+  id: string,
+  expanded: boolean,
+  localize: LocalizeFunc
+): TemplateResult {
+  return html`<button
+    class="expand-button"
+    type="button"
+    aria-pressed=${expanded}
+    title=${localize("wizard.expand_board")}
+    @click=${() => host._onToggleExpand(id)}
+  >
+    <wa-icon
+      library="mdi"
+      name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
+    ></wa-icon>
+  </button>`;
+}
+
 function renderRecommendedChip(chipId: string, tooltip: string): TemplateResult {
   return html`<span
       id=${chipId}
@@ -40,9 +60,17 @@ export function renderBundleCard(
   const recommendedTooltip = host.board
     ? host._localize("device.recommended_chip_tooltip", { board: host.board.name })
     : "";
+  // Bundle ids are board-local tokens (rgb_buzzer_module) that could
+  // collide with a bare core-component id (debug, wifi) in the shared
+  // expanded/overflow namespaces; the prefix keeps them apart.
+  const expandKey = `bundle.${bundle.id}`;
+  const expanded = host._expandedId === expandKey;
+  const expandable = expanded || host._overflowingDescriptions.has(expandKey);
   return html`
     <article
-      class="component-card component-card--featured"
+      class="component-card component-card--featured ${
+        expanded ? "component-card--expanded" : ""
+      }"
       @click=${(ev: MouseEvent) => {
         if (shouldHandleCardClick(ev)) host._onAddBundle(bundle);
       }}
@@ -74,10 +102,20 @@ export function renderBundleCard(
           <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
           ${host._localize("device.featured_bundle_badge")}
         </span>
+        ${
+          expandable
+            ? renderExpandButton(host, expandKey, expanded, host._localize)
+            : nothing
+        }
       </div>
       ${
         bundle.description
-          ? html`<p class="component-description component-description--clamp">
+          ? html`<p
+              class="component-description ${
+                expanded ? "" : "component-description--clamp"
+              }"
+              data-component-id=${expandKey}
+            >
               ${renderMarkdown(bundle.description)}
             </p>`
           : nothing
@@ -174,18 +212,7 @@ export function renderCard(
         </div>
         ${
           expandable
-            ? html`<button
-                class="expand-button"
-                type="button"
-                aria-pressed=${expanded}
-                title=${localize("wizard.expand_board")}
-                @click=${() => host._onToggleExpand(component)}
-              >
-                <wa-icon
-                  library="mdi"
-                  name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
-                ></wa-icon>
-              </button>`
+            ? renderExpandButton(host, component.id, expanded, localize)
             : nothing
         }
       </div>

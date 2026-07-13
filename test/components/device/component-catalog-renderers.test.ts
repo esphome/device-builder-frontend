@@ -23,6 +23,7 @@ function makeHost(): ESPHomeComponentCatalog {
   return {
     _imageFailed: new Set<string>(),
     _overflowingDescriptions: new Set<string>(),
+    _expandedId: null,
     _category: "all",
     board: { name: "Guition Smart Screen" },
     _localize: localize,
@@ -173,6 +174,51 @@ describe("renderBundleCard", () => {
     expect(container.querySelector("wa-tooltip")).toBeNull();
     // No tooltip to raise — the chip must not be a dead tab stop.
     expect(chip?.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("omits the expand button when the description doesn't overflow its clamp", () => {
+    const container = document.createElement("div");
+    render(renderBundleCard(makeHost(), makeBundle()), container);
+    expect(container.querySelector(".expand-button")).toBeNull();
+    // Prefixed key: a board-local bundle id must not collide with a
+    // bare core-component id in the shared overflow namespace.
+    expect(
+      container.querySelector<HTMLElement>(".component-description")?.dataset.componentId
+    ).toBe("bundle.rgb_buzzer_module");
+  });
+
+  it("shows the expand button when the clamped description overflows", () => {
+    const container = document.createElement("div");
+    const host = makeHost();
+    (host._overflowingDescriptions as Set<string>).add("bundle.rgb_buzzer_module");
+    render(renderBundleCard(host, makeBundle()), container);
+    expect(container.querySelector(".expand-button")).not.toBeNull();
+  });
+
+  it("unclamps the description and keeps the collapse button while expanded", () => {
+    const container = document.createElement("div");
+    const host = makeHost();
+    (host as unknown as { _expandedId: string })._expandedId = "bundle.rgb_buzzer_module";
+    render(renderBundleCard(host, makeBundle()), container);
+    expect(container.querySelector(".component-card--expanded")).not.toBeNull();
+    const description = container.querySelector(".component-description");
+    expect(description?.classList.contains("component-description--clamp")).toBe(false);
+    const button = container.querySelector(".expand-button");
+    expect(button?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("toggles expansion under the prefixed bundle key", () => {
+    const container = document.createElement("div");
+    const host = makeHost();
+    const toggled: string[] = [];
+    (host as unknown as { _onToggleExpand: (id: string) => void })._onToggleExpand = (
+      id
+    ) => toggled.push(id);
+    render(renderBundleCard(host, makeBundle()), container);
+    (host._overflowingDescriptions as Set<string>).add("bundle.rgb_buzzer_module");
+    render(renderBundleCard(host, makeBundle()), container);
+    (container.querySelector(".expand-button") as HTMLButtonElement).click();
+    expect(toggled).toEqual(["bundle.rgb_buzzer_module"]);
   });
 });
 

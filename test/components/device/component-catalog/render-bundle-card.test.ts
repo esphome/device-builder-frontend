@@ -13,6 +13,8 @@ import { identityLocalize, renderInto } from "../../../_dom.js";
 function host(failed: string[] = []): unknown {
   return {
     _imageFailed: new Set(failed),
+    _overflowingDescriptions: new Set<string>(),
+    _expandedId: null,
     _onAddBundle: () => {},
     _onImageError: () => {},
     _localize: identityLocalize,
@@ -56,6 +58,8 @@ describe("renderBundleCard image", () => {
     const failedIds: string[] = [];
     const spyHost = {
       _imageFailed: new Set<string>(),
+      _overflowingDescriptions: new Set<string>(),
+      _expandedId: null,
       _onAddBundle: () => {},
       _onImageError: (id: string) => failedIds.push(id),
       _localize: identityLocalize,

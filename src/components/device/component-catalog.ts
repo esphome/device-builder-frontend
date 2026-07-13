@@ -394,8 +394,8 @@ export class ESPHomeComponentCatalog extends LitElement {
     `;
   }
 
-  _onToggleExpand(component: ComponentCatalogEntry) {
-    this._expandedId = this._expandedId === component.id ? null : component.id;
+  _onToggleExpand(id: string) {
+    this._expandedId = this._expandedId === id ? null : id;
   }
 
   // The catalog stays mounted (hidden) inside its dialog: a hidden
