@@ -277,6 +277,9 @@ export class ESPHomeGuidedTour extends LitElement {
 
   private _onDialogShown = (): void => {
     if (this._active && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) {
+      // The dialog's open animation is a transform (no layout-box change), so
+      // the target ResizeObserver never fires; re-measure now that it settled.
+      this._refresh();
       this._bouncePopover();
     }
   };
