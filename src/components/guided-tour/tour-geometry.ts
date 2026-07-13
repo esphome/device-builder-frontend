@@ -60,6 +60,18 @@ export function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(Math.max(lo, hi), value));
 }
 
+/** The bounding box of one or more rects. */
+export function unionRects(rects: Rect[]): Rect {
+  const x = Math.min(...rects.map((r) => r.x));
+  const y = Math.min(...rects.map((r) => r.y));
+  return {
+    x,
+    y,
+    w: Math.max(...rects.map((r) => r.x + r.w)) - x,
+    h: Math.max(...rects.map((r) => r.y + r.h)) - y,
+  };
+}
+
 /** The padded spotlight box around the target rect. */
 export function computeHole(rect: Rect, pad = SPOTLIGHT_PADDING): Box {
   return {

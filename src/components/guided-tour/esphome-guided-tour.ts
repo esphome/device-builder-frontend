@@ -12,7 +12,7 @@ import {
   requestTourReveal,
   type TourAnchorEventDetail,
 } from "./tour-anchor.js";
-import { computeTourFrame, type TourFrame } from "./tour-geometry.js";
+import { computeTourFrame, unionRects, type TourFrame } from "./tour-geometry.js";
 import { clearTourSuggestedName, setTourSuggestedName } from "./tour-session.js";
 import { renderTourSpotlightBackdrop, tourSpotlightStyles } from "./tour-spotlight.js";
 import {
@@ -411,15 +411,31 @@ export class ESPHomeGuidedTour extends LitElement {
     // backdrop swallows scroll, so a target below the fold (or its bubble)
     // would otherwise be unreachable on a small screen.
     if (appearing) this._scrollTargetIntoView(target);
-    const rect = target.getBoundingClientRect();
-    this._frame = computeTourFrame(
-      { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
-      this._step.side,
-      { w: window.innerWidth, h: window.innerHeight }
+    const rects = [target, ...this._highlightEls()].map((el) =>
+      el.getBoundingClientRect()
     );
+    const rect = unionRects(
+      rects.map((r) => ({ x: r.left, y: r.top, w: r.width, h: r.height }))
+    );
+    this._frame = computeTourFrame(rect, this._step.side, {
+      w: window.innerWidth,
+      h: window.innerHeight,
+    });
     if (appearing && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) {
       this._bouncePopover();
     }
+  }
+
+  /** Sized elements from the step's highlight-only anchors. */
+  private _highlightEls(): Element[] {
+    const els: Element[] = [];
+    for (const id of this._step.highlightAnchors ?? []) {
+      const el = this._anchors.get(id);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 || r.height > 0) els.push(el);
+    }
+    return els;
   }
 
   /** Center the target if it isn't already comfortably within the viewport. */

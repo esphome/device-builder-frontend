@@ -6,6 +6,9 @@ export type TourRoute = "dashboard" | "device";
 
 export interface TourStep {
   anchors: string[];
+  /** Extra anchors merged into the spotlight hole (not click targets) so the
+   *  bubble also keeps clear of context the step talks about. */
+  highlightAnchors?: string[];
   route: TourRoute;
   side: TourSide;
   kind: TourStepKind;
@@ -50,6 +53,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     anchors: ["name-finish"],
+    highlightAnchors: ["name-section"],
     route: "dashboard",
     side: "right",
     kind: "action",

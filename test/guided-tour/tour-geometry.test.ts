@@ -6,6 +6,7 @@ import {
   clamp,
   computeHole,
   computeTourFrame,
+  unionRects,
   type Rect,
   type Viewport,
 } from "../../src/components/guided-tour/tour-geometry.js";
@@ -23,6 +24,21 @@ describe("clamp", () => {
 
   it("biases to the low bound when hi < lo (tiny viewport)", () => {
     expect(clamp(50, 16, 4)).toBe(16);
+  });
+});
+
+describe("unionRects", () => {
+  it("returns the bounding box of disjoint rects", () => {
+    expect(
+      unionRects([
+        { x: 10, y: 20, w: 30, h: 40 },
+        { x: 100, y: 5, w: 20, h: 10 },
+      ])
+    ).toEqual({ x: 10, y: 5, w: 110, h: 55 });
+  });
+
+  it("is the identity for a single rect", () => {
+    expect(unionRects([TARGET])).toEqual(TARGET);
   });
 });
 
