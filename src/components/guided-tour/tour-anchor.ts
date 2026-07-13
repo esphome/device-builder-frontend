@@ -9,11 +9,27 @@ import {
 } from "lit/directive.js";
 
 export const TOUR_ANCHOR_EVENT = "esphome-tour-anchor";
+export const TOUR_REVEAL_EVENT = "esphome-tour-reveal";
 
 export interface TourAnchorEventDetail {
   id: string;
   el: Element;
   action: "register" | "unregister";
+}
+
+export interface TourRevealEventDetail {
+  id: string;
+}
+
+/**
+ * Ask the component owning *id* to make that anchor visible (e.g. a pane
+ * hidden by the current editor layout). Fired by the tour when a step's
+ * anchor is registered but has no size; owners may ignore it.
+ */
+export function requestTourReveal(id: string): void {
+  window.dispatchEvent(
+    new CustomEvent<TourRevealEventDetail>(TOUR_REVEAL_EVENT, { detail: { id } })
+  );
 }
 
 function dispatchAnchor(

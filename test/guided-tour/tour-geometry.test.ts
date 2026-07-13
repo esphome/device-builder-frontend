@@ -102,6 +102,19 @@ describe("computeTourFrame bubble placement", () => {
     expect(vp.h - (frame.bubble.bottom ?? 0)).toBeLessThanOrEqual(frame.hole.y);
   });
 
+  it("overlays the bubble on a near-full-screen hole instead of going off screen", () => {
+    // A full-pane target (mobile editor pane): no side both clears the hole
+    // and fits the viewport, so the bubble pins inside the viewport over it.
+    const vp: Viewport = { w: 375, h: 812 };
+    const pane: Rect = { x: 0, y: 72, w: 375, h: 630 };
+    const frame = computeTourFrame(pane, "left", vp);
+    expect(frame.overlay).toBe(true);
+    expect(frame.bubble.top).toBeGreaterThanOrEqual(16);
+    expect((frame.bubble.top ?? 0) + 220).toBeLessThanOrEqual(vp.h);
+    expect(frame.bubble.left).toBeGreaterThanOrEqual(16);
+    expect(frame.bubble.left + frame.bubble.width).toBeLessThanOrEqual(vp.w - 16);
+  });
+
   it("prefers a viewport-fitting side over one that overflows it (mobile, target near top)", () => {
     // A dialog card near the top of a phone screen: "right"/"left" don't fit the
     // narrow width and "top" would overflow above the viewport, so the bubble

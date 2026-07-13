@@ -7,7 +7,11 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { stripBase } from "../../util/base-path.js";
 import { navigate } from "../../util/navigation.js";
-import { TOUR_ANCHOR_EVENT, type TourAnchorEventDetail } from "./tour-anchor.js";
+import {
+  TOUR_ANCHOR_EVENT,
+  requestTourReveal,
+  type TourAnchorEventDetail,
+} from "./tour-anchor.js";
 import { computeTourFrame, type TourFrame } from "./tour-geometry.js";
 import { clearTourSuggestedName, setTourSuggestedName } from "./tour-session.js";
 import { renderTourSpotlightBackdrop, tourSpotlightStyles } from "./tour-spotlight.js";
@@ -37,6 +41,7 @@ export class ESPHomeGuidedTour extends LitElement {
   private _clickTargets: Element[] = [];
   private _resizeObserver?: ResizeObserver;
   private _observedTarget: Element | null = null;
+  private _revealRequested = false;
 
   private _observeTarget(el: Element | null): void {
     if (el === this._observedTarget) return;
@@ -226,6 +231,7 @@ export class ESPHomeGuidedTour extends LitElement {
     this._active = true;
     this._stepIndex = stepIndex;
     this._frame = null;
+    this._revealRequested = false;
     if (this._step.route === "dashboard" && this._onDeviceRoute()) void navigate("/");
     this._scheduleMeasure();
   }
@@ -389,6 +395,13 @@ export class ESPHomeGuidedTour extends LitElement {
         return r.width > 0 || r.height > 0;
       }) ?? null;
     if (!target) {
+      // Anchors registered but zero-sized: the pane is hidden by the current
+      // layout (single-pane mobile, YAML-only desktop). Ask the owner to
+      // reveal it once — the ResizeObserver picks up the resulting resize.
+      if (present.length > 0 && !this._revealRequested) {
+        this._revealRequested = true;
+        requestTourReveal(this._step.anchors[0]);
+      }
       if (this._frame !== null) this._frame = null;
       return;
     }
@@ -435,6 +448,7 @@ export class ESPHomeGuidedTour extends LitElement {
     this._teardownClicks();
     this._stepIndex = index;
     this._frame = null;
+    this._revealRequested = false;
     if (this._step.route === "dashboard" && this._onDeviceRoute()) {
       void navigate("/");
     }
@@ -547,11 +561,15 @@ export class ESPHomeGuidedTour extends LitElement {
         aria-label=${this._localize(step.titleKey)}
         style=${styleMap(bubbleStyle)}
       >
-        <div
-          class="caret"
-          style=${styleMap(this._caretStyle(frame, frame.side))}
-          aria-hidden="true"
-        ></div>
+        ${
+          frame.overlay
+            ? nothing
+            : html`<div
+                class="caret"
+                style=${styleMap(this._caretStyle(frame, frame.side))}
+                aria-hidden="true"
+              ></div>`
+        }
         <div class="step-label">
           ${this._localize("tour.step_counter", {
             current: this._stepIndex + 1,

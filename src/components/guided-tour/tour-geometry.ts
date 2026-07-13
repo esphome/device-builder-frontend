@@ -36,6 +36,9 @@ export interface TourFrame {
   dim: { top: Box; bottom: Box; left: Box; right: Box };
   bubble: Bubble;
   side: Side;
+  /** Bubble overlaps the hole because no side both clears it and fits the
+   *  viewport (near-full-screen target); the caret is meaningless then. */
+  overlay?: boolean;
 }
 
 export const SPOTLIGHT_PADDING = 6;
@@ -161,20 +164,26 @@ export function computeTourFrame(
     candidate,
     bubble: computeBubble(hole, candidate, vp, width),
   }));
-  // Prefer a side that neither covers the hole nor overflows the viewport; then
-  // any side clear of the hole (even if it overflows — the caller scrolls the
-  // target into view for that case); finally the requested side.
+  // Prefer a side that neither covers the hole nor overflows the viewport.
   const clear = candidates.filter(({ bubble }) => !bubbleCoversHole(bubble, vp, hole));
-  const chosen =
-    clear.find(({ bubble }) => bubbleFitsViewport(bubble, vp)) ??
-    clear[0] ??
-    candidates[0];
+  const fitting = clear.find(({ bubble }) => bubbleFitsViewport(bubble, vp));
+  const dim = computeDim(hole, vp);
+  if (fitting) {
+    return { hole, ring, dim, bubble: fitting.bubble, side: fitting.candidate };
+  }
 
-  return {
-    hole,
-    ring,
-    dim: computeDim(hole, vp),
-    bubble: chosen.bubble,
-    side: chosen.candidate,
+  // A near-full-screen hole leaves no side that both clears it and stays on
+  // screen; pin the bubble inside the viewport over the hole instead.
+  const w = width ?? BUBBLE_WIDTH;
+  const overlay: Bubble = {
+    left: clamp(hole.x + (hole.w - w) / 2, EDGE_MARGIN, vp.w - w - EDGE_MARGIN),
+    top: clamp(
+      hole.y + BUBBLE_GAP,
+      EDGE_MARGIN,
+      Math.max(EDGE_MARGIN, vp.h - BUBBLE_HEIGHT_EST - EDGE_MARGIN)
+    ),
+    width: w,
   };
+  const chosen = clear[0] ?? candidates[0];
+  return { hole, ring, dim, bubble: overlay, side: chosen.candidate, overlay: true };
 }
