@@ -50,6 +50,12 @@ import { parseSubstitutions } from "../../../util/substitutions.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import {
+  actionsFocus,
+  createFocusResolver,
+  entryFieldFocus,
+  type YamlPathSegment,
+} from "./automation-focus.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { loadIntervalComponent } from "./load-interval-component.js";
 import { ParseErrorController } from "./parse-error-controller.js";
@@ -107,6 +113,12 @@ export class ESPHomeAutomationEditor extends LitElement {
   addMode = false;
 
   @property() yaml = "";
+
+  /** Document-absolute indexed key path at the YAML cursor; resolved
+   *  against the hydrated tree to scroll/highlight the matching node
+   *  or field. Ignored when it doesn't land inside this automation. */
+  @property({ attribute: false })
+  focusYamlPath?: YamlPathSegment[];
 
   /** Action-list reference — used by the header-positioned Add
    *  button to open the catalog picker dialog that lives inside
@@ -176,6 +188,8 @@ export class ESPHomeAutomationEditor extends LitElement {
   /** Parse ``substitutions:`` from the current YAML once per edit so the
    *  read-only Target field can preview ${...} like the text fields do. */
   private _parseSubstitutions = memoizeOne(parseSubstitutions);
+
+  private _resolveFocus = createFocusResolver();
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
@@ -379,6 +393,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     const activeTrigger = effectiveTriggerId
       ? (triggers.find((t) => t.id === effectiveTriggerId) ?? null)
       : null;
+    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
     return html`
       ${renderAutomationHeader(
         this.location,
@@ -416,6 +431,7 @@ export class ESPHomeAutomationEditor extends LitElement {
               yaml: this.yaml,
               disabled,
               showAdvanced: this._showAdvanced,
+              focusFieldPath: entryFieldFocus(focus),
               onValueChange: this._onTriggerParamsValueChange,
               onAdvancedToggle: this._onAdvancedToggle,
             })}`
@@ -430,6 +446,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         yaml: this.yaml,
         disabled,
         localize: this._localize,
+        focusTarget: actionsFocus(focus),
         onOpenPicker: () => this._actionList?.openPicker(),
         onActionsChange: this._onActionsChange,
       })}

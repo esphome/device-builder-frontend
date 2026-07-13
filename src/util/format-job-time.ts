@@ -1,3 +1,5 @@
+import { formatDuration } from "./relative-time.js";
+
 /**
  * Render an ISO timestamp as a short relative phrase ("2m ago",
  * "in 30s") via Intl.RelativeTimeFormat. Picks the coarsest unit that
@@ -17,6 +19,22 @@ export function formatRelativeTime(iso: string, now: number, locale?: string): s
   if (Math.abs(diffHour) < 24) return rtf.format(diffHour, "hour");
   const diffDay = Math.round(diffHour / 24);
   return rtf.format(diffDay, "day");
+}
+
+/** Parse an ISO timestamp to epoch ms, or null for a nullish/unparseable value. */
+export function parseIsoMs(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * :func:`formatDuration`'s counter variant for a running millisecond
+ * clock — ``45s``, ``4m 32s``, ``1h 05m``. Negative deltas clamp to ``0s``
+ * so a clock skew never prints a leading minus.
+ */
+export function formatElapsed(ms: number, language?: string): string {
+  return formatDuration(ms / 1000, { variant: "counter", language });
 }
 
 /**

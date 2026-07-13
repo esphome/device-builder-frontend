@@ -31,6 +31,18 @@ describe("pathIsAdvanced", () => {
     expect(pathIsAdvanced(entries, ["hide_timestamp"])).toBe(true);
   });
 
+  it("is false for a hidden entry — revealing advanced can't show it", () => {
+    const hidden = {
+      key: "actions",
+      type: ConfigEntryType.NESTED,
+      label: "Actions",
+      advanced: true,
+      hidden: true,
+    } as ConfigEntry;
+    expect(pathIsAdvanced([...entries, hidden], ["actions"])).toBe(false);
+    expect(pathIsAdvanced([...entries, hidden], ["actions", "then"])).toBe(false);
+  });
+
   it("is false for a plain leaf", () => {
     expect(pathIsAdvanced(entries, ["name"])).toBe(false);
   });

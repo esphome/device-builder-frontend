@@ -110,7 +110,11 @@ export class ESPHomeDeprecationNotice extends LitElement {
       // A schema-gated deprecated key that doesn't apply to the current
       // values (wrong `type`) is a different problem than a migration.
       const entry = this.entries.find((e) => e.key === option.key);
-      if (entry && !isEntryVisible(entry, this.values)) continue;
+      if (
+        entry &&
+        !isEntryVisible(entry, this.values, undefined, undefined, undefined, this.entries)
+      )
+        continue;
       const changes = option.migrate(this.values[option.key]);
       if (changes) out.push({ option, changes });
     }

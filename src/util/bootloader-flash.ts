@@ -10,5 +10,5 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 export const canFlashBootloader = (d: ConfiguredDevice | null | undefined): boolean =>
   !!d &&
   d.ota_partition_access === true &&
-  !!d.deployed_config_hash &&
-  d.deployed_config_hash === d.expected_config_hash;
+  !!d.runtime_state.deployed_config_hash &&
+  d.runtime_state.deployed_config_hash === d.expected_config_hash;

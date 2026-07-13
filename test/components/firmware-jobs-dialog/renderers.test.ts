@@ -7,8 +7,11 @@
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 
-import { JobSource } from "../../../src/api/types/firmware-jobs.js";
-import { renderSourceLine } from "../../../src/components/firmware-jobs-dialog/renderers.js";
+import { JobSource, JobType } from "../../../src/api/types/firmware-jobs.js";
+import {
+  renderGroups,
+  renderSourceLine,
+} from "../../../src/components/firmware-jobs-dialog/renderers.js";
 import { identityLocalize, renderInto } from "../../_dom.js";
 import { makeFirmwareJob } from "../../_make-firmware-job.js";
 
@@ -38,5 +41,33 @@ describe("renderSourceLine", () => {
   it("renders nothing for a plain LOCAL compile", () => {
     const job = makeFirmwareJob({ source: JobSource.LOCAL });
     expect(renderSourceLine(host() as never, job)).toBe(nothing);
+  });
+});
+
+// renderGroups reads _jobDisplayName / _localize / _openJob / _now off the host.
+function groupsHost() {
+  return {
+    _localize: identityLocalize,
+    _jobDisplayName: (job: { configuration: string }) => job.configuration,
+    _openJob: () => {},
+    _now: new Date("2026-01-01T00:01:00Z").getTime(),
+  };
+}
+
+describe("renderJob type label", () => {
+  it("labels a deferred-install compile as the Install its dialog claims to be", () => {
+    const job = makeFirmwareJob({
+      job_type: JobType.COMPILE,
+      is_deferred_install: true,
+    });
+    const el = renderInto(renderGroups(groupsHost() as never, [job], []));
+    expect(el.textContent).toContain("firmware_jobs.type_install");
+    expect(el.textContent).not.toContain("firmware_jobs.type_compile");
+  });
+
+  it("keeps a plain compile labeled Compile", () => {
+    const job = makeFirmwareJob({ job_type: JobType.COMPILE });
+    const el = renderInto(renderGroups(groupsHost() as never, [job], []));
+    expect(el.textContent).toContain("firmware_jobs.type_compile");
   });
 });

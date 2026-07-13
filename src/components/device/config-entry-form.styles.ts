@@ -295,6 +295,15 @@ export const configEntryFormStyles = css`
     cursor: not-allowed;
   }
 
+  /* Stacks a row's input above its substitution hint while the remove
+     button stays beside the input column. */
+  .multi-row .multi-value-cell {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
   .combobox-input {
     font-family: inherit;
     font-size: var(--wa-font-size-s);

@@ -1,4 +1,5 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
+import { isVisible } from "./is-visible.js";
 import { ACCEPTED_UPLOAD_EXTENSIONS } from "./upload-file-types.js";
 
 export interface FileDropControllerOptions {
@@ -124,8 +125,4 @@ export class FileDropController implements ReactiveController {
 function hasFiles(e: DragEvent): boolean {
   if (!e.dataTransfer) return false;
   return e.dataTransfer.types.includes("Files") || e.dataTransfer.files.length > 0;
-}
-
-function isVisible(el: HTMLElement): boolean {
-  return el.isConnected && (el.checkVisibility?.() ?? el.offsetParent !== null);
 }

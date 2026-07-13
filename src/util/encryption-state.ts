@@ -1,9 +1,9 @@
 import { mdiLock, mdiLockAlert, mdiLockClock, mdiLockOpenVariant } from "@mdi/js";
 
-/** Minimal shape needed to derive the encryption state. ``ConfiguredDevice``
- *  satisfies this; the table-row and card components also pass narrowed
- *  versions of the same fields so the helper isn't tied to the full
- *  device record. */
+/** Minimal flat shape needed to derive the encryption state. Each caller
+ *  (drawer, table row, card) adapts its own record — ``ConfiguredDevice``
+ *  nests ``api_encryption_active`` under ``runtime_state``, so no full
+ *  record satisfies this directly. */
 export interface EncryptionInputs {
   api_enabled: boolean;
   api_encrypted: boolean;

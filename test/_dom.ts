@@ -53,6 +53,29 @@ export function renderInto(tpl: unknown): HTMLElement {
 export const identityLocalize = (key: string): string => key;
 
 /**
+ * Click ``target`` and return which of ``names`` fired on ``listenOn``,
+ * in order — the "emits A, not B" assertion is then a single
+ * ``toEqual(["A"])``.
+ */
+export function clickCollect(
+  listenOn: HTMLElement,
+  target: HTMLElement,
+  names: string[]
+): string[] {
+  const fired: string[] = [];
+  const handlers = names.map((name) => {
+    const handler = () => fired.push(name);
+    listenOn.addEventListener(name, handler);
+    return [name, handler] as const;
+  });
+  target.click();
+  for (const [name, handler] of handlers) {
+    listenOn.removeEventListener(name, handler);
+  }
+  return fired;
+}
+
+/**
  * Await the host's update *and* its nested ``<esphome-base-dialog>``'s.
  *
  * The base dialog binds its ``confirmOnEnter`` Enter listener in its own

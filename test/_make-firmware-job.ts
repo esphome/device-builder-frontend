@@ -14,6 +14,8 @@ export function makeFirmwareJob(overrides: Partial<FirmwareJob> = {}): FirmwareJ
     created_at: "2026-01-01T00:00:00Z",
     started_at: null,
     completed_at: null,
+    compile_started_at: null,
+    compile_ended_at: null,
     exit_code: null,
     output: [],
     error: null,

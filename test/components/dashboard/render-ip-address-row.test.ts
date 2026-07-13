@@ -25,7 +25,7 @@ describe("renderIpAddressRow", () => {
   it("falls back to d.ip when ip_addresses is empty (cold scan)", () => {
     const result = renderIpAddressRow(
       _host,
-      _device({ web_port: 80, ip: "10.0.0.5", ip_addresses: [] })
+      _device({ web_port: 80, ip: "10.0.0.5", runtime_state: { ip_addresses: [] } })
     );
     const valueText = findTemplatesByAnchor(result, "address-value-text");
     expect(valueText.flatMap((t) => t.values)).toContain("10.0.0.5");
@@ -35,7 +35,7 @@ describe("renderIpAddressRow", () => {
   it("renders no link when both ip_addresses and d.ip are empty", () => {
     const result = renderIpAddressRow(
       _host,
-      _device({ web_port: 80, ip: "", ip_addresses: [] })
+      _device({ web_port: 80, ip: "", runtime_state: { ip_addresses: [] } })
     );
     expect(findTemplatesByAnchor(result, "<a")).toHaveLength(0);
   });
@@ -43,7 +43,7 @@ describe("renderIpAddressRow", () => {
   it("shows waiting-for-first-signal when no IP is known", () => {
     const result = renderIpAddressRow(
       _host,
-      _device({ web_port: 80, ip: "", ip_addresses: [] })
+      _device({ web_port: 80, ip: "", runtime_state: { ip_addresses: [] } })
     );
     const texts = findTemplatesByAnchor(result, 'class="value').flatMap((t) => t.values);
     expect(texts).toContain("dashboard.drawer_waiting_for_signal");
@@ -52,7 +52,11 @@ describe("renderIpAddressRow", () => {
   it("links the resolved address to its own host", () => {
     const result = renderIpAddressRow(
       _host,
-      _device({ web_port: 8080, ip: "10.0.0.5", ip_addresses: ["192.168.1.9"] })
+      _device({
+        web_port: 8080,
+        ip: "10.0.0.5",
+        runtime_state: { ip_addresses: ["192.168.1.9"] },
+      })
     );
     expect(hrefs(result)).toEqual(["http://192.168.1.9:8080"]);
   });

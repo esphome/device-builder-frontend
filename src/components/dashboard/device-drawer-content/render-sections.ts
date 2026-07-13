@@ -138,7 +138,7 @@ export function renderVersionSection(
   // The deployed version comes only from mDNS; when mDNS is dark it's stale, so
   // treat it as unknown and let the existing empty-deployed path show
   // "waiting for mDNS" instead of a false "out of sync".
-  const deployed = mdnsOnline(d) ? d.deployed_version || "" : "";
+  const deployed = mdnsOnline(d) ? d.runtime_state.deployed_version : "";
   if (!local && !deployed) return nothing;
   const matches = !!local && !!deployed && local === deployed;
   const statusIcon = matches ? "check-circle-outline" : "sync";
@@ -191,7 +191,7 @@ export function renderConfigHashSection(
 ): TemplateResult | typeof nothing {
   const expected = d.expected_config_hash || "";
   // mDNS-sourced; treat as unknown when mDNS is dark (see renderVersionSection).
-  const deployed = mdnsOnline(d) ? d.deployed_config_hash || "" : "";
+  const deployed = mdnsOnline(d) ? d.runtime_state.deployed_config_hash : "";
   if (!expected && !deployed) return nothing;
   const matches = !!expected && !!deployed && expected === deployed;
   const statusIcon = matches ? "check-circle-outline" : "sync";
@@ -269,7 +269,7 @@ export function renderIpAddressRow(
   host: ESPHomeDeviceDrawerContent,
   d: ConfiguredDevice
 ): TemplateResult {
-  const list = d.ip_addresses;
+  const list = d.runtime_state.ip_addresses;
   const label = host._localize("dashboard.drawer_ip_address");
   // ip_addresses isn't persisted across restarts but the primary d.ip is, so
   // fall back to it on a cold scan to keep the IP row and its visit link.

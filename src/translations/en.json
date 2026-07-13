@@ -93,6 +93,8 @@
     "deselect_all": "Deselect all",
     "selected_count": "{count} selected",
     "update_selected": "Update",
+    "compile_selected": "Compile only",
+    "update_more_options_aria": "More update options",
     "delete_selected": "Delete",
     "delete_selected_title": "Delete devices",
     "delete_selected_desc": "Are you sure you want to delete {count, plural, one {# device} other {# devices}}? This will remove their configuration files and cannot be undone.",
@@ -343,6 +345,7 @@
     "status_modified": "Modified",
     "status_update_available": "Update available",
     "status_installing": "Installing…",
+    "status_compiling": "Compiling…",
     "status_renaming": "Renaming…",
     "status_queued_update": "Update queued; installs when the device comes back online",
     "action_clear_queued": "Clear queued update",
@@ -374,7 +377,8 @@
     "labels_bulk_aria": "Labels on {count} selected",
     "archive_selected_aria": "Archive {count} selected",
     "delete_selected_aria": "Delete {count} selected",
-    "update_selected_aria": "Update {count} selected"
+    "update_selected_aria": "Update {count} selected",
+    "compile_selected_aria": "Compile {count} selected without installing"
   },
   "command": {
     "install_title": "Install — {name}",
@@ -402,6 +406,13 @@
     "try_reset_button": "resetting the build environment",
     "validation_failed_suggestion": "Looks like a configuration error. Try {editor_action} to fix the YAML.",
     "try_open_editor_button": "opening this device in the editor",
+    "offload_hint": "Compiling is taking a while. You can send builds to a faster machine on your network to speed this up. {action}.",
+    "offload_hint_action": "Set up a build server",
+    "run_elapsed_title": "Total build time. Click for the compile-only breakdown",
+    "timer_detail_title": "Build time breakdown",
+    "compile_time_label": "Compile time",
+    "total_run_time_label": "Total run time",
+    "timer_offload_hint": "This compile is taking a while. Send builds to a faster machine on your network to speed it up.",
     "validate_success": "Configuration is valid!",
     "validate_failed": "Validation failed.",
     "show_secrets": "Show secrets",
@@ -445,6 +456,7 @@
     "status_verifying": "Verifying chip…",
     "status_compiling": "Compiling firmware…",
     "status_queued": "Waiting for server…",
+    "status_waiting_build": "Waiting for the current build to finish…",
     "status_installing": "Compiling and installing firmware…",
     "status_downloading": "Downloading firmware…",
     "status_flashing": "Flashing firmware to device…",
@@ -679,6 +691,7 @@
     "component_categories": "Categories",
     "component_category_all": "All",
     "component_category_featured": "Recommended",
+    "recommended_chip_tooltip": "Pre-configured for the {board}",
     "search_components_placeholder": "Search components…",
     "no_components_found": "No components found",
     "components_load_error": "Could not load components. Check your connection and try again.",
@@ -776,7 +789,6 @@
     "save": "Save",
     "save_yaml": "Save YAML",
     "validate": "Validate",
-    "validate_yaml": "Validate YAML",
     "validate_disabled_pending": "Save changes first to validate",
     "loading_config_catalog": "Loading configuration catalog…",
     "loading_automation_catalog": "Loading automation catalog…",
@@ -943,6 +955,8 @@
     "back": "Back",
     "hide_navigator": "Hide navigator",
     "show_navigator": "Show navigator",
+    "actions_menu": "Device actions",
+    "show_logs": "Logs",
     "yaml_preview": "YAML preview",
     "yaml_preview_toggle": "Show YAML",
     "diff_view_diff": "Show diff against saved",
@@ -992,6 +1006,7 @@
       "continue": "Continue",
       "finish": "Finish",
       "dismiss": "Maybe later",
+      "recommended": "RECOMMENDED",
       "saving": "Saving…",
       "ack_failed": "Saved your choices, but the wizard couldn't be marked as completed — it may reappear next time.",
       "use_case": {
@@ -999,16 +1014,73 @@
         "intro": "This helps tailor the dashboard to what you need.",
         "devices_title": "Build and manage devices",
         "devices_desc": "Create, configure, and flash ESPHome devices from this dashboard.",
-        "remote_title": "Only for remote compute",
-        "remote_desc": "Use this install purely as a remote build server for other dashboards. Device creation stays hidden."
+        "remote_title": "Remote compute only",
+        "remote_desc": "Use this installation only as a remote build server for other dashboards. Device creation stays hidden."
       },
       "experience": {
-        "title": "Pick your experience",
+        "title": "Choose your experience level",
         "intro": "You can change this any time in Settings.",
         "beginner_title": "New to ESPHome",
-        "beginner_desc": "Keep it simple and guided, the lightest interface.",
+        "beginner_desc": "Start with a simple, guided interface.",
         "expert_title": "Expert",
-        "expert_desc": "Unlock the editor diff, navigator search, and YAML search."
+        "expert_desc": "Unlock the diff viewer, navigator search, and YAML search."
+      }
+    }
+  },
+  "tour": {
+    "step_counter": "Step {current} of {total}",
+    "skip": "Skip tour",
+    "next": "Next",
+    "finish": "Finish",
+    "continue": "Continue",
+    "steps": {
+      "create": {
+        "title": "Create your first device",
+        "body": "Everything starts here. Open the guided setup to add a device.",
+        "hint": "Click “Create device” to continue"
+      },
+      "method": {
+        "title": "Choose how to start",
+        "body": "“Create new project” walks you through a starter kit or any ESP board.",
+        "hint": "Click “Create new project”"
+      },
+      "board": {
+        "title": "Pick a board",
+        "body": "Starter kits come pre-configured and are ideal for your first device. Select the featured kit.",
+        "hint": "Click “Select” on the starter kit"
+      },
+      "name": {
+        "title": "Name it, then finish",
+        "body": "We’ve suggested a name and generated a working config. Finish to open it.",
+        "hint": "Click “Finish setup”"
+      },
+      "navigator": {
+        "title": "Your device navigator",
+        "body": "Browse and edit core configuration, components, and automations. No YAML required."
+      },
+      "central": {
+        "title": "The main editor",
+        "body": "Select a section in the navigator to open it here. Configure your board, components, and automations visually; every change updates the YAML on the right."
+      },
+      "yaml": {
+        "title": "Live YAML, kept in sync",
+        "body": "Everything you do is mirrored here. Try changing fields in the visual editor and watch the YAML update."
+      },
+      "layout": {
+        "title": "Switch your view",
+        "body": "Switch between the visual editor, YAML, or both side by side. Choose whichever view suits your workflow."
+      },
+      "install": {
+        "title": "Install to your board",
+        "body": "Flash firmware to your device over USB or the network. Your edits are saved automatically first — that’s the whole loop: configure and install."
+      },
+      "dashboard": {
+        "title": "Find it on your dashboard",
+        "body": "Your device lives here now. Switch between card and table views as your collection grows."
+      },
+      "done": {
+        "title": "You’re all set",
+        "body": "That’s the full loop: create, configure, and install. Add your next device whenever you like."
       }
     }
   },
@@ -1018,6 +1090,9 @@
     "update_all_started": "{count, plural, one {# device update started} other {# device updates started}}",
     "update_all_none": "No online devices to update",
     "update_all_error": "Failed to start updates",
+    "compile_all_started": "{count, plural, one {# device compilation started} other {# device compilations started}}",
+    "compile_all_none": "No devices selected to compile",
+    "compile_all_error": "Failed to start compilations",
     "update_all_no_compatible_peer_offline": "Paired build servers are offline — wait for one to reconnect, or relax the policy in Settings → Build server.",
     "update_all_no_compatible_peer_version": "No paired build server runs ESPHome {local} — update one, or relax the policy in Settings → Build server.",
     "update_all_no_compatible_peer_mixed": "No compatible build server (you're on {local}) — wait for a reconnect, or relax the policy in Settings → Build server.",
@@ -1031,6 +1106,7 @@
     "settings": "Settings",
     "search": "Search commands",
     "search_shortcut": "Ctrl K",
+    "guided_tour": "Take a tour",
     "archived_devices": "Archived devices",
     "show_ignored_discoveries": "Show ignored discoveries ({count})",
     "hide_ignored_discoveries": "Hide ignored discoveries",
@@ -1106,6 +1182,7 @@
   "update_all_dialog": {
     "title": "Update All",
     "count": "{count, plural, one {# device will be updated} other {# devices will be updated}}",
+    "supersede_note": "{count, plural, one {# device is building now — its build will restart} other {# devices are building now — their builds will restart}}",
     "confirm": "Update"
   },
   "yaml_search": {
@@ -1249,7 +1326,9 @@
     "pair_build_server_row_action": "Pair",
     "pair_build_server_row_aria": "Pair with {name}",
     "paired_build_servers_heading": "Paired build servers",
-    "paired_build_servers_desc": "Build servers this dashboard has paired with for compile jobs. Pending rows are waiting for the receiver's admin to accept.",
+    "paired_build_servers_desc": "Compiling firmware is CPU-heavy and can take a while on a low-power system. Pair a faster machine on your network, another dashboard or {desktop_link}, to cut compile times; flashing still happens here. Pending rows are waiting for the receiver's admin to accept.",
+    "paired_build_servers_desc_desktop": "Pair a faster machine on your network running another Device Builder to cut compile times; flashing still happens here. Pending rows are waiting for the receiver's admin to accept.",
+    "esphome_desktop": "ESPHome Desktop",
     "paired_build_servers_loading": "Loading pairings…",
     "paired_build_servers_empty": "No build servers paired yet.",
     "pairing_status_pending": "Pending",
@@ -1266,7 +1345,7 @@
     "offloader_version_match_policy_exact_required": "Require exact match — fail install if no compatible peer",
     "offloader_version_match_policy_exact_required_desc": "Like \"Require exact version match\", but refuses to fall back to a local build when no server is eligible; the install fails until a compatible server is reachable and version-matched or the policy is relaxed. A briefly-disconnected server surfaces the same failure as a version-mismatched one.",
     "offloader_include_local": "Include this machine in the build pool",
-    "offloader_include_local_desc": "When enabled, this dashboard compiles a build itself whenever every paired build server is busy, so local and remote builds run at the same time. A single build still prefers an idle remote server, so the default of offloading from slow hardware is unchanged.",
+    "offloader_include_local_desc": "When enabled, this dashboard compiles a build itself whenever every paired build server is busy, so local and remote builds run at the same time. A single build still prefers an idle remote server, so the default of offloading a single build is unchanged.",
     "offloader_include_local_loading": "Loading…",
     "build_offload_pairing_connected": "Connected",
     "build_offload_pairing_connecting": "Connecting…",

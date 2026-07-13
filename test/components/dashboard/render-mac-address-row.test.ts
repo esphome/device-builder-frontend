@@ -159,7 +159,7 @@ describe("renderVersionSection deployed row", () => {
     // Version is NOT gated on api_enabled: it can still arrive over the
     // _http._tcp mDNS fallback for MQTT-only devices.
     const result = renderVersionSection(
-      _device({ current_version: "2026.5.2", deployed_version: "" }),
+      _device({ current_version: "2026.5.2", runtime_state: { deployed_version: "" } }),
       _localize
     );
     const texts = valueTexts(result);
@@ -173,7 +173,7 @@ describe("renderConfigHashSection deployed row", () => {
     const result = renderConfigHashSection(
       _device({
         expected_config_hash: "abc123",
-        deployed_config_hash: "",
+        runtime_state: { deployed_config_hash: "" },
         api_enabled: true,
       }),
       _localize
@@ -187,7 +187,7 @@ describe("renderConfigHashSection deployed row", () => {
     const result = renderConfigHashSection(
       _device({
         expected_config_hash: "abc123",
-        deployed_config_hash: "",
+        runtime_state: { deployed_config_hash: "" },
         api_enabled: false,
       }),
       _localize

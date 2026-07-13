@@ -82,6 +82,13 @@ export interface RenderFilterOptions {
    * add-component dialog when no board is selected yet.
    */
   targetPlatform?: string | null;
+  /**
+   * The component-root value map, forwarded to ``isEntryVisible`` so a
+   * nested entry's ``depends_on`` can resolve a top-level field (e.g.
+   * esp32 ``framework.advanced.sram1_as_iram`` gated on ``variant``).
+   * Omit and ``depends_on`` stays sibling-scoped.
+   */
+  rootValues?: Record<string, unknown>;
 }
 
 /** The form-level inputs to ``filterRenderable``. Both the form element
@@ -92,6 +99,35 @@ export interface RenderFilterSource {
   showAdvanced: boolean;
   presentComponents: ReadonlySet<string>;
   board: BoardCatalogEntry | null;
+  /** The component-root value map, forwarded as ``rootValues`` so a nested
+   *  entry's ``depends_on`` can resolve a top-level field. Sourced here (not
+   *  per call site) so every caller — the form, the add-component filter — is
+   *  covered without remembering to pass it. A nested-scope caller whose local
+   *  ``values`` isn't the root passes an explicit ``rootValues`` override. */
+  values?: Record<string, unknown>;
+  /** The YAML section this form renders (``esp32`` / ``wifi`` / ``sensor`` …).
+   *  Used to seed board-implied values only on the platform section. */
+  sectionKey?: string;
+}
+
+/**
+ * Layer the board's implied ``esphome`` fields under *rootValues* when the form
+ * renders its platform section (``esp32`` / ``esp8266`` / ``rp2040``).
+ *
+ * A board fixes its ``variant`` (``esp32-poe-iso`` → ``esp32``) even when the
+ * user never writes ``variant:`` in YAML, so a field gated on it — esp32
+ * ``framework.advanced.sram1_as_iram`` — must resolve its ``depends_on``
+ * against the board. Explicit YAML wins (spread last); other sections and the
+ * boardless variant-only config are untouched.
+ */
+function seedBoardImpliedRootValues(
+  rootValues: Record<string, unknown> | undefined,
+  source: RenderFilterSource
+): Record<string, unknown> | undefined {
+  const esphome = source.board?.esphome;
+  if (!esphome || source.sectionKey !== esphome.platform) return rootValues;
+  if (esphome.variant == null) return rootValues;
+  return { variant: esphome.variant, ...rootValues };
 }
 
 /** Build ``RenderFilterOptions`` from a *source*, with optional overrides
@@ -100,13 +136,18 @@ export function renderFilterOptions(
   source: RenderFilterSource,
   overrides: Partial<RenderFilterOptions> = {}
 ): RenderFilterOptions {
-  return {
+  const opts: RenderFilterOptions = {
     requiredOnly: source.requiredOnly,
     showAdvanced: source.showAdvanced,
     presentComponents: source.presentComponents,
     targetPlatform: source.board?.esphome.platform ?? null,
+    rootValues: source.values,
     ...overrides,
   };
+  // Seed after overrides so an explicit ``rootValues`` (the nested renderer's
+  // ``scopeValues([])``) still inherits the board's variant.
+  opts.rootValues = seedBoardImpliedRootValues(opts.rootValues, source);
+  return opts;
 }
 
 /**
@@ -158,7 +199,16 @@ export function filterRenderable(
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
   for (const entry of entries) {
-    if (!isEntryVisible(entry, values, opts.presentComponents, opts.targetPlatform)) {
+    if (
+      !isEntryVisible(
+        entry,
+        values,
+        opts.presentComponents,
+        opts.targetPlatform,
+        opts.rootValues,
+        entries
+      )
+    ) {
       continue;
     }
     if (entry.advanced && !opts.showAdvanced && !hasMaterialValue(entry, values)) {

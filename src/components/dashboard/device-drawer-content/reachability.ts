@@ -56,7 +56,7 @@ export function renderReachabilitySection(
   // and the reachability snapshot can be stale (no push fires on the
   // mDNS Removed that took it offline), so trust the live device state.
   const mdnsAge = ageOf(r.mdns_last_seen_seconds_ago, anchor, now);
-  const deviceOffline = host.device?.state === DeviceState.OFFLINE;
+  const deviceOffline = host.device?.runtime_state.state === DeviceState.OFFLINE;
   const rows: ReachabilityRowSpec[] = [
     {
       source: "mdns",

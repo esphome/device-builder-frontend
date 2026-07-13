@@ -18,13 +18,19 @@ import { css } from "lit";
  *   @keyframes menu-in  — fade + scale entrance.
  *   .menu-item          — one row: flex, icon gap, padding,
  *                         hover tint.
+ *   .menu-item--link    — anchor reset for items rendered as
+ *                         ``<a>`` (``renderVisitWebUiLink``) so
+ *                         they match the ``<div>`` rows.
+ *   .menu-divider       — 1px separator row between item groups.
  *
  * Consumers drop this fragment into their ``static styles``
  * array BEFORE their local ``css`` block so local rules of equal
  * specificity (min-width, z-index tweaks, an alternative
  * ``@keyframes menu-in``) override the shared ones in cascade
- * order. Item modifiers (--danger, --disabled, --active, icon
- * colouring) stay in the consumer's local styles.
+ * order. State-flavour item modifiers (--danger, --disabled,
+ * --active, icon colouring) stay in the consumer's local styles;
+ * structural resets tied to shared render helpers (--link) live
+ * here.
  */
 export const dropdownMenuStyles = css`
   .backdrop {
@@ -69,5 +75,16 @@ export const dropdownMenuStyles = css`
 
   .menu-item:hover {
     background-color: var(--esphome-tint);
+  }
+
+  .menu-item--link {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .menu-divider {
+    height: 1px;
+    background: var(--wa-color-surface-border);
+    margin: var(--wa-space-2xs) 0;
   }
 `;

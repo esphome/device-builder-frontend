@@ -67,6 +67,11 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _binaries: [] as FirmwareBinary[],
     _downloadedFilename: "",
     _logLines: [] as string[],
+    // Synchronous stand-ins for the dialog's rAF-batched log sink.
+    _enqueueLogLine(line: string) {
+      this._logLines = [...this._logLines, line];
+    },
+    _flushLogLines() {},
     _failedDuringCompile: false,
     _failedDuringValidate: false,
     _jobId: "",
@@ -74,6 +79,8 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
+    _activeJobs: new Map<string, unknown>(),
+    _timer: { noteLine: vi.fn() },
     _localize: identityLocalize,
     _fail: vi.fn(),
   };

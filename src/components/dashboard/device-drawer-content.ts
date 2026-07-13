@@ -163,7 +163,12 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const showModified = showPendingChanges(d);
     const showUpdate = showUpdateAvailable(d);
     // Four-state encryption indicator. "none" = no Native API surface — no badge.
-    const encState = getEncryptionState(d);
+    const encState = getEncryptionState({
+      api_enabled: d.api_enabled,
+      api_encrypted: d.api_encrypted,
+      api_encryption_active: d.runtime_state.api_encryption_active,
+      has_pending_changes: d.has_pending_changes,
+    });
     const apiEnabled = encState !== "none";
     const showAnyBadge = showModified || showUpdate || apiEnabled;
 

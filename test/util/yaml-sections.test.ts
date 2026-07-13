@@ -348,6 +348,28 @@ sensor:
     expect(sectionAtLine(yaml, 7)?.key).toBe("logger");
   });
 
+  it("routes the script/interval block key line to the first item", () => {
+    // The block's own component form is a dead end — every item is
+    // owned by its automation editor.
+    const y = `script:
+  - id: morning_alarm
+    then:
+      - logger.log: hi
+interval:
+  - interval: 5s
+    then:
+      - logger.log: tick
+`;
+    expect(sectionAtLine(y, 1)?.key).toBe("automation:script:morning_alarm");
+    expect(sectionAtLine(y, 5)?.key).toBe("automation:interval:0");
+    // Inside an item stays on that item.
+    expect(sectionAtLine(y, 2)?.key).toBe("automation:script:morning_alarm");
+  });
+
+  it("keeps the block section for an empty script block", () => {
+    expect(sectionAtLine("script:\nlogger:\n", 1)?.key).toBe("script");
+  });
+
   it("hits the parent line of a flat-dict section", () => {
     expect(sectionAtLine(yaml, 2)?.key).toBe("esphome");
   });

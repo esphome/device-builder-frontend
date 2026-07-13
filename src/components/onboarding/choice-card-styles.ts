@@ -36,6 +36,30 @@ export const choiceCardStyles = css`
     background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
   }
 
+  /* Recommended (default) pick: accent border so it stands out before any
+     selection is made; the selected state above still wins visually via
+     its stronger background tint. */
+  .choice-card.recommended {
+    position: relative;
+    border-color: var(--esphome-primary);
+  }
+
+  /* Pill sits on the card's top border, "Most popular"-style. */
+  .choice-badge {
+    position: absolute;
+    top: 0;
+    right: var(--wa-space-m);
+    transform: translateY(-50%);
+    font-size: var(--wa-font-size-2xs);
+    font-weight: var(--wa-font-weight-semibold);
+    letter-spacing: 0.04em;
+    line-height: 1;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--esphome-primary);
+    color: var(--esphome-on-primary);
+  }
+
   .choice-card:focus-visible {
     outline: none;
     box-shadow: var(--esphome-focus-ring);

@@ -53,7 +53,10 @@ const REQUIRED_GROUPS: RequiredGroup[] = [
   { kind: "exactly_one", keys: ["chipset", "bit0_high"] },
 ];
 
-function ctxFor(values: Record<string, unknown>): RenderCtx {
+function ctxFor(
+  values: Record<string, unknown>,
+  entries: ConfigEntry[] = ENTRIES
+): RenderCtx {
   return {
     localize: (key: string, params?: Record<string, unknown>) =>
       params ? `${key}|${params.keys}` : key,
@@ -61,8 +64,9 @@ function ctxFor(values: Record<string, unknown>): RenderCtx {
     getAt: (path: string[]) => values[path[0]],
     board: null,
     presentComponents: new Set<string>(),
+    entries,
     renderEntry: (entry: ConfigEntry) => `<entry:${entry.key}>`,
-  } as unknown as RenderCtx;
+  } satisfies Partial<RenderCtx> as unknown as RenderCtx;
 }
 
 const serialize = (tpl: unknown): string =>
@@ -167,6 +171,7 @@ function statefulCtx(initial: Record<string, unknown>) {
     },
     board: null,
     presentComponents: new Set<string>(),
+    entries: ENTRIES,
     renderEntry: (entry: ConfigEntry) => `<entry:${entry.key}>`,
     getClusterChoice: (id: string) => choice.get(id),
     setClusterChoice: (id: string, alt: string) => choice.set(id, alt),
@@ -174,7 +179,7 @@ function statefulCtx(initial: Record<string, unknown>) {
     setClusterStash: (id: string, key: string, v: unknown) =>
       stash.set(`${id} ${key}`, v),
     clearClusterStash: (id: string, key: string) => stash.delete(`${id} ${key}`),
-  } as unknown as RenderCtx;
+  } satisfies Partial<RenderCtx> as unknown as RenderCtx;
   return { ctx, values, stash, choice };
 }
 
@@ -217,7 +222,10 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
 
   it("boxes both members and warns when only one is set", () => {
     const out = serialize(
-      renderConstraintClusterField(cluster, ctxFor({ client_certificate: "/d.crt" }))
+      renderConstraintClusterField(
+        cluster,
+        ctxFor({ client_certificate: "/d.crt" }, MQTT_ENTRIES)
+      )
     );
     expect(out).toContain("nested-group");
     expect(out).toContain("unsatisfied");
@@ -236,7 +244,10 @@ describe("renderConstraintClusterField (all-or-none box)", () => {
     const out = serialize(
       renderConstraintClusterField(
         cluster,
-        ctxFor({ client_certificate: "/d.crt", client_certificate_key: "/d.key" })
+        ctxFor(
+          { client_certificate: "/d.crt", client_certificate_key: "/d.key" },
+          MQTT_ENTRIES
+        )
       )
     );
     expect(out).not.toContain("unsatisfied");

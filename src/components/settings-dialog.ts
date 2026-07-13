@@ -21,6 +21,7 @@ import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { closeOpenDialogs } from "./base-dialog.js";
 import {
   SETTINGS_DIALOG_BREAKPOINT,
   settingsRowStyles,
@@ -29,7 +30,6 @@ import {
 import { SECTIONS, type Section, type SectionDef } from "./settings-dialog/types.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "./base-dialog.js";
 import "./settings-dialog/appearance-section.js";
 import "./settings-dialog/build-offload-section.js";
 import "./settings-dialog/build-server-section.js";
@@ -82,8 +82,12 @@ export class ESPHomeSettingsDialog extends LitElement {
     fullscreenMobileDialog("esphome-base-dialog", SETTINGS_DIALOG_BREAKPOINT),
   ];
 
-  open() {
-    this._section = "appearance";
+  open(section: Section = "appearance") {
+    // Opening from inside another modal (a terminal's offload link, the
+    // firmware-tasks list): dismiss open siblings or this one can paint
+    // underneath them.
+    closeOpenDialogs(this);
+    this._section = section;
     this._open = true;
   }
 

@@ -6,7 +6,8 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 // those values go stale, so we gate the out-of-sync / update indicators on a
 // live mDNS rather than flagging a false "out of sync". The device reappears
 // as out-of-sync once mDNS hears from it again.
-export const mdnsOnline = (d: ConfiguredDevice): boolean => d.active_source === "mdns";
+export const mdnsOnline = (d: ConfiguredDevice): boolean =>
+  d.runtime_state.active_source === "mdns";
 
 // Whether to SHOW the "modified" (needs-install) and "update available"
 // indicators, gated so a stale mDNS-dark value can't flag a false "out of

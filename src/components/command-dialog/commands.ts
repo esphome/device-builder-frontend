@@ -1,6 +1,7 @@
 import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
+import { effectiveJobType } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
@@ -28,7 +29,7 @@ export function deriveFollowCommandType(
     if (dependent?.job_type === JobType.RENAME) return "rename";
     if (dependent?.job_type === JobType.UPLOAD) return "install";
   }
-  return JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
+  return JOB_TYPE_TO_COMMAND[effectiveJobType(job)] ?? "install";
 }
 
 // An install chain is followed via its COMPILE head, but the flash target
@@ -179,6 +180,13 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
 // Leaves _commandType to the caller (the install chain relies on it).
 function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   host._jobId = job.job_id;
+  // Chaining from the compile head into its dependent flash keeps the timer
+  // on the compile — the build time (clocks + backend stamps) lives there;
+  // the flash tail has neither, so re-pointing would reset the readout
+  // mid-install. Any other (re)prime is a fresh run and takes the new job.
+  if (!host._timerJobId || job.depends_on !== host._timerJobId) {
+    host._timerJobId = job.job_id;
+  }
   host._jobStatus = job.status;
   host._primedSource = {
     source: job.source,
@@ -198,14 +206,20 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       host._enqueueLine(line);
       if (isValidationFailureLine(line)) host._failedDuringValidate = true;
     },
-    onResult: (data) => {
+    onResult: (result) => {
       host._streamId = "";
       host._flushPendingLines();
-      const result = data as unknown as Pick<
-        FirmwareJob,
-        "status" | "exit_code" | "is_deferred_install"
-      >;
       const success = result.status === JobStatus.COMPLETED;
+
+      // Queued is the outcome regardless of which job carried it; check
+      // before chaining into a dependent flash — a converted chain's
+      // upload is already cancelled.
+      if (result.queued_update_armed) {
+        host._state = "success";
+        host._statusMessage = host._localize("dashboard.queued_successfully");
+        host._jobId = "";
+        return;
+      }
 
       // On a successful install/rename COMPILE, follow the dependent flash —
       // the install's UPLOAD or the rename's flash-and-swap tail — so success
@@ -230,14 +244,6 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
           // so the remote-builder sub-line doesn't linger on the compile's
           // receiver.
           primeAndFollow(host, flash);
-          return;
-        }
-        // A deferred install compiles now and flashes when the device wakes,
-        // so no dependent flash exists — queued is the success state.
-        if (result.is_deferred_install) {
-          host._state = "success";
-          host._statusMessage = host._localize("dashboard.queued_successfully");
-          host._jobId = "";
           return;
         }
         // No flash step — the device was never flashed, so don't report success.
@@ -351,9 +357,12 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
     // Keep _commandType "install": the public followJob would derive "compile"
     // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
     // attempt and reset the run state (the public followJob did this), then
-    // re-attach via primeAndFollow.
+    // re-attach via primeAndFollow. The timer restarts with the fresh compile —
+    // clear its id so primeAndFollow re-points it, and drop the old clocks.
     await detachStream(host);
     resetRunState(host);
+    host._timerJobId = "";
+    host._timer.reset();
     primeAndFollow(host, job);
   } catch (err) {
     host._state = "error";

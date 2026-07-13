@@ -48,6 +48,30 @@ export function platformSupported(
  * without device-wide context — e.g. add-component before insertion
  * with no board picked — should leave them undefined).
  *
+ * `rootValues` is the component-root value map. A nested entry can
+ * depend on a field it isn't a sibling of (e.g. esp32
+ * ``framework.advanced.sram1_as_iram`` gated on the top-level
+ * ``variant``); ``depends_on`` resolves in ``values`` first, then
+ * falls back to ``rootValues``. Omit it and ``depends_on`` stays
+ * sibling-scoped as before.
+ *
+ * Resolution is by key *presence*, not value: a local sibling whose key
+ * exists on ``values`` wins (even if its value is ``undefined``); only a
+ * key absent from ``values`` falls through to ``rootValues``. So a
+ * ``depends_on`` names either a local sibling or a component-root field
+ * — not both. The backend keeps ``depends_on`` targets from colliding
+ * across nesting levels, so an absent local key can't resolve against a
+ * same-named root field it wasn't meant to. (A future explicit
+ * root-vs-sibling scope marker would remove the reliance on name
+ * uniqueness.)
+ *
+ * When the dependency resolves to nothing in either scope, its
+ * ``default_value`` (looked up in `siblings`, the schema list `entry`
+ * belongs to) stands in — YAML omits fields sitting at their default, so
+ * an absent ``spi.type`` still means ``single`` and must keep
+ * ``miso_pin``/``mosi_pin`` visible (#1972). Omit `siblings` and an
+ * unresolved dependency hides the entry as before.
+ *
  * Used by both ``filterRenderable`` (deciding what to paint) and
  * ``validateEntries`` (deciding what to validate). Keeping the
  * predicate in one place means a hidden-by-platform field can't be
@@ -58,7 +82,9 @@ export function isEntryVisible(
   entry: ConfigEntry,
   values: Record<string, unknown>,
   presentComponents?: ReadonlySet<string>,
-  targetPlatform?: string | null
+  targetPlatform?: string | null,
+  rootValues?: Record<string, unknown>,
+  siblings?: readonly ConfigEntry[]
 ): boolean {
   if (entry.hidden && !isValuePresent(values[entry.key])) return false;
 
@@ -74,8 +100,13 @@ export function isEntryVisible(
 
   if (!entry.depends_on) return true;
   // The backend sets at most one of the three gate fields, so the
-  // check order below is immaterial.
-  const depValue = values[entry.depends_on];
+  // check order below is immaterial. Resolve the dependency in the
+  // local scope first, then fall back to the component root so a
+  // nested entry can gate on a top-level field.
+  let depValue = Object.prototype.hasOwnProperty.call(values, entry.depends_on)
+    ? values[entry.depends_on]
+    : rootValues?.[entry.depends_on];
+  depValue ??= siblings?.find((s) => s.key === entry.depends_on)?.default_value;
   if (entry.depends_on_value !== null && entry.depends_on_value !== undefined) {
     return depValue === entry.depends_on_value;
   }
@@ -288,8 +319,15 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
   // for fields that opt into custom values (combobox-style entries treat
   // `options` as suggestions, not a fixed set).
   if (entry.options && entry.options.length > 0 && !entry.allow_custom_value) {
+    const rawStr = String(raw);
     const allowed = entry.options.map((o) => o.value);
-    if (!allowed.includes(String(raw))) {
+    // A case-only difference is accepted: esphome's `cv.one_of(..., upper=True)`
+    // normalizes case, so a board-written `esp32` against a catalog `ESP32`
+    // option compiles fine and the form already resolves it case-insensitively.
+    if (
+      !allowed.includes(rawStr) &&
+      nearCanonicalOption(rawStr, entry.options) === null
+    ) {
       return { key: entry.key, code: "validation.invalid_option" };
     }
   }
@@ -312,7 +350,8 @@ export function validateEntries(
     targetPlatform,
     [],
     errors,
-    sectionKey
+    sectionKey,
+    values
   );
   return errors;
 }
@@ -330,12 +369,23 @@ function _validateEntriesRecursive(
   targetPlatform: string | null | undefined,
   pathPrefix: string[],
   errors: Map<string, ValidationError>,
-  sectionKey: string | undefined
+  sectionKey: string | undefined,
+  rootValues: Record<string, unknown>
 ): void {
   for (const entry of entries) {
     // Skip hidden entries and those whose visibility predicates fail —
     // we don't want to require fields the user can't even see.
-    if (!isEntryVisible(entry, values, presentComponents, targetPlatform)) continue;
+    if (
+      !isEntryVisible(
+        entry,
+        values,
+        presentComponents,
+        targetPlatform,
+        rootValues,
+        entries
+      )
+    )
+      continue;
 
     if (entry.type === ConfigEntryType.NESTED) {
       const childSchema = entry.config_entries ?? [];
@@ -374,7 +424,8 @@ function _validateEntriesRecursive(
             targetPlatform,
             [...pathPrefix, entry.key, String(idx)],
             errors,
-            sectionKey
+            sectionKey,
+            rootValues
           );
         });
         continue;
@@ -398,7 +449,8 @@ function _validateEntriesRecursive(
         targetPlatform,
         [...pathPrefix, entry.key],
         errors,
-        sectionKey
+        sectionKey,
+        rootValues
       );
       continue;
     }

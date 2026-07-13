@@ -49,12 +49,12 @@ function makeHost(
 ): { host: ESPHomePageDashboard; openConfirm: ReturnType<typeof vi.fn> } {
   const openConfirm = vi.fn();
   const host = makeDashboardHost({
-    _actionDevice: {
+    _actionDevice: makeConfiguredDevice({
       name: "rename_test",
       friendly_name: "Rename_Test",
       configuration: "rename_test.yaml",
-      state,
-    } as ConfiguredDevice,
+      runtime_state: { state },
+    }),
     _api: { renameDevice } as unknown as ESPHomeAPI,
     _localize: localize,
     _openConfirm: openConfirm,

@@ -14,7 +14,7 @@
  * care about a particular value pass it via *overrides*; the rest
  * fall through.
  */
-import type { ConfiguredDevice } from "../src/api/types/devices.js";
+import type { ConfiguredDevice, DeviceRuntimeState } from "../src/api/types/devices.js";
 import { DeviceState } from "../src/api/types/devices.js";
 
 const _BASE = {
@@ -27,7 +27,6 @@ const _BASE = {
   target_platform: "esp32",
   address: "kitchen.local",
   ip: "",
-  ip_addresses: [],
   mac_address: "",
   ethernet_mac: "",
   bluetooth_mac: "",
@@ -36,28 +35,45 @@ const _BASE = {
   web_port: null,
   logger_baud_rate: null,
   current_version: "",
-  deployed_version: "",
   loaded_integrations: [],
-  state: DeviceState.UNKNOWN,
-  // Default to a live mDNS source so the happy-path fixture shows its
-  // out-of-sync / update indicators as before; tests covering the mDNS-dark
-  // "hide indicators" behaviour override this to "ping" / "unknown".
-  active_source: "mdns",
+  runtime_state: {
+    state: DeviceState.UNKNOWN,
+    // Default to a live mDNS source so the happy-path fixture shows its
+    // out-of-sync / update indicators as before; tests covering the mDNS-dark
+    // "hide indicators" behaviour override this to "ping" / "unknown".
+    active_source: "mdns",
+    ip_addresses: [],
+    deployed_version: "",
+    deployed_config_hash: "",
+    queued_update: false,
+    api_encryption_active: null,
+  },
   expected_config_hash: "",
-  deployed_config_hash: "",
   has_pending_changes: false,
   update_available: false,
   api_enabled: false,
   api_encrypted: false,
-  api_encryption_active: null,
 } satisfies ConfiguredDevice;
+
+/** Overrides accepted by :func:`makeConfiguredDevice` — flat fields
+ *  plus a partial ``runtime_state`` merged over the baseline's. */
+export type ConfiguredDeviceOverrides = Partial<
+  Omit<ConfiguredDevice, "runtime_state">
+> & {
+  runtime_state?: Partial<DeviceRuntimeState>;
+};
 
 /** Build a ``ConfiguredDevice`` from the shared defaults, with any
  *  fields the test cares about overridden. The return type is the
  *  full ``ConfiguredDevice`` (not ``Partial``) so consumers can
  *  pass the result anywhere a real device object is expected. */
 export function makeConfiguredDevice(
-  overrides: Partial<ConfiguredDevice> = {}
+  overrides: ConfiguredDeviceOverrides = {}
 ): ConfiguredDevice {
-  return { ..._BASE, ...overrides };
+  const { runtime_state, ...flat } = overrides;
+  return {
+    ..._BASE,
+    ...flat,
+    runtime_state: { ..._BASE.runtime_state, ...runtime_state },
+  };
 }

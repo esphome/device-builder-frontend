@@ -7,6 +7,10 @@ export interface EscapeControllerOptions {
    *  swallow the same Escape. Accepts any ``EventTarget`` so tests can
    *  inject a stub. */
   target?: EventTarget;
+  /** Bind in the capture phase so the handler runs ahead of every
+   *  bubble-phase listener — e.g. a popover claiming Escape before its
+   *  hosting dialog sees the keypress. */
+  capture?: boolean;
 }
 
 /**
@@ -29,6 +33,7 @@ export interface EscapeControllerOptions {
 export class EscapeController implements ReactiveController {
   private _bound = false;
   private readonly _target: EventTarget;
+  private readonly _capture: boolean;
 
   constructor(
     host: ReactiveControllerHost,
@@ -36,6 +41,7 @@ export class EscapeController implements ReactiveController {
     options: EscapeControllerOptions = {}
   ) {
     this._target = options.target ?? window;
+    this._capture = options.capture ?? false;
     host.addController(this);
   }
 
@@ -46,9 +52,9 @@ export class EscapeController implements ReactiveController {
   set(active: boolean) {
     if (active === this._bound) return;
     if (active) {
-      this._target.addEventListener("keydown", this._handler);
+      this._target.addEventListener("keydown", this._handler, this._capture);
     } else {
-      this._target.removeEventListener("keydown", this._handler);
+      this._target.removeEventListener("keydown", this._handler, this._capture);
     }
     this._bound = active;
   }

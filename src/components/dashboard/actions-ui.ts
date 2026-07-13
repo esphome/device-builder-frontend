@@ -10,13 +10,8 @@ import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
-import { resolveLogBaudRate } from "../../util/log-baud-rate.js";
+import { launchLogsWithMethod } from "../../util/logs-launch.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
-import {
-  attachSerialLogStream,
-  reconnectWebSerialLogs,
-  requestAndOpenSerialPort,
-} from "../../util/post-install-logs.js";
 
 export async function executeFriendlyName(
   host: ESPHomePageDashboard,
@@ -93,7 +88,7 @@ export async function executeRename(
   // reachable device. Route offline/unknown devices to a confirm before a
   // config-only rename (renames the YAML now; the device keeps its old name
   // until reflashed, which the prompt spells out).
-  if (device.state !== DeviceState.ONLINE) {
+  if (device.runtime_state.state !== DeviceState.ONLINE) {
     host._openConfirm({ kind: "rename-config-only", device, newName });
     return;
   }
@@ -173,57 +168,18 @@ export async function deleteLabel(
   }
 }
 
-export async function openLogsWithMethod(
+export function openLogsWithMethod(
   host: ESPHomePageDashboard,
   device: ConfiguredDevice,
   method: string,
   port?: string
 ): Promise<void> {
-  if (method === "ota") {
-    host._logsDialog.configuration = device.configuration;
-    host._logsDialog.name = device.friendly_name || device.name;
-    host._logsDialog.open();
-  } else if (method === "server-serial") {
-    host._logsDialog.configuration = device.configuration;
-    host._logsDialog.name = device.friendly_name || device.name;
-    host._logsDialog.open(port);
-  } else if (method === "web-serial") {
-    if (!("serial" in navigator)) {
-      notifyError(host._localize("dashboard.logs_web_serial_unsupported"));
-      return;
-    }
-    const baudRate = resolveLogBaudRate(device.logger_baud_rate);
-    if (baudRate === null) {
-      // logger: baud_rate: 0 — UART logging is disabled; serial would be silent.
-      notifyError(host._localize("dashboard.logs_serial_disabled"));
-      return;
-    }
-    let serialPort: SerialPort | null;
-    try {
-      serialPort = await requestAndOpenSerialPort(baudRate);
-    } catch {
-      // The user picked a port but it couldn't open (claimed by another tab,
-      // driver error); unlike a picker dismissal this needs feedback.
-      notifyError(host._localize("dashboard.logs_web_serial_open_failed"));
-      return;
-    }
-    if (!serialPort) return; // User dismissed the port picker.
-    host._logsDialog.configuration = device.configuration;
-    host._logsDialog.name = device.friendly_name || device.name;
-    // Reconnect (the dialog's "click Start to reconnect") re-acquires a fresh
-    // port via the picker — the cached handle can be dead after a device reset.
-    host._logsDialog.openPassive({
-      onReconnect: () =>
-        reconnectWebSerialLogs(host._logsDialog, host._localize, baudRate),
-    });
-    // attach toasts the reopen-retry failure itself; cover any other rejection
-    // so it can't escape this fire-and-forget call as an unhandled rejection.
-    try {
-      await attachSerialLogStream(serialPort, host._logsDialog, host._localize, baudRate);
-    } catch {
-      notifyError(host._localize("dashboard.logs_web_serial_open_failed"));
-    }
-  }
+  return launchLogsWithMethod(
+    { api: host._api, logsDialog: host._logsDialog, localize: host._localize },
+    device,
+    method,
+    port
+  );
 }
 
 export function scheduleScrollIntoView(

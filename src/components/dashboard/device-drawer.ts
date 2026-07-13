@@ -18,7 +18,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { updateButtonTitle } from "../../util/update-tooltip.js";
+import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./device-drawer-content.js";
@@ -303,8 +303,9 @@ export class ESPHomeDeviceDrawer extends LitElement {
     const device = this.device;
     if (!device) return nothing;
 
-    const online = device.state === DeviceState.ONLINE;
-    const offline = device.state === DeviceState.OFFLINE;
+    const rt = device.runtime_state;
+    const online = rt.state === DeviceState.ONLINE;
+    const offline = rt.state === DeviceState.OFFLINE;
     const stateClass = online ? "online" : offline ? "offline" : "unknown";
     // Transport-agnostic network icons — wifi/wifi-off implied a
     // wireless link, but plenty of devices on the network are on
@@ -354,7 +355,6 @@ export class ESPHomeDeviceDrawer extends LitElement {
         <div class="footer">
           <button
             class="action action--primary"
-            ?disabled=${this.busy}
             @click=${() => this._emitAction("edit-device")}
           >
             <wa-icon library="mdi" name="pencil"></wa-icon>
@@ -364,26 +364,28 @@ export class ESPHomeDeviceDrawer extends LitElement {
             showUpdateAvailable(device)
               ? html`<button
                   class="action action--accent"
-                  ?disabled=${this.busy}
-                  @click=${() => this._emitAction("update-device")}
-                  title=${updateButtonTitle(
+                  @click=${() =>
+                    this._emitAction(this.busy ? "show-progress" : "update-device")}
+                  title=${updateActionTitle(
                     this._localize,
-                    device.deployed_version,
+                    this.busy,
+                    rt.deployed_version,
                     device.current_version,
                     "dashboard.drawer_update"
                   )}
                 >
                   <wa-icon library="mdi" name="upload"></wa-icon>
-                  ${this._localize("dashboard.drawer_update")}
+                  ${busyActionLabel(this._localize, this.busy, "dashboard.drawer_update")}
                 </button>`
               : showPendingChanges(device)
                 ? html`<button
                     class="action action--accent"
-                    ?disabled=${this.busy}
-                    @click=${() => this._emitAction("install-device")}
+                    @click=${() =>
+                      this._emitAction(this.busy ? "show-progress" : "install-device")}
+                    title=${busyActionLabel(this._localize, this.busy, "dashboard.install")}
                   >
                     <wa-icon library="mdi" name="upload"></wa-icon>
-                    ${this._localize("dashboard.install")}
+                    ${busyActionLabel(this._localize, this.busy, "dashboard.install")}
                   </button>`
                 : nothing
           }

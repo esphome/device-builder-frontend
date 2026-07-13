@@ -26,6 +26,7 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import { triggerParamFormEntries } from "../../../util/trigger-param-form-entries.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
+import type { AutomationFocus } from "./automation-focus.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
 import { renderTargetField } from "./render-target-field.js";
@@ -105,6 +106,7 @@ export function renderTriggerParamsForm(opts: {
   yaml: string;
   disabled: boolean;
   showAdvanced: boolean;
+  focusFieldPath?: string[];
   onValueChange: (e: CustomEvent<{ path: string[]; value: unknown }>) => void;
   onAdvancedToggle: (e: CustomEvent<{ show: boolean }>) => void;
 }) {
@@ -126,6 +128,7 @@ export function renderTriggerParamsForm(opts: {
       .values=${opts.automation.trigger_params}
       .board=${opts.board}
       .yaml=${opts.yaml}
+      .focusFieldPath=${opts.focusFieldPath}
       ?disabled=${opts.disabled}
       advanced-section
       ?show-advanced=${opts.showAdvanced}
@@ -148,6 +151,7 @@ export function renderActionsSection(opts: {
   yaml: string;
   disabled: boolean;
   localize: LocalizeFunc;
+  focusTarget?: AutomationFocus | null;
   onOpenPicker: () => void;
   onActionsChange: (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => void;
 }) {
@@ -171,6 +175,7 @@ export function renderActionsSection(opts: {
       <esphome-automation-action-list
         no-header
         hide-add
+        .focusTarget=${opts.focusTarget ?? null}
         .actions=${opts.automation.actions}
         .catalog=${opts.catalog}
         .conditionCatalog=${opts.conditionCatalog}

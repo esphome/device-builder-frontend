@@ -13,13 +13,25 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import {
+  activeJobsContext,
+  apiContext,
+  buildOffloadPairingsContext,
+  darkModeContext,
+  desktopVersionContext,
+  firmwareJobsContext,
+  localizeContext,
+} from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
+import { LineBatcher } from "../util/line-batcher.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { RunTimerController } from "../util/run-timer-controller.js";
 import type { DetectedChip } from "../util/web-serial.js";
 import {
   downloadSelectedBinary,
@@ -30,12 +42,14 @@ import {
   startDownload,
   startUsbFlash,
   startWebSerialInstall,
+  waitForRunningJob,
 } from "./firmware-install-dialog/install-flow.js";
 import {
   cardState,
   cardStatusDetail,
   cardStatusMessage,
   renderFooter,
+  renderOffloadHintSlot,
   renderResetSuggestion,
   renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
@@ -81,6 +95,27 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     initialDarkMode();
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
+  // Live job snapshot — the compile job's progress gauge is the second
+  // compile-start signal beside the log scanner (covers raw ninja builds).
+  @consume({ context: firmwareJobsContext, subscribe: true })
+  @state()
+  _jobs: Map<string, FirmwareJob> = new Map();
+
+  // Active job per configuration — the download flow waits for a running
+  // build instead of reading artifacts it's rewriting (#1200). Not @state:
+  // read imperatively at download start, never in render.
+  @consume({ context: activeJobsContext, subscribe: true })
+  _activeJobs: Map<string, FirmwareJob> = new Map();
+
+  // Suppress the "set up a build server" hint once a build server is paired.
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  _pairings: Map<string, PairingSummary> | null = null;
+
+  @consume({ context: desktopVersionContext, subscribe: true })
+  @state()
+  _desktopVersion = "";
+
   @state() _open = false;
   @state() _step: InstallStep = "installing";
   @state() _title = "";
@@ -124,6 +159,22 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _device: ConfiguredDevice | null = null;
   _jobId = "";
   _streamId = "";
+
+  // rAF batch buffer for streamed output — coalesce per-line writes into
+  // one render per frame instead of one per line (#1203).
+  private _lineBatch = new LineBatcher((batch) => {
+    this._logLines = [...this._logLines, ...batch];
+  });
+
+  // Build compile clocks — drives the compiling-step elapsed readout + the
+  // offload hint. The step-based runEnded backstop freezes the span when the
+  // flow leaves compiling without a summary banner.
+  _timer = new RunTimerController(this, {
+    job: () => (this._jobId ? this._jobs.get(this._jobId) : undefined),
+    jobId: () => this._jobId,
+    runEnded: () => this._step !== "compiling" && this._step !== "queued",
+    tick: () => this._open && this._timer.isCompiling,
+  });
 
   // The compiled factory image for the "web-flash" installer, held between the
   // download-ready step and the user clicking "Open USB flasher". Detached
@@ -223,6 +274,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     });
     this._statusMessage = "";
     this._errorMessage = "";
+    this._lineBatch.reset();
     this._logLines = [];
     this._logsExpanded = false;
     this._flashPercent = 0;
@@ -234,6 +286,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._failedDuringValidate = false;
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
+    this._timer.reset();
     this._usbFirmware = null;
     this._usbFirmwareName = "";
     // _detachStream already cleared _jobId / _streamId / _compileReject.
@@ -243,8 +296,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Tear down active follow_job: client-side (drop local handler) and
   // backend-side (stop pushing lines). Settles a pending _compileAndWait so
   // the parent flow doesn't hang. Cancels the underlying job so the backend
-  // stops working for a dismissed dialog.
-  _detachStream() {
+  // stops working for a dismissed dialog, unless ``cancelJob: false`` —
+  // then the job is released to finish in the background queue.
+  _detachStream({ cancelJob = true }: { cancelJob?: boolean } = {}) {
+    // Land any buffered lines before teardown so nothing streamed is lost.
+    this._flushLogLines();
     // Tear down an in-flight USB-flasher hand-off (message listener + timers)
     // too, so closing or reusing the dialog can't leak it or let a stale
     // flasher tab mutate the next install's state. Pure teardown, no _fail.
@@ -262,7 +318,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       reject(new Error("Install dialog dismissed"));
     }
     if (this._jobId) {
-      this._api.firmwareCancel(this._jobId).catch(() => {});
+      if (cancelJob) this._api.firmwareCancel(this._jobId).catch(() => {});
       this._jobId = "";
     }
   }
@@ -276,13 +332,41 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     }
   }
 
+  // Close the dialog and open Settings → Send builds. The install flow ends
+  // (the flash needs this dialog), but the compile itself is released to
+  // finish in the background queue, so its artifacts warm the next install.
+  _tryOpenBuildOffloadSettings = () => {
+    this._detachStream({ cancelJob: false });
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-settings", {
+        detail: { section: "build_offload" },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
   // Drop into red error state. detail is optional — render skips it entirely
   // when empty so a single-string call doesn't paint the same text twice.
   _fail(title: string, detail = "") {
+    // The expanded log must show every line up to the failure, not race the rAF.
+    this._flushLogLines();
     this._step = "error";
     this._statusMessage = title;
     this._errorMessage = detail;
     this._logsExpanded = true;
+  }
+
+  // Buffer a streamed line; flushed on the next animation frame.
+  _enqueueLogLine(line: string): void {
+    this._lineBatch.enqueue(line);
+  }
+
+  // Drain pending lines into ``_logLines`` now — terminal callbacks and
+  // teardown call this so consumers don't race the rAF.
+  _flushLogLines(): void {
+    this._lineBatch.flush();
   }
 
   // Close + navigate to /device/<configuration>. Same payload shape as
@@ -337,10 +421,30 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // build/flash, so a transient error (serial noise, the external flasher's
   // chip-init failing, a closed flasher tab) can be retried in place. Routes by
   // installer since web-flash hands off to the external tab again.
-  _retry = () => {
-    if (!this._device) return;
-    if (this._installer === "web-flash") this.installUsbFlash(this._device);
-    else this.installWebSerial(this._device);
+  _retry = async () => {
+    const device = this._device;
+    if (!device) return;
+    // A foreign build may have started while the error screen sat open;
+    // Retry bypasses the page-level seam guards, so re-running now would
+    // supersede it (#1202). Wait it out like the download flow instead.
+    const running = this._activeJobs.get(device.configuration);
+    if (running) {
+      this._step = "queued";
+      this._errorMessage = "";
+      // Drop the failed run's log and clocks so the wait streams only the
+      // foreign build, not the old failure's lines or elapsed time.
+      this._logLines = [];
+      this._timer.reset();
+      this._statusMessage = this._localize("firmware.status_waiting_build");
+      const settled = await waitForRunningJob(
+        this,
+        running.job_id,
+        "firmware.install_failed"
+      );
+      if (!settled) return;
+    }
+    if (this._installer === "web-flash") this.installUsbFlash(device);
+    else this.installWebSerial(device);
   };
 
   _cancel = async () => {
@@ -396,7 +500,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           .statusDetail=${cardStatusDetail(this)}
           .progress=${this._step === "flashing" ? this._flashPercent : null}
         >
-          ${renderResetSuggestion(this)} ${renderStatusExtra(this)}
+          ${renderResetSuggestion(this)} ${renderOffloadHintSlot(this)}
+          ${renderStatusExtra(this)}
           <div slot="toolbar-right">${renderFooter(this)}</div>
         </esphome-process-terminal>
       </esphome-base-dialog>

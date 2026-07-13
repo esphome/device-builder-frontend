@@ -10,6 +10,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { FileDropController } from "../../util/file-drop-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { ACCEPTED_UPLOAD_EXTENSIONS } from "../../util/upload-file-types.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -168,7 +169,11 @@ export class ESPHomeWizardStepMethod extends LitElement {
 
         <div class="method-layout">
           <div class="option-cards">
-            <button class="option-card" @click=${this._goToBoard}>
+            <button
+              class="option-card"
+              ${tourAnchor("create-method-basic")}
+              @click=${this._goToBoard}
+            >
               <div class="option-card-text">
                 <h3>${this._localize("wizard.create_new")}</h3>
                 <p>${this._localize("wizard.create_new_desc")}</p>

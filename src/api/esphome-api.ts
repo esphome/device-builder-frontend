@@ -54,6 +54,7 @@ import type {
 import type {
   FirmwareBinary,
   FirmwareJob,
+  FirmwareJobResult,
   RemoteBuildSubmitTarget,
 } from "./types/firmware-jobs.js";
 import type {
@@ -143,11 +144,9 @@ type PendingRequest = {
   reject: (error: Error) => void;
 };
 
-type StreamHandler = {
-  onOutput?: (line: string) => void;
-  onResult?: (data: { success: boolean; code: number }) => void;
-  onError?: (error: string) => void;
-};
+// Type-erased bucket for in-flight streams; each command's real result
+// shape is bound at its sendStreamCommand call site.
+type StreamHandler = StreamCallbacks<unknown>;
 
 export class ESPHomeAPI {
   private _ws: WebSocket | null = null;
@@ -356,7 +355,7 @@ export class ESPHomeAPI {
           stream.onOutput?.(evt.data as string);
         } else if (evt.event === "result") {
           this._streamHandlers.delete(messageId);
-          stream.onResult?.(evt.data as { success: boolean; code: number });
+          stream.onResult?.(evt.data);
         }
       }
       return;
@@ -517,10 +516,10 @@ export class ESPHomeAPI {
    * Send a streaming command (compile, upload, logs, etc.).
    * Returns the message_id for cancellation.
    */
-  sendStreamCommand(
+  sendStreamCommand<TResult = { success: boolean; code: number }>(
     command: string,
     args: Record<string, unknown>,
-    callbacks: StreamCallbacks
+    callbacks: StreamCallbacks<TResult>
   ): string {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
       callbacks.onError?.("WebSocket not connected");
@@ -528,7 +527,7 @@ export class ESPHomeAPI {
     }
 
     const messageId = this._nextMessageId();
-    this._streamHandlers.set(messageId, callbacks);
+    this._streamHandlers.set(messageId, callbacks as StreamHandler);
 
     const msg: CommandMessage = { command, message_id: messageId, args };
     this._ws.send(JSON.stringify(msg));
@@ -1175,7 +1174,10 @@ export class ESPHomeAPI {
   }
 
   /** Follow a job's output: historical lines + live stream until completion. */
-  firmwareFollowJob(jobId: string, callbacks: StreamCallbacks): string {
+  firmwareFollowJob(
+    jobId: string,
+    callbacks: StreamCallbacks<FirmwareJobResult>
+  ): string {
     return this.sendStreamCommand("firmware/follow_job", { job_id: jobId }, callbacks);
   }
 

@@ -24,6 +24,8 @@ export interface FormRenderPlan {
   clusters: ConstraintCluster[];
   /** Keys folded into a cluster, dropped from the normal flow. */
   memberKeys: Set<string>;
+  /** Each cluster keyed by its first member's key — the slot it paints at. */
+  clusterByFirstKey: Map<string, ConstraintCluster>;
   /** Plain (non-exclusive, non-cluster) entries that pass the filter. */
   visible: Set<ConfigEntry>;
 }
@@ -36,11 +38,12 @@ export function buildFormRenderPlan(
 ): FormRenderPlan {
   const ordered = orderExclusiveGroups(entries);
   const { clusters, memberKeys } = buildConstraintClusters(entries, requiredGroups);
+  const clusterByFirstKey = new Map(clusters.map((c) => [c.members[0].key, c]));
   const nonExclusive = entries.filter(
     (entry) => !entry.exclusive_group && !memberKeys.has(entry.key)
   );
   const visible = new Set(filterRenderable(nonExclusive, values, opts));
-  return { ordered, clusters, memberKeys, visible };
+  return { ordered, clusters, memberKeys, clusterByFirstKey, visible };
 }
 
 /**

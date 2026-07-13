@@ -40,6 +40,16 @@ function applyEspHomeTokens(): void {
   style.textContent = `
     :root {
       --esphome-svg-filter: none;
+
+      /* WebAwesome's stock tooltip is inverted (text-on-surface colors
+         swapped), which reads as a light bubble on our dark UI. Skin it
+         like the system's other floating surfaces (dropdown menus):
+         raised surface, hairline border, normal text. Mode-aware for
+         free — these tokens are remapped per .wa-light/.wa-dark below. */
+      --wa-tooltip-background-color: var(--wa-color-surface-raised);
+      --wa-tooltip-border-color: var(--wa-color-surface-border);
+      --wa-tooltip-content-color: var(--wa-color-text-normal);
+      --wa-tooltip-font-size: var(--wa-font-size-2xs);
     }
 
     /* Surfaces and text — remap WebAwesome's surface/text tokens to

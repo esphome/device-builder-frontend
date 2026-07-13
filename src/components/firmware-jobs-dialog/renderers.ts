@@ -6,6 +6,7 @@ import {
   JobType,
 } from "../../api/types/firmware-jobs.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
+import { effectiveJobType } from "../../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
 import type { ESPHomeFirmwareJobsDialog } from "../firmware-jobs-dialog.js";
@@ -62,8 +63,9 @@ export function renderGroups(
 
 function renderJob(host: ESPHomeFirmwareJobsDialog, job: FirmwareJob): TemplateResult {
   const name = host._jobDisplayName(job);
-  const typeIcon = TYPE_ICONS[job.job_type] ?? "hammer-wrench";
-  const typeLabel = host._localize(`firmware_jobs.type_${job.job_type}`);
+  const effectiveType = effectiveJobType(job);
+  const typeIcon = TYPE_ICONS[effectiveType] ?? "hammer-wrench";
+  const typeLabel = host._localize(`firmware_jobs.type_${effectiveType}`);
   const showProgress =
     job.status === JobStatus.RUNNING && typeof job.progress === "number";
   const terminal = isTerminal(job);

@@ -52,6 +52,15 @@ import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import {
+  actionsFocus,
+  type AutomationFocus,
+  createFocusResolver,
+  entryFieldFocus,
+  focusKey,
+  paramFocus,
+  type YamlPathSegment,
+} from "./automation-focus.js";
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
@@ -102,11 +111,32 @@ export class ESPHomeScriptEditor extends LitElement {
 
   @property() yaml = "";
 
+  /** Indexed key path at the YAML cursor; resolved against the
+   *  hydrated tree to scroll/highlight the matching node or field. */
+  @property({ attribute: false })
+  focusYamlPath?: YamlPathSegment[];
+
   /** Action-list reference — used by the header-positioned Add
    *  button to open the catalog picker dialog that lives inside
    *  the action-list component. */
   @query("esphome-automation-action-list")
   private _actionList?: ESPHomeAutomationActionList;
+
+  private _resolveFocus = createFocusResolver();
+
+  /** ``focusKey`` already advanced-revealed — one-shot per target so a
+   *  later deliberate collapse sticks. */
+  private _paramsRevealKey?: string;
+
+  /** The Parameters block hides behind the advanced toggle; reveal it
+   *  when the cursor targets a parameter so the row can render. */
+  protected willUpdate(): void {
+    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
+    const key = focusKey(focus);
+    if (key === this._paramsRevealKey) return;
+    this._paramsRevealKey = key;
+    if (paramFocus(focus, "parameters") !== null) this._showAdvanced = true;
+  }
 
   @state() private _available: AvailableAutomations | null = null;
   @state() private _loading = true;
@@ -288,9 +318,14 @@ export class ESPHomeScriptEditor extends LitElement {
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
+    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
     return html`
-      ${this._renderHeader()} ${this._renderConfigForm(automation, disabled)}
-      ${this._showAdvanced ? this._renderParametersField(automation, disabled) : nothing}
+      ${this._renderHeader()} ${this._renderConfigForm(automation, disabled, focus)}
+      ${
+        this._showAdvanced
+          ? this._renderParametersField(automation, disabled, focus)
+          : nothing
+      }
       <div class="field">
         <div class="ae-actions-header">
           <label class="field-label">
@@ -312,6 +347,7 @@ export class ESPHomeScriptEditor extends LitElement {
         <esphome-automation-action-list
           no-header
           hide-add
+          .focusTarget=${actionsFocus(focus)}
           .actions=${automation.actions}
           .catalog=${actions}
           .conditionCatalog=${conditions}
@@ -388,7 +424,11 @@ export class ESPHomeScriptEditor extends LitElement {
    * and ``then`` is the actions block, rendered by the action-list
    * below the form.
    */
-  private _renderConfigForm(automation: AutomationTree, disabled: boolean) {
+  private _renderConfigForm(
+    automation: AutomationTree,
+    disabled: boolean,
+    focus: AutomationFocus | null
+  ) {
     const comp = this._scriptComponent;
     if (!comp) return nothing;
     const entries = comp.config_entries.filter(
@@ -405,6 +445,9 @@ export class ESPHomeScriptEditor extends LitElement {
         .values=${automation.trigger_params}
         .board=${this.board}
         .yaml=${this.yaml}
+        .focusFieldPath=${
+          paramFocus(focus, "parameters") === null ? entryFieldFocus(focus) : undefined
+        }
         ?disabled=${disabled}
         advanced-section
         ?force-advanced-control=${hasParameters}
@@ -469,10 +512,15 @@ export class ESPHomeScriptEditor extends LitElement {
    * lives in the shared ``<esphome-callable-params-editor>``; we
    * just wire the wire-shape in and out of it here.
    */
-  private _renderParametersField(automation: AutomationTree, disabled: boolean) {
+  private _renderParametersField(
+    automation: AutomationTree,
+    disabled: boolean,
+    focus: AutomationFocus | null
+  ) {
     const value = (automation.trigger_params.parameters ?? {}) as Record<string, string>;
     return html`<esphome-callable-params-editor
       .value=${value}
+      .focusParam=${paramFocus(focus, "parameters")}
       ?disabled=${disabled}
       .fieldLabel=${this._localize("device.automation_script_parameters")}
       .description=${this._localize("device.script_parameters_description")}

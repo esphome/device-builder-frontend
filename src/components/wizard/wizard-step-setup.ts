@@ -11,6 +11,11 @@ import { boardImageUrl } from "../../util/board-image.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { boardOffersFullSetup } from "../../util/full-setup.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../../util/secrets-cache.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
+import {
+  clearTourSuggestedName,
+  getTourSuggestedName,
+} from "../guided-tour/tour-session.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
 
@@ -90,6 +95,12 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
+
+    if (!this._deviceName) {
+      const suggested = getTourSuggestedName();
+      if (suggested) this._deviceName = suggested;
+    }
+    clearTourSuggestedName();
     // Already configured ⇒ skip the Wi-Fi stage and reuse !secret. Read via the
     // shared, secrets-saved-refreshed key cache (caches [] on failure).
     this._wifiConfigured = hasSharedWifiSecret(await fetchSecretKeys(this._api));
@@ -322,6 +333,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           <button
             class="btn btn-primary"
             type="button"
+            ${tourAnchor("name-finish")}
             ?disabled=${!this._canAdvance() || this.submitting}
             aria-busy=${this.submitting || nothing}
             @click=${this._onNext}
@@ -348,7 +360,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           </p>
         </div>
 
-        <div class="field">
+        <div class="field" ${tourAnchor("name-field")}>
           <label for="device-name">${this._localize("wizard.device_name")}</label>
           <input
             id="device-name"

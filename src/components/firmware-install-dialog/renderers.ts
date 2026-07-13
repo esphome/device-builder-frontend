@@ -1,8 +1,14 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
 import { FLASHER_HOST } from "../../common/docs.js";
+import { activeLocale } from "../../common/localize.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
+import { formatElapsed } from "../../util/format-job-time.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
+import {
+  renderOffloadHint,
+  shouldShowOffloadHint,
+} from "../process-terminal/offload-hint.js";
 import type { ProcessTerminalState } from "../process-terminal/process-terminal.js";
 import {
   renderBuildFailureSuggestion,
@@ -149,7 +155,27 @@ export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
         : "firmware.flashing_keep_visible"
     );
   }
+  // Once compilation begins, surface the elapsed so a slow build reads as slow.
+  if (host._step === "compiling" && host._timer.compileElapsedMs !== null) {
+    return formatElapsed(host._timer.compileElapsedMs, activeLocale());
+  }
   return "";
+}
+
+// Nudge a slow local compile toward "send builds to a faster machine". Same
+// gate as the command-dialog: compile elapsed past the threshold, suppressed
+// for remote builds and when offloading is already set up.
+export function renderOffloadHintSlot(
+  host: ESPHomeFirmwareInstallDialog
+): TemplateResult | typeof nothing {
+  if (!host._timer.isCompiling) return nothing;
+  const visible = shouldShowOffloadHint({
+    elapsedMs: host._timer.compileElapsedMs ?? 0,
+    source: host._jobSource,
+    pairings: host._pairings,
+    desktop: Boolean(host._desktopVersion),
+  });
+  return visible ? renderOffloadHint(host) : nothing;
 }
 
 // ── status-extra slot ────────────────────────────────────────────────
@@ -211,6 +237,9 @@ export function renderStatusExtra(
 }
 
 function downloadInstallLogs(host: ESPHomeFirmwareInstallDialog): void {
+  // Land the pending rAF batch so a mid-stream download can't drop the
+  // last frame of lines (mirrors command-dialog's _downloadOutput).
+  host._flushLogLines();
   const stem = configurationStem(host._device?.configuration, "install");
   downloadAnsiText(host._logLines, `${stem}-install.txt`);
 }

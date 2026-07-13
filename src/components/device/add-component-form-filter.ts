@@ -17,6 +17,7 @@ import { collectUnsatisfiedConstraints } from "./config-entry-renderers/constrai
  * lockstep with the form's own paint.
  */
 function addFormFilterOptions(
+  values: Record<string, unknown>,
   board: BoardCatalogEntry | null,
   presentComponents: ReadonlySet<string>
 ): RenderFilterOptions {
@@ -25,6 +26,7 @@ function addFormFilterOptions(
     showAdvanced: false,
     presentComponents,
     board,
+    values,
   });
 }
 
@@ -42,7 +44,7 @@ export function addFormRenderablePaths(
   return collectRenderablePaths(
     entries,
     values,
-    addFormFilterOptions(board, presentComponents)
+    addFormFilterOptions(values, board, presentComponents)
   );
 }
 
@@ -62,13 +64,20 @@ export function addFormNeedsUserInput(
   board: BoardCatalogEntry | null,
   presentComponents: ReadonlySet<string>
 ): boolean {
-  const opts = addFormFilterOptions(board, presentComponents);
+  const opts = addFormFilterOptions(values, board, presentComponents);
   const plan = buildFormRenderPlan(entries, values, requiredGroups, opts);
   // Group/cluster members are unfiltered in the plan; gate them on the same
   // visibility the form uses so a hidden unlocked member can't keep the form
   // open when every rendered field is board-locked.
   const isVisible = (entry: ConfigEntry): boolean =>
-    isEntryVisible(entry, values, opts.presentComponents, opts.targetPlatform ?? null);
+    isEntryVisible(
+      entry,
+      values,
+      opts.presentComponents,
+      opts.targetPlatform ?? null,
+      opts.rootValues,
+      entries
+    );
   if (planNeedsUserInput(plan, isVisible)) return true;
   // Pure-cardinality groups with no cluster box surface a banner only when
   // unsatisfied; keys are irrelevant to presence, so format to "".

@@ -38,6 +38,7 @@ import { dialogChromeStyles } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { labelChipStyles, renderLabelChip } from "../../util/label-chip-template.js";
 import { notifyError, notifyInfo, notifySuccess } from "../../util/notify.js";
+import { setsEqual } from "../../util/set-equal.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import "../base-dialog.js";
 import { labelsListStyles } from "./labels-list-styles.js";
@@ -50,12 +51,6 @@ registerMdiIcons({
 });
 
 export type TriState = "checked" | "unchecked" | "indeterminate";
-
-function _setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
-  if (a.size !== b.size) return false;
-  for (const item of a) if (!b.has(item)) return false;
-  return true;
-}
 
 @customElement("esphome-bulk-labels-dialog")
 export class ESPHomeBulkLabelsDialog extends LitElement {
@@ -261,7 +256,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         if (change === "checked") after.add(labelId);
         else after.delete(labelId);
       }
-      if (_setsEqual(before, after)) return [];
+      if (setsEqual(before, after)) return [];
       return [{ configuration: device.configuration, labelIds: [...after] }];
     });
   }

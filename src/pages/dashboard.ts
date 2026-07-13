@@ -96,7 +96,7 @@ import {
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { runBulkUpdate } from "../util/bulk-update.js";
+import { runBulkCompile, runBulkUpdate } from "../util/bulk-update.js";
 import {
   loadDashboardFilters,
   saveDashboardFilters,
@@ -920,6 +920,18 @@ export class ESPHomePageDashboard extends LitElement {
     this._selectMode = false;
     this._selectedDevices = new Set();
     await runBulkUpdate(selected, {
+      api: this._api,
+      localize: this._localize,
+      appVersion: this._appVersion,
+      pairings: this._pairings?.values() ?? [],
+    });
+  };
+
+  _compileSelected = async () => {
+    const selected = [...this._selectedDevices];
+    this._selectMode = false;
+    this._selectedDevices = new Set();
+    await runBulkCompile(selected, {
       api: this._api,
       localize: this._localize,
       appVersion: this._appVersion,

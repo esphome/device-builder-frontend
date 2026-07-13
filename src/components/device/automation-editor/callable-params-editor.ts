@@ -15,7 +15,7 @@
  */
 import { consume } from "@lit/context";
 import { mdiClose, mdiPlus } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
@@ -25,6 +25,8 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { scrollFlashRow } from "../field-highlight.js";
+import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -71,6 +73,11 @@ export class ESPHomeCallableParamsEditor extends LitElement {
   /** Localized text input placeholder for the name column. */
   @property() namePlaceholder = "";
 
+  /** Cursor-targeted parameter name; ``""`` targets the block itself.
+   *  The matching row (or the whole field) scrolls in with the shared
+   *  cursor glow. */
+  @property() focusParam: string | null = null;
+
   /**
    * Working list mirroring ``value`` plus any in-progress unnamed
    * rows. Projected back to the wire map on each change; unnamed
@@ -78,22 +85,36 @@ export class ESPHomeCallableParamsEditor extends LitElement {
    */
   @state() private _params: ParameterDecl[] = [];
 
-  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    automationEditorStyles,
+    fieldHighlightStyles,
+  ];
+
+  /** Row scroll spent on the current target. */
+  private _focusScrolled = false;
+
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has("focusParam")) this._focusScrolled = false;
+  }
 
   protected updated(changed: Map<string, unknown>) {
-    if (!changed.has("value")) return;
-    // Sync from outside (hydrate / parent re-render). Don't disturb
-    // local empty-name rows when the wire matches what we already
-    // have for named entries — the user is mid-edit on an unnamed
-    // row and we shouldn't drop it.
-    const fromWire = this._readFromWire();
-    const localNamed = this._params.filter((p) => p.name);
-    const matches =
-      localNamed.length === fromWire.length &&
-      localNamed.every(
-        (p, i) => p.name === fromWire[i].name && p.type === fromWire[i].type
-      );
-    if (!matches) this._params = fromWire;
+    if (changed.has("value")) {
+      // Sync from outside (hydrate / parent re-render). Don't disturb
+      // local empty-name rows when the wire matches what we already
+      // have for named entries — the user is mid-edit on an unnamed
+      // row and we shouldn't drop it.
+      const fromWire = this._readFromWire();
+      const localNamed = this._params.filter((p) => p.name);
+      const matches =
+        localNamed.length === fromWire.length &&
+        localNamed.every(
+          (p, i) => p.name === fromWire[i].name && p.type === fromWire[i].type
+        );
+      if (!matches) this._params = fromWire;
+    }
+    this._maybeScrollToParam();
   }
 
   protected render() {
@@ -167,6 +188,26 @@ export class ESPHomeCallableParamsEditor extends LitElement {
         <wa-icon library="mdi" name="close"></wa-icon>
       </button>
     </div>`;
+  }
+
+  private _maybeScrollToParam(): void {
+    if (this.focusParam === null || this._focusScrolled) return;
+    if (this.focusParam === "") {
+      // Block-level target — checked first so it can't alias an
+      // in-progress unnamed draft row.
+      this._focusScrolled = true;
+      const block = this.shadowRoot?.querySelector<HTMLElement>(".field");
+      if (block) scrollFlashRow(block);
+      return;
+    }
+    const idx = this._params.findIndex((p) => p.name === this.focusParam);
+    if (idx < 0) return;
+    const row = this.shadowRoot?.querySelectorAll<HTMLElement>(".script-param-row")[idx];
+    // The wire sync above may have just filled ``_params``; the rows
+    // render next pass — hold the shot rather than mis-flash.
+    if (!row) return;
+    this._focusScrolled = true;
+    scrollFlashRow(row);
   }
 
   private _readFromWire(): ParameterDecl[] {

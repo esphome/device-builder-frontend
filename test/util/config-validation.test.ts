@@ -3,6 +3,7 @@ import type { ConfigValueOption } from "../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import {
   getDeviceNameWarning,
+  isEntryVisible,
   nearCanonicalOption,
   platformSupported,
   validateDeviceName,
@@ -61,6 +62,92 @@ describe("getDeviceNameWarning", () => {
   it("returns null for clean hyphenated names", () => {
     expect(getDeviceNameWarning("my-device")).toBeNull();
     expect(getDeviceNameWarning("device42")).toBeNull();
+  });
+});
+
+describe("isEntryVisible depends_on resolution", () => {
+  const gated = makeEntry({
+    key: "sram1_as_iram",
+    depends_on: "variant",
+    depends_on_value_any: ["esp32", "ESP32"],
+  });
+
+  it("resolves depends_on against a sibling in the local scope", () => {
+    expect(isEntryVisible(gated, { variant: "esp32" })).toBe(true);
+    expect(isEntryVisible(gated, { variant: "esp32c2" })).toBe(false);
+  });
+
+  it("falls back to rootValues when the dependency isn't a local sibling", () => {
+    // sram1_as_iram is nested under framework.advanced; `variant` lives at
+    // the component root, so the local (advanced-group) scope lacks it.
+    expect(isEntryVisible(gated, {}, undefined, undefined, { variant: "esp32" })).toBe(
+      true
+    );
+    expect(isEntryVisible(gated, {}, undefined, undefined, { variant: "ESP32" })).toBe(
+      true
+    );
+    expect(isEntryVisible(gated, {}, undefined, undefined, { variant: "esp32c2" })).toBe(
+      false
+    );
+  });
+
+  it("prefers a local sibling over rootValues when both carry the key", () => {
+    expect(
+      isEntryVisible(gated, { variant: "esp32c2" }, undefined, undefined, {
+        variant: "esp32",
+      })
+    ).toBe(false);
+  });
+
+  it("without rootValues, an unresolved cross-scope dependency hides the entry", () => {
+    expect(isEntryVisible(gated, {})).toBe(false);
+  });
+});
+
+describe("isEntryVisible depends_on default fallback", () => {
+  // The spi shape from #1972: `type` defaults to "single" and YAML omits
+  // defaulted fields, so miso_pin/mosi_pin must stay visible with `type` unset.
+  const type = makeEntry({ key: "type", default_value: "single" });
+  const misoPin = makeEntry({
+    key: "miso_pin",
+    depends_on: "type",
+    depends_on_value_any: ["single"],
+  });
+  const dataPins = makeEntry({
+    key: "data_pins",
+    depends_on: "type",
+    depends_on_value_any: ["quad", "octal"],
+  });
+  const siblings = [type, misoPin, dataPins];
+
+  it("an unset dependency reads as its sibling's default_value", () => {
+    expect(isEntryVisible(misoPin, {}, undefined, undefined, undefined, siblings)).toBe(
+      true
+    );
+    expect(isEntryVisible(dataPins, {}, undefined, undefined, undefined, siblings)).toBe(
+      false
+    );
+  });
+
+  it("an explicit value beats the default", () => {
+    const values = { type: "quad" };
+    expect(
+      isEntryVisible(misoPin, values, undefined, undefined, undefined, siblings)
+    ).toBe(false);
+    expect(
+      isEntryVisible(dataPins, values, undefined, undefined, undefined, siblings)
+    ).toBe(true);
+  });
+
+  it("without siblings an unset dependency hides the entry as before", () => {
+    expect(isEntryVisible(misoPin, {})).toBe(false);
+  });
+
+  it("a dependency without a default_value still hides the entry", () => {
+    const noDefault = [makeEntry({ key: "type" }), misoPin];
+    expect(isEntryVisible(misoPin, {}, undefined, undefined, undefined, noDefault)).toBe(
+      false
+    );
   });
 });
 
@@ -277,6 +364,21 @@ describe("validateEntry", () => {
     });
     expect(validateEntry(entry, "3")?.code).toBe("validation.invalid_option");
     expect(validateEntry(entry, "2")).toBeNull();
+  });
+
+  it("accepts a case-only difference against the options (upper=True enums)", () => {
+    // esp32 `variant` options are uppercase (`ESP32`) but boards write `esp32`;
+    // cv.one_of(..., upper=True) accepts it, so it must not hard-fail.
+    const entry = makeEntry({
+      type: ConfigEntryType.SELECT,
+      options: [
+        { label: "ESP32", value: "ESP32" },
+        { label: "ESP32C2", value: "ESP32C2" },
+      ],
+    });
+    expect(validateEntry(entry, "esp32")).toBeNull();
+    expect(validateEntry(entry, "esp32c2")).toBeNull();
+    expect(validateEntry(entry, "esp32xx")?.code).toBe("validation.invalid_option");
   });
 
   it("flags empty array when required", () => {

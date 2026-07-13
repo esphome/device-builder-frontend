@@ -153,4 +153,83 @@ export const commandDialogStyles = css`
     text-decoration-thickness: 2px;
     outline: none;
   }
+
+  /* Compile-elapsed counter, slotted lower-left where the streaming dot
+     sits. Shares the dot's accent + a gentle pulse so the "still working"
+     cue reads the same once download gives way to compilation. Clicking it
+     opens the detail popover below. */
+  .compile-timer-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  .compile-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    margin: -2px -4px;
+    border-radius: 4px;
+    font-family: var(--term-mono-font);
+    font-size: 12px;
+    color: var(--term-accent);
+    cursor: pointer;
+  }
+  .compile-timer:hover,
+  .compile-timer:focus-visible {
+    background: var(--term-bg-alt);
+    outline: none;
+  }
+  .compile-timer wa-icon {
+    font-size: 14px;
+  }
+  .compile-timer-detail {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 2;
+    min-width: 220px;
+    padding: 10px 12px;
+    background: var(--term-bg-alt);
+    border: 1px solid var(--term-border);
+    border-radius: 8px;
+    font-family: var(--term-mono-font);
+    font-size: 12px;
+    color: var(--term-fg);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+  }
+  .compile-timer-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 2px 0;
+  }
+  .compile-timer-row span:first-child {
+    color: var(--term-fg-muted);
+  }
+  .compile-timer-hint {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--term-border);
+    color: var(--term-fg-muted);
+    line-height: 1.5;
+  }
+  .compile-timer--live {
+    animation: compile-timer-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes compile-timer-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .compile-timer--live {
+      animation: none;
+    }
+  }
 `;
