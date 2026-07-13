@@ -23,6 +23,7 @@ export interface TourSkipAffordanceOptions {
 export class TourSkipAffordance implements ReactiveController {
   private _hover = false;
   private _prevCursor: string | null = null;
+  private _listening = false;
 
   constructor(
     private readonly _host: ReactiveControllerHost,
@@ -36,15 +37,26 @@ export class TourSkipAffordance implements ReactiveController {
     return this._hover;
   }
 
-  hostConnected(): void {
-    window.addEventListener("click", this._onCaptureClick, true);
-    window.addEventListener("pointermove", this._onPointerMove);
+  /**
+   * Attach the window listeners only while a dialog-anchored step is
+   * showing — pointermove fires constantly, so they shouldn't idle for
+   * the host's lifetime. Deactivating also clears any lingering hover.
+   */
+  setActive(on: boolean): void {
+    if (on === this._listening) return;
+    this._listening = on;
+    if (on) {
+      window.addEventListener("click", this._onCaptureClick, true);
+      window.addEventListener("pointermove", this._onPointerMove);
+    } else {
+      window.removeEventListener("click", this._onCaptureClick, true);
+      window.removeEventListener("pointermove", this._onPointerMove);
+      this.reset();
+    }
   }
 
   hostDisconnected(): void {
-    window.removeEventListener("click", this._onCaptureClick, true);
-    window.removeEventListener("pointermove", this._onPointerMove);
-    this.reset();
+    this.setActive(false);
   }
 
   /** Clear the hover state and restore the document cursor. */
@@ -76,6 +88,7 @@ export class TourSkipAffordance implements ReactiveController {
     return (
       !!r &&
       r.width > 0 &&
+      r.height > 0 &&
       event.clientX >= r.left &&
       event.clientX <= r.right &&
       event.clientY >= r.top &&

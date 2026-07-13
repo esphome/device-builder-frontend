@@ -153,7 +153,9 @@ export class ESPHomeGuidedTour extends LitElement {
     } else if (this._anchors.get(id) === el) {
       this._anchors.delete(id);
     }
-    if (this._active && this._maybeAutoAdvance()) return;
+    // Anchors register from all over the app; only react while touring.
+    if (!this._active) return;
+    if (this._maybeAutoAdvance()) return;
     this._refresh();
   };
 
@@ -244,7 +246,8 @@ export class ESPHomeGuidedTour extends LitElement {
       // reveal it once — the ResizeObserver picks up the resulting resize.
       if (present.length > 0 && !this._revealRequested) {
         this._revealRequested = true;
-        requestTourReveal(this._step.anchors[0]);
+        const presentId = this._step.anchors.find((a) => this._anchors.has(a));
+        if (presentId) requestTourReveal(presentId);
       }
       if (this._frame !== null) this._frame = null;
       return;
@@ -371,8 +374,11 @@ export class ESPHomeGuidedTour extends LitElement {
   }
 
   protected updated(): void {
+    const onDialogStep =
+      this._active && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a));
+    this._skipAffordance.setActive(onDialogStep);
     if (this._active) {
-      if (!this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) this._showPopover();
+      if (!onDialogStep) this._showPopover();
     } else {
       this._hidePopover();
     }
