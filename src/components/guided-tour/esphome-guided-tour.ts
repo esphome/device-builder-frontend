@@ -7,13 +7,19 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { stripBase } from "../../util/base-path.js";
 import { navigate } from "../../util/navigation.js";
+import { isTypingTarget } from "../../util/typing-target.js";
 import { guidedTourStyles } from "./esphome-guided-tour.styles.js";
 import {
   TOUR_ANCHOR_EVENT,
   requestTourReveal,
   type TourAnchorEventDetail,
 } from "./tour-anchor.js";
-import { computeTourFrame, unionRects, type TourFrame } from "./tour-geometry.js";
+import {
+  computeTourFrame,
+  unionRects,
+  type Rect,
+  type TourFrame,
+} from "./tour-geometry.js";
 import { clearTourSuggestedName, setTourSuggestedName } from "./tour-session.js";
 import { TourSkipAffordance } from "./tour-skip-affordance.js";
 import { renderTourSpotlightBackdrop, tourSpotlightStyles } from "./tour-spotlight.js";
@@ -24,10 +30,6 @@ import {
   type TourStep,
 } from "./tour-steps.js";
 
-// Focus on one of these means the key is already spoken for — typing in an
-// input, caret movement, native button/link activation.
-const KEY_SELF_HANDLING = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"]);
-
 @customElement("esphome-guided-tour")
 export class ESPHomeGuidedTour extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -37,7 +39,6 @@ export class ESPHomeGuidedTour extends LitElement {
   @state() private _active = false;
   @state() private _stepIndex = 0;
   @state() private _frame: TourFrame | null = null;
-  @state() private _skipHover = false;
 
   @query(".tour-popover") private _popover?: HTMLElement;
   @query(".btn-skip") private _skipButton?: HTMLElement;
@@ -55,9 +56,6 @@ export class ESPHomeGuidedTour extends LitElement {
       this._active && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a)),
     skipRect: () => this._skipButton?.getBoundingClientRect(),
     onSkip: () => this._skip(),
-    onHoverChange: (hover) => {
-      this._skipHover = hover;
-    },
   });
 
   private _observeTarget(el: Element | null): void {
@@ -196,10 +194,12 @@ export class ESPHomeGuidedTour extends LitElement {
     if (this._step.kind !== "info") return;
     if (event.key !== "Enter" && event.key !== "ArrowRight") return;
     if (event.isComposing) return;
-    // Don't steal keys from a focused control (mirrors EnterController):
-    // composedPath()[0] is the real focused element across shadow roots.
+    // Don't steal keys from a focused control; composedPath()[0] is the real
+    // focused element across shadow roots. Buttons/links keep Enter for
+    // native activation.
     const el = event.composedPath()[0] as HTMLElement | undefined;
-    if (el && (KEY_SELF_HANDLING.has(el.tagName) || el.isContentEditable)) return;
+    if (isTypingTarget(el)) return;
+    if (el && (el.tagName === "BUTTON" || el.tagName === "A")) return;
     event.preventDefault();
     this._next();
   };
@@ -255,12 +255,11 @@ export class ESPHomeGuidedTour extends LitElement {
     // backdrop swallows scroll, so a target below the fold (or its bubble)
     // would otherwise be unreachable on a small screen.
     if (appearing) this._scrollTargetIntoView(target);
-    const rects = [target, ...this._highlightEls()].map((el) =>
-      el.getBoundingClientRect()
-    );
-    const rect = unionRects(
-      rects.map((r) => ({ x: r.left, y: r.top, w: r.width, h: r.height }))
-    );
+    const tr = target.getBoundingClientRect();
+    const rect = unionRects([
+      { x: tr.left, y: tr.top, w: tr.width, h: tr.height },
+      ...this._highlightRects(),
+    ]);
     this._frame = computeTourFrame(rect, this._step.side, {
       w: window.innerWidth,
       h: window.innerHeight,
@@ -270,16 +269,18 @@ export class ESPHomeGuidedTour extends LitElement {
     }
   }
 
-  /** Sized elements from the step's highlight-only anchors. */
-  private _highlightEls(): Element[] {
-    const els: Element[] = [];
+  /** Viewport rects of the step's sized highlight-only anchors. */
+  private _highlightRects(): Rect[] {
+    const rects: Rect[] = [];
     for (const id of this._step.highlightAnchors ?? []) {
       const el = this._anchors.get(id);
       if (!el) continue;
       const r = el.getBoundingClientRect();
-      if (r.width > 0 || r.height > 0) els.push(el);
+      if (r.width > 0 || r.height > 0) {
+        rects.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+      }
     }
-    return els;
+    return rects;
   }
 
   /** Center the target if it isn't already comfortably within the viewport. */
@@ -330,7 +331,6 @@ export class ESPHomeGuidedTour extends LitElement {
   private _finish(): void {
     this._active = false;
     this._frame = null;
-    this._skipHover = false;
     this._skipAffordance.reset();
     this._teardownClicks();
     this._observeTarget(null);
@@ -448,7 +448,7 @@ export class ESPHomeGuidedTour extends LitElement {
                 <div class="actions action-only">
                   <button
                     type="button"
-                    class="btn btn-skip ${this._skipHover ? "hovered" : ""}"
+                    class="btn btn-skip ${this._skipAffordance.hover ? "hovered" : ""}"
                     @click=${this._skip}
                   >
                     ${this._localize("tour.skip")}

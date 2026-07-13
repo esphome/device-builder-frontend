@@ -16,6 +16,15 @@ const PREF_TO_DEVICE: Record<EditorLayout, DeviceLayoutMode> = {
   [EditorLayout.BOTH]: "both",
 };
 
+/** The pane layout actually painted: mobile collapses the split view to
+ *  the YAML pane. */
+export function effectiveDeviceLayout(
+  layout: DeviceLayoutMode,
+  isMobile: boolean
+): DeviceLayoutMode {
+  return isMobile && layout === "both" ? "right" : layout;
+}
+
 export function deviceLayoutToPref(mode: DeviceLayoutMode): EditorLayout {
   return DEVICE_TO_PREF[mode];
 }

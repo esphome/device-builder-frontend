@@ -196,6 +196,6 @@ export function computeTourFrame(
     ),
     width: w,
   };
-  const chosen = clear[0] ?? candidates[0];
-  return { hole, ring, dim, bubble: overlay, side: chosen.candidate, overlay: true };
+  // `side` is only read for caret placement, which overlay frames skip.
+  return { hole, ring, dim, bubble: overlay, side, overlay: true };
 }

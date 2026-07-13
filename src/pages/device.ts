@@ -47,6 +47,7 @@ import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { isTypingTarget } from "../util/typing-target.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import {
   resolveSectionForUrlLine,
@@ -509,7 +510,7 @@ export class ESPHomePageDevice extends LitElement {
        composedPath()[0] is the actual focused element across shadow
        boundaries; e.target gets retargeted to the host. */
     const target = e.composedPath()[0] as HTMLElement | undefined;
-    if (this._isTextEntry(target)) return;
+    if (isTypingTarget(target)) return;
     if (this._drawerOpen) {
       e.preventDefault();
       this._drawerOpen = false;
@@ -520,22 +521,6 @@ export class ESPHomePageDevice extends LitElement {
     e.preventDefault();
     window.history.back();
   };
-
-  private _isTextEntry(el: HTMLElement | undefined): boolean {
-    if (!el) return false;
-    const tag = el.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-    if (el.isContentEditable) return true;
-    /* The Monaco-style YAML editor renders its caret inside a
-       textarea-like child but the focused element can vary by version.
-       Walk up looking for a recognisable editor host. */
-    let cur: HTMLElement | null = el;
-    while (cur) {
-      if (cur.tagName === "ESPHOME-YAML-EDITOR") return true;
-      cur = cur.parentElement;
-    }
-    return false;
-  }
 
   updated(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("id") && this.id) {

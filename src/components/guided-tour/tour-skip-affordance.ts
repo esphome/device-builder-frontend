@@ -6,7 +6,6 @@ export interface TourSkipAffordanceOptions {
   /** The Skip button's current viewport rect (undefined when not rendered). */
   skipRect: () => DOMRect | undefined;
   onSkip: () => void;
-  onHoverChange: (hover: boolean) => void;
 }
 
 /**
@@ -26,10 +25,15 @@ export class TourSkipAffordance implements ReactiveController {
   private _prevCursor: string | null = null;
 
   constructor(
-    host: ReactiveControllerHost,
+    private readonly _host: ReactiveControllerHost,
     private readonly _options: TourSkipAffordanceOptions
   ) {
-    host.addController(this);
+    _host.addController(this);
+  }
+
+  /** True while the pointer is over the Skip button's rect. */
+  get hover(): boolean {
+    return this._hover;
   }
 
   hostConnected(): void {
@@ -48,7 +52,7 @@ export class TourSkipAffordance implements ReactiveController {
     if (!this._hover) return;
     this._hover = false;
     this._setCursor(false);
-    this._options.onHoverChange(false);
+    this._host.requestUpdate();
   }
 
   private _onCaptureClick = (event: MouseEvent): void => {
@@ -64,7 +68,7 @@ export class TourSkipAffordance implements ReactiveController {
     if (over === this._hover) return;
     this._hover = over;
     this._setCursor(over);
-    this._options.onHoverChange(over);
+    this._host.requestUpdate();
   };
 
   private _hit(event: MouseEvent): boolean {

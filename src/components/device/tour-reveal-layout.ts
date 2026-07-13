@@ -1,3 +1,4 @@
+import { effectiveDeviceLayout } from "../../util/editor-layout.js";
 import type { DeviceLayoutMode } from "./device-editor.js";
 
 /**
@@ -13,7 +14,7 @@ export function layoutRevealingAnchor(
   layout: DeviceLayoutMode,
   isMobile: boolean
 ): DeviceLayoutMode | null {
-  const effective = isMobile && layout === "both" ? "right" : layout;
+  const effective = effectiveDeviceLayout(layout, isMobile);
   if (id === "central" && effective === "right") return isMobile ? "left" : "both";
   if (id === "yaml" && effective === "left") return isMobile ? "right" : "both";
   return null;

@@ -20,6 +20,7 @@ import {
   NO_INSTANCE_ERRORS,
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
+import { effectiveDeviceLayout } from "../../util/editor-layout.js";
 import { notifyError, notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
@@ -268,8 +269,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     // last chose. We deliberately do NOT force "right" when there's
     // no board — a missing board catalog entry shouldn't make the
     // navigator + section editor disappear.
-    const effectiveLayout =
-      this._isMobile && this.layout === "both" ? "right" : this.layout;
+    const effectiveLayout = effectiveDeviceLayout(this.layout, this._isMobile);
     const layoutClass =
       effectiveLayout === "both"
         ? "editor-layout--both"
