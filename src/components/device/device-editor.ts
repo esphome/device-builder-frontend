@@ -326,7 +326,6 @@ export class ESPHomeDeviceEditor extends LitElement {
                  Carries Validate too (Install validates anyway, so the
                  explicit button rarely earned its slot on the bar). -->
             <esphome-device-actions-menu
-              ${tourAnchor("validate")}
               ?busy=${this.busy}
               ?validate-disabled=${this.hasUnsavedEdits}
               .webUiUrl=${this.webUiUrl}

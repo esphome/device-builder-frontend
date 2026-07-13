@@ -102,14 +102,6 @@ export const TOUR_STEPS: readonly TourStep[] = [
     bodyKey: "tour.steps.install.body",
   },
   {
-    anchors: ["validate"],
-    route: "device",
-    side: "top",
-    kind: "info",
-    titleKey: "tour.steps.validate.title",
-    bodyKey: "tour.steps.validate.body",
-  },
-  {
     anchors: ["save"],
     route: "device",
     side: "top",

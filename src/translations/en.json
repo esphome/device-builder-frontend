@@ -1072,10 +1072,6 @@
         "title": "Install to your board",
         "body": "Flash firmware to your device over USB or the network."
       },
-      "validate": {
-        "title": "Validate your configuration",
-        "body": "Open the actions menu to check your configuration for errors before installing."
-      },
       "save": {
         "title": "Save your changes",
         "body": "Save your edits to the configuration file. That’s the whole loop: configure, save, and install."
