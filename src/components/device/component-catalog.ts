@@ -235,6 +235,13 @@ export class ESPHomeComponentCatalog extends LitElement {
     loadMoreFooterStyles,
   ];
 
+  protected firstUpdated() {
+    // A late web-font swap changes wrap heights without a resize or a
+    // render, stranding stale expand buttons; re-measure once fonts
+    // settle. Optional-chained: happy-dom has no document.fonts.
+    document.fonts?.ready.then(() => this._measureDescriptionOverflow());
+  }
+
   protected updated() {
     this._measureDescriptionOverflow();
 
