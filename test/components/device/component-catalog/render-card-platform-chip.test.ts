@@ -12,16 +12,10 @@ import {
 } from "../../../../src/api/types/components.js";
 import { renderCard } from "../../../../src/components/device/component-catalog/renderers.js";
 import { identityLocalize as localize, renderInto } from "../../../_dom.js";
+import { makeCatalogHost } from "./_host.js";
 
 function host(category = "stepper"): unknown {
-  return {
-    _imageFailed: new Set<string>(),
-    _overflowingDescriptions: new Set<string>(),
-    _category: category,
-    _onAdd: () => {},
-    _onToggleExpand: () => {},
-    _onImageError: () => {},
-  };
+  return makeCatalogHost({ _category: category });
 }
 
 function entry(id: string): ComponentCatalogEntry {

@@ -12,6 +12,7 @@ import {
   renderCard,
   shouldHandleCardClick,
 } from "../../../src/components/device/component-catalog/renderers.js";
+import { makeCatalogHost } from "./component-catalog/_host.js";
 
 function clickFrom(target: Element): MouseEvent {
   const ev = new MouseEvent("click", { bubbles: true });
@@ -20,18 +21,10 @@ function clickFrom(target: Element): MouseEvent {
 }
 
 function makeHost(): ESPHomeComponentCatalog {
-  return {
-    _imageFailed: new Set<string>(),
-    _overflowingDescriptions: new Set<string>(),
-    _expandedId: null,
-    _category: "all",
+  return makeCatalogHost({
     board: { name: "Guition Smart Screen" },
     _localize: localize,
-    _onAdd: () => {},
-    _onAddBundle: () => {},
-    _onToggleExpand: () => {},
-    _onImageError: () => {},
-  } as unknown as ESPHomeComponentCatalog;
+  });
 }
 
 function makeEntry(overrides: Partial<ComponentCatalogEntry>): ComponentCatalogEntry {
@@ -132,7 +125,9 @@ describe("renderCard", () => {
     // Once open, the unclamped text no longer measures as overflowing; the
     // card still needs its collapse affordance.
     const container = document.createElement("div");
-    render(renderCard(makeHost(), makeEntry({}), true, false, localize), container);
+    const host = makeHost();
+    host._expandedId = "spi";
+    render(renderCard(host, makeEntry({}), true, false, localize), container);
     const button = container.querySelector(".expand-button");
     expect(button).not.toBeNull();
     expect(button?.getAttribute("aria-pressed")).toBe("true");
@@ -180,8 +175,13 @@ describe("renderBundleCard", () => {
     const container = document.createElement("div");
     render(renderBundleCard(makeHost(), makeBundle()), container);
     expect(container.querySelector(".expand-button")).toBeNull();
-    // Prefixed key: a board-local bundle id must not collide with a
-    // bare core-component id in the shared overflow namespace.
+  });
+
+  it("stamps the prefixed key on the description for overflow measurement", () => {
+    // The prefix keeps the board-local bundle id apart from bare
+    // core-component ids in the shared expanded/overflow namespaces.
+    const container = document.createElement("div");
+    render(renderBundleCard(makeHost(), makeBundle()), container);
     expect(
       container.querySelector<HTMLElement>(".component-description")?.dataset.componentId
     ).toBe("bundle.rgb_buzzer_module");
@@ -198,7 +198,7 @@ describe("renderBundleCard", () => {
   it("unclamps the description and keeps the collapse button while expanded", () => {
     const container = document.createElement("div");
     const host = makeHost();
-    (host as unknown as { _expandedId: string })._expandedId = "bundle.rgb_buzzer_module";
+    host._expandedId = "bundle.rgb_buzzer_module";
     render(renderBundleCard(host, makeBundle()), container);
     expect(container.querySelector(".component-card--expanded")).not.toBeNull();
     const description = container.querySelector(".component-description");
@@ -209,12 +209,9 @@ describe("renderBundleCard", () => {
 
   it("toggles expansion under the prefixed bundle key", () => {
     const container = document.createElement("div");
-    const host = makeHost();
     const toggled: string[] = [];
-    (host as unknown as { _onToggleExpand: (id: string) => void })._onToggleExpand = (
-      id
-    ) => toggled.push(id);
-    render(renderBundleCard(host, makeBundle()), container);
+    const host = makeHost();
+    host._onToggleExpand = (id) => toggled.push(id);
     (host._overflowingDescriptions as Set<string>).add("bundle.rgb_buzzer_module");
     render(renderBundleCard(host, makeBundle()), container);
     (container.querySelector(".expand-button") as HTMLButtonElement).click();

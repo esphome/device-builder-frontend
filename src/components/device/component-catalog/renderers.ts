@@ -22,26 +22,6 @@ export function shouldHandleCardClick(ev: MouseEvent): boolean {
 // recommendation explainer rides a wa-tooltip anchored to the chip.
 // An empty tooltip (board body not yet hydrated) renders the chip
 // alone, rather than naming a placeholder board.
-function renderExpandButton(
-  host: ESPHomeComponentCatalog,
-  id: string,
-  expanded: boolean,
-  localize: LocalizeFunc
-): TemplateResult {
-  return html`<button
-    class="expand-button"
-    type="button"
-    aria-pressed=${expanded}
-    title=${localize("wizard.expand_board")}
-    @click=${() => host._onToggleExpand(id)}
-  >
-    <wa-icon
-      library="mdi"
-      name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
-    ></wa-icon>
-  </button>`;
-}
-
 function renderRecommendedChip(chipId: string, tooltip: string): TemplateResult {
   return html`<span
       id=${chipId}
@@ -50,6 +30,22 @@ function renderRecommendedChip(chipId: string, tooltip: string): TemplateResult 
       >${categoryChipLabel("featured")}</span
     >
     ${tooltip ? html`<wa-tooltip for=${chipId}>${tooltip}</wa-tooltip>` : nothing}`;
+}
+
+function renderExpandButton(host: ESPHomeComponentCatalog, id: string): TemplateResult {
+  const expanded = host._expandedId === id;
+  return html`<button
+    class="expand-button"
+    type="button"
+    aria-pressed=${expanded}
+    title=${host._localize("wizard.expand_board")}
+    @click=${() => host._onToggleExpand(id)}
+  >
+    <wa-icon
+      library="mdi"
+      name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
+    ></wa-icon>
+  </button>`;
 }
 
 export function renderBundleCard(
@@ -102,11 +98,7 @@ export function renderBundleCard(
           <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
           ${host._localize("device.featured_bundle_badge")}
         </span>
-        ${
-          expandable
-            ? renderExpandButton(host, expandKey, expanded, host._localize)
-            : nothing
-        }
+        ${expandable ? renderExpandButton(host, expandKey) : nothing}
       </div>
       ${
         bundle.description
@@ -210,11 +202,7 @@ export function renderCard(
               : nothing
           }
         </div>
-        ${
-          expandable
-            ? renderExpandButton(host, component.id, expanded, localize)
-            : nothing
-        }
+        ${expandable ? renderExpandButton(host, component.id) : nothing}
       </div>
       <p
         class="component-description ${expanded ? "" : "component-description--clamp"}"
