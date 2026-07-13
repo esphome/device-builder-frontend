@@ -335,7 +335,6 @@ export class ESPHomeDeviceEditor extends LitElement {
             <button
               type="button"
               class="save-button"
-              ${tourAnchor("save")}
               ?disabled=${!this.hasUnsavedEdits || this.saving}
               aria-busy=${this.saving}
               @click=${this._onSave}

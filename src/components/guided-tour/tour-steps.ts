@@ -103,14 +103,6 @@ export const TOUR_STEPS: readonly TourStep[] = [
     bodyKey: "tour.steps.install.body",
   },
   {
-    anchors: ["save"],
-    route: "device",
-    side: "top",
-    kind: "info",
-    titleKey: "tour.steps.save.title",
-    bodyKey: "tour.steps.save.body",
-  },
-  {
     anchors: ["view-toggle"],
     route: "dashboard",
     side: "bottom",

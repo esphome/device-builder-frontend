@@ -1070,11 +1070,7 @@
       },
       "install": {
         "title": "Install to your board",
-        "body": "Flash firmware to your device over USB or the network."
-      },
-      "save": {
-        "title": "Save your changes",
-        "body": "Save your edits to the configuration file. That’s the whole loop: configure, save, and install."
+        "body": "Flash firmware to your device over USB or the network. Your edits are saved automatically first — that’s the whole loop: configure and install."
       },
       "dashboard": {
         "title": "Find it on your dashboard",
