@@ -1002,11 +1002,15 @@
     "wizard": {
       "back": "Back",
       "continue": "Continue",
-      "finish": "Finish",
       "dismiss": "Maybe later",
       "recommended": "RECOMMENDED",
+      "start_tour": "Start guided tour",
       "saving": "Saving…",
       "ack_failed": "Saved your choices, but the wizard couldn't be marked as completed — it may reappear next time.",
+      "welcome": {
+        "title": "Welcome to ESPHome Device Builder",
+        "intro": "We’ll help you tailor your ESPHome experience in a few quick steps."
+      },
       "use_case": {
         "title": "How will you use this?",
         "intro": "This helps tailor the dashboard to what you need.",
@@ -1022,6 +1026,12 @@
         "beginner_desc": "Start with a simple, guided interface.",
         "expert_title": "Expert",
         "expert_desc": "Unlock the diff viewer, navigator search, and YAML search."
+      },
+      "tour": {
+        "title": "You’re ready to build",
+        "ready": "Everything is set up and ready to use.",
+        "intro": "Take a guided tour to see how to create, configure, and install your first device.",
+        "later": "You can always start the tour later from the menu in the top-right corner."
       }
     }
   },

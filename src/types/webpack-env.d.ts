@@ -24,3 +24,6 @@ interface ImportMeta {
     }
   ): WebpackModuleContext;
 }
+
+/** Replaced by rspack's DefinePlugin; true only for the dev-server bundle. */
+declare const __DEV__: boolean;

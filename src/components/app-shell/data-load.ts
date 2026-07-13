@@ -25,14 +25,12 @@ export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
     host._onboardingHasUseCase = state.steps.some(
       (s) => s.id === OnboardingStepId.USE_CASE
     );
-    // Only the full first-run wizard (use-case + experience) auto-pops now;
-    // Wi-Fi is collected per-device in the create wizard, never auto-popped.
+    // Only the mandatory setup wizard auto-pops. Wi-Fi is collected when the
+    // first Wi-Fi device needs it, never during onboarding.
     host._onboardingShouldShow =
-      shouldAutoShowOnboarding(state, host._onboardingSessionDismissed) &&
-      !isExperienceChosen(state);
+      shouldAutoShowOnboarding(state) && !isExperienceChosen(state);
   } catch (err) {
-    // Non-critical — leave _onboardingShouldShow alone so a transient reload on
-    // a session-dismissed state can't re-open the wizard.
+    // Non-critical — leave the current visibility decision alone.
     console.warn("Failed to load onboarding state:", err);
   }
   host._onboardingPending = !hasSharedWifiSecret(await keysPromise);

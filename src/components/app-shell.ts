@@ -64,7 +64,6 @@ import {
   themeIsDark,
 } from "../util/dark-mode.js";
 import { isExpert } from "../util/experience.js";
-import { navigate } from "../util/navigation.js";
 import { notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
@@ -218,7 +217,6 @@ export class ESPHomeApp extends LitElement {
   // auto-popped — it's collected per-device in the create wizard, or on demand
   // via the kebab "Set up Wi-Fi" dialog.
   @state() _onboardingShouldShow = false;
-  @state() _onboardingSessionDismissed = false;
   // Whether the first-run wizard should ask the remote-compute use-case
   // question (non-HA only). Seeded from the onboarding state's step list.
   @state() _onboardingHasUseCase = false;
@@ -491,31 +489,16 @@ export class ESPHomeApp extends LitElement {
     }
   }
 
-  // Triggered by the onboarding dialog after a save or explicit decline.
-  // Refresh state so the badge reflects new data.
+  // The required choices have landed; refresh their contexts and completion
+  // state while the wizard presents its final, optional tour offer.
   _onOnboardingAcknowledged = () => {
     this._onboardingShouldShow = false;
     void loadOnboardingState(this);
-    void loadPreferences(this).then(() => this._maybeOfferTour());
+    void loadPreferences(this);
   };
-
-  private _maybeOfferTour(): void {
-    if (this._remoteComputeOnly || isExpert(this._experienceLevel)) return;
-
-    void navigate("/?tourStep=1");
-  }
 
   private _onOpenGuidedTour = () => {
     this._guidedTour?.start();
-  };
-
-  _onOnboardingDismissedSession = () => {
-    this._onboardingSessionDismissed = true;
-    this._onboardingShouldShow = false;
-    // Skip-Wi-Fi persists the experience pick without acknowledging; refresh
-    // prefs so the contexts (yaml-diff button, experience-gated UI) reflect it
-    // this session rather than waiting for the next reconnect.
-    void loadPreferences(this);
   };
 
   // Kebab "Set up / Change Wi-Fi credentials" — open the manual Wi-Fi dialog.
@@ -652,15 +635,14 @@ export class ESPHomeApp extends LitElement {
       <esphome-onboarding-wizard-dialog
         .hasUseCase=${this._onboardingHasUseCase}
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
-        @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
+        @open-guided-tour=${this._onOpenGuidedTour}
       ></esphome-onboarding-wizard-dialog>
       <esphome-guided-tour></esphome-guided-tour>
     `;
   }
 
-  // Auto-pop the full first-run wizard for a fresh install. The standalone
-  // Wi-Fi dialog is mounted unconditionally (so the kebab "Set up Wi-Fi" can
-  // open it) but is never auto-popped — Wi-Fi is collected per-device now.
+  // Auto-pop the mandatory first-run wizard for a fresh install. The standalone
+  // Wi-Fi dialog remains available on demand but is never part of onboarding.
   protected willUpdate(changed: PropertyValues) {
     // Expert Mode is experience_level === EXPERT; keep the provided context in
     // sync so its consumers react when the level changes.

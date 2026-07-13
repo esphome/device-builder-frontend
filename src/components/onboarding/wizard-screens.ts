@@ -1,16 +1,15 @@
-export type WizardScreen = "use_case" | "experience";
+export type WizardScreen = "welcome" | "use_case" | "experience" | "tour";
 
 /**
- * The ordered onboarding-wizard screens for a given environment.
+ * The ordered onboarding-wizard screens for the current environment.
  *
- * The use-case screen only appears on non-HA installs (`hasUseCase`); the
- * experience screen is always present. Wi-Fi is no longer an onboarding step —
- * it's collected per-device in the create wizard. Pure so the branch logic is
- * unit-testable without the component.
+ * Welcome and experience are always mandatory. The use-case screen only
+ * appears on non-HA installs, and the optional-tour offer always closes the
+ * flow. Wi-Fi is deliberately not part of onboarding.
  */
 export function wizardScreens(opts: { hasUseCase: boolean }): WizardScreen[] {
-  const screens: WizardScreen[] = [];
+  const screens: WizardScreen[] = ["welcome"];
   if (opts.hasUseCase) screens.push("use_case");
-  screens.push("experience");
+  screens.push("experience", "tour");
   return screens;
 }

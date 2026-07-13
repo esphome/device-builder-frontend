@@ -42,7 +42,6 @@ function makeHost(state: OnboardingState) {
     _onboardingPending: false,
     _onboardingHasUseCase: false,
     _onboardingShouldShow: false,
-    _onboardingSessionDismissed: false,
     _api: { getOnboardingState: vi.fn(async () => state) },
   };
 }
@@ -63,15 +62,6 @@ describe("loadOnboardingState routing", () => {
     const host = makeHost(
       state([{ id: OnboardingStepId.EXPERIENCE_LEVEL, status: DONE }])
     );
-    await loadOnboardingState(host as unknown as ESPHomeApp);
-    expect(host._onboardingShouldShow).toBe(false);
-  });
-
-  it("respects a session dismissal", async () => {
-    const host = makeHost(
-      state([{ id: OnboardingStepId.EXPERIENCE_LEVEL, status: PENDING }])
-    );
-    host._onboardingSessionDismissed = true;
     await loadOnboardingState(host as unknown as ESPHomeApp);
     expect(host._onboardingShouldShow).toBe(false);
   });
