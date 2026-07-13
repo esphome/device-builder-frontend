@@ -18,6 +18,7 @@ import { notifyError, notifySuccess } from "../util/notify.js";
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
 import type { ESPHomeDeviceSectionConfig } from "../components/device/device-section-config.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
@@ -1141,6 +1142,7 @@ export class ESPHomePageDevice extends LitElement {
                         ? html`<button
                             type="button"
                             class="ghost-icon-btn nav-toggle-btn"
+                            ${tourAnchor("nav")}
                             @click=${this._onNavExpand}
                             title=${this._localize("device.show_navigator")}
                             aria-label=${this._localize("device.show_navigator")}
@@ -1331,9 +1333,13 @@ export class ESPHomePageDevice extends LitElement {
    * across two copies.
    */
   private _renderNavigator(className: "drawer-nav" | "desktop-nav") {
+    const isVisibleTourNavigator =
+      className === "desktop-nav"
+        ? !this._isMobile && !this._navCollapsed
+        : this._isMobile && this._drawerOpen;
     return html`<esphome-device-navigator
       class=${className}
-      .tourAnchorId=${className === "desktop-nav" ? "nav" : undefined}
+      .tourAnchorId=${isVisibleTourNavigator ? "nav" : undefined}
       .openSections=${this._openSections}
       .yaml=${this._yaml}
       .board=${this._board}

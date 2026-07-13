@@ -200,7 +200,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openFirmwareJobs}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="playlist-check"></wa-icon>
                   <span class="menu-item-label"
@@ -217,7 +217,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openSecrets}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="key-variant"></wa-icon>
                   <span class="menu-item-label">${this._localize("layout.secrets")}</span>
@@ -227,7 +227,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openOnboarding}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="wifi-cog"></wa-icon>
                   <span class="menu-item-label"
@@ -245,7 +245,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                         role="menuitem"
                         tabindex="0"
                         @click=${this._openArchivedDevices}
-                        @keydown=${this._onMenuItemKeydown}
+                        @keydown=${this._onItemKeydown}
                       >
                         <wa-icon library="mdi" name="archive-outline"></wa-icon>
                         ${this._localize("layout.archived_devices")}
@@ -260,7 +260,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                         tabindex="0"
                         aria-checked=${this._showIgnored ? "true" : "false"}
                         @click=${this._toggleShowIgnoredDiscoveries}
-                        @keydown=${this._onMenuItemKeydown}
+                        @keydown=${this._onItemKeydown}
                       >
                         <wa-icon
                           library="mdi"
@@ -283,7 +283,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openResetBuildEnv}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="cog-refresh"></wa-icon>
                   ${this._localize("layout.reset_build_env")}
@@ -294,7 +294,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openSettings}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="cog"></wa-icon>
                   <span class="menu-item-label"
@@ -315,7 +315,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                         role="menuitem"
                         tabindex="0"
                         @click=${this._openCheckForUpdates}
-                        @keydown=${this._onMenuItemKeydown}
+                        @keydown=${this._onItemKeydown}
                       >
                         <wa-icon library="mdi" name="update"></wa-icon>
                         <span class="menu-item-label"
@@ -329,7 +329,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openSearch}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="magnify"></wa-icon>
                   <span class="menu-item-label">${this._localize("layout.search")}</span>
@@ -340,7 +340,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openGuidedTour}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="compass-outline"></wa-icon>
                   <span class="menu-item-label"
@@ -353,7 +353,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openFeedback}
-                  @keydown=${this._onMenuItemKeydown}
+                  @keydown=${this._onItemKeydown}
                 >
                   <wa-icon library="mdi" name="comment-question-outline"></wa-icon>
                   ${this._localize("layout.feedback_menu")}

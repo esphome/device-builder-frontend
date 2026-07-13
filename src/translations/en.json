@@ -1004,6 +1004,7 @@
       "continue": "Continue",
       "finish": "Finish",
       "dismiss": "Maybe later",
+      "recommended": "Recommended",
       "saving": "Saving…",
       "ack_failed": "Saved your choices, but the wizard couldn't be marked as completed — it may reappear next time.",
       "use_case": {
@@ -1011,20 +1012,20 @@
         "intro": "This helps tailor the dashboard to what you need.",
         "devices_title": "Build and manage devices",
         "devices_desc": "Create, configure, and flash ESPHome devices from this dashboard.",
-        "remote_title": "Only for remote compute",
-        "remote_desc": "Use this install purely as a remote build server for other dashboards. Device creation stays hidden."
+        "remote_title": "Remote compute only",
+        "remote_desc": "Use this installation only as a remote build server for other dashboards. Device creation stays hidden."
       },
       "experience": {
-        "title": "Pick your experience",
+        "title": "Choose your experience level",
         "intro": "You can change this any time in Settings.",
         "beginner_title": "New to ESPHome",
-        "beginner_desc": "Keep it simple and guided, the lightest interface.",
+        "beginner_desc": "Start with a simple, guided interface.",
         "expert_title": "Expert",
-        "expert_desc": "Unlock the editor diff, navigator search, and YAML search."
+        "expert_desc": "Unlock the diff viewer, navigator search, and YAML search."
       },
       "wifi": {
         "title": "Connect to Wi-Fi",
-        "intro": "Your devices join your network with these. They're saved once to secrets.yaml and reused by every device you create — including the one we'll set up next."
+        "intro": "Enter the Wi-Fi network and password your devices should use. They're saved once in secrets.yaml and reused for every device you create, including the one we'll set up next."
       }
     }
   },
@@ -1047,7 +1048,7 @@
       },
       "board": {
         "title": "Pick a board",
-        "body": "Starter kits come pre-configured who's ideal for a first device. Select the featured kit.",
+        "body": "Starter kits come pre-configured and are ideal for your first device. Select the featured kit.",
         "hint": "Click “Select” on the starter kit"
       },
       "name": {
@@ -1057,31 +1058,31 @@
       },
       "navigator": {
         "title": "Your device navigator",
-        "body": "Browse and edit core config, components and automations. No YAML required."
+        "body": "Browse and edit core configuration, components, and automations. No YAML required."
       },
       "central": {
         "title": "The main editor",
-        "body": "Pick a section in the navigator and it opens here. Configure your board, components and automations visually. Every change updates the YAML on the right."
+        "body": "Select a section in the navigator to open it here. Configure your board, components, and automations visually; every change updates the YAML on the right."
       },
       "yaml": {
         "title": "Live YAML, kept in sync",
-        "body": "Everything you do is mirrored here. We encourage new users to try input fields and observe the changes in the yaml."
+        "body": "Everything you do is mirrored here. Try changing fields in the visual editor and watch the YAML update."
       },
       "layout": {
         "title": "Switch your view",
-        "body": "Toggle between the visual editor only, the YAML only, or both side by side. Whatever suits how you like to work."
+        "body": "Switch between the visual editor, YAML, or both side by side. Choose whichever view suits your workflow."
       },
       "install": {
         "title": "Install to your board",
-        "body": "Flashes the firmware to your device over USB or the network."
+        "body": "Flash firmware to your device over USB or the network."
       },
       "validate": {
-        "title": "Validate before you flash",
-        "body": "Checks the configuration for errors so an install doesn’t fail halfway."
+        "title": "Validate your configuration",
+        "body": "Open the actions menu to check your configuration for errors before installing."
       },
       "save": {
         "title": "Save your changes",
-        "body": "Writes your edits to the config file. That’s the whole loop: configure, save, install."
+        "body": "Save your edits to the configuration file. That’s the whole loop: configure, save, and install."
       },
       "dashboard": {
         "title": "Find it on your dashboard",
@@ -1089,7 +1090,7 @@
       },
       "done": {
         "title": "You’re all set",
-        "body": "That’s the full loop: create, configure, install. Add your next device whenever you like."
+        "body": "That’s the full loop: create, configure, and install. Add your next device whenever you like."
       }
     }
   },

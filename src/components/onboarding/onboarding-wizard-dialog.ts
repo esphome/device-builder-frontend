@@ -67,9 +67,12 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   @state() private _error: string | null = null;
   @state() private _index = 0;
 
-  @state() private _useCaseChosen = false;
+  // Both screens open with the recommended option pre-selected so a new
+  // user can click straight through: build-and-manage on the use-case
+  // screen, beginner on the experience screen.
+  @state() private _useCaseChosen = true;
   @state() private _remoteCompute = false;
-  @state() private _experience: ExperienceLevel | null = null;
+  @state() private _experience: ExperienceLevel | null = ExperienceLevel.BEGINNER;
   @state() private _wifiSsid = "";
   @state() private _wifiPassword = "";
 
@@ -83,9 +86,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._saving = false;
     this._error = null;
     this._index = 0;
-    this._useCaseChosen = false;
+    this._useCaseChosen = true;
     this._remoteCompute = false;
-    this._experience = null;
+    this._experience = ExperienceLevel.BEGINNER;
     this._wifiSsid = "";
     this._wifiPassword = "";
     this._exitedExplicitly = false;
@@ -246,6 +249,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           description: this._localize("onboarding.wizard.use_case.devices_desc"),
           selected: devices,
           tabbable: rovingTabbable(devices, this._useCaseChosen, 0),
+          badge: this._localize("onboarding.wizard.recommended"),
           disabled: this._saving,
           onSelect: () => this._chooseUseCase(false),
         })}
@@ -282,6 +286,10 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
               this._experience !== null,
               i
             ),
+            badge:
+              level === ExperienceLevel.BEGINNER
+                ? this._localize("onboarding.wizard.recommended")
+                : undefined,
             disabled: this._saving,
             onSelect: () => {
               this._experience = level;

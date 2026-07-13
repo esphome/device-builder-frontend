@@ -10,6 +10,7 @@ import { navigate } from "../../util/navigation.js";
 import { TOUR_ANCHOR_EVENT, type TourAnchorEventDetail } from "./tour-anchor.js";
 import { computeTourFrame, type TourFrame } from "./tour-geometry.js";
 import { clearTourSuggestedName, setTourSuggestedName } from "./tour-session.js";
+import { renderTourSpotlightBackdrop, tourSpotlightStyles } from "./tour-spotlight.js";
 import {
   DIALOG_ANCHORS,
   STARTER_DEVICE_NAME,
@@ -46,6 +47,7 @@ export class ESPHomeGuidedTour extends LitElement {
 
   static styles = [
     espHomeStyles,
+    tourSpotlightStyles,
     css`
       :host {
         display: contents;
@@ -463,17 +465,14 @@ export class ESPHomeGuidedTour extends LitElement {
 
   private _showPopover(): void {
     const el = this._popover;
-    if (!el || !el.isConnected) return;
-    if (!el.matches(":popover-open")) {
-      try {
-        el.showPopover();
-      } catch {}
-    }
+    if (!el || !el.isConnected || typeof el.showPopover !== "function") return;
+    if (!el.matches(":popover-open")) el.showPopover();
   }
 
   private _hidePopover(): void {
     const el = this._popover;
-    if (el?.matches(":popover-open")) el.hidePopover();
+    if (!el || typeof el.hidePopover !== "function") return;
+    if (el.matches(":popover-open")) el.hidePopover();
   }
 
   private _bouncePopover(): void {
@@ -524,6 +523,7 @@ export class ESPHomeGuidedTour extends LitElement {
         : { top: `${bubble.top ?? 0}px` }),
     };
     return html`
+      ${renderTourSpotlightBackdrop(frame)}
       <div
         class="bubble"
         role="dialog"
