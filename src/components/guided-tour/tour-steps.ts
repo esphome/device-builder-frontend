@@ -53,7 +53,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     anchors: ["name-finish"],
-    highlightAnchors: ["name-section"],
+    highlightAnchors: ["name-field"],
     route: "dashboard",
     side: "right",
     kind: "action",

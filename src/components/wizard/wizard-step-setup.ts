@@ -352,7 +352,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _renderNameSection() {
     return html`
-      <section class="section" ${tourAnchor("name-section")}>
+      <section class="section">
         <div>
           <h3 class="section-title">${this._localize("wizard.section_name_device")}</h3>
           <p class="section-subtitle">
@@ -360,7 +360,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           </p>
         </div>
 
-        <div class="field">
+        <div class="field" ${tourAnchor("name-field")}>
           <label for="device-name">${this._localize("wizard.device_name")}</label>
           <input
             id="device-name"
