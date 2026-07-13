@@ -92,13 +92,25 @@ describe("computeTourFrame bubble placement", () => {
   it("flips to a side clear of the target when the preferred side would clamp onto it", () => {
     // The wizard's Finish button, bottom-right of a centred dialog on a narrow
     // viewport: a "right" bubble clamps back over it (the block bug). It must
-    // flip to a side that leaves the control clickable.
+    // flip to a side that leaves the control clickable and stays on screen —
+    // "left" would spill below the fold here, so it lands "top".
     const vp: Viewport = { w: 1033, h: 800 };
     const finishBtn: Rect = { x: 724, y: 590, w: 82, h: 34 };
     const frame = computeTourFrame(finishBtn, "right", vp);
-    expect(frame.side).toBe("left");
-    // Bubble sits entirely left of the target hole — doesn't cover it.
-    expect(frame.bubble.left + BUBBLE_WIDTH).toBeLessThanOrEqual(frame.hole.x);
+    expect(frame.side).toBe("top");
+    // Top-anchored bubble sits above the target hole — doesn't cover it.
+    expect(vp.h - (frame.bubble.bottom ?? 0)).toBeLessThanOrEqual(frame.hole.y);
+  });
+
+  it("prefers a viewport-fitting side over one that overflows it (mobile, target near top)", () => {
+    // A dialog card near the top of a phone screen: "right"/"left" don't fit the
+    // narrow width and "top" would overflow above the viewport, so the bubble
+    // must drop to "bottom", which has room.
+    const vp: Viewport = { w: 375, h: 812 };
+    const card: Rect = { x: 16, y: 140, w: 343, h: 111 };
+    const frame = computeTourFrame(card, "right", vp);
+    expect(frame.side).toBe("bottom");
+    expect(frame.bubble.top).toBeGreaterThanOrEqual(0);
   });
 
   it("clamps a bubble that would overflow the right edge back on screen", () => {

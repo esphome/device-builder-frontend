@@ -394,6 +394,10 @@ export class ESPHomeGuidedTour extends LitElement {
     }
 
     const appearing = this._frame === null;
+    // On first paint of a step, pull an off-screen target into view — the dim
+    // backdrop swallows scroll, so a target below the fold (or its bubble)
+    // would otherwise be unreachable on a small screen.
+    if (appearing) this._scrollTargetIntoView(target);
     const rect = target.getBoundingClientRect();
     this._frame = computeTourFrame(
       { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
@@ -403,6 +407,15 @@ export class ESPHomeGuidedTour extends LitElement {
     if (appearing && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) {
       this._bouncePopover();
     }
+  }
+
+  /** Center the target if it isn't already comfortably within the viewport. */
+  private _scrollTargetIntoView(target: Element): void {
+    if (typeof target.scrollIntoView !== "function") return;
+    const r = target.getBoundingClientRect();
+    const margin = 24;
+    const visible = r.top >= margin && r.bottom <= window.innerHeight - margin;
+    if (!visible) target.scrollIntoView({ block: "center", inline: "nearest" });
   }
 
   private _onAnchorClick = (): void => {

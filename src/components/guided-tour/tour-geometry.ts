@@ -117,11 +117,15 @@ function computeBubble(
   };
 }
 
+/** The bubble's estimated top edge in viewport coordinates. */
+function bubbleTop(bubble: Bubble, vp: Viewport): number {
+  return bubble.bottom !== undefined
+    ? vp.h - bubble.bottom - BUBBLE_HEIGHT_EST
+    : (bubble.top ?? 0);
+}
+
 function bubbleCoversHole(bubble: Bubble, vp: Viewport, hole: Box): boolean {
-  const top =
-    bubble.bottom !== undefined
-      ? vp.h - bubble.bottom - BUBBLE_HEIGHT_EST
-      : (bubble.top ?? 0);
+  const top = bubbleTop(bubble, vp);
   const b = {
     l: bubble.left,
     r: bubble.left + bubble.width,
@@ -136,6 +140,13 @@ function bubbleCoversHole(bubble: Bubble, vp: Viewport, hole: Box): boolean {
   );
 }
 
+/** True when the estimated bubble sits fully within the viewport's vertical
+ *  margins (horizontal placement is already clamped in `computeBubble`). */
+function bubbleFitsViewport(bubble: Bubble, vp: Viewport): boolean {
+  const top = bubbleTop(bubble, vp);
+  return top >= EDGE_MARGIN && top + BUBBLE_HEIGHT_EST <= vp.h - EDGE_MARGIN;
+}
+
 export function computeTourFrame(
   rect: Rect,
   side: Side,
@@ -146,15 +157,24 @@ export function computeTourFrame(
   const ring: Ring = { ...hole, radius: Math.min(hole.h / 2, RING_MAX_RADIUS) };
   const width = options.bubbleWidth;
 
-  let chosenSide = side;
-  let bubble = computeBubble(hole, side, vp, width);
-  for (const candidate of SIDE_ORDER[side]) {
-    const b = computeBubble(hole, candidate, vp, width);
-    if (!bubbleCoversHole(b, vp, hole)) {
-      chosenSide = candidate;
-      bubble = b;
-      break;
-    }
-  }
-  return { hole, ring, dim: computeDim(hole, vp), bubble, side: chosenSide };
+  const candidates = SIDE_ORDER[side].map((candidate) => ({
+    candidate,
+    bubble: computeBubble(hole, candidate, vp, width),
+  }));
+  // Prefer a side that neither covers the hole nor overflows the viewport; then
+  // any side clear of the hole (even if it overflows — the caller scrolls the
+  // target into view for that case); finally the requested side.
+  const clear = candidates.filter(({ bubble }) => !bubbleCoversHole(bubble, vp, hole));
+  const chosen =
+    clear.find(({ bubble }) => bubbleFitsViewport(bubble, vp)) ??
+    clear[0] ??
+    candidates[0];
+
+  return {
+    hole,
+    ring,
+    dim: computeDim(hole, vp),
+    bubble: chosen.bubble,
+    side: chosen.candidate,
+  };
 }
