@@ -1022,10 +1022,6 @@
         "beginner_desc": "Start with a simple, guided interface.",
         "expert_title": "Expert",
         "expert_desc": "Unlock the diff viewer, navigator search, and YAML search."
-      },
-      "wifi": {
-        "title": "Connect to Wi-Fi",
-        "intro": "Enter the Wi-Fi network and password your devices should use. They're saved once in secrets.yaml and reused for every device you create, including the one we'll set up next."
       }
     }
   },
