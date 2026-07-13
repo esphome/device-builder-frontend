@@ -50,6 +50,7 @@ export class ESPHomeGuidedTour extends LitElement {
   private _observedTarget: Element | null = null;
   private _revealRequested = false;
   private _reflowScheduled = false;
+  private _tourListenersBound = false;
 
   private readonly _skipAffordance = new TourSkipAffordance(this, {
     isDialogStep: () =>
@@ -69,12 +70,10 @@ export class ESPHomeGuidedTour extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    // Only anchor registration and the ?tourStep= deep link stay permanent;
+    // the interaction listeners bind for the tour's lifetime in start().
     window.addEventListener(TOUR_ANCHOR_EVENT, this._onAnchorEvent);
-    window.addEventListener("resize", this._onReflow);
-    window.addEventListener("scroll", this._onReflow, true);
-    window.addEventListener("keydown", this._onKeydown, true);
     window.addEventListener("popstate", this._onPopState);
-    window.addEventListener("wa-after-show", this._onDialogShown);
 
     this._resizeObserver = new ResizeObserver(() => {
       if (this._active) this._refresh();
@@ -84,11 +83,8 @@ export class ESPHomeGuidedTour extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener(TOUR_ANCHOR_EVENT, this._onAnchorEvent);
-    window.removeEventListener("resize", this._onReflow);
-    window.removeEventListener("scroll", this._onReflow, true);
-    window.removeEventListener("keydown", this._onKeydown, true);
     window.removeEventListener("popstate", this._onPopState);
-    window.removeEventListener("wa-after-show", this._onDialogShown);
+    this._unbindTourListeners();
     this._teardownClicks();
     this._observeTarget(null);
     this._resizeObserver?.disconnect();
@@ -101,8 +97,27 @@ export class ESPHomeGuidedTour extends LitElement {
     this._stepIndex = stepIndex;
     this._frame = null;
     this._revealRequested = false;
+    this._bindTourListeners();
     if (this._step.route === "dashboard" && this._onDeviceRoute()) void navigate("/");
     this._scheduleMeasure();
+  }
+
+  private _bindTourListeners(): void {
+    if (this._tourListenersBound) return;
+    this._tourListenersBound = true;
+    window.addEventListener("resize", this._onReflow);
+    window.addEventListener("scroll", this._onReflow, true);
+    window.addEventListener("keydown", this._onKeydown, true);
+    window.addEventListener("wa-after-show", this._onDialogShown);
+  }
+
+  private _unbindTourListeners(): void {
+    if (!this._tourListenersBound) return;
+    this._tourListenersBound = false;
+    window.removeEventListener("resize", this._onReflow);
+    window.removeEventListener("scroll", this._onReflow, true);
+    window.removeEventListener("keydown", this._onKeydown, true);
+    window.removeEventListener("wa-after-show", this._onDialogShown);
   }
 
   protected firstUpdated(): void {
@@ -337,6 +352,7 @@ export class ESPHomeGuidedTour extends LitElement {
   private _finish(): void {
     this._active = false;
     this._frame = null;
+    this._unbindTourListeners();
     this._skipAffordance.reset();
     this._teardownClicks();
     this._observeTarget(null);
