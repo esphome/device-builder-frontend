@@ -18,6 +18,7 @@ import { notifyError, notifySuccess } from "../util/notify.js";
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
 import type { ESPHomeDeviceSectionConfig } from "../components/device/device-section-config.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
@@ -131,6 +132,14 @@ export class ESPHomePageDevice extends LitElement {
 
   @state()
   private _layout: DeviceLayoutMode = "both";
+
+  private _tourLayout = new TourLayoutController(
+    this,
+    () => this._layout,
+    (layout: DeviceLayoutMode) => {
+      this._layout = layout;
+    }
+  );
 
   @state()
   private _openSections = new Set<number>(this._readUrlSections());

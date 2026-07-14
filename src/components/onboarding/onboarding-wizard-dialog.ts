@@ -75,7 +75,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   private _startTourAfterClose = false;
   private _enter = new EnterController(this, () => {
     if (this._isTourOffer) {
-      this._startTour();
+      if (this._remoteCompute) this._maybeLater();
+      else this._startTour();
       return;
     }
     if (this._canContinue) void this._onContinue();
@@ -120,6 +121,12 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     return this._screen === "tour";
   }
 
+  private get _titleKey(): string {
+    return this._isTourOffer && this._remoteCompute
+      ? "onboarding.wizard.tour.remote_title"
+      : `onboarding.wizard.${this._screen}.title`;
+  }
+
   private get _canContinue(): boolean {
     if (this._saving) return false;
     switch (this._screen) {
@@ -140,7 +147,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         class=${this._isTourOffer ? "" : "mandatory"}
         ?open=${this._open}
         ?busy=${this._saving}
-        .label=${this._localize(`onboarding.wizard.${this._screen}.title`)}
+        .label=${this._localize(this._titleKey)}
         @request-close=${this._onRequestClose}
         @after-hide=${this._onAfterHide}
       >
@@ -155,6 +162,14 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   private _renderActions() {
     if (this._isTourOffer) {
+      if (this._remoteCompute) {
+        return html`
+          <span class="spacer"></span>
+          <button type="button" class="btn btn--primary" @click=${this._maybeLater}>
+            ${this._localize("onboarding.wizard.done")}
+          </button>
+        `;
+      }
       return html`
         <button type="button" class="btn btn--cancel" @click=${this._maybeLater}>
           ${this._localize("onboarding.wizard.dismiss")}
@@ -231,6 +246,17 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   }
 
   private _renderTourOffer() {
+    if (this._remoteCompute) {
+      return html`
+        <div class="tour-offer">
+          <wa-icon library="mdi" name="server-network" class="tour-offer-icon"></wa-icon>
+          <p class="tour-ready">
+            ${this._localize("onboarding.wizard.tour.remote_ready")}
+          </p>
+          <p class="intro">${this._localize("onboarding.wizard.tour.remote_intro")}</p>
+        </div>
+      `;
+    }
     return html`
       <div class="tour-offer">
         <wa-icon library="mdi" name="compass-outline" class="tour-offer-icon"></wa-icon>

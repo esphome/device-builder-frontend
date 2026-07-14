@@ -23,6 +23,7 @@ interface WizardInternals {
   _useCaseChosen: boolean;
   _remoteCompute: boolean;
   _experience: ExperienceLevel;
+  _titleKey: string;
   _onContinue(): Promise<void>;
   _onRequestClose(event: Event): void;
   _startTour(): void;
@@ -118,5 +119,16 @@ describe("mandatory onboarding flow", () => {
 
     state._onAfterHide();
     expect(openTour).toHaveBeenCalledOnce();
+  });
+
+  it("ends remote-compute setup without offering an incompatible tour", () => {
+    const wizard = new ESPHomeOnboardingWizardDialog();
+    wizard.hasUseCase = true;
+    wizard.open();
+    const state = internals(wizard);
+    state._remoteCompute = true;
+    state._index = 3;
+
+    expect(state._titleKey).toBe("onboarding.wizard.tour.remote_title");
   });
 });

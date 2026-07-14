@@ -42,7 +42,13 @@ import { matchesDeviceRow } from "../../util/device-search.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { TourActivityController } from "../guided-tour/tour-activity-controller.js";
+import { getActiveTourConfiguration } from "../guided-tour/tour-session.js";
 import { renderDeviceTableBody, renderDeviceTableHead } from "./device-table-grid.js";
+import {
+  scrollTableConfigurationIntoView,
+  TourTablePageController,
+} from "./device-table-tour.js";
 import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
 import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
@@ -76,14 +82,11 @@ registerMdiIcons({
   upload: mdiUpload,
 });
 
-// ─── Cached row-model factories (created once, reused forever) ───
-
 const coreRowModel = getCoreRowModel<DeviceRow>();
 const sortedRowModel = getSortedRowModel<DeviceRow>();
 const filteredRowModel = getFilteredRowModel<DeviceRow>();
 const paginatedRowModel = getPaginationRowModel<DeviceRow>();
 
-// Columns hidden by default unless the user explicitly enables them via preferences.
 const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
   comment: false,
   area: false,
@@ -96,6 +99,8 @@ const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
 
 @customElement("esphome-device-table")
 export class ESPHomeDeviceTable extends LitElement {
+  private _tourActivity = new TourActivityController(this);
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
@@ -154,6 +159,10 @@ export class ESPHomeDeviceTable extends LitElement {
 
   @state()
   private _contextMenuDevice: ConfiguredDevice | null = null;
+
+  private _tourPage = new TourTablePageController((pageIndex) => {
+    this._pageIndex = pageIndex;
+  });
 
   @state()
   private _contextMenuPos: { x: number; y: number } | null = null;
@@ -223,6 +232,7 @@ export class ESPHomeDeviceTable extends LitElement {
     _columnId: string,
     filterValue: unknown
   ): boolean => {
+    if (row.original.config === getActiveTourConfiguration()) return true;
     // Full-text matching lives in util/device-search.ts so the
     // dashboard's select-all scoping helper matches the same rows
     // this filter makes visible (single source of truth).
@@ -306,8 +316,6 @@ export class ESPHomeDeviceTable extends LitElement {
 
   static styles = [espHomeStyles, tableCellStyles, tableLayoutStyles, labelChipStyles];
 
-  // ─── Render ───
-
   protected render() {
     const effectivePageSize = effectiveTablePageSize(this._pageSize, this._rows.length);
     const effectivePageIndex = this._pageSize === ALL_PAGE_SIZE ? 0 : this._pageIndex;
@@ -330,6 +338,12 @@ export class ESPHomeDeviceTable extends LitElement {
       globalFilterFn: this._globalFilterFn,
     });
 
+    this._tourPage.ensureTargetPage(
+      table.getSortedRowModel().rows,
+      this._pageSize,
+      effectivePageSize,
+      effectivePageIndex
+    );
     const rows = table.getRowModel().rows;
     this._visibleConfigs = table.getFilteredRowModel().rows.map((r) => r.original.config);
     const pgState = table.getState().pagination;
@@ -516,23 +530,9 @@ export class ESPHomeDeviceTable extends LitElement {
     );
   }
 
-  /** Scroll the row matching *configuration* into view.
-   *
-   *  Exposed so the dashboard can highlight a freshly-adopted device
-   *  without reaching across the table's shadow-DOM boundary —
-   *  ``shadowRoot.querySelector`` from the dashboard can't see rows
-   *  rendered in this component's shadow root. No-op when the row
-   *  isn't on the current page. ``behavior: "instant"`` dodges
-   *  Chrome mobile's smooth-scroll abort and lands the row at the
-   *  intended position — the highlight pulse handles transition
-   *  feedback. */
+  /** Scroll a configuration row without crossing its shadow-DOM boundary. */
   public scrollConfigurationIntoView(configuration: string): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-    const row = root.querySelector<HTMLElement>(
-      `tr[data-configuration="${CSS.escape(configuration)}"]`
-    );
-    row?.scrollIntoView({ behavior: "instant", block: "center" });
+    scrollTableConfigurationIntoView(this.shadowRoot, configuration);
   }
 
   private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {

@@ -547,7 +547,12 @@
     "full_setup_desc": "Adds this device's onboard components (relays, sensors, and more) so it's ready to use. You can change them afterwards in the editor.",
     "full_setup_partial": "{count, plural, one {Couldn't add recommended component {names}} other {Couldn't add recommended components {names}{extra, plural, =0 {} other { and # more}}}}; finish in the editor.",
     "wifi_configuration": "Wi-Fi Configuration",
-    "wifi_required_desc": "This board connects over Wi-Fi. Enter your network so the device can come online.",
+    "wifi_required_desc": "This board connects over Wi-Fi. Enter your network once and Device Builder will securely reuse it for future Wi-Fi devices.",
+    "wifi_saved_title": "Wi-Fi credentials already saved",
+    "wifi_saved_desc": "This board uses the shared Wi-Fi credentials already stored by Device Builder.",
+    "wifi_saved_reuse": "The saved values stay hidden and will be reused automatically.",
+    "wifi_skip": "Skip for now",
+    "wifi_use_saved": "Use saved credentials",
     "other_boards": "Other boards",
     "starter_kit": "Featured",
     "expand_board": "Expand details",
@@ -1003,6 +1008,7 @@
       "back": "Back",
       "continue": "Continue",
       "dismiss": "Maybe later",
+      "done": "Done",
       "recommended": "RECOMMENDED",
       "start_tour": "Start guided tour",
       "saving": "Saving…",
@@ -1030,15 +1036,23 @@
       "tour": {
         "title": "You’re ready to build",
         "ready": "Everything is set up and ready to use.",
-        "intro": "Take a guided tour to see how to create, configure, and install your first device.",
-        "later": "You can always start the tour later from the menu in the top-right corner."
+        "intro": "Take a guided tour to see how to create, configure, and install your first device. It takes about 5 minutes.",
+        "later": "You can always start the tour later from the menu in the top-right corner.",
+        "remote_title": "Setup complete",
+        "remote_ready": "Your remote build server is ready.",
+        "remote_intro": "This dashboard is configured to receive build jobs from other Device Builder installations."
       }
     }
   },
   "tour": {
+    "header": "Quickstart tour",
     "step_counter": "Step {current} of {total}",
     "skip": "Skip tour",
+    "pause": "Close for now",
+    "unavailable_title": "This tour step isn’t available",
+    "unavailable_body": "The highlighted control could not be shown. Close for now and try again later, or skip the tour.",
     "next": "Next",
+    "got_it": "Got it!",
     "finish": "Finish",
     "continue": "Continue",
     "steps": {
@@ -1049,30 +1063,36 @@
       },
       "method": {
         "title": "Choose how to start",
-        "body": "“Create new project” walks you through a starter kit or any ESP board.",
+        "body": "“Create new project” guides you through choosing and configuring your board step by step.",
         "hint": "Click “Create new project”"
       },
       "board": {
         "title": "Pick a board",
-        "body": "Starter kits come pre-configured and are ideal for your first device. Select the featured kit.",
-        "hint": "Click “Select” on the starter kit"
+        "body": "You can configure any board from the catalog. For this tour, we’ll use the featured Starter Kit as an example; the same workflow applies to other supported boards.",
+        "hint": "Click “Select” on the featured Starter Kit"
       },
       "name": {
-        "title": "Name it, then finish",
-        "body": "We’ve suggested a name and generated a working config. Finish to open it.",
-        "hint": "Click “Finish setup”"
+        "title": "Name your device",
+        "body": "We’ve suggested a name and generated a working configuration. Keep it or choose a name of your own.",
+        "hint": "Continue when the name looks right"
+      },
+      "wifi": {
+        "title": "Wi-Fi for your devices",
+        "body": "Device Builder stores Wi-Fi credentials once and reuses them for future devices. For this quickstart, continue without changing them.",
+        "hint": "Continue without changing Wi-Fi"
       },
       "navigator": {
         "title": "Your device navigator",
-        "body": "Browse and edit core configuration, components, and automations. No YAML required."
+        "body": "Core Configuration contains essentials such as Wi-Fi, device identity, and hardware settings. Components add sensors and features; Automations define behavior.",
+        "hint": "Open Core Configuration to continue"
       },
       "central": {
         "title": "The main editor",
         "body": "Select a section in the navigator to open it here. Configure your board, components, and automations visually; every change updates the YAML on the right."
       },
       "yaml": {
-        "title": "Live YAML, kept in sync",
-        "body": "Everything you do is mirrored here. Try changing fields in the visual editor and watch the YAML update."
+        "title": "Your configuration in YAML",
+        "body": "YAML is the text version of your device configuration—the source ESPHome uses to build the firmware. It stays in sync with the visual editor. We show it by default, but you can hide it and configure everything visually if you prefer."
       },
       "layout": {
         "title": "Switch your view",
@@ -1083,12 +1103,8 @@
         "body": "Flash firmware to your device over USB or the network. Your edits are saved automatically first — that’s the whole loop: configure and install."
       },
       "dashboard": {
-        "title": "Find it on your dashboard",
-        "body": "Your device lives here now. Switch between card and list views as your collection grows."
-      },
-      "done": {
-        "title": "You’re all set",
-        "body": "That’s the full loop: create, configure, and install. Add your next device whenever you like."
+        "title": "Your device is ready",
+        "body": "Your device has been added to the dashboard. From here you can monitor its status, edit its configuration, install updates, and return to it whenever you need."
       }
     }
   },

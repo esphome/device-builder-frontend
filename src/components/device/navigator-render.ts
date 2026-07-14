@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { withBase } from "../../util/base-path.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
 import type { NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
@@ -24,6 +25,7 @@ export interface NavSectionView {
   filtering: boolean;
   selectedLine: number | null;
   hoveredLine: number | null;
+  tourAnchorId?: string;
   /** Backend validation errors attributed to a row's section instance. */
   errorCount?: (item: YamlSection) => number;
   /** Localized accessible label for an error badge carrying count errors. */
@@ -194,7 +196,18 @@ function renderNavAction(action: NavAction): TemplateResult {
 export function renderNavSection(v: NavSectionView): TemplateResult | typeof nothing {
   if (v.filtering && v.rows.length === 0) return nothing;
   return html`
-    <div class="nav-content" @click=${() => v.onToggle()}>
+    <div
+      class="nav-content"
+      role="button"
+      tabindex="0"
+      ${tourAnchor(v.tourAnchorId)}
+      @click=${() => v.onToggle()}
+      @keydown=${(event: KeyboardEvent) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        (event.currentTarget as HTMLElement).click();
+      }}
+    >
       <div class="nav-content-label">
         <wa-icon library="mdi" name=${v.icon}></wa-icon>
         <p>${v.label}</p>

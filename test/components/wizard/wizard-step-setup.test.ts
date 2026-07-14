@@ -8,6 +8,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
+import {
+  clearTourPending,
+  setTourPending,
+} from "../../../src/components/guided-tour/tour-session.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
 import { pressEnter } from "../../_press-enter.js";
@@ -26,6 +30,7 @@ vi.mock("../../../src/util/secrets-cache.js", async (importOriginal) => ({
 }));
 
 beforeEach(() => {
+  clearTourPending();
   vi.mocked(fetchSecretKeys).mockResolvedValue([]);
 });
 
@@ -92,13 +97,17 @@ describe("wizard-step-setup", () => {
     expect(stage(el)).toBe("wifi");
   });
 
-  it("never shows a skip link on the Wi-Fi stage", async () => {
+  it("offers Skip for now on the Wi-Fi stage", async () => {
     const el = await mount(wifiBoard());
     await setName(el, "kitchen");
     pressEnter();
     await el.updateComplete;
     expect(stage(el)).toBe("wifi");
-    expect(el.shadowRoot!.querySelector(".skip-wifi")).toBeNull();
+    const skip = el.shadowRoot!.querySelector<HTMLButtonElement>(".skip-wifi")!;
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    skip.click();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("");
   });
 
   it("requires an SSID to finish a Wi-Fi-only board", async () => {
@@ -162,6 +171,21 @@ describe("wizard-step-setup", () => {
     const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
     expect(detail.wifiSsid).toBe("");
     expect(detail.wifiPassword).toBe("");
+  });
+
+  it("shows saved Wi-Fi during the tour without revealing its values", async () => {
+    setTourPending();
+    const el = await mount(wifiBoard(), ["wifi_ssid", "wifi_password"]);
+    await setName(el, "kitchen");
+    pressEnter();
+    await el.updateComplete;
+
+    expect(stage(el)).toBe("wifi");
+    expect(el.shadowRoot!.querySelector(".wifi-saved")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector("#onboarding-ssid")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".skip-wifi")?.textContent).toContain(
+      "wizard.wifi_use_saved"
+    );
   });
 
   it("passes a typed SSID through unchanged for the backend to persist", async () => {

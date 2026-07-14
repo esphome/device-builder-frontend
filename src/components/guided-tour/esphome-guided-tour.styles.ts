@@ -40,7 +40,53 @@ export const guidedTourStyles = css`
     box-sizing: border-box;
   }
 
+  .recovery-bubble {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(320px, calc(100vw - 32px));
+    transform: translate(-50%, -50%);
+  }
+
+  .btn-step-close {
+    position: absolute;
+    top: var(--wa-space-s);
+    right: var(--wa-space-s);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    color: var(--wa-color-text-quiet);
+  }
+
+  .btn-step-close:hover,
+  .btn-step-close.hovered {
+    color: var(--wa-color-text-normal);
+    background: var(--wa-color-surface-lowered);
+  }
+
+  .btn-step-close wa-icon {
+    font-size: 18px;
+  }
+
+  .tour-header {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+    padding: 0 var(--wa-space-xl) var(--wa-space-s) 0;
+    border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+  }
+
+  .tour-name {
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-normal);
+  }
+
   .step-label {
+    margin-left: auto;
     font-size: 11px;
     font-weight: var(--wa-font-weight-bold);
     letter-spacing: 0.07em;
@@ -49,7 +95,7 @@ export const guidedTourStyles = css`
   }
 
   .bubble h2 {
-    margin: var(--wa-space-2xs) 0 0;
+    margin: var(--wa-space-xs) 0 0;
     font-size: var(--wa-font-size-m);
     font-weight: var(--wa-font-weight-bold);
   }

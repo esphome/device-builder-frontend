@@ -76,14 +76,6 @@ describe("computeTourFrame dim panels", () => {
   });
 });
 
-describe("computeTourFrame ring", () => {
-  it("matches the hole and caps the corner radius at half its height", () => {
-    const { hole, ring } = computeTourFrame(TARGET, "right", VP);
-    expect({ x: ring.x, y: ring.y, w: ring.w, h: ring.h }).toEqual(hole);
-    expect(ring.radius).toBe(Math.min(hole.h / 2, 14));
-  });
-});
-
 describe("computeTourFrame bubble placement", () => {
   it("places a right-side bubble just past the hole, top-anchored", () => {
     const { hole, bubble } = computeTourFrame(TARGET, "right", VP);

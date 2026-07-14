@@ -5,7 +5,6 @@ import { findTemplatesByAnchor } from "../_lit-template-walker.js";
 
 const FRAME: TourFrame = {
   hole: { x: 100, y: 80, w: 200, h: 120 },
-  ring: { x: 100, y: 80, w: 200, h: 120, radius: 14 },
   dim: {
     top: { x: 0, y: 0, w: 800, h: 80 },
     bottom: { x: 0, y: 200, w: 800, h: 400 },
@@ -17,10 +16,9 @@ const FRAME: TourFrame = {
 };
 
 describe("renderTourSpotlightBackdrop", () => {
-  it("renders four dim panels around a visible target ring", () => {
+  it("renders four dim panels around the target cutout", () => {
     const result = renderTourSpotlightBackdrop(FRAME);
 
     expect(findTemplatesByAnchor(result, 'class="tour-dim"')).toHaveLength(4);
-    expect(findTemplatesByAnchor(result, 'class="tour-ring"')).toHaveLength(1);
   });
 });

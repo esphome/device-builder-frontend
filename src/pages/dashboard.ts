@@ -78,6 +78,7 @@ import {
 } from "../components/dashboard/skeletons.js";
 import { dashboardStyles } from "../components/dashboard/styles.js";
 import { yamlModeStyles } from "../components/dashboard/yaml-mode-styles.js";
+import { TourActivityController } from "../components/guided-tour/tour-activity-controller.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import {
   activeJobsContext,
@@ -169,6 +170,8 @@ registerMdiIcons({
 
 @customElement("esphome-page-dashboard")
 export class ESPHomePageDashboard extends LitElement {
+  private _tourActivity = new TourActivityController(this);
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;

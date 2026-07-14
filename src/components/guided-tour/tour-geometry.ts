@@ -19,10 +19,6 @@ export interface Box {
   h: number;
 }
 
-export interface Ring extends Box {
-  radius: number;
-}
-
 export interface Bubble {
   left: number;
   top?: number;
@@ -32,7 +28,6 @@ export interface Bubble {
 
 export interface TourFrame {
   hole: Box;
-  ring: Ring;
   dim: { top: Box; bottom: Box; left: Box; right: Box };
   bubble: Bubble;
   side: Side;
@@ -44,7 +39,6 @@ export interface TourFrame {
 export const SPOTLIGHT_PADDING = 6;
 export const BUBBLE_WIDTH = 300;
 export const BUBBLE_GAP = 16;
-const RING_MAX_RADIUS = 14;
 const EDGE_MARGIN = 16;
 const BUBBLE_BOTTOM_RESERVE = 200;
 const BUBBLE_HEIGHT_EST = 220;
@@ -169,7 +163,6 @@ export function computeTourFrame(
   options: { pad?: number; bubbleWidth?: number } = {}
 ): TourFrame {
   const hole = computeHole(rect, options.pad);
-  const ring: Ring = { ...hole, radius: Math.min(hole.h / 2, RING_MAX_RADIUS) };
   const width = options.bubbleWidth;
 
   const candidates = SIDE_ORDER[side].map((candidate) => ({
@@ -181,7 +174,7 @@ export function computeTourFrame(
   const fitting = clear.find(({ bubble }) => bubbleFitsViewport(bubble, vp));
   const dim = computeDim(hole, vp);
   if (fitting) {
-    return { hole, ring, dim, bubble: fitting.bubble, side: fitting.candidate };
+    return { hole, dim, bubble: fitting.bubble, side: fitting.candidate };
   }
 
   // A near-full-screen hole leaves no side that both clears it and stays on
@@ -197,5 +190,5 @@ export function computeTourFrame(
     width: w,
   };
   // `side` is only read for caret placement, which overlay frames skip.
-  return { hole, ring, dim, bubble: overlay, side, overlay: true };
+  return { hole, dim, bubble: overlay, side, overlay: true };
 }

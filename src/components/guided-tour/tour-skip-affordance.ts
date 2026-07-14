@@ -5,23 +5,26 @@ export interface TourSkipAffordanceOptions {
   isDialogStep: () => boolean;
   /** The Skip button's current viewport rect (undefined when not rendered). */
   skipRect: () => DOMRect | undefined;
+  /** The Close-for-now button's viewport rect. */
+  pauseRect: () => DOMRect | undefined;
   onSkip: () => void;
+  onPause: () => void;
 }
 
 /**
- * Skip-button hit-testing for dialog-anchored tour steps.
+ * Skip/close-button hit-testing for dialog-anchored tour steps.
  *
  * While a modal ``wa-dialog`` is open the tour popover paints above it but
  * is not hit-testable — the dialog owns the pointer — so the bubble's Skip
- * button receives neither real clicks nor ``:hover``. This controller
- * reproduces both from window-level events: a capturing click inside the
- * button's rect skips the tour, and pointer moves drive a hover flag plus
+ * buttons receive neither real clicks nor ``:hover``. This controller
+ * reproduces both from window-level events: a capturing click inside either
+ * button rect invokes its action, and pointer moves drive hover state plus
  * the pointer cursor. The cursor must live on ``document.documentElement``
  * (no element the tour controls is under the pointer), so the mutation is
  * confined here with teardown on both ``hostDisconnected`` and ``reset``.
  */
 export class TourSkipAffordance implements ReactiveController {
-  private _hover = false;
+  private _hover: "skip" | "pause" | null = null;
   private _prevCursor: string | null = null;
   private _listening = false;
 
@@ -34,7 +37,11 @@ export class TourSkipAffordance implements ReactiveController {
 
   /** True while the pointer is over the Skip button's rect. */
   get hover(): boolean {
-    return this._hover;
+    return this._hover === "skip";
+  }
+
+  get pauseHover(): boolean {
+    return this._hover === "pause";
   }
 
   /**
@@ -61,30 +68,37 @@ export class TourSkipAffordance implements ReactiveController {
 
   /** Clear the hover state and restore the document cursor. */
   reset(): void {
-    if (!this._hover) return;
-    this._hover = false;
+    if (this._hover === null) return;
+    this._hover = null;
     this._setCursor(false);
     this._host.requestUpdate();
   }
 
   private _onCaptureClick = (event: MouseEvent): void => {
     if (!this._options.isDialogStep()) return;
-    if (!this._hit(event)) return;
+    const target = this._hit(event);
+    if (target === null) return;
     event.preventDefault();
     event.stopPropagation();
-    this._options.onSkip();
+    if (target === "skip") this._options.onSkip();
+    else this._options.onPause();
   };
 
   private _onPointerMove = (event: PointerEvent): void => {
-    const over = this._options.isDialogStep() && this._hit(event);
-    if (over === this._hover) return;
-    this._hover = over;
-    this._setCursor(over);
+    const target = this._options.isDialogStep() ? this._hit(event) : null;
+    if (target === this._hover) return;
+    this._hover = target;
+    this._setCursor(target !== null);
     this._host.requestUpdate();
   };
 
-  private _hit(event: MouseEvent): boolean {
-    const r = this._options.skipRect();
+  private _hit(event: MouseEvent): "skip" | "pause" | null {
+    if (this._inside(event, this._options.skipRect())) return "skip";
+    if (this._inside(event, this._options.pauseRect())) return "pause";
+    return null;
+  }
+
+  private _inside(event: MouseEvent, r: DOMRect | undefined): boolean {
     return (
       !!r &&
       r.width > 0 &&
