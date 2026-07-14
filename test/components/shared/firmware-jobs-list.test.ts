@@ -1,17 +1,18 @@
 // @vitest-environment happy-dom
 //
-// Tests for renderSourceLine — the per-job "source" line in the firmware-jobs
-// dialog. Mounts the Lit TemplateResult into a happy-dom container (repo idiom)
-// and asserts on the produced DOM.
+// Tests for renderSourceLine — the per-job "source" line in the shared
+// firmware-jobs list. Mounts the Lit TemplateResult into a happy-dom container
+// (repo idiom) and asserts on the produced DOM.
 
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 
-import { JobSource, JobType } from "../../../src/api/types/firmware-jobs.js";
+import { JobSource, JobStatus, JobType } from "../../../src/api/types/firmware-jobs.js";
 import {
+  bucketJobs,
   renderGroups,
   renderSourceLine,
-} from "../../../src/components/firmware-jobs-dialog/renderers.js";
+} from "../../../src/components/shared/firmware-jobs-list.js";
 import { identityLocalize, renderInto } from "../../_dom.js";
 import { makeFirmwareJob } from "../../_make-firmware-job.js";
 
@@ -69,5 +70,40 @@ describe("renderJob type label", () => {
     const job = makeFirmwareJob({ job_type: JobType.COMPILE });
     const el = renderInto(renderGroups(groupsHost() as never, [job], []));
     expect(el.textContent).toContain("firmware_jobs.type_compile");
+  });
+});
+
+describe("bucketJobs", () => {
+  it("splits and orders running → queued, terminal newest-first", () => {
+    const running = makeFirmwareJob({
+      job_id: "r",
+      status: JobStatus.RUNNING,
+      created_at: "2026-01-01T00:05:00Z",
+    });
+    const queued = makeFirmwareJob({
+      job_id: "q",
+      status: JobStatus.QUEUED,
+      created_at: "2026-01-01T00:01:00Z",
+    });
+    const doneOld = makeFirmwareJob({
+      job_id: "d1",
+      status: JobStatus.COMPLETED,
+      completed_at: "2026-01-01T00:02:00Z",
+    });
+    const doneNew = makeFirmwareJob({
+      job_id: "d2",
+      status: JobStatus.FAILED,
+      completed_at: "2026-01-01T00:04:00Z",
+    });
+    const { active, terminal } = bucketJobs(
+      new Map([
+        ["d1", doneOld],
+        ["q", queued],
+        ["d2", doneNew],
+        ["r", running],
+      ])
+    );
+    expect(active.map((j) => j.job_id)).toEqual(["r", "q"]);
+    expect(terminal.map((j) => j.job_id)).toEqual(["d2", "d1"]);
   });
 });

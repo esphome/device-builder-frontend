@@ -11,7 +11,6 @@ import {
   CLEANUP_TTL_DEFAULT_SECONDS,
   CLEANUP_TTL_MAX_SECONDS,
   CLEANUP_TTL_MIN_SECONDS,
-  type IdentityView,
   type PeerSummary,
 } from "../../api/types/remote-build.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
@@ -29,6 +28,7 @@ import { copyToClipboard } from "../../util/copy-to-clipboard.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { formatSecondsAgo } from "../../util/relative-time.js";
+import { RemoteBuildIdentityController } from "../../util/remote-build-identity-controller.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import { buildServerCardStyles, cleanupTtlStyles } from "./build-server-styles.js";
 import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
@@ -72,11 +72,10 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   @state()
   private _rotationCounter = 0;
 
-  @state()
-  private _identity: IdentityView | null = null;
-
-  @state()
-  private _identityLoadFailed = false;
+  private readonly _identityCtrl = new RemoteBuildIdentityController(
+    this,
+    () => this._api
+  );
 
   @state()
   private _rotateInFlight = false;
@@ -100,11 +99,6 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     cleanupTtlStyles,
   ];
 
-  connectedCallback() {
-    super.connectedCallback();
-    void this._loadIdentity();
-  }
-
   protected updated(changed: Map<string, unknown>) {
     super.updated(changed);
     // Cross-tab rotate: another tab fired remote_build_identity_rotated;
@@ -113,7 +107,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
       changed.has("_rotationCounter") &&
       changed.get("_rotationCounter") !== undefined
     ) {
-      void this._loadIdentity();
+      this._identityCtrl.onRotationCounterChanged();
     }
   }
 
@@ -264,17 +258,17 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   }
 
   private _renderCard() {
-    if (this._identityLoadFailed) {
+    if (this._identityCtrl.loadFailed) {
       return renderStatusRow(
         this._localize,
         "settings.remote_build_identity_load_failed",
         "alert"
       );
     }
-    if (this._identity === null) {
+    if (this._identityCtrl.identity === null) {
       return renderStatusRow(this._localize, "settings.remote_build_identity_loading");
     }
-    const identity = this._identity;
+    const identity = this._identityCtrl.identity;
     const formattedPin = formatPinSha256(identity.pin_sha256);
     return html`
       <div class="build-server-card">
@@ -385,17 +379,6 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     `;
   }
 
-  private async _loadIdentity(): Promise<void> {
-    if (this._api === undefined) return;
-    try {
-      this._identity = await this._api.getRemoteBuildIdentity();
-      this._identityLoadFailed = false;
-    } catch (err) {
-      console.warn("Could not load remote-build identity:", err);
-      this._identityLoadFailed = true;
-    }
-  }
-
   private _toast(
     level: "success" | "warning" | "error",
     key: string,
@@ -446,9 +429,8 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     if (this._api === undefined || this._rotateInFlight) return;
     this._rotateInFlight = true;
     try {
-      this._identity = await this._api.rotateRemoteBuildIdentity();
-      this._identityLoadFailed = false;
-      if (this._identity.listener_bound) {
+      this._identityCtrl.set(await this._api.rotateRemoteBuildIdentity());
+      if (this._identityCtrl.identity?.listener_bound) {
         this._toast("success", "settings.remote_build_rotate_success");
       } else {
         this._toast("warning", "settings.remote_build_rotate_listener_down");
@@ -465,7 +447,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   }
 
   private async _onCopyPin() {
-    const pin = this._identity?.pin_sha256;
+    const pin = this._identityCtrl.identity?.pin_sha256;
     if (!pin) {
       this._toast("warning", "settings.remote_build_pin_copy_failed");
       return;
