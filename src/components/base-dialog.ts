@@ -8,6 +8,37 @@ import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { centeredMobileDialog } from "../styles/dialog-mobile.js";
 import { EnterController } from "../util/enter-controller.js";
 
+/** Wrappers currently open, maintained by the class below. Backs
+ *  cross-dialog navigation (``closeOpenDialogs``); dialogs not built on
+ *  the wrapper don't participate. */
+const openDialogs = new Set<ESPHomeBaseDialog>();
+
+/**
+ * Request-close every open dialog except those inside *except*'s composed
+ * tree.
+ *
+ * Each close is a :meth:`ESPHomeBaseDialog.requestClose`, so busy gates and
+ * host ``request-close`` vetoes still apply — a dialog that refuses to
+ * close stays open, same as Escape.
+ */
+export function closeOpenDialogs(except?: Node): void {
+  for (const dialog of [...openDialogs]) {
+    if (except && composedContains(except, dialog)) continue;
+    dialog.requestClose();
+  }
+}
+
+// Composed-tree containment: follows shadow boundaries via the host chain,
+// so a component passed as ``except`` shields the wrapper in its shadow DOM.
+function composedContains(ancestor: Node, node: Node): boolean {
+  let cur: Node | null = node;
+  while (cur) {
+    if (cur === ancestor) return true;
+    cur = cur.parentNode ?? (cur instanceof ShadowRoot ? cur.host : null);
+  }
+  return false;
+}
+
 /**
  * Thin shared wrapper around ``<wa-dialog>``.
  *
@@ -175,6 +206,36 @@ export class ESPHomeBaseDialog extends LitElement {
     if (changed.has("open") || changed.has("confirmOnEnter")) {
       this._enter.set(this.open && this.confirmOnEnter !== undefined);
     }
+    if (this.open) openDialogs.add(this);
+    else openDialogs.delete(this);
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (this.open) openDialogs.add(this);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    openDialogs.delete(this);
+  }
+
+  /**
+   * Ask for a close through the exact Escape codepath.
+   *
+   * Delegates to the inner ``wa-dialog``'s ``requestClose()`` method (what
+   * its own Escape handler calls), so the one ``wa-hide`` → busy gate →
+   * host-veto → hide → ``after-hide`` sequence runs — both host shapes
+   * close (flag flipped from ``request-close`` or from ``after-hide``).
+   * Don't switch this to writing the ``open`` *property*: its watcher
+   * reverts and re-requests, double-triggering the hide.
+   */
+  requestClose(): void {
+    this.shadowRoot
+      ?.querySelector<HTMLElement & { requestClose?: (source?: unknown) => void }>(
+        "wa-dialog"
+      )
+      ?.requestClose?.(this);
   }
 
   // Focus a consumer-marked ``[autofocus]`` control once the dialog has

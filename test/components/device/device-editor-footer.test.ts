@@ -84,4 +84,28 @@ describe("device-editor footer install action", () => {
     btn!.click(); // still usable (re-flash)
     expect(install).toHaveBeenCalledTimes(1);
   });
+
+  it("busy Update stays enabled and its visible label flips to view-progress", async () => {
+    // The visible text IS the accessible name (no aria-label), so the flip
+    // covers screen-reader and voice-control users alike (WCAG 2.5.3).
+    const el = await mount({ showUpdate: true, busy: true });
+    const main = q(el, ".install-split__main") as HTMLButtonElement;
+    expect(main.disabled).toBe(false);
+    expect(main.textContent).toContain("dashboard.table_action_view_progress");
+    expect(main.textContent).not.toContain("dashboard.update");
+    expect(main.hasAttribute("aria-label")).toBe(false);
+    expect(main.title).toBe("dashboard.table_action_view_progress");
+    // The caret can only start a *new* job, so it alone disables mid-job.
+    expect((q(el, ".install-split__caret") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("busy Install stays enabled and its visible label flips to view-progress", async () => {
+    const el = await mount({ showModified: true, busy: true });
+    const btn = q(el, ".install-fab") as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    expect(btn.textContent).toContain("dashboard.table_action_view_progress");
+    expect(btn.textContent).not.toContain("dashboard.install");
+    expect(btn.hasAttribute("aria-label")).toBe(false);
+    expect(btn.title).toBe("dashboard.table_action_view_progress");
+  });
 });

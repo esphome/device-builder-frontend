@@ -53,7 +53,14 @@ export function collectUnsatisfiedConstraints(
       return (
         entry !== undefined &&
         (getIn(values, [k]) !== undefined ||
-          isEntryVisible(entry, values, presentComponents, targetPlatform))
+          isEntryVisible(
+            entry,
+            values,
+            presentComponents,
+            targetPlatform,
+            undefined,
+            entries
+          ))
       );
     });
   for (const group of requiredGroups) {

@@ -8,15 +8,11 @@ import { describe, expect, it } from "vitest";
 
 import type { FeaturedBundle } from "../../../../src/api/types/boards.js";
 import { renderBundleCard } from "../../../../src/components/device/component-catalog/renderers.js";
-import { identityLocalize, renderInto } from "../../../_dom.js";
+import { renderInto } from "../../../_dom.js";
+import { makeCatalogHost } from "./_host.js";
 
 function host(failed: string[] = []): unknown {
-  return {
-    _imageFailed: new Set(failed),
-    _onAddBundle: () => {},
-    _onImageError: () => {},
-    _localize: identityLocalize,
-  };
+  return makeCatalogHost({ _imageFailed: new Set(failed) });
 }
 
 function bundle(overrides: Partial<FeaturedBundle> = {}): FeaturedBundle {
@@ -54,12 +50,9 @@ describe("renderBundleCard image", () => {
 
   it("calls _onImageError with the bundle id when the img fires an error", () => {
     const failedIds: string[] = [];
-    const spyHost = {
-      _imageFailed: new Set<string>(),
-      _onAddBundle: () => {},
+    const spyHost = makeCatalogHost({
       _onImageError: (id: string) => failedIds.push(id),
-      _localize: identityLocalize,
-    };
+    });
     const b = bundle({ image_url: "https://example.com/module.jpg" });
     const el = renderInto(renderBundleCard(spyHost as never, b));
     el.querySelector("img")!.dispatchEvent(new Event("error"));

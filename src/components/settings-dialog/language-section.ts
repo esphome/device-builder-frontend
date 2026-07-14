@@ -46,13 +46,10 @@ export class ESPHomeSettingsLanguage extends LitElement {
         color: var(--wa-color-text-quiet);
         line-height: 1.4;
       }
+      /* Colour + hover come from the shared .settings-inline-link; this
+         adds only the help-line specifics. */
       .language-help-link {
-        color: var(--esphome-primary);
-        text-decoration: none;
         white-space: nowrap;
-      }
-      .language-help-link:hover {
-        text-decoration: underline;
       }
       .language-help-link wa-icon {
         font-size: 1em;
@@ -96,7 +93,7 @@ export class ESPHomeSettingsLanguage extends LitElement {
           <span aria-hidden="true">💡</span>
           ${this._localize("settings.language_help")}
           <a
-            class="language-help-link"
+            class="language-help-link settings-inline-link"
             href=${TRANSLATIONS_GUIDE_URL}
             target="_blank"
             rel="noopener noreferrer"

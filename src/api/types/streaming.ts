@@ -6,9 +6,10 @@
 
 // ─── Streaming Commands ──────────────────────────────────────
 
-/** Callbacks for streaming commands (validate, logs). */
-export interface StreamCallbacks {
+/** Callbacks for streaming commands (validate, logs, follow_job).
+ *  The result frame's shape is per-command; validate/logs use the default. */
+export interface StreamCallbacks<TResult = { success: boolean; code: number }> {
   onOutput?: (line: string) => void;
-  onResult?: (data: { success: boolean; code: number }) => void;
+  onResult?: (data: TResult) => void;
   onError?: (error: string) => void;
 }

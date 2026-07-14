@@ -29,6 +29,8 @@ export function makeCommandDialogHost(
     _jobs: jobs,
     _commandType: "install",
     _jobId: "",
+    _timerJobId: "",
+    _timer: { reset: () => {} },
     _jobStatus: JobStatus.RUNNING,
     _state: "running",
     _statusMessage: "",

@@ -109,7 +109,8 @@ export function computeStateFacet(
   counts.set(DeviceState.OFFLINE, 0);
   counts.set(DeviceState.UNKNOWN, 0);
   for (const d of devices) {
-    counts.set(d.state, (counts.get(d.state) ?? 0) + 1);
+    const state = d.runtime_state.state;
+    counts.set(state, (counts.get(state) ?? 0) + 1);
   }
   const labelKeyByState: Record<DeviceState, string> = {
     [DeviceState.ONLINE]: "dashboard.online",

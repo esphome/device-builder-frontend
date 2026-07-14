@@ -1,4 +1,4 @@
-import { type TemplateResult, html } from "lit";
+import { type TemplateResult, html, nothing } from "lit";
 
 export interface ChoiceCardProps {
   /** mdi icon name; the caller is responsible for registering it. */
@@ -8,6 +8,9 @@ export interface ChoiceCardProps {
   selected: boolean;
   /** Roving-tabindex tab stop: the checked card, or the first when none is. */
   tabbable: boolean;
+  /** Localized badge text rendered over the card border; also gives the
+   *  recommended default an accent border before it is selected. */
+  badge?: string;
   disabled?: boolean;
   onSelect: () => void;
 }
@@ -23,7 +26,9 @@ export function renderChoiceCard(props: ChoiceCardProps): TemplateResult {
   return html`
     <button
       type="button"
-      class="choice-card ${props.selected ? "selected" : ""}"
+      class="choice-card ${props.selected ? "selected" : ""} ${
+        props.badge ? "recommended" : ""
+      }"
       role="radio"
       aria-checked=${props.selected ? "true" : "false"}
       tabindex=${props.tabbable ? "0" : "-1"}
@@ -35,6 +40,7 @@ export function renderChoiceCard(props: ChoiceCardProps): TemplateResult {
         <span class="choice-title">${props.title}</span>
         <span class="choice-desc">${props.description}</span>
       </span>
+      ${props.badge ? html`<span class="choice-badge">${props.badge}</span>` : nothing}
     </button>
   `;
 }

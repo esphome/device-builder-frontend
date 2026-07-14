@@ -91,6 +91,7 @@ export function makeRenderCtx(
     requiredOnly: false,
     showAdvanced: false,
     presentComponents: new Set<string>(),
+    entries: [],
     nestedOpenSections: new Set<string>(),
     getAt: (path: string[]) => {
       let cur: unknown = values;

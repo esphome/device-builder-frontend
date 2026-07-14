@@ -297,6 +297,23 @@ export const componentCatalogStyles = css`
     letter-spacing: 0.04em;
   }
 
+  /* Board-recommendation identity: same pill as its sibling chips so the
+     row reads as one family, recolored primary so it stands out from the
+     muted category chips (frontend #1220). */
+  .component-category-chip--recommended {
+    color: var(--esphome-primary);
+    background: var(--esphome-tint);
+    border-color: var(--esphome-primary);
+    font-weight: var(--wa-font-weight-bold);
+  }
+
+  /* Focusable (tabindex) so keyboard users can raise the explainer
+     tooltip; wa-tooltip's default trigger is hover+focus. */
+  .component-category-chip--recommended:focus-visible {
+    outline: none;
+    box-shadow: var(--esphome-focus-ring-tight);
+  }
+
   .component-description {
     margin: 0;
     font-size: var(--wa-font-size-2xs);

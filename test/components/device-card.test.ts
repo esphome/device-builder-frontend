@@ -11,17 +11,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
-import { ESPHomeDeviceCard } from "../../src/components/device-card.js";
-
-async function mount(props: Partial<ESPHomeDeviceCard>): Promise<ESPHomeDeviceCard> {
-  const el = new ESPHomeDeviceCard();
-  el.name = "kitchen";
-  el.configuration = "kitchen.yaml";
-  Object.assign(el, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+import { JobType } from "../../src/api/types/firmware-jobs.js";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
+import { mountDeviceCard as mount } from "./_device-card.js";
 
 describe("device-card encryption indicator uses the raw pending flag", () => {
   it("shows encryption-pending but hides the modified dot when the gate is off", async () => {
@@ -34,5 +26,27 @@ describe("device-card encryption indicator uses the raw pending flag", () => {
     });
     expect(el.shadowRoot!.querySelector(".encryption-icon.pending")).not.toBeNull();
     expect(el.shadowRoot!.querySelector(".indicator-dot--modified")).toBeNull();
+  });
+});
+
+describe("device-card busy badge names the running job", () => {
+  it("shows the compiling label for an active compile job", async () => {
+    const el = await mount({
+      busy: true,
+      activeJob: makeFirmwareJob({ job_type: JobType.COMPILE }),
+    });
+    expect(el.shadowRoot!.querySelector(".device-status.busy")!.textContent).toContain(
+      "dashboard.status_compiling"
+    );
+  });
+
+  it("keeps the installing label for an active upload job", async () => {
+    const el = await mount({
+      busy: true,
+      activeJob: makeFirmwareJob({ job_type: JobType.UPLOAD }),
+    });
+    expect(el.shadowRoot!.querySelector(".device-status.busy")!.textContent).toContain(
+      "dashboard.status_installing"
+    );
   });
 });

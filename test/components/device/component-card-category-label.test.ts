@@ -36,6 +36,12 @@ describe("categoryChipLabel", () => {
     expect(categoryChipLabel("audio_dac")).toBe("Audio DAC");
   });
 
+  it("maps the featured id to the Recommended display word", () => {
+    // The wire id stays ``featured`` but every user-facing surface
+    // says "Recommended" (#1220).
+    expect(categoryChipLabel("featured")).toBe("Recommended");
+  });
+
   it("returns an empty string for an empty id", () => {
     // Defensive: the catalog API contract guarantees a
     // non-empty ``category`` field, but if a future schema
@@ -92,6 +98,12 @@ describe("componentDialogTitle", () => {
         core: false,
       })
     ).toBe("ATM90E32 Power Sensor · Text Sensor");
+  });
+
+  it("says Recommended for a featured entry", () => {
+    expect(componentDialogTitle("SPI Bus (lcd_spi)", "featured", { core: false })).toBe(
+      "SPI Bus (lcd_spi) · Recommended"
+    );
   });
 
   it("keeps the bare name in the core-config flow", () => {

@@ -1,13 +1,11 @@
 import type { PropertyValues } from "lit";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
+import { flashHighlight } from "./field-highlight.js";
 
 /** Renders to spend looking for a cursor-targeted field before giving up.
  *  entries + values land in separate renders, so one retry isn't enough;
  *  the cap stops an unbounded shadow-DOM walk for a never-rendered path. */
 const MAX_TRIES = 3;
-
-/** Class that runs the one-shot glow; defined in ``config-entry-form.styles``. */
-const FLASH_CLASS = "field--highlight";
 
 /** Don't re-pulse the same field within this window — moving the cursor
  *  around inside one field shouldn't keep re-flashing it. */
@@ -100,8 +98,13 @@ export class FieldScrollController {
   maybeScroll(changed: PropertyValues): void {
     const fp = this.host.focusFieldPath;
     const key = fp?.length ? fieldKeyAttr(fp) : undefined;
+    // showAdvanced counts: a focus-driven advanced reveal renders the
+    // target field a pass after the path landed.
     const relevant =
-      changed.has("focusFieldPath") || changed.has("entries") || changed.has("values");
+      changed.has("focusFieldPath") ||
+      changed.has("entries") ||
+      changed.has("values") ||
+      changed.has("showAdvanced");
     const { gate, scroll } = advanceScrollGate(
       {
         scrolledKey: this._scrolledKey,
@@ -146,29 +149,13 @@ export class FieldScrollController {
       // plus input — lands fully in view instead of clipped at the fold.
       target.scrollIntoView({ block: "center" });
       // Keyed on the matched prefix; debounced so it isn't re-pulsed on every
-      // cursor nudge. Skipped under reduced-motion: the animation is disabled
-      // there, so adding the class only strands it (animationend never fires).
+      // cursor nudge.
       const matchedKey = fieldKeyAttr(path.slice(0, len));
       const now = Date.now();
-      const reduceMotion = window.matchMedia?.(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
-      if (
-        !reduceMotion &&
-        (matchedKey !== this._lastFlashKey || now - this._lastFlashAt > FLASH_DEDUP_MS)
-      ) {
+      if (matchedKey !== this._lastFlashKey || now - this._lastFlashAt > FLASH_DEDUP_MS) {
         this._lastFlashKey = matchedKey;
         this._lastFlashAt = now;
-        target.classList.remove(FLASH_CLASS);
-        void target.offsetWidth;
-        target.classList.add(FLASH_CLASS);
-        // Drop the class once the one-shot glow ends so it isn't left on the
-        // element (and can't linger across a re-render).
-        target.addEventListener(
-          "animationend",
-          () => target.classList.remove(FLASH_CLASS),
-          { once: true }
-        );
+        flashHighlight(target);
       }
       if (len === path.length) this._scrolledKey = key;
       return;

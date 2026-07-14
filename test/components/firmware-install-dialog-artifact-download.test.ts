@@ -3,7 +3,8 @@
  * the device's existing build artefacts (firmware images + the ELF) so the
  * user can pick one, and compiles ONLY when nothing is built yet — an existing
  * build is served as-is, with no recompile, so the ELF's debug symbols keep
- * matching the firmware currently flashed on the device.
+ * matching the firmware currently flashed on the device. A running build is
+ * followed to completion first, without claiming it (#1200).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -38,6 +39,11 @@ const ELF: FirmwareBinary = {
   description: "Debug symbols for the ESP stack trace decoder.",
 };
 
+type FollowCbs = {
+  onResult?: (d: unknown) => void;
+  onError?: (e: string) => void;
+};
+
 // get_binaries can return a different list on each call (empty before a
 // compile, populated after), so accept a queue of results.
 function makeHost(getBinariesResults: FirmwareBinary[][]) {
@@ -49,8 +55,8 @@ function makeHost(getBinariesResults: FirmwareBinary[][]) {
     firmwareCompile: vi
       .fn()
       .mockResolvedValue({ job_id: "j1", source: JobSource.LOCAL, source_label: "" }),
-    firmwareFollowJob: vi.fn((_id: string, cbs: { onResult: (d: unknown) => void }) => {
-      cbs.onResult({ status: JobStatus.COMPLETED });
+    firmwareFollowJob: vi.fn((_id: string, cbs: FollowCbs) => {
+      cbs.onResult?.({ status: JobStatus.COMPLETED });
       return "s1";
     }),
     firmwareGetBinaries,
@@ -68,12 +74,19 @@ function makeHost(getBinariesResults: FirmwareBinary[][]) {
     _binaries: [] as FirmwareBinary[],
     _downloadedFilename: "",
     _logLines: [] as string[],
+    // Synchronous stand-ins for the dialog's rAF-batched log sink.
+    _enqueueLogLine(line: string) {
+      this._logLines = [...this._logLines, line];
+    },
+    _flushLogLines() {},
     _failedDuringCompile: false,
     _jobId: "",
     _streamId: "",
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
+    _activeJobs: new Map<string, unknown>(),
+    _timer: { noteLine: vi.fn() },
     _localize: identityLocalize,
     _fail: vi.fn(),
   };
@@ -103,6 +116,8 @@ describe("download flow (startArtifactDownload)", () => {
     const { host, api } = makeHost([[FACTORY]]);
     await run(host);
     expect(api.firmwareCompile).not.toHaveBeenCalled();
+    // With no active job there's nothing to wait on either.
+    expect(api.firmwareFollowJob).not.toHaveBeenCalled();
     expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
       "device.yaml",
       "firmware.factory.bin"
@@ -156,5 +171,87 @@ describe("download flow (startArtifactDownload)", () => {
     expect(host._step).toBe("error");
     expect(host._statusMessage).toBe("firmware.no_binaries_remote");
     expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe("download waits for a running build (#1200)", () => {
+  const runningJob = { job_id: "running-1", configuration: "device.yaml" };
+
+  it("follows the running job to completion, then serves fresh artefacts", async () => {
+    const { host, api } = makeHost([[FACTORY]]);
+    host._activeJobs.set("device.yaml", runningJob);
+    await run(host);
+    // Waited on the running job (not a new compile), then downloaded.
+    expect(api.firmwareFollowJob).toHaveBeenCalledWith("running-1", expect.anything());
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
+      "device.yaml",
+      "firmware.factory.bin"
+    );
+    // The dialog never claims the job it waited on: dismissing the download
+    // must not cancel a build it doesn't own.
+    expect(host._jobId).toBe("");
+  });
+
+  it("continues to its own compile when the awaited job ends non-completed", async () => {
+    const { host, api } = makeHost([[], [FACTORY]]);
+    host._activeJobs.set("device.yaml", runningJob);
+    api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: FollowCbs) => {
+      cbs.onResult?.({ status: JobStatus.CANCELLED });
+      return "s1";
+    });
+    await run(host);
+    // The wait resolves regardless of outcome; the empty build dir then
+    // triggers the download's own (no-longer-superseding) compile.
+    expect(api.firmwareCompile).toHaveBeenCalledTimes(1);
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("fails closed when the follow stream errors mid-wait", async () => {
+    // A dead stream says nothing about the job: proceeding could still read
+    // torn artifacts or supersede it, so the flow fails instead.
+    const { host, api } = makeHost([[FACTORY]]);
+    host._activeJobs.set("device.yaml", runningJob);
+    api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: FollowCbs) => {
+      cbs.onError?.("stream lost");
+      return "s1";
+    });
+    await run(host);
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.download_failed");
+    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+  });
+
+  it("bails without touching the backend when dismissed mid-wait", async () => {
+    const { host, api } = makeHost([[FACTORY]]);
+    host._activeJobs.set("device.yaml", runningJob);
+    // A follow that never completes: the user closes the dialog instead.
+    api.firmwareFollowJob.mockImplementationOnce(() => "s1");
+    const flow = run(host);
+    expect(host._compileReject).not.toBeNull();
+    host._compileReject!(new Error("Install dialog dismissed"));
+    await flow;
+    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("re-waits at picker-select time for a build that started meanwhile", async () => {
+    const { host, api } = makeHost([[FACTORY, OTA, ELF]]);
+    await run(host); // lands on choose-binary, no job running
+    expect(api.firmwareFollowJob).not.toHaveBeenCalled();
+    // The race: a build starts while the picker sits open.
+    host._activeJobs.set("device.yaml", runningJob);
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.ota.bin"
+    );
+    expect(api.firmwareFollowJob).toHaveBeenCalledWith("running-1", expect.anything());
+    expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
+      "device.yaml",
+      "firmware.ota.bin"
+    );
+    expect(host._step).toBe("download-ready");
   });
 });

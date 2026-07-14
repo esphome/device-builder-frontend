@@ -3,6 +3,8 @@ import { mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { notify, notifyError, notifySuccess } from "../../util/notify.js";
+import { desktopDocsUrl } from "../../util/release-notes-url.js";
+import { splitTemplate } from "../../util/template-split.js";
 
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
@@ -16,6 +18,7 @@ import {
   buildOffloadDiscoveredHostsContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
+  desktopVersionContext,
   localizeContext,
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
@@ -76,6 +79,10 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   @consume({ context: versionContext, subscribe: true })
   @state()
   private _appVersion = "";
+
+  @consume({ context: desktopVersionContext, subscribe: true })
+  @state()
+  private _desktopVersion = "";
 
   @consume({ context: buildOffloadDiscoveredHostsContext, subscribe: true })
   @state()
@@ -145,6 +152,26 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     `,
   ];
 
+  // Intro copy with "ESPHome Desktop" itself linked to the app's docs, so a
+  // reader learns how to get it inline rather than via a separate CTA. On
+  // Desktop that link is self-referential, so a plain variant renders instead.
+  private _renderPairedServersDesc() {
+    if (this._desktopVersion) {
+      return html`${this._localize("settings.paired_build_servers_desc_desktop")}`;
+    }
+    const [before, after] = splitTemplate(
+      this._localize("settings.paired_build_servers_desc"),
+      "{desktop_link}"
+    );
+    return html`${before}<a
+        class="settings-inline-link"
+        href=${desktopDocsUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        >${this._localize("settings.esphome_desktop")}</a
+      >${after}`;
+  }
+
   protected render() {
     return html`
       ${this._renderAlerts()}
@@ -152,9 +179,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
       </div>
-      <div class="section-intro">
-        ${this._localize("settings.paired_build_servers_desc")}
-      </div>
+      <div class="section-intro">${this._renderPairedServersDesc()}</div>
       ${this._renderPairings()}
 
       <div class="section-heading">

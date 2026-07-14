@@ -53,7 +53,7 @@ function renderCalls(
 ): Array<[string, Record<string, unknown> | undefined]> {
   const calls: Array<[string, Record<string, unknown> | undefined]> = [];
   const host = {
-    device: { state: deviceState },
+    device: { runtime_state: { state: deviceState } },
     _reachability: r,
     _reachabilityAnchorMs: NOW,
     _localize: (key: string, args?: Record<string, unknown>) => {

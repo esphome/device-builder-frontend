@@ -45,6 +45,8 @@ import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import "../config-entry-renderers/lambda-editor.js";
 import { lambdaBodyOf } from "../config-entry-renderers/lambda.js";
 import { literalLambdaToggleStyles } from "../config-entry-renderers/literal-lambda-toggle.js";
+import { scrollFlashRow } from "../field-highlight.js";
+import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import "./automation-condition-tree.js";
 import {
   delayLambdaOf,
@@ -55,6 +57,11 @@ import {
   writeDelayParams,
 } from "./automation-delay-params.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import {
+  type AutomationFocus,
+  childFocus,
+  focusTargetHasChanged,
+} from "./automation-focus.js";
 import "./catalog-picker-dialog.js";
 import type {
   CatalogPickedDetail,
@@ -79,6 +86,21 @@ registerMdiIcons({
 // Stable identity for group-less defs — a fresh [] per render would
 // defeat Lit's property change detection on the form mount.
 const NO_REQUIRED_GROUPS: RequiredGroup[] = [];
+
+/** Only ``if`` and ``wait_until`` carry a separate boolean-gate
+ *  condition list distinct from a sub-action list. Detected by catalog
+ *  id rather than a flag on AutomationAction — the wire shape keeps the
+ *  gate implicit in the action's semantics. */
+function hasConditionGate(def: AutomationAction | undefined): boolean {
+  return def?.id === "if" || def?.id === "wait_until";
+}
+
+/** Whether the action's params render as a catalog-driven
+ *  ``<esphome-config-entry-form>`` (vs the bespoke delay widget or
+ *  nothing). */
+function rendersParamsForm(def: AutomationAction | undefined): def is AutomationAction {
+  return !!def && def.id !== "delay" && def.config_entries.length > 0;
+}
 
 @customElement("esphome-automation-action-node")
 export class ESPHomeAutomationActionNode extends LitElement {
@@ -122,6 +144,12 @@ export class ESPHomeAutomationActionNode extends LitElement {
   @property({ type: Boolean })
   last = false;
 
+  /** Cursor focus target routed to this node: ``"conditions"`` head →
+   *  the boolean gate, a child-list key → that nested list, empty →
+   *  this node's params form or the row itself. */
+  @property({ attribute: false, hasChanged: focusTargetHasChanged })
+  focusTarget: AutomationFocus | null = null;
+
   @query("esphome-catalog-picker-dialog")
   private _picker!: ESPHomeCatalogPickerDialog;
 
@@ -150,7 +178,12 @@ export class ESPHomeAutomationActionNode extends LitElement {
     inputStyles,
     automationEditorStyles,
     literalLambdaToggleStyles,
+    fieldHighlightStyles,
   ];
+
+  /** Row-level scroll spent on the current target (``hasChanged`` keys
+   *  the property by value, so a reset means a genuinely new target). */
+  private _focusScrolled = false;
 
   /**
    * The list reuses nodes by DOM position (plain actions.map, no keyed
@@ -161,14 +194,49 @@ export class ESPHomeAutomationActionNode extends LitElement {
    * on that would snap the card shut mid-edit.
    */
   protected willUpdate(changed: PropertyValues<this>): void {
-    if (!changed.has("value")) return;
-    const previous = changed.get("value") as ActionNode | undefined;
-    if (previous && previous.action_id !== this.value.action_id) {
-      this._collapsed = false;
-      this._showAdvanced = false;
-      this._delayLambdaStash = "";
-      this._delayLiteralStash = null;
+    if (changed.has("value")) {
+      const previous = changed.get("value") as ActionNode | undefined;
+      if (previous && previous.action_id !== this.value.action_id) {
+        this._collapsed = false;
+        this._showAdvanced = false;
+        this._delayLambdaStash = "";
+        this._delayLiteralStash = null;
+      }
     }
+    if (changed.has("focusTarget")) {
+      this._focusScrolled = false;
+      // A collapsed card doesn't render its body — the target couldn't mount.
+      if (this.focusTarget) this._collapsed = false;
+    }
+  }
+
+  protected updated(): void {
+    this._maybeScrollSelf();
+  }
+
+  /** Scroll + flash this row when the target terminates here — a
+   *  node-level target, or one the rendered surface can't forward
+   *  (no gate/child list/params form for the remaining path). One
+   *  evaluation per target; forwarding layers pay nothing after it. */
+  private _maybeScrollSelf(): void {
+    const t = this.focusTarget;
+    if (!t || this._focusScrolled) return;
+    this._focusScrolled = true;
+    if (!this._isTerminalFocus(t)) return;
+    const row = this.shadowRoot?.querySelector<HTMLElement>(".ae-row");
+    if (row) scrollFlashRow(row);
+  }
+
+  private _isTerminalFocus(t: AutomationFocus): boolean {
+    const def = this.catalog.find((a) => a.id === this.value.action_id);
+    const head = t.node[0];
+    if (head === "conditions") return !hasConditionGate(def);
+    if (typeof head === "string") {
+      return !(def?.accepts_action_list ?? []).includes(head);
+    }
+    if (t.field.length === 0) return true;
+    // Field target with no catalog form to arm — degrade to the row flash.
+    return !rendersParamsForm(def);
   }
 
   protected render() {
@@ -303,18 +371,15 @@ export class ESPHomeAutomationActionNode extends LitElement {
    * declare one (``if`` / ``wait_until``).
    */
   private _renderConditionGate(def: AutomationAction | undefined) {
-    // Only ``if`` and ``wait_until`` carry a separate boolean-gate
-    // condition list distinct from a sub-action list. Detect by
-    // checking the catalog's action id rather than re-introducing
-    // a flag on AutomationAction — the wire shape keeps the gate
-    // implicit in the action's semantics.
-    if (!def) return nothing;
-    if (def.id !== "if" && def.id !== "wait_until") return nothing;
+    if (!hasConditionGate(def)) return nothing;
     return html`<div class="ae-nested">
       <p class="ae-nested-label">${this._localize("device.automation_only_when")}</p>
       <esphome-automation-condition-tree
         no-header
         .conditions=${this.value.conditions ?? []}
+        .focusTarget=${
+          this.focusTarget?.node[0] === "conditions" ? childFocus(this.focusTarget) : null
+        }
         .catalog=${this.conditionCatalog}
         .devices=${this.devices}
         .board=${this.board}
@@ -358,6 +423,9 @@ export class ESPHomeAutomationActionNode extends LitElement {
           <esphome-automation-action-list
             no-header
             .actions=${this.value.children?.[key] ?? []}
+            .focusTarget=${
+              this.focusTarget?.node[0] === key ? childFocus(this.focusTarget) : null
+            }
             .catalog=${this.catalog}
             .conditionCatalog=${this.conditionCatalog}
             .scripts=${this.scripts}
@@ -393,18 +461,21 @@ export class ESPHomeAutomationActionNode extends LitElement {
    * exact substitution.
    */
   private _renderActionParams(def: AutomationAction | undefined) {
-    if (!def) return nothing;
-    if (def.id === "delay") return this._renderDelayParams();
-    if (def.config_entries.length === 0) return nothing;
+    if (def?.id === "delay") return this._renderDelayParams();
+    if (!rendersParamsForm(def)) return nothing;
     // The form owns the advanced section; an all-advanced action (no basic
     // fields) renders everything with no control, matching the old
     // force-open-no-toggle behaviour.
+    const t = this.focusTarget;
     return html`<esphome-config-entry-form
       .entries=${def.config_entries}
       .values=${this.value.params}
       .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
       .board=${this.board}
       .yaml=${this.yaml}
+      .focusFieldPath=${
+        t && t.node.length === 0 && t.field.length > 0 ? t.field : undefined
+      }
       ?disabled=${this.disabled}
       advanced-section
       ?show-advanced=${this._showAdvanced}

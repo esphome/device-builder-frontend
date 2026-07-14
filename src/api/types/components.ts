@@ -121,6 +121,10 @@ export interface ComponentCatalogEntry {
    *  parity, ...), range bounds (min/max_frequency in Hz) and required
    *  pins (require_tx / require_mosi / ...). Drives dep-add prefill. */
   bus_constraints?: Record<string, Record<string, unknown>>;
+  /** Real catalog category behind a `featured` entry (`bus` for a featured
+   *  `spi`), so the card can chip its type alongside its recommendation
+   *  status. Null/absent on regular entries. */
+  underlying_category?: ComponentCategory | null;
   /** Cross-field cardinality constraints over the top-level `config_entries`
    *  (from ESPHome's `cv.has_*_one_key` validators). Nested-scope constraints
    *  live on the owning `nested` entry's `required_groups`. */

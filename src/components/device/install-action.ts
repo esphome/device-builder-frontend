@@ -1,6 +1,7 @@
 import { html, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { updateButtonTitle } from "../../util/update-tooltip.js";
+import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 
 export interface InstallActionProps {
   localize: LocalizeFunc;
@@ -20,26 +21,33 @@ export interface InstallActionProps {
  * install-method picker (Web Serial / OTA / manual) so a re-flash or
  * replacement chip still has a path. Otherwise a plain Install opens the
  * picker — highlighted when there are pending changes, muted but still usable
- * when the config already matches the deployed firmware. Rendered into the
- * device-editor shadow root, so its `.install-fab` styles apply.
+ * when the config already matches the deployed firmware. While a job runs
+ * (`busy`) the main buttons stay clickable — the page routes the click to the
+ * running job's progress dialog — and only the caret disables, since picking
+ * a method for a *new* job is exactly what can't start mid-job. Rendered into
+ * the device-editor shadow root, so its `.install-fab` styles apply.
  */
 export function renderInstallAction(p: InstallActionProps): TemplateResult {
+  // The visible text is the accessible name (no aria-label), and it flips to
+  // view-progress while busy — one honest label for sighted, screen-reader,
+  // and voice-control users alike (WCAG 2.5.3 Label in Name).
   if (p.showUpdate) {
     return html`<div class="install-split">
       <button
         type="button"
         class="install-fab install-split__main"
-        ?disabled=${p.busy}
+        ${tourAnchor("install")}
         @click=${p.onUpdate}
-        title=${updateButtonTitle(
+        title=${updateActionTitle(
           p.localize,
+          p.busy,
           p.installedVersion,
           p.availableVersion,
           "dashboard.update"
         )}
       >
         <wa-icon library="mdi" name="upload"></wa-icon>
-        ${p.localize("dashboard.update")}
+        ${busyActionLabel(p.localize, p.busy, "dashboard.update")}
       </button>
       <button
         type="button"
@@ -53,14 +61,15 @@ export function renderInstallAction(p: InstallActionProps): TemplateResult {
       </button>
     </div>`;
   }
+  const installLabel = busyActionLabel(p.localize, p.busy, "dashboard.install");
   return html`<button
     type="button"
     class="install-fab ${p.showModified ? "" : "install-fab--muted"}"
-    ?disabled=${p.busy}
+    ${tourAnchor("install")}
     @click=${p.onInstall}
-    title=${p.localize("dashboard.install")}
+    title=${installLabel}
   >
     <wa-icon library="mdi" name="upload"></wa-icon>
-    ${p.localize("dashboard.install")}
+    ${installLabel}
   </button>`;
 }

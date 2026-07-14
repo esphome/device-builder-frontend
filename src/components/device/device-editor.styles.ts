@@ -102,7 +102,6 @@ export const deviceEditorStyles = css`
   }
 
   .save-button,
-  .validate-button,
   .install-fab {
     display: inline-flex;
     align-items: center;
@@ -186,28 +185,6 @@ export const deviceEditorStyles = css`
     transform: none;
   }
 
-  /* Subordinate to Save: surface-tinted variant so the primary
-     action stays visually dominant. The disabled state (YAML buffer
-     dirty) is the more common one — a bright primary button there
-     would compete with Save for attention. */
-  .validate-button {
-    background: var(--wa-color-surface-default);
-    color: var(--wa-color-text-normal);
-    border-color: var(--wa-color-surface-border);
-  }
-
-  .validate-button:hover:not(:disabled) {
-    background: var(--wa-color-surface-raised);
-    border-color: color-mix(in srgb, var(--wa-color-text-normal), transparent 70%);
-  }
-
-  .validate-button:disabled {
-    background: var(--wa-color-surface-default);
-    color: color-mix(in srgb, var(--wa-color-text-normal), transparent 55%);
-    border-color: var(--wa-color-surface-border);
-    cursor: not-allowed;
-  }
-
   .install-fab {
     background: color-mix(
       in srgb,
@@ -251,7 +228,6 @@ export const deviceEditorStyles = css`
      box from this one font-size, so there's nothing to keep in sync. */
   .save-button wa-icon,
   .save-button wa-spinner,
-  .validate-button wa-icon,
   .install-fab wa-icon {
     font-size: 16px;
   }
@@ -271,13 +247,6 @@ export const deviceEditorStyles = css`
     --track-width: 2px;
     --indicator-color: currentColor;
     --track-color: color-mix(in srgb, currentColor 30%, transparent);
-  }
-
-  /* Tooltip carrier so the "why disabled" hint reaches mouse users
-     even when the underlying button has the disabled attribute
-     (which suppresses pointer events on the button itself). */
-  .validate-button-wrap {
-    display: inline-flex;
   }
 
   .header-actions {

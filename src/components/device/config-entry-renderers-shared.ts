@@ -523,7 +523,7 @@ export function renderChildEntries(
     ? filterRenderable(
         entry.config_entries ?? [],
         values,
-        renderFilterOptions(ctx, { showAdvanced: true })
+        renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
       )
     : ctx.filterRenderable(entry.config_entries ?? [], values);
   return children.map((child) => ctx.renderEntry(child, [...path, child.key]));

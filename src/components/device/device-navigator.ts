@@ -32,6 +32,7 @@ import {
   parseYamlTopLevelSections,
   sectionKeyOf,
 } from "../../util/yaml-sections.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
@@ -107,6 +108,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   @property({ attribute: false })
   openSections: Set<number> = new Set();
+
+  @property({ attribute: false })
+  tourAnchorId?: string;
 
   @property({ attribute: false })
   yaml = "";
@@ -384,7 +388,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
         : "";
 
     return html`
-      <section class="card">
+      <section class="card" ${tourAnchor(this.tourAnchorId)}>
         <esphome-add-config-dialog
           .boardName=${this.boardName}
           .configuration=${this.configuration}

@@ -4,6 +4,17 @@ import { JobType } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /**
+ * The job type a job presents as: a deferred install is a lone COMPILE
+ * carrying the whole install intent, so it surfaces as an Install.
+ *
+ * Deliberately NOT used by the device card's busy badge — "Compiling"
+ * during a deferred install matches a normal chain's compile phase.
+ */
+export function effectiveJobType(job: FirmwareJob): JobType {
+  return job.is_deferred_install ? JobType.INSTALL : job.job_type;
+}
+
+/**
  * Resolve the human-readable label for a firmware job.
  *
  * Used by both the firmware-tasks dialog and the command dialog's
@@ -80,4 +91,25 @@ export function firmwareJobDisplayName(
   }
   const device = devices.find((d) => d.configuration === job.configuration);
   return device?.friendly_name || device?.name || job.configuration;
+}
+
+/**
+ * Re-attach *dialog* to the configuration's running job, if any.
+ *
+ * Returns true when an active job existed (the dialog now follows it) —
+ * the install seams bail on true, since enqueuing instead would
+ * supersede: the backend cancels and restarts the configuration's
+ * in-flight jobs ("one active job per device").
+ */
+export function followActiveJob(
+  activeJobs: Map<string, FirmwareJob>,
+  configuration: string,
+  dialog: { followJob(job: FirmwareJob, displayName: string): void },
+  devices: ConfiguredDevice[],
+  localize: LocalizeFunc
+): boolean {
+  const job = activeJobs.get(configuration);
+  if (!job) return false;
+  dialog.followJob(job, firmwareJobDisplayName(job, devices, localize));
+  return true;
 }

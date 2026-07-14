@@ -58,9 +58,14 @@ function makePage(api: Partial<ESPHomeAPI> = {}): ESPHomePageDevice {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const internals = (page: ESPHomePageDevice) => page as any;
 
-function clickYamlLine(page: ESPHomePageDevice, line: number, path: string[] = []) {
+function clickYamlLine(
+  page: ESPHomePageDevice,
+  line: number,
+  path: string[] = [],
+  indexedPath?: (string | number)[]
+) {
   internals(page)._onYamlCursorLine(
-    new CustomEvent("yaml-cursor-line", { detail: { line, path } })
+    new CustomEvent("yaml-cursor-line", { detail: { line, path, indexedPath } })
   );
 }
 
@@ -161,6 +166,30 @@ describe("cursor-driven YAML highlight (#1885)", () => {
     expect(internals(page)._selectedSection).not.toBe("i2c");
     expect(internals(page)._highlightRange).toEqual({ fromLine: 2, toLine: 2 });
     expect(internals(page)._errorHighlight).toBe("active");
+  });
+
+  it("clears the field focus on a navigator-driven section switch", () => {
+    // A navigator click carries no field intent; a stale cursor path would
+    // scroll/flash an unrelated target in the newly mounted editor.
+    const page = makePage();
+    clickYamlLine(page, 2, ["i2c", "sda"], ["i2c", "sda"]);
+    expect(internals(page)._focusYamlPath).toEqual(["i2c", "sda"]);
+
+    internals(page)._onSectionSelect(
+      new CustomEvent("section-select", { detail: { sectionKey: "sensor", fromLine: 4 } })
+    );
+
+    expect(internals(page)._focusFieldPath).toBeUndefined();
+    expect(internals(page)._focusYamlPath).toBeUndefined();
+  });
+
+  it("captures the indexed cursor path on cross- and same-section moves", () => {
+    const page = makePage();
+    clickYamlLine(page, 5, ["sensor"], ["sensor", 0, "platform"]); // cross-section
+    expect(internals(page)._focusYamlPath).toEqual(["sensor", 0, "platform"]);
+
+    clickYamlLine(page, 6, ["sensor", "temperature"], ["sensor", 0, "temperature"]);
+    expect(internals(page)._focusYamlPath).toEqual(["sensor", 0, "temperature"]);
   });
 
   it("an active error-jump highlight survives a hand edit", () => {

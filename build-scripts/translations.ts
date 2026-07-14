@@ -4,6 +4,14 @@
 //   npm run translations:download                pull translated locales from Lokalise
 //   npm run translations:download -- --source release
 //                                                pull locales from the latest GitHub release
+//   npm run translations:orphans                 export keys on Lokalise but not in en.json
+//   npm run translations:orphans:delete [-- --yes]
+//                                                delete the reviewed orphan keys from Lokalise
+//
+// `orphans` is a reviewable alternative to `upload --cleanup`: instead of
+// letting Lokalise blindly delete every key absent from en.json, it writes
+// the orphan list to translation-orphans.json so a human can prune the ones
+// to keep, then `orphans:delete -- --yes` deletes whatever's left.
 //
 // The base language (en.json) is the in-repo source of truth: `upload`
 // pushes its keys to Lokalise, adding new keys and updating the English
@@ -32,8 +40,14 @@ import { unzipSync } from "fflate";
 
 import {
   BASE_LANGUAGE,
+  findOrphans,
+  flattenKeys,
+  nonEmptyFlagValue,
+  projectIdMismatch,
   localeFromZipEntry,
   resolveDownloadSource,
+  type LokaliseKey,
+  type OrphanKey,
 } from "./translations-lib.ts";
 
 // --- Paths and locale config -------------------------------------------
@@ -67,6 +81,15 @@ const API_BASE = "https://api.lokalise.com/api2";
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 300_000;
 
+// Default working file for the orphan review flow: `orphans` writes it,
+// `delete-orphans` reads it back. Gitignored — it's a throwaway diff against
+// the live Lokalise project, not a committed artifact.
+const ORPHANS_FILE = "translation-orphans.json";
+// Page size for the keys listing and batch size for bulk delete. Both well
+// within Lokalise's per-request ceilings for this project's key count.
+const KEYS_PAGE_LIMIT = 500;
+const DELETE_CHUNK = 500;
+
 class LokaliseError extends Error {}
 
 const sleep = (ms: number): Promise<void> =>
@@ -96,7 +119,10 @@ class LokaliseClient {
     this.projectId = projectId;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // Low-level request returning the raw Response so callers that need the
+  // pagination headers (listAllKeys) can read them; `request` wraps this for
+  // the common JSON-body case.
+  private async send(method: string, path: string, body?: unknown): Promise<Response> {
     const resp = await fetch(`${API_BASE}/projects/${this.projectId}/${path}`, {
       method,
       headers: {
@@ -112,7 +138,41 @@ class LokaliseClient {
         `Lokalise ${method} ${path} failed: HTTP ${resp.status} ${text}`
       );
     }
+    return resp;
+  }
+
+  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const resp = await this.send(method, path, body);
     return (await resp.json()) as T;
+  }
+
+  // List every key in the project, walking offset pagination until the last
+  // page (X-Pagination-Page-Count). Translations are excluded from the
+  // payload — the orphan diff only needs key ids and names.
+  async listAllKeys(): Promise<LokaliseKey[]> {
+    const all: LokaliseKey[] = [];
+    let page = 1;
+    for (;;) {
+      const resp = await this.send(
+        "GET",
+        `keys?limit=${KEYS_PAGE_LIMIT}&page=${page}&include_translations=0`
+      );
+      const data = (await resp.json()) as { keys?: LokaliseKey[] };
+      all.push(...(data.keys ?? []));
+      const pageCount = Number(resp.headers.get("x-pagination-page-count") ?? "0");
+      if (!Number.isFinite(pageCount) || pageCount <= page) {
+        break;
+      }
+      page += 1;
+    }
+    return all;
+  }
+
+  // Bulk-delete keys by id, chunked to stay within the per-request ceiling.
+  async deleteKeys(keyIds: number[]): Promise<void> {
+    for (let i = 0; i < keyIds.length; i += DELETE_CHUNK) {
+      await this.request("DELETE", "keys", { keys: keyIds.slice(i, i + DELETE_CHUNK) });
+    }
   }
 
   // Upload a base-language file and wait for processing to finish.
@@ -379,6 +439,132 @@ async function runDownloadFromRelease(): Promise<number> {
   return 0;
 }
 
+// --- Orphan review flow ------------------------------------------------
+
+interface OrphanFile {
+  _README: string;
+  project_id: string;
+  generated_at: string;
+  count: number;
+  orphans: OrphanKey[];
+}
+
+const ORPHAN_README =
+  "Keys present in Lokalise but absent from src/translations/en.json. " +
+  "Remove any entry you want to KEEP — every entry left in `orphans` is " +
+  "DELETED from Lokalise by `npm run translations:orphans:delete -- --yes`. " +
+  "This is a throwaway working copy and is gitignored.";
+
+// The base-language key set as Lokalise names it: en.json flattened with the
+// `::` separator (see flattenKeys). This is what an orphan is diffed against.
+function loadBaseKeys(): Set<string> {
+  const raw = readFileSync(translationPath(BASE_LANGUAGE), "utf-8");
+  return flattenKeys(JSON.parse(raw));
+}
+
+async function runOrphans(client: LokaliseClient, outPath: string): Promise<number> {
+  const baseKeys = loadBaseKeys();
+  console.log("Listing all Lokalise keys");
+  const keys = await client.listAllKeys();
+  const orphans = findOrphans(keys, baseKeys);
+
+  const file: OrphanFile = {
+    _README: ORPHAN_README,
+    project_id: process.env.LOKALISE_PROJECT_ID ?? "",
+    generated_at: new Date().toISOString(),
+    count: orphans.length,
+    orphans,
+  };
+  writeFileSync(outPath, `${JSON.stringify(file, null, 2)}\n`, "utf-8");
+
+  console.log(
+    `${orphans.length} orphan(s) of ${keys.length} Lokalise key(s) ` +
+      `(${baseKeys.size} keys in ${BASE_LANGUAGE}.json).`
+  );
+  console.log(`Wrote ${relative(REPO_ROOT, outPath)}`);
+  if (orphans.length > 0) {
+    console.log(
+      "Review it (delete any entry you want to keep), then run " +
+        "`npm run translations:orphans:delete -- --yes`."
+    );
+  }
+  return 0;
+}
+
+// Parse the reviewed orphans file back into the key ids to delete. Validates
+// shape strictly: a missing `orphans` array or a non-numeric `key_id` is an
+// error, not a silent skip, since the next step deletes by these ids.
+function readOrphanFile(inPath: string, currentProjectId: string): OrphanKey[] {
+  let raw: string;
+  try {
+    raw = readFileSync(inPath, "utf-8");
+  } catch {
+    throw new LokaliseError(
+      `Orphans file not found: ${inPath}. Run \`npm run translations:orphans\` first.`
+    );
+  }
+  let parsed: { project_id?: unknown; orphans?: unknown };
+  try {
+    parsed = JSON.parse(raw) as { project_id?: unknown; orphans?: unknown };
+  } catch (err) {
+    throw new LokaliseError(
+      `Orphans file ${inPath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  const mismatch = projectIdMismatch(parsed.project_id, currentProjectId);
+  if (mismatch) {
+    throw new LokaliseError(
+      `Orphans file ${inPath} was generated for Lokalise project ${mismatch}, but ` +
+        `LOKALISE_PROJECT_ID is ${currentProjectId}. Refusing to delete keys by id in a ` +
+        `different project — regenerate it with \`npm run translations:orphans\`.`
+    );
+  }
+  if (!Array.isArray(parsed.orphans)) {
+    throw new LokaliseError(`Orphans file ${inPath} has no \`orphans\` array.`);
+  }
+  return parsed.orphans.map((entry, i) => {
+    const o = entry as Partial<OrphanKey>;
+    if (typeof o.key_id !== "number") {
+      throw new LokaliseError(
+        `Orphans file ${inPath}: entry ${i} is missing a numeric \`key_id\`.`
+      );
+    }
+    return {
+      key_id: o.key_id,
+      key_name: typeof o.key_name === "string" ? o.key_name : String(o.key_id),
+    };
+  });
+}
+
+async function runDeleteOrphans(
+  client: LokaliseClient,
+  inPath: string,
+  confirmed: boolean
+): Promise<number> {
+  const orphans = readOrphanFile(inPath, process.env.LOKALISE_PROJECT_ID ?? "");
+  if (orphans.length === 0) {
+    console.log(
+      `No orphans listed in ${relative(REPO_ROOT, inPath)}; nothing to delete.`
+    );
+    return 0;
+  }
+
+  if (!confirmed) {
+    console.log(
+      `Dry run — would delete ${orphans.length} key(s) from Lokalise (pass --yes to apply):`
+    );
+    for (const o of orphans) {
+      console.log(`  ${o.key_id}  ${o.key_name}`);
+    }
+    return 0;
+  }
+
+  console.log(`Deleting ${orphans.length} key(s) from Lokalise`);
+  await client.deleteKeys(orphans.map((o) => o.key_id));
+  console.log("Done.");
+  return 0;
+}
+
 function writeTranslation(locale: string, data: unknown): void {
   const path = translationPath(locale);
   // Re-serialize with the repo's JSON conventions (2-space indent, raw
@@ -398,6 +584,10 @@ function usage(): void {
       "  npm run translations:download                Pull translated locales from Lokalise",
       "  npm run translations:download -- --source release",
       "                                               Pull locales from the latest GitHub release",
+      "  npm run translations:orphans [-- --out <file>]",
+      "                                               Export keys on Lokalise but not in en.json",
+      "  npm run translations:orphans:delete [-- --yes] [-- --file <file>]",
+      "                                               Delete the reviewed orphan keys from Lokalise",
       "",
       "Environment:",
       "  LOKALISE_API_TOKEN   API token with read/write file permissions",
@@ -433,6 +623,14 @@ async function main(): Promise<number> {
     }
     if (command === "upload") {
       return await runUpload(makeLokaliseClient(), args.includes("--cleanup"));
+    }
+    if (command === "orphans") {
+      const outPath = nonEmptyFlagValue(args, "--out") ?? join(REPO_ROOT, ORPHANS_FILE);
+      return await runOrphans(makeLokaliseClient(), outPath);
+    }
+    if (command === "delete-orphans") {
+      const inPath = nonEmptyFlagValue(args, "--file") ?? join(REPO_ROOT, ORPHANS_FILE);
+      return await runDeleteOrphans(makeLokaliseClient(), inPath, args.includes("--yes"));
     }
     console.error(`error: unknown command '${command}'`);
     usage();

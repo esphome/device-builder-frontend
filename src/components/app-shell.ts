@@ -64,6 +64,7 @@ import {
   themeIsDark,
 } from "../util/dark-mode.js";
 import { isExpert } from "../util/experience.js";
+import { navigate } from "../util/navigation.js";
 import { notifyInfo } from "../util/notify.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
@@ -109,10 +110,13 @@ import "./feedback-dialog.js";
 import type { ESPHomeFeedbackDialog } from "./feedback-dialog.js";
 import "./firmware-jobs-dialog.js";
 import type { ESPHomeFirmwareJobsDialog } from "./firmware-jobs-dialog.js";
+import "./guided-tour/esphome-guided-tour.js";
+import type { ESPHomeGuidedTour } from "./guided-tour/esphome-guided-tour.js";
 import "./onboarding-wifi-dialog.js";
 import "./onboarding/onboarding-wizard-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
+import type { Section } from "./settings-dialog/types.js";
 import "./update-all-dialog.js";
 import type { ESPHomeUpdateAllDialog } from "./update-all-dialog.js";
 
@@ -252,6 +256,7 @@ export class ESPHomeApp extends LitElement {
   private _onboardingDialog?: HTMLElement & { open(): void };
   @query("esphome-onboarding-wizard-dialog")
   private _onboardingWizard?: HTMLElement & { open(): void };
+  @query("esphome-guided-tour") private _guidedTour?: ESPHomeGuidedTour;
 
   static styles = [
     espHomeStyles,
@@ -491,9 +496,17 @@ export class ESPHomeApp extends LitElement {
   _onOnboardingAcknowledged = () => {
     this._onboardingShouldShow = false;
     void loadOnboardingState(this);
-    // The wizard persists experience / remote-compute before acknowledging;
-    // refresh prefs so the contexts (and the gated UI) reflect the picks.
-    void loadPreferences(this);
+    void loadPreferences(this).then(() => this._maybeOfferTour());
+  };
+
+  private _maybeOfferTour(): void {
+    if (this._remoteComputeOnly || isExpert(this._experienceLevel)) return;
+
+    void navigate("/?tourStep=1");
+  }
+
+  private _onOpenGuidedTour = () => {
+    this._guidedTour?.start();
   };
 
   _onOnboardingDismissedSession = () => {
@@ -577,12 +590,14 @@ export class ESPHomeApp extends LitElement {
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
-        @open-settings=${() => this._settingsDialog?.open()}
+        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) =>
+          this._settingsDialog?.open(e.detail?.section)}
         @open-firmware-jobs=${() => this._firmwareJobsDialog?.open()}
         @open-reset-build-env=${() => this._firmwareJobsDialog?.openResetBuildEnv()}
         @open-feedback=${() => this._feedbackDialog?.open()}
         @open-check-updates=${() => this._desktopUpdateDialog?.open()}
         @open-onboarding-wifi=${this._onOpenOnboarding}
+        @open-guided-tour=${this._onOpenGuidedTour}
       >
         ${this._router.outlet()}
       </esphome-layout>
@@ -639,6 +654,7 @@ export class ESPHomeApp extends LitElement {
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
         @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
       ></esphome-onboarding-wizard-dialog>
+      <esphome-guided-tour></esphome-guided-tour>
     `;
   }
 

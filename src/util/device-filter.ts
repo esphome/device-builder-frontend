@@ -69,7 +69,7 @@ export function applyFacetFilters(
   }
   if (selectedStates.length > 0) {
     const set = new Set(selectedStates);
-    out = out.filter((d) => set.has(d.state));
+    out = out.filter((d) => set.has(d.runtime_state.state));
   }
   if (selectedUpdateStatus.length > 0) {
     // AND / narrowing: a device must satisfy every selected bucket
@@ -120,7 +120,7 @@ export function matchesDeviceSearch(
   if (!includeAddressFields) return false;
   return (
     device.address.toLowerCase().includes(query) ||
-    device.ip_addresses.some((ip) => ip.toLowerCase().includes(query)) ||
+    device.runtime_state.ip_addresses.some((ip) => ip.toLowerCase().includes(query)) ||
     device.target_platform.toLowerCase().includes(query) ||
     matchesMacAddress(device.mac_address, query)
   );

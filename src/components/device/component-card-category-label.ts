@@ -26,6 +26,10 @@ const ACRONYMS = new Set(["adc", "dac", "ota"]);
 
 export function categoryChipLabel(category: string): string {
   if (!category) return "";
+  // The synthetic board-recommendation category is the one id whose
+  // display word diverges from its wire id: every other surface
+  // (sidebar row, wizard copy) says "Recommended" (#1220).
+  if (category === "featured") return "Recommended";
   return category
     .split("_")
     .filter((word) => word.length > 0)

@@ -57,7 +57,8 @@ describe("logs-dialog line batching + cap", () => {
     // pending buffer must not grow without bound during a flood.
     const d = new ESPHomeLogsDialog();
     for (let i = 0; i < 12000; i++) d._enqueueLine(String(i));
-    const pending = (d as unknown as { _pendingLines: string[] })._pendingLines;
+    const pending = (d as unknown as { _lineBatch: { _pending: string[] } })._lineBatch
+      ._pending;
     expect(d._lines).toHaveLength(0); // nothing flushed without a frame
     expect(pending.length).toBeLessThanOrEqual(10000); // 2 * MAX_LOG_LINES
     expect(pending[pending.length - 1]).toBe("11999"); // newest retained

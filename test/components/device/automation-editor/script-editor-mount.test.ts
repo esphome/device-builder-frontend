@@ -49,12 +49,14 @@ const loggerBodies = () => ({
 
 async function mountEditor(
   api: ESPHomeAPI,
-  configuration?: string
+  configuration?: string,
+  props: object = {}
 ): Promise<ESPHomeScriptEditor> {
   const editor = new ESPHomeScriptEditor();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (editor as any)._api = api;
   if (configuration !== undefined) editor.configuration = configuration;
+  Object.assign(editor, props);
   document.body.appendChild(editor);
   await editor.updateComplete;
   await flushMicrotasks(30);
@@ -91,5 +93,69 @@ describe("script-editor action-catalog hydration (#1286)", () => {
 
     expect(getAvailableAutomations).not.toHaveBeenCalled();
     expect(getAutomationBodies).not.toHaveBeenCalled();
+  });
+
+  it("resolves a cursor path into the action list's focus target", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue(loggerBodies());
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "script", id: "my_script" },
+      value: {
+        trigger_id: null,
+        trigger_params: { id: "my_script" },
+        actions: [{ action_id: "logger.log", params: {}, children: {}, conditions: [] }],
+      },
+      focusYamlPath: ["script", 0, "then", 0, "logger.log", "format"],
+    });
+
+    const list = editor.shadowRoot!.querySelector("esphome-automation-action-list");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((list as any).focusTarget).toEqual({ node: [0], field: ["format"] });
+  });
+
+  it("routes an entry-param cursor path to the config form", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "script", id: "my_script" },
+      value: { trigger_id: null, trigger_params: { id: "my_script" }, actions: [] },
+      focusYamlPath: ["script", 0, "mode"],
+      _scriptComponent: {
+        config_entries: [
+          { key: "id", type: "string", label: "ID" },
+          { key: "mode", type: "enum", label: "Mode" },
+        ],
+      },
+    });
+
+    const form = editor.shadowRoot!.querySelector("esphome-config-entry-form");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((form as any).focusFieldPath).toEqual(["mode"]);
+  });
+
+  it("reveals the advanced-gated parameters block for a parameter target", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "script", id: "my_script" },
+      value: {
+        trigger_id: null,
+        trigger_params: { id: "my_script", parameters: { pin: "int" } },
+        actions: [],
+      },
+      focusYamlPath: ["script", 0, "parameters", "pin"],
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((editor as any)._showAdvanced).toBe(true);
+    const params = editor.shadowRoot!.querySelector("esphome-callable-params-editor");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((params as any).focusParam).toBe("pin");
   });
 });

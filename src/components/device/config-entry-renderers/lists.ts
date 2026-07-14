@@ -11,6 +11,7 @@ import {
   labelFor,
   renderFieldError,
   renderLabel,
+  renderSubstitutionHint,
   renderYamlOnlyField,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
@@ -137,16 +138,27 @@ export function renderMultiValueField(
       ${items.map(
         (item, i) => html`
           <div class="multi-row">
-            <input
-              type=${numeric ? "number" : "text"}
-              step=${
-                numeric ? (entry.type === ConfigEntryType.FLOAT ? "any" : "1") : nothing
+            <div class="multi-value-cell">
+              <input
+                type=${numeric ? "number" : "text"}
+                step=${
+                  numeric ? (entry.type === ConfigEntryType.FLOAT ? "any" : "1") : nothing
+                }
+                class="multi-input ${invalid ? "invalid" : ""}"
+                .value=${item}
+                ?disabled=${disabled}
+                @input=${(e: Event) => updateAt(i, (e.target as HTMLInputElement).value)}
+              />
+              ${
+                // Resolve against the stored value, not the escaped display
+                // form the input shows.
+                renderSubstitutionHint(
+                  String(raw[i] ?? ""),
+                  ctx.substitutions,
+                  ctx.localize
+                )
               }
-              class="multi-input ${invalid ? "invalid" : ""}"
-              .value=${item}
-              ?disabled=${disabled}
-              @input=${(e: Event) => updateAt(i, (e.target as HTMLInputElement).value)}
-            />
+            </div>
             ${renderListRemoveButton(ctx, disabled, () => removeAt(i))}
           </div>
         `

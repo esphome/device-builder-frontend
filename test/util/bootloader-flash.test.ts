@@ -10,7 +10,7 @@ describe("canFlashBootloader", () => {
         makeConfiguredDevice({
           ota_partition_access: true,
           expected_config_hash: "aa11bb22",
-          deployed_config_hash: "aa11bb22",
+          runtime_state: { deployed_config_hash: "aa11bb22" },
         })
       )
     ).toBe(true);
@@ -21,7 +21,7 @@ describe("canFlashBootloader", () => {
       canFlashBootloader(
         makeConfiguredDevice({
           expected_config_hash: "aa11bb22",
-          deployed_config_hash: "aa11bb22",
+          runtime_state: { deployed_config_hash: "aa11bb22" },
         })
       )
     ).toBe(false);
@@ -30,7 +30,7 @@ describe("canFlashBootloader", () => {
         makeConfiguredDevice({
           ota_partition_access: true,
           expected_config_hash: "aa11bb22",
-          deployed_config_hash: "ff00ff00",
+          runtime_state: { deployed_config_hash: "ff00ff00" },
         })
       )
     ).toBe(false);
@@ -39,7 +39,7 @@ describe("canFlashBootloader", () => {
         makeConfiguredDevice({
           ota_partition_access: true,
           expected_config_hash: "",
-          deployed_config_hash: "",
+          runtime_state: { deployed_config_hash: "" },
         })
       )
     ).toBe(false);

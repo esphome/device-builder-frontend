@@ -115,6 +115,16 @@ export const settingsSharedStyles = css`
     overflow-y: auto;
   }
 
+  /* Inline text link inside section copy. Single source for every settings
+     section (language help, the ESPHome Desktop link, …). */
+  .settings-inline-link {
+    color: var(--esphome-primary);
+    text-decoration: none;
+  }
+  .settings-inline-link:hover {
+    text-decoration: underline;
+  }
+
   /* Compact layout: the dialog goes full-screen (see fullscreenMobileDialog in
      settings-dialog.ts, driven by the same SETTINGS_DIALOG_BREAKPOINT) and the
      nav stacks above the content. height: 100% fills the full-screen sheet so

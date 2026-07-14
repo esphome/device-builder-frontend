@@ -4,9 +4,11 @@ import { customElement, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
 import { DeviceState, type ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
+  activeJobsContext,
   apiContext,
   buildOffloadPairingsContext,
   devicesContext,
@@ -70,6 +72,10 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   @state()
   private _pairings: Map<string, PairingSummary> | null = null;
 
+  @consume({ context: activeJobsContext, subscribe: true })
+  @state()
+  private _activeJobs: Map<string, FirmwareJob> = new Map();
+
   @state()
   private _open = false;
 
@@ -108,6 +114,11 @@ export class ESPHomeUpdateAllDialog extends LitElement {
         padding: var(--wa-space-m) 0 0;
         font-size: var(--wa-font-size-s);
         color: var(--wa-color-text-quiet);
+      }
+
+      .summary-note {
+        margin-top: var(--wa-space-2xs);
+        color: var(--wa-color-warning-text-quiet);
       }
     `,
   ];
@@ -153,6 +164,23 @@ export class ESPHomeUpdateAllDialog extends LitElement {
     return this._matchedMemo(this._devices, this._selection);
   }
 
+  // Bulk update deliberately supersedes: the backend cancels and restarts a
+  // configuration's in-flight jobs on enqueue (#1195). Warn when it will
+  // actually happen. Deliberately not memoized: the note only renders while
+  // jobs run, which is exactly when _activeJobs is rebuilt per progress
+  // event — a cache would always miss when it matters.
+  private _renderSupersedeNote(matched: ConfiguredDevice[]) {
+    let building = 0;
+    for (const d of matched) {
+      if (this._activeJobs.has(d.configuration)) building += 1;
+    }
+    return building > 0
+      ? html`<div class="summary-note">
+          ${this._localize("update_all_dialog.supersede_note", { count: building })}
+        </div>`
+      : nothing;
+  }
+
   protected render() {
     // Keep one <esphome-base-dialog> so a close flips ?open reactively and
     // wa-dialog's exit animation plays on every path. Gate only the body +
@@ -185,6 +213,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
                   ${this._localize("update_all_dialog.count", {
                     count: matched.length,
                   })}
+                  ${this._renderSupersedeNote(matched)}
                 </div>
                 <div class="actions">
                   <button class="btn btn--cancel" @click=${this.close}>

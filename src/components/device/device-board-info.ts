@@ -8,6 +8,7 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -105,6 +106,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   /** Instance-relative field path to scroll into view, from the YAML cursor. */
   @property({ attribute: false })
   focusFieldPath?: string[];
+
+  /** Indexed key path at the cursor, for automation deep-targeting. */
+  @property({ attribute: false })
+  focusYamlPath?: (string | number)[];
 
   /** The selected section's backend errors; forwarded to the section editor. */
   @property({ attribute: false })
@@ -368,14 +373,10 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     `;
   }
 
-  /**
-   * Render one of the three numbered "next steps" panels in the
-   * unselected content pane (Core / Components / Automations). Each
-   * has a heading, a longer description, and a CTA that expands the
-   * matching section in the device navigator on the left — the goal
-   * is to teach the user that the navigator is where you manage
-   * these things, rather than handing them an add-button right here.
-   */
+  /** Key → location, memoized: a fresh object per render would defeat
+   *  the editors' focus-resolver memoization on every parent render. */
+  private _locationForKey = memoizeOne(locationFromSectionKey);
+
   /**
    * Route an automation / script section key into the right
    * structured editor; everything else lands in the regular
@@ -400,7 +401,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    */
   private _renderSelectedSection() {
     const key = this.selectedSection!;
-    const location = key.startsWith("automation:") ? locationFromSectionKey(key) : null;
+    const location = key.startsWith("automation:") ? this._locationForKey(key) : null;
     if (location?.kind === "script") {
       return html`<esphome-script-editor
         .configuration=${this.configuration}
@@ -408,6 +409,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .platform=${this.board?.esphome.platform ?? ""}
         .location=${location}
         .yaml=${this.yaml}
+        .focusYamlPath=${this.focusYamlPath}
       ></esphome-script-editor>`;
     }
     if (location?.kind === "api_action") {
@@ -417,6 +419,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .platform=${this.board?.esphome.platform ?? ""}
         .location=${location}
         .yaml=${this.yaml}
+        .focusYamlPath=${this.focusYamlPath}
       ></esphome-api-action-editor>`;
     }
     if (location) {
@@ -426,6 +429,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .platform=${this.board?.esphome.platform ?? ""}
         .location=${location}
         .yaml=${this.yaml}
+        .focusYamlPath=${this.focusYamlPath}
       ></esphome-automation-editor>`;
     }
     return html`<esphome-device-section-config
@@ -441,6 +445,14 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     ></esphome-device-section-config>`;
   }
 
+  /**
+   * Render one of the three numbered "next steps" panels in the
+   * unselected content pane (Core / Components / Automations). Each
+   * has a heading, a longer description, and a CTA that expands the
+   * matching section in the device navigator on the left — the goal
+   * is to teach the user that the navigator is where you manage
+   * these things, rather than handing them an add-button right here.
+   */
   private _renderStepSection(opts: {
     title: string;
     desc: string;

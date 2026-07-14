@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  findOrphans,
   flagValue,
   localeCompleteness,
+  flattenKeys,
+  projectIdMismatch,
+  nonEmptyFlagValue,
+  keyNameCandidates,
   localeFromZipEntry,
   resolveDownloadSource,
   toBcp47,
+  type LokaliseKey,
 } from "../../build-scripts/translations-lib.js";
 
 describe("toBcp47", () => {
@@ -57,6 +63,148 @@ describe("flagValue", () => {
 
   it("returns undefined when the flag is absent", () => {
     expect(flagValue(["download"], "--source")).toBeUndefined();
+  });
+});
+
+describe("nonEmptyFlagValue", () => {
+  it("reads a `--flag value` pair", () => {
+    expect(nonEmptyFlagValue(["orphans", "--out", "f.json"], "--out")).toBe("f.json");
+  });
+
+  it("reads a `--flag=value` pair", () => {
+    expect(nonEmptyFlagValue(["orphans", "--out=f.json"], "--out")).toBe("f.json");
+  });
+
+  it("returns undefined when the flag is absent", () => {
+    expect(nonEmptyFlagValue(["orphans"], "--out")).toBeUndefined();
+  });
+
+  it("throws on `--flag=` with an empty value", () => {
+    expect(() => nonEmptyFlagValue(["orphans", "--out="], "--out")).toThrow(
+      /requires a non-empty file path/
+    );
+  });
+
+  it("throws on a valueless `--flag` at the end of argv", () => {
+    expect(() => nonEmptyFlagValue(["orphans", "--out"], "--out")).toThrow(
+      /requires a non-empty file path/
+    );
+  });
+
+  it("rejects a next token that looks like a flag in the space form", () => {
+    expect(() =>
+      nonEmptyFlagValue(["delete-orphans", "--file", "--yes"], "--file")
+    ).toThrow(/looks like a flag/);
+  });
+
+  it("takes an explicit inline value verbatim even if it starts with a dash", () => {
+    expect(nonEmptyFlagValue(["orphans", "--out=-weird.json"], "--out")).toBe(
+      "-weird.json"
+    );
+  });
+});
+
+describe("projectIdMismatch", () => {
+  it("returns null when the ids match", () => {
+    expect(projectIdMismatch("proj-1", "proj-1")).toBeNull();
+  });
+
+  it("returns the file id when the ids differ", () => {
+    expect(projectIdMismatch("proj-1", "proj-2")).toBe("proj-1");
+  });
+
+  it("returns null when the file id is missing or non-string", () => {
+    expect(projectIdMismatch(undefined, "proj-2")).toBeNull();
+    expect(projectIdMismatch("", "proj-2")).toBeNull();
+    expect(projectIdMismatch(42, "proj-2")).toBeNull();
+  });
+
+  it("returns null when the current id is unknown", () => {
+    expect(projectIdMismatch("proj-1", "")).toBeNull();
+  });
+});
+
+describe("flattenKeys", () => {
+  it("joins nested object levels with the Lokalise `::` separator", () => {
+    const keys = flattenKeys({
+      language: "English",
+      dashboard: { title: "ESPHome", nested: { deep: "x" } },
+    });
+    expect(keys).toEqual(
+      new Set(["language", "dashboard::title", "dashboard::nested::deep"])
+    );
+  });
+
+  it("keeps non-string leaves (number/boolean/null) as keys", () => {
+    expect(flattenKeys({ a: 1, b: true, c: null })).toEqual(new Set(["a", "b", "c"]));
+  });
+
+  it("indexes array entries positionally", () => {
+    expect(flattenKeys({ list: ["a", "b"] })).toEqual(new Set(["list::0", "list::1"]));
+  });
+
+  it("returns an empty set for an empty object", () => {
+    expect(flattenKeys({})).toEqual(new Set());
+  });
+});
+
+describe("keyNameCandidates", () => {
+  it("returns a single-element list for a plain string name", () => {
+    expect(keyNameCandidates("dashboard::title")).toEqual(["dashboard::title"]);
+  });
+
+  it("dedupes identical per-platform names", () => {
+    expect(
+      keyNameCandidates({
+        ios: "a",
+        android: "a",
+        web: "a",
+        other: "a",
+      })
+    ).toEqual(["a"]);
+  });
+
+  it("collects distinct non-empty per-platform names and drops blanks", () => {
+    expect(
+      keyNameCandidates({ ios: "", android: "a", web: "b", other: undefined })
+    ).toEqual(["a", "b"]);
+  });
+});
+
+describe("findOrphans", () => {
+  const base = new Set(["dashboard::title", "settings::theme"]);
+
+  it("reports keys whose every name is absent from the base set", () => {
+    const keys: LokaliseKey[] = [
+      { key_id: 1, key_name: "dashboard::title" },
+      { key_id: 2, key_name: "settings::removed_old" },
+    ];
+    expect(findOrphans(keys, base)).toEqual([
+      { key_id: 2, key_name: "settings::removed_old", created_at: undefined },
+    ]);
+  });
+
+  it("keeps a key when any platform name still matches the base set", () => {
+    const keys: LokaliseKey[] = [
+      { key_id: 3, key_name: { web: "renamed::on_web", other: "dashboard::title" } },
+    ];
+    expect(findOrphans(keys, base)).toEqual([]);
+  });
+
+  it("skips keys with no resolvable name so they can't be deleted", () => {
+    const keys: LokaliseKey[] = [{ key_id: 4, key_name: { web: "", other: "" } }];
+    expect(findOrphans(keys, base)).toEqual([]);
+  });
+
+  it("sorts orphans by name", () => {
+    const keys: LokaliseKey[] = [
+      { key_id: 5, key_name: "zzz::late" },
+      { key_id: 6, key_name: "aaa::early" },
+    ];
+    expect(findOrphans(keys, base).map((o) => o.key_name)).toEqual([
+      "aaa::early",
+      "zzz::late",
+    ]);
   });
 });
 

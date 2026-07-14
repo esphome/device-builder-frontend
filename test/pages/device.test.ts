@@ -8,6 +8,7 @@ vi.mock("sonner-js", () => ({
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { EditorValidateResponse } from "../../src/api/types/editor.js";
+import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import type { DeviceLayoutMode } from "../../src/components/device/device-editor.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 
@@ -181,7 +182,10 @@ describe("esphome-page-device save re-entrancy", () => {
 });
 
 interface InstallView {
+  id: string;
   _installCtrl: { onInstall: () => void; onUpdate: () => void };
+  _activeJobs: Map<string, FirmwareJob>;
+  _commandDialog: { followJob(job: FirmwareJob, displayName: string): void };
   _saveYaml(): Promise<boolean>;
   _saveThenInstall(): Promise<void>;
   _saveThenUpdate(): Promise<void>;
@@ -235,5 +239,64 @@ describe("esphome-page-device save before install", () => {
     await expect(page._saveThenInstall()).resolves.toBeUndefined();
     expect(onInstall).not.toHaveBeenCalled();
     expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1);
+  });
+});
+
+function makeBusyInstallView(): ReturnType<typeof makeInstallView> & {
+  followJob: ReturnType<typeof vi.fn>;
+  job: FirmwareJob;
+} {
+  const view = makeInstallView(true);
+  const job = { job_id: "job-1", configuration: "kitchen.yaml" } as FirmwareJob;
+  const otherJob = { job_id: "job-2", configuration: "garage.yaml" } as FirmwareJob;
+  view.page.id = "kitchen.yaml";
+  // A second device's concurrent job proves the lookup keys on this page's id.
+  view.page._activeJobs = new Map([
+    ["garage.yaml", otherJob],
+    ["kitchen.yaml", job],
+  ]);
+  const followJob = vi.fn();
+  // _commandDialog is a @query getter on the prototype; shadow it.
+  Object.defineProperty(view.page, "_commandDialog", { value: { followJob } });
+  return { ...view, followJob, job };
+}
+
+describe("esphome-page-device install while a job is running", () => {
+  test("update re-attaches to the running job: no save, no new build", async () => {
+    const { page, onUpdate, saveYaml, followJob, job } = makeBusyInstallView();
+    await page._saveThenUpdate();
+    expect(followJob).toHaveBeenCalledTimes(1);
+    expect(followJob.mock.calls[0][0]).toBe(job);
+    expect(saveYaml).not.toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  test("install re-attaches to the running job: no save, no new build", async () => {
+    const { page, onInstall, saveYaml, followJob, job } = makeBusyInstallView();
+    await page._saveThenInstall();
+    expect(followJob).toHaveBeenCalledTimes(1);
+    expect(followJob.mock.calls[0][0]).toBe(job);
+    expect(saveYaml).not.toHaveBeenCalled();
+    expect(onInstall).not.toHaveBeenCalled();
+  });
+
+  test("with no active job the save-then-install path runs unchanged", async () => {
+    const { page, onInstall, saveYaml, followJob } = makeBusyInstallView();
+    page._activeJobs = new Map();
+    await page._saveThenInstall();
+    expect(followJob).not.toHaveBeenCalled();
+    expect(saveYaml).toHaveBeenCalledTimes(1);
+    expect(onInstall).toHaveBeenCalledTimes(1);
+  });
+
+  test("another device's running job doesn't hijack this page's install", async () => {
+    const { page, onInstall, saveYaml, followJob } = makeBusyInstallView();
+    page._activeJobs = new Map([
+      ["garage.yaml", { job_id: "job-2", configuration: "garage.yaml" } as FirmwareJob],
+    ]);
+    await page._saveThenInstall();
+    expect(followJob).not.toHaveBeenCalled();
+    expect(saveYaml).toHaveBeenCalledTimes(1);
+    expect(onInstall).toHaveBeenCalledTimes(1);
   });
 });

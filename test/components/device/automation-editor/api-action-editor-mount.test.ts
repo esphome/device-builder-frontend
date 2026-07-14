@@ -46,12 +46,14 @@ const loggerBodies = () => ({
 
 async function mountEditor(
   api: ESPHomeAPI,
-  configuration?: string
+  configuration?: string,
+  props: object = {}
 ): Promise<ESPHomeApiActionEditor> {
   const editor = new ESPHomeApiActionEditor();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (editor as any)._api = api;
   if (configuration !== undefined) editor.configuration = configuration;
+  Object.assign(editor, props);
   document.body.appendChild(editor);
   await editor.updateComplete;
   await flushMicrotasks(30);
@@ -88,5 +90,65 @@ describe("api-action-editor action-catalog hydration (#1286)", () => {
 
     expect(getAvailableAutomations).not.toHaveBeenCalled();
     expect(getAutomationBodies).not.toHaveBeenCalled();
+  });
+
+  it("resolves a cursor path into the action list's focus target", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue(loggerBodies());
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "api_action", action_name: "ring_bell" },
+      value: {
+        trigger_id: null,
+        trigger_params: {},
+        actions: [{ action_id: "logger.log", params: {}, children: {}, conditions: [] }],
+      },
+      focusYamlPath: ["api", "actions", 0, "then", 0, "logger.log", "format"],
+    });
+
+    const list = editor.shadowRoot!.querySelector("esphome-automation-action-list");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((list as any).focusTarget).toEqual({ node: [0], field: ["format"] });
+  });
+
+  it("flashes the name field for an action-key cursor path", async () => {
+    const scrolled = vi
+      .spyOn(HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "api_action", action_name: "ring_bell" },
+      value: { trigger_id: null, trigger_params: {}, actions: [] },
+      focusYamlPath: ["api", "actions", 0, "action"],
+    });
+
+    expect(scrolled).toHaveBeenCalledTimes(1);
+    const field = editor.shadowRoot!.querySelector("#api-action-name")!.closest(".field");
+    expect(scrolled.mock.instances[0]).toBe(field);
+    vi.restoreAllMocks();
+  });
+
+  it("routes a variables cursor path to the params editor", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimWithLoggerAction());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = await mountEditor(api, "device.yaml", {
+      location: { kind: "api_action", action_name: "ring_bell" },
+      value: {
+        trigger_id: null,
+        trigger_params: { variables: { times: "int" } },
+        actions: [],
+      },
+      focusYamlPath: ["api", "actions", 0, "variables", "times"],
+    });
+
+    const params = editor.shadowRoot!.querySelector("esphome-callable-params-editor");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((params as any).focusParam).toBe("times");
   });
 });

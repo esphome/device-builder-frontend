@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { DeviceLayoutMode } from "./device-editor.js";
 
 export interface EditorToolbarProps {
@@ -73,6 +74,7 @@ export function renderEditorToolbar(p: EditorToolbarProps): TemplateResult {
       class="layout-toggle"
       role="group"
       aria-label=${p.localize("device.editor_layout_label")}
+      ${tourAnchor("layout-toggle")}
     >
       <button
         type="button"

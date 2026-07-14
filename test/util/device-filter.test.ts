@@ -15,26 +15,19 @@ import {
   hasActiveFilters,
   matchesDeviceSearch,
 } from "../../src/util/device-filter.js";
+import {
+  type ConfiguredDeviceOverrides,
+  makeConfiguredDevice,
+} from "../_make-configured-device.js";
 
-function device(over: Partial<ConfiguredDevice> = {}): ConfiguredDevice {
-  return {
-    name: "kitchen",
+function device(over: ConfiguredDeviceOverrides = {}): ConfiguredDevice {
+  // Online + live mDNS by default so update/modified filters match; mDNS-dark
+  // cases override active_source.
+  return makeConfiguredDevice({
     friendly_name: "Kitchen Lamp",
-    configuration: "kitchen.yaml",
-    address: "kitchen.local",
-    ip_addresses: [],
-    state: DeviceState.ONLINE,
-    target_platform: "esp32",
-    mac_address: "",
-    labels: [],
-    area: "",
-    // Live mDNS by default so update/modified filters match; mDNS-dark cases
-    // override active_source.
-    active_source: "mdns",
-    update_available: false,
-    has_pending_changes: false,
     ...over,
-  } as ConfiguredDevice;
+    runtime_state: { state: DeviceState.ONLINE, ...over.runtime_state },
+  });
 }
 
 const emptySelection: FacetSelection = {
@@ -98,8 +91,8 @@ describe("applyFacetFilters", () => {
   });
 
   it("state facet matches the device state", () => {
-    const online = device({ name: "a", state: DeviceState.ONLINE });
-    const offline = device({ name: "b", state: DeviceState.OFFLINE });
+    const online = device({ name: "a", runtime_state: { state: DeviceState.ONLINE } });
+    const offline = device({ name: "b", runtime_state: { state: DeviceState.OFFLINE } });
     const out = applyFacetFilters(
       [online, offline],
       selection({ selectedStates: [DeviceState.OFFLINE] })
@@ -167,7 +160,7 @@ describe("matchesDeviceSearch", () => {
   const d = device({
     friendly_name: "Kitchen Lamp",
     address: "10.0.0.5",
-    ip_addresses: ["192.168.1.20"],
+    runtime_state: { ip_addresses: ["192.168.1.20"] },
     target_platform: "esp32",
     mac_address: "94:C9:60:AA:BB:CC",
   });

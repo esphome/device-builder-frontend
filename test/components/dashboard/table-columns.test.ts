@@ -51,7 +51,11 @@ function renderActionsCell(rowOverrides: Partial<DeviceRow> = {}): TemplateResul
     busy: false,
     showUpdate: false,
     showModified: false,
-    _device: { web_port: null },
+    _device: {
+      web_port: null,
+      current_version: "",
+      runtime_state: { deployed_version: "" },
+    },
     ...rowOverrides,
   } as unknown as DeviceRow;
   const info = { row: { original: row } } as unknown as CellContext<DeviceRow, unknown>;
@@ -91,6 +95,76 @@ describe("device table actions", () => {
     const edit = container.querySelector(".cell-action-btn--edit");
     expect(edit).not.toBeNull();
     expect(edit?.classList.contains("cell-action-btn--accent")).toBe(true);
+  });
+});
+
+function clickInstallAction(container: HTMLElement): {
+  fired: string[];
+  details: unknown[];
+} {
+  const btn = container.querySelector<HTMLButtonElement>(".cell-action-btn--install");
+  expect(btn).not.toBeNull();
+  expect(btn!.disabled).toBe(false);
+  const fired: string[] = [];
+  const details: unknown[] = [];
+  for (const name of ["show-progress", "install-device", "update-device"]) {
+    container.addEventListener(name, (e) => {
+      fired.push(name);
+      details.push((e as CustomEvent).detail);
+    });
+  }
+  btn!.click();
+  return { fired, details };
+}
+
+describe("device table busy install/update actions", () => {
+  it("busy install button stays enabled and dispatches show-progress for its own device", () => {
+    const device = {
+      web_port: null,
+      current_version: "",
+      runtime_state: { deployed_version: "" },
+    } as unknown as DeviceRow["_device"];
+    const container = renderInto(
+      renderActionsCell({ busy: true, showModified: true, _device: device })
+    );
+    const { fired, details } = clickInstallAction(container);
+    expect(fired).toEqual(["show-progress"]);
+    // The event carries the row's own device, so with several jobs running
+    // the dashboard opens this row's job, not another device's.
+    expect(details[0]).toBe(device);
+  });
+
+  it("busy update button stays enabled and dispatches show-progress", () => {
+    const container = renderInto(renderActionsCell({ busy: true, showUpdate: true }));
+    expect(clickInstallAction(container).fired).toEqual(["show-progress"]);
+  });
+
+  it("busy row keeps Edit clickable", () => {
+    // Edit only navigates; the editor is designed for mid-job use (#1196).
+    const container = renderInto(renderActionsCell({ busy: true }));
+    expect(
+      container.querySelector<HTMLButtonElement>(".cell-action-btn--edit")!.disabled
+    ).toBe(false);
+  });
+
+  it("idle install button dispatches install-device", () => {
+    const container = renderInto(renderActionsCell({ busy: false, showModified: true }));
+    expect(clickInstallAction(container).fired).toEqual(["install-device"]);
+  });
+
+  it("idle update button dispatches update-device", () => {
+    const container = renderInto(
+      renderActionsCell({
+        busy: false,
+        showUpdate: true,
+        _device: {
+          web_port: null,
+          current_version: "2026.6.0",
+          runtime_state: { deployed_version: "2026.5.0" },
+        } as unknown as DeviceRow["_device"],
+      })
+    );
+    expect(clickInstallAction(container).fired).toEqual(["update-device"]);
   });
 });
 

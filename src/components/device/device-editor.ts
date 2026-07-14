@@ -1,6 +1,5 @@
 import { consume } from "@lit/context";
 import {
-  mdiCheckCircleOutline,
   mdiChevronDown,
   mdiContentSave,
   mdiDockLeft,
@@ -21,6 +20,7 @@ import {
   NO_INSTANCE_ERRORS,
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
+import { effectiveDeviceLayout } from "../../util/editor-layout.js";
 import { notifyError, notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
@@ -34,6 +34,11 @@ import {
 } from "../../util/split-ratio.js";
 import type { BannerError, YamlDiagnosticsDetail } from "../../util/yaml-lint-backend.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
+import {
+  TOUR_REVEAL_EVENT,
+  tourAnchor,
+  type TourRevealEventDetail,
+} from "../guided-tour/tour-anchor.js";
 import type { ESPHomeYamlEditor, HighlightRange } from "../yaml-editor.js";
 import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
@@ -42,6 +47,7 @@ import type {
   BannerGotoLineDetail,
 } from "./editor-invalid-banner.js";
 import { renderInstallAction } from "./install-action.js";
+import { layoutRevealingAnchor } from "./tour-reveal-layout.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -49,11 +55,11 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../confirm-dialog.js";
 import "../yaml-diff.js";
 import "../yaml-editor.js";
+import "./device-actions-menu.js";
 import "./device-board-info.js";
 import "./editor-invalid-banner.js";
 
 registerMdiIcons({
-  "check-circle-outline": mdiCheckCircleOutline,
   "chevron-down": mdiChevronDown,
   "content-save": mdiContentSave,
   eye: mdiEye,
@@ -97,6 +103,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ type: Boolean })
   justCreated = false;
 
+  /** Prebuilt device web-UI URL; empty hides the actions-menu item. */
+  @property({ attribute: false })
+  webUiUrl = "";
+
   @state()
   private _isMobile = false;
 
@@ -117,12 +127,20 @@ export class ESPHomeDeviceEditor extends LitElement {
     super.connectedCallback();
     this._isMobile = this._mql.matches;
     this._mql.addEventListener("change", this._onMqlChange);
+    window.addEventListener(TOUR_REVEAL_EVENT, this._onTourReveal);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this._mql.removeEventListener("change", this._onMqlChange);
+    window.removeEventListener(TOUR_REVEAL_EVENT, this._onTourReveal);
   }
+
+  private _onTourReveal = (event: Event): void => {
+    const { id } = (event as CustomEvent<TourRevealEventDetail>).detail;
+    const next = layoutRevealingAnchor(id, this.layout, this._isMobile);
+    if (next) this._setLayout(next);
+  };
 
   @property({ attribute: false })
   highlightRange: HighlightRange | null = null;
@@ -142,6 +160,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   /** Instance-relative field path to scroll into view, from the YAML cursor. */
   @property({ attribute: false })
   focusFieldPath?: string[];
+
+  /** Indexed key path at the cursor, for automation deep-targeting. */
+  @property({ attribute: false })
+  focusYamlPath?: (string | number)[];
 
   /** The selected section's backend errors; forwarded to the section editor. */
   @property({ attribute: false })
@@ -247,8 +269,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     // last chose. We deliberately do NOT force "right" when there's
     // no board — a missing board catalog entry shouldn't make the
     // navigator + section editor disappear.
-    const effectiveLayout =
-      this._isMobile && this.layout === "both" ? "right" : this.layout;
+    const effectiveLayout = effectiveDeviceLayout(this.layout, this._isMobile);
     const layoutClass =
       effectiveLayout === "both"
         ? "editor-layout--both"
@@ -300,31 +321,17 @@ export class ESPHomeDeviceEditor extends LitElement {
         </header>
         <div class="card-body">
           <div class="editor-floating-actions">
+            <!-- Leftmost so it stays clear of Save in the lower-right corner:
+                 a mis-tap on Save must not land on the overflow menu.
+                 Carries Validate too (Install validates anyway, so the
+                 explicit button rarely earned its slot on the bar). -->
+            <esphome-device-actions-menu
+              ?busy=${this.busy}
+              ?validate-disabled=${this.hasUnsavedEdits}
+              .webUiUrl=${this.webUiUrl}
+              @validate=${this._onValidate}
+            ></esphome-device-actions-menu>
             ${this._renderPrimaryAction()}
-            <!-- Span wrapper carries the title because a disabled
-                 button isn't focusable and most browsers won't
-                 surface its tooltip on hover. The disabled state
-                 is still announced via the button's own disabled
-                 attribute; the span just makes the why-disabled
-                 hint reachable for mouse users. -->
-            <span
-              class="validate-button-wrap"
-              title=${
-                this.hasUnsavedEdits
-                  ? this._localize("device.validate_disabled_pending")
-                  : this._localize("device.validate_yaml")
-              }
-            >
-              <button
-                type="button"
-                class="validate-button"
-                ?disabled=${this.hasUnsavedEdits}
-                @click=${this._onValidate}
-              >
-                <wa-icon library="mdi" name="check-circle-outline"></wa-icon>
-                ${this._localize("device.validate")}
-              </button>
-            </span>
             <button
               type="button"
               class="save-button"
@@ -349,7 +356,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 : ""
             }
           >
-            <div class="editor-pane editor-pane--left">
+            <div class="editor-pane editor-pane--left" ${tourAnchor("central")}>
               <esphome-device-board-info
                 .board=${this.board}
                 .yaml=${this.yaml}
@@ -357,6 +364,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 .selectedSection=${this.selectedSection}
                 .selectedFromLine=${this.selectedFromLine}
                 .focusFieldPath=${this.focusFieldPath}
+                .focusYamlPath=${this.focusYamlPath}
                 .backendErrors=${this.backendErrors}
                 .justCreated=${this.justCreated}
                 .yamlPaneVisible=${effectiveLayout !== "left"}
@@ -382,7 +390,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                   ></div>`
                 : nothing
             }
-            <div class="editor-pane editor-pane--right">
+            <div class="editor-pane editor-pane--right" ${tourAnchor("yaml")}>
               <div class="editor-pane-body">
                 ${
                   this._showDiff

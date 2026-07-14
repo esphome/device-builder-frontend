@@ -40,6 +40,9 @@ export function pathIsAdvanced(entries: ConfigEntry[], path: string[]): boolean 
     if (isIndexSegment(key)) continue;
     const entry = level.find((e) => e.key === key);
     if (!entry) return false;
+    // A hidden entry never renders, so opening the advanced section
+    // can't show it — don't reveal for one.
+    if (entry.hidden) return false;
     if (entry.advanced) advanced = true;
     level = entry.config_entries ?? [];
   }

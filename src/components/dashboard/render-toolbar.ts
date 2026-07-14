@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DashboardView } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { renderFacets } from "./render-facets.js";
 import { renderYamlPreviewPivot } from "./render-yaml.js";
 
@@ -18,6 +19,7 @@ export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
       class="view-toggle"
       role="group"
       aria-label=${host._localize("dashboard.view_toggle_group_label")}
+      ${tourAnchor("view-toggle")}
     >
       <button
         class="view-toggle-btn ${!yaml && view === DashboardView.CARDS ? "active" : ""}"
@@ -173,7 +175,14 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   const hits = host._yamlSearch.hits;
   const matchCount =
     hits === null ? null : hits.reduce((sum, hit) => sum + hit.matches.length, 0);
-  const unit = host._localize("yaml_search.match_count", { count: matchCount ?? 0 });
+  const totalCount =
+    hits === null
+      ? null
+      : hits.reduce((sum, hit) => sum + (hit.total_matches ?? hit.matches.length), 0);
+  const unit =
+    totalCount !== null && totalCount > (matchCount ?? 0)
+      ? host._localize("yaml_search.match_count_of", { total: totalCount })
+      : host._localize("yaml_search.match_count", { count: matchCount ?? 0 });
   return html`
     <div class="toolbar">
       <div class="toolbar-row">${renderSearchInput(host)} ${renderViewToggle(host)}</div>
@@ -228,7 +237,11 @@ export function renderAddDeviceCard(
   // Remote-compute installs don't create devices.
   if (host._hideDeviceCreation) return nothing;
   return html`
-    <div class="add-device-card" @click=${() => host._createDialog.open()}>
+    <div
+      class="add-device-card"
+      ${tourAnchor("add-device-card")}
+      @click=${() => host._createDialog.open()}
+    >
       <div class="add-device-icon-wrap">
         <wa-icon library="mdi" name="plus"></wa-icon>
       </div>
@@ -267,6 +280,7 @@ export function renderSelectBarOrFab(
           host._selectedDevices = new Set();
         }}
         @update-selected=${host._updateSelected}
+        @compile-selected=${host._compileSelected}
         @archive-selected=${host._archiveSelected}
         @delete-selected=${host._deleteSelected}
         @labels-selected=${host._labelsSelected}
@@ -276,7 +290,11 @@ export function renderSelectBarOrFab(
   if (host._view === DashboardView.CARDS && !host._hideDeviceCreation) {
     return html`
       <div class="fab-container">
-        <button class="fab-btn" @click=${() => host._createDialog.open()}>
+        <button
+          class="fab-btn"
+          ${tourAnchor("create-device-fab")}
+          @click=${() => host._createDialog.open()}
+        >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${host._localize("dashboard.create_device")}
         </button>

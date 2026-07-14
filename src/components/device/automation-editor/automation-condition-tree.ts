@@ -19,7 +19,7 @@ import {
   mdiPencilOutline,
   mdiPlus,
 } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 
 import type {
@@ -37,7 +37,14 @@ import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
+import { scrollFlashRow } from "../field-highlight.js";
+import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import {
+  type AutomationFocus,
+  childFocus,
+  focusTargetHasChanged,
+} from "./automation-focus.js";
 import "./catalog-picker-dialog.js";
 import type {
   CatalogPickedDetail,
@@ -101,6 +108,12 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   @property({ attribute: false })
   devices: AvailableComponentInstance[] = [];
 
+  /** Cursor focus target — ``node`` here is condition-list indices
+   *  only: ``[idx]`` targets a row (or its params via ``field``),
+   *  deeper indices recurse into a combinator's child tree. */
+  @property({ attribute: false, hasChanged: focusTargetHasChanged })
+  focusTarget: AutomationFocus | null = null;
+
   @query("esphome-catalog-picker-dialog")
   private _picker!: ESPHomeCatalogPickerDialog;
 
@@ -116,7 +129,24 @@ export class ESPHomeAutomationConditionTree extends LitElement {
    *  changes remap or drop entries so the flag follows its row. */
   @state() private _advancedIdxs: ReadonlySet<number> = new Set();
 
-  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    automationEditorStyles,
+    fieldHighlightStyles,
+  ];
+
+  /** Row-level scroll spent on the current target (``hasChanged`` keys
+   *  the property by value, so a reset means a genuinely new target). */
+  private _focusScrolled = false;
+
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has("focusTarget")) this._focusScrolled = false;
+  }
+
+  protected updated(): void {
+    this._maybeScrollRow();
+  }
 
   protected render() {
     return html`
@@ -155,6 +185,13 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   private _renderNode(node: ConditionNode, idx: number) {
     const def = this.catalog.find((c) => c.id === node.condition_id);
     const lastIdx = this.conditions.length - 1;
+    const rowFocus = this.focusTarget?.node[0] === idx ? this.focusTarget : null;
+    const nestedFocus =
+      rowFocus && rowFocus.node.length > 1 ? childFocus(rowFocus) : null;
+    const fieldFocus =
+      rowFocus && rowFocus.node.length === 1 && rowFocus.field.length > 0
+        ? rowFocus.field
+        : undefined;
     return html`
       <div class="ae-row">
         <div class="ae-row-header">
@@ -209,6 +246,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
                   .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
                   .board=${this.board}
                   .yaml=${this.yaml}
+                  .focusFieldPath=${fieldFocus}
                   ?disabled=${this.disabled}
                   advanced-section
                   ?show-advanced=${this._advancedIdxs.has(idx)}
@@ -228,6 +266,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
                   <esphome-automation-condition-tree
                     no-header
                     .conditions=${node.children ?? []}
+                    .focusTarget=${nestedFocus}
                     .catalog=${this.catalog}
                     .devices=${this.devices}
                     .board=${this.board}
@@ -325,6 +364,25 @@ export class ESPHomeAutomationConditionTree extends LitElement {
       [...this._advancedIdxs].filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i))
     );
     this._emit(removeAt(this.conditions, idx));
+  }
+
+  /** Scroll + flash the targeted row when the target terminates on it —
+   *  a node-level target, or one this row can't forward (no params form
+   *  for a field target, no child tree for a deeper one). */
+  private _maybeScrollRow(): void {
+    const t = this.focusTarget;
+    if (!t || this._focusScrolled) return;
+    this._focusScrolled = true;
+    const idx = t.node[0];
+    if (typeof idx !== "number") return;
+    const def = this.catalog.find((c) => c.id === this.conditions[idx]?.condition_id);
+    const terminal =
+      t.node.length > 1
+        ? !def?.accepts_condition_list
+        : t.field.length === 0 || !def || def.config_entries.length === 0;
+    if (!terminal) return;
+    const row = this.shadowRoot?.querySelectorAll<HTMLElement>(".ae-row")[idx];
+    if (row) scrollFlashRow(row);
   }
 
   private _emit(conditions: ConditionNode[]) {

@@ -182,16 +182,38 @@ export function readStoredLocale(): SupportedLocale | null {
 
 export function writeStoredLocale(locale: SupportedLocale): void {
   localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  invalidateActiveLocale();
 }
 
 /** Drop the explicit override so subsequent loads follow the browser. */
 export function clearStoredLocale(): void {
   localStorage.removeItem(LOCALE_STORAGE_KEY);
+  invalidateActiveLocale();
+}
+
+// Memoized: activeLocale() sits on 1Hz-and-faster render paths (timer
+// readouts re-render per streamed log line), and an uncached resolve pays a
+// localStorage read plus matchLocale's per-candidate normalization each call.
+let cachedActiveLocale: SupportedLocale | null = null;
+
+function invalidateActiveLocale(): void {
+  cachedActiveLocale = null;
+}
+
+// Browser-language and cross-tab locale changes invalidate too (a storage
+// event's null key is a full clear); same-tab writes go through
+// write/clearStoredLocale below.
+if (typeof window !== "undefined") {
+  window.addEventListener("languagechange", invalidateActiveLocale);
+  window.addEventListener("storage", (e) => {
+    if (e.key === LOCALE_STORAGE_KEY || e.key === null) invalidateActiveLocale();
+  });
 }
 
 /** The active locale: stored override, else browser detection. */
 export function activeLocale(): SupportedLocale {
-  return readStoredLocale() ?? detectLocale();
+  cachedActiveLocale ??= readStoredLocale() ?? detectLocale();
+  return cachedActiveLocale;
 }
 
 /** Traverse a nested object using a dot-notation key. */

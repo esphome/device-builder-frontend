@@ -101,22 +101,23 @@ export function renderCardGrid(
       ${host._devices.length === 0 ? renderAddDeviceCard(host) : ""}
       ${filtered.map((device) => {
         const webUrl = buildWebUiUrl(device);
+        const rt = device.runtime_state;
         return html`
           <esphome-device-card
             data-configuration=${device.configuration}
             .name=${device.friendly_name || device.name}
             .configuration=${device.configuration}
-            .state=${device.state}
+            .state=${rt.state}
             .labelIds=${device.labels ?? []}
             ?has-pending-changes=${device.has_pending_changes === true}
             ?show-modified=${showPendingChanges(device)}
             ?show-update=${showUpdateAvailable(device)}
-            .installedVersion=${device.deployed_version}
+            .installedVersion=${rt.deployed_version}
             .availableVersion=${device.current_version}
             ?api-enabled=${device.api_enabled === true}
             ?api-encrypted=${device.api_encrypted === true}
-            .apiEncryptionActive=${device.api_encryption_active ?? null}
-            ?queued-update=${device.queued_update === true}
+            .apiEncryptionActive=${rt.api_encryption_active}
+            ?queued-update=${rt.queued_update}
             ?busy=${host._activeJobs.has(device.configuration)}
             .activeJob=${host._activeJobs.get(device.configuration) ?? null}
             ?highlight=${host._recentlyAdopted === device.configuration}
@@ -250,6 +251,10 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
         host._drawerOpen = false;
         host._openInstallMethod(e.detail);
       }}
+      @show-progress=${(e: CustomEvent<ConfiguredDevice>) => {
+        host._drawerOpen = false;
+        host._showJobProgress(e.detail);
+      }}
       @open-logs=${(e: CustomEvent) => {
         host._drawerOpen = false;
         host._openLogs(e.detail);
@@ -285,6 +290,8 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
         host._openCommand(e.detail, "validate")}
       @install-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openInstallMethod(e.detail)}
+      @show-progress=${(e: CustomEvent<ConfiguredDevice>) =>
+        host._showJobProgress(e.detail)}
       @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => host._showApiKey(e.detail)}
       @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
         downloadYaml(e.detail, host._api, host._localize)}

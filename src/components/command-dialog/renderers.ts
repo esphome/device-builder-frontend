@@ -1,8 +1,14 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware-jobs.js";
+import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { formatElapsed } from "../../util/format-job-time.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
+import {
+  renderOffloadHint,
+  shouldShowOffloadHint,
+} from "../process-terminal/offload-hint.js";
 import {
   renderBuildFailureSuggestion,
   renderValidationFailureSuggestion,
@@ -130,6 +136,138 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   const primed = host._primedSource;
   if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
   return live?.source_label || primed?.source_label || null;
+}
+
+// Don't show the run timer until it would read at least "1s" — below that it
+// degrades to the streaming dot rather than a bare "0s".
+const MIN_RUN_TIMER_MS = 1000;
+
+// Whether to show the run timer at all. Only the build commands have a
+// meaningful build time (not clean / validate), and only once the run has
+// accrued at least a second — a sub-second or untimed job (e.g. one compiled
+// before this feature existed) degrades to the plain streaming dot.
+export function showRunTimer(host: ESPHomeCommandDialog): boolean {
+  if (
+    host._commandType !== "install" &&
+    host._commandType !== "compile" &&
+    host._commandType !== "rename"
+  ) {
+    return false;
+  }
+  const total = host._timer.totalRunElapsedMs;
+  return total !== null && total >= MIN_RUN_TIMER_MS;
+}
+
+// Whole-run timer pinned lower-left — the number that matches PlatformIO's
+// "Took N seconds", so it never reads shorter than the log and never
+// disappears once the job has started (it stays through a queued/deferred
+// install too). Pulses while the run is live, freezes at completion. Clicking
+// opens the detail popover with the compile-only breakdown + offload nudge.
+export function renderCompileTimer(
+  host: ESPHomeCommandDialog
+): TemplateResult | typeof nothing {
+  if (!showRunTimer(host)) return nothing;
+  const total = host._timer.totalRunElapsedMs!;
+  const lang = activeLocale();
+  return html`
+    <div class="compile-timer-wrap" slot="toolbar-left">
+      <button
+        class="compile-timer ${host._timer.isRunFrozen ? "" : "compile-timer--live"}"
+        aria-expanded=${host._timerDetailOpen ? "true" : "false"}
+        aria-haspopup="dialog"
+        aria-label="${formatElapsed(total, lang)}. ${host._localize("command.run_elapsed_title")}"
+        title=${host._localize("command.run_elapsed_title")}
+        @click=${host._toggleTimerDetail}
+      >
+        <wa-icon library="mdi" name="timer-outline"></wa-icon>
+        <span>${formatElapsed(total, lang)}</span>
+      </button>
+      ${host._timerDetailOpen ? renderTimerDetail(host, total, lang) : nothing}
+    </div>
+  `;
+}
+
+// The breakdown revealed on click: the compile-only slice of the run, and the
+// offload nudge attached to it (a long local compile is what offloading fixes).
+function renderTimerDetail(
+  host: ESPHomeCommandDialog,
+  totalMs: number,
+  lang: string
+): TemplateResult {
+  const compile = host._timer.compileDetailMs;
+  const showHint =
+    // While the compile is live the inline suggestion already carries this
+    // nudge; only add it here once that's gone, so they never double up.
+    !host._timer.isCompiling &&
+    compile !== null &&
+    shouldShowOffloadHint({
+      elapsedMs: compile,
+      source: resolveJobSource(host),
+      pairings: host._pairings,
+      desktop: Boolean(host._desktopVersion),
+    });
+  return html`
+    <div
+      class="compile-timer-detail"
+      role="dialog"
+      aria-label=${host._localize("command.timer_detail_title")}
+    >
+      ${
+        // An old build from before compile timing existed doesn't know its
+        // compile time — show only the total rather than a bogus "0s".
+        compile === null
+          ? nothing
+          : html`<div class="compile-timer-row">
+              <span>${host._localize("command.compile_time_label")}</span>
+              <span>${formatElapsed(compile, lang)}</span>
+            </div>`
+      }
+      <div class="compile-timer-row">
+        <span>${host._localize("command.total_run_time_label")}</span>
+        <span>${formatElapsed(totalMs, lang)}</span>
+      </div>
+      ${
+        showHint
+          ? html`<div class="compile-timer-hint">
+              ${host._localize("command.timer_offload_hint")}
+              <button
+                class="reset-suggestion-link"
+                @click=${host._tryOpenBuildOffloadSettings}
+              >
+                ${host._localize("command.offload_hint_action")}
+              </button>
+            </div>`
+          : nothing
+      }
+    </div>
+  `;
+}
+
+// Nudge a slow local compile toward "send builds to a faster machine" while it
+// is still running (a finished compile hands the slot to the reset hint on
+// failure). Gated on compile elapsed past the threshold; suppressed for remote
+// builds and when offloading is already set up.
+export function renderOffloadHintSlot(
+  host: ESPHomeCommandDialog
+): TemplateResult | typeof nothing {
+  if (!host._timer.isCompiling) return nothing;
+  const visible = shouldShowOffloadHint({
+    elapsedMs: host._timer.compileElapsedMs ?? 0,
+    source: resolveJobSource(host),
+    pairings: host._pairings,
+    desktop: Boolean(host._desktopVersion),
+  });
+  return visible ? renderOffloadHint(host) : nothing;
+}
+
+// The job's build source (LOCAL / REMOTE / REMOTE_PENDING): the live jobs-context
+// entry wins, then the locally-primed snapshot for the gap before it lands.
+function resolveJobSource(host: ESPHomeCommandDialog): JobSource {
+  return (
+    (host._jobId ? host._jobs.get(host._jobId)?.source : undefined) ??
+    host._primedSource?.source ??
+    JobSource.LOCAL
+  );
 }
 
 // --show-secrets is an `esphome config` flag — hide the toggle on every other

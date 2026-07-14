@@ -43,9 +43,19 @@ import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { scrollFlashRow } from "../field-highlight.js";
+import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import { AutoApplyController } from "./auto-apply-controller.js";
 import "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import {
+  actionsFocus,
+  createFocusResolver,
+  entryFieldFocus,
+  focusKey,
+  paramFocus,
+  type YamlPathSegment,
+} from "./automation-focus.js";
 import "./callable-params-editor.js";
 import { CatalogLoadController } from "./catalog-load-controller.js";
 import { ParseErrorController } from "./parse-error-controller.js";
@@ -99,6 +109,13 @@ export class ESPHomeApiActionEditor extends LitElement {
 
   @property() yaml = "";
 
+  /** Indexed key path at the YAML cursor; resolved against the
+   *  hydrated tree to scroll/highlight the matching action node. */
+  @property({ attribute: false })
+  focusYamlPath?: YamlPathSegment[];
+
+  private _resolveFocus = createFocusResolver();
+
   /** Scoped catalog response — drives the action / condition / script
    *  / device pickers inside the action list. */
   @state() private _available: AvailableAutomations | null = null;
@@ -136,14 +153,23 @@ export class ESPHomeApiActionEditor extends LitElement {
     return this._engine.inFlightWrite;
   }
 
-  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    automationEditorStyles,
+    fieldHighlightStyles,
+  ];
 
   connectedCallback(): void {
     super.connectedCallback();
     void this._load();
   }
 
+  /** ``focusKey`` already name-flashed — one-shot per target. */
+  private _nameFlashKey?: string;
+
   protected updated(changed: Map<string, unknown>) {
+    this._maybeFlashName();
     if (changed.has("configuration")) {
       void this._loadAvailable();
     }
@@ -194,10 +220,12 @@ export class ESPHomeApiActionEditor extends LitElement {
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
     const disabled = this._engine.deleting;
+    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
     return html`
       ${this._renderHeader()} ${this._renderActionNameField(disabled)}
       <esphome-callable-params-editor
         .value=${(automation.trigger_params.variables ?? {}) as Record<string, string>}
+        .focusParam=${paramFocus(focus, "variables")}
         ?disabled=${disabled}
         .fieldLabel=${this._localize("device.api_action_variables")}
         .description=${this._localize("device.api_action_variables_description")}
@@ -212,6 +240,7 @@ export class ESPHomeApiActionEditor extends LitElement {
         </p>
         <esphome-automation-action-list
           no-header
+          .focusTarget=${actionsFocus(focus)}
           .actions=${automation.actions}
           .catalog=${actions}
           .conditionCatalog=${conditions}
@@ -288,6 +317,24 @@ export class ESPHomeApiActionEditor extends LitElement {
           this._onActionNameChange((e.target as HTMLInputElement).value)}
       />
     </div>`;
+  }
+
+  /** The action name lives in a bespoke input, outside any form — flash
+   *  its field when the cursor targets ``action:`` (or legacy
+   *  ``service:``). */
+  private _maybeFlashName(): void {
+    const focus = this._resolveFocus(this.value, this.location, this.focusYamlPath);
+    const head = entryFieldFocus(focus)?.[0];
+    if (head !== "action" && head !== "service") return;
+    const key = focusKey(focus);
+    if (key === this._nameFlashKey) return;
+    const field = this.shadowRoot
+      ?.querySelector("#api-action-name")
+      ?.closest<HTMLElement>(".field");
+    // Hold the shot while the loading spinner still owns the render.
+    if (!field) return;
+    this._nameFlashKey = key;
+    scrollFlashRow(field);
   }
 
   private async _load() {

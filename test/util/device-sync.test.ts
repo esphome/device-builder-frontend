@@ -9,17 +9,19 @@ import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 describe("device-sync mDNS gating", () => {
   it("is mDNS-online only when the live source is mDNS", () => {
-    expect(mdnsOnline(makeConfiguredDevice({ active_source: "mdns" }))).toBe(true);
+    expect(
+      mdnsOnline(makeConfiguredDevice({ runtime_state: { active_source: "mdns" } }))
+    ).toBe(true);
     for (const s of ["ping", "mqtt", "unknown"] as const) {
-      expect(mdnsOnline(makeConfiguredDevice({ active_source: s }))).toBe(false);
+      expect(
+        mdnsOnline(makeConfiguredDevice({ runtime_state: { active_source: s } }))
+      ).toBe(false);
     }
-    // Absent on the wire (older / unclaimed) reads as not mDNS.
-    expect(mdnsOnline(makeConfiguredDevice({ active_source: undefined }))).toBe(false);
   });
 
   it("hides the hash-driven modified / update signals while mDNS is dark", () => {
     const dark = makeConfiguredDevice({
-      active_source: "ping",
+      runtime_state: { active_source: "ping" },
       has_pending_changes: true,
       pending_changes_via_hash: true,
       update_available: true,
@@ -33,7 +35,7 @@ describe("device-sync mDNS gating", () => {
     // without mDNS, so the needs-install cue stays. update_available is still
     // mDNS-sourced, so it stays hidden.
     const dark = makeConfiguredDevice({
-      active_source: "ping",
+      runtime_state: { active_source: "ping" },
       has_pending_changes: true,
       update_available: true,
     });
@@ -43,7 +45,7 @@ describe("device-sync mDNS gating", () => {
 
   it("shows the modified / update signals once mDNS is the live source", () => {
     const live = makeConfiguredDevice({
-      active_source: "mdns",
+      runtime_state: { active_source: "mdns" },
       has_pending_changes: true,
       update_available: true,
     });

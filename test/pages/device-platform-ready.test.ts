@@ -35,6 +35,10 @@ import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
 import { flushMicrotasks } from "../_dom.js";
+import {
+  type ConfiguredDeviceOverrides,
+  makeConfiguredDevice,
+} from "../_make-configured-device.js";
 
 const board = (overrides: Partial<BoardCatalogEntry> = {}): BoardCatalogEntry =>
   ({
@@ -44,13 +48,8 @@ const board = (overrides: Partial<BoardCatalogEntry> = {}): BoardCatalogEntry =>
     ...overrides,
   }) as BoardCatalogEntry;
 
-const device = (overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice =>
-  ({
-    configuration: "kitchen.yaml",
-    name: "kitchen",
-    board_id: "esp32cam",
-    ...overrides,
-  }) as ConfiguredDevice;
+const device = (overrides: ConfiguredDeviceOverrides = {}): ConfiguredDevice =>
+  makeConfiguredDevice({ board_id: "esp32cam", ...overrides });
 
 interface FakeApi {
   getConfig: ReturnType<typeof vi.fn>;
