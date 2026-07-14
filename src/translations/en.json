@@ -1076,7 +1076,7 @@
       },
       "dashboard": {
         "title": "Find it on your dashboard",
-        "body": "Your device lives here now. Switch between card and table views as your collection grows."
+        "body": "Your device lives here now. Switch between card and list views as your collection grows."
       },
       "done": {
         "title": "You’re all set",
@@ -1189,6 +1189,7 @@
     "searching": "Searching…",
     "no_matches": "No matches",
     "match_count": "{count, plural, one {match} other {matches}}",
+    "match_count_of": "of {total, plural, one {# match} other {# matches}}",
     "switch_to_yaml": "Search YAML content",
     "placeholder": "Search YAML content…",
     "no_match_yaml_preview": "{count, plural, one {Try YAML search — found # match across your configs} other {Try YAML search — found # matches across your configs}}"

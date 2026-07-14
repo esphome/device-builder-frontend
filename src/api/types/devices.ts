@@ -268,6 +268,10 @@ export interface YamlSearchHit {
   device_name: string;
   friendly_name: string;
   matches: YamlSearchMatch[];
+  /** Uncapped match count in the file's scanned window; greater than
+   *  `matches.length` when the per-file cap truncated the list. Absent
+   *  on backends that predate it — fall back to `matches.length`. */
+  total_matches?: number;
 }
 
 /** Response from devices/create. */

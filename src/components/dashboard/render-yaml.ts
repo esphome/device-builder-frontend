@@ -122,7 +122,11 @@ function renderYamlHits(
       ${hits.map((hit) => {
         const blocks = buildYamlSnippetBlocks(hit.matches);
         const matchCount = hit.matches.length;
-        const countUnit = localize("yaml_search.match_count", { count: matchCount });
+        const totalCount = hit.total_matches ?? matchCount;
+        const countUnit =
+          totalCount > matchCount
+            ? localize("yaml_search.match_count_of", { total: totalCount })
+            : localize("yaml_search.match_count", { count: matchCount });
         const trailing = html`<span class="yaml-hit-group-count"
           >${matchCount} ${countUnit}</span
         >`;

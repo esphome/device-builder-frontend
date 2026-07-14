@@ -175,7 +175,14 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   const hits = host._yamlSearch.hits;
   const matchCount =
     hits === null ? null : hits.reduce((sum, hit) => sum + hit.matches.length, 0);
-  const unit = host._localize("yaml_search.match_count", { count: matchCount ?? 0 });
+  const totalCount =
+    hits === null
+      ? null
+      : hits.reduce((sum, hit) => sum + (hit.total_matches ?? hit.matches.length), 0);
+  const unit =
+    totalCount !== null && totalCount > (matchCount ?? 0)
+      ? host._localize("yaml_search.match_count_of", { total: totalCount })
+      : host._localize("yaml_search.match_count", { count: matchCount ?? 0 });
   return html`
     <div class="toolbar">
       <div class="toolbar-row">${renderSearchInput(host)} ${renderViewToggle(host)}</div>
