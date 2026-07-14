@@ -1019,10 +1019,7 @@
       "existing_server": {
         "title": "You already have ESPHome Device Builder",
         "found": "Found on your network: {name}",
-        "intro": "Your existing ESPHome Device Builder can offload its firmware compiles to this machine. Set it up as a build server, or just manage devices right here.",
-        "setup": "Set up build server",
-        "not_now": "Not now",
-        "setup_failed": "Couldn’t enable the build server; you can turn it on later in Settings."
+        "intro": "This app is a full ESPHome Device Builder and is ready to build firmware for the others. To send builds here, open Send builds on your existing dashboard and pair it with this machine."
       },
       "use_case": {
         "title": "How will you use this?",

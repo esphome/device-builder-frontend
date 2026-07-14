@@ -639,8 +639,6 @@ export class ESPHomeApp extends LitElement {
         .hasUseCase=${this._onboardingHasUseCase}
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
         @open-guided-tour=${this._onOpenGuidedTour}
-        @open-settings=${(e: CustomEvent<{ section?: Section } | undefined>) =>
-          this._settingsDialog?.open(e.detail?.section)}
       ></esphome-onboarding-wizard-dialog>
       <esphome-guided-tour></esphome-guided-tour>
     `;
