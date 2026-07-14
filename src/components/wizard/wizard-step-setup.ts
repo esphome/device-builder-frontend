@@ -15,7 +15,7 @@ import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import {
   clearTourSuggestedName,
   getTourSuggestedName,
-  isTourPending,
+  isTourActive,
 } from "../guided-tour/tour-session.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
@@ -55,7 +55,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
    *  learn that saved credentials are reused without revealing their values. */
   private get _collectWifi(): boolean {
     return (
-      Boolean(this.board?.requires_wifi) && (!this._wifiConfigured || isTourPending())
+      Boolean(this.board?.requires_wifi) && (!this._wifiConfigured || isTourActive())
     );
   }
 

@@ -157,6 +157,24 @@ describe("guided-tour pause state", () => {
     expect(isTourPending()).toBe(true);
   });
 
+  it("pauses when guarded navigation rejects", async () => {
+    const error = new Error("guard failed");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(navigate).mockRejectedValueOnce(error);
+    setTourPending();
+    window.history.replaceState(null, "", "/secrets");
+    const state = internals(new ESPHomeGuidedTour());
+
+    state.firstUpdated();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(state._active).toBe(false);
+    expect(isTourPending()).toBe(true);
+    expect(warn).toHaveBeenCalledWith("Guided tour navigation failed:", error);
+    warn.mockRestore();
+  });
+
   it("remeasures a dialog anchor after its opening transition", () => {
     const state = internals(new ESPHomeGuidedTour());
     state._active = true;

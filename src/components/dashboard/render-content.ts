@@ -2,7 +2,11 @@ import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import { html, type TemplateResult } from "lit";
 import type { AdoptableDevice, ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
-import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
+import {
+  DEVICE_SORT_COLLATOR,
+  deviceSortKey,
+  sortDevices,
+} from "../../util/device-sort.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
@@ -29,7 +33,7 @@ function includeTourDevice(
     return devices;
   }
   const target = allDevices.find((device) => device.configuration === configuration);
-  return target ? [...devices, target] : devices;
+  return target ? sortDevices([...devices, target]) : devices;
 }
 
 export function renderDiscoveredSection(

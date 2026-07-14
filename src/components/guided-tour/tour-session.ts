@@ -91,6 +91,10 @@ export function setTourActive(active: boolean): void {
   window.dispatchEvent(new Event(TOUR_ACTIVE_CHANGE_EVENT));
 }
 
+export function isTourActive(): boolean {
+  return tourActive;
+}
+
 export function getActiveTourConfiguration(): string | null {
   return tourActive ? getTourConfiguration() : null;
 }

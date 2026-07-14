@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
 import {
   clearTourPending,
+  setTourActive,
   setTourPending,
 } from "../../../src/components/guided-tour/tour-session.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
@@ -31,6 +32,7 @@ vi.mock("../../../src/util/secrets-cache.js", async (importOriginal) => ({
 
 beforeEach(() => {
   clearTourPending();
+  setTourActive(false);
   vi.mocked(fetchSecretKeys).mockResolvedValue([]);
 });
 
@@ -175,6 +177,7 @@ describe("wizard-step-setup", () => {
 
   it("shows saved Wi-Fi during the tour without revealing its values", async () => {
     setTourPending();
+    setTourActive(true);
     const el = await mount(wifiBoard(), ["wifi_ssid", "wifi_password"]);
     await setName(el, "kitchen");
     pressEnter();
@@ -186,6 +189,19 @@ describe("wizard-step-setup", () => {
     expect(el.shadowRoot!.querySelector(".skip-wifi")?.textContent).toContain(
       "wizard.wifi_use_saved"
     );
+  });
+
+  it("does not show saved Wi-Fi while the tour is paused", async () => {
+    setTourPending();
+    const el = await mount(wifiBoard(), ["wifi_ssid", "wifi_password"]);
+    await setName(el, "kitchen");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+
+    pressEnter();
+
+    expect(onFinish).toHaveBeenCalledOnce();
+    expect(stage(el)).toBe("name");
   });
 
   it("passes a typed SSID through unchanged for the backend to persist", async () => {

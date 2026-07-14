@@ -27,11 +27,18 @@ export function navigateToTourStep(
   }
   if (target === null) return false;
 
-  void navigate(target).then(() => {
+  void (async () => {
+    try {
+      await navigate(target);
+    } catch (err) {
+      console.warn("Guided tour navigation failed:", err);
+      onCancelled();
+      return;
+    }
     const arrived = step.route === "dashboard" ? onDashboardRoute() : onTourDeviceRoute();
     if (arrived) onArrived();
     else onCancelled();
-  });
+  })();
   return true;
 }
 
