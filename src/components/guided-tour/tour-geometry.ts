@@ -26,23 +26,25 @@ export interface Bubble {
   width: number;
 }
 
+export type Dock = "top" | "bottom";
+
 export interface TourFrame {
   hole: Box;
   dim: { top: Box; bottom: Box; left: Box; right: Box };
   bubble: Bubble;
   side: Side;
-  /** Bubble overlaps the hole because no side both clears it and fits the
-   *  viewport (near-full-screen target); the caret is meaningless then. */
-  overlay?: boolean;
+  /** Set when no side both clears the hole and fits the viewport; the bubble
+   *  is docked to this viewport edge instead and the caret is meaningless. */
+  dock?: Dock;
 }
 
 export const SPOTLIGHT_PADDING = 6;
 export const BUBBLE_WIDTH = 300;
 export const BUBBLE_GAP = 16;
 const EDGE_MARGIN = 16;
-const BUBBLE_BOTTOM_RESERVE = 200;
 const BUBBLE_HEIGHT_EST = 220;
 const COMPACT_BUBBLE_HEIGHT_EST = 340;
+const DOCKED_MAX_WIDTH = 360;
 
 const SIDE_ORDER: Record<Side, Side[]> = {
   right: ["right", "left", "top", "bottom"],
@@ -53,6 +55,10 @@ const SIDE_ORDER: Record<Side, Side[]> = {
 
 export function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(Math.max(lo, hi), value));
+}
+
+export function rectsIntersect(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
 /** The bounding box of one or more rects. */
@@ -92,7 +98,8 @@ function computeBubble(
   hole: Box,
   side: Side,
   vp: Viewport,
-  width = BUBBLE_WIDTH
+  width: number,
+  height: number
 ): Bubble {
   const right = hole.x + hole.w;
   let left: number;
@@ -122,14 +129,13 @@ function computeBubble(
   }
   return {
     left,
-    top: clamp(top ?? 0, EDGE_MARGIN, vp.h - BUBBLE_BOTTOM_RESERVE),
+    top: clamp(top ?? 0, EDGE_MARGIN, vp.h - height - EDGE_MARGIN),
     width,
   };
 }
 
-/** The bubble's estimated top edge in viewport coordinates. */
-function bubbleTop(bubble: Bubble, vp: Viewport): number {
-  const height = bubbleHeightEstimate(vp);
+/** The bubble's top edge in viewport coordinates. */
+function bubbleTop(bubble: Bubble, vp: Viewport, height: number): number {
   return bubble.bottom !== undefined ? vp.h - bubble.bottom - height : (bubble.top ?? 0);
 }
 
@@ -138,63 +144,65 @@ function bubbleHeightEstimate(vp: Viewport): number {
   return vp.w <= 600 || vp.h <= 600 ? COMPACT_BUBBLE_HEIGHT_EST : BUBBLE_HEIGHT_EST;
 }
 
-function bubbleCoversHole(bubble: Bubble, vp: Viewport, hole: Box): boolean {
-  const top = bubbleTop(bubble, vp);
-  const height = bubbleHeightEstimate(vp);
-  const b = {
-    l: bubble.left,
-    r: bubble.left + bubble.width,
-    t: top,
-    b: top + height,
-  };
-  return !(
-    b.r <= hole.x ||
-    b.l >= hole.x + hole.w ||
-    b.b <= hole.y ||
-    b.t >= hole.y + hole.h
-  );
+function bubbleCoversHole(
+  bubble: Bubble,
+  vp: Viewport,
+  hole: Box,
+  height: number
+): boolean {
+  const top = bubbleTop(bubble, vp, height);
+  return rectsIntersect({ x: bubble.left, y: top, w: bubble.width, h: height }, hole);
 }
 
-/** True when the estimated bubble sits fully within the viewport's vertical
- *  margins (horizontal placement is already clamped in `computeBubble`). */
-function bubbleFitsViewport(bubble: Bubble, vp: Viewport): boolean {
-  const top = bubbleTop(bubble, vp);
-  return top >= EDGE_MARGIN && top + bubbleHeightEstimate(vp) <= vp.h - EDGE_MARGIN;
+/** True when the bubble sits fully within the viewport's vertical margins
+ *  (horizontal placement is already clamped in `computeBubble`). */
+function bubbleFitsViewport(bubble: Bubble, vp: Viewport, height: number): boolean {
+  const top = bubbleTop(bubble, vp, height);
+  return top >= EDGE_MARGIN && top + height <= vp.h - EDGE_MARGIN;
+}
+
+/** Full-width-ish bubble pinned to the viewport edge farther from the hole. */
+function computeDockedBubble(hole: Box, vp: Viewport): { bubble: Bubble; dock: Dock } {
+  const w = Math.min(vp.w - EDGE_MARGIN * 2, DOCKED_MAX_WIDTH);
+  const left = clamp((vp.w - w) / 2, EDGE_MARGIN, vp.w - w - EDGE_MARGIN);
+  const dock: Dock = hole.y + hole.h / 2 >= vp.h / 2 ? "top" : "bottom";
+  return {
+    bubble:
+      dock === "top"
+        ? { left, top: EDGE_MARGIN, width: w }
+        : { left, bottom: EDGE_MARGIN, width: w },
+    dock,
+  };
 }
 
 export function computeTourFrame(
   rect: Rect,
   side: Side,
   vp: Viewport,
-  options: { pad?: number; bubbleWidth?: number } = {}
+  options: { pad?: number; bubbleWidth?: number; bubbleHeight?: number } = {}
 ): TourFrame {
   const hole = computeHole(rect, options.pad);
-  const width = options.bubbleWidth;
+  const width = options.bubbleWidth ?? BUBBLE_WIDTH;
+  const height = options.bubbleHeight ?? bubbleHeightEstimate(vp);
 
   const candidates = SIDE_ORDER[side].map((candidate) => ({
     candidate,
-    bubble: computeBubble(hole, candidate, vp, width),
+    bubble: computeBubble(hole, candidate, vp, width, height),
   }));
   // Prefer a side that neither covers the hole nor overflows the viewport.
-  const clear = candidates.filter(({ bubble }) => !bubbleCoversHole(bubble, vp, hole));
-  const fitting = clear.find(({ bubble }) => bubbleFitsViewport(bubble, vp));
+  const clear = candidates.filter(
+    ({ bubble }) => !bubbleCoversHole(bubble, vp, hole, height)
+  );
+  const fitting = clear.find(({ bubble }) => bubbleFitsViewport(bubble, vp, height));
   const dim = computeDim(hole, vp);
   if (fitting) {
     return { hole, dim, bubble: fitting.bubble, side: fitting.candidate };
   }
 
-  // A near-full-screen hole leaves no side that both clears it and stays on
-  // screen; pin the bubble inside the viewport over the hole instead.
-  const w = width ?? BUBBLE_WIDTH;
-  const overlay: Bubble = {
-    left: clamp(hole.x + (hole.w - w) / 2, EDGE_MARGIN, vp.w - w - EDGE_MARGIN),
-    top: clamp(
-      hole.y + BUBBLE_GAP,
-      EDGE_MARGIN,
-      Math.max(EDGE_MARGIN, vp.h - bubbleHeightEstimate(vp) - EDGE_MARGIN)
-    ),
-    width: w,
-  };
-  // `side` is only read for caret placement, which overlay frames skip.
-  return { hole, dim, bubble: overlay, side, overlay: true };
+  // No side both clears the hole and stays on screen (tall target on a small
+  // viewport); dock the bubble to the edge whose half the hole occupies less,
+  // keeping the spotlit control reachable instead of pinning over it.
+  const docked = computeDockedBubble(hole, vp);
+  // `side` is only read for caret placement, which docked frames skip.
+  return { hole, dim, bubble: docked.bubble, side, dock: docked.dock };
 }

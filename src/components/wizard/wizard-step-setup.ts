@@ -431,7 +431,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _renderWifiSection() {
     return html`
-      <section class="section">
+      <section class="section" ${tourAnchor("wifi-fields")}>
         <div>
           <h3 class="section-title">${this._localize("wizard.wifi_configuration")}</h3>
           <p class="section-subtitle">

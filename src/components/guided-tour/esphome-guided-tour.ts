@@ -9,6 +9,7 @@ import { isTypingTarget } from "../../util/typing-target.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { guidedTourStyles } from "./esphome-guided-tour.styles.js";
 import { renderTourBubble, renderTourRecovery } from "./tour-bubble.js";
+import { TourBubbleFit } from "./tour-bubble-fit.js";
 import { TOUR_LAYOUT_RESTORE_EVENT } from "./tour-layout-controller.js";
 import { TourNavigatorController } from "./tour-navigator-controller.js";
 import { captureTourConfiguration, navigateToTourStep } from "./tour-route.js";
@@ -62,6 +63,7 @@ export class ESPHomeGuidedTour extends LitElement {
   @state() private _showAnchorRecovery = false;
 
   @query(".tour-popover") private _popover?: HTMLElement;
+  @query(".bubble") private _bubbleEl?: HTMLElement;
   @query(".btn-skip") private _skipButton?: HTMLElement;
   @query(".btn-pause") private _pauseButton?: HTMLElement;
 
@@ -83,6 +85,14 @@ export class ESPHomeGuidedTour extends LitElement {
     pauseRect: () => this._pauseButton?.getBoundingClientRect(),
     onSkip: () => this._skip(),
     onPause: () => this._pause(),
+  });
+  private readonly _bubbleFit = new TourBubbleFit(this, {
+    bubbleEl: () => this._bubbleEl,
+    frame: () => (this._active ? this._frame : null),
+    anchorEl: () => this._observedTarget,
+    stepIndex: () => this._stepIndex,
+    isActionStep: () => this._step.kind === "action",
+    onHeightChange: () => this._refresh(),
   });
   private readonly _navigator = new TourNavigatorController(this, {
     isNavigatorStep: () =>
@@ -153,6 +163,7 @@ export class ESPHomeGuidedTour extends LitElement {
     setTourActive(true);
     this._stepIndex = stepIndex;
     this._frame = null;
+    this._bubbleFit.reset();
     this._dialogReady = false;
     this._revealRequested = false;
     this._bindTourListeners();
@@ -384,10 +395,12 @@ export class ESPHomeGuidedTour extends LitElement {
       { x: tr.left, y: tr.top, w: tr.width, h: tr.height },
       ...this._highlightRects(),
     ]);
-    this._frame = computeTourFrame(rect, this._step.side, {
-      w: window.innerWidth,
-      h: window.innerHeight,
-    });
+    this._frame = computeTourFrame(
+      rect,
+      this._step.side,
+      { w: window.innerWidth, h: window.innerHeight },
+      { bubbleHeight: this._bubbleFit.measuredHeight }
+    );
     if (appearing && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) {
       this._bouncePopover();
     }
@@ -438,6 +451,7 @@ export class ESPHomeGuidedTour extends LitElement {
     this._stepIndex = index;
     setTourPending(index);
     this._frame = null;
+    this._bubbleFit.reset();
     this._revealRequested = false;
     if (
       !navigateToTourStep(

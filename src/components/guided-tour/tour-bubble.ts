@@ -63,7 +63,7 @@ export function renderTourBubble(p: TourBubbleProps): TemplateResult {
         <wa-icon library="mdi" name="close" aria-hidden="true"></wa-icon>
       </button>
       ${
-        p.frame.overlay
+        p.frame.dock
           ? nothing
           : html`<div
               class="caret"
@@ -81,8 +81,10 @@ export function renderTourBubble(p: TourBubbleProps): TemplateResult {
           })}
         </span>
       </div>
-      <h2>${p.localize(p.step.titleKey)}</h2>
-      <p>${p.localize(p.step.bodyKey)}</p>
+      <div class="bubble-scroll">
+        <h2>${p.localize(p.step.titleKey)}</h2>
+        <p>${p.localize(p.step.bodyKey)}</p>
+      </div>
       ${
         p.step.kind === "action"
           ? html`

@@ -31,6 +31,13 @@ export const guidedTourStyles = css`
 
   .bubble {
     position: absolute;
+    display: flex;
+    flex-direction: column;
+    /* Cap the bubble so placement can always fit it somewhere on a small
+       screen; the body scrolls instead of covering the step's control. The
+       caret sits outside the box, so overflow lives on .bubble-scroll. */
+    max-height: min(60vh, calc(100vh - 32px));
+    max-height: min(60dvh, calc(100dvh - 32px));
     background: var(--wa-color-surface-raised, #fff);
     color: var(--wa-color-text-normal);
     border-radius: var(--wa-border-radius-l);
@@ -38,6 +45,12 @@ export const guidedTourStyles = css`
     padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-m);
     pointer-events: auto;
     box-sizing: border-box;
+  }
+
+  .bubble-scroll {
+    overflow-y: auto;
+    min-height: 0;
+    overscroll-behavior: contain;
   }
 
   .recovery-bubble {
@@ -176,6 +189,12 @@ export const guidedTourStyles = css`
 
   .btn-next:hover {
     background: var(--esphome-primary-hover);
+  }
+
+  @media (max-width: 480px) {
+    .bubble {
+      padding: var(--wa-space-m) var(--wa-space-m) var(--wa-space-s);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

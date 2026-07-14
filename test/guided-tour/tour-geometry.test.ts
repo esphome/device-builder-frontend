@@ -101,26 +101,25 @@ describe("computeTourFrame bubble placement", () => {
     // The wizard's Finish button, bottom-right of a centred dialog on a narrow
     // viewport: a "right" bubble clamps back over it (the block bug). It must
     // flip to a side that leaves the control clickable and stays on screen —
-    // "left" would spill below the fold here, so it lands "top".
+    // "left" clears it once the height-aware clamp lifts the bubble above the
+    // fold.
     const vp: Viewport = { w: 1033, h: 800 };
     const finishBtn: Rect = { x: 724, y: 590, w: 82, h: 34 };
     const frame = computeTourFrame(finishBtn, "right", vp);
-    expect(frame.side).toBe("top");
-    // Top-anchored bubble sits above the target hole — doesn't cover it.
-    expect(vp.h - (frame.bubble.bottom ?? 0)).toBeLessThanOrEqual(frame.hole.y);
+    expect(frame.side).toBe("left");
+    // Lifted so the estimated bubble bottom stays inside the viewport margin.
+    expect((frame.bubble.top ?? 0) + 220).toBeLessThanOrEqual(vp.h - 16);
+    expect(frame.bubble.left + frame.bubble.width).toBeLessThanOrEqual(frame.hole.x);
   });
 
-  it("overlays the bubble on a near-full-screen hole instead of going off screen", () => {
-    // A full-pane target (mobile editor pane): no side both clears the hole
-    // and fits the viewport, so the bubble pins inside the viewport over it.
-    const vp: Viewport = { w: 375, h: 812 };
-    const pane: Rect = { x: 0, y: 72, w: 375, h: 630 };
-    const frame = computeTourFrame(pane, "left", vp);
-    expect(frame.overlay).toBe(true);
-    expect(frame.bubble.top).toBeGreaterThanOrEqual(16);
-    expect((frame.bubble.top ?? 0) + 220).toBeLessThanOrEqual(vp.h);
-    expect(frame.bubble.left).toBeGreaterThanOrEqual(16);
-    expect(frame.bubble.left + frame.bubble.width).toBeLessThanOrEqual(vp.w - 16);
+  it("keeps a tall real bubble on screen by lifting its top-anchored placement", () => {
+    // The estimate-height clamp used to reserve a fixed 200px and reject the
+    // side; with the real height threaded through, the bubble lifts to fit.
+    const vp: Viewport = { w: 1280, h: 800 };
+    const target: Rect = { x: 400, y: 640, w: 120, h: 40 };
+    const frame = computeTourFrame(target, "right", vp, { bubbleHeight: 300 });
+    expect(frame.side).toBe("right");
+    expect(frame.bubble.top).toBe(vp.h - 300 - 16);
   });
 
   it("prefers a viewport-fitting side over one that overflows it (mobile, target near top)", () => {
@@ -140,5 +139,53 @@ describe("computeTourFrame bubble placement", () => {
     const { bubble } = computeTourFrame(rightEdge, "right", VP);
     expect(bubble.left).toBeLessThanOrEqual(VP.w - BUBBLE_WIDTH - 16);
     expect(bubble.left).toBeGreaterThanOrEqual(16);
+  });
+});
+
+describe("computeTourFrame docked fallback", () => {
+  it("docks opposite the hole instead of pinning over a near-full-screen target", () => {
+    // A full-pane target (mobile editor pane): no side both clears the hole
+    // and fits the viewport. The bubble docks to the edge whose half the hole
+    // occupies less, leaving the pane interactive.
+    const vp: Viewport = { w: 375, h: 812 };
+    const pane: Rect = { x: 0, y: 72, w: 375, h: 630 };
+    const frame = computeTourFrame(pane, "left", vp);
+    expect(frame.dock).toBe("bottom");
+    expect(frame.bubble.bottom).toBe(16);
+    expect(frame.bubble.width).toBe(vp.w - 32);
+    expect(frame.bubble.left).toBe(16);
+  });
+
+  it("docks to the top when a phone-height bubble can't clear a low control", () => {
+    // iPhone SE, the featured board card's Select button near the bottom: a
+    // real bubble taller than every gap must not pin over the button.
+    const vp: Viewport = { w: 375, h: 667 };
+    const selectBtn: Rect = { x: 243, y: 590, w: 116, h: 40 };
+    const frame = computeTourFrame(selectBtn, "top", vp, { bubbleHeight: 560 });
+    expect(frame.dock).toBe("top");
+    expect(frame.bubble.top).toBe(16);
+  });
+
+  it("docks clear of the wifi step's field-spanning hole on a phone", () => {
+    // The wifi step's hole is the credentials section plus the Finish button
+    // (union); a tall bubble has no side left, so it docks over the header
+    // instead of burying the inputs.
+    const vp: Viewport = { w: 375, h: 667 };
+    const fieldsAndButton: Rect = { x: 16, y: 210, w: 343, h: 420 };
+    const frame = computeTourFrame(fieldsAndButton, "top", vp, {
+      bubbleHeight: 400,
+    });
+    expect(frame.dock).toBe("top");
+    expect(frame.bubble.top).toBe(16);
+    expect(frame.bubble.bottom).toBeUndefined();
+  });
+
+  it("caps the docked bubble width and centers it on desktop", () => {
+    const vp: Viewport = { w: 1280, h: 800 };
+    const pane: Rect = { x: 40, y: 40, w: 1200, h: 720 };
+    const frame = computeTourFrame(pane, "left", vp);
+    expect(frame.dock).toBe("top");
+    expect(frame.bubble.width).toBe(360);
+    expect(frame.bubble.left).toBe((vp.w - 360) / 2);
   });
 });

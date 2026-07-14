@@ -70,6 +70,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // Creation is asynchronous; anchor churn advances only after the device
     // page mounts, so failures keep this step visible in the wizard.
     actionAnchors: [],
+    // The credential inputs the hint asks for; keeping them in the hole
+    // keeps the bubble (and the dim) off them on small viewports.
+    highlightAnchors: ["wifi-fields"],
     route: "dashboard",
     side: "top",
     kind: "action",
