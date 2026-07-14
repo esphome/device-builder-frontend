@@ -285,7 +285,7 @@ export function renderFloatWithUnitField(
     parsed.value === null &&
     editingText == null &&
     rawValue != null &&
-    rawValue !== ""
+    String(rawValue).trim() !== ""
   ) {
     return looksLikeSubstitution(String(rawValue))
       ? renderStringField(entry, "text", path, ctx)

@@ -323,7 +323,12 @@ describe("renderNumberField / renderFloatWithUnitField — bail on unparseable p
   });
 
   it("renders the editable float-with-unit UI for a well-formed value and for unset", () => {
-    for (const values of [{ default_target_temperature: "21°C" }, {}]) {
+    // A whitespace-only value is effectively unset, never a bail.
+    for (const values of [
+      { default_target_temperature: "21°C" },
+      { default_target_temperature: " " },
+      {},
+    ]) {
       const { ctx } = makeCtx(values);
       const tpl = renderFloatWithUnitField(
         withUnitEntry(),

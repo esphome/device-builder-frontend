@@ -20,8 +20,9 @@ export interface FloatWithUnit {
 // symbol (resistance: 'Ohm' / 'OHM' for Ω; temperature: '21C', '70F', '21° C'
 // for the degree forms). Keyed by the canonical base symbol (unit_options[0]);
 // each matched spelling is folded onto its symbol before matching, so
-// '5.6kOhm' lands on the kΩ option and '21C' on °C. ESPHome rejects plural
-// forms ('Ohms'), so the patterns are anchored to the singular. The
+// '5.6kOhm' lands on the kΩ option and '21C' on °C. Plurals follow upstream:
+// resistance rejects 'Ohms' so that pattern stays singular, while current /
+// voltage / data size accept 'amps' / 'Volts' / 'bytes' and fold them. The
 // temperature patterns are case-sensitive: ESPHome parses a trailing
 // lowercase 'c' as the centi metric prefix ('21c' is 0.21 °C), never a degree.
 // The full spelling inventory mirrors esphome/config_validation.py's
