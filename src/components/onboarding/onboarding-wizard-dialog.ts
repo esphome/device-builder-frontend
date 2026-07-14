@@ -301,6 +301,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           <wa-switch
             ?checked=${this._remoteCompute}
             ?disabled=${this._saving}
+            aria-label=${this._localize("onboarding.wizard.existing_server.remote_only_title")}
             @change=${this._onToggleRemoteCompute}
           ></wa-switch>
         </label>
