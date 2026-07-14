@@ -17,17 +17,17 @@ function terminalState(flow: InstallFlowController): ProcessTerminalState {
 function statusMessage(flow: InstallFlowController, localize: LocalizeFunc): string {
   switch (flow.step) {
     case "connecting":
-      return localize("web.install.connecting");
+      return localize("firmware.status_connecting");
     case "preparing":
       return localize("web.install.preparing");
     case "erasing":
       return localize("web.install.erasing");
     case "flashing":
-      return localize("web.install.flashing");
+      return localize("dashboard.status_installing");
     case "done":
       return localize("web.install.done");
     case "error":
-      return localize("web.install.failed");
+      return localize("firmware.status_failed");
     default:
       return "";
   }

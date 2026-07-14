@@ -93,7 +93,7 @@ export class ESPHomeWebInstallUploadDialog extends LitElement {
                   ?disabled=${this._flow.busy || (!inProgress && !this._file)}
                   @click=${this._install}
                 >
-                  ${this._localize("web.install.install")}
+                  ${this._localize("dashboard.install")}
                 </wa-button>`
           }
         </div>

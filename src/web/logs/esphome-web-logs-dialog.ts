@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiDeleteSweep, mdiDownload, mdiRestart } from "@mdi/js";
+import { mdiDeleteSweep, mdiDownload, mdiPlay, mdiRestart, mdiStop } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -12,6 +12,7 @@ import {
 } from "../../components/process-terminal/process-terminal.styles.js";
 import { renderTermButton } from "../../components/process-terminal/toolbar-button.js";
 import { localizeContext } from "../../context/index.js";
+import { primaryDialogHeaderStyles } from "../../styles/dialog-header.js";
 import { downloadAnsiText } from "../../util/download-text.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { streamSerialLines } from "../../util/serial-log-stream.js";
@@ -24,6 +25,8 @@ registerMdiIcons({
   restart: mdiRestart,
   download: mdiDownload,
   "delete-sweep": mdiDeleteSweep,
+  stop: mdiStop,
+  play: mdiPlay,
 });
 
 // Hard cap on retained log lines, mirroring the dashboard logs dialog: a
@@ -102,7 +105,11 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _lines: string[] = [];
+  // ``_streaming`` = reader alive and displaying (drives the pulsing dot + the
+  // Stop button). ``_paused`` = user pressed Stop; the reader keeps draining the
+  // port (so Start resumes without a reopen/reset) but appends are dropped.
   @state() private _streaming = false;
+  @state() private _paused = false;
 
   private _cancel?: () => void;
   // Batched line buffer flushed on the next animation frame, matching the
@@ -126,14 +133,32 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _start(): void {
     if (!this.port?.readable || this._cancel) return;
     this._resetLines();
+    this._paused = false;
     this._streaming = true;
     // Shared reader: same ESPHome log formatting / timestamps / garbage
     // filtering as the dashboard's post-install serial logs. The cancel it
     // returns also closes the port.
     this._cancel = streamSerialLines(this.port, {
-      onLine: (line) => this._enqueueLine(line),
+      // Stop pauses only the display — the reader keeps draining the port so a
+      // Start resumes without a reopen (which would DTR/RTS-reset the device).
+      onLine: (line) => {
+        if (!this._paused) this._enqueueLine(line);
+      },
       onDisconnect: (error) => this._onDisconnect(error),
     });
+  }
+
+  // Stop → pause the display (reader stays alive). Start → resume. Start only
+  // shows while ``_paused`` is true, which is only reachable with a live reader,
+  // so resuming never lands on a dead stream.
+  private _onStop(): void {
+    this._streaming = false;
+    this._paused = true;
+  }
+
+  private _onStart(): void {
+    this._streaming = true;
+    this._paused = false;
   }
 
   // The device dropped the stream on its own (unplugged / reset). Print a
@@ -145,11 +170,14 @@ export class ESPHomeWebLogsDialog extends LitElement {
     const base = this._localize("web.logs.terminal_disconnected");
     this._enqueueLine(error ? `${base}: ${String(error)}` : base);
     this._flushPending();
+    // Reader ended: no Stop/Start button (neither streaming nor paused).
     this._streaming = false;
+    this._paused = false;
   }
 
   private _stop(): void {
     this._streaming = false;
+    this._paused = false;
     this._resetPending();
     const cancel = this._cancel;
     this._cancel = undefined;
@@ -225,7 +253,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   protected render() {
     const label = this.deviceLabel
       ? this._localize("web.logs.title_named", { name: this.deviceLabel })
-      : this._localize("web.logs.title");
+      : this._localize("dashboard.logs");
     return html`
       <esphome-base-dialog
         .label=${label}
@@ -244,7 +272,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
                 ? nothing
                 : renderTermButton({
                     icon: "restart",
-                    label: this._localize("web.logs.reset_device"),
+                    // Reuse the builder's logs-terminal labels (same context) so
+                    // translators don't re-translate these generic strings.
+                    label: this._localize("dashboard.logs_reset_device"),
                     onClick: () => void this._resetDevice(),
                   })
             }
@@ -255,9 +285,26 @@ export class ESPHomeWebLogsDialog extends LitElement {
             })}
             ${renderTermButton({
               icon: "delete-sweep",
-              title: this._localize("web.logs.clear"),
+              label: this._localize("dashboard.logs_clear"),
               onClick: () => this._clear(),
             })}
+            ${
+              this._streaming
+                ? renderTermButton({
+                    icon: "stop",
+                    label: this._localize("dashboard.logs_stop"),
+                    variant: "stop",
+                    onClick: () => this._onStop(),
+                  })
+                : this._paused
+                  ? renderTermButton({
+                      icon: "play",
+                      label: this._localize("dashboard.logs_start"),
+                      variant: "start",
+                      onClick: () => this._onStart(),
+                    })
+                  : nothing
+            }
           </div>
         </esphome-process-terminal>
       </esphome-base-dialog>
@@ -265,16 +312,32 @@ export class ESPHomeWebLogsDialog extends LitElement {
   }
 
   static styles = [
+    // Brand-primary header bar, matching the builder's own logs dialog.
+    primaryDialogHeaderStyles,
     termTokens,
     termButtonStyles,
     fillTerminalOnMobile,
     css`
       esphome-base-dialog {
-        --width: 60rem;
+        /* Wide enough for ESPHome's timestamp + [C][module:NNN] prefix plus a
+           long message before wrapping (mirrors the builder's logs dialog). */
+        --width: min(1300px, 94vw);
+      }
+      /* Dress the dialog body as the terminal surface: drop the default body
+         padding so the terminal fills it edge-to-edge, and paint the body the
+         terminal background so there's no seam behind the rounded corners. */
+      esphome-base-dialog::part(body) {
+        padding: 0;
+        background: var(--term-bg);
+        overflow: hidden;
       }
       esphome-process-terminal {
         display: block;
-        height: min(70vh, 40rem);
+        /* Size the terminal's own flex column via its height variable, not the
+           host's height: the internal .content defaults to 60vh, so forcing a
+           taller host would leave a gap below the toolbar. */
+        --process-terminal-height: min(70vh, 40rem);
+        --process-terminal-max-height: min(70vh, 40rem);
       }
       .toolbar-slot {
         display: flex;

@@ -239,11 +239,11 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       {
         onStep: (step) => {
           if (step === "connecting") {
-            this._setState("connecting", this._localize("web.flash.connecting"));
+            this._setState("connecting", this._localize("firmware.status_connecting"));
           } else if (step === "erasing") {
             this._setState("installing", this._localize("web.flash.erasing"));
           } else if (step === "flashing") {
-            this._setState("installing", this._localize("web.flash.writing"));
+            this._setState("installing", this._localize("dashboard.status_installing"));
           }
         },
         onProgress: (pct) => this._setProgress(pct),
@@ -345,7 +345,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     if (this._flashDone) {
       return this._hasOpener
         ? this._localize("web.flash.close_tab")
-        : this._localize("web.flash.done_button");
+        : this._localize("command.done");
     }
     return this._localize("web.flash.connect_install");
   }

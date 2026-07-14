@@ -65,8 +65,8 @@ export class ESPHomeWebPicoDeviceCard extends LitElement {
           </button>
           <button
             class="action-btn action-btn--ghost action-btn--tile"
-            title=${this._localize("web.actions.logs")}
-            aria-label=${this._localize("web.actions.logs")}
+            title=${this._localize("dashboard.logs")}
+            aria-label=${this._localize("dashboard.logs")}
             @click=${this._showLogs}
           >
             <wa-icon library="mdi" name="text-box-outline"></wa-icon>

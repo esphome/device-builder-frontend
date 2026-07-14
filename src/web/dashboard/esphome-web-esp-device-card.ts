@@ -98,16 +98,16 @@ export class ESPHomeWebEspDeviceCard extends LitElement {
           </button>
           <button
             class="action-btn action-btn--ghost action-btn--tile"
-            title=${this._localize("web.actions.install")}
-            aria-label=${this._localize("web.actions.install")}
+            title=${this._localize("dashboard.install")}
+            aria-label=${this._localize("dashboard.install")}
             @click=${this._showInstall}
           >
             <wa-icon library="mdi" name="upload"></wa-icon>
           </button>
           <button
             class="action-btn action-btn--ghost action-btn--tile"
-            title=${this._localize("web.actions.logs")}
-            aria-label=${this._localize("web.actions.logs")}
+            title=${this._localize("dashboard.logs")}
+            aria-label=${this._localize("dashboard.logs")}
             @click=${this._showLogs}
           >
             <wa-icon library="mdi" name="text-box-outline"></wa-icon>

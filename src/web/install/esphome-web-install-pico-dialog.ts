@@ -110,7 +110,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
         <p>${this._localize("web.pico.setup_continue_hint")}</p>
         <div class="actions">
           <wa-button variant="brand" @click=${this._continue}>
-            ${this._localize("web.pico.setup_continue")}
+            ${this._localize("onboarding.wizard.continue")}
           </wa-button>
         </div>
       </esphome-base-dialog>

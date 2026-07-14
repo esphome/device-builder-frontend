@@ -126,8 +126,8 @@ export class ESPHomeWebNoPortPickedDialog extends LitElement {
           <wa-button @click=${() => (this.open = false)}>
             ${
               this.onTryAgain
-                ? this.localize("web.no_port.cancel")
-                : this.localize("web.no_port.close")
+                ? this.localize("layout.cancel")
+                : this.localize("layout.close")
             }
           </wa-button>
         </div>

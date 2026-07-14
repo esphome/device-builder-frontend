@@ -99,14 +99,14 @@ export class ESPHomeWebInstallAdoptableDialog extends LitElement {
           ${
             this._flow.done
               ? html`<wa-button variant="brand" @click=${this._continue}>
-                  ${this._localize("web.install.continue_wifi")}
+                  ${this._localize("onboarding.wizard.continue")}
                 </wa-button>`
               : html`<wa-button
                   variant="brand"
                   ?disabled=${this._flow.busy}
                   @click=${this._install}
                 >
-                  ${this._localize("web.install.install")}
+                  ${this._localize("dashboard.install")}
                 </wa-button>`
           }
         </div>
