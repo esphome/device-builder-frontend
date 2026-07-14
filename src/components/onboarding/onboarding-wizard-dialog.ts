@@ -5,7 +5,7 @@ import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { RemoteBuildPeer } from "../../api/types/remote-build.js";
 import { ExperienceLevel } from "../../api/types/system.js";
-import type { LocalizeFunc } from "../../common/localize.js";
+import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
   buildOffloadDiscoveredHostsContext,
@@ -274,7 +274,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     // Cap the named list so a busy network can't push the switch off-screen.
     const shown = names.slice(0, 3);
     const extra = names.length - shown.length;
-    const joined = new Intl.ListFormat(undefined, {
+    const joined = new Intl.ListFormat(activeLocale(), {
       type: extra > 0 ? "unit" : "conjunction",
     }).format(shown);
     const foundLabel =
