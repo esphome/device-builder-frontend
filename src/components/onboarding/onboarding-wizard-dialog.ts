@@ -13,6 +13,7 @@ import {
   localizeContext,
 } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
+import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { EnterController } from "../../util/enter-controller.js";
@@ -115,6 +116,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     dialogActionButtonStyles,
     choiceCardStyles,
     onboardingWizardStyles,
+    fullscreenMobileDialog("esphome-base-dialog"),
   ];
 
   /** Ordered screens for the current environment. */

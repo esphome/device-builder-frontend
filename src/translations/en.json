@@ -1020,7 +1020,7 @@
         "title": "You already have ESPHome Device Builder",
         "found": "Found on your network: {name}",
         "found_overflow": "Found on your network: {name}, and {count} more",
-        "intro": "This app is a full ESPHome Device Builder and is ready to build firmware for the others. To send builds here, open Send builds on your existing dashboard and pair it with this machine.",
+        "intro": "This app is a full ESPHome Device Builder and is ready to build firmware for the others. To send builds here, open Settings → Send builds on your existing dashboard and pair it with this machine.",
         "remote_only_title": "Only use this for remote compute",
         "remote_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards."
       },

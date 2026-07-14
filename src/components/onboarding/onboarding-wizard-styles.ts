@@ -14,7 +14,7 @@ export const onboardingWizardStyles = css`
     flex-direction: column;
     gap: var(--wa-space-m);
     box-sizing: border-box;
-    height: 300px;
+    height: 380px;
     overflow-y: auto;
   }
 
@@ -142,9 +142,12 @@ export const onboardingWizardStyles = css`
     flex: 1;
   }
 
-  @media (max-width: 600px), (max-height: 600px) {
+  /* On phones the dialog goes full-screen (fullscreenMobileDialog), so the
+     body fills the sheet instead of a fixed height — the switch and its
+     description then have room without scrolling. */
+  @media (max-width: 600px) {
     .body {
-      height: min(390px, calc(100dvh - 190px));
+      height: 100%;
     }
   }
 `;
