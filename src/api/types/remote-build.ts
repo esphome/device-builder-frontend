@@ -286,6 +286,12 @@ export interface RemoteBuildPeer {
    * list filters those out; the Pair button there pre-fills a `> 0` port.
    */
   remote_build_port: number;
+  /**
+   * `true` when the discovered peer is the HA add-on (`ha_addon` TXT
+   * key). The add-on advertises `friendly_name: "Home Assistant"`, so
+   * this is mainly for badging; absent/false for every other install.
+   */
+  ha_addon?: boolean;
 }
 
 /**
