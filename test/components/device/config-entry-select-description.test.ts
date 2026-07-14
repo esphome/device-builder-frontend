@@ -4,10 +4,8 @@ import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderSelectField } from "../../../src/components/device/config-entry-renderers/primitives.js";
 import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
-// Options whose catalog docs read as prose ship a per-option
-// `description` (label stays the value, e.g. web_server auth `type`'s
-// basic/digest); the menu renders it as a quiet second line, stacking
-// with the default tag when the option is also the default.
+// Described options render a quiet second line; the default option
+// stacks both notes.
 const OPTIONS: ConfigValueOption[] = [
   {
     value: "basic",
@@ -44,6 +42,6 @@ describe("renderSelectField — option descriptions", () => {
     });
     const json = serialize(renderSelectField(plain, ["type"], makeRenderCtx({})));
     expect(json).not.toContain("option-description-note");
-    expect(json).not.toContain("option-default-stack");
+    expect(json).not.toContain("option-stack");
   });
 });

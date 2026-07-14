@@ -14,6 +14,7 @@ import { mdiChevronDown } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { inputStyles } from "../styles/inputs.js";
+import { renderOptionStack } from "../util/option-stack.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { buildOptionsComboboxChangeEvent } from "./options-combobox-event.js";
 import { optionsComboboxStyles } from "./options-combobox.styles.js";
@@ -154,27 +155,11 @@ export class ESPHomeOptionsCombobox extends LitElement {
                       @click=${() => this._select(opt)}
                       @mouseenter=${() => (this._active = i)}
                     >
-                      ${
-                        this._isDefault(opt) || opt.description
-                          ? html`<span class="option-default-stack">
-                              <span class="option-label">${opt.label}</span>
-                              ${
-                                opt.description
-                                  ? html`<small class="option-description-note"
-                                      >${opt.description}</small
-                                    >`
-                                  : nothing
-                              }
-                              ${
-                                this._isDefault(opt)
-                                  ? html`<small class="option-default-note"
-                                      >${this.defaultNote}</small
-                                    >`
-                                  : nothing
-                              }
-                            </span>`
-                          : html`<span class="option-label">${opt.label}</span>`
-                      }
+                      ${renderOptionStack(
+                        opt.label,
+                        opt.description,
+                        this._isDefault(opt) ? this.defaultNote : undefined
+                      )}
                     </div>`
                 )}
               </div>`
