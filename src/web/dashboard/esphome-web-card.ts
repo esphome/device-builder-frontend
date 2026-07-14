@@ -112,9 +112,6 @@ export class ESPHomeWebCard extends LitElement {
         color: var(--wa-color-text-quiet);
         line-height: var(--wa-line-height-normal);
       }
-      .card-content:empty {
-        display: none;
-      }
       .card-actions {
         margin-top: auto;
       }
