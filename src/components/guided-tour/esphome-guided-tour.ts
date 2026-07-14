@@ -5,19 +5,16 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, remoteComputeOnlyContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { isTypingTarget } from "../../util/typing-target.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { isTypingTarget } from "../../util/typing-target.js";
 import { guidedTourStyles } from "./esphome-guided-tour.styles.js";
-import { renderTourBubble, renderTourRecovery } from "./tour-bubble.js";
-import { TourBubbleFit } from "./tour-bubble-fit.js";
-import { TOUR_LAYOUT_RESTORE_EVENT } from "./tour-layout-controller.js";
-import { TourNavigatorController } from "./tour-navigator-controller.js";
-import { captureTourConfiguration, navigateToTourStep } from "./tour-route.js";
 import {
   TOUR_ANCHOR_EVENT,
   requestTourReveal,
   type TourAnchorEventDetail,
 } from "./tour-anchor.js";
+import { TourBubbleFit } from "./tour-bubble-fit.js";
+import { renderTourBubble, renderTourRecovery } from "./tour-bubble.js";
 import {
   computeTourFrame,
   toRect,
@@ -25,6 +22,9 @@ import {
   type Rect,
   type TourFrame,
 } from "./tour-geometry.js";
+import { TOUR_LAYOUT_RESTORE_EVENT } from "./tour-layout-controller.js";
+import { TourNavigatorController } from "./tour-navigator-controller.js";
+import { captureTourConfiguration, navigateToTourStep } from "./tour-route.js";
 import {
   clearTourConfiguration,
   clearTourPending,
@@ -279,17 +279,29 @@ export class ESPHomeGuidedTour extends LitElement {
     if ((this._step.actionAnchors?.length ?? 0) > 0) return false;
     const next = TOUR_STEPS[this._stepIndex + 1];
     if (!next) return false;
-    const currentPresent = this._step.anchors.some((a) => this._anchors.has(a));
-    const nextPresent = next.anchors.some((a) => this._anchors.has(a));
-    if (!currentPresent && nextPresent) {
-      const enteringDialog =
-        !this._step.anchors.some((anchor) => DIALOG_ANCHORS.has(anchor)) &&
-        next.anchors.some((anchor) => DIALOG_ANCHORS.has(anchor));
-      if (enteringDialog && !this._dialogReady) return false;
-      this._goToStep(this._stepIndex + 1);
-      return true;
+    const enteringDialog =
+      !this._step.anchors.some((anchor) => DIALOG_ANCHORS.has(anchor)) &&
+      next.anchors.some((anchor) => DIALOG_ANCHORS.has(anchor));
+    if (enteringDialog) {
+      // Anchor churn can't signal completion here: the page keeps this
+      // step's anchors registered behind the modal, and a hidden dialog
+      // keeps the next step's registered but sizeless. The dialog visibly
+      // showing the next anchor after its open animation is the signal.
+      if (!this._dialogReady) return false;
+      const sized = next.anchors.some((a) => {
+        const el = this._anchors.get(a);
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 || r.height > 0;
+      });
+      if (!sized) return false;
+    } else {
+      const currentPresent = this._step.anchors.some((a) => this._anchors.has(a));
+      const nextPresent = next.anchors.some((a) => this._anchors.has(a));
+      if (currentPresent || !nextPresent) return false;
     }
-    return false;
+    this._goToStep(this._stepIndex + 1);
+    return true;
   }
 
   // Scroll/resize can fire many times per frame; coalesce the layout reads
@@ -354,13 +366,7 @@ export class ESPHomeGuidedTour extends LitElement {
     }
     const present = this._presentAnchorEls();
 
-    this._teardownClicks();
-    if (this._step.kind === "action") {
-      for (const el of this._actionAnchorEls()) {
-        el.addEventListener("click", this._onAnchorClick);
-        this._clickTargets.push(el);
-      }
-    }
+    this._syncClickTargets();
 
     const target =
       present.find((el) => {
@@ -439,6 +445,21 @@ export class ESPHomeGuidedTour extends LitElement {
       el.removeEventListener("click", this._onAnchorClick);
     }
     this._clickTargets = [];
+  }
+
+  private _syncClickTargets(): void {
+    // removeEventListener drops a listener from an in-flight dispatch even
+    // when it is re-added immediately, so a full teardown here would eat the
+    // very click _onAnchorClick waits for whenever that click's own handlers
+    // re-render an anchor. Only touch elements that actually changed.
+    const els = this._step.kind === "action" ? this._actionAnchorEls() : [];
+    for (const el of this._clickTargets) {
+      if (!els.includes(el)) el.removeEventListener("click", this._onAnchorClick);
+    }
+    for (const el of els) {
+      el.addEventListener("click", this._onAnchorClick);
+    }
+    this._clickTargets = els;
   }
 
   private _goToStep(index: number): void {

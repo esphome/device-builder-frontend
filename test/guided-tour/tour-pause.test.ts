@@ -19,8 +19,8 @@ import {
   getPendingTourStep,
   getTourConfiguration,
   isTourPending,
-  setTourConfiguration,
   setTourActive,
+  setTourConfiguration,
   setTourPending,
 } from "../../src/components/guided-tour/tour-session.js";
 import { TOUR_STEPS } from "../../src/components/guided-tour/tour-steps.js";
@@ -46,6 +46,21 @@ interface TourInternals {
 }
 
 const internals = (tour: ESPHomeGuidedTour) => tour as unknown as TourInternals;
+
+const sized = (el: HTMLElement): HTMLElement => {
+  el.getBoundingClientRect = () =>
+    ({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      bottom: 24,
+      right: 120,
+      width: 120,
+      height: 24,
+    }) as DOMRect;
+  return el;
+};
 
 afterEach(() => {
   vi.useRealTimers();
@@ -195,10 +210,46 @@ describe("guided-tour pause state", () => {
     state._active = true;
     state._stepIndex = 0;
     state._dialogReady = false;
-    state._anchors.set("create-method-basic", document.createElement("button"));
+    // The create button stays registered behind the modal.
+    state._anchors.set("create-device-fab", document.createElement("button"));
+    state._anchors.set("create-method-basic", sized(document.createElement("button")));
 
     expect(state._maybeAutoAdvance()).toBe(false);
     state._onDialogShown();
+    expect(state._stepIndex).toBe(1);
+  });
+
+  it("does not advance into a wizard that is not visibly open", () => {
+    const state = internals(new ESPHomeGuidedTour());
+    state._active = true;
+    state._stepIndex = 0;
+    state._dialogReady = true;
+    state._anchors.set("create-device-fab", document.createElement("button"));
+    // A hidden dialog keeps its anchors registered but sizeless.
+    state._anchors.set("create-method-basic", document.createElement("button"));
+
+    expect(state._maybeAutoAdvance()).toBe(false);
+    expect(state._stepIndex).toBe(0);
+  });
+
+  it("does not detach the click listener when a refresh leaves targets unchanged", () => {
+    const state = internals(new ESPHomeGuidedTour());
+    state._active = true;
+    state._stepIndex = 0;
+    const create = sized(document.createElement("button"));
+    document.body.appendChild(create);
+    state._anchors.set("create-device-fab", create);
+    state._refresh();
+
+    // Browsers skip a listener removed during dispatch even when re-added,
+    // so the mid-click refresh caused by the wizard opening must not detach
+    // _onAnchorClick while its click is still in flight.
+    const removeSpy = vi.spyOn(create, "removeEventListener");
+    state._refresh();
+    expect(removeSpy).not.toHaveBeenCalled();
+
+    create.click();
+    create.remove();
     expect(state._stepIndex).toBe(1);
   });
 
