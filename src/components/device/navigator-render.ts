@@ -191,6 +191,12 @@ function renderNavAction(action: NavAction): TemplateResult {
   </div>`;
 }
 
+function onSectionKeydown(event: KeyboardEvent): void {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  (event.currentTarget as HTMLElement).click();
+}
+
 /**
  * One section block: header (collapsible when not filtering), its rows,
  * and the "+ Add X" actions. Returns ``nothing`` while filtering when the
@@ -201,16 +207,12 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
   return html`
     <div
       class="nav-content"
-      role="button"
-      tabindex="0"
-      aria-expanded=${v.open ? "true" : "false"}
+      role=${ifDefined(v.filtering ? undefined : "button")}
+      tabindex=${ifDefined(v.filtering ? undefined : "0")}
+      aria-expanded=${ifDefined(v.filtering ? undefined : v.open ? "true" : "false")}
       ${tourAnchor(v.tourAnchorId)}
-      @click=${() => v.onToggle()}
-      @keydown=${(event: KeyboardEvent) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        (event.currentTarget as HTMLElement).click();
-      }}
+      @click=${v.filtering ? nothing : v.onToggle}
+      @keydown=${v.filtering ? nothing : onSectionKeydown}
     >
       <div class="nav-content-label">
         <wa-icon library="mdi" name=${v.icon}></wa-icon>
