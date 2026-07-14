@@ -145,11 +145,12 @@ function bubbleTop(bubble: Bubble, vp: Viewport, height: number): number {
 }
 
 /** Long localized copy reaches ~310px on phones; desktop copy is much wider.
- *  Clamped to the CSS max-height cap (60vh, esphome-guided-tour.styles.ts) so
- *  the estimate never exceeds what a rendered bubble can be. */
+ *  Clamped to the bubble's CSS max-height (min(60vh, 100vh - 32px) in
+ *  esphome-guided-tour.styles.ts) so the estimate never exceeds what a
+ *  rendered bubble can be. */
 function bubbleHeightEstimate(vp: Viewport): number {
   const base = vp.w <= 600 || vp.h <= 600 ? COMPACT_BUBBLE_HEIGHT_EST : BUBBLE_HEIGHT_EST;
-  return Math.min(base, vp.h * 0.6);
+  return Math.min(base, vp.h * 0.6, vp.h - EDGE_MARGIN * 2);
 }
 
 function bubbleCoversHole(
