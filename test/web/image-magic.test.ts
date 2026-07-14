@@ -25,7 +25,21 @@ describe("validateEspImage", () => {
     );
   });
 
-  it("rejects when there's no part at offset 0", () => {
+  it("accepts a multi-part image whose bootloader is a separate part at 0x1000", () => {
+    // No address-0 part; the bootloader (magic at its start) rides its own part.
+    expect(
+      validateEspImage([
+        { address: 0x1000, data: withMagicAt(0, 64) },
+        { address: 0x8000, data: new Uint8Array(64) },
+      ])
+    ).toBe(true);
+  });
+
+  it("accepts a multi-part image whose bootloader is a separate part at 0x2000", () => {
+    expect(validateEspImage([{ address: 0x2000, data: withMagicAt(0, 64) }])).toBe(true);
+  });
+
+  it("rejects magic that lands at a non-boot offset (e.g. a part at 0x10000)", () => {
     expect(validateEspImage([{ address: 0x10000, data: withMagicAt(0, 64) }])).toBe(
       false
     );

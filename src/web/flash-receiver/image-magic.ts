@@ -7,19 +7,34 @@ import type { FlashPart } from "../util/esphome-web-firmware.js";
 export const ESP_IMAGE_MAGIC = 0xe9;
 
 /**
- * Reject anything that isn't an ESP image before the chip is erased. The magic
- * sits at byte 0 for ESP8266 and native-USB ESP32 parts (S3/C3/C6, bootloader
- * at 0x0); the classic ESP32 / ESP32-S2 merged factory image pads 0x0–0xFFF
- * with 0xFF and puts the bootloader (magic) at 0x1000; ESP32-P4 / C5 / C61 pad
- * further and put the bootloader at 0x2000. Returns ``true`` when the payload
- * looks like ESP firmware, ``false`` otherwise.
+ * Absolute flash offsets the bootloader (which carries the image magic) can
+ * start at: 0x0 for ESP8266 and native-USB ESP32 (S3/C3/C6); 0x1000 for classic
+ * ESP32 / ESP32-S2; 0x2000 for ESP32-P4 / C5 / C61.
+ */
+const BOOTLOADER_OFFSETS = [0x0, 0x1000, 0x2000];
+
+/**
+ * The byte at absolute flash ``offset`` across the (arbitrarily-addressed)
+ * parts, or ``undefined`` when no part covers it.
+ */
+function byteAtOffset(files: FlashPart[], offset: number): number | undefined {
+  for (const f of files) {
+    if (offset >= f.address && offset < f.address + f.data.length) {
+      return f.data[offset - f.address];
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Reject anything that isn't an ESP image before the chip is erased. Check the
+ * bootloader magic at each possible absolute flash offset across the parts — a
+ * merged factory image is a single part at 0x0, but the receiver's protocol
+ * also accepts a separate bootloader part at 0x1000 / 0x2000 (with no address-0
+ * part). Returns ``true`` when the payload looks like ESP firmware.
  */
 export function validateEspImage(files: FlashPart[]): boolean {
-  const boot = files.find((f) => f.address === 0);
-  if (!boot) return false;
-  return (
-    boot.data[0] === ESP_IMAGE_MAGIC ||
-    (boot.data.length > 0x1000 && boot.data[0x1000] === ESP_IMAGE_MAGIC) ||
-    (boot.data.length > 0x2000 && boot.data[0x2000] === ESP_IMAGE_MAGIC)
+  return BOOTLOADER_OFFSETS.some(
+    (offset) => byteAtOffset(files, offset) === ESP_IMAGE_MAGIC
   );
 }
