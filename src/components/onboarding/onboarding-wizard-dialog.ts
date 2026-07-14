@@ -59,8 +59,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
-  /** Whether this install asks the remote-compute use-case question
-   *  (non-HA only). Seeded by the app shell from the onboarding state. */
+  /** Whether this install can ask expert users the remote-compute use-case
+   *  question (non-HA only). Seeded by the app shell from onboarding state. */
   @property({ type: Boolean }) hasUseCase = false;
 
   @state() private _open = false;
@@ -110,7 +110,10 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   /** Ordered screens for the current environment. */
   private get _screens(): WizardScreen[] {
-    return wizardScreens({ hasUseCase: this.hasUseCase });
+    return wizardScreens({
+      hasUseCase: this.hasUseCase,
+      isExpert: this._experience === ExperienceLevel.EXPERT,
+    });
   }
 
   private get _screen(): WizardScreen {
@@ -325,9 +328,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
                 ? this._localize("onboarding.wizard.recommended")
                 : undefined,
             disabled: this._saving,
-            onSelect: () => {
-              this._experience = level;
-            },
+            onSelect: () => this._chooseExperience(level),
           })
         )}
       </div>
@@ -339,6 +340,14 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._remoteCompute = remoteCompute;
   }
 
+  private _chooseExperience(level: ExperienceLevel) {
+    this._experience = level;
+    if (level === ExperienceLevel.BEGINNER) {
+      this._useCaseChosen = true;
+      this._remoteCompute = false;
+    }
+  }
+
   private _onBack() {
     this._error = null;
     if (this._index > 0) this._index -= 1;
@@ -348,10 +357,16 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._error = null;
     switch (this._screen) {
       case "welcome":
-      case "use_case":
         this._index += 1;
         return;
       case "experience":
+        if (this.hasUseCase && this._experience === ExperienceLevel.EXPERT) {
+          this._index += 1;
+          return;
+        }
+        await this._completeSetup();
+        return;
+      case "use_case":
         await this._completeSetup();
         return;
       case "tour":
