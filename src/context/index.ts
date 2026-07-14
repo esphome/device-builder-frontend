@@ -18,6 +18,7 @@ export {
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
+  isHaAddonContext,
   isHaIngressContext,
   labelsContext,
   localizeContext,

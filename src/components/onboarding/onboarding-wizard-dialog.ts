@@ -9,15 +9,22 @@ import {
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
+import type { RemoteBuildPeer } from "../../api/types/remote-build.js";
 import { ExperienceLevel } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  buildOffloadDiscoveredHostsContext,
+  isHaAddonContext,
+  localizeContext,
+} from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
 import { formatApiError } from "../../util/format-api-error.js";
+import { trimTrailingDot } from "../../util/hostname.js";
 import { notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { closeOpenDialogs } from "../base-dialog.js";
@@ -60,6 +67,14 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
+  @consume({ context: buildOffloadDiscoveredHostsContext, subscribe: true })
+  @state()
+  private _discoveredHosts: Map<string, RemoteBuildPeer> | null = null;
+
+  @consume({ context: isHaAddonContext, subscribe: true })
+  @state()
+  private _isHaAddon = false;
+
   /** Whether this install can ask expert users the remote-compute use-case
    *  question (non-HA only). Seeded by the app shell from onboarding state. */
   @property({ type: Boolean }) hasUseCase = false;
@@ -72,6 +87,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   @state() private _useCaseChosen = true;
   @state() private _remoteCompute = false;
   @state() private _experience: ExperienceLevel | null = ExperienceLevel.BEGINNER;
+  // Frozen when leaving Welcome so mDNS hosts arriving mid-flow can't
+  // insert/remove the existing-server screen under the user.
+  @state() private _existingServerPinned = false;
 
   private _startTourAfterClose = false;
   private _enter = new EnterController(this, () => {
@@ -98,6 +116,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._useCaseChosen = true;
     this._remoteCompute = false;
     this._experience = ExperienceLevel.BEGINNER;
+    this._existingServerPinned = false;
     this._startTourAfterClose = false;
     this._enter.set(true);
   }
@@ -111,10 +130,21 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   /** Ordered screens for the current environment. */
   private get _screens(): WizardScreen[] {
+    // Live while still on Welcome (safe to grow the tail as hosts arrive);
+    // frozen to the pinned value once past it.
+    const showExistingServer =
+      this._index === 0 ? this._computeShowExistingServer() : this._existingServerPinned;
     return wizardScreens({
       hasUseCase: this.hasUseCase,
       isExpert: this._experience === ExperienceLevel.EXPERT,
+      showExistingServer,
     });
+  }
+
+  /** Show the orientation screen only off the HA add-on, and only when another
+   *  Device Builder is on the network. */
+  private _computeShowExistingServer(): boolean {
+    return !this._isHaAddon && !!this._discoveredHosts?.size;
   }
 
   private get _screen(): WizardScreen {
@@ -135,6 +165,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     if (this._saving) return false;
     switch (this._screen) {
       case "welcome":
+        return true;
+      case "existing_server":
         return true;
       case "use_case":
         return this._useCaseChosen;
@@ -227,6 +259,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     switch (this._screen) {
       case "welcome":
         return this._renderWelcome();
+      case "existing_server":
+        return this._renderExistingServer();
       case "use_case":
         return this._renderUseCase();
       case "experience":
@@ -245,6 +279,30 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           alt=""
         />
         <p class="intro">${this._localize("onboarding.wizard.welcome.intro")}</p>
+      </div>
+    `;
+  }
+
+  private _renderExistingServer() {
+    const names = this._discoveredHosts
+      ? [...this._discoveredHosts.values()].map((peer) =>
+          trimTrailingDot(peer.friendly_name.trim() || peer.name)
+        )
+      : [];
+    const joined = new Intl.ListFormat(undefined, { type: "conjunction" }).format(names);
+    return html`
+      <div class="tour-offer">
+        <wa-icon library="mdi" name="server-network" class="tour-offer-icon"></wa-icon>
+        ${
+          names.length
+            ? html`<p class="tour-ready">
+                ${this._localize("onboarding.wizard.existing_server.found", {
+                  name: joined,
+                })}
+              </p>`
+            : nothing
+        }
+        <p class="intro">${this._localize("onboarding.wizard.existing_server.intro")}</p>
       </div>
     `;
   }
@@ -358,6 +416,10 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._error = null;
     switch (this._screen) {
       case "welcome":
+        this._existingServerPinned = this._computeShowExistingServer();
+        this._index += 1;
+        return;
+      case "existing_server":
         this._index += 1;
         return;
       case "experience":

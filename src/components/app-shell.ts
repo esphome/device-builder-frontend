@@ -40,6 +40,7 @@ import {
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
+  isHaAddonContext,
   isHaIngressContext,
   labelsContext,
   localizeContext,
@@ -137,6 +138,7 @@ export class ESPHomeApp extends LitElement {
   _desktopUpdateCapable = false;
   @provide({ context: darkModeContext }) @state() _darkMode = initialDarkMode();
   @provide({ context: isHaIngressContext }) @state() _isHaIngress = false;
+  @provide({ context: isHaAddonContext }) @state() _isHaAddon = false;
   @provide({ context: activeJobsContext }) @state() _activeJobs: Map<
     string,
     FirmwareJob
@@ -449,6 +451,7 @@ export class ESPHomeApp extends LitElement {
       this._desktopVersion = info.desktop_version ?? "";
       this._desktopUpdateCapable = info.desktop_update_capable ?? false;
       this._isHaIngress = info.ha_ingress;
+      this._isHaAddon = info.ha_addon;
       this._apiConnected = true;
       void this._api.ready.then(() => this._afterAuthenticated());
     };

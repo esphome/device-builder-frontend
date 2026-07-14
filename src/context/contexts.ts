@@ -70,6 +70,11 @@ export const devicesLoadedContext = createContext<boolean>(
 /** Context for whether the frontend is running inside HA ingress. */
 export const isHaIngressContext = createContext<boolean>(Symbol("esphome-is-ha-ingress"));
 
+/** Context for whether the backend is running as the HA add-on. Broader than
+ *  :member:`isHaIngressContext` (also true when the add-on is reached directly
+ *  on its exposed port, not just through Supervisor ingress). */
+export const isHaAddonContext = createContext<boolean>(Symbol("esphome-is-ha-addon"));
+
 /** Context for active firmware jobs, keyed by device configuration.
  *  Tracks the latest non-terminal job per device (used for the busy
  *  spinner on cards/tables). For the full multi-job view, see
