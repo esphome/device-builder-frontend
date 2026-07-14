@@ -26,6 +26,8 @@ registerMdiIcons({ "chevron-down": mdiChevronDown });
 export interface ComboboxOption {
   label: string;
   value: string;
+  /** Prose explaining the choice, rendered as a quiet second line. */
+  description?: string;
 }
 
 @customElement("esphome-options-combobox")
@@ -153,12 +155,23 @@ export class ESPHomeOptionsCombobox extends LitElement {
                       @mouseenter=${() => (this._active = i)}
                     >
                       ${
-                        this._isDefault(opt)
+                        this._isDefault(opt) || opt.description
                           ? html`<span class="option-default-stack">
                               <span class="option-label">${opt.label}</span>
-                              <small class="option-default-note"
-                                >${this.defaultNote}</small
-                              >
+                              ${
+                                opt.description
+                                  ? html`<small class="option-description-note"
+                                      >${opt.description}</small
+                                    >`
+                                  : nothing
+                              }
+                              ${
+                                this._isDefault(opt)
+                                  ? html`<small class="option-default-note"
+                                      >${this.defaultNote}</small
+                                    >`
+                                  : nothing
+                              }
                             </span>`
                           : html`<span class="option-label">${opt.label}</span>`
                       }
@@ -184,7 +197,10 @@ export class ESPHomeOptionsCombobox extends LitElement {
     const q = this._query.trim().toLowerCase();
     if (!q) return this.options;
     return this.options.filter(
-      (o) => o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q)
+      (o) =>
+        o.value.toLowerCase().includes(q) ||
+        o.label.toLowerCase().includes(q) ||
+        o.description?.toLowerCase().includes(q)
     );
   }
 

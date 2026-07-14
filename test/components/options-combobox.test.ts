@@ -214,6 +214,54 @@ describe("esphome-options-combobox", () => {
     expect(el.shadowRoot!.querySelector(".option-default-note")).toBeNull();
   });
 
+  test("renders an option's description as a quiet second line", async () => {
+    const el = await mount("");
+    el.options = [
+      { label: "basic", value: "basic", description: "Reversible on every request." },
+      { label: "digest", value: "digest" },
+    ];
+    await el.updateComplete;
+    await open(el);
+    const opts = options(el);
+    expect(opts[0].querySelector(".option-description-note")?.textContent?.trim()).toBe(
+      "Reversible on every request."
+    );
+    expect(opts[1].querySelector(".option-description-note")).toBeNull();
+  });
+
+  test("stacks the description with the default note on the default option", async () => {
+    const el = await mount("");
+    el.options = [
+      { label: "basic", value: "basic", description: "Reversible on every request." },
+    ];
+    el.defaultValue = "basic";
+    el.defaultNote = "default";
+    await el.updateComplete;
+    await open(el);
+    const opt = options(el)[0];
+    expect(opt.querySelector(".option-description-note")).not.toBeNull();
+    expect(opt.querySelector(".option-default-note")?.textContent?.trim()).toBe(
+      "default"
+    );
+  });
+
+  test("typing filters on description text too", async () => {
+    const el = await mount("");
+    el.options = [
+      { label: "basic", value: "basic", description: "Reversible on every request." },
+      { label: "digest", value: "digest", description: "Sends only hashes." },
+    ];
+    await el.updateComplete;
+    await open(el);
+    const field = input(el);
+    field.value = "hashes";
+    field.dispatchEvent(new InputEvent("input"));
+    await el.updateComplete;
+    const opts = options(el);
+    expect(opts).toHaveLength(1);
+    expect(opts[0].querySelector(".option-label")?.textContent?.trim()).toBe("digest");
+  });
+
   test("the change event is namespaced (no generic value-changed)", () => {
     expect(OPTIONS_COMBOBOX_CHANGE_EVENT).toBe("options-combobox-change");
   });

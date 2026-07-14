@@ -226,7 +226,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         ${shownOptions.map((opt) => {
           const selected = opt.value.toLowerCase() === valueLower;
           const isDefault = defaultStr !== "" && opt.value.toLowerCase() === defaultLower;
-          if (!isDefault) {
+          if (!isDefault && !opt.description) {
             return html`<wa-option value=${opt.value} ?selected=${selected}
               >${opt.label}</wa-option
             >`;
@@ -234,6 +234,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
           // wa-select activates the first option when nothing is committed,
           // so give the default a muted second line (like the pin menu's
           // notes) — the honest "this applies if you leave it" signal.
+          // An option's catalog description stacks the same way.
           // `.label` keeps the closed control showing just the label.
           return html`<wa-option
             value=${opt.value}
@@ -242,9 +243,20 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
           >
             <span class="option-default-stack">
               <span>${opt.label}</span>
-              <small class="option-default-note"
-                >${ctx.localize("device.default_option_tag")}</small
-              >
+              ${
+                opt.description
+                  ? html`<small class="option-description-note"
+                      >${opt.description}</small
+                    >`
+                  : nothing
+              }
+              ${
+                isDefault
+                  ? html`<small class="option-default-note"
+                      >${ctx.localize("device.default_option_tag")}</small
+                    >`
+                  : nothing
+              }
             </span>
           </wa-option>`;
         })}

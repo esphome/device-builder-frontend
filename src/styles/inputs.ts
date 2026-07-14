@@ -138,6 +138,15 @@ export const inputStyles = css`
     font-style: italic;
   }
 
+  /* Catalog prose for one option (quiet, non-italic so it reads as
+     content rather than the default-tag annotation above). */
+  .option-description-note {
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+    max-width: 42ch;
+    white-space: normal;
+  }
+
   wa-select::part(listbox) {
     padding-block: 0;
   }

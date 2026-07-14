@@ -12,6 +12,10 @@ export type ConfigPrimitive = string | number | boolean;
 export interface ConfigValueOption {
   label: string;
   value: string;
+  /** Prose explaining the choice, rendered as secondary text under the label.
+   *  Set when the catalog's per-value docs read as a sentence rather than a
+   *  label. */
+  description?: string;
   /** ESP32 variants that accept this value (lowercased, e.g. `esp32s3`); absent
    *  or empty means every variant. When the device resolves to an ESP32 variant
    *  the select filters to it; otherwise (non-ESP32 or unknown) all options
