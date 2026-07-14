@@ -5,13 +5,13 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, remoteComputeOnlyContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { stripBase } from "../../util/base-path.js";
-import { navigate } from "../../util/navigation.js";
 import { isTypingTarget } from "../../util/typing-target.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { guidedTourStyles } from "./esphome-guided-tour.styles.js";
 import { renderTourBubble, renderTourRecovery } from "./tour-bubble.js";
 import { TOUR_LAYOUT_RESTORE_EVENT } from "./tour-layout-controller.js";
+import { TourNavigatorController } from "./tour-navigator-controller.js";
+import { captureTourConfiguration, navigateToTourStep } from "./tour-route.js";
 import {
   TOUR_ANCHOR_EVENT,
   requestTourReveal,
@@ -29,7 +29,6 @@ import {
   clearTourSuggestedName,
   getPendingTourStep,
   getTourConfiguration,
-  setTourConfiguration,
   setTourActive,
   setTourPending,
   setTourSuggestedName,
@@ -84,6 +83,12 @@ export class ESPHomeGuidedTour extends LitElement {
     pauseRect: () => this._pauseButton?.getBoundingClientRect(),
     onSkip: () => this._skip(),
     onPause: () => this._pause(),
+  });
+  private readonly _navigator = new TourNavigatorController(this, {
+    isNavigatorStep: () =>
+      this._step.actionAnchors?.some((id) => id.endsWith("core-item")) ?? false,
+    onCoreSelected: () => this._goToStep(this._stepIndex + 1),
+    onReflow: () => this._refresh(),
   });
 
   private _observeTarget(el: Element | null): void {
@@ -154,7 +159,20 @@ export class ESPHomeGuidedTour extends LitElement {
     this._dialogReady = false;
     this._revealRequested = false;
     this._bindTourListeners();
-    if (!this._navigateToCurrentStep(resuming)) this._scheduleMeasure();
+    if (
+      !navigateToTourStep(
+        this._step,
+        resuming,
+        () => {
+          if (this._active) this._scheduleMeasure();
+        },
+        () => {
+          if (this._active) this._pause();
+        }
+      )
+    ) {
+      this._scheduleMeasure();
+    }
   }
 
   private _bindTourListeners(): void {
@@ -164,6 +182,7 @@ export class ESPHomeGuidedTour extends LitElement {
     window.addEventListener("scroll", this._onReflow, true);
     window.addEventListener("keydown", this._onKeydown, true);
     window.addEventListener("wa-after-show", this._onDialogShown);
+    this._navigator.setActive(true);
   }
 
   private _unbindTourListeners(): void {
@@ -173,6 +192,7 @@ export class ESPHomeGuidedTour extends LitElement {
     window.removeEventListener("scroll", this._onReflow, true);
     window.removeEventListener("keydown", this._onKeydown, true);
     window.removeEventListener("wa-after-show", this._onDialogShown);
+    this._navigator.setActive(false);
   }
 
   protected firstUpdated(): void {
@@ -219,52 +239,6 @@ export class ESPHomeGuidedTour extends LitElement {
     return TOUR_STEPS[this._stepIndex];
   }
 
-  private _onDeviceRoute(): boolean {
-    return stripBase(window.location.pathname).startsWith("/device/");
-  }
-
-  private _onDashboardRoute(): boolean {
-    const path = stripBase(window.location.pathname);
-    return path === "" || path === "/";
-  }
-
-  /** Returns true when measurement must wait for an async route transition. */
-  private _navigateToCurrentStep(resuming: boolean): boolean {
-    let target: string | null = null;
-    if (this._step.route === "dashboard" && !this._onDashboardRoute()) {
-      target = "/";
-    } else if (resuming && this._step.route === "device" && !this._onDeviceRoute()) {
-      const configuration = getTourConfiguration();
-      if (configuration) target = `/device/${encodeURIComponent(configuration)}`;
-    }
-    if (target === null) return false;
-
-    void navigate(target).then(() => {
-      if (!this._active) return;
-      const arrived =
-        this._step.route === "dashboard"
-          ? this._onDashboardRoute()
-          : this._onDeviceRoute();
-      if (!arrived) {
-        this._pause();
-        return;
-      }
-      this._scheduleMeasure();
-    });
-    return true;
-  }
-
-  private _captureDeviceConfiguration(): void {
-    if (!this._active || !this._onDeviceRoute()) return;
-    const encoded = stripBase(window.location.pathname).slice("/device/".length);
-    if (!encoded) return;
-    try {
-      setTourConfiguration(decodeURIComponent(encoded));
-    } catch {
-      setTourConfiguration(encoded);
-    }
-  }
-
   private _onAnchorEvent = (event: Event): void => {
     const { id, el, action } = (event as CustomEvent<TourAnchorEventDetail>).detail;
     if (action === "register") {
@@ -274,13 +248,27 @@ export class ESPHomeGuidedTour extends LitElement {
     }
     // Anchors register from all over the app; only react while touring.
     if (!this._active) return;
-    this._captureDeviceConfiguration();
+    captureTourConfiguration(this._active);
+    if (action === "register" && this._step.anchors.includes(id)) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        requestAnimationFrame(() => {
+          if (this._active && this._step.anchors.includes(id)) this._refresh();
+        });
+      }
+    }
+    if (action === "register" && id === "nav-mobile-core") {
+      this._navigator.anchorRegistered(id, el);
+    }
     if (this._maybeAutoAdvance()) return;
     this._refresh();
   };
 
   private _maybeAutoAdvance(): boolean {
     if (this._step.kind !== "action") return false;
+    // Explicit action anchors must receive their click; visual-anchor churn
+    // (for example opening the mobile navigator drawer) is not completion.
+    if ((this._step.actionAnchors?.length ?? 0) > 0) return false;
     const next = TOUR_STEPS[this._stepIndex + 1];
     if (!next) return false;
     const currentPresent = this._step.anchors.some((a) => this._anchors.has(a));
@@ -454,7 +442,20 @@ export class ESPHomeGuidedTour extends LitElement {
     setTourPending(index);
     this._frame = null;
     this._revealRequested = false;
-    if (!this._navigateToCurrentStep(false)) this._scheduleMeasure();
+    if (
+      !navigateToTourStep(
+        this._step,
+        false,
+        () => {
+          if (this._active) this._scheduleMeasure();
+        },
+        () => {
+          if (this._active) this._pause();
+        }
+      )
+    ) {
+      this._scheduleMeasure();
+    }
   }
 
   private _next(): void {

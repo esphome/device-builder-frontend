@@ -82,6 +82,9 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
       class="nav-item ${
         v.selectedLine === item.fromLine ? "nav-item--selected" : ""
       } ${v.hoveredLine === item.fromLine ? "nav-item--hovered" : ""}"
+      ${tourAnchor(
+        item.key === "esphome" && v.tourAnchorId ? `${v.tourAnchorId}-item` : undefined
+      )}
       @mouseenter=${() => v.onItemEnter(item)}
       @mouseleave=${() => v.onItemLeave()}
       @click=${() => v.onItemClick(item)}

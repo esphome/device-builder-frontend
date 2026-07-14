@@ -1084,7 +1084,7 @@
       "navigator": {
         "title": "Your device navigator",
         "body": "Core Configuration contains essentials such as Wi-Fi, device identity, and hardware settings. Components add sensors and features; Automations define behavior.",
-        "hint": "Open Core Configuration to continue"
+        "hint": "Expand Core Configuration, then open ESPHome Core"
       },
       "central": {
         "title": "The main editor",

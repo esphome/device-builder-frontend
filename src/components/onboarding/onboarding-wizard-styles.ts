@@ -2,7 +2,7 @@ import { css } from "lit";
 
 export const onboardingWizardStyles = css`
   esphome-base-dialog {
-    --width: 520px;
+    --width: min(520px, calc(100vw - 24px));
   }
 
   esphome-base-dialog.mandatory::part(close-button) {
@@ -93,5 +93,11 @@ export const onboardingWizardStyles = css`
 
   .actions .spacer {
     flex: 1;
+  }
+
+  @media (max-width: 600px), (max-height: 600px) {
+    .body {
+      height: min(390px, calc(100dvh - 190px));
+    }
   }
 `;

@@ -11,6 +11,7 @@ vi.mock("../../src/util/navigation.js", () => ({
 }));
 
 import { ESPHomeGuidedTour } from "../../src/components/guided-tour/esphome-guided-tour.js";
+import { captureTourConfiguration } from "../../src/components/guided-tour/tour-route.js";
 import {
   clearTourConfiguration,
   clearTourPending,
@@ -37,7 +38,6 @@ interface TourInternals {
   _refresh(): void;
   _onDialogShown(): void;
   _maybeAutoAdvance(): boolean;
-  _captureDeviceConfiguration(): void;
   _onKeydown(event: KeyboardEvent): void;
   _next(): void;
   _pause(): void;
@@ -171,15 +171,30 @@ describe("guided-tour pause state", () => {
     expect(state._stepIndex).toBe(1);
   });
 
-  it("advances the navigator step only from Core Configuration", () => {
+  it("advances the navigator step only from ESPHome Core", () => {
     const state = internals(new ESPHomeGuidedTour());
     state._stepIndex = TOUR_STEPS.findIndex((step) => step.anchors.includes("nav"));
     const navigator = document.createElement("section");
     const core = document.createElement("button");
     state._anchors.set("nav", navigator);
-    state._anchors.set("nav-core", core);
+    state._anchors.set("nav-core-item", core);
 
     expect(state._actionAnchorEls()).toEqual([core]);
+  });
+
+  it("advances from the semantic ESPHome Core selection event", () => {
+    const tour = new ESPHomeGuidedTour();
+    const state = internals(tour);
+    const navigatorIndex = TOUR_STEPS.findIndex((step) => step.anchors.includes("nav"));
+    tour.start(navigatorIndex);
+
+    window.dispatchEvent(
+      new CustomEvent("section-select", {
+        detail: { sectionKey: "esphome" },
+      })
+    );
+
+    expect(state._stepIndex).toBe(navigatorIndex + 1);
   });
 
   it("waits for successful creation before leaving the Wi-Fi step", () => {
@@ -197,7 +212,7 @@ describe("guided-tour pause state", () => {
     state._active = true;
     window.history.replaceState(null, "", "/device/my%20tour.yaml");
 
-    state._captureDeviceConfiguration();
+    captureTourConfiguration(state._active);
 
     expect(getTourConfiguration()).toBe("my tour.yaml");
   });

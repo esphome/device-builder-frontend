@@ -79,8 +79,14 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     // The open navigator when visible, else the toggle that reveals it.
-    anchors: ["nav", "nav-toggle"],
-    actionAnchors: ["nav-core"],
+    anchors: [
+      "nav-mobile-core-item",
+      "nav-core-item",
+      "nav-mobile-core",
+      "nav",
+      "nav-toggle",
+    ],
+    actionAnchors: ["nav-mobile-core-item", "nav-core-item"],
     route: "device",
     side: "right",
     kind: "action",

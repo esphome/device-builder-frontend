@@ -42,6 +42,7 @@ export const BUBBLE_GAP = 16;
 const EDGE_MARGIN = 16;
 const BUBBLE_BOTTOM_RESERVE = 200;
 const BUBBLE_HEIGHT_EST = 220;
+const COMPACT_BUBBLE_HEIGHT_EST = 340;
 
 const SIDE_ORDER: Record<Side, Side[]> = {
   right: ["right", "left", "top", "bottom"],
@@ -128,18 +129,23 @@ function computeBubble(
 
 /** The bubble's estimated top edge in viewport coordinates. */
 function bubbleTop(bubble: Bubble, vp: Viewport): number {
-  return bubble.bottom !== undefined
-    ? vp.h - bubble.bottom - BUBBLE_HEIGHT_EST
-    : (bubble.top ?? 0);
+  const height = bubbleHeightEstimate(vp);
+  return bubble.bottom !== undefined ? vp.h - bubble.bottom - height : (bubble.top ?? 0);
+}
+
+/** Long localized copy reaches ~310px on phones; desktop copy is much wider. */
+function bubbleHeightEstimate(vp: Viewport): number {
+  return vp.w <= 600 || vp.h <= 600 ? COMPACT_BUBBLE_HEIGHT_EST : BUBBLE_HEIGHT_EST;
 }
 
 function bubbleCoversHole(bubble: Bubble, vp: Viewport, hole: Box): boolean {
   const top = bubbleTop(bubble, vp);
+  const height = bubbleHeightEstimate(vp);
   const b = {
     l: bubble.left,
     r: bubble.left + bubble.width,
     t: top,
-    b: top + BUBBLE_HEIGHT_EST,
+    b: top + height,
   };
   return !(
     b.r <= hole.x ||
@@ -153,7 +159,7 @@ function bubbleCoversHole(bubble: Bubble, vp: Viewport, hole: Box): boolean {
  *  margins (horizontal placement is already clamped in `computeBubble`). */
 function bubbleFitsViewport(bubble: Bubble, vp: Viewport): boolean {
   const top = bubbleTop(bubble, vp);
-  return top >= EDGE_MARGIN && top + BUBBLE_HEIGHT_EST <= vp.h - EDGE_MARGIN;
+  return top >= EDGE_MARGIN && top + bubbleHeightEstimate(vp) <= vp.h - EDGE_MARGIN;
 }
 
 export function computeTourFrame(
@@ -185,7 +191,7 @@ export function computeTourFrame(
     top: clamp(
       hole.y + BUBBLE_GAP,
       EDGE_MARGIN,
-      Math.max(EDGE_MARGIN, vp.h - BUBBLE_HEIGHT_EST - EDGE_MARGIN)
+      Math.max(EDGE_MARGIN, vp.h - bubbleHeightEstimate(vp) - EDGE_MARGIN)
     ),
     width: w,
   };
