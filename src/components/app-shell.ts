@@ -219,9 +219,6 @@ export class ESPHomeApp extends LitElement {
   // auto-popped — it's collected per-device in the create wizard, or on demand
   // via the kebab "Set up Wi-Fi" dialog.
   @state() _onboardingShouldShow = false;
-  // Whether the first-run wizard should ask the remote-compute use-case
-  // question (non-HA only). Seeded from the onboarding state's step list.
-  @state() _onboardingHasUseCase = false;
   @state() _authState: AuthState = "connecting";
   @state() _authError: string | null = null;
   @state() _rateLimitedUntil = 0;
@@ -636,7 +633,6 @@ export class ESPHomeApp extends LitElement {
       <esphome-feedback-dialog></esphome-feedback-dialog>
       <esphome-onboarding-wifi-dialog></esphome-onboarding-wifi-dialog>
       <esphome-onboarding-wizard-dialog
-        .hasUseCase=${this._onboardingHasUseCase}
         @onboarding-acknowledged=${this._onOnboardingAcknowledged}
         @open-guided-tour=${this._onOpenGuidedTour}
       ></esphome-onboarding-wizard-dialog>

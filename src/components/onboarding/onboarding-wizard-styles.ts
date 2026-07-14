@@ -48,6 +48,53 @@ export const onboardingWizardStyles = css`
     gap: var(--wa-space-s);
   }
 
+  .existing-server {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--wa-space-s);
+    justify-content: flex-start;
+  }
+
+  .existing-server .tour-offer-icon {
+    margin-top: var(--wa-space-s);
+  }
+
+  .remote-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-m);
+    width: 100%;
+    text-align: left;
+    box-sizing: border-box;
+    margin-top: var(--wa-space-s);
+    padding: var(--wa-space-m);
+    border: 1px solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    cursor: pointer;
+  }
+
+  .remote-toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .remote-toggle-title {
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--wa-color-text-normal);
+  }
+
+  .remote-toggle-desc {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+    line-height: 1.4;
+  }
+
   .welcome-screen {
     gap: var(--wa-space-xl);
   }

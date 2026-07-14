@@ -40,7 +40,6 @@ function state(
 function makeHost(state: OnboardingState) {
   return {
     _onboardingPending: false,
-    _onboardingHasUseCase: false,
     _onboardingShouldShow: false,
     _api: { getOnboardingState: vi.fn(async () => state) },
   };

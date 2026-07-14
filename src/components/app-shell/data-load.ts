@@ -1,4 +1,4 @@
-import { OnboardingStepId, type UserPreferences } from "../../api/types/system.js";
+import type { UserPreferences } from "../../api/types/system.js";
 import {
   isExperienceChosen,
   shouldAutoShowOnboarding,
@@ -22,9 +22,6 @@ export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
   const keysPromise = fetchSecretKeys(host._api);
   try {
     const state = await host._api.getOnboardingState();
-    host._onboardingHasUseCase = state.steps.some(
-      (s) => s.id === OnboardingStepId.USE_CASE
-    );
     // Only the mandatory setup wizard auto-pops. Wi-Fi is collected when the
     // first Wi-Fi device needs it, never during onboarding.
     host._onboardingShouldShow =

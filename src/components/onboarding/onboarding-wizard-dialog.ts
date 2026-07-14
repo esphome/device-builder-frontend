@@ -1,13 +1,7 @@
 import { consume } from "@lit/context";
-import {
-  mdiCodeBraces,
-  mdiCompassOutline,
-  mdiLaptop,
-  mdiServerNetwork,
-  mdiSprout,
-} from "@mdi/js";
+import { mdiCodeBraces, mdiCompassOutline, mdiServerNetwork, mdiSprout } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { RemoteBuildPeer } from "../../api/types/remote-build.js";
 import { ExperienceLevel } from "../../api/types/system.js";
@@ -34,13 +28,13 @@ import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
 import { type WizardScreen, wizardScreens } from "./wizard-screens.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 export const RESET_ONBOARDING_PARAM = "resetOnboarding";
 
 registerMdiIcons({
   "code-braces": mdiCodeBraces,
   "compass-outline": mdiCompassOutline,
-  laptop: mdiLaptop,
   "server-network": mdiServerNetwork,
   sprout: mdiSprout,
 });
@@ -48,11 +42,12 @@ registerMdiIcons({
 /**
  * Mandatory first-run onboarding flow.
  *
- * A fresh install walks through Welcome and experience. Expert users on non-HA
- * installs also choose a use case. The choices are persisted before the final
- * tour offer appears, so "Maybe later" only skips the optional tour. Wi-Fi is
- * intentionally absent: the first Wi-Fi device that needs shared credentials
- * collects them.
+ * A fresh install walks through Welcome and experience. When another Device
+ * Builder is on the network (non-add-on installs), an orientation step follows
+ * with an opt-in "remote compute only" switch. The choices are persisted before
+ * the final tour offer appears, so "Maybe later" only skips the optional tour.
+ * Wi-Fi is intentionally absent: the first Wi-Fi device that needs shared
+ * credentials collects them.
  *
  * ``?resetOnboarding=1`` reopens a clean default run for frontend development.
  * It does not reset data before opening; completing the choices writes them
@@ -75,16 +70,11 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   @state()
   private _isHaAddon = false;
 
-  /** Whether this install can ask expert users the remote-compute use-case
-   *  question (non-HA only). Seeded by the app shell from onboarding state. */
-  @property({ type: Boolean }) hasUseCase = false;
-
   @state() private _open = false;
   @state() private _saving = false;
   @state() private _error: string | null = null;
   @state() private _index = 0;
 
-  @state() private _useCaseChosen = true;
   @state() private _remoteCompute = false;
   @state() private _experience: ExperienceLevel | null = ExperienceLevel.BEGINNER;
   // Frozen when leaving Welcome so mDNS hosts arriving mid-flow can't
@@ -113,7 +103,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._saving = false;
     this._error = null;
     this._index = 0;
-    this._useCaseChosen = true;
     this._remoteCompute = false;
     this._experience = ExperienceLevel.BEGINNER;
     this._existingServerPinned = false;
@@ -130,19 +119,16 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   /** Ordered screens for the current environment. */
   private get _screens(): WizardScreen[] {
-    // Live while still on Welcome (safe to grow the tail as hosts arrive);
-    // frozen to the pinned value once past it.
+    // existing_server sits after experience (index 1). While the user is still
+    // on Welcome or experience the tail can grow as mDNS hosts arrive; freeze it
+    // once they advance past experience so a late host can't shift the flow.
     const showExistingServer =
-      this._index === 0 ? this._computeShowExistingServer() : this._existingServerPinned;
-    return wizardScreens({
-      hasUseCase: this.hasUseCase,
-      isExpert: this._experience === ExperienceLevel.EXPERT,
-      showExistingServer,
-    });
+      this._index <= 1 ? this._computeShowExistingServer() : this._existingServerPinned;
+    return wizardScreens({ showExistingServer });
   }
 
-  /** Show the orientation screen only off the HA add-on, and only when another
-   *  Device Builder is on the network. */
+  /** Offer the orientation step only off the HA add-on, and only when another
+   *  Device Builder is on the network (nothing to build for otherwise). */
   private _computeShowExistingServer(): boolean {
     return !this._isHaAddon && !!this._discoveredHosts?.size;
   }
@@ -168,8 +154,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         return true;
       case "existing_server":
         return true;
-      case "use_case":
-        return this._useCaseChosen;
       case "experience":
         return this._experience !== null;
       case "tour":
@@ -261,8 +245,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         return this._renderWelcome();
       case "existing_server":
         return this._renderExistingServer();
-      case "use_case":
-        return this._renderUseCase();
       case "experience":
         return this._renderExperience();
       case "tour":
@@ -293,22 +275,47 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           ),
         ]
       : [];
-    const joined = new Intl.ListFormat(undefined, { type: "conjunction" }).format(names);
+    // Cap the named list so a busy network can't push the switch off-screen.
+    const shown = names.slice(0, 3);
+    const extra = names.length - shown.length;
+    const joined = new Intl.ListFormat(undefined, {
+      type: extra > 0 ? "unit" : "conjunction",
+    }).format(shown);
+    const foundLabel =
+      extra > 0
+        ? this._localize("onboarding.wizard.existing_server.found_overflow", {
+            name: joined,
+            count: extra,
+          })
+        : this._localize("onboarding.wizard.existing_server.found", { name: joined });
     return html`
-      <div class="tour-offer">
+      <div class="existing-server">
         <wa-icon library="mdi" name="server-network" class="tour-offer-icon"></wa-icon>
-        ${
-          names.length
-            ? html`<p class="tour-ready">
-                ${this._localize("onboarding.wizard.existing_server.found", {
-                  name: joined,
-                })}
-              </p>`
-            : nothing
-        }
+        ${names.length ? html`<p class="tour-ready">${foundLabel}</p>` : nothing}
         <p class="intro">${this._localize("onboarding.wizard.existing_server.intro")}</p>
+        <label class="remote-toggle">
+          <span class="remote-toggle-text">
+            <span class="remote-toggle-title">
+              ${this._localize("onboarding.wizard.existing_server.remote_only_title")}
+            </span>
+            <span class="remote-toggle-desc">
+              ${this._localize("onboarding.wizard.existing_server.remote_only_desc")}
+            </span>
+          </span>
+          <wa-switch
+            ?checked=${this._remoteCompute}
+            ?disabled=${this._saving}
+            @change=${this._onToggleRemoteCompute}
+          ></wa-switch>
+        </label>
       </div>
     `;
+  }
+
+  private _onToggleRemoteCompute(event: Event) {
+    this._remoteCompute = (
+      event.target as HTMLInputElement & { checked: boolean }
+    ).checked;
   }
 
   private _renderTourOffer() {
@@ -332,40 +339,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
       </div>
     `;
   }
-  private _renderUseCase() {
-    const devices = this._useCaseChosen && !this._remoteCompute;
-    const remote = this._useCaseChosen && this._remoteCompute;
-    return html`
-      <p class="intro">${this._localize("onboarding.wizard.use_case.intro")}</p>
-      <div
-        class="choices"
-        role="radiogroup"
-        aria-label=${this._localize("onboarding.wizard.use_case.title")}
-        @keydown=${onChoiceGroupKeydown}
-      >
-        ${renderChoiceCard({
-          icon: "laptop",
-          title: this._localize("onboarding.wizard.use_case.devices_title"),
-          description: this._localize("onboarding.wizard.use_case.devices_desc"),
-          selected: devices,
-          tabbable: rovingTabbable(devices, this._useCaseChosen, 0),
-          badge: this._localize("onboarding.wizard.recommended"),
-          disabled: this._saving,
-          onSelect: () => this._chooseUseCase(false),
-        })}
-        ${renderChoiceCard({
-          icon: "server-network",
-          title: this._localize("onboarding.wizard.use_case.remote_title"),
-          description: this._localize("onboarding.wizard.use_case.remote_desc"),
-          selected: remote,
-          tabbable: rovingTabbable(remote, this._useCaseChosen, 1),
-          disabled: this._saving,
-          onSelect: () => this._chooseUseCase(true),
-        })}
-      </div>
-    `;
-  }
-
   private _renderExperience() {
     return html`
       <p class="intro">${this._localize("onboarding.wizard.experience.intro")}</p>
@@ -398,17 +371,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     `;
   }
 
-  private _chooseUseCase(remoteCompute: boolean) {
-    this._useCaseChosen = true;
-    this._remoteCompute = remoteCompute;
-  }
-
   private _chooseExperience(level: ExperienceLevel) {
     this._experience = level;
-    if (level === ExperienceLevel.BEGINNER) {
-      this._useCaseChosen = true;
-      this._remoteCompute = false;
-    }
   }
 
   private _onBack() {
@@ -420,20 +384,19 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._error = null;
     switch (this._screen) {
       case "welcome":
-        this._existingServerPinned = this._computeShowExistingServer();
-        this._index += 1;
-        return;
-      case "existing_server":
         this._index += 1;
         return;
       case "experience":
-        if (this.hasUseCase && this._experience === ExperienceLevel.EXPERT) {
+        // Freeze whether the orientation step follows, now that mDNS has had
+        // Welcome + this screen to report.
+        this._existingServerPinned = this._computeShowExistingServer();
+        if (this._existingServerPinned) {
           this._index += 1;
           return;
         }
         await this._completeSetup();
         return;
-      case "use_case":
+      case "existing_server":
         await this._completeSetup();
         return;
       case "tour":

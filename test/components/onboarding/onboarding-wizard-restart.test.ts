@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
 
 import { ExperienceLevel } from "../../../src/api/types/system.js";
 import {
@@ -20,11 +21,12 @@ interface WizardInternals {
   _open: boolean;
   _index: number;
   _screen: string;
-  _useCaseChosen: boolean;
   _remoteCompute: boolean;
   _experience: ExperienceLevel;
+  _existingServerPinned: boolean;
+  _isHaAddon: boolean;
+  _discoveredHosts: Map<string, { friendly_name: string; name: string }> | null;
   _titleKey: string;
-  _chooseExperience(level: ExperienceLevel): void;
   _onContinue(): Promise<void>;
   _onRequestClose(event: Event): void;
   _startTour(): void;
@@ -49,14 +51,12 @@ describe("onboarding wizard reset query", () => {
       `/?keep=yes&${RESET_ONBOARDING_PARAM}=1#section`
     );
     const wizard = new ESPHomeOnboardingWizardDialog();
-    wizard.hasUseCase = true;
     document.body.appendChild(wizard);
     await wizard.updateComplete;
 
     const state = internals(wizard);
     expect(state._open).toBe(true);
     expect(state._screen).toBe("welcome");
-    expect(state._useCaseChosen).toBe(true);
     expect(state._remoteCompute).toBe(false);
     expect(state._experience).toBe(ExperienceLevel.BEGINNER);
     expect(window.location.search).toBe("?keep=yes");
@@ -67,7 +67,6 @@ describe("onboarding wizard reset query", () => {
 describe("mandatory onboarding flow", () => {
   it("vetoes close requests until the final tour offer", () => {
     const wizard = new ESPHomeOnboardingWizardDialog();
-    wizard.hasUseCase = true;
     wizard.open();
     const state = internals(wizard);
 
@@ -75,7 +74,7 @@ describe("mandatory onboarding flow", () => {
     state._onRequestClose(requiredClose);
     expect(requiredClose.defaultPrevented).toBe(true);
 
-    state._index = 2;
+    state._index = 2; // welcome, experience, tour
     const optionalClose = new Event("request-close", { cancelable: true });
     state._onRequestClose(optionalClose);
     expect(optionalClose.defaultPrevented).toBe(false);
@@ -84,10 +83,9 @@ describe("mandatory onboarding flow", () => {
 
   it("persists choices before presenting the tour offer", async () => {
     const wizard = new ESPHomeOnboardingWizardDialog();
-    wizard.hasUseCase = true;
     wizard.open();
     const state = internals(wizard);
-    state._index = 1;
+    state._index = 1; // experience
     state._api = {
       updatePreferences: vi.fn().mockResolvedValue(undefined),
       markOnboardingAcknowledged: vi.fn().mockResolvedValue(undefined),
@@ -95,7 +93,7 @@ describe("mandatory onboarding flow", () => {
     const acknowledged = vi.fn();
     wizard.addEventListener("onboarding-acknowledged", acknowledged);
 
-    await state._onContinue();
+    await state._onContinue(); // experience -> tour (nothing detected)
 
     expect(state._api.updatePreferences).toHaveBeenCalledWith({
       experience_level: ExperienceLevel.BEGINNER,
@@ -106,45 +104,11 @@ describe("mandatory onboarding flow", () => {
     expect(acknowledged).toHaveBeenCalledOnce();
   });
 
-  it("asks expert users for their use case before saving", async () => {
-    const wizard = new ESPHomeOnboardingWizardDialog();
-    wizard.hasUseCase = true;
-    wizard.open();
-    const state = internals(wizard);
-    state._experience = ExperienceLevel.EXPERT;
-    state._index = 1;
-    state._api = {
-      updatePreferences: vi.fn(),
-      markOnboardingAcknowledged: vi.fn(),
-    };
-
-    await state._onContinue();
-
-    expect(state._screen).toBe("use_case");
-    expect(state._api.updatePreferences).not.toHaveBeenCalled();
-  });
-
-  it("restores local-device mode when switching back to beginner", () => {
-    const wizard = new ESPHomeOnboardingWizardDialog();
-    wizard.hasUseCase = true;
-    wizard.open();
-    const state = internals(wizard);
-    state._experience = ExperienceLevel.EXPERT;
-    state._remoteCompute = true;
-    state._index = 1;
-
-    state._chooseExperience(ExperienceLevel.BEGINNER);
-
-    expect(state._remoteCompute).toBe(false);
-    expect(state._screen).toBe("experience");
-  });
-
   it("starts the guided tour only after the final dialog has closed", () => {
     const wizard = new ESPHomeOnboardingWizardDialog();
-    wizard.hasUseCase = true;
     wizard.open();
     const state = internals(wizard);
-    state._index = 2;
+    state._index = 2; // tour
     const openTour = vi.fn();
     wizard.addEventListener("open-guided-tour", openTour);
 
@@ -157,13 +121,17 @@ describe("mandatory onboarding flow", () => {
 
   it("ends remote-compute setup without offering an incompatible tour", () => {
     const wizard = new ESPHomeOnboardingWizardDialog();
-    wizard.hasUseCase = true;
     wizard.open();
     const state = internals(wizard);
-    state._experience = ExperienceLevel.EXPERT;
+    // A detected server with the remote-compute switch on lands on the remote
+    // variant of the tour offer.
+    state._isHaAddon = false;
+    state._discoveredHosts = new Map([["h", { friendly_name: "", name: "hass" }]]);
+    state._existingServerPinned = true;
     state._remoteCompute = true;
-    state._index = 3;
+    state._index = 3; // welcome, experience, existing_server, tour
 
+    expect(state._screen).toBe("tour");
     expect(state._titleKey).toBe("onboarding.wizard.tour.remote_title");
   });
 });
