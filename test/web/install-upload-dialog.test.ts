@@ -54,6 +54,12 @@ describe("esphome-web-install-upload-dialog", () => {
     expect(runFlash).toHaveBeenCalledTimes(2);
   });
 
+  it("gives the file input an accessible name", async () => {
+    const el = await mount();
+    const input = el.shadowRoot!.querySelector("input[type=file]");
+    expect(input?.getAttribute("aria-label")).toBeTruthy();
+  });
+
   it("clears the picked file on close", async () => {
     const el = await mount();
     (el as any)._onFileChange({

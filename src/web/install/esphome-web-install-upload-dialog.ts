@@ -60,7 +60,12 @@ export class ESPHomeWebInstallUploadDialog extends LitElement {
   private _renderSetup() {
     return html`
       <p>${this._localize("web.install.upload_intro")}</p>
-      <input type="file" accept=".bin" @change=${this._onFileChange} />
+      <input
+        type="file"
+        accept=".bin"
+        aria-label=${this._localize("web.install.upload_intro")}
+        @change=${this._onFileChange}
+      />
       <p>${this._localize("web.install.upload_howto_title")}</p>
       <ol>
         <li>${this._localize("web.install.upload_howto_1")}</li>

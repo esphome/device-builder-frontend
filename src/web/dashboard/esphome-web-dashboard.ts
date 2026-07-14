@@ -25,14 +25,28 @@ export class ESPHomeWebDashboard extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  // Legacy ``?dashboard_logs/install/wizard`` deep-link hint (ESP-only).
-  private _hint = parseDashboardHint();
+  connectedCallback(): void {
+    super.connectedCallback();
+    // The legacy ?dashboard_* hint is derived from the URL query, so re-render
+    // on back/forward navigation to keep it in sync with the current query.
+    window.addEventListener("popstate", this._onPopState);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    window.removeEventListener("popstate", this._onPopState);
+  }
+
+  private _onPopState = (): void => this.requestUpdate();
 
   private _renderHint() {
+    // Legacy ``?dashboard_logs/install/wizard`` deep-link hint (ESP-only). Read
+    // fresh each render so it isn't stale after a navigation changed the query.
+    const hint = parseDashboardHint();
     // Only ESP has the Logs / Install / Prepare actions the hint points at.
-    if (!this._hint || this.mode !== "esp" || !isWebSerialSupported()) return null;
+    if (!hint || this.mode !== "esp" || !isWebSerialSupported()) return null;
     return html`<div class="hint" role="note">
-      ${this._localize(`web.dashboard_hint.${this._hint}`)}
+      ${this._localize(`web.dashboard_hint.${hint}`)}
     </div>`;
   }
 
