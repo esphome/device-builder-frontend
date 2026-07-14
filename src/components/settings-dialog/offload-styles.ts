@@ -44,9 +44,20 @@ export const offloaderAlertStyles = css`
 `;
 
 export const pairingRowStyles = css`
+  /* Wraps so a wide button label (German) drops below the helper text
+     instead of squeezing it to a word per line on narrow viewports. */
   .pair-build-server-row {
     align-items: center;
     gap: var(--wa-space-s);
+    flex-wrap: wrap;
+  }
+
+  .pair-build-server-row .row-label {
+    flex: 1 1 240px;
+  }
+
+  .pair-build-server-row .btn-pair-build-server {
+    margin-left: auto;
   }
 
   .btn-pair-build-server {
