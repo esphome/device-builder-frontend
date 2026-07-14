@@ -116,12 +116,9 @@ export class ESPHomeGuidedTour extends LitElement {
     super.disconnectedCallback();
     window.removeEventListener(TOUR_ANCHOR_EVENT, this._onAnchorEvent);
     window.removeEventListener("popstate", this._onPopState);
-    this._unbindTourListeners();
-    this._teardownClicks();
-    this._observeTarget(null);
+    this._deactivate();
     this._resizeObserver?.disconnect();
     this._resizeObserver = undefined;
-    setTourActive(false);
   }
 
   start(stepIndex = 0): void {

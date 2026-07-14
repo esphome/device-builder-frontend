@@ -82,6 +82,19 @@ describe("guided-tour pause state", () => {
     expect(isTourPending()).toBe(false);
   });
 
+  it("can start again after a completed tour", () => {
+    const tour = new ESPHomeGuidedTour();
+    const state = internals(tour);
+    tour.start();
+    state._finish();
+
+    tour.start();
+
+    expect(state._active).toBe(true);
+    expect(state._stepIndex).toBe(0);
+    expect(getPendingTourStep()).toBe(0);
+  });
+
   it("does not start in remote-compute-only mode", () => {
     setTourPending();
     const tour = new ESPHomeGuidedTour();

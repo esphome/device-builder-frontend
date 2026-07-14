@@ -203,6 +203,7 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
       class="nav-content"
       role="button"
       tabindex="0"
+      aria-expanded=${v.open ? "true" : "false"}
       ${tourAnchor(v.tourAnchorId)}
       @click=${() => v.onToggle()}
       @keydown=${(event: KeyboardEvent) => {

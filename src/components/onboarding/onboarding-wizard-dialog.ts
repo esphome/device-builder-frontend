@@ -41,10 +41,11 @@ registerMdiIcons({
 /**
  * Mandatory first-run onboarding flow.
  *
- * A fresh install walks through Welcome, use case (non-HA only), and
- * experience. The choices are persisted before the final tour offer appears,
- * so "Maybe later" only skips the optional tour. Wi-Fi is intentionally absent:
- * the first Wi-Fi device that needs shared credentials collects them.
+ * A fresh install walks through Welcome and experience. Expert users on non-HA
+ * installs also choose a use case. The choices are persisted before the final
+ * tour offer appears, so "Maybe later" only skips the optional tour. Wi-Fi is
+ * intentionally absent: the first Wi-Fi device that needs shared credentials
+ * collects them.
  *
  * ``?resetOnboarding=1`` reopens a clean default run for frontend development.
  * It does not reset data before opening; completing the choices writes them

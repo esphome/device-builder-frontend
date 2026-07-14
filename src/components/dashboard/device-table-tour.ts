@@ -35,9 +35,10 @@ export class TourTablePageController {
     if (this._pendingRequest === request) return;
     this._pendingRequest = request;
     queueMicrotask(() => {
+      if (this._pendingRequest !== request) return;
+      this._pendingRequest = null;
       if (getActiveTourConfiguration() !== configuration) return;
       this._setPageIndex(pageIndex);
-      this._pendingRequest = null;
     });
   }
 }
