@@ -20,6 +20,7 @@ import {
 } from "./tour-anchor.js";
 import {
   computeTourFrame,
+  toRect,
   unionRects,
   type Rect,
   type TourFrame,
@@ -88,9 +89,8 @@ export class ESPHomeGuidedTour extends LitElement {
   });
   private readonly _bubbleFit = new TourBubbleFit(this, {
     bubbleEl: () => this._bubbleEl,
-    frame: () => (this._active ? this._frame : null),
+    frame: () => this._frame,
     anchorEl: () => this._observedTarget,
-    stepIndex: () => this._stepIndex,
     isActionStep: () => this._step.kind === "action",
     onHeightChange: () => this._refresh(),
   });
@@ -390,9 +390,8 @@ export class ESPHomeGuidedTour extends LitElement {
     // backdrop swallows scroll, so a target below the fold (or its bubble)
     // would otherwise be unreachable on a small screen.
     if (appearing) this._scrollTargetIntoView(target);
-    const tr = target.getBoundingClientRect();
     const rect = unionRects([
-      { x: tr.left, y: tr.top, w: tr.width, h: tr.height },
+      toRect(target.getBoundingClientRect()),
       ...this._highlightRects(),
     ]);
     this._frame = computeTourFrame(
@@ -414,7 +413,7 @@ export class ESPHomeGuidedTour extends LitElement {
       if (!el) continue;
       const r = el.getBoundingClientRect();
       if (r.width > 0 || r.height > 0) {
-        rects.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+        rects.push(toRect(r));
       }
     }
     return rects;

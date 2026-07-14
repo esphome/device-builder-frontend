@@ -1,10 +1,5 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import {
-  BUBBLE_WIDTH,
-  rectsIntersect,
-  type Rect,
-  type TourFrame,
-} from "./tour-geometry.js";
+import { BUBBLE_WIDTH, rectsIntersect, toRect, type TourFrame } from "./tour-geometry.js";
 
 export interface TourBubbleFitOptions {
   /** The rendered bubble element (undefined until the frame first paints). */
@@ -13,7 +8,6 @@ export interface TourBubbleFitOptions {
   frame: () => TourFrame | null;
   /** The step's measured anchor — the control the user must reach. */
   anchorEl: () => Element | null;
-  stepIndex: () => number;
   isActionStep: () => boolean;
   /** Re-place the bubble with the newly measured height. */
   onHeightChange: () => void;
@@ -24,18 +18,19 @@ export interface TourBubbleFitOptions {
  * the anchor clear of it.
  *
  * Placement runs before the bubble paints, so `computeTourFrame` starts from
- * a height estimate; long localized copy on a phone can double it, letting an
- * accepted placement cover the very control the step points at. After each
- * render this measures the bubble (memoized per bubble width so a docked
- * re-layout never feeds back into side placement) and asks the host to
- * re-place once per height change. Once the height is settled, if the bubble
- * still overlaps the action anchor, the anchor is scrolled toward the free
- * half of the viewport — once per placement per step, so a scroll-triggered
- * re-measure can't loop.
+ * a height estimate; long localized copy on a phone can double it, letting
+ * an accepted placement cover the very control the step points at. After a
+ * step's first paint this measures the side-placement bubble and asks the
+ * host to re-place once with the real height (a docked bubble renders at a
+ * different width, so its height never feeds back into side placement). Once
+ * settled, if the bubble still overlaps the spotlight hole, the anchor is
+ * scrolled toward the free half of the viewport — one check per placement
+ * per step, so a scroll-triggered re-measure can't loop and steady-state
+ * renders skip the layout reads entirely.
  */
 export class TourBubbleFit implements ReactiveController {
-  private _heights = new Map<number, number>();
-  private _spentNudges = new Set<string>();
+  private _sideHeight?: number;
+  private _checkedPlacements = new Set<string>();
 
   constructor(
     host: ReactiveControllerHost,
@@ -47,50 +42,51 @@ export class TourBubbleFit implements ReactiveController {
   /** The measured side-placement bubble height, if any (else the caller's
    *  estimate stands). */
   get measuredHeight(): number | undefined {
-    return this._heights.get(BUBBLE_WIDTH);
+    return this._sideHeight;
   }
 
-  /** Forget measurements and spent nudges; call on step change. */
+  /** Forget the measurement and checked placements; call on step change. */
   reset(): void {
-    this._heights.clear();
-    this._spentNudges.clear();
+    this._sideHeight = undefined;
+    this._checkedPlacements.clear();
   }
 
   hostUpdated(): void {
     const frame = this._options.frame();
     const bubble = this._options.bubbleEl();
     if (!frame || !bubble) return;
+    const sideBubble = frame.bubble.width === BUBBLE_WIDTH;
+    const placement = frame.dock ?? frame.side;
+    if (
+      this._checkedPlacements.has(placement) &&
+      (!sideBubble || this._sideHeight !== undefined)
+    ) {
+      return;
+    }
     const height = bubble.offsetHeight;
     if (height === 0) return;
-    const width = frame.bubble.width;
-    const prev = this._heights.get(width);
-    if (prev === undefined || Math.abs(prev - height) > 1) {
-      this._heights.set(width, height);
-      if (width === BUBBLE_WIDTH) {
-        this._options.onHeightChange();
-        return;
-      }
+    if (
+      sideBubble &&
+      (this._sideHeight === undefined || Math.abs(this._sideHeight - height) > 1)
+    ) {
+      this._sideHeight = height;
+      this._options.onHeightChange();
+      return;
     }
+    this._checkedPlacements.add(placement);
     this._maybeNudgeAnchor(frame, bubble);
   }
 
   private _maybeNudgeAnchor(frame: TourFrame, bubble: HTMLElement): void {
     if (!this._options.isActionStep()) return;
-    const key = `${this._options.stepIndex()}:${frame.dock ?? frame.side}`;
-    if (this._spentNudges.has(key)) return;
     const anchor = this._options.anchorEl();
     if (!anchor || typeof anchor.scrollIntoView !== "function") return;
-    const b = bubble.getBoundingClientRect();
-    if (!rectsIntersect(toRect(b), toRect(anchor.getBoundingClientRect()))) return;
-    this._spentNudges.add(key);
-    const bubbleOnTop = b.top + b.height / 2 < window.innerHeight / 2;
+    const bubbleRect = bubble.getBoundingClientRect();
+    if (!rectsIntersect(toRect(bubbleRect), frame.hole)) return;
+    const bubbleOnTop = bubbleRect.top + bubbleRect.height / 2 < window.innerHeight / 2;
     anchor.scrollIntoView({
       block: bubbleOnTop ? "end" : "start",
       inline: "nearest",
     });
   }
-}
-
-function toRect(r: DOMRect): Rect {
-  return { x: r.left, y: r.top, w: r.width, h: r.height };
 }

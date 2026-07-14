@@ -61,6 +61,11 @@ export function rectsIntersect(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+/** A DOMRect as the module's plain `Rect`. */
+export function toRect(r: DOMRect): Rect {
+  return { x: r.left, y: r.top, w: r.width, h: r.height };
+}
+
 /** The bounding box of one or more rects. */
 export function unionRects(rects: Rect[]): Rect {
   const x = Math.min(...rects.map((r) => r.x));
@@ -139,9 +144,12 @@ function bubbleTop(bubble: Bubble, vp: Viewport, height: number): number {
   return bubble.bottom !== undefined ? vp.h - bubble.bottom - height : (bubble.top ?? 0);
 }
 
-/** Long localized copy reaches ~310px on phones; desktop copy is much wider. */
+/** Long localized copy reaches ~310px on phones; desktop copy is much wider.
+ *  Clamped to the CSS max-height cap (60vh, esphome-guided-tour.styles.ts) so
+ *  the estimate never exceeds what a rendered bubble can be. */
 function bubbleHeightEstimate(vp: Viewport): number {
-  return vp.w <= 600 || vp.h <= 600 ? COMPACT_BUBBLE_HEIGHT_EST : BUBBLE_HEIGHT_EST;
+  const base = vp.w <= 600 || vp.h <= 600 ? COMPACT_BUBBLE_HEIGHT_EST : BUBBLE_HEIGHT_EST;
+  return Math.min(base, vp.h * 0.6);
 }
 
 function bubbleCoversHole(
@@ -164,7 +172,7 @@ function bubbleFitsViewport(bubble: Bubble, vp: Viewport, height: number): boole
 /** Full-width-ish bubble pinned to the viewport edge farther from the hole. */
 function computeDockedBubble(hole: Box, vp: Viewport): { bubble: Bubble; dock: Dock } {
   const w = Math.min(vp.w - EDGE_MARGIN * 2, DOCKED_MAX_WIDTH);
-  const left = clamp((vp.w - w) / 2, EDGE_MARGIN, vp.w - w - EDGE_MARGIN);
+  const left = (vp.w - w) / 2;
   const dock: Dock = hole.y + hole.h / 2 >= vp.h / 2 ? "top" : "bottom";
   return {
     bubble:
