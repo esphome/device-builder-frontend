@@ -260,7 +260,7 @@ describe("renderNumberField / renderFloatWithUnitField — bail on unparseable p
   });
 
   it("bails on a malformed unit string under a float-with-unit field", () => {
-    const { ctx } = makeCtx({ default_target_temperature: "21C" });
+    const { ctx } = makeCtx({ default_target_temperature: "21X" });
     const tpl = renderFloatWithUnitField(
       withUnitEntry(),
       ["default_target_temperature"],
@@ -268,6 +268,17 @@ describe("renderNumberField / renderFloatWithUnitField — bail on unparseable p
     );
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
     expect(rendersBailBranch(json)).toBe(true);
+  });
+
+  it("keeps a degree-less temperature spelling editable (21C is valid upstream)", () => {
+    const { ctx } = makeCtx({ default_target_temperature: "21C" });
+    const tpl = renderFloatWithUnitField(
+      withUnitEntry(),
+      ["default_target_temperature"],
+      ctx
+    );
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
   });
 
   it("renders both fields as editable text for a ${substitution} value", () => {

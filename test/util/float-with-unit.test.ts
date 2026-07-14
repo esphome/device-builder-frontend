@@ -232,6 +232,69 @@ describe("parseFloatWithUnit", () => {
       });
     });
 
+    it("folds ESPHome's degree-less temperature spellings onto the ° options", () => {
+      // cv.temperature accepts '21C', '70F', and '21° C' and normalizes
+      // them, so they must edit as numbers rather than lock read-only.
+      expect(parseFloatWithUnit("21C", TEMPERATURE_UNITS)).toEqual({
+        value: 21,
+        unit: "°C",
+      });
+      expect(parseFloatWithUnit("21° C", TEMPERATURE_UNITS)).toEqual({
+        value: 21,
+        unit: "°C",
+      });
+      expect(parseFloatWithUnit("70F", TEMPERATURE_UNITS)).toEqual({
+        value: 70,
+        unit: "°F",
+      });
+      // A trailing lowercase 'c' is the centi metric prefix to ESPHome
+      // ('21c' parses as 0.21 °C), so it must NOT fold onto °C.
+      expect(parseFloatWithUnit("21c", TEMPERATURE_UNITS)).toEqual({
+        value: null,
+        unit: "°C",
+      });
+      // The remaining cv.temperature alternations: a bare degree is
+      // Celsius, and Kelvin also takes the degree forms.
+      expect(parseFloatWithUnit("21°", TEMPERATURE_UNITS)).toEqual({
+        value: 21,
+        unit: "°C",
+      });
+      expect(parseFloatWithUnit("294° K", TEMPERATURE_UNITS)).toEqual({
+        value: 294,
+        unit: "K",
+      });
+    });
+
+    it("folds the remaining ESPHome textual unit spellings onto their symbols", () => {
+      // Inventory from esphome/config_validation.py: current
+      // (amp/ampere), voltage (volt/Volts), bps (bit/s, bits/s),
+      // color temperature (Kelvin), data size (byte/b/Bs forms).
+      expect(parseFloatWithUnit("2 amps", ["A", "mA"])).toEqual({
+        value: 2,
+        unit: "A",
+      });
+      expect(parseFloatWithUnit("3.3volt", ["V", "mV"])).toEqual({
+        value: 3.3,
+        unit: "V",
+      });
+      expect(parseFloatWithUnit("9600bit/s", ["bps", "kbps"])).toEqual({
+        value: 9600,
+        unit: "bps",
+      });
+      expect(parseFloatWithUnit("6500Kelvin", ["mireds", "K"])).toEqual({
+        value: 6500,
+        unit: "K",
+      });
+      expect(parseFloatWithUnit("5Mbyte", ["B", "kB", "MB", "GB"])).toEqual({
+        value: 5,
+        unit: "MB",
+      });
+      expect(parseFloatWithUnit("512b", ["B", "kB", "MB", "GB"])).toEqual({
+        value: 512,
+        unit: "B",
+      });
+    });
+
     it("save round-trip normalises case-variant input to canonical", () => {
       // Round-trip via parse → serialize. The user's lowercase
       // ``Mhz`` becomes the canonical ``MHz`` on save — same shape
