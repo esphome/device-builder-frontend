@@ -12,6 +12,7 @@ import {
 } from "../../../util/float-with-unit.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
+import { looksLikeSubstitution } from "../../../util/substitutions.js";
 import {
   parseTimePeriodScalar,
   serializeTimePeriod,
@@ -49,13 +50,13 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   }
   // An unparseable primitive ("250 steps/s", a stray boolean) blanks inside
   // <input type="number"> and reads as unset — and an edit would write a bare
-  // number over the original value. Bail visibly instead (#2056).
-  if (
-    raw != null &&
-    raw !== "" &&
-    (typeof raw === "boolean" || !Number.isFinite(Number(raw)))
-  ) {
-    return renderYamlOnlyField(entry, path, ctx);
+  // number over the original value. Bail visibly instead; a ${substitution}
+  // stays editable as text, matching the validator's carve-out (#2056).
+  // Number(String(raw)) is the same numeric test validateEntry applies.
+  if (raw != null && !Number.isFinite(Number(String(raw)))) {
+    return looksLikeSubstitution(String(raw))
+      ? renderStringField(entry, "text", path, ctx)
+      : renderYamlOnlyField(entry, path, ctx);
   }
   // FLOAT keeps the native number spinner — floats don't take 0x… literals.
   const value = String(raw ?? "");
@@ -277,14 +278,17 @@ export function renderFloatWithUnitField(
   const editingText = ctx.getEditingMagnitude(path);
   // A present value the parser can't split ("21C", "inf") would render as an
   // empty magnitude + unit picker and read as unset. Bail visibly unless the
-  // user is mid-edit — the buffer legitimately holds partial input (#2056).
+  // user is mid-edit — the buffer legitimately holds partial input — with the
+  // same editable-text carve-out for a ${substitution} value (#2056).
   if (
     parsed.value === null &&
     editingText == null &&
     rawValue != null &&
     rawValue !== ""
   ) {
-    return renderYamlOnlyField(entry, path, ctx);
+    return looksLikeSubstitution(String(rawValue))
+      ? renderStringField(entry, "text", path, ctx)
+      : renderYamlOnlyField(entry, path, ctx);
   }
   const numberValue = editingText ?? (parsed.value === null ? "" : String(parsed.value));
   const unit = chooseDisplayUnit(

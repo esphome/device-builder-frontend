@@ -270,14 +270,33 @@ describe("renderNumberField / renderFloatWithUnitField — bail on unparseable p
     expect(rendersBailBranch(json)).toBe(true);
   });
 
+  it("renders both fields as editable text for a ${substitution} value", () => {
+    // The validator skips numeric checks for substitution refs; the
+    // renderer must keep them editable, not lock them behind the notice.
+    const floatCtx = makeCtx({ max_speed: "${speed}" }).ctx;
+    const floatJson = JSON.stringify(
+      renderNumberField(floatEntry(), ["max_speed"], floatCtx),
+      (k, v) => (k === "_$litType$" ? 0 : v)
+    );
+    expect(rendersBailBranch(floatJson)).toBe(false);
+    expect(floatJson).toContain("${speed}");
+
+    const unitCtx = makeCtx({ default_target_temperature: "${target}" }).ctx;
+    const unitJson = JSON.stringify(
+      renderFloatWithUnitField(withUnitEntry(), ["default_target_temperature"], unitCtx),
+      (k, v) => (k === "_$litType$" ? 0 : v)
+    );
+    expect(rendersBailBranch(unitJson)).toBe(false);
+    expect(unitJson).toContain("${target}");
+  });
+
   it("keeps the editable UI mid-edit even when the committed value is empty", () => {
-    const emitChange = vi.fn();
     const ctx = makeRenderCtx(
       { default_target_temperature: "1e" },
       {
         board: null,
         overrides: {
-          emitChange,
+          emitChange: vi.fn(),
           renderEntry: () => "<rendered>",
           getEditingMagnitude: () => "1e",
         },
