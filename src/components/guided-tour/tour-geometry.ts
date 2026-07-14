@@ -150,7 +150,7 @@ function bubbleTop(bubble: Bubble, vp: Viewport, height: number): number {
  *  rendered bubble can be. */
 function bubbleHeightEstimate(vp: Viewport): number {
   const base = vp.w <= 600 || vp.h <= 600 ? COMPACT_BUBBLE_HEIGHT_EST : BUBBLE_HEIGHT_EST;
-  return Math.min(base, vp.h * 0.6, vp.h - EDGE_MARGIN * 2);
+  return Math.max(1, Math.min(base, vp.h * 0.6, vp.h - EDGE_MARGIN * 2));
 }
 
 function bubbleCoversHole(
@@ -172,7 +172,7 @@ function bubbleFitsViewport(bubble: Bubble, vp: Viewport, height: number): boole
 
 /** Full-width-ish bubble pinned to the viewport edge farther from the hole. */
 function computeDockedBubble(hole: Box, vp: Viewport): { bubble: Bubble; dock: Dock } {
-  const w = Math.min(vp.w - EDGE_MARGIN * 2, DOCKED_MAX_WIDTH);
+  const w = Math.max(1, Math.min(vp.w - EDGE_MARGIN * 2, DOCKED_MAX_WIDTH));
   const left = (vp.w - w) / 2;
   const dock: Dock = hole.y + hole.h / 2 >= vp.h / 2 ? "top" : "bottom";
   return {

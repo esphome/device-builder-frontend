@@ -56,7 +56,9 @@ export class TourBubbleFit implements ReactiveController {
     const bubble = this._options.bubbleEl();
     if (!frame || !bubble) return;
     const sideBubble = frame.dock === undefined;
-    const placement = frame.dock ?? frame.side;
+    // Dock names reuse side names; prefix so "top" side and "top" dock
+    // placements each get their own check.
+    const placement = frame.dock ? `dock:${frame.dock}` : frame.side;
     if (
       this._checkedPlacements.has(placement) &&
       (!sideBubble || this._sideHeight !== undefined)
