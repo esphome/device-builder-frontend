@@ -172,7 +172,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       flex: 1;
       min-height: 0;
       /* Contain CodeMirror's internal z-indexes (search panel: 300) so they
-         can't paint over the action rows hosts float above the editor. */
+         can't paint over action rows that host pages float above the editor. */
       isolation: isolate;
     }
 
