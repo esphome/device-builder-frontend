@@ -19,8 +19,8 @@ import { withBase } from "../../util/base-path.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
 import { formatApiError } from "../../util/format-api-error.js";
-import { trimTrailingDot } from "../../util/hostname.js";
 import { notifyWarning } from "../../util/notify.js";
+import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { closeOpenDialogs } from "../base-dialog.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
@@ -269,13 +269,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   private _renderExistingServer() {
     const names = this._discoveredHosts
-      ? [
-          ...new Set(
-            [...this._discoveredHosts.values()].map((peer) =>
-              trimTrailingDot(peer.friendly_name.trim() || peer.name)
-            )
-          ),
-        ]
+      ? [...new Set([...this._discoveredHosts.values()].map(remoteBuildPeerName))]
       : [];
     // Cap the named list so a busy network can't push the switch off-screen.
     const shown = names.slice(0, 3);

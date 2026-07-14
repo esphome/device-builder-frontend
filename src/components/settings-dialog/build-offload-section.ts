@@ -27,6 +27,7 @@ import {
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeEditPairingEndpointDialog } from "../edit-pairing-endpoint-dialog.js";
 import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.js";
@@ -323,8 +324,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
           esphome: peer.esphome_version,
         })
       : nothing;
-    // Prefer the friendly_name label; fall back to the instance name.
-    const displayName = trimTrailingDot(peer.friendly_name.trim() || peer.name);
+    const displayName = remoteBuildPeerName(peer);
     return html`
       <div class="row peer-row">
         <div class="row-label">
