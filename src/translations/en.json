@@ -1613,5 +1613,28 @@
     "building_on": "Building on {label}",
     "waiting_for_build_server": "Waiting for a build server",
     "submitted_by": "from {label}"
+  },
+  "remote_build_dashboard": {
+    "title": "Remote build server",
+    "intro_empty": "No dashboards are paired yet. Pair one to start receiving builds.",
+    "step1_label": "Step 1 — here",
+    "step1_title": "Open the pairing window",
+    "step1_desc": "Pair requests are only accepted while the window is open.",
+    "step2_label": "Step 2 — on the sending dashboard",
+    "step2_title": "Send a pair request",
+    "step2_desc": "Open Settings → Send builds on the dashboard that should build here, then pair with this build server.",
+    "step3_label": "Step 3 — back here",
+    "step3_title": "Review and accept",
+    "step3_desc": "Compare the fingerprint below with what the sender shows, then accept the request.",
+    "open_pairing_window": "Open pairing window",
+    "request_title": "{label} wants to pair",
+    "request_review": "Review request",
+    "peers_heading": "Paired dashboards",
+    "peers_manage": "Manage",
+    "queue_heading": "Build queue",
+    "queue_active_count": "{count} active",
+    "disabled_title": "Remote builds are disabled",
+    "disabled_desc": "This install is set up as a remote build server, but the remote build listener is turned off.",
+    "disabled_cta": "Open build server settings"
   }
 }

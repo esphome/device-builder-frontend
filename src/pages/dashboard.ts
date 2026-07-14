@@ -148,6 +148,7 @@ import "../components/labels/bulk-labels-dialog.js";
 import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
 import "../components/labels/label-dialog.js";
 import "../components/logs-dialog.js";
+import "../components/remote-build-panel.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
@@ -216,6 +217,12 @@ export class ESPHomePageDashboard extends LitElement {
   /** Whether every device-creation affordance should be hidden. */
   get _hideDeviceCreation(): boolean {
     return this._remoteComputeOnly || !this._prefsLoaded;
+  }
+
+  /** Whether the remote-build-server panel takes over / tops the dashboard.
+   *  Gated on _prefsLoaded so a slow prefs fetch can't flash the panel. */
+  get _showRemotePanel(): boolean {
+    return this._remoteComputeOnly && this._prefsLoaded;
   }
 
   // Passed to runBulkUpdate for the NO_COMPATIBLE_PEER toast
@@ -641,6 +648,16 @@ export class ESPHomePageDashboard extends LitElement {
       `;
     }
 
+    // Remote-compute-only install with nothing configured locally: the
+    // remote-build panel takes the whole page. With local devices it
+    // stacks above the grid/table instead (below).
+    if (this._showRemotePanel && this._devices.length === 0) {
+      return html`
+        <esphome-remote-build-panel></esphome-remote-build-panel>
+        ${renderDialogs(this)}
+      `;
+    }
+
     const q = this._search.trim().toLowerCase();
     const facetFiltered = this._applyFacetFilters(this._sortedDevices);
     const filtered = q
@@ -656,6 +673,11 @@ export class ESPHomePageDashboard extends LitElement {
       this._hasActiveFilters;
 
     return html`
+      ${
+        this._showRemotePanel
+          ? html`<esphome-remote-build-panel></esphome-remote-build-panel>`
+          : ""
+      }
       ${renderDiscoveredSection(this)}
       ${
         this._devices.length > 0 && this._view === DashboardView.CARDS
