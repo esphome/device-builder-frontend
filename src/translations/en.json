@@ -1020,10 +1020,10 @@
       "use_case": {
         "title": "How will you use this?",
         "intro": "This helps tailor the dashboard to what you need.",
-        "devices_title": "Build and manage devices",
-        "devices_desc": "Create, configure, and flash ESPHome devices from this dashboard.",
-        "remote_title": "Remote compute only",
-        "remote_desc": "Use this installation only as a remote build server for other dashboards. Device creation stays hidden."
+        "devices_title": "I want to manage ESPHome devices on this system",
+        "devices_desc": "Create, configure, build, flash, and manage devices from this dashboard.",
+        "remote_title": "I want to use this system as a remote build server",
+        "remote_desc": "Build firmware for Device Builder dashboards running on other systems. Device creation is hidden."
       },
       "experience": {
         "title": "Choose your experience level",

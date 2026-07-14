@@ -1,8 +1,8 @@
 import { consume } from "@lit/context";
 import {
-  mdiChip,
   mdiCodeBraces,
   mdiCompassOutline,
+  mdiLaptop,
   mdiServerNetwork,
   mdiSprout,
 } from "@mdi/js";
@@ -31,9 +31,9 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 export const RESET_ONBOARDING_PARAM = "resetOnboarding";
 
 registerMdiIcons({
-  chip: mdiChip,
   "code-braces": mdiCodeBraces,
   "compass-outline": mdiCompassOutline,
+  laptop: mdiLaptop,
   "server-network": mdiServerNetwork,
   sprout: mdiSprout,
 });
@@ -278,7 +278,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         @keydown=${onChoiceGroupKeydown}
       >
         ${renderChoiceCard({
-          icon: "chip",
+          icon: "laptop",
           title: this._localize("onboarding.wizard.use_case.devices_title"),
           description: this._localize("onboarding.wizard.use_case.devices_desc"),
           selected: devices,
