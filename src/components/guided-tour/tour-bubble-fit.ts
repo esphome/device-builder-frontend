@@ -31,6 +31,7 @@ export interface TourBubbleFitOptions {
 export class TourBubbleFit implements ReactiveController {
   private _sideHeight?: number;
   private _checkedPlacements = new Set<string>();
+  private _viewport = "";
 
   constructor(
     host: ReactiveControllerHost,
@@ -55,6 +56,13 @@ export class TourBubbleFit implements ReactiveController {
     const frame = this._options.frame();
     const bubble = this._options.bubbleEl();
     if (!frame || !bubble) return;
+    // The rendered height depends on the viewport (60vh cap, narrow-screen
+    // padding); a resize invalidates the measurement and the checks.
+    const viewport = `${window.innerWidth}x${window.innerHeight}`;
+    if (viewport !== this._viewport) {
+      this._viewport = viewport;
+      this.reset();
+    }
     const sideBubble = frame.dock === undefined;
     // Dock names reuse side names; prefix so "top" side and "top" dock
     // placements each get their own check.

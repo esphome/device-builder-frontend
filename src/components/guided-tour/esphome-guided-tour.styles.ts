@@ -48,9 +48,17 @@ export const guidedTourStyles = css`
   }
 
   .bubble-scroll {
+    flex: 1 1 auto;
     overflow-y: auto;
     min-height: 0;
     overscroll-behavior: contain;
+  }
+
+  /* Only the body compresses when the bubble hits its max-height. */
+  .tour-header,
+  .hint,
+  .actions {
+    flex-shrink: 0;
   }
 
   .recovery-bubble {
