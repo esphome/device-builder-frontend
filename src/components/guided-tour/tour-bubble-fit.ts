@@ -1,5 +1,5 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import { BUBBLE_WIDTH, rectsIntersect, toRect, type TourFrame } from "./tour-geometry.js";
+import { rectsIntersect, toRect, type TourFrame } from "./tour-geometry.js";
 
 export interface TourBubbleFitOptions {
   /** The rendered bubble element (undefined until the frame first paints). */
@@ -21,8 +21,8 @@ export interface TourBubbleFitOptions {
  * a height estimate; long localized copy on a phone can double it, letting
  * an accepted placement cover the very control the step points at. After a
  * step's first paint this measures the side-placement bubble and asks the
- * host to re-place once with the real height (a docked bubble renders at a
- * different width, so its height never feeds back into side placement). Once
+ * host to re-place once with the real height (docked frames skip the
+ * feedback — placement already gave up on the side candidates). Once
  * settled, if the bubble still overlaps the spotlight hole, the anchor is
  * scrolled toward the free half of the viewport — one check per placement
  * per step, so a scroll-triggered re-measure can't loop and steady-state
@@ -55,7 +55,7 @@ export class TourBubbleFit implements ReactiveController {
     const frame = this._options.frame();
     const bubble = this._options.bubbleEl();
     if (!frame || !bubble) return;
-    const sideBubble = frame.bubble.width === BUBBLE_WIDTH;
+    const sideBubble = frame.dock === undefined;
     const placement = frame.dock ?? frame.side;
     if (
       this._checkedPlacements.has(placement) &&
