@@ -217,6 +217,40 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
       `;
     }
 
+    if (this._screen === "existing_server") {
+      return html`
+        <button
+          type="button"
+          class="btn btn--cancel"
+          ?disabled=${this._saving}
+          @click=${this._onBack}
+        >
+          ${this._localize("onboarding.wizard.back")}
+        </button>
+        <span class="spacer"></span>
+        <button
+          type="button"
+          class="btn btn--cancel"
+          ?disabled=${this._saving}
+          @click=${this._onContinue}
+        >
+          ${this._localize("onboarding.wizard.existing_server.not_now")}
+        </button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          ?disabled=${this._saving}
+          @click=${this._setupBuildServer}
+        >
+          ${
+            this._saving
+              ? this._localize("onboarding.wizard.saving")
+              : this._localize("onboarding.wizard.existing_server.setup")
+          }
+        </button>
+      `;
+    }
+
     return html`
       ${
         this._index > 0
@@ -285,9 +319,13 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
 
   private _renderExistingServer() {
     const names = this._discoveredHosts
-      ? [...this._discoveredHosts.values()].map((peer) =>
-          trimTrailingDot(peer.friendly_name.trim() || peer.name)
-        )
+      ? [
+          ...new Set(
+            [...this._discoveredHosts.values()].map((peer) =>
+              trimTrailingDot(peer.friendly_name.trim() || peer.name)
+            )
+          ),
+        ]
       : [];
     const joined = new Intl.ListFormat(undefined, { type: "conjunction" }).format(names);
     return html`
@@ -450,6 +488,40 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._emitAcknowledged();
     this._saving = false;
     this._index += 1;
+  }
+
+  private async _setupBuildServer() {
+    if (this._saving) return;
+    this._saving = true;
+    this._error = null;
+    try {
+      await this._api.setRemoteBuildSettings({ enabled: true });
+    } catch (err) {
+      this._error = formatApiError(
+        err,
+        this._localize,
+        "onboarding.wizard.existing_server.setup_failed"
+      );
+      this._saving = false;
+      return;
+    }
+    if (!(await this._persistChoices())) return;
+    try {
+      await this._api.markOnboardingAcknowledged();
+    } catch (err) {
+      console.warn("Failed to mark onboarding acknowledged:", err);
+      notifyWarning(this._localize("onboarding.wizard.ack_failed"));
+    }
+    this._emitAcknowledged();
+    this._saving = false;
+    this._open = false;
+    this.dispatchEvent(
+      new CustomEvent("open-settings", {
+        detail: { section: "build_server" },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   private async _persistChoices(): Promise<boolean> {

@@ -11,12 +11,19 @@ import { ESPHomeOnboardingWizardDialog } from "../../../src/components/onboardin
 
 interface WizardInternals {
   _index: number;
+  _open: boolean;
   _screen: string;
   _screens: string[];
   _isHaAddon: boolean;
   _discoveredHosts: Map<string, { friendly_name: string; name: string }> | null;
   _localize: LocalizeFunc;
+  _api: {
+    setRemoteBuildSettings: ReturnType<typeof vi.fn>;
+    updatePreferences: ReturnType<typeof vi.fn>;
+    markOnboardingAcknowledged: ReturnType<typeof vi.fn>;
+  };
   _onContinue(): Promise<void>;
+  _setupBuildServer(): Promise<void>;
 }
 
 const internals = (wizard: ESPHomeOnboardingWizardDialog) =>
@@ -95,6 +102,36 @@ describe("onboarding existing-server orientation", () => {
     state._discoveredHosts = hosts({ name: "late-arrival" }); // mDNS lands late
     expect(state._screen).toBe("experience");
     expect(state._screens).not.toContain("existing_server");
+  });
+
+  it("enables the receiver role and opens Build server settings", async () => {
+    const wizard = new ESPHomeOnboardingWizardDialog();
+    const state = internals(wizard);
+    state._api = {
+      setRemoteBuildSettings: vi.fn().mockResolvedValue(undefined),
+      updatePreferences: vi.fn().mockResolvedValue(undefined),
+      markOnboardingAcknowledged: vi.fn().mockResolvedValue(undefined),
+    };
+    wizard.open();
+    state._isHaAddon = false;
+    state._discoveredHosts = hosts({ name: "living-room" });
+    await state._onContinue(); // welcome -> existing_server
+
+    const openSettings = vi.fn();
+    wizard.addEventListener("open-settings", openSettings);
+    const acknowledged = vi.fn();
+    wizard.addEventListener("onboarding-acknowledged", acknowledged);
+
+    await state._setupBuildServer();
+
+    expect(state._api.setRemoteBuildSettings).toHaveBeenCalledWith({ enabled: true });
+    expect(state._api.markOnboardingAcknowledged).toHaveBeenCalledOnce();
+    expect(acknowledged).toHaveBeenCalledOnce();
+    expect(openSettings).toHaveBeenCalledOnce();
+    expect((openSettings.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      section: "build_server",
+    });
+    expect(state._open).toBe(false);
   });
 
   it("names the discovered server, preferring its friendly name", async () => {

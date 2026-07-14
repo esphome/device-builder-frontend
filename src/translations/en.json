@@ -1017,9 +1017,12 @@
         "intro": "We’ll help you tailor your ESPHome experience in a few quick steps."
       },
       "existing_server": {
-        "title": "You already have ESPHome running",
+        "title": "You already have ESPHome Device Builder",
         "found": "Found on your network: {name}",
-        "intro": "This app is a complete ESPHome install of its own, not a remote for that one. You can create and manage your devices right here."
+        "intro": "Your existing ESPHome Device Builder can offload its firmware compiles to this machine. Set it up as a build server, or just manage devices right here.",
+        "setup": "Set up build server",
+        "not_now": "Not now",
+        "setup_failed": "Couldn’t enable the build server; you can turn it on later in Settings."
       },
       "use_case": {
         "title": "How will you use this?",
