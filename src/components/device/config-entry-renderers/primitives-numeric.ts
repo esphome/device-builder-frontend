@@ -52,7 +52,8 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   // <input type="number"> and reads as unset — and an edit would write a bare
   // number over the original value. Bail visibly instead; a ${substitution}
   // stays editable as text, matching the validator's carve-out (#2056).
-  // Number(String(raw)) is the same numeric test validateEntry applies.
+  // Number(String(raw)) mirrors validateEntry's coercion, tightened to
+  // isFinite: Infinity also blanks in a number input, so it bails too.
   if (raw != null && !Number.isFinite(Number(String(raw)))) {
     return looksLikeSubstitution(String(raw))
       ? renderStringField(entry, "text", path, ctx)
