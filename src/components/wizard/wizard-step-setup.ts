@@ -345,17 +345,15 @@ export class ESPHomeWizardStepSetup extends LitElement {
         </button>
         <div class="actions-right">
           ${
-            this._stage === "wifi"
+            this._stage === "wifi" && this._wifiConfigured
               ? html`<button
-                  class="btn ${this._wifiConfigured ? "btn-primary" : "btn-secondary"} skip-wifi"
+                  class="btn btn-primary wifi-confirm"
                   type="button"
                   ${tourAnchor("wifi-tour-continue")}
                   ?disabled=${this.submitting}
-                  @click=${this._onSkipWifi}
+                  @click=${this._onUseSavedWifi}
                 >
-                  ${this._localize(
-                    this._wifiConfigured ? "wizard.wifi_use_saved" : "wizard.wifi_skip"
-                  )}
+                  ${this._localize("wizard.wifi_use_saved")}
                 </button>`
               : nothing
           }
@@ -365,7 +363,9 @@ export class ESPHomeWizardStepSetup extends LitElement {
               : html`<button
                   class="btn btn-primary"
                   type="button"
-                  ${tourAnchor(this._stage === "name" ? "name-finish" : undefined)}
+                  ${tourAnchor(
+                    this._stage === "name" ? "name-finish" : "wifi-tour-continue"
+                  )}
                   ?disabled=${!this._canAdvance() || this.submitting}
                   aria-busy=${this.submitting || nothing}
                   @click=${this._onNext}
@@ -512,7 +512,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
     this._finish(this._wifiSsid, this._wifiPassword);
   }
 
-  private _onSkipWifi = () => {
+  private _onUseSavedWifi = () => {
     if (this.submitting) return;
     this._finish("", "");
   };

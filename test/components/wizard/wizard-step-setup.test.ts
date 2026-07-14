@@ -99,17 +99,14 @@ describe("wizard-step-setup", () => {
     expect(stage(el)).toBe("wifi");
   });
 
-  it("offers Skip for now on the Wi-Fi stage", async () => {
+  it("does not offer an unusable skip path before Wi-Fi is configured", async () => {
     const el = await mount(wifiBoard());
     await setName(el, "kitchen");
     pressEnter();
     await el.updateComplete;
+
     expect(stage(el)).toBe("wifi");
-    const skip = el.shadowRoot!.querySelector<HTMLButtonElement>(".skip-wifi")!;
-    const onFinish = vi.fn();
-    el.addEventListener("finish-setup", onFinish as EventListener);
-    skip.click();
-    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("");
+    expect(el.shadowRoot!.querySelector(".wifi-confirm")).toBeNull();
   });
 
   it("requires an SSID to finish a Wi-Fi-only board", async () => {
@@ -186,8 +183,30 @@ describe("wizard-step-setup", () => {
     expect(stage(el)).toBe("wifi");
     expect(el.shadowRoot!.querySelector(".wifi-saved")).not.toBeNull();
     expect(el.shadowRoot!.querySelector("#onboarding-ssid")).toBeNull();
-    expect(el.shadowRoot!.querySelector(".skip-wifi")?.textContent).toContain(
+    expect(el.shadowRoot!.querySelector(".wifi-confirm")?.textContent).toContain(
       "wizard.wifi_use_saved"
+    );
+  });
+
+  it("collects missing Wi-Fi during the tour instead of offering skip", async () => {
+    setTourActive(true);
+    const el = await mount(wifiBoard());
+    await setName(el, "kitchen");
+    pressEnter();
+    await el.updateComplete;
+
+    expect(stage(el)).toBe("wifi");
+    expect(el.shadowRoot!.querySelector(".wifi-confirm")).toBeNull();
+    expect(
+      el.shadowRoot!.querySelector(".actions-right .btn-primary")?.textContent
+    ).toContain("wizard.finish_setup");
+
+    await setSsid(el, "tour-network");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe(
+      "tour-network"
     );
   });
 

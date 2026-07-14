@@ -551,7 +551,6 @@
     "wifi_saved_title": "Wi-Fi credentials already saved",
     "wifi_saved_desc": "This board uses the shared Wi-Fi credentials already stored by Device Builder.",
     "wifi_saved_reuse": "The saved values stay hidden and will be reused automatically.",
-    "wifi_skip": "Skip for now",
     "wifi_use_saved": "Use saved credentials",
     "other_boards": "Other boards",
     "starter_kit": "Featured",
@@ -1077,9 +1076,9 @@
         "hint": "Continue when the name looks right"
       },
       "wifi": {
-        "title": "Wi-Fi for your devices",
-        "body": "Device Builder stores Wi-Fi credentials once and reuses them for future devices. For this quickstart, continue without changing them.",
-        "hint": "Continue without changing Wi-Fi"
+        "title": "Connect your device",
+        "body": "Enter your Wi-Fi details, or confirm the saved credentials. Device Builder stores them securely for future devices.",
+        "hint": "Enter or confirm Wi-Fi to continue"
       },
       "navigator": {
         "title": "Your device navigator",

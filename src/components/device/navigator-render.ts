@@ -211,8 +211,8 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
       tabindex=${ifDefined(v.filtering ? undefined : "0")}
       aria-expanded=${ifDefined(v.filtering ? undefined : v.open ? "true" : "false")}
       ${tourAnchor(v.tourAnchorId)}
-      @click=${v.filtering ? nothing : v.onToggle}
-      @keydown=${v.filtering ? nothing : onSectionKeydown}
+      @click=${v.filtering ? undefined : v.onToggle}
+      @keydown=${v.filtering ? undefined : onSectionKeydown}
     >
       <div class="nav-content-label">
         <wa-icon library="mdi" name=${v.icon}></wa-icon>
