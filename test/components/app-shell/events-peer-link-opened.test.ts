@@ -24,6 +24,7 @@ function makeSummary(pin: string, esphome_version: string): PairingSummary {
     auto_provision_supported: false,
     friendly_name: "",
     ha_addon: false,
+    reset_build_env_supported: false,
   };
 }
 
@@ -40,6 +41,7 @@ function opened(
     auto_provision_supported: false,
     friendly_name: "",
     ha_addon: false,
+    reset_build_env_supported: false,
     ...extra,
   };
 }

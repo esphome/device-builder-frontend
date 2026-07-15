@@ -3,6 +3,7 @@ import { mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { notify, notifyError, notifySuccess } from "../../util/notify.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { desktopDocsUrl } from "../../util/release-notes-url.js";
 import { splitTemplate } from "../../util/template-split.js";
 
@@ -121,6 +122,13 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     label: string;
   } | null = null;
 
+  @state()
+  private _pendingResetEnv: { pin_sha256: string; label: string } | null = null;
+
+  // In-flight guard for the remote build-env reset round-trip.
+  @state()
+  private _resetEnvPending = false;
+
   @query("esphome-pair-build-server-dialog")
   private _pairDialog!: ESPHomePairBuildServerDialog;
 
@@ -135,6 +143,9 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
 
   @query("#unpair-confirm")
   private _unpairConfirmDialog!: ESPHomeConfirmDialog;
+
+  @query("#reset-peer-env-confirm")
+  private _resetEnvConfirmDialog!: ESPHomeConfirmDialog;
 
   static styles = [
     espHomeStyles,
@@ -228,6 +239,16 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         confirm-label=${this._localize("settings.unpair_confirm_confirm")}
         @confirm=${this._onUnpairConfirm}
       ></esphome-confirm-dialog>
+      <esphome-confirm-dialog
+        id="reset-peer-env-confirm"
+        destructive
+        heading=${this._localize("settings.reset_peer_env_confirm_title", {
+          label: this._pendingResetEnv?.label ?? "",
+        })}
+        message=${this._localize("settings.reset_peer_env_confirm_body")}
+        confirm-label=${this._localize("settings.reset_peer_env_confirm_action")}
+        @confirm=${this._onResetEnvConfirm}
+      ></esphome-confirm-dialog>
     `;
   }
 
@@ -301,6 +322,8 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         onBuildRemote: this._onBuildRemoteClick,
         onViewBuild: (jobId) => this._jobDialog?.openForJob(jobId),
         onEditEndpoint: this._onEditEndpointClick,
+        resetPending: this._resetEnvPending,
+        onResetBuildEnv: this._onResetBuildEnvRequest,
         onUnpair: this._onUnpairRequest,
       })
     );
@@ -523,6 +546,33 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       return;
     }
     this._toast("success", "settings.unpair_success", { label: pending.label });
+  };
+
+  private _onResetBuildEnvRequest = (pairing: PairingSummary): void => {
+    this._pendingResetEnv = {
+      pin_sha256: pairing.pin_sha256,
+      label: pairingDisplayName(pairing),
+    };
+    this._resetEnvConfirmDialog?.open();
+  };
+
+  private _onResetEnvConfirm = async (): Promise<void> => {
+    const pending = this._pendingResetEnv;
+    this._pendingResetEnv = null;
+    if (this._api === undefined || pending === null) return;
+    this._resetEnvPending = true;
+    try {
+      await this._api.remoteBuildResetPeerBuildEnv({ pin_sha256: pending.pin_sha256 });
+    } catch (err) {
+      this._toast("error", "settings.reset_peer_env_failed", {
+        label: pending.label,
+        detail: getErrorMessage(err),
+      });
+      return;
+    } finally {
+      this._resetEnvPending = false;
+    }
+    this._toast("success", "settings.reset_peer_env_success", { label: pending.label });
   };
 
   private _onBuildRemoteClick = (pairing: PairingSummary): void => {

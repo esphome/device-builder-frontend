@@ -25,15 +25,18 @@ export const remoteBuildHintStyles = css`
 export interface RemoteBuildHintHost {
   _localize: LocalizeFunc;
   _tryCleanBuild: () => void;
+  _tryResetRemoteBuildEnv: (pin: string) => void;
+  _remoteResetPending: boolean;
 }
 
 // Build-failure hint shown when the failed compile ran on a paired
 // receiver. firmware/reset_build_env wipes the LOCAL toolchain cache, so
-// the link half is useless when the broken cache is on the receiver. Per
-// esphome/device-builder#608 we deliberately don't fan reset out to
-// receivers; clean still works (db#608 fans clean out), so the helper
-// keeps the clean link and replaces the reset link with a plain-text
-// "ask the operator of <receiver>" instruction.
+// the link half is useless when the broken cache is on the receiver.
+// When the job's pairing advertises reset_build_env_supported and is
+// connected (`resetPin` non-null), the hint offers the remote reset
+// directly; otherwise the plain-text "ask the operator of <receiver>"
+// fallback stays for old receivers (clean still works — db#608 fans
+// clean out).
 //
 // The receiver label is user-controlled (set during pairing on another
 // machine). Wrapping it in a styled <code> gives a visual boundary so a
@@ -43,8 +46,34 @@ export interface RemoteBuildHintHost {
 // is a presentational guard, not an XSS defense.
 export function renderRemoteBuildFailureSuggestion(
   host: RemoteBuildHintHost,
-  receiver: string
+  receiver: string,
+  resetPin: string | null = null
 ): TemplateResult {
+  if (resetPin !== null) {
+    const template = host._localize("command.try_reset_suggestion_remote_capable");
+    const [before, middle, after] = splitTemplate(
+      template,
+      "{clean_action}",
+      "{reset_remote_action}"
+    );
+    return html`
+      <div class="reset-suggestion" role="status" slot="suggestion">
+        ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
+          ${host._localize("command.try_clean_button")}</button
+        >${middle}<button
+          class="reset-suggestion-link"
+          ?disabled=${host._remoteResetPending}
+          @click=${() => host._tryResetRemoteBuildEnv(resetPin)}
+        >
+          ${host._localize(
+            host._remoteResetPending
+              ? "command.try_reset_remote_pending"
+              : "command.try_reset_remote_button"
+          )}</button
+        >${after}
+      </div>
+    `;
+  }
   const template = host._localize("command.try_reset_suggestion_remote");
   const [before, middle, after] = splitTemplate(template, "{clean_action}", "{receiver}");
   return html`

@@ -44,10 +44,13 @@ interface PairingRowContext {
   localize: LocalizeFunc;
   appVersion: string;
   latestJob: RemoteBuildJobState | undefined;
+  /** Disables the reset button while a reset round-trip is in flight. */
+  resetPending: boolean;
   onToggleEnabled: (pairing: PairingSummary) => void;
   onBuildRemote: (pairing: PairingSummary) => void;
   onViewBuild: (jobId: string) => void;
   onEditEndpoint: (pairing: PairingSummary) => void;
+  onResetBuildEnv: (pairing: PairingSummary) => void;
   onUnpair: (pairing: PairingSummary) => void;
 }
 
@@ -59,10 +62,12 @@ export function renderPairingRow(
     localize,
     appVersion,
     latestJob,
+    resetPending,
     onToggleEnabled,
     onBuildRemote,
     onViewBuild,
     onEditEndpoint,
+    onResetBuildEnv,
     onUnpair,
   } = ctx;
   const { pillClass, pillLabel } = pillFor(pairing, localize);
@@ -137,6 +142,28 @@ export function renderPairingRow(
                   @click=${() => onViewBuild(latestJob.job_id)}
                 >
                   ${localize("settings.remote_build_view_action")}
+                </button>
+              `
+            : nothing
+        }
+        ${
+          pairing.status === "approved" &&
+          pairing.connected &&
+          pairing.reset_build_env_supported
+            ? html`
+                <button
+                  type="button"
+                  class="btn-reset-peer-env"
+                  ?disabled=${resetPending}
+                  aria-label=${localize("settings.reset_peer_env_aria", {
+                    label: displayName,
+                  })}
+                  title=${localize("settings.reset_peer_env_aria", {
+                    label: displayName,
+                  })}
+                  @click=${() => onResetBuildEnv(pairing)}
+                >
+                  <wa-icon library="mdi" name="broom"></wa-icon>
                 </button>
               `
             : nothing

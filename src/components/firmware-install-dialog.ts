@@ -29,7 +29,9 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
+import { getErrorMessage } from "../util/error-message.js";
 import { LineBatcher } from "../util/line-batcher.js";
+import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import type { DetectedChip } from "../util/web-serial.js";
@@ -139,6 +141,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _jobSource: JobSource = JobSource.LOCAL;
   @state() _jobSourceLabel = "";
   @state() _jobSourcePin = "";
+
+  // In-flight guard for the failure hint's remote build-env reset.
+  @state() _remoteResetPending = false;
 
   @state() _logLines: string[] = [];
   @state() _logsExpanded = false;
@@ -406,6 +411,27 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
     );
   };
+
+  _tryResetRemoteBuildEnv = (pin: string) => {
+    void this._resetRemoteBuildEnv(pin);
+  };
+
+  private async _resetRemoteBuildEnv(pin: string): Promise<void> {
+    if (this._remoteResetPending || this._api === undefined) return;
+    this._remoteResetPending = true;
+    try {
+      await this._api.remoteBuildResetPeerBuildEnv({ pin_sha256: pin });
+      notifySuccess(this._localize("command.reset_remote_success"));
+    } catch (err) {
+      notifyError(
+        this._localize("command.reset_remote_failed", {
+          detail: getErrorMessage(err),
+        })
+      );
+    } finally {
+      this._remoteResetPending = false;
+    }
+  }
 
   _toggleShowLogsAfterInstall = () => {
     this._showLogsAfterInstall = !this._showLogsAfterInstall;

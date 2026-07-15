@@ -35,9 +35,11 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
+import { getErrorMessage } from "../util/error-message.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LightDismissController } from "../util/light-dismiss-controller.js";
 import { LineBatcher } from "../util/line-batcher.js";
+import { notifyError, notifySuccess } from "../util/notify.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
@@ -187,6 +189,9 @@ export class ESPHomeCommandDialog extends LitElement {
 
   // True while "Build locally instead" override is mid-flight.
   @state() _switchingToLocal = false;
+
+  // In-flight guard for the failure hint's remote build-env reset.
+  @state() _remoteResetPending = false;
 
   // Guard re-entrancy on the show-secrets toggle — detachStream clears
   // _streamId synchronously, so a fast double-click without this guard
@@ -456,6 +461,27 @@ export class ESPHomeCommandDialog extends LitElement {
       new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
     );
   };
+
+  _tryResetRemoteBuildEnv = (pin: string) => {
+    void this._resetRemoteBuildEnv(pin);
+  };
+
+  private async _resetRemoteBuildEnv(pin: string): Promise<void> {
+    if (this._remoteResetPending) return;
+    this._remoteResetPending = true;
+    try {
+      await this._api.remoteBuildResetPeerBuildEnv({ pin_sha256: pin });
+      notifySuccess(this._localize("command.reset_remote_success"));
+    } catch (err) {
+      notifyError(
+        this._localize("command.reset_remote_failed", {
+          detail: getErrorMessage(err),
+        })
+      );
+    } finally {
+      this._remoteResetPending = false;
+    }
+  }
 
   _toggleShowLogsAfterInstall = () => {
     this._showLogsAfterInstall = !this._showLogsAfterInstall;

@@ -139,7 +139,19 @@ export function renderResetSuggestion(
   if (host._commandType !== "install" && host._commandType !== "compile") {
     return nothing;
   }
-  return renderBuildFailureSuggestion(host, remotePeerLabel(host));
+  return renderBuildFailureSuggestion(host, remotePeerLabel(host), remoteResetPin(host));
+}
+
+// The pin to offer a remote build-env reset against: non-null only when
+// the failed job ran on a pairing that advertises the capability and is
+// still connected.
+function remoteResetPin(host: ESPHomeCommandDialog): string | null {
+  const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
+  const primed = host._primedSource;
+  if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
+  const pin = live?.source_pin_sha256 ?? primed?.source_pin_sha256 ?? "";
+  const pairing = pin ? host._pairings?.get(pin) : undefined;
+  return pairing?.reset_build_env_supported && pairing.connected ? pin : null;
 }
 
 // Resolve the receiver label for a REMOTE-sourced job. Returns null for

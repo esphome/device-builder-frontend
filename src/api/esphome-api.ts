@@ -2084,6 +2084,23 @@ export class ESPHomeAPI {
   }
 
   /**
+   * Ask the build server behind ``pin_sha256`` to wipe this
+   * dashboard's isolated build environment (its `.remote_builds`
+   * subtree on the server). Gated on the pairing's
+   * `reset_build_env_supported` capability; the server refuses
+   * `precondition_failed` while this dashboard still has a job
+   * queued, running, or uploading there.
+   */
+  async remoteBuildResetPeerBuildEnv(args: {
+    pin_sha256: string;
+  }): Promise<{ accepted: boolean }> {
+    return this.sendCommand<{ accepted: boolean }>(
+      "remote_build/reset_peer_build_env",
+      args
+    );
+  }
+
+  /**
    * Drop the local pairing row identified by *pin_sha256*.
    *
    * Idempotent — returns ``{removed: false}`` when no row
