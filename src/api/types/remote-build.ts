@@ -314,4 +314,9 @@ export interface IdentityView {
   server_version: string;
   esphome_version: string;
   listener_bound: boolean;
+  /**
+   * Bound peer-link port ('null' while the listener is down;
+   * absent from pre-1.1 backends).
+   */
+  listener_port?: number | null;
 }

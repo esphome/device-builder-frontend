@@ -79,6 +79,29 @@ describe("renderOnboarding", () => {
     expect(el.textContent).not.toContain("remote_build_dashboard.open_pairing_window");
   });
 
+  it("shows this server's pairing address once identity carries the port", () => {
+    const withPort = fakePanel({
+      _identity: {
+        loadFailed: false,
+        identity: {
+          dashboard_id: "dash-0",
+          pin_sha256: "cd".repeat(32),
+          server_version: "1.2.0",
+          esphome_version: "2026.6.1",
+          listener_bound: true,
+          listener_port: 6055,
+        },
+      },
+    });
+    const el = renderInto(renderOnboarding(withPort));
+    expect(el.querySelector(".step-address code")?.textContent).toBe(
+      `${window.location.hostname}:6055`
+    );
+    // Unbound listener / pre-port backend: no address line.
+    const withoutPort = renderInto(renderOnboarding(fakePanel()));
+    expect(withoutPort.querySelector(".step-address")).toBeNull();
+  });
+
   it("shows the identity loading row until the fingerprint lands", () => {
     const el = renderInto(renderOnboarding(fakePanel()));
     expect(el.textContent).toContain("settings.remote_build_identity_loading");

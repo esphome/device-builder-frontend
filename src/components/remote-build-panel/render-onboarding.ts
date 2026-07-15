@@ -6,6 +6,7 @@ import { renderPairingWindowStatus } from "../shared/pairing-window-status.js";
 /** Nothing paired yet: walk the operator through the receiver pairing flow. */
 export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult {
   const windowOpen = host._windowState?.open === true;
+  const listenerPort = host._identity.identity?.listener_port;
   return html`
     <div class="intro">${host._localize("remote_build_dashboard.intro_empty")}</div>
     <div class="steps">
@@ -53,6 +54,16 @@ export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult 
         <div class="step-desc">
           ${host._localize("remote_build_dashboard.step_send_request_desc")}
         </div>
+        ${
+          listenerPort
+            ? html`
+                <div class="step-action step-address">
+                  ${host._localize("remote_build_dashboard.step_send_request_address")}
+                  <code>${window.location.hostname}:${listenerPort}</code>
+                </div>
+              `
+            : nothing
+        }
       </div>
       <div class="step">
         <div class="step-label">

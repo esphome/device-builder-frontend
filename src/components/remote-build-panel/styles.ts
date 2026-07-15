@@ -153,6 +153,17 @@ export const remoteBuildPanelStyles = css`
     padding-top: var(--wa-space-xs);
   }
 
+  .step-address {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+  }
+
+  .step-address code {
+    font-family: var(--wa-font-family-code);
+    color: var(--wa-color-text-normal);
+    word-break: break-all;
+  }
+
   .disabled-cta {
     display: flex;
     flex-direction: column;
