@@ -59,9 +59,9 @@ describe("renderOnboarding", () => {
   it("walks the three steps with an open-window CTA while closed", () => {
     const host = fakePanel();
     const el = renderInto(renderOnboarding(host));
-    expect(el.textContent).toContain("remote_build_dashboard.step1_title");
-    expect(el.textContent).toContain("remote_build_dashboard.step2_title");
-    expect(el.textContent).toContain("remote_build_dashboard.step3_title");
+    expect(el.textContent).toContain("remote_build_dashboard.step_open_window_title");
+    expect(el.textContent).toContain("remote_build_dashboard.step_send_request_title");
+    expect(el.textContent).toContain("remote_build_dashboard.step_accept_request_title");
     const button = el.querySelector<HTMLButtonElement>(".primary-action");
     expect(button?.textContent).toContain("remote_build_dashboard.open_pairing_window");
     button?.click();

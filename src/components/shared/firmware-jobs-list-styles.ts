@@ -60,7 +60,13 @@ export const firmwareJobsListStyles = css`
   .job:hover,
   .job:focus-visible {
     background: var(--wa-color-surface-lowered);
-    outline: none;
+  }
+
+  /* Negative offset keeps the ring inside the scroll container; a real
+     outline lets forced-colors mode substitute the system highlight. */
+  .job:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: -2px;
   }
 
   .job-icon {

@@ -11,13 +11,13 @@ export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult 
     <div class="steps">
       <div class="step">
         <div class="step-label">
-          ${host._localize("remote_build_dashboard.step1_label")}
+          ${host._localize("remote_build_dashboard.step_open_window_label")}
         </div>
         <div class="step-title">
-          ${host._localize("remote_build_dashboard.step1_title")}
+          ${host._localize("remote_build_dashboard.step_open_window_title")}
         </div>
         <div class="step-desc">
-          ${host._localize("remote_build_dashboard.step1_desc")}
+          ${host._localize("remote_build_dashboard.step_open_window_desc")}
         </div>
         <div class="step-action">
           ${
@@ -38,24 +38,24 @@ export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult 
       </div>
       <div class="step">
         <div class="step-label">
-          ${host._localize("remote_build_dashboard.step2_label")}
+          ${host._localize("remote_build_dashboard.step_send_request_label")}
         </div>
         <div class="step-title">
-          ${host._localize("remote_build_dashboard.step2_title")}
+          ${host._localize("remote_build_dashboard.step_send_request_title")}
         </div>
         <div class="step-desc">
-          ${host._localize("remote_build_dashboard.step2_desc")}
+          ${host._localize("remote_build_dashboard.step_send_request_desc")}
         </div>
       </div>
       <div class="step">
         <div class="step-label">
-          ${host._localize("remote_build_dashboard.step3_label")}
+          ${host._localize("remote_build_dashboard.step_accept_request_label")}
         </div>
         <div class="step-title">
-          ${host._localize("remote_build_dashboard.step3_title")}
+          ${host._localize("remote_build_dashboard.step_accept_request_title")}
         </div>
         <div class="step-desc">
-          ${host._localize("remote_build_dashboard.step3_desc")}
+          ${host._localize("remote_build_dashboard.step_accept_request_desc")}
         </div>
       </div>
     </div>

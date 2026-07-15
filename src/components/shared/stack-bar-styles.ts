@@ -46,7 +46,13 @@ export const stackBarStyles = css`
   .stack-bar:hover,
   .stack-bar:focus-visible {
     background: var(--esphome-primary-light);
-    outline: none;
+  }
+
+  /* Negative offset keeps the ring inside the full-bleed bar; a real
+     outline lets forced-colors mode substitute the system highlight. */
+  .stack-bar:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: -2px;
   }
 
   .stack-bar > wa-icon:first-child {
