@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -55,6 +55,11 @@ describe("crash-report-dialog", () => {
       stopStream: vi.fn(() => Promise.resolve()),
     };
     document.body.appendChild(el);
+  });
+
+  afterEach(() => {
+    // The stubbed `window.open` must not leak into other files in this worker.
+    vi.unstubAllGlobals();
   });
 
   const finishValidate = (lines = VALIDATE_OUTPUT, success = true) => {
