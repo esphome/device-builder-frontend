@@ -22,12 +22,8 @@ const CRASH_END_RE = /<<<stack<<<|^ELF file SHA256:|^Rebooting\.\.\./;
 const MAX_ISSUE_URL_LENGTH = 8000;
 
 // Cap on decoded frames placed in the issue's `problem` field; the full
-// list always rides in the clipboard report.
+// list always rides in the downloadable report.
 const MAX_PROBLEM_FRAMES = 40;
-
-// Prefilling the YAML Config box must still leave room for a meaningful
-// crash-log excerpt in the `logs` field.
-const MIN_LOGS_BUDGET = 1500;
 
 const ISSUE_URL_BASE =
   "https://github.com/esphome/esphome/issues/new?template=bug_report.yml";
@@ -356,21 +352,12 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   }
   params.set("problem", problem.join("\n"));
 
-  // The sanitized YAML goes into the form's YAML Config box, truncated
-  // line-wise with a marker when it can't fit whole alongside a useful
-  // log excerpt — the downloadable report always carries the full dump.
-  const configYaml = report.configYaml.trimEnd();
-  if (configYaml) {
-    const configBudget = MAX_ISSUE_URL_LENGTH - url.toString().length - MIN_LOGS_BUDGET;
-    const fitted = fitConfig(configYaml, configBudget);
-    if (fitted.text) params.set("config", fitted.text);
-    if (fitted.truncated) missing = true;
-  }
-
-  // The `logs` field fits the crash block first, then as many preceding
-  // context lines as the budget allows. When the decoded backtrace
-  // already rides in `problem`, its echo lines are dropped here so the
-  // trace appears only once in the issue.
+  // The crash logs get first claim on the budget: they're a one-time
+  // capture, whereas the config can always be re-obtained from the YAML
+  // later. The `logs` field fits the crash block first, then as many
+  // preceding context lines as the budget allows. When the decoded
+  // backtrace already rides in `problem`, its echo lines are dropped
+  // here so the trace appears only once in the issue.
   const { lines: logLines, anchor } =
     scrape.decodedFrames.length > 0
       ? excerptWithoutDecodeEchoes(scrape.excerpt, scrape.crashIndex)
@@ -383,6 +370,17 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   } else {
     params.delete("logs");
     if (logLines.length > 0) missing = true;
+  }
+
+  // The sanitized YAML takes whatever budget the logs left, truncated
+  // (with a marker) when it can't fit whole — the full dump is always in
+  // the downloadable report, and the config is recoverable from the YAML
+  // regardless. Secrets are already redacted to `<removed>`.
+  const configYaml = report.configYaml.trimEnd();
+  if (configYaml) {
+    const fitted = fitConfig(configYaml, MAX_ISSUE_URL_LENGTH - url.toString().length);
+    if (fitted.text) params.set("config", fitted.text);
+    if (fitted.truncated) missing = true;
   }
 
   // Pack the supplementary sections into `additional`, whole sections

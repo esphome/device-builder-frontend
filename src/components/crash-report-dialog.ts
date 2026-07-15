@@ -242,7 +242,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
       onOutput: (line) => collected.push(line),
       onResult: (result) =>
         finish(result.success ? distillValidatedConfig(collected) : ""),
-      onError: () => finish(""),
+      onError: (err) => {
+        // Degrades to the same config-unavailable note as an invalid
+        // config; log so a real transport failure is distinguishable.
+        console.warn("Config validation stream failed", err);
+        finish("");
+      },
     });
   }
 
@@ -295,7 +300,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // away until the user closes it themselves. window.open with noopener
   // returns null by spec, so blocking can't be detected here; the manual
   // "Open GitHub issue" link in the delivered state is the fallback.
-  private _openIssue(): void {
+  // Arrow properties: used directly as @click handlers, so `this` must
+  // stay the dialog instance (repo convention for handlers).
+  private _openIssue = (): void => {
     const report = this._buildReport();
     this._reportText = buildFullReport(report);
     const { url, complete } = buildIssueUrl(report);
@@ -304,20 +311,20 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._downloadReport();
     window.open(url, "_blank", "noopener");
     this._delivered = true;
-  }
+  };
 
-  private _downloadReport(): void {
+  private _downloadReport = (): void => {
     const stem = configurationStem(this._configuration, "device");
     downloadBlob(this._reportText, `${stem}-crash-report.md`, "text/markdown");
-  }
+  };
 
-  private async _copyReport(): Promise<void> {
+  private _copyReport = async (): Promise<void> => {
     if (await copyToClipboard(this._reportText)) {
       notifySuccess(this._localize("crash_report.copied"));
     } else {
       notifyError(this._localize("crash_report.copy_failed"));
     }
-  }
+  };
 
   private _renderSummaryRow(text: string, degraded: boolean) {
     return html`<li class=${degraded ? "degraded" : ""}>
