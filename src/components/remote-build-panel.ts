@@ -52,6 +52,7 @@ import { renderQueueCard } from "./remote-build-panel/render-queue.js";
 import { remoteBuildPanelStyles } from "./remote-build-panel/styles.js";
 import { bucketJobs } from "./shared/firmware-jobs-list.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
+import { stackBarStyles } from "./shared/stack-bar-styles.js";
 import { peerRowStyles } from "./settings-dialog/shared-styles.js";
 
 registerMdiIcons({
@@ -141,6 +142,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
     pairingWindowStyles,
     peerRowStyles,
     firmwareJobsListStyles,
+    stackBarStyles,
     remoteBuildPanelStyles,
   ];
 
@@ -227,13 +229,13 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
     return html`
       <button
         type="button"
-        class="banner"
+        class="banner stack-bar"
         aria-expanded=${this.collapsed ? "false" : "true"}
         @click=${this._onToggleCollapsed}
       >
         <wa-icon library="mdi" name="server-network"></wa-icon>
-        <span class="banner-main">
-          <span class="banner-title">
+        <span class="banner-main stack-bar-main">
+          <span class="banner-title stack-bar-title">
             ${this._localize("remote_build_dashboard.title")}
           </span>
           ${
@@ -260,7 +262,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
           }
         </span>
         <wa-icon
-          class="banner-chevron"
+          class="banner-chevron stack-bar-chevron"
           library="mdi"
           name="chevron-down"
           aria-hidden="true"

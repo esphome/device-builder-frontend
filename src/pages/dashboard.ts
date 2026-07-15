@@ -62,6 +62,7 @@ import {
   renderBuilderStack,
   renderRemoteStack,
 } from "../components/dashboard/render-stacks.js";
+import { stackBarStyles } from "../components/shared/stack-bar-styles.js";
 import {
   renderEmptySearch,
   renderSelectBarOrFab,
@@ -376,6 +377,7 @@ export class ESPHomePageDashboard extends LitElement {
     espHomeStyles,
     inputStyles,
     dashboardStyles,
+    stackBarStyles,
     dashboardStacksStyles,
     deviceGridStyles,
     yamlModeStyles,
@@ -613,9 +615,16 @@ export class ESPHomePageDashboard extends LitElement {
     if (
       changed.has("_remoteComputeOnly") ||
       changed.has("_prefsLoaded") ||
-      changed.has("_buildServerPeers")
+      changed.has("_buildServerPeers") ||
+      changed.has("_expandedStackChoice")
     ) {
       this.toggleAttribute("stacks", this._showRemoteStack);
+      // remote-open pins the page to the viewport (internal scroll only)
+      // while the remote section is the expanded one.
+      this.toggleAttribute(
+        "remote-open",
+        this._showRemoteStack && !this._remoteStackCollapsed
+      );
     }
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.
@@ -704,9 +713,19 @@ export class ESPHomePageDashboard extends LitElement {
     // matches drop out and matching ones expand to show their YAML
     // snippets.
     if (this._yamlMode) {
-      return html`
+      const yamlContent = html`
         ${renderDiscoveredSection(this)} ${renderYamlToolbar(this)}
-        ${renderYamlMode(this)} ${renderDrawer(this)} ${renderSelectBarOrFab(this)}
+        ${renderYamlMode(this)}
+      `;
+      return html`
+        ${this._showRemoteStack ? renderRemoteStack(this) : ""}
+        ${this._showRemoteStack ? renderBuilderStack(this, yamlContent) : yamlContent}
+        ${renderDrawer(this)}
+        ${
+          this._showRemoteStack && this._builderStackCollapsed
+            ? ""
+            : renderSelectBarOrFab(this)
+        }
         ${renderDialogs(this)}
       `;
     }

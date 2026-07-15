@@ -9,8 +9,8 @@ export const remoteBuildPanelStyles = css`
   .panel {
     display: flex;
     flex-direction: column;
-    gap: var(--wa-space-m);
-    margin-bottom: var(--wa-space-s);
+    gap: var(--stack-gap);
+    margin-bottom: var(--stack-gap);
     flex: 1;
     min-height: 0;
   }
@@ -28,67 +28,6 @@ export const remoteBuildPanelStyles = css`
   .panel > :not(.banner) {
     margin-left: var(--content-gutter, var(--wa-space-l));
     margin-right: var(--content-gutter, var(--wa-space-l));
-  }
-
-  /* Square edge-to-edge strip mirroring .builder-stack-header exactly;
-     shares the app header's gutter so icon and chevron line up with the
-     logo and the kebab above. */
-  .banner {
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-s);
-    padding: var(--wa-space-xs) var(--content-gutter, var(--wa-space-l));
-    margin: 0;
-    border: none;
-    border-top: var(--wa-border-width-s) solid var(--esphome-primary);
-    border-bottom: var(--wa-border-width-s) solid var(--esphome-primary);
-    border-radius: 0;
-    background: transparent;
-    font-family: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.1s;
-  }
-
-  .banner:hover,
-  .banner:focus-visible {
-    background: var(--esphome-primary-light);
-    outline: none;
-  }
-
-  .banner > wa-icon:first-child {
-    font-size: 20px;
-    color: var(--esphome-primary);
-    flex-shrink: 0;
-  }
-
-  /* Title/pill/badges wrap among themselves; the chevron stays pinned.
-     Baseline-aligned so the pill text sits on the title's baseline. */
-  .banner-main {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: var(--wa-space-xs) var(--wa-space-s);
-    flex: 1;
-    min-width: 0;
-  }
-
-  .banner-title {
-    font-size: var(--wa-font-size-m);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--wa-color-text-normal);
-  }
-
-  .banner-chevron {
-    margin-left: auto;
-    font-size: 20px;
-    color: var(--wa-color-text-quiet);
-    transition: transform 0.15s;
-    flex-shrink: 0;
-  }
-
-  .banner[aria-expanded="true"] .banner-chevron {
-    transform: rotate(180deg);
   }
 
   .banner-badge {
@@ -283,10 +222,12 @@ export const remoteBuildPanelStyles = css`
   }
 
   /* Default grid stretch keeps side-by-side cards the same height; the
-     grid flexes into the section's leftover viewport space. */
+     grid flexes into the section's leftover viewport space, stacked rows
+     split it, and only the lists inside the cards scroll. */
   .cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-auto-rows: minmax(0, 1fr);
     gap: var(--wa-space-m);
     flex: 1;
     min-height: 0;
@@ -346,6 +287,26 @@ export const remoteBuildPanelStyles = css`
     color: var(--wa-color-text-normal);
   }
 
+  /* Only the peer list scrolls, so the window controls stay in view. */
+  .peer-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* The pairing-window controls get their own row under the heading. */
+  .card-window-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--wa-space-xs);
+    padding-bottom: var(--wa-space-s);
+  }
+
+  .card-heading .heading-action--quiet {
+    margin-left: auto;
+  }
+
   .peer-line {
     display: flex;
     align-items: center;
@@ -384,7 +345,6 @@ export const remoteBuildPanelStyles = css`
   .jobs {
     flex: 1;
     min-height: 0;
-    max-height: 70vh;
     overflow-y: auto;
   }
 

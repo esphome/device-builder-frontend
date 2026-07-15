@@ -44,7 +44,9 @@ export function renderRequestCard(
   `;
 }
 
-/** Approved senders with live connected state; management stays in Settings. */
+/** Approved senders with live connected state; management stays in Settings.
+ *  Manage sits in the heading, the peer list scrolls, and the pairing-window
+ *  controls stay pinned to the card's bottom. */
 export function renderPeersCard(
   host: ESPHomeRemoteBuildPanel,
   approved: PeerSummary[]
@@ -53,6 +55,15 @@ export function renderPeersCard(
     <div class="card">
       <div class="card-heading">
         <span>${host._localize("remote_build_dashboard.peers_heading")}</span>
+        <button
+          type="button"
+          class="heading-action heading-action--quiet"
+          @click=${host._openBuildServerSettings}
+        >
+          ${host._localize("remote_build_dashboard.peers_manage")}
+        </button>
+      </div>
+      <div class="card-window-row">
         ${renderPairingWindowStatus(
           host._localize,
           host._windowState,
@@ -68,15 +79,8 @@ export function renderPeersCard(
                 </button>
               `
         }
-        <button
-          type="button"
-          class="heading-action heading-action--quiet"
-          @click=${host._openBuildServerSettings}
-        >
-          ${host._localize("remote_build_dashboard.peers_manage")}
-        </button>
       </div>
-      ${approved.map((p) => renderPeerRow(host, p))}
+      <div class="peer-list">${approved.map((p) => renderPeerRow(host, p))}</div>
     </div>
   `;
 }
