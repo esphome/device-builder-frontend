@@ -3,6 +3,7 @@ import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware
 import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { isPinnableVersion } from "../../util/version-mismatch.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 import {
@@ -35,9 +36,18 @@ export function renderRemoteBuilderSubLine(
   if (source !== JobSource.REMOTE || !label) return nothing;
   // source_esphome_version is also a job-creation-time snapshot; empty when
   // the pairing hadn't completed a peer-link session yet. Render "<label>
-  // (<version>)" so the operator can spot version skew vs the offloader.
-  const version =
+  // (<version>)" with the version that actually builds the firmware: a
+  // receiver that auto-provisions a mismatch compiles with this
+  // dashboard's own esphome in a venv, not its installed one.
+  const receiverVersion =
     liveJob?.source_esphome_version ?? host._primedSource?.source_esphome_version ?? "";
+  const pin = liveJob?.source_pin_sha256 ?? host._primedSource?.source_pin_sha256 ?? "";
+  const buildsLocalVersion =
+    receiverVersion !== "" &&
+    receiverVersion !== host._esphomeVersion &&
+    isPinnableVersion(host._esphomeVersion) &&
+    (host._pairings?.get(pin)?.auto_provision_supported ?? false);
+  const version = buildsLocalVersion ? host._esphomeVersion : receiverVersion;
   const display = version ? `${label} (${version})` : label;
   // Only allow override for in-flight install — switching mid-upload or
   // mid-compile is a power-user shape without a UI today.

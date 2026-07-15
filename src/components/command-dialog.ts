@@ -129,6 +129,10 @@ export class ESPHomeCommandDialog extends LitElement {
   @state()
   _pairings: Map<string, PairingSummary> | null = null;
 
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  _esphomeVersion = "";
+
   @consume({ context: desktopVersionContext, subscribe: true })
   @state()
   _desktopVersion = "";
@@ -182,6 +186,7 @@ export class ESPHomeCommandDialog extends LitElement {
     source: JobSource;
     source_label: string;
     source_esphome_version: string;
+    source_pin_sha256: string;
   } | null = null;
 
   // True while "Build locally instead" override is mid-flight.
@@ -345,6 +350,7 @@ export class ESPHomeCommandDialog extends LitElement {
       source: job.source,
       source_label: job.source_label,
       source_esphome_version: job.source_esphome_version,
+      source_pin_sha256: job.source_pin_sha256,
     };
     // Reattaching to a still-running (or finished) build: restore the true
     // compile clock so the replayed buffer doesn't restart the timer from now.
