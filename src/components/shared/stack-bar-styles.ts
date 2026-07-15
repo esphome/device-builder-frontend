@@ -19,6 +19,9 @@ export const stackBarStyles = css`
     /* The header kebab's footprint (6px padding + 25px icon) — centers
        the chevron under its dots. */
     --stack-bar-chevron-box: 37px;
+    --stack-bar-icon-size: 20px;
+    --stack-bar-title-size: var(--wa-font-size-s);
+    --stack-bar-subtitle-size: var(--wa-font-size-xs);
   }
 
   .stack-bar {
@@ -50,7 +53,7 @@ export const stackBarStyles = css`
     width: var(--stack-bar-icon-box);
     display: inline-flex;
     justify-content: center;
-    font-size: 20px;
+    font-size: var(--stack-bar-icon-size);
     color: var(--esphome-primary);
     flex-shrink: 0;
   }
@@ -67,7 +70,7 @@ export const stackBarStyles = css`
   }
 
   .stack-bar-title {
-    font-size: var(--wa-font-size-m);
+    font-size: var(--stack-bar-title-size);
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
   }
@@ -75,7 +78,7 @@ export const stackBarStyles = css`
   /* Quiet inline tagline after the title ("builds firmware for other
      dashboards"); wraps under the title on narrow viewports. */
   .stack-bar-subtitle {
-    font-size: var(--wa-font-size-xs);
+    font-size: var(--stack-bar-subtitle-size);
     color: var(--wa-color-text-quiet);
   }
 
@@ -84,7 +87,7 @@ export const stackBarStyles = css`
     width: var(--stack-bar-chevron-box);
     display: inline-flex;
     justify-content: center;
-    font-size: 20px;
+    font-size: var(--stack-bar-icon-size);
     color: var(--wa-color-text-quiet);
     transition: transform 0.15s;
     flex-shrink: 0;
