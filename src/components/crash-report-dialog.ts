@@ -285,13 +285,13 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   // Maps the deployment signals onto the bug form's installation
-  // dropdown. The desktop app has no matching option, so it stays ""
-  // and the user picks in the form.
+  // dropdown. Unknown ("" — the desktop app, or before the handshake
+  // populates serverInfo) omits the fact so the value isn't guessed.
   private _detectInstallation(): string {
     if (this._isHaAddon) return "Home Assistant Add-on";
     const info = this._api.serverInfo;
-    if (info?.desktop_version) return "";
-    return info?.in_docker ? "Docker" : "pip";
+    if (!info || info.desktop_version) return "";
+    return info.in_docker ? "Docker" : "pip";
   }
 
   // Download the full report first — the user always keeps a complete

@@ -375,11 +375,18 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // The sanitized YAML takes whatever budget the logs left, truncated
   // (with a marker) when it can't fit whole — the full dump is always in
   // the downloadable report, and the config is recoverable from the YAML
-  // regardless. Secrets are already redacted to `<removed>`.
+  // regardless. Secrets are already redacted to `<removed>`. Set an empty
+  // `config` param first so the `&config=` key overhead is counted in the
+  // measured budget, keeping the final URL reliably under the cap.
   const configYaml = report.configYaml.trimEnd();
   if (configYaml) {
+    params.set("config", "");
     const fitted = fitConfig(configYaml, MAX_ISSUE_URL_LENGTH - url.toString().length);
-    if (fitted.text) params.set("config", fitted.text);
+    if (fitted.text) {
+      params.set("config", fitted.text);
+    } else {
+      params.delete("config");
+    }
     if (fitted.truncated) missing = true;
   }
 
