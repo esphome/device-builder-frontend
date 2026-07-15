@@ -31,10 +31,11 @@ export class NowTickController implements ReactiveController {
     return this._now;
   }
 
+  /** Idempotent while running; a stopped ticker re-anchors ``now`` on start. */
   start(): void {
+    if (this._handle !== null) return;
     this._now = Date.now();
     this._host.requestUpdate();
-    if (this._handle !== null) return;
     this._handle = setInterval(() => {
       this._now = Date.now();
       this._host.requestUpdate();

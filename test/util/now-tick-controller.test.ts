@@ -32,7 +32,9 @@ describe("NowTickController", () => {
     const host = new FakeHost();
     const ticker = new NowTickController(host, { intervalMs: 1000 });
     ticker.start();
+    const updatesAfterFirstStart = host.updates;
     ticker.start();
+    expect(host.updates).toBe(updatesAfterFirstStart);
     vi.advanceTimersByTime(1000);
     const updates = host.updates;
     ticker.stop();
