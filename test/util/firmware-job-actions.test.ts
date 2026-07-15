@@ -34,14 +34,24 @@ describe("cancelFirmwareJob", () => {
     expect(notify.error).not.toHaveBeenCalled();
   });
 
-  it.each([ErrorCode.NOT_FOUND, ErrorCode.INVALID_ARGS])(
-    "swallows the already-finished race (%s)",
-    async (code) => {
-      const api = makeApi(vi.fn().mockRejectedValue(new APIError(code, "gone")));
-      await cancelFirmwareJob(api, identityLocalize, "job-1");
-      expect(notify.error).not.toHaveBeenCalled();
-    }
-  );
+  it.each([
+    [ErrorCode.NOT_FOUND, "Job not found: job-1"],
+    [ErrorCode.INVALID_ARGS, "Cannot cancel a completed job"],
+  ])("swallows the already-finished race (%s)", async (code, details) => {
+    const api = makeApi(vi.fn().mockRejectedValue(new APIError(code, details)));
+    await cancelFirmwareJob(api, identityLocalize, "job-1");
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
+  it("toasts an INVALID_ARGS failure that isn't the terminal-job race", async () => {
+    const api = makeApi(
+      vi
+        .fn()
+        .mockRejectedValue(new APIError(ErrorCode.INVALID_ARGS, "job_id is required"))
+    );
+    await cancelFirmwareJob(api, identityLocalize, "job-1");
+    expect(notify.error).toHaveBeenCalledWith("firmware_jobs.cancel_failed_detail");
+  });
 
   it("toasts the detail key when the backend sent a reason", async () => {
     const api = makeApi(

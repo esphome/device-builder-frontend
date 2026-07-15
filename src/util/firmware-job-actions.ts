@@ -8,7 +8,8 @@ import { notify } from "./notify.js";
  * Cancel a firmware job, toasting real failures.
  *
  * The already-finished race is silent (``NOT_FOUND`` for a pruned job,
- * ``INVALID_ARGS`` for a terminal one) — follow_jobs reconciles the row.
+ * the backend's "Cannot cancel a <status> job" rejection for a terminal
+ * one) — follow_jobs reconciles the row.
  */
 export async function cancelFirmwareJob(
   api: ESPHomeAPI,
@@ -18,12 +19,7 @@ export async function cancelFirmwareJob(
   try {
     await api.firmwareCancel(jobId);
   } catch (err) {
-    if (
-      err instanceof APIError &&
-      (err.errorCode === ErrorCode.NOT_FOUND || err.errorCode === ErrorCode.INVALID_ARGS)
-    ) {
-      return;
-    }
+    if (err instanceof APIError && _isAlreadyFinished(err)) return;
     const reason = apiErrorDetails(err);
     if (reason) {
       notify.error(localize("firmware_jobs.cancel_failed_detail", { reason }));
@@ -31,4 +27,13 @@ export async function cancelFirmwareJob(
     }
     notify.error(localize("firmware_jobs.cancel_failed"));
   }
+}
+
+function _isAlreadyFinished(err: APIError): boolean {
+  if (err.errorCode === ErrorCode.NOT_FOUND) return true;
+  // The terminal-job rejection rides INVALID_ARGS with this message
+  // (backend firmware jobs.cancel); other INVALID_ARGS failures toast.
+  return (
+    err.errorCode === ErrorCode.INVALID_ARGS && err.details.startsWith("Cannot cancel a")
+  );
 }
