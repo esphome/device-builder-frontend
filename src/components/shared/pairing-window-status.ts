@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { PairingWindowState } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { activeLocale } from "../../common/localize.js";
 import { formatDuration, formatMinSec } from "../../util/relative-time.js";
 
 /**
@@ -34,7 +35,12 @@ export function renderPairingWindowStatus(
               class="pairing-window-countdown"
               aria-label=${localize(
                 "settings.build_server_pairing_window_remaining_aria",
-                { duration: formatDuration(remaining, { variant: "counter" }) }
+                {
+                  duration: formatDuration(remaining, {
+                    variant: "counter",
+                    language: activeLocale(),
+                  }),
+                }
               )}
             >
               ${formatMinSec(remaining)}

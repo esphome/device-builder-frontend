@@ -17,6 +17,7 @@ import {
   ageOf,
   formatCountdown,
   formatDuration,
+  formatMinSec,
   formatSecondsAgo,
   getNumberFormatter,
   remainingOf,
@@ -220,5 +221,22 @@ describe("formatCountdown", () => {
 
   it("does not crash without a language argument", () => {
     expect(() => formatCountdown(75)).not.toThrow();
+  });
+});
+
+describe("formatMinSec", () => {
+  it("returns empty string for null", () => {
+    expect(formatMinSec(null)).toBe("");
+  });
+
+  it("floors fractional seconds into clock-style M:SS", () => {
+    expect(formatMinSec(127.4)).toBe("2:07");
+    expect(formatMinSec(59.9)).toBe("0:59");
+  });
+
+  it("zero-pads the seconds", () => {
+    expect(formatMinSec(60)).toBe("1:00");
+    expect(formatMinSec(605)).toBe("10:05");
+    expect(formatMinSec(0)).toBe("0:00");
   });
 });

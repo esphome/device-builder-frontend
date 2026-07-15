@@ -85,7 +85,6 @@ import {
 import { dashboardStyles } from "../components/dashboard/styles.js";
 import { yamlModeStyles } from "../components/dashboard/yaml-mode-styles.js";
 import { TourActivityController } from "../components/guided-tour/tour-activity-controller.js";
-import { isTourActive } from "../components/guided-tour/tour-session.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import {
   activeJobsContext,
@@ -110,11 +109,7 @@ import {
   loadDashboardFilters,
   saveDashboardFilters,
 } from "../util/dashboard-filters-session.js";
-import {
-  type DashboardStack,
-  loadExpandedStack,
-  saveExpandedStack,
-} from "../util/dashboard-stacks-session.js";
+import { DashboardStacksController } from "../util/dashboard-stacks-controller.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import {
   activeFacetCount,
@@ -230,52 +225,12 @@ export class ESPHomePageDashboard extends LitElement {
   @state()
   _buildServerPeers: PeerSummary[] | null = null;
 
-  // Session-scoped choice of which stack is expanded; null = use the
-  // pref-driven default. Seeded once at construction, saved on every swap.
-  @state() private _expandedStackChoice = loadExpandedStack();
-
-  // Tour session state, cached once per render cycle in willUpdate()
-  // (reading it live would hit localStorage on every getter call).
-  private _tourEngaged = false;
-
-  /** Remote-compute preference resolved (never flashes during prefs load). */
-  get _remoteComputeReady(): boolean {
-    return this._remoteComputeOnly && this._prefsLoaded;
-  }
-
-  /** The remote stack shows when opted in, or as soon as a sender is
-   *  approved to build here. Otherwise the dashboard is untouched. */
-  get _showRemoteStack(): boolean {
-    return (
-      this._remoteComputeReady ||
-      (this._buildServerPeers?.some((p) => p.status === "approved") ?? false)
-    );
-  }
-
-  /** Accordion with exactly one stack expanded, filling the page; the
-   *  headers swap between them (clicking the open one swaps to the other,
-   *  so neither can be closed). The preference picks the default. */
-  get _expandedStack(): DashboardStack {
-    // A live tour anchors builder content; never hide it.
-    if (this._tourEngaged) return "builder";
-    return this._expandedStackChoice ?? (this._remoteComputeReady ? "remote" : "builder");
-  }
-
-  get _remoteStackCollapsed(): boolean {
-    return this._expandedStack !== "remote";
-  }
-
-  get _builderStackCollapsed(): boolean {
-    return this._expandedStack !== "builder";
-  }
-
-  /** Both headers share this: with two stacks and always-one-open, every
-   *  header click means "show the other section". */
-  _onSwapStacks = (): void => {
-    const stack = this._expandedStack === "remote" ? "builder" : "remote";
-    this._expandedStackChoice = stack;
-    saveExpandedStack(stack);
-  };
+  /** Build server / Device builder accordion state (always one open). */
+  _stacks = new DashboardStacksController(this, {
+    remoteComputeReady: () => this._remoteComputeOnly && this._prefsLoaded,
+    hasApprovedSender: () =>
+      this._buildServerPeers?.some((p) => p.status === "approved") ?? false,
+  });
 
   // Passed to runBulkUpdate for the NO_COMPATIBLE_PEER toast
   // classifier. Same context the settings dialog reads; null until
@@ -605,11 +560,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (changed.has("_importableDevices") || changed.has("_showIgnored")) {
       this.toggleAttribute("has-discovered", this._visibleImportableDevices.length > 0);
     }
-    // Only a *live* spotlight forces the builder section: the pending
-    // key survives a click-outside pause (it's the resume-on-reload
-    // marker), and gating on it left the Build server bar dead until
-    // the tour was explicitly skipped.
-    this._tourEngaged = isTourActive();
+    this._stacks.refreshTourState();
     // ``stacks`` re-homes the discovery banner: floating at the page top
     // normally, in-flow inside the Device builder section when the
     // remote/builder stacks are shown; ``remote-open`` pins the page to
@@ -617,10 +568,10 @@ export class ESPHomePageDashboard extends LitElement {
     // the expanded one. Toggled unconditionally — the inputs span six
     // properties plus tour session state, and toggleAttribute is an
     // idempotent no-op when nothing changed.
-    this.toggleAttribute("stacks", this._showRemoteStack);
+    this.toggleAttribute("stacks", this._stacks.show);
     this.toggleAttribute(
       "remote-open",
-      this._showRemoteStack && !this._remoteStackCollapsed
+      this._stacks.show && !this._stacks.remoteCollapsed
     );
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.
@@ -754,11 +705,11 @@ export class ESPHomePageDashboard extends LitElement {
    *  building the device grid it would immediately discard. */
   private _renderStacked(content: () => TemplateResult): TemplateResult {
     return html`
-      ${this._showRemoteStack ? renderRemoteStack(this) : ""}
-      ${this._showRemoteStack ? renderBuilderStack(this, content) : content()}
+      ${this._stacks.show ? renderRemoteStack(this) : ""}
+      ${this._stacks.show ? renderBuilderStack(this, content) : content()}
       ${renderDrawer(this)}
       ${
-        this._showRemoteStack && this._builderStackCollapsed
+        this._stacks.show && this._stacks.builderCollapsed
           ? ""
           : renderSelectBarOrFab(this)
       }

@@ -12,8 +12,8 @@ registerMdiIcons({
 export function renderRemoteStack(host: ESPHomePageDashboard): TemplateResult {
   return html`
     <esphome-remote-build-panel
-      .collapsed=${host._remoteStackCollapsed}
-      @toggle-collapsed=${host._onSwapStacks}
+      .collapsed=${host._stacks.remoteCollapsed}
+      @toggle-collapsed=${host._stacks.swap}
     ></esphome-remote-build-panel>
   `;
 }
@@ -27,7 +27,7 @@ export function renderBuilderStack(
   host: ESPHomePageDashboard,
   content: () => TemplateResult
 ): TemplateResult {
-  const collapsed = host._builderStackCollapsed;
+  const collapsed = host._stacks.builderCollapsed;
   return html`
     <section
       class="builder-stack"
@@ -37,7 +37,7 @@ export function renderBuilderStack(
         type="button"
         class="builder-stack-header stack-bar"
         aria-expanded=${collapsed ? "false" : "true"}
-        @click=${host._onSwapStacks}
+        @click=${host._stacks.swap}
       >
         <wa-icon library="mdi" name="memory"></wa-icon>
         <span class="stack-bar-main">
