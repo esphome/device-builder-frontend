@@ -234,8 +234,7 @@ export class ESPHomePageDashboard extends LitElement {
     remoteComputeReady: () => this._remoteComputeOnly && this._prefsLoaded,
     hasApprovedSender: () =>
       this._buildServerPeers?.some((p) => p.status === "approved") ?? false,
-    hideBuilder: () =>
-      this._hideDeviceBuilder && this._remoteComputeOnly && this._prefsLoaded,
+    hideBuilder: () => this._hideDeviceBuilder,
   });
 
   // Passed to runBulkUpdate for the NO_COMPATIBLE_PEER toast
@@ -713,11 +712,11 @@ export class ESPHomePageDashboard extends LitElement {
     return html`
       ${this._stacks.show ? renderRemoteStack(this) : ""}
       ${
-        this._stacks.show
-          ? this._stacks.builderHidden
-            ? ""
-            : renderBuilderStack(this, content)
-          : content()
+        this._stacks.builderHidden
+          ? ""
+          : this._stacks.show
+            ? renderBuilderStack(this, content)
+            : content()
       }
       ${renderDrawer(this)}
       ${

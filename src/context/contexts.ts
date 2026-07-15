@@ -130,11 +130,9 @@ export const remoteComputeOnlyContext = createContext<boolean>(
 );
 
 /**
- * Context for hiding the dashboard's Device builder section entirely.
- *
- * Only honoured while ``remote_compute_only`` is on; the Appearance
- * toggle that sets it is likewise gated. A live guided tour overrides
- * the hide so its anchors stay visible.
+ * Context for the raw ``hide_device_builder`` preference. The gating
+ * policy (remote-compute only, tour override) lives in
+ * ``DashboardStacksController.builderHidden``.
  */
 export const hideDeviceBuilderContext = createContext<boolean>(
   Symbol("esphome-hide-device-builder")

@@ -88,13 +88,23 @@ function setExperienceLevel(host: ESPHomeApp, level: ExperienceLevel): void {
 }
 
 export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>): void {
+  // Turning the parent off also clears the hide sub-toggle: its control
+  // disappears with the parent, and a stale true would re-hide the
+  // builder without warning on the next enable. Tuple-valued so a
+  // failed write reverts both fields together.
+  const clearHide = !e.detail && host._hideDeviceBuilder;
   void optimisticSetting(host, {
-    get: () => host._remoteComputeOnly,
-    set: (v) => {
-      host._remoteComputeOnly = v;
+    get: () => [host._remoteComputeOnly, host._hideDeviceBuilder] as const,
+    set: ([remote, hide]) => {
+      host._remoteComputeOnly = remote;
+      host._hideDeviceBuilder = hide;
     },
-    write: () => host._api.updatePreferences({ remote_compute_only: e.detail }),
-    value: e.detail,
+    write: () =>
+      host._api.updatePreferences({
+        remote_compute_only: e.detail,
+        ...(clearHide ? { hide_device_builder: false } : {}),
+      }),
+    value: [e.detail, clearHide ? false : host._hideDeviceBuilder] as const,
     toastKey: "settings.experience_save_failed",
     warn: "Failed to save remote-compute-only:",
     inFlight: (active) => {

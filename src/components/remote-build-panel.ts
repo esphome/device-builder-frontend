@@ -241,14 +241,17 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   }
 
   private _renderBanner(pendingCount: number) {
+    const activeCount = this._buckets().active.length;
     // Solo: the banner is a plain heading — no chevron, not focusable,
-    // no accordion semantics.
+    // no accordion semantics. Badges stay off through the existing
+    // collapsed gate (a solo panel is never collapsed).
     if (this.solo) {
       return html`
-        <header class="banner stack-bar">${this._renderBannerContent(0, 0)}</header>
+        <header class="banner stack-bar">
+          ${this._renderBannerContent(pendingCount, activeCount)}
+        </header>
       `;
     }
-    const activeCount = this._buckets().active.length;
     return html`
       <button
         type="button"

@@ -28,10 +28,9 @@ async function mount(opts: {
 }
 
 const hideToggle = (el: ESPHomeSettingsAppearance) =>
-  el
-    .shadowRoot!.querySelector("#hide-device-builder-title")
-    ?.closest(".expert-row")
-    ?.querySelector<HTMLButtonElement>('button.toggle[role="switch"]') ?? null;
+  el.shadowRoot!.querySelector<HTMLButtonElement>(
+    'button.toggle[aria-labelledby="hide-device-builder-title"]'
+  );
 
 describe("appearance hide-device-builder toggle", () => {
   it("is absent while the remote-compute pref is off", async () => {
