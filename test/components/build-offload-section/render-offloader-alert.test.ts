@@ -52,4 +52,16 @@ describe("renderOffloaderAlert", () => {
     expect(tokens).toContain("offloader-alert-unpair");
     expect(tokens).not.toContain("peer-remove");
   });
+
+  it("trims the mDNS trailing dot from the endpoint in the alert text", () => {
+    const localizeSpy = vi.fn((key: string, _values?: Record<string, unknown>) => key);
+    renderOffloaderAlert(
+      { ...pinMismatch, receiver_hostname: "macbook-pro.local." },
+      { localize: localizeSpy, onRepair: vi.fn(), onUnpair: vi.fn() }
+    );
+    const descCall = localizeSpy.mock.calls.find(
+      ([key]) => key === "settings.offloader_alert_pin_mismatch_desc"
+    );
+    expect(descCall?.[1]).toMatchObject({ target: "macbook-pro.local:6053" });
+  });
 });

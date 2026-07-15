@@ -181,10 +181,11 @@ function renderRowAction(host: FirmwareJobsListHost, job: FirmwareJob): Template
   `;
 }
 
-// Picked up from source_label (snapshotted at job creation) so the row text
-// doesn't churn if the pairing is later renamed. Symmetric receiver-side
-// rendering: when remote_peer is set, the job was submitted from another
-// dashboard's offloader.
+// Names the build server from the live pairing (rename-aware, handshake
+// friendly name) via pairingDisplayNameForPin, falling back to the job's
+// creation-time source_label snapshot when the pairing is gone. Symmetric
+// receiver-side rendering: when remote_peer is set, the job was submitted
+// from another dashboard's offloader.
 // Exported for unit testing of the per-source row line (building-on /
 // waiting-for-server / submitted-by).
 export function renderSourceLine(

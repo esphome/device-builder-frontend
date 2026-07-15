@@ -2,6 +2,7 @@ import { html, type TemplateResult } from "lit";
 
 import type { OffloaderAlertSnapshotEntry } from "../../api/types/remote-build-events.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { trimTrailingDot } from "../../util/hostname.js";
 
 interface AlertContext {
   localize: LocalizeFunc;
@@ -19,7 +20,7 @@ export function renderOffloaderAlert(
   alert: OffloaderAlertSnapshotEntry,
   { localize, displayLabel, onRepair, onUnpair }: AlertContext
 ): TemplateResult {
-  const target = `${alert.receiver_hostname}:${alert.receiver_port}`;
+  const target = `${trimTrailingDot(alert.receiver_hostname)}:${alert.receiver_port}`;
   const label = displayLabel || alert.receiver_label;
   if (alert.kind === "pin_mismatch") {
     return html`
