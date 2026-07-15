@@ -153,7 +153,11 @@ export const remoteBuildPanelStyles = css`
     padding-top: var(--wa-space-xs);
   }
 
+  /* Label on its own line, the address disclosure below it. */
   .step-address {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--wa-space-2xs);
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
   }

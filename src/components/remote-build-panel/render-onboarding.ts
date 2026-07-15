@@ -61,7 +61,7 @@ export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult 
             ? html`
                 <div class="step-action step-address">
                   ${host._localize("remote_build_dashboard.step_send_request_address")}
-                  ${renderPairingAddress(host._identity.identity)}
+                  ${renderPairingAddress(host._localize, host._identity.identity)}
                 </div>
               `
             : nothing

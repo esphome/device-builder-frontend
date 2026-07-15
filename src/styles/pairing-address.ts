@@ -3,8 +3,9 @@
  *
  * The advertised hostname:port is the always-visible summary; the raw
  * IP:port lines sit behind the native chevron (same disclosure idiom
- * as `pin-hex`). Rendered by `renderPairingAddress`; drop this
- * fragment into each consumer's `static styles` array.
+ * as `pin-hex`), each line with its own copy button. Rendered by
+ * `renderPairingAddress`; drop this fragment into each consumer's
+ * `static styles` array.
  */
 import { css } from "lit";
 
@@ -14,14 +15,43 @@ export const pairingAddressStyles = css`
     user-select: none;
   }
 
-  .pairing-address summary code {
+  .pairing-address summary code,
+  .pairing-address-line code {
     color: var(--wa-color-text-normal);
   }
 
+  .pairing-address-line {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+  }
+
   .pairing-address-ip {
-    display: block;
+    display: flex;
     margin-top: 4px;
     color: var(--wa-color-text-quiet);
     line-height: 1.5;
+  }
+
+  .pairing-address-copy {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--wa-color-text-quiet);
+    font-size: 14px;
+  }
+
+  .pairing-address-copy:hover,
+  .pairing-address-copy:focus-visible {
+    color: var(--esphome-primary);
+  }
+
+  .pairing-address-copy:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: -2px;
   }
 `;

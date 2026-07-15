@@ -96,7 +96,9 @@ describe("renderOnboarding", () => {
     expect(
       el.querySelector(".step-address details.pairing-address summary code")?.textContent
     ).toBe("esphome-builder-abc.local:6055");
-    expect(el.querySelector(".pairing-address-ip")?.textContent).toBe("192.168.1.5:6055");
+    expect(el.querySelector(".pairing-address-ip code")?.textContent).toBe(
+      "192.168.1.5:6055"
+    );
     // No advertiser attached: browser-hostname fallback, no disclosure.
     const noAdvertiser = fakePanel({
       _identity: {

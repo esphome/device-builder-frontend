@@ -306,7 +306,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
                   <span class="build-server-label">
                     ${this._localize("settings.remote_build_address_label")}
                   </span>
-                  ${renderPairingAddress(identity)}
+                  ${renderPairingAddress(this._localize, identity)}
                 </div>
               `
             : nothing
