@@ -11,11 +11,8 @@ export const STORAGE_KEY = "esphome-dashboard-stacks";
 
 export type DashboardStack = "remote" | "builder";
 
-/** "none" = the user collapsed the open section; both bars sit closed. */
-export type ExpandedStack = DashboardStack | "none";
-
 /** Read the session's expanded-stack choice; null = no choice yet. */
-export function loadExpandedStack(): ExpandedStack | null {
+export function loadExpandedStack(): DashboardStack | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (raw === null) return null;
@@ -23,14 +20,14 @@ export function loadExpandedStack(): ExpandedStack | null {
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
       return null;
     const value = (parsed as Record<string, unknown>).expanded;
-    return value === "remote" || value === "builder" || value === "none" ? value : null;
+    return value === "remote" || value === "builder" ? value : null;
   } catch {
     return null;
   }
 }
 
 /** Persist the expanded-stack choice; drops the write if storage is unavailable. */
-export function saveExpandedStack(stack: ExpandedStack): void {
+export function saveExpandedStack(stack: DashboardStack): void {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ expanded: stack }));
   } catch {

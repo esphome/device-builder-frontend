@@ -145,14 +145,14 @@ describe("dashboard remote-compute stacks", () => {
     );
   });
 
-  it("clicking the open section's header collapses it (both closed)", async () => {
+  it("clicking the open section's header swaps to the other (never both closed)", async () => {
     const page = await mountDashboard({ remote: true });
     const panel = panelIn(page)!;
     expect(panel.collapsed).toBe(false);
     panel.shadowRoot?.querySelector<HTMLButtonElement>(".banner")?.click();
     await page.updateComplete;
     expect(panel.collapsed).toBe(true);
-    expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("false");
+    expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("collapsed banner badges waiting requests and active jobs", async () => {

@@ -113,7 +113,7 @@ import {
   saveDashboardFilters,
 } from "../util/dashboard-filters-session.js";
 import {
-  type ExpandedStack,
+  type DashboardStack,
   loadExpandedStack,
   saveExpandedStack,
 } from "../util/dashboard-stacks-session.js";
@@ -250,10 +250,10 @@ export class ESPHomePageDashboard extends LitElement {
     );
   }
 
-  /** Accordion: at most one stack expanded, filling the page; the headers
-   *  swap between them (clicking the open one closes it). The preference
-   *  picks the default. */
-  get _expandedStack(): ExpandedStack {
+  /** Accordion with exactly one stack expanded, filling the page; the
+   *  headers swap between them (clicking the open one swaps to the other,
+   *  so neither can be closed). The preference picks the default. */
+  get _expandedStack(): DashboardStack {
     // A pending/active tour anchors builder content; never hide it.
     if (isTourPending() || getActiveTourConfiguration() !== null) return "builder";
     return this._expandedStackChoice ?? (this._remoteComputeReady ? "remote" : "builder");
@@ -268,14 +268,14 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   _onToggleRemoteStack = (): void => {
-    this._selectStack(this._expandedStack === "remote" ? "none" : "remote");
+    this._selectStack(this._expandedStack === "remote" ? "builder" : "remote");
   };
 
   _onToggleBuilderStack = (): void => {
-    this._selectStack(this._expandedStack === "builder" ? "none" : "builder");
+    this._selectStack(this._expandedStack === "builder" ? "remote" : "builder");
   };
 
-  private _selectStack(stack: ExpandedStack): void {
+  private _selectStack(stack: DashboardStack): void {
     this._expandedStackChoice = stack;
     saveExpandedStack(stack);
   }

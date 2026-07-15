@@ -2,7 +2,8 @@ import { css } from "lit";
 
 export const remoteBuildPanelStyles = css`
   :host {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
 
   .panel {
@@ -10,6 +11,8 @@ export const remoteBuildPanelStyles = css`
     flex-direction: column;
     gap: var(--wa-space-m);
     margin-bottom: var(--wa-space-s);
+    flex: 1;
+    min-height: 0;
   }
 
   /* Single accordion unit while collapsed: flush against the builder bar
@@ -17,11 +20,6 @@ export const remoteBuildPanelStyles = css`
      top corners and overlaps the border). */
   :host([collapsed]) .panel {
     margin-bottom: 0;
-  }
-
-  :host([collapsed]) .banner {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
   }
 
   /* Content shares the Device builder's horizontal gutter (the toolbar /
@@ -32,16 +30,19 @@ export const remoteBuildPanelStyles = css`
     margin-right: var(--content-gutter, var(--wa-space-l));
   }
 
-  /* Outlined bar in the discovery pill's visual language; hover tints
-     the whole bar. Mirrors .builder-stack-header exactly. */
+  /* Square edge-to-edge strip mirroring .builder-stack-header exactly;
+     shares the app header's gutter so icon and chevron line up with the
+     logo and the kebab above. */
   .banner {
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-xs) var(--wa-space-s);
+    padding: var(--wa-space-xs) var(--content-gutter, var(--wa-space-l));
     margin: 0;
-    border: var(--wa-border-width-s) solid var(--esphome-primary);
-    border-radius: var(--wa-border-radius-m);
+    border: none;
+    border-top: var(--wa-border-width-s) solid var(--esphome-primary);
+    border-bottom: var(--wa-border-width-s) solid var(--esphome-primary);
+    border-radius: 0;
     background: transparent;
     font-family: inherit;
     text-align: left;
@@ -56,7 +57,7 @@ export const remoteBuildPanelStyles = css`
   }
 
   .banner > wa-icon:first-child {
-    font-size: 22px;
+    font-size: 20px;
     color: var(--esphome-primary);
     flex-shrink: 0;
   }
@@ -73,14 +74,14 @@ export const remoteBuildPanelStyles = css`
   }
 
   .banner-title {
-    font-size: var(--wa-font-size-l);
+    font-size: var(--wa-font-size-m);
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
   }
 
   .banner-chevron {
     margin-left: auto;
-    font-size: 22px;
+    font-size: 20px;
     color: var(--wa-color-text-quiet);
     transition: transform 0.15s;
     flex-shrink: 0;
@@ -281,11 +282,14 @@ export const remoteBuildPanelStyles = css`
     word-break: break-all;
   }
 
-  /* Default grid stretch keeps side-by-side cards the same height. */
+  /* Default grid stretch keeps side-by-side cards the same height; the
+     grid flexes into the section's leftover viewport space. */
   .cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: var(--wa-space-m);
+    flex: 1;
+    min-height: 0;
   }
 
   .card {
@@ -375,11 +379,12 @@ export const remoteBuildPanelStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  /* The shared list caps its own height inside the card so a long build
-     history scrolls in place instead of stretching the page. Viewport-
-     relative: the expanded stack owns the whole screen. */
+  /* A long build history scrolls inside the card instead of stretching
+     it past the viewport-filled section. */
   .jobs {
-    max-height: 60vh;
+    flex: 1;
+    min-height: 0;
+    max-height: 70vh;
     overflow-y: auto;
   }
 
