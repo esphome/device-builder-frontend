@@ -81,6 +81,21 @@ describe("scrapeCrashData", () => {
     ]);
   });
 
+  it("preserves repeated [C] config lines verbatim (no folding)", () => {
+    const scraped = scrapeCrashData([
+      "Guru Meditation Error: crash",
+      "[C][gpio:001]: Pin: GPIO2",
+      "[C][gpio:001]: Pin: GPIO2",
+      "[C][gpio:001]: Pin: GPIO2",
+    ]);
+    // Config dump keeps each line (folding is only for [W]/[E] spam).
+    expect(scraped.configLines).toEqual([
+      "[C][gpio:001]: Pin: GPIO2",
+      "[C][gpio:001]: Pin: GPIO2",
+      "[C][gpio:001]: Pin: GPIO2",
+    ]);
+  });
+
   it("reports a crash that scrolled out of the buffer", () => {
     const scrolled = scrapeCrashData(FILLER);
     expect(scrolled.crashFound).toBe(false);
@@ -196,6 +211,13 @@ describe("buildIssueUrl", () => {
 
   it("reports complete when everything fit", () => {
     expect(buildIssueUrl(report()).complete).toBe(true);
+  });
+
+  it("keeps the URL under budget even with a huge user description", () => {
+    const result = buildIssueUrl(report({ userDescription: "x".repeat(20000) }));
+    expect(result.url.length).toBeLessThanOrEqual(8000);
+    expect(result.complete).toBe(false);
+    expect(new URL(result.url).searchParams.get("problem")).toContain("truncated");
   });
 
   it("omits the platform fact when unknown", () => {

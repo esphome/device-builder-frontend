@@ -173,7 +173,14 @@ function extractTaggedLines(lines: string[]): {
   const configLines: string[] = [];
   for (const line of lines) {
     const match = TAGGED_LINE_RE.exec(line);
-    if (match) appendFolded(match[1] === "C" ? configLines : warnings, line);
+    if (!match) continue;
+    if (match[1] === "C") {
+      // Config-dump lines are structured output, not spam — keep them
+      // verbatim (folding would silently collapse repeated values).
+      configLines.push(line);
+    } else {
+      appendFolded(warnings, line);
+    }
   }
   return { warnings, configLines };
 }
@@ -328,11 +335,11 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   const component = inferComponentName(scrape.decodedFrames);
   if (component) params.set("component_name", component);
   const platform = issuePlatform(meta.targetPlatform);
-  let missing = scrape.decodedFrames.length > MAX_PROBLEM_FRAMES;
+  let missing = false;
 
   // The user's own context leads the problem field, then the platform /
   // installation the dropdowns can't be prefilled with, then the trace.
-  const problem: string[] = report.userDescription
+  const head: string[] = report.userDescription
     ? [report.userDescription, "", "(Crash detected in the Device Builder log viewer.)"]
     : [`The device crashed (crash detected in the Device Builder log viewer).`];
   const facts = [
@@ -342,15 +349,11 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
     meta.deployedVersion && `${meta.deployedVersion} (running)`,
     meta.board && `Board: ${meta.board}`,
   ].filter(Boolean);
-  problem.push("", ...facts.map((fact) => `- ${fact}`));
-  if (scrape.decodedFrames.length > 0) {
-    problem.push(
-      "",
-      "Decoded backtrace:",
-      ...scrape.decodedFrames.slice(0, MAX_PROBLEM_FRAMES)
-    );
-  }
-  params.set("problem", problem.join("\n"));
+  head.push("", ...facts.map((fact) => `- ${fact}`));
+  // `problem` is set first but still bounded: a long description and/or
+  // many long decoded frames could blow the budget before logs/config
+  // trim. Drop trailing frames (then hard-truncate) until it fits.
+  if (fitProblem(url, params, head, scrape.decodedFrames)) missing = true;
 
   // The crash logs get first claim on the budget: they're a one-time
   // capture, whereas the config can always be re-obtained from the YAML
@@ -433,6 +436,46 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
     }
   }
   return { url: url.toString(), complete: !missing };
+}
+
+/**
+ * Set the `problem` param to *head* plus as many decoded *frames* as the
+ * URL budget allows, dropping trailing frames (then hard-truncating the
+ * text) until it fits. Returns true when anything was dropped/truncated.
+ */
+function fitProblem(
+  url: URL,
+  params: URLSearchParams,
+  head: string[],
+  frames: string[]
+): boolean {
+  let used = Math.min(frames.length, MAX_PROBLEM_FRAMES);
+  let dropped = frames.length > used;
+  for (;;) {
+    const body = used > 0 ? ["", "Decoded backtrace:", ...frames.slice(0, used)] : [];
+    const note =
+      frames.length > used
+        ? ["", `(+${frames.length - used} more frames in the report)`]
+        : [];
+    params.set("problem", [...head, ...body, ...note].join("\n"));
+    if (url.toString().length <= MAX_ISSUE_URL_LENGTH || used === 0) break;
+    used = Math.max(0, used - 4);
+    dropped = true;
+  }
+  if (url.toString().length <= MAX_ISSUE_URL_LENGTH) return dropped;
+  // Even head-only overflows (a huge description): hard-truncate to fit.
+  params.set("problem", "");
+  const budget = MAX_ISSUE_URL_LENGTH - url.toString().length;
+  const text = head.join("\n");
+  let end = Math.max(0, Math.min(text.length, budget - 20));
+  while (
+    end > 0 &&
+    encodeURIComponent(`${text.slice(0, end)}\n…[truncated]`).length > budget
+  ) {
+    end -= 32;
+  }
+  params.set("problem", `${text.slice(0, Math.max(0, end))}\n…[truncated]`);
+  return true;
 }
 
 const CONFIG_TRUNCATED_NOTE = "# [config truncated to fit the pre-filled URL]";
