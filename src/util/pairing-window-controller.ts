@@ -25,9 +25,10 @@ interface PairingWindowControllerOptions {
  * :meth:`remainingSeconds` at render time.
  *
  * On disconnect the controller releases the window only when this host
- * opened it (or ``autoOpen`` is set) — the server refcounts opens per WS
- * client and its idle timer is the safety net, so a panel that never opened
- * the window can't close one the settings inbox is holding.
+ * actually opened it (``autoOpen`` goes through the same :meth:`open`, so a
+ * failed auto-open claims nothing) — the server refcounts opens per WS
+ * client and its idle timer is the safety net, so a host that never opened
+ * the window can't close one another surface is holding.
  */
 export class PairingWindowController implements ReactiveController {
   private _baselineSeconds: number | null = null;
@@ -48,7 +49,7 @@ export class PairingWindowController implements ReactiveController {
 
   hostDisconnected(): void {
     this._stopTick();
-    if (this._openedHere || this._opts.autoOpen) {
+    if (this._openedHere) {
       this._openedHere = false;
       void this._opts
         .getApi()

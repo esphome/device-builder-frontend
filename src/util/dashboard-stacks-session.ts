@@ -19,6 +19,8 @@ export function loadExpandedStack(): DashboardStack | null {
     const parsed: unknown = JSON.parse(raw);
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
       return null;
+    // Own-key check so a polluted Object.prototype can't supply the value.
+    if (!Object.prototype.hasOwnProperty.call(parsed, "expanded")) return null;
     const value = (parsed as Record<string, unknown>).expanded;
     return value === "remote" || value === "builder" ? value : null;
   } catch {

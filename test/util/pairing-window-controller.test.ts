@@ -78,6 +78,18 @@ describe("PairingWindowController", () => {
     expect(api.setRemoteBuildPairingWindow).not.toHaveBeenCalled();
   });
 
+  it("a failed auto-open claims nothing, so disconnect closes nothing", async () => {
+    const api = makeApi(true);
+    const onOpenFailed = vi.fn();
+    const { ctrl } = makeController(api, { autoOpen: true, onOpenFailed });
+    ctrl.hostConnected();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onOpenFailed).toHaveBeenCalled();
+    api.setRemoteBuildPairingWindow.mockClear();
+    ctrl.hostDisconnected();
+    expect(api.setRemoteBuildPairingWindow).not.toHaveBeenCalled();
+  });
+
   it("a failed open reports and forgets the claim", async () => {
     const api = makeApi(true);
     const onOpenFailed = vi.fn();
