@@ -12,7 +12,7 @@ import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
 import {
   jobPeerDisplayName,
-  jobSourceDisplayName,
+  pairingDisplayNameForPin,
 } from "../../util/pairing-display-name.js";
 
 /**
@@ -192,7 +192,7 @@ export function renderSourceLine(
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
   if (job.source === JobSource.REMOTE && job.source_label) {
-    const name = jobSourceDisplayName(
+    const name = pairingDisplayNameForPin(
       host._pairings,
       job.source_pin_sha256,
       job.source_label

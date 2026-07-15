@@ -15,7 +15,7 @@ import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { friendlyHostname, trimTrailingDot } from "../util/hostname.js";
-import { pairingDisplayName } from "../util/pairing-display-name.js";
+import { pairingDisplayNameForPin } from "../util/pairing-display-name.js";
 import { formatPinSha256 } from "../util/pin-format.js";
 import {
   buildReauthPairRequest,
@@ -163,8 +163,11 @@ export class ESPHomeReauthWizardDialog extends LitElement {
   // ``target`` line shows the endpoint separately, so the bare name is
   // right here. Falls back to the snapshot when the pairing is gone.
   private _displayLabel(alert: OffloaderPinMismatchAlert): string {
-    const pairing = this._pairings?.get(alert.pin_sha256);
-    return pairing ? pairingDisplayName(pairing) : alert.receiver_label;
+    return pairingDisplayNameForPin(
+      this._pairings,
+      alert.pin_sha256,
+      alert.receiver_label
+    );
   }
 
   close(): void {

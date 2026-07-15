@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PairingSummary, PeerSummary } from "../../src/api/types/remote-build.js";
 import {
   jobPeerDisplayName,
-  jobSourceDisplayName,
+  pairingDisplayNameForPin,
   pairingDisplayName,
   peerDisplayName,
 } from "../../src/util/pairing-display-name.js";
@@ -69,18 +69,20 @@ describe("pairingDisplayName", () => {
   });
 });
 
-describe("jobSourceDisplayName", () => {
+describe("pairingDisplayNameForPin", () => {
   it("prefers the live pairing's display name over the snapshot", () => {
     const p = pairing({ friendly_name: "Nicks-Mac-Studio" });
     const map = new Map([[p.pin_sha256, p]]);
-    expect(jobSourceDisplayName(map, p.pin_sha256, "esphome-builder-xnnspgdv")).toBe(
+    expect(pairingDisplayNameForPin(map, p.pin_sha256, "esphome-builder-xnnspgdv")).toBe(
       "Nicks-Mac-Studio"
     );
   });
 
   it("falls back to the snapshot label for an unknown or missing pin", () => {
-    expect(jobSourceDisplayName(new Map(), "c".repeat(64), "snapshot")).toBe("snapshot");
-    expect(jobSourceDisplayName(null, undefined, "snapshot")).toBe("snapshot");
+    expect(pairingDisplayNameForPin(new Map(), "c".repeat(64), "snapshot")).toBe(
+      "snapshot"
+    );
+    expect(pairingDisplayNameForPin(null, undefined, "snapshot")).toBe("snapshot");
   });
 });
 

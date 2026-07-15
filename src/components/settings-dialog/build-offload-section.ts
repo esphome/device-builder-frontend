@@ -28,7 +28,10 @@ import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { pairingDisplayName } from "../../util/pairing-display-name.js";
+import {
+  pairingDisplayName,
+  pairingDisplayNameForPin,
+} from "../../util/pairing-display-name.js";
 import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeEditPairingEndpointDialog } from "../edit-pairing-endpoint-dialog.js";
@@ -481,11 +484,16 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   };
 
   private _onAlertUnpair = (alert: OffloaderAlertSnapshotEntry): void => {
+    // An alert can outlive its pairing, so fall back to the snapshot label.
     this._pendingUnpair = {
       pin_sha256: alert.pin_sha256,
       hostname: alert.receiver_hostname,
       port: alert.receiver_port,
-      label: this._pairingLabelForPin(alert.pin_sha256, alert.receiver_label),
+      label: pairingDisplayNameForPin(
+        this._pairings,
+        alert.pin_sha256,
+        alert.receiver_label
+      ),
     };
     this._unpairConfirmDialog?.open();
   };
@@ -502,13 +510,6 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     };
     this._unpairConfirmDialog?.open();
   };
-
-  // Resolved display name for a pin, falling back to a snapshot label when
-  // the live pairing is gone (an alert can outlive its pairing).
-  private _pairingLabelForPin(pin: string, fallback: string): string {
-    const pairing = this._pairings?.get(pin);
-    return pairing ? pairingDisplayName(pairing) : fallback;
-  }
 
   private _onUnpairConfirm = async (): Promise<void> => {
     const pending = this._pendingUnpair;

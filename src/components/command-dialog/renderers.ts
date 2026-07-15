@@ -3,7 +3,7 @@ import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware
 import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
-import { jobSourceDisplayName } from "../../util/pairing-display-name.js";
+import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { isPinnableVersion } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
@@ -51,7 +51,7 @@ export function renderRemoteBuilderSubLine(
   const version = buildsLocalVersion ? host._appVersion : receiverVersion;
   // The live pairing's display name (handshake friendly name, rename-aware)
   // wins over the job's creation-time source_label snapshot.
-  const name = jobSourceDisplayName(host._pairings, pin, label);
+  const name = pairingDisplayNameForPin(host._pairings, pin, label);
   const display = version ? `${name} (${version})` : name;
   // Only allow override for in-flight install — switching mid-upload or
   // mid-compile is a power-user shape without a UI today.
@@ -152,7 +152,7 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   const label = live?.source_label || primed?.source_label || null;
   if (label === null) return null;
   const pin = live?.source_pin_sha256 ?? primed?.source_pin_sha256 ?? "";
-  return jobSourceDisplayName(host._pairings, pin, label);
+  return pairingDisplayNameForPin(host._pairings, pin, label);
 }
 
 // Don't show the run timer until it would read at least "1s" — below that it

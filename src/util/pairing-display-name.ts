@@ -26,13 +26,14 @@ export function pairingDisplayName(pairing: PairingSummary): string {
 }
 
 /**
- * Display name for a job's build server, preferring the live pairing.
+ * Resolve a pairing's display name by pin, preferring the live row.
  *
- * `FirmwareJob.source_label` is a creation-time snapshot; when the
- * pairing is still known (by `source_pin_sha256`) the live row's
- * display name reflects renames and the handshake friendly name.
+ * The caller holds a pin plus a snapshot label (a job's `source_label`
+ * stamped at creation, or an alert's `receiver_label`); when the pairing
+ * is still known the live row's name reflects renames and the handshake
+ * friendly name, otherwise the snapshot is the fallback.
  */
-export function jobSourceDisplayName(
+export function pairingDisplayNameForPin(
   pairings: Map<string, PairingSummary> | null | undefined,
   pin: string | undefined,
   fallbackLabel: string
@@ -63,7 +64,7 @@ export function peerDisplayName(peer: PeerSummary): string {
 /**
  * Display name for a receiver-side job's submitting offloader.
  *
- * Mirrors `jobSourceDisplayName`: `remote_peer_label` is the
+ * Mirrors `pairingDisplayNameForPin`: `remote_peer_label` is the
  * submit-time snapshot, the live `PeerSummary` (keyed on
  * `job.remote_peer`, the offloader's dashboard_id) wins when known.
  */
