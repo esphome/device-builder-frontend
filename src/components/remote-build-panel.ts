@@ -262,8 +262,8 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
               ? html`
                   <span class="banner-badge banner-badge--requests">
                     ${this._localize("remote_build_dashboard.badge_requests", {
-                    count: pendingCount,
-                  })}
+                      count: pendingCount,
+                    })}
                   </span>
                 `
               : nothing
@@ -273,8 +273,8 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
               ? html`
                   <span class="banner-badge">
                     ${this._localize("remote_build_dashboard.badge_active", {
-                    count: activeCount,
-                  })}
+                      count: activeCount,
+                    })}
                   </span>
                 `
               : nothing
