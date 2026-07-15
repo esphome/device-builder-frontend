@@ -383,8 +383,11 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
     if (fitted.truncated) missing = true;
   }
 
-  // Pack the supplementary sections into `additional`, whole sections
-  // at a time, so the common case needs no manual paste at all.
+  // Pack the supplementary sections into `additional`, whole sections at
+  // a time, so the common case needs no manual paste. Only sections that
+  // aren't already elsewhere in the URL — environment (in `problem`),
+  // backtrace (in `problem`), config (in `config`) are deliberately not
+  // repeated here, since the budget is tight.
   const extras: string[] = [];
   const tryAddSection = (text: string): void => {
     params.set("additional", [...extras, text].join("\n\n"));
@@ -399,7 +402,6 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
       params.delete("additional");
     }
   };
-  tryAddSection(`Environment:\n${environmentSection(meta)}`);
   if (scrape.warnings.length > 0) {
     tryAddSection(`Warnings and errors:\n${fence(scrape.warnings)}`);
   }

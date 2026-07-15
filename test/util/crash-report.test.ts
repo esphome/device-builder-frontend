@@ -204,11 +204,14 @@ describe("buildIssueUrl", () => {
     expect(p.get("problem")).not.toContain("Installation:");
   });
 
-  it("packs supplementary sections into additional", () => {
+  it("packs only non-duplicated sections into additional", () => {
     const p = params(report());
     const additional = p.get("additional") ?? "";
-    expect(additional).toContain("Environment:");
     expect(additional).toContain("Warnings and errors:");
+    // Environment already rides in `problem`; don't repeat it under the
+    // tight URL budget.
+    expect(additional).not.toContain("Environment:");
+    expect(p.get("problem")).toContain("Platform: ESP32");
   });
 
   it("stays under budget, truncating config then logs, and reports incomplete", () => {
