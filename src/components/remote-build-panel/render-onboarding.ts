@@ -123,16 +123,6 @@ function renderFingerprintRow(
           <code>${formatPinSha256(identity.pin_sha256)}</code>
         </details>
       </div>
-      <span class="fingerprint-versions">
-        <span>
-          ${host._localize("settings.remote_build_server_version_label")}
-          <code>${identity.server_version}</code>
-        </span>
-        <span>
-          ${host._localize("settings.remote_build_esphome_version_label")}
-          <code>${identity.esphome_version}</code>
-        </span>
-      </span>
     </div>
   `;
 }

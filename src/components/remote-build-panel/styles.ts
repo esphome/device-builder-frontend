@@ -188,15 +188,6 @@ export const remoteBuildPanelStyles = css`
     width: min(340px, 100%);
   }
 
-  .fingerprint-versions {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-left: auto;
-    text-align: right;
-  }
-
-  .fingerprint-versions code,
   .fingerprint-display code {
     font-family: var(--wa-font-family-code);
     word-break: break-all;

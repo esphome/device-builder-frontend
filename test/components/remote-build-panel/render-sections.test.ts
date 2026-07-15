@@ -84,7 +84,7 @@ describe("renderOnboarding", () => {
     expect(el.textContent).toContain("settings.remote_build_identity_loading");
   });
 
-  it("renders the fingerprint grid and versions once identity loads", () => {
+  it("renders the fingerprint grid once identity loads, versions left to the footer", () => {
     const host = fakePanel({
       _identity: {
         loadFailed: false,
@@ -99,8 +99,8 @@ describe("renderOnboarding", () => {
     });
     const el = renderInto(renderOnboarding(host));
     expect(el.querySelector("esphome-pin-emoji-grid")).not.toBeNull();
-    expect(el.textContent).toContain("1.2.0");
-    expect(el.textContent).toContain("2026.6.1");
+    expect(el.textContent).not.toContain("1.2.0");
+    expect(el.textContent).not.toContain("2026.6.1");
   });
 });
 
