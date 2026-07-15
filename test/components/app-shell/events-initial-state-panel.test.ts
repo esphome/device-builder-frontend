@@ -1,12 +1,13 @@
-// Pins the initial_state seeds the Build server panel paints from:
-// receiver settings scalars (no disabled-CTA flash) and the one-shot
-// firmware-jobs snapshot (no per-frame queue accretion).
+// Pins what initial_state seeds for the Build server panel's first
+// paint: the receiver settings scalars (no disabled-CTA flash) and the
+// one-shot firmware-jobs snapshot (no per-frame queue buildup).
 
 import { describe, expect, it } from "vitest";
 import {
   DeviceEventType,
   type InitialStateEventData,
 } from "../../../src/api/types/event-subscription.js";
+import { CLEANUP_TTL_DEFAULT_SECONDS } from "../../../src/api/types/remote-build.js";
 import { JobStatus, JobType } from "../../../src/api/types/firmware-jobs.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import { handleEvent } from "../../../src/components/app-shell/events.js";
@@ -24,7 +25,7 @@ type Host = { [key: string]: unknown } & Pick<
 function makeHost(): Host {
   return {
     _remoteBuildEnabled: false,
-    _remoteBuildCleanupTtl: null,
+    _remoteBuildCleanupTtl: CLEANUP_TTL_DEFAULT_SECONDS,
     _remoteBuildSetInFlight: false,
     _firmwareJobs: new Map(),
     _activeJobs: new Map(),
@@ -77,7 +78,7 @@ describe("handleEvent INITIAL_STATE panel seeds", () => {
     const host = makeHost();
     dispatch(host, {});
     expect(host._remoteBuildEnabled).toBe(false);
-    expect(host._remoteBuildCleanupTtl).toBeNull();
+    expect(host._remoteBuildCleanupTtl).toBe(CLEANUP_TTL_DEFAULT_SECONDS);
   });
 
   it("keeps a job a follow_jobs frame delivered ahead of the snapshot", () => {
