@@ -39,6 +39,9 @@ registerMdiIcons({
   download: mdiDownload,
 });
 
+// The backend caps `esphome config` at 60s; the margin covers WS latency.
+const VALIDATE_TIMEOUT_MS = 90_000;
+
 /**
  * "Report this crash" flow: scrape the log buffer handed over by the
  * logs dialog, capture the sanitized config via `devices/validate`,
@@ -178,11 +181,20 @@ export class ESPHomeCrashReportDialog extends LitElement {
 
   private _captureConfig(session: number): void {
     const collected: string[] = [];
+    let timer = 0;
     const finish = (yaml: string) => {
+      clearTimeout(timer);
       if (session !== this._session) return;
       this._validateStreamId = "";
       if (this._dialog.open) this._configYaml = yaml;
     };
+    // A stream dropped without a result must not stick the spinner
+    // forever; degrade to the config-unavailable note instead.
+    timer = window.setTimeout(() => {
+      if (session !== this._session) return;
+      this._stopValidateStream();
+      finish("");
+    }, VALIDATE_TIMEOUT_MS);
     this._validateStreamId = this._api.validate(this._configuration, {
       onOutput: (line) => collected.push(line),
       onResult: (result) =>

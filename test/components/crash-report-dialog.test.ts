@@ -90,6 +90,19 @@ describe("crash-report-dialog", () => {
     expect(el.shadowRoot!.textContent).toContain("crash_report.config_unavailable");
   });
 
+  it("degrades to config-unavailable when the validate stream stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+      expect((el as any)._configYaml).toBeNull();
+      vi.advanceTimersByTime(90_000);
+      expect((el as any)._configYaml).toBe("");
+      expect((el as any)._api.stopStream).toHaveBeenCalledWith("v1");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("stops an abandoned validate stream on close and on re-open", () => {
     const stopStream = (el as any)._api.stopStream;
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
