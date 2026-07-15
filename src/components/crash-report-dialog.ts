@@ -16,6 +16,7 @@ import {
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
+import { notifyError, notifySuccess } from "../util/notify.js";
 import {
   type CrashReport,
   type CrashScrape,
@@ -82,8 +83,16 @@ export class ESPHomeCrashReportDialog extends LitElement {
   @state()
   private _copyFailed = false;
 
+  // Set once the report was delivered (copied/downloaded) and the issue
+  // opened; the dialog then stays up offering copy-again / download, so a
+  // clipboard overwritten before the paste isn't a dead end.
+  @state()
+  private _delivered = false;
+
   private _configuration = "";
   private _name = "";
+  // The rendered report backing the delivered-state re-copy / download.
+  private _reportText = "";
   // Bumped per open(); a validate stream from a previous open must not
   // populate this session's config.
   private _session = 0;
@@ -160,6 +169,8 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._session += 1;
     this._configYaml = null;
     this._copyFailed = false;
+    this._delivered = false;
+    this._reportText = "";
     this._scrape = scrapeCrashData(lines);
     this._dialog.open = true;
     this._captureConfig(this._session);
@@ -208,7 +219,8 @@ export class ESPHomeCrashReportDialog extends LitElement {
 
   private async _copyAndOpen(): Promise<void> {
     const report = this._buildReport();
-    if (!(await copyToClipboard(buildFullReport(report)))) {
+    this._reportText = buildFullReport(report);
+    if (!(await copyToClipboard(this._reportText))) {
       this._copyFailed = true;
       return;
     }
@@ -217,14 +229,30 @@ export class ESPHomeCrashReportDialog extends LitElement {
 
   private _downloadAndOpen(): void {
     const report = this._buildReport();
-    const stem = configurationStem(this._configuration, "device");
-    downloadBlob(buildFullReport(report), `${stem}-crash-report.md`, "text/markdown");
+    this._reportText = buildFullReport(report);
+    this._downloadReport();
     this._openIssue(report, "download");
   }
 
+  // The dialog stays open after delivery: switching to the GitHub tab can
+  // cost the user the clipboard contents, so copy-again / download stay
+  // one click away until they close it themselves.
   private _openIssue(report: CrashReport, delivery: "clipboard" | "download"): void {
     window.open(buildIssueUrl(report, delivery), "_blank", "noopener");
-    this._dialog.open = false;
+    this._delivered = true;
+  }
+
+  private async _copyAgain(): Promise<void> {
+    if (await copyToClipboard(this._reportText)) {
+      notifySuccess(this._localize("crash_report.copied"));
+    } else {
+      notifyError(this._localize("crash_report.copy_failed"));
+    }
+  }
+
+  private _downloadReport(): void {
+    const stem = configurationStem(this._configuration, "device");
+    downloadBlob(this._reportText, `${stem}-crash-report.md`, "text/markdown");
   }
 
   private _renderSummaryRow(text: string, degraded: boolean) {
@@ -235,6 +263,24 @@ export class ESPHomeCrashReportDialog extends LitElement {
       ></wa-icon>
       <span>${text}</span>
     </li>`;
+  }
+
+  private _renderDelivered() {
+    return html`
+      <p class="hint">${this._localize("crash_report.delivered_hint")}</p>
+      <div class="actions">
+        <button class="btn btn--cancel" @click=${() => (this._dialog.open = false)}>
+          ${this._localize("layout.close")}
+        </button>
+        <button class="btn btn--cancel" @click=${this._downloadReport}>
+          <wa-icon library="mdi" name="download"></wa-icon>
+          ${this._localize("crash_report.download_report")}
+        </button>
+        <button class="btn btn--confirm" @click=${this._copyAgain}>
+          ${this._localize("crash_report.copy_again")}
+        </button>
+      </div>
+    `;
   }
 
   private _renderReady() {
@@ -311,7 +357,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
                 <wa-spinner></wa-spinner>
                 <span>${this._localize("crash_report.collecting")}</span>
               </div>`
-            : this._renderReady()
+            : this._delivered
+              ? this._renderDelivered()
+              : this._renderReady()
         }
       </esphome-base-dialog>
     `;

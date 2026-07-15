@@ -1675,6 +1675,11 @@
     "hint": "The full report will be copied to your clipboard and a pre-filled GitHub issue will open. Paste the report into the issue's \"Additional information\" field.",
     "copy_failed_hint": "Copying to the clipboard failed. Download the report instead and attach it to the issue.",
     "copy_and_open": "Copy report & open GitHub issue",
-    "download_and_open": "Download report & open GitHub issue"
+    "download_and_open": "Download report & open GitHub issue",
+    "delivered_hint": "The report is on your clipboard and the GitHub issue form opened in a new tab. If something overwrites your clipboard before you paste, copy or download the report again from here.",
+    "copy_again": "Copy report again",
+    "download_report": "Download report",
+    "copied": "Report copied to clipboard",
+    "copy_failed": "Copying the report failed"
   }
 }

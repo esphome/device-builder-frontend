@@ -6,6 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+vi.mock("sonner-js", () => ({
+  default: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
 
 const { copyToClipboard } = vi.hoisted(() => ({ copyToClipboard: vi.fn() }));
 vi.mock("../../src/util/copy-to-clipboard.js", () => ({ copyToClipboard }));
@@ -115,6 +118,24 @@ describe("crash-report-dialog", () => {
     expect(openedUrls).toHaveLength(1);
     expect(openedUrls[0]).toContain("github.com/esphome/esphome/issues/new");
     expect(new URL(openedUrls[0]).searchParams.get("additional")).toContain("clipboard");
+
+    // The dialog stays open in the delivered state so a clipboard lost to
+    // the tab switch can be re-copied (or downloaded) without redoing the
+    // validate round-trip.
+    await el.updateComplete;
+    expect((el as any)._dialog.open).toBe(true);
+    expect((el as any)._delivered).toBe(true);
+
+    await (el as any)._copyAgain();
+    expect(copyToClipboard).toHaveBeenCalledTimes(2);
+    expect(copyToClipboard.mock.calls[1][0]).toBe(reportText);
+
+    (el as any)._downloadReport();
+    expect(downloadBlob).toHaveBeenCalledWith(
+      reportText,
+      "smallgarage-crash-report.md",
+      "text/markdown"
+    );
   });
 
   it("falls back to a report download when the copy fails", async () => {
