@@ -591,7 +591,7 @@ export class ESPHomeLogsDialog extends LitElement {
         // The callout shrinks the log container; re-pin so the crash
         // tail stays visible.
         if (firstDetection) {
-          this.updateComplete.then(() => this._terminal?.scrollToBottom());
+          void this.updateComplete.then(() => this._terminal?.scrollToBottom());
         }
       }
     }
