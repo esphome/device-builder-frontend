@@ -49,7 +49,7 @@ describe("crash-report-dialog", () => {
       "open",
       vi.fn((url: string) => {
         openedUrls.push(url);
-        return null;
+        return {} as Window;
       })
     );
     el = new ESPHomeCrashReportDialog();
@@ -88,6 +88,29 @@ describe("crash-report-dialog", () => {
     expect((el as any)._configYaml).toBe("");
     expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
     expect(el.shadowRoot!.textContent).toContain("crash_report.config_unavailable");
+  });
+
+  it("does not claim the tab opened when the popup was blocked", async () => {
+    vi.stubGlobal(
+      "open",
+      vi.fn((url: string) => {
+        openedUrls.push(url);
+        return null; // popup blocker
+      })
+    );
+    copyToClipboard.mockResolvedValue(true);
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    await el.updateComplete;
+
+    await (el as any)._copyAndOpen();
+    await el.updateComplete;
+    expect((el as any)._popupBlocked).toBe(true);
+    expect(el.shadowRoot!.textContent).toContain("crash_report.popup_blocked_hint");
+    // The manual link is the primary action when the popup was blocked.
+    const anchor = el.shadowRoot!.querySelector<HTMLAnchorElement>(".actions a");
+    expect(anchor!.classList.contains("btn--confirm")).toBe(true);
+    expect(anchor!.href).toBe(openedUrls[0]);
   });
 
   it("degrades to config-unavailable when the validate stream stalls", async () => {
@@ -138,6 +161,10 @@ describe("crash-report-dialog", () => {
     await el.updateComplete;
     expect((el as any)._dialog.open).toBe(true);
     expect((el as any)._delivered).toBe(true);
+    expect((el as any)._popupBlocked).toBe(false);
+    // The delivered state keeps a manual link to the issue as well.
+    const anchor = el.shadowRoot!.querySelector<HTMLAnchorElement>(".actions a");
+    expect(anchor!.href).toBe(openedUrls[0]);
 
     await (el as any)._copyAgain();
     expect(copyToClipboard).toHaveBeenCalledTimes(2);

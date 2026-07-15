@@ -92,10 +92,17 @@ export class ESPHomeCrashReportDialog extends LitElement {
   @state()
   private _delivered = false;
 
+  // window.open returned null (popup blocker); the delivered state then
+  // leads with the manual "Open GitHub issue" link instead of claiming
+  // a tab opened.
+  @state()
+  private _popupBlocked = false;
+
   private _configuration = "";
   private _name = "";
   // The rendered report backing the delivered-state re-copy / download.
   private _reportText = "";
+  private _issueUrl = "";
   // Bumped per open(); a validate stream from a previous open must not
   // populate this session's config.
   private _session = 0;
@@ -173,7 +180,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._configYaml = null;
     this._copyFailed = false;
     this._delivered = false;
+    this._popupBlocked = false;
     this._reportText = "";
+    this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
     this._dialog.open = true;
     this._captureConfig(this._session);
@@ -207,7 +216,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // backend's esphome config subprocess running to completion.
   private _stopValidateStream(): void {
     if (!this._validateStreamId) return;
-    void this._api.stopStream(this._validateStreamId).catch(() => undefined);
+    void this._api
+      .stopStream(this._validateStreamId)
+      .catch((err) => console.warn("Failed to stop the validate stream", err));
     this._validateStreamId = "";
   }
 
@@ -247,10 +258,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   // The dialog stays open after delivery: switching to the GitHub tab can
-  // cost the user the clipboard contents, so copy-again / download stay
-  // one click away until they close it themselves.
+  // cost the user the clipboard contents, so copy-again / download / the
+  // issue link stay one click away until they close it themselves.
   private _openIssue(report: CrashReport, delivery: "clipboard" | "download"): void {
-    window.open(buildIssueUrl(report, delivery), "_blank", "noopener");
+    this._issueUrl = buildIssueUrl(report, delivery);
+    this._popupBlocked = window.open(this._issueUrl, "_blank", "noopener") === null;
     this._delivered = true;
   }
 
@@ -278,8 +290,13 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   private _renderDelivered() {
+    const blocked = this._popupBlocked;
     return html`
-      <p class="hint">${this._localize("crash_report.delivered_hint")}</p>
+      <p class="hint">
+        ${this._localize(
+          blocked ? "crash_report.popup_blocked_hint" : "crash_report.delivered_hint"
+        )}
+      </p>
       <div class="actions">
         <button class="btn btn--cancel" @click=${() => (this._dialog.open = false)}>
           ${this._localize("layout.close")}
@@ -288,9 +305,20 @@ export class ESPHomeCrashReportDialog extends LitElement {
           <wa-icon library="mdi" name="download"></wa-icon>
           ${this._localize("crash_report.download_report")}
         </button>
-        <button class="btn btn--confirm" @click=${this._copyAgain}>
+        <button
+          class="btn ${blocked ? "btn--cancel" : "btn--confirm"}"
+          @click=${this._copyAgain}
+        >
           ${this._localize("crash_report.copy_again")}
         </button>
+        <a
+          class="btn ${blocked ? "btn--confirm" : "btn--cancel"}"
+          href=${this._issueUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ${this._localize("crash_report.open_issue")}
+        </a>
       </div>
     `;
   }

@@ -1680,6 +1680,8 @@
     "copy_again": "Copy report again",
     "download_report": "Download report",
     "copied": "Report copied to clipboard",
-    "copy_failed": "Copying the report failed"
+    "copy_failed": "Copying the report failed",
+    "popup_blocked_hint": "Your browser blocked the GitHub tab. The report is on your clipboard; use \"Open GitHub issue\" below and paste it there.",
+    "open_issue": "Open GitHub issue"
   }
 }
