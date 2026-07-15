@@ -330,10 +330,17 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     `;
   }
 
-  private _onToggleRemoteCompute(event: Event) {
+  private async _onToggleRemoteCompute(event: Event) {
     this._remoteCompute = (
       event.target as HTMLInputElement & { checked: boolean }
     ).checked;
+    if (!this._remoteCompute) return;
+    // The explainer renders below the toggle, past the dialog's fold —
+    // bring it into view so flipping the switch visibly does something.
+    await this.updateComplete;
+    this.shadowRoot
+      ?.querySelector(".remote-feature-box")
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   private _renderTourOffer() {

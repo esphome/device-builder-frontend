@@ -23,6 +23,7 @@ interface WizardInternals {
     markOnboardingAcknowledged: ReturnType<typeof vi.fn>;
   };
   _onContinue(): Promise<void>;
+  _onToggleRemoteCompute(event: Event): Promise<void>;
 }
 
 const internals = (wizard: ESPHomeOnboardingWizardDialog) =>
@@ -120,6 +121,33 @@ describe("onboarding existing-server orientation", () => {
     expect(state._api.updatePreferences).toHaveBeenCalledWith(
       expect.objectContaining({ remote_compute_only: true })
     );
+  });
+
+  it("scrolls the explainer into view when the switch turns on", async () => {
+    const scrolled: string[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this.className);
+    };
+    const wizard = new ESPHomeOnboardingWizardDialog();
+    document.body.appendChild(wizard);
+    const state = internals(wizard);
+    wizard.open();
+    state._isHaAddon = false;
+    state._discoveredHosts = hosts({ name: "living-room" });
+
+    await state._onContinue(); // welcome -> experience
+    await state._onContinue(); // experience -> existing_server
+    await wizard.updateComplete;
+    await state._onToggleRemoteCompute({
+      target: { checked: true },
+    } as unknown as Event);
+    expect(scrolled).toEqual(["remote-feature-box"]);
+
+    // Turning it back off scrolls nothing (the box is gone).
+    await state._onToggleRemoteCompute({
+      target: { checked: false },
+    } as unknown as Event);
+    expect(scrolled).toEqual(["remote-feature-box"]);
   });
 
   it("names the discovered server, preferring its friendly name", async () => {
