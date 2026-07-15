@@ -20,7 +20,7 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { CrashDetector } from "../util/crash-detector.js";
+import { hasCrashMarker } from "../util/crash-detector.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LineBatcher } from "../util/line-batcher.js";
@@ -123,7 +123,6 @@ export class ESPHomeLogsDialog extends LitElement {
   // "Report this crash" callout for the rest of the session.
   @state()
   private _crashDetected = false;
-  private _crashDetector = new CrashDetector();
 
   @query("esphome-crash-report-dialog")
   private _crashReportDialog?: ESPHomeCrashReportDialog;
@@ -204,7 +203,6 @@ export class ESPHomeLogsDialog extends LitElement {
     void this._teardownSession();
     this._resetPendingLines();
     this._lines = [];
-    this._crashDetector.reset();
     this._crashDetected = false;
     this._expanded = false;
     this._showStates = true;
@@ -361,7 +359,7 @@ export class ESPHomeLogsDialog extends LitElement {
                   >
                   <button
                     type="button"
-                    class="crash-callout-button"
+                    class="term-btn crash-callout-button"
                     @click=${this._openCrashReport}
                   >
                     ${this._localize("crash_report.report_button")}
@@ -561,7 +559,6 @@ export class ESPHomeLogsDialog extends LitElement {
   private _clearLogs() {
     this._resetPendingLines();
     this._lines = [];
-    this._crashDetector.reset();
     this._crashDetected = false;
   }
 
@@ -577,14 +574,11 @@ export class ESPHomeLogsDialog extends LitElement {
   private _appendCapped(lines: string[]): void {
     const merged = [...this._lines, ...lines];
     this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
-    if (!this._crashDetected) {
-      this._crashDetector.feed(lines);
-      if (this._crashDetector.detected) {
-        this._crashDetected = true;
-        // The callout shrinks the log container; re-pin so the crash
-        // tail stays visible.
-        this.updateComplete.then(() => this._terminal?.scrollToBottom());
-      }
+    if (!this._crashDetected && hasCrashMarker(lines)) {
+      this._crashDetected = true;
+      // The callout shrinks the log container; re-pin so the crash
+      // tail stays visible.
+      this.updateComplete.then(() => this._terminal?.scrollToBottom());
     }
   }
 

@@ -3,30 +3,24 @@ import {
   type CrashReport,
   buildFullReport,
   buildIssueUrl,
+  distillValidatedConfig,
   inferComponentName,
   issuePlatform,
   scrapeCrashData,
 } from "../../src/util/crash-report.js";
+import { CRASH_BLOCK } from "../_crash-lines.js";
 
 const FILLER = Array.from(
   { length: 40 },
   (_, i) => `[12:00:00][I][app:029]: loop iteration ${i}`
 );
 
-const CRASH_BLOCK = [
-  "Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.",
-  "Core  1 register dump:",
-  "PC      : 0x400d9150  PS      : 0x00060330  A0      : 0x800da73c",
-  "Backtrace: 0x400d9150:0x3ffb4f60 0x400da73c:0x3ffb4f90",
-  "WARNING Decoded 0x400d9150: esphome::Application::setup() at esphome/core/application.cpp:59",
-  "WARNING Decoded 0x400da73c: esphome::wifi::WiFiComponent::loop() at esphome/components/wifi/wifi_component.cpp:100",
-  "Rebooting...",
-];
-
 const BUFFER = [
   ...FILLER,
+  // Continuation lines arrive with the entry's prefix re-applied (the
+  // log parsers on both transports do this before lines hit the buffer).
   "[12:00:01][C][wifi:001]: WiFi:",
-  "[12:00:01]  SSID: 'mynetwork'",
+  "[12:00:01][C][wifi:001]:   SSID: 'mynetwork'",
   "[12:00:02][W][component:214]: Component wifi took a long time (128 ms)",
   "[12:00:03][W][component:214]: Component wifi took a long time (128 ms)",
   "[12:00:04][W][component:214]: Component wifi took a long time (128 ms)",
@@ -79,14 +73,31 @@ describe("scrapeCrashData", () => {
     ]);
   });
 
-  it("keeps indented continuations attached to their [C] entry line", () => {
-    expect(scrape.configLines).toEqual(["[C][wifi:001]: WiFi:", "  SSID: 'mynetwork'"]);
+  it("collects multi-line [C] records (continuations carry the re-applied prefix)", () => {
+    expect(scrape.configLines).toEqual([
+      "[C][wifi:001]: WiFi:",
+      "[C][wifi:001]:   SSID: 'mynetwork'",
+    ]);
   });
 
   it("reports a crash that scrolled out of the buffer", () => {
     const scrolled = scrapeCrashData(FILLER);
     expect(scrolled.crashFound).toBe(false);
     expect(scrolled.excerpt).toEqual([]);
+  });
+});
+
+describe("distillValidatedConfig", () => {
+  it("keeps the YAML and drops CLI log records, timestamped or not", () => {
+    expect(
+      distillValidatedConfig([
+        "\\033[32mINFO ESPHome 2026.6.4\\033[0m",
+        "12:34:56 INFO Reading configuration...",
+        "esphome:",
+        "  name: smallgarage",
+        "\\033[32mINFO Configuration is valid!\\033[0m",
+      ])
+    ).toBe("esphome:\n  name: smallgarage");
   });
 });
 

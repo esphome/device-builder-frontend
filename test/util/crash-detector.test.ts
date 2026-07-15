@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  CrashDetector,
+  hasCrashMarker,
   isCrashMarker,
   normalizeLogLine,
 } from "../../src/util/crash-detector.js";
@@ -62,26 +62,14 @@ describe("isCrashMarker", () => {
   });
 });
 
-describe("CrashDetector", () => {
-  it("latches on a crash line arriving wrapped in ANSI + timestamp", () => {
-    const detector = new CrashDetector();
-    detector.feed(["[12:00:00][I][app:029]: boot"]);
-    expect(detector.detected).toBe(false);
-    detector.feed([wrapEsc("Guru Meditation Error: Core 1 panic'ed (StoreProhibited).")]);
-    expect(detector.detected).toBe(true);
-  });
-
-  it("stays latched across later batches", () => {
-    const detector = new CrashDetector();
-    detector.feed([">>>stack>>>"]);
-    detector.feed(["[12:00:05][I][app:029]: rebooted fine"]);
-    expect(detector.detected).toBe(true);
-  });
-
-  it("reset clears the latch", () => {
-    const detector = new CrashDetector();
-    detector.feed(["Soft WDT reset"]);
-    detector.reset();
-    expect(detector.detected).toBe(false);
+describe("hasCrashMarker", () => {
+  it("spots a crash line arriving wrapped in ANSI + timestamp", () => {
+    expect(hasCrashMarker(["[12:00:00][I][app:029]: boot"])).toBe(false);
+    expect(
+      hasCrashMarker([
+        "[12:00:00][I][app:029]: boot",
+        wrapEsc("Guru Meditation Error: Core 1 panic'ed (StoreProhibited)."),
+      ])
+    ).toBe(true);
   });
 });

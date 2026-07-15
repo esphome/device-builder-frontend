@@ -4,6 +4,15 @@ import { stripAnsiSgr } from "./ansi-escapes.js";
 // Log format is "<asctime>? <LEVEL> <message>" (esphome/log.py).
 const LOADER_ERROR = /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
 
+// Any esphome CLI log record, same "<asctime>? <LEVEL> <message>" grammar.
+const CLI_LOG_LINE =
+  /^(?:\d{2}:\d{2}:\d{2}\s+)?(?:INFO|WARNING|ERROR|DEBUG|CRITICAL|VERBOSE)\b/;
+
+/** True when an (ANSI-stripped) line is esphome CLI logging, not payload. */
+export function isCliLogLine(line: string): boolean {
+  return CLI_LOG_LINE.test(line);
+}
+
 /**
  * True when a compile-log line marks an ESPHome validation failure.
  *

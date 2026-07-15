@@ -1,4 +1,5 @@
-import { CRASH_END_RE, isCrashMarker, normalizeLogLine } from "./crash-detector.js";
+import { isCrashMarker, normalizeLogLine } from "./crash-detector.js";
+import { isCliLogLine } from "./validation-log.js";
 
 /**
  * Crash-report assembly: scrape the log buffer the user is already
@@ -11,6 +12,9 @@ import { CRASH_END_RE, isCrashMarker, normalizeLogLine } from "./crash-detector.
 // far past it the excerpt extends when no explicit end marker arrives.
 const CONTEXT_LINES_BEFORE = 25;
 const MAX_LINES_AFTER_MARKER = 60;
+
+// Terminators of a crash dump — the excerpt window closes here.
+const CRASH_END_RE = /<<<stack<<<|^ELF file SHA256:|^Rebooting\.\.\./;
 
 // Total pre-filled URL budget. GitHub 414s somewhere past ~8k; staying
 // at 6k leaves headroom for their own redirect/query additions.
@@ -33,23 +37,22 @@ const CRASH_RELATED_RE = /(?:0x)?[0-9a-fA-F]{8}(?::|\b)|Decoded 0x/;
 
 const TAGGED_LINE_RE = /^\[([CWE])\]\[[^\]]*\]/;
 
-/** `target_platform` → the bug form's platform dropdown values. */
-export const ISSUE_PLATFORM_MAP: ReadonlyArray<[RegExp, string]> = [
-  [/^ESP32/i, "ESP32"],
-  [/^ESP8266$/i, "ESP8266"],
-  [/^RP2040$/i, "RP2040"],
-  [/^BK72XX$/i, "BK72XX"],
-  [/^RTL87XX$/i, "RTL87XX"],
-  [/^LN882X$/i, "LN882X"],
-  [/^HOST$/i, "Host"],
-];
+// `target_platform` → the bug form's platform dropdown values. ESP32 is a
+// prefix match (variants like ESP32S3 report as ESP32).
+const ISSUE_PLATFORMS: Record<string, string> = {
+  ESP8266: "ESP8266",
+  RP2040: "RP2040",
+  BK72XX: "BK72XX",
+  RTL87XX: "RTL87XX",
+  LN882X: "LN882X",
+  HOST: "Host",
+};
 
 export function issuePlatform(targetPlatform: string): string {
   if (!targetPlatform) return "";
-  for (const [re, value] of ISSUE_PLATFORM_MAP) {
-    if (re.test(targetPlatform)) return value;
-  }
-  return "Other";
+  const upper = targetPlatform.toUpperCase();
+  if (upper.startsWith("ESP32")) return "ESP32";
+  return ISSUE_PLATFORMS[upper] ?? "Other";
 }
 
 export interface CrashReportMeta {
@@ -69,12 +72,14 @@ export interface CrashScrape {
   /** Normalized crash excerpt (context + crash block); [] when the crash
    *  scrolled out of the capped buffer. */
   excerpt: string[];
+  /** Index of the first crash marker within `excerpt`; -1 when none. */
+  crashIndex: number;
   crashFound: boolean;
   /** `0x...: func at file:line` frames from the inline decoder. */
   decodedFrames: string[];
-  /** All `[W]` / `[E]` lines (continuations attached, duplicates folded). */
+  /** All `[W]` / `[E]` lines (duplicates folded). */
   warnings: string[];
-  /** All `[C]` dump_config lines (continuations attached). */
+  /** All `[C]` dump_config lines. */
   configLines: string[];
 }
 
@@ -85,16 +90,29 @@ export function scrapeCrashData(rawLines: string[]): CrashScrape {
   const { warnings, configLines } = extractTaggedLines(lines);
   return {
     excerpt: excerpt.lines,
-    crashFound: excerpt.found,
+    crashIndex: excerpt.crashIndex,
+    crashFound: excerpt.crashIndex !== -1,
     decodedFrames: extractDecodedFrames(excerpt.lines),
     warnings,
     configLines,
   };
 }
 
-function extractCrashExcerpt(lines: string[]): { lines: string[]; found: boolean } {
+/**
+ * Clean YAML from a `devices/validate` stream: normalize each line and
+ * drop the esphome CLI log records interleaved on the merged stream.
+ */
+export function distillValidatedConfig(lines: string[]): string {
+  return lines
+    .map(normalizeLogLine)
+    .filter((line) => !isCliLogLine(line))
+    .join("\n")
+    .trim();
+}
+
+function extractCrashExcerpt(lines: string[]): { lines: string[]; crashIndex: number } {
   const start = lines.findIndex((line) => isCrashMarker(line));
-  if (start === -1) return { lines: [], found: false };
+  if (start === -1) return { lines: [], crashIndex: -1 };
   const hardStop = Math.min(lines.length - 1, start + MAX_LINES_AFTER_MARKER);
   let end = start;
   for (let i = start; i <= hardStop; i++) {
@@ -105,10 +123,8 @@ function extractCrashExcerpt(lines: string[]): { lines: string[]; found: boolean
       break;
     }
   }
-  return {
-    lines: lines.slice(Math.max(0, start - CONTEXT_LINES_BEFORE), end + 1),
-    found: true,
-  };
+  const from = Math.max(0, start - CONTEXT_LINES_BEFORE);
+  return { lines: lines.slice(from, end + 1), crashIndex: start - from };
 }
 
 function extractDecodedFrames(excerpt: string[]): string[] {
@@ -120,25 +136,19 @@ function extractDecodedFrames(excerpt: string[]): string[] {
   return frames;
 }
 
+// A bare tag match covers multi-line records too: both transports re-apply
+// the entry's `[L][tag]:` prefix to every continuation line before it
+// reaches the buffer (ESPHomeLogParser client-side, aioesphomeapi's
+// LogParser behind `esphome logs`).
 function extractTaggedLines(lines: string[]): {
   warnings: string[];
   configLines: string[];
 } {
   const warnings: string[] = [];
   const configLines: string[] = [];
-  let bucket: string[] | null = null;
   for (const line of lines) {
     const match = TAGGED_LINE_RE.exec(line);
-    if (match) {
-      bucket = match[1] === "C" ? configLines : warnings;
-      appendFolded(bucket, line);
-    } else if (bucket !== null && /^\s/.test(line)) {
-      // Raw-UART continuations of a multi-line record are indented and
-      // untagged; keep them with their entry line.
-      bucket.push(line);
-    } else {
-      bucket = null;
-    }
+    if (match) appendFolded(match[1] === "C" ? configLines : warnings, line);
   }
   return { warnings, configLines };
 }
@@ -234,8 +244,9 @@ export function buildFullReport(report: CrashReport): string {
 }
 
 /** Issue title: the crash banner line when present, else a generic one. */
-export function buildIssueTitle(report: CrashReport): string {
-  const banner = report.scrape.excerpt.find((line) => isCrashMarker(line)) ?? "";
+function buildIssueTitle(report: CrashReport): string {
+  const { excerpt, crashIndex } = report.scrape;
+  const banner = crashIndex === -1 ? "" : excerpt[crashIndex];
   const title = banner ? `Crash: ${banner}` : `Device crash on ${report.meta.deviceName}`;
   return title.length > 100 ? `${title.slice(0, 97)}...` : title;
 }
@@ -288,8 +299,7 @@ export function buildIssueUrl(
   params.set("logs", "");
   const overhead = url.toString().length;
   const budget = MAX_ISSUE_URL_LENGTH - overhead;
-  const crashStart = scrape.excerpt.findIndex((line) => isCrashMarker(line));
-  const logs = fitLines(scrape.excerpt, Math.max(0, crashStart), budget);
+  const logs = fitLines(scrape.excerpt, Math.max(0, scrape.crashIndex), budget);
   if (logs) {
     params.set("logs", logs);
   } else {

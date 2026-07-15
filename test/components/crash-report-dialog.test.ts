@@ -18,14 +18,9 @@ vi.mock("../../src/util/download-text.js", async (importOriginal) => ({
 
 import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
 import type { StreamCallbacks } from "../../src/api/types/streaming.js";
+import { CRASH_BLOCK as CRASH_LINES } from "../_crash-lines.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
-const CRASH_LINES = [
-  "Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.",
-  "Backtrace: 0x400d9150:0x3ffb4f60",
-  "WARNING Decoded 0x400d9150: esphome::wifi::WiFiComponent::loop() at esphome/components/wifi/wifi_component.cpp:100",
-];
 
 const VALIDATE_OUTPUT = [
   "\\033[32mINFO ESPHome 2026.6.4\\033[0m",
@@ -60,6 +55,7 @@ describe("crash-report-dialog", () => {
         validateCallbacks = callbacks;
         return "v1";
       },
+      stopStream: vi.fn(() => Promise.resolve()),
     };
     document.body.appendChild(el);
   });
@@ -80,7 +76,6 @@ describe("crash-report-dialog", () => {
     expect((el as any)._configYaml).toBe(
       "esphome:\n  name: smallgarage\nwifi:\n  password: <removed>"
     );
-    expect((el as any)._configFailed).toBe(false);
   });
 
   it("degrades to a config-unavailable note when validation fails", async () => {
@@ -88,8 +83,19 @@ describe("crash-report-dialog", () => {
     finishValidate(["\\033[31mERROR something\\033[0m"], false);
     await el.updateComplete;
     expect((el as any)._configYaml).toBe("");
-    expect((el as any)._configFailed).toBe(true);
     expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
+    expect(el.shadowRoot!.textContent).toContain("crash_report.config_unavailable");
+  });
+
+  it("stops an abandoned validate stream on close and on re-open", () => {
+    const stopStream = (el as any)._api.stopStream;
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    (el as any)._onAfterHide();
+    expect(stopStream).toHaveBeenCalledWith("v1");
+
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    el.open("other.yaml", "Other", CRASH_LINES);
+    expect(stopStream).toHaveBeenCalledTimes(2);
   });
 
   it("copies the full report and opens the pre-filled issue", async () => {
@@ -120,7 +126,7 @@ describe("crash-report-dialog", () => {
     await (el as any)._copyAndOpen();
     expect(openedUrls).toHaveLength(0); // no tab until the report is delivered
     await el.updateComplete;
-    expect((el as any)._phase).toBe("copy-failed");
+    expect((el as any)._copyFailed).toBe(true);
 
     (el as any)._downloadAndOpen();
     expect(downloadBlob).toHaveBeenCalledWith(
@@ -141,7 +147,7 @@ describe("crash-report-dialog", () => {
     stale.onResult!({ success: false, code: 1 });
     await el.updateComplete;
     // Still collecting: the stale stream must not flip this session ready.
-    expect((el as any)._phase).toBe("collecting");
+    expect((el as any)._configYaml).toBeNull();
   });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

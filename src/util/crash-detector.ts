@@ -11,6 +11,8 @@ import { stripAnsi } from "./ansi-escapes.js";
  * ...). Matching runs against `normalizeLogLine` output so the same
  * pattern hits regardless of transport (raw UART bytes vs the
  * backend's `\033`-literal ANSI vs the dialog's timestamp prefix).
+ * The logs dialog latches on the first hit, so on hot streams this is
+ * one batch scan until a crash is seen and zero cost after.
  */
 
 // The dialog prepends `[HH:MM:SS]` (optionally with millis) to every line.
@@ -50,34 +52,7 @@ export function isCrashMarker(line: string): boolean {
   return CRASH_MARKERS.some((re) => re.test(line));
 }
 
-/** Terminators of a crash dump — the excerpt window closes here. */
-export const CRASH_END_RE = /<<<stack<<<|^ELF file SHA256:|^Rebooting\.\.\./;
-
-/**
- * Session-scoped crash latch fed from the log dialog's append path.
- *
- * Stays cheap on hot streams: one pass over each appended batch and a
- * full short-circuit once a crash has been seen.
- */
-export class CrashDetector {
-  private _detected = false;
-
-  /** Scan a batch of raw (ANSI/timestamped) lines. */
-  feed(lines: string[]): void {
-    if (this._detected) return;
-    for (const line of lines) {
-      if (isCrashMarker(normalizeLogLine(line))) {
-        this._detected = true;
-        return;
-      }
-    }
-  }
-
-  get detected(): boolean {
-    return this._detected;
-  }
-
-  reset(): void {
-    this._detected = false;
-  }
+/** True when any raw (ANSI/timestamped) line in the batch is a crash marker. */
+export function hasCrashMarker(lines: string[]): boolean {
+  return lines.some((line) => isCrashMarker(normalizeLogLine(line)));
 }

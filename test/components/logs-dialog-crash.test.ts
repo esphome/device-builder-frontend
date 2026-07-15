@@ -7,13 +7,11 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
+import { CRASH_BANNER_LINE as CRASH_LINE } from "../_crash-lines.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const append = (el: ESPHomeLogsDialog, lines: string[]) =>
   (el as any)._appendCapped(lines);
-
-const CRASH_LINE =
-  "Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.";
 
 describe("logs-dialog crash callout", () => {
   let el: ESPHomeLogsDialog;

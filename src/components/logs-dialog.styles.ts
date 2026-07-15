@@ -83,16 +83,13 @@ export const logsDialogStyles = css`
     flex: 1;
   }
 
+  /* Composes .term-btn (shape/typography from termButtonStyles); only the
+     primary-CTA colours are local. */
   .crash-callout-button {
     flex-shrink: 0;
-    padding: 4px 12px;
-    border: none;
-    border-radius: var(--wa-border-radius-m);
+    border-color: transparent;
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
-    font: inherit;
-    font-weight: var(--wa-font-weight-semibold);
-    cursor: pointer;
   }
 
   .crash-callout-button:hover {
