@@ -317,15 +317,12 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
             @change=${this._onToggleRemoteCompute}
           ></wa-switch>
         </label>
-        ${
-          this._remoteCompute
-            ? html`
-                <div class="remote-feature-box">
-                  ${renderFeatureList(this._localize, REMOTE_COMPUTE_FEATURES)}
-                </div>
-              `
-            : nothing
-        }
+        <div class="remote-feature-box">
+          <p class="remote-feature-heading">
+            ${this._localize("settings.remote_compute_features_title")}
+          </p>
+          ${renderFeatureList(this._localize, REMOTE_COMPUTE_FEATURES)}
+        </div>
       </div>
     `;
   }

@@ -138,6 +138,9 @@ describe("onboarding existing-server orientation", () => {
     await state._onContinue(); // welcome -> experience
     await state._onContinue(); // experience -> existing_server
     await wizard.updateComplete;
+    // The explainer is visible before the switch is touched.
+    expect(wizard.shadowRoot?.querySelector(".remote-feature-box")).not.toBeNull();
+    expect(wizard.shadowRoot?.querySelector(".remote-feature-heading")).not.toBeNull();
     await state._onToggleRemoteCompute({
       target: { checked: true },
     } as unknown as Event);

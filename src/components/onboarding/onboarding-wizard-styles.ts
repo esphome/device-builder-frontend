@@ -111,6 +111,15 @@ export const onboardingWizardStyles = css`
     text-align: left;
   }
 
+  .remote-feature-heading {
+    margin: 0 0 var(--wa-space-2xs);
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--wa-color-text-quiet);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
   .welcome-screen {
     gap: var(--wa-space-xl);
   }
