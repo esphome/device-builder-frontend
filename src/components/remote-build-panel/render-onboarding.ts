@@ -29,7 +29,14 @@ export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult 
                   host._extendWindow
                 )
               : html`
-                  <button type="button" class="primary-action" @click=${host._openWindow}>
+                  <button
+                    type="button"
+                    class="primary-action"
+                    title=${host._localize(
+                      "remote_build_dashboard.open_pairing_window_tooltip"
+                    )}
+                    @click=${host._openWindow}
+                  >
                     ${host._localize("remote_build_dashboard.open_pairing_window")}
                   </button>
                 `

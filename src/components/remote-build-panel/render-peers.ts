@@ -75,7 +75,12 @@ export function renderPeersCard(
           host._windowState?.open === true
             ? nothing
             : html`
-                <button type="button" class="heading-action" @click=${host._openWindow}>
+                <button
+                  type="button"
+                  class="heading-action"
+                  title=${host._localize("remote_build_dashboard.open_pairing_window_tooltip")}
+                  @click=${host._openWindow}
+                >
                   ${host._localize("remote_build_dashboard.open_pairing_window")}
                 </button>
               `

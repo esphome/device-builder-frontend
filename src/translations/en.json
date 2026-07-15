@@ -1639,6 +1639,7 @@
     "step_accept_request_title": "Review and accept",
     "step_accept_request_desc": "Compare the fingerprint below with what the sender shows, then accept the request.",
     "open_pairing_window": "Open pairing window",
+    "open_pairing_window_tooltip": "Lets other dashboards send pair requests to this build server until the window closes again.",
     "request_title": "{label} wants to pair",
     "request_review": "Review request",
     "peers_heading": "Paired dashboards",
