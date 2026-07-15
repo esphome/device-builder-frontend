@@ -1275,7 +1275,7 @@
     "remote_compute_feature_builder": "Device builder stays available",
     "remote_compute_feature_builder_desc": "Device creation and your devices keep working; the builder section starts collapsed and expands with one click.",
     "remote_compute_feature_paired": "Appears automatically once paired",
-    "remote_compute_feature_paired_desc": "Even with this off, the build server dashboard shows up collapsed as soon as another dashboard pairs with this one.",
+    "remote_compute_feature_paired_desc": "Even with this off, a collapsed Build server bar appears once another dashboard pairs with this one; the Device builder stays front and center.",
     "version_history": "Save version history",
     "version_history_desc": "Keep a local Git history of your config changes so you can view and restore earlier versions. Turn this off to stop the automatic commits.",
     "language": "Language",
