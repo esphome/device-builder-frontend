@@ -66,8 +66,18 @@ export async function resetRemoteBuildEnv(
   if (host._remoteResetPending || host._api === undefined) return;
   host._remoteResetPending = true;
   try {
-    await host._api.remoteBuildResetPeerBuildEnv({ pin_sha256: pin });
-    notifySuccess(host._localize("command.reset_remote_success"));
+    const { accepted } = await host._api.remoteBuildResetPeerBuildEnv({
+      pin_sha256: pin,
+    });
+    if (accepted) {
+      notifySuccess(host._localize("command.reset_remote_success"));
+    } else {
+      notifyError(
+        host._localize("command.reset_remote_failed", {
+          detail: host._localize("command.reset_remote_unconfirmed"),
+        })
+      );
+    }
   } catch (err) {
     notifyError(
       host._localize("command.reset_remote_failed", { detail: getErrorMessage(err) })

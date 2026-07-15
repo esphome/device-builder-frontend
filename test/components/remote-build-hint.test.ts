@@ -1,9 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/util/notify.js", () => ({
   notifySuccess: vi.fn(),
   notifyError: vi.fn(),
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 import type { PairingSummary } from "../../src/api/types/remote-build.js";
 import {
@@ -76,6 +80,15 @@ describe("resetRemoteBuildEnv", () => {
     host._api.remoteBuildResetPeerBuildEnv.mockRejectedValueOnce(new Error("boom"));
     await resetRemoteBuildEnv(host, "pin-1");
     expect(notifyError).toHaveBeenCalled();
+    expect(host._remoteResetPending).toBe(false);
+  });
+
+  it("toasts an error (not success) when the server does not confirm", async () => {
+    const host = makeHost();
+    host._api.remoteBuildResetPeerBuildEnv.mockResolvedValueOnce({ accepted: false });
+    await resetRemoteBuildEnv(host, "pin-1");
+    expect(notifyError).toHaveBeenCalled();
+    expect(notifySuccess).not.toHaveBeenCalled();
     expect(host._remoteResetPending).toBe(false);
   });
 

@@ -407,6 +407,7 @@
     "try_reset_remote_pending": "resetting the build environment on the build server\u2026",
     "reset_remote_success": "The build server reset this dashboard's build environment. The next build re-downloads everything from scratch.",
     "reset_remote_failed": "Resetting the build environment on the build server failed: {detail}",
+    "reset_remote_unconfirmed": "the build server didn't confirm the reset",
     "try_clean_button": "cleaning the build files for this device",
     "try_reset_button": "resetting the build environment",
     "validation_failed_suggestion": "Looks like a configuration error. Try {editor_action} to fix the YAML.",

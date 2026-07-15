@@ -562,7 +562,16 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     if (this._api === undefined || pending === null) return;
     this._resetEnvPending = true;
     try {
-      await this._api.remoteBuildResetPeerBuildEnv({ pin_sha256: pending.pin_sha256 });
+      const { accepted } = await this._api.remoteBuildResetPeerBuildEnv({
+        pin_sha256: pending.pin_sha256,
+      });
+      if (!accepted) {
+        this._toast("error", "settings.reset_peer_env_failed", {
+          label: pending.label,
+          detail: this._localize("command.reset_remote_unconfirmed"),
+        });
+        return;
+      }
     } catch (err) {
       this._toast("error", "settings.reset_peer_env_failed", {
         label: pending.label,
