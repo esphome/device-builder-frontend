@@ -13,6 +13,7 @@ export function renderRemoteStack(host: ESPHomePageDashboard): TemplateResult {
   return html`
     <esphome-remote-build-panel
       .collapsed=${host._stacks.remoteCollapsed}
+      .solo=${host._stacks.builderHidden}
       @toggle-collapsed=${host._stacks.swap}
     ></esphome-remote-build-panel>
   `;

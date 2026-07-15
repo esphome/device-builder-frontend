@@ -103,6 +103,22 @@ export function onSetRemoteComputeOnly(host: ESPHomeApp, e: CustomEvent<boolean>
   });
 }
 
+export function onSetHideDeviceBuilder(host: ESPHomeApp, e: CustomEvent<boolean>): void {
+  void optimisticSetting(host, {
+    get: () => host._hideDeviceBuilder,
+    set: (v) => {
+      host._hideDeviceBuilder = v;
+    },
+    write: () => host._api.updatePreferences({ hide_device_builder: e.detail }),
+    value: e.detail,
+    toastKey: "settings.experience_save_failed",
+    warn: "Failed to save hide-device-builder:",
+    inFlight: (active) => {
+      host._prefsWritesInFlight += active ? 1 : -1;
+    },
+  });
+}
+
 // Expert Mode is just experience_level === EXPERT; the Appearance/command-palette
 // toggle re-points the level (off → BEGINNER) through the same write path.
 export function onSetExpertMode(host: ESPHomeApp, e: CustomEvent<boolean>): void {

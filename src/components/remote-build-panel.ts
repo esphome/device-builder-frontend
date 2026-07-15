@@ -80,6 +80,11 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
    *  the page can join the collapsed bar with the builder header below. */
   @property({ type: Boolean, reflect: true }) collapsed = false;
 
+  /** The Device builder section is hidden (hide_device_builder pref):
+   *  this panel is the whole dashboard, so the banner stops being an
+   *  accordion header — no chevron, clicks don't fire toggle-collapsed. */
+  @property({ type: Boolean, reflect: true }) solo = false;
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;
@@ -236,6 +241,13 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   }
 
   private _renderBanner(pendingCount: number) {
+    // Solo: the banner is a plain heading — no chevron, not focusable,
+    // no accordion semantics.
+    if (this.solo) {
+      return html`
+        <header class="banner stack-bar">${this._renderBannerContent(0, 0)}</header>
+      `;
+    }
     const activeCount = this._buckets().active.length;
     return html`
       <button
@@ -244,37 +256,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
         aria-expanded=${this.collapsed ? "false" : "true"}
         @click=${this._onToggleCollapsed}
       >
-        <wa-icon library="mdi" name="server-network"></wa-icon>
-        <span class="stack-bar-main">
-          <span class="stack-bar-title">
-            ${this._localize("remote_build_dashboard.title")}
-          </span>
-          <span class="stack-bar-subtitle">
-            ${this._localize("remote_build_dashboard.tagline")}
-          </span>
-          ${
-            this.collapsed && pendingCount > 0
-              ? html`
-                  <span class="banner-badge banner-badge--requests">
-                    ${this._localize("remote_build_dashboard.badge_requests", {
-                      count: pendingCount,
-                    })}
-                  </span>
-                `
-              : nothing
-          }
-          ${
-            this.collapsed && activeCount > 0
-              ? html`
-                  <span class="banner-badge">
-                    ${this._localize("remote_build_dashboard.badge_active", {
-                      count: activeCount,
-                    })}
-                  </span>
-                `
-              : nothing
-          }
-        </span>
+        ${this._renderBannerContent(pendingCount, activeCount)}
         <wa-icon
           class="stack-bar-chevron"
           library="mdi"
@@ -282,6 +264,42 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
           aria-hidden="true"
         ></wa-icon>
       </button>
+    `;
+  }
+
+  private _renderBannerContent(pendingCount: number, activeCount: number) {
+    return html`
+      <wa-icon library="mdi" name="server-network"></wa-icon>
+      <span class="stack-bar-main">
+        <span class="stack-bar-title">
+          ${this._localize("remote_build_dashboard.title")}
+        </span>
+        <span class="stack-bar-subtitle">
+          ${this._localize("remote_build_dashboard.tagline")}
+        </span>
+        ${
+          this.collapsed && pendingCount > 0
+            ? html`
+                <span class="banner-badge banner-badge--requests">
+                  ${this._localize("remote_build_dashboard.badge_requests", {
+                    count: pendingCount,
+                  })}
+                </span>
+              `
+            : nothing
+        }
+        ${
+          this.collapsed && activeCount > 0
+            ? html`
+                <span class="banner-badge">
+                  ${this._localize("remote_build_dashboard.badge_active", {
+                    count: activeCount,
+                  })}
+                </span>
+              `
+            : nothing
+        }
+      </span>
     `;
   }
 

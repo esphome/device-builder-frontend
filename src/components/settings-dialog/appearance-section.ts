@@ -14,6 +14,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import {
   expertModeContext,
   localizeContext,
+  hideDeviceBuilderContext,
   remoteComputeOnlyContext,
   versionHistoryEnabledContext,
 } from "../../context/index.js";
@@ -76,6 +77,10 @@ export class ESPHomeSettingsAppearance extends LitElement {
   @consume({ context: remoteComputeOnlyContext, subscribe: true })
   @state()
   private _remoteComputeOnly = false;
+
+  @consume({ context: hideDeviceBuilderContext, subscribe: true })
+  @state()
+  private _hideDeviceBuilder = false;
 
   @consume({ context: versionHistoryEnabledContext, subscribe: true })
   @state()
@@ -161,6 +166,18 @@ export class ESPHomeSettingsAppearance extends LitElement {
           this._remoteFeaturesOpen = !this._remoteFeaturesOpen;
         }
       )}
+      ${
+        this._remoteComputeOnly
+          ? renderToggleRow(this._localize, {
+              titleId: "hide-device-builder-title",
+              titleKey: "settings.hide_device_builder",
+              descKey: "settings.hide_device_builder_desc",
+              checked: this._hideDeviceBuilder,
+              onToggle: this._onToggleHideDeviceBuilder,
+              rowClass: "expert-row",
+            })
+          : nothing
+      }
     `;
   }
 
@@ -231,6 +248,16 @@ export class ESPHomeSettingsAppearance extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-remote-compute-only", {
         detail: !this._remoteComputeOnly,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onToggleHideDeviceBuilder() {
+    this.dispatchEvent(
+      new CustomEvent("set-hide-device-builder", {
+        detail: !this._hideDeviceBuilder,
         bubbles: true,
         composed: true,
       })

@@ -1268,6 +1268,8 @@
     "appearance": "Appearance",
     "experience_save_failed": "Failed to save your preference",
     "remote_compute_only": "Remote compute dashboard",
+    "hide_device_builder": "Hide the Device builder",
+    "hide_device_builder_desc": "Show only the Build server view. Device creation and the device list come back the moment this is turned off.",
     "remote_compute_only_desc": "Put this install's remote build server dashboard front and center. Nothing is removed; the device builder section just starts collapsed.",
     "remote_compute_features_title": "What the remote compute dashboard changes",
     "remote_compute_feature_dashboard": "Build server front and center",

@@ -130,6 +130,17 @@ export const remoteComputeOnlyContext = createContext<boolean>(
 );
 
 /**
+ * Context for hiding the dashboard's Device builder section entirely.
+ *
+ * Only honoured while ``remote_compute_only`` is on; the Appearance
+ * toggle that sets it is likewise gated. A live guided tour overrides
+ * the hide so its anchors stay visible.
+ */
+export const hideDeviceBuilderContext = createContext<boolean>(
+  Symbol("esphome-hide-device-builder")
+);
+
+/**
  * Context for whether Git version-history auto-commit is enabled.
  *
  * Default ``true``. Set from the ``subscribe_events`` ``initial_state``

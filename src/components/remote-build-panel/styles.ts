@@ -30,6 +30,16 @@ export const remoteBuildPanelStyles = css`
     margin-right: var(--content-gutter, var(--wa-space-l));
   }
 
+  /* Solo (Device builder hidden): the banner is a plain heading, not
+     an accordion header. */
+  :host([solo]) .banner {
+    cursor: default;
+  }
+
+  :host([solo]) .banner:hover {
+    background: transparent;
+  }
+
   .banner-badge {
     display: inline-flex;
     align-items: center;
