@@ -418,14 +418,18 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
 
   // When content was truncated, a note (for the maintainer reading the
   // issue) leads the additional field; the reporter can attach the
-  // downloaded report on request. Drop trailing sections until the note
-  // fits so prepending it can't push the URL over budget.
+  // downloaded report on request. Drop trailing sections until it fits,
+  // and drop `additional` entirely if even the note alone overflows.
   if (missing) {
-    const note = "(Truncated to fit; full report available on request.)";
+    const withNote = ["(Truncated to fit; full report available on request.)", ...extras];
     for (;;) {
-      params.set("additional", [note, ...extras].join("\n\n"));
-      if (url.toString().length <= MAX_ISSUE_URL_LENGTH || extras.length === 0) break;
-      extras.pop();
+      params.set("additional", withNote.join("\n\n"));
+      if (url.toString().length <= MAX_ISSUE_URL_LENGTH) break;
+      if (withNote.length === 1) {
+        params.delete("additional");
+        break;
+      }
+      withNote.pop();
     }
   }
   return { url: url.toString(), complete: !missing };

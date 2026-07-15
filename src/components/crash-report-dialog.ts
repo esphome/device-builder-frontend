@@ -303,7 +303,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
   private _detectInstallation(): string {
     if (this._isHaAddon) return "Home Assistant Add-on";
     const info = this._api.serverInfo;
-    if (!info || info.desktop_version) return "";
+    // Unknown (no serverInfo, desktop app, or a backend that predates
+    // in_docker) omits the fact rather than guessing pip vs Docker.
+    if (!info || info.desktop_version || info.in_docker === undefined) return "";
     return info.in_docker ? "Docker" : "pip";
   }
 
