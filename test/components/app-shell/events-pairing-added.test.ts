@@ -17,6 +17,7 @@ function makeSummary(pin: string): PairingSummary {
     last_connect_error: "",
     esphome_version: "",
     enabled: true,
+    auto_provision_supported: false,
   };
 }
 

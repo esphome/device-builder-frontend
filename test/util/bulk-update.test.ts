@@ -31,6 +31,7 @@ function pairing(overrides: Partial<PairingSummary>): PairingSummary {
     last_connect_error: "",
     esphome_version: "2026.5.0",
     enabled: true,
+    auto_provision_supported: false,
     ...overrides,
   };
 }

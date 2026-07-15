@@ -21,6 +21,7 @@ function makeSummary(esphome_version: string): PairingSummary {
     last_connect_error: "",
     esphome_version,
     enabled: true,
+    auto_provision_supported: false,
   };
 }
 
@@ -59,6 +60,16 @@ describe("renderPairingRow version line", () => {
   it("omits the version line before the first handshake (empty version)", () => {
     const text = renderedText(renderPairingRow(makeSummary(""), ctx()));
     expect(text).not.toContain("settings.remote_build_peer_version_line");
+  });
+
+  it("shows the auto-provision line instead of a warning when supported", () => {
+    const pairing = {
+      ...makeSummary("2026.5.0"),
+      auto_provision_supported: true,
+    };
+    const text = renderedText(renderPairingRow(pairing, ctx()));
+    expect(text).toContain("settings.build_offload_pairing_version_auto_provision");
+    expect(text).not.toContain("settings.build_offload_pairing_version_mismatch_release");
   });
 
   it("omits the version line on a mismatch (the mismatch note already states it)", () => {

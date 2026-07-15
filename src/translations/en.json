@@ -1388,6 +1388,7 @@
     "build_offload_pairing_last_error": "Last connection error: {detail}",
     "build_offload_pairing_enabled_aria": "Use {label} for remote builds",
     "build_offload_pairing_enabled_title": "Use this server when auto-routing installs",
+    "build_offload_pairing_version_auto_provision": "Build server runs ESPHome {peer}; your builds use {local} automatically",
     "build_offload_pairing_version_mismatch_patch": "Build server runs ESPHome {peer}; you're on {local}",
     "build_offload_pairing_version_mismatch_release": "Build server runs ESPHome {peer}; you're on {local}. YAML may not compile across this release gap.",
     "remote_build_submit_action": "Build remotely",

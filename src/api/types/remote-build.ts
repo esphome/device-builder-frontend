@@ -178,6 +178,13 @@ export interface PairingSummary {
    * eligible).
    */
   enabled: boolean;
+  /**
+   * Receiver capability from the session handshake: a mismatched
+   * version is built in a venv provisioned with this offloader's
+   * own esphome, so the row shows informative copy instead of a
+   * skew warning.
+   */
+  auto_provision_supported: boolean;
 }
 
 /**

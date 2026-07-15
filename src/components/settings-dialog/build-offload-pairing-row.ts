@@ -4,7 +4,10 @@ import type { PairingSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { trimTrailingDot } from "../../util/hostname.js";
-import { classifyVersionMismatch } from "../../util/version-mismatch.js";
+import {
+  classifyVersionMismatch,
+  isPinnableVersion,
+} from "../../util/version-mismatch.js";
 
 interface PillResult {
   pillClass: string;
@@ -179,6 +182,22 @@ function renderPeerVersion(
   // doesn't. Hidden until the first handshake fills in esphome_version.
   if (pairing.status !== "approved" || !pairing.esphome_version) return nothing;
   const kind = classifyVersionMismatch(appVersion, pairing.esphome_version);
+  // A mismatch the receiver can auto-provision isn't a caution: builds
+  // run with this dashboard's own version in a venv on the server.
+  if (
+    kind !== null &&
+    pairing.auto_provision_supported &&
+    isPinnableVersion(appVersion)
+  ) {
+    return html`
+      <span class="row-desc">
+        ${localize("settings.build_offload_pairing_version_auto_provision", {
+          peer: pairing.esphome_version,
+          local: appVersion,
+        })}
+      </span>
+    `;
+  }
   if (kind === null) {
     return html`
       <span class="row-desc">

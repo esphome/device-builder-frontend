@@ -28,6 +28,16 @@ export type VersionMismatchKind = "patch" | "release" | null;
  * Returns the mismatch classification for two ESPHome version
  * strings. See module docstring for the contract.
  */
+/**
+ * Whether *version* pins to a reproducible `pip install esphome==<v>` —
+ * a plain release or an a/b/rc pre-release, the shapes PyPI publishes.
+ * Twin of the backend's `is_pinnable_version`; the auto-provision copy
+ * only applies when the receiver could actually provision our version.
+ */
+export function isPinnableVersion(version: string): boolean {
+  return /^\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?$/.test(version);
+}
+
 export function classifyVersionMismatch(
   local: string,
   peer: string
