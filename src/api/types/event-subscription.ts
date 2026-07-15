@@ -222,6 +222,18 @@ export interface InitialStateEventData {
    *  reason as ``pairings`` / ``peers`` — absent controller,
    *  omitted field. */
   remote_jobs?: OffloaderRemoteJobSnapshotEntry[];
+  /** Receiver-side settings scalars (RAM-canonical on the backend's
+   *  ReceiverState). Gate the Build server panel's first paint —
+   *  disabled CTA vs live view — without a get_settings round-trip.
+   *  Optional: absent controller (or pre-1.1 backend), omitted
+   *  field. Live updates keep flowing through the existing
+   *  loadRemoteBuildSettings refreshes. */
+  remote_build_settings?: { enabled: boolean; cleanup_ttl_seconds: number };
+  /** Full firmware-jobs snapshot (active + retained history, the same
+   *  rows follow_jobs would replay) so the build queue paints in one
+   *  shot. Optional for the same reasons as above; follow_jobs stays
+   *  the live-update stream. */
+  firmware_jobs?: FirmwareJob[];
   /** Offloader-side master "Remote builds enabled" toggle (7b).
    *  When `false`, the backend's ``pick_build_path`` short-
    *  circuits every install to LOCAL; paired peer-link

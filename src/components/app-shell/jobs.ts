@@ -45,6 +45,26 @@ export function subscribeToFollowJobs(host: ESPHomeApp): void {
   }
 }
 
+/**
+ * One-shot seed from the initial_state snapshot: a single map build
+ * (one render) instead of one per follow_jobs replay frame. Terminal
+ * jobs land in history only, and no recent-flash timers fire on a
+ * page-load snapshot.
+ */
+export function seedJobs(host: ESPHomeApp, jobs: FirmwareJob[]): void {
+  const all = new Map<string, FirmwareJob>();
+  const active = new Map<string, FirmwareJob>();
+  for (const job of jobs) {
+    all.set(job.job_id, job);
+    if (isTerminalJobStatus(job.status)) continue;
+    active.set(job.configuration, job);
+    // Mirror under the new key so the soon-to-be-renamed card finds the job.
+    for (const key of renameKeys(job)) active.set(key, job);
+  }
+  host._firmwareJobs = all;
+  host._activeJobs = active;
+}
+
 export function handleJobEvent(host: ESPHomeApp, event: string, data: unknown): void {
   switch (event) {
     case "snapshot":

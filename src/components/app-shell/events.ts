@@ -38,6 +38,7 @@ import {
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { applyPreferences } from "./data-load.js";
+import { seedJobs } from "./jobs.js";
 
 // Merge a partial diff into the matching offloader pairing row keyed by pin_sha256.
 // _buildOffloadPairings === null = snapshot not seeded; missing row = event raced
@@ -67,6 +68,8 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         pairings,
         offloader_alerts,
         remote_jobs,
+        remote_build_settings,
+        firmware_jobs,
         remote_builds_enabled,
         version_match_policy,
         include_local_in_pool,
@@ -111,6 +114,14 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         }
         host._buildOffloadJobs = seeded;
       }
+      // Receiver settings scalars: same skip-while-write guard the
+      // loadRemoteBuildSettings refresh uses, so a reconnect snapshot
+      // can't revert an optimistic toggle mid-write.
+      if (remote_build_settings !== undefined && !host._remoteBuildSetInFlight) {
+        host._remoteBuildEnabled = remote_build_settings.enabled;
+        host._remoteBuildCleanupTtl = remote_build_settings.cleanup_ttl_seconds;
+      }
+      if (firmware_jobs !== undefined) seedJobs(host, firmware_jobs);
       // Skip re-applying offloader settings while a toggle write is in flight,
       // so a reconnect's snapshot can't revert the optimistic value mid-write.
       if (host._offloaderWritesInFlight === 0) {
