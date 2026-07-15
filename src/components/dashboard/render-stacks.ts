@@ -40,13 +40,15 @@ export function renderBuilderStack(
         @click=${host._onToggleBuilderStack}
       >
         <wa-icon library="mdi" name="memory"></wa-icon>
-        <span class="builder-stack-title">
-          ${host._localize("dashboard.builder_stack_heading")}
-        </span>
-        <span class="builder-stack-count">
-          ${host._localize("dashboard.builder_stack_count", {
-            count: host._devices.length,
-          })}
+        <span class="builder-stack-main">
+          <span class="builder-stack-title">
+            ${host._localize("dashboard.builder_stack_heading")}
+          </span>
+          <span class="builder-stack-count">
+            ${host._localize("dashboard.builder_stack_count", {
+              count: host._devices.length,
+            })}
+          </span>
         </span>
         <wa-icon
           class="builder-stack-chevron"
@@ -99,17 +101,16 @@ export const dashboardStacksStyles = css`
     padding-top: var(--wa-space-s);
   }
 
-  /* Width mirrors the panel banner (a stretched flex item with the same
-     negative side margins) so the two chevrons align: the hover pill
-     bleeds one 2xs past each content edge, text stays on the gutter. */
+  /* Geometry mirrors the panel banner exactly so the two icons and the
+     two chevrons sit on the same vertical lines. */
   .builder-stack-header {
     display: flex;
     align-items: center;
-    width: calc(100% + 2 * var(--wa-space-2xs));
+    width: 100%;
     box-sizing: border-box;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-2xs);
-    margin: 0 calc(-1 * var(--wa-space-2xs)) var(--wa-space-s);
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    margin: 0 0 var(--wa-space-s);
     border: none;
     border-radius: var(--wa-border-radius-m);
     background: transparent;
@@ -117,6 +118,16 @@ export const dashboardStacksStyles = css`
     text-align: left;
     cursor: pointer;
     transition: background 0.1s;
+  }
+
+  /* Title + count on one text baseline. */
+  .builder-stack-main {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--wa-space-xs) var(--wa-space-s);
+    flex: 1;
+    min-width: 0;
   }
 
   .builder-stack-header:hover,

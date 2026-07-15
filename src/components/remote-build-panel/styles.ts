@@ -24,8 +24,8 @@ export const remoteBuildPanelStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-2xs) var(--wa-space-2xs);
-    margin: 0 calc(-1 * var(--wa-space-2xs));
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    margin: 0;
     border: none;
     border-radius: var(--wa-border-radius-m);
     background: transparent;
@@ -47,10 +47,11 @@ export const remoteBuildPanelStyles = css`
     flex-shrink: 0;
   }
 
-  /* Title/pill/badges wrap among themselves; the chevron stays pinned. */
+  /* Title/pill/badges wrap among themselves; the chevron stays pinned.
+     Baseline-aligned so the pill text sits on the title's baseline. */
   .banner-main {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     flex-wrap: wrap;
     gap: var(--wa-space-xs) var(--wa-space-s);
     flex: 1;
