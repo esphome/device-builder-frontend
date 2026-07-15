@@ -241,10 +241,13 @@ export class ESPHomePageDashboard extends LitElement {
     return this._remoteComputeOnly && this._prefsLoaded;
   }
 
-  /** The remote stack shows when opted in, or as soon as any sender has
-   *  asked to (pending) or been approved to build here. */
+  /** The remote stack shows when opted in, or as soon as a sender is
+   *  approved to build here. Otherwise the dashboard is untouched. */
   get _showRemoteStack(): boolean {
-    return this._remoteComputeReady || (this._buildServerPeers?.length ?? 0) > 0;
+    return (
+      this._remoteComputeReady ||
+      (this._buildServerPeers?.some((p) => p.status === "approved") ?? false)
+    );
   }
 
   /** Expanded by default only via the preference; a stack that appeared
@@ -597,6 +600,16 @@ export class ESPHomePageDashboard extends LitElement {
     // empty space at the top of the view.
     if (changed.has("_importableDevices") || changed.has("_showIgnored")) {
       this.toggleAttribute("has-discovered", this._visibleImportableDevices.length > 0);
+    }
+    // ``stacks`` re-homes the discovery banner: floating at the page top
+    // normally, in-flow inside the Device builder section when the
+    // remote/builder stacks are shown.
+    if (
+      changed.has("_remoteComputeOnly") ||
+      changed.has("_prefsLoaded") ||
+      changed.has("_buildServerPeers")
+    ) {
+      this.toggleAttribute("stacks", this._showRemoteStack);
     }
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.

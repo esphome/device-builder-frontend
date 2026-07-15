@@ -1,11 +1,11 @@
-import { mdiChevronDown, mdiViewGridOutline } from "@mdi/js";
+import { mdiChevronDown, mdiMemory } from "@mdi/js";
 import { css, html, type TemplateResult } from "lit";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
-  "view-grid-outline": mdiViewGridOutline,
+  memory: mdiMemory,
 });
 
 /** The remote compute stack: the panel owns its own collapse header. */
@@ -39,7 +39,7 @@ export function renderBuilderStack(
         aria-expanded=${collapsed ? "false" : "true"}
         @click=${host._onToggleBuilderStack}
       >
-        <wa-icon library="mdi" name="view-grid-outline"></wa-icon>
+        <wa-icon library="mdi" name="memory"></wa-icon>
         <span class="builder-stack-title">
           ${host._localize("dashboard.builder_stack_heading")}
         </span>
@@ -62,10 +62,40 @@ export function renderBuilderStack(
 
 /** Mirrors the remote panel's banner so the two stack headers read as one system. */
 export const dashboardStacksStyles = css`
+  /* Stacks mode: the discovery banner belongs to the Device builder
+     section, so it flows in place of its usual float at the page top
+     (and the float's compensating top padding goes too). */
+  :host([stacks][has-discovered]) {
+    padding-top: 0;
+  }
+
+  :host([stacks]) .discovered-section {
+    position: static;
+    align-items: flex-start;
+    margin: 0 0 var(--wa-space-s);
+    pointer-events: auto;
+  }
+
+  :host([stacks]) .discovered-section-header {
+    border-top: var(--wa-border-width-s) solid var(--esphome-primary);
+    border-radius: var(--wa-border-radius-l) var(--wa-border-radius-l) 0 0;
+    animation: none;
+  }
+
+  :host([stacks])
+    .discovered-section:has(.discovered-section-grid[hidden])
+    .discovered-section-header {
+    border-radius: var(--wa-border-radius-l);
+  }
+
+  /* Width mirrors the panel banner (a stretched flex item with the same
+     negative side margins) so the two chevrons align: the hover pill
+     bleeds one 2xs past each content edge, text stays on the gutter. */
   .builder-stack-header {
     display: flex;
     align-items: center;
-    width: 100%;
+    width: calc(100% + 2 * var(--wa-space-2xs));
+    box-sizing: border-box;
     gap: var(--wa-space-s);
     padding: var(--wa-space-2xs);
     margin: 0 calc(-1 * var(--wa-space-2xs)) var(--wa-space-s);

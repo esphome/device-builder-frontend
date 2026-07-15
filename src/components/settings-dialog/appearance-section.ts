@@ -5,7 +5,7 @@ import {
   mdiHandshake,
   mdiMagnify,
   mdiServerNetwork,
-  mdiViewGridOutline,
+  mdiMemory,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -36,7 +36,7 @@ registerMdiIcons({
   "file-compare": mdiFileCompare,
   handshake: mdiHandshake,
   "server-network": mdiServerNetwork,
-  "view-grid-outline": mdiViewGridOutline,
+  memory: mdiMemory,
 });
 
 interface FeatureItem {
@@ -52,7 +52,7 @@ const REMOTE_COMPUTE_FEATURES: FeatureItem[] = [
     descKey: "settings.remote_compute_feature_dashboard_desc",
   },
   {
-    icon: "view-grid-outline",
+    icon: "memory",
     titleKey: "settings.remote_compute_feature_builder",
     descKey: "settings.remote_compute_feature_builder_desc",
   },

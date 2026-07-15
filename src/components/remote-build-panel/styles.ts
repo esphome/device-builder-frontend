@@ -9,7 +9,7 @@ export const remoteBuildPanelStyles = css`
     display: flex;
     flex-direction: column;
     gap: var(--wa-space-m);
-    margin-bottom: var(--wa-space-l);
+    margin-bottom: var(--wa-space-s);
   }
 
   .banner {

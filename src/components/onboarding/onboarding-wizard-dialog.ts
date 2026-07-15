@@ -5,7 +5,7 @@ import {
   mdiHandshake,
   mdiServerNetwork,
   mdiSprout,
-  mdiViewGridOutline,
+  mdiMemory,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -46,7 +46,7 @@ registerMdiIcons({
   handshake: mdiHandshake,
   "server-network": mdiServerNetwork,
   sprout: mdiSprout,
-  "view-grid-outline": mdiViewGridOutline,
+  memory: mdiMemory,
 });
 
 // Mirrors the settings explainer so the wizard and Settings tell the same
@@ -62,7 +62,7 @@ const REMOTE_COMPUTE_ONBOARDING_FEATURES: {
     descKey: "settings.remote_compute_feature_dashboard_desc",
   },
   {
-    icon: "view-grid-outline",
+    icon: "memory",
     titleKey: "settings.remote_compute_feature_builder",
     descKey: "settings.remote_compute_feature_builder_desc",
   },

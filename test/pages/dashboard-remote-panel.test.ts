@@ -164,6 +164,16 @@ describe("dashboard remote-compute stacks", () => {
     expect(banner?.textContent).toContain("remote_build_dashboard.badge_active");
   });
 
+  it("a pending-only request does not surface the stacks", async () => {
+    const page = await mountDashboard({
+      remote: false,
+      devices: [makeConfiguredDevice()],
+      peers: [makePeer({ status: "pending" })],
+    });
+    expect(panelIn(page)).toBeNull();
+    expect(builderHeaderIn(page)).toBeNull();
+  });
+
   it("stays out of the way with no preference and no senders", async () => {
     const page = await mountDashboard({
       remote: false,
