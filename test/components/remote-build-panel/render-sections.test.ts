@@ -87,21 +87,28 @@ describe("renderOnboarding", () => {
       esphome_version: "2026.6.1",
       listener_bound: true,
       listener_host: "esphome-builder-abc.local",
+      listener_addresses: ["192.168.1.5"],
       listener_port: 6055,
     };
     const advertised = fakePanel({ _identity: { loadFailed: false, identity } });
     const el = renderInto(renderOnboarding(advertised));
-    expect(el.querySelector(".step-address code")?.textContent).toBe(
-      "esphome-builder-abc.local:6055"
-    );
-    // No advertiser attached: fall back to the browser's hostname.
+    // Hostname:port up front; the advertised IPs behind the chevron.
+    expect(
+      el.querySelector(".step-address details.pairing-address summary code")?.textContent
+    ).toBe("esphome-builder-abc.local:6055");
+    expect(el.querySelector(".pairing-address-ip")?.textContent).toBe("192.168.1.5:6055");
+    // No advertiser attached: browser-hostname fallback, no disclosure.
     const noAdvertiser = fakePanel({
-      _identity: { loadFailed: false, identity: { ...identity, listener_host: null } },
+      _identity: {
+        loadFailed: false,
+        identity: { ...identity, listener_host: null, listener_addresses: [] },
+      },
     });
     const fallback = renderInto(renderOnboarding(noAdvertiser));
     expect(fallback.querySelector(".step-address code")?.textContent).toBe(
       `${window.location.hostname}:6055`
     );
+    expect(fallback.querySelector(".step-address details")).toBeNull();
     // Unbound listener / pre-port backend: no address line.
     const withoutPort = renderInto(renderOnboarding(fakePanel()));
     expect(withoutPort.querySelector(".step-address")).toBeNull();

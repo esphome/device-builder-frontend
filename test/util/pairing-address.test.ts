@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { IdentityView } from "../../src/api/types/remote-build.js";
-import { pairingAddress } from "../../src/util/pairing-address.js";
+import { formatHostPort, pairingAddress } from "../../src/util/pairing-address.js";
 
 const BASE: IdentityView = {
   dashboard_id: "dash-0",
@@ -39,5 +39,12 @@ describe("pairingAddress", () => {
     expect(pairingAddress({ ...BASE, listener_port: null })).toBeNull();
     expect(pairingAddress(BASE)).toBeNull();
     expect(pairingAddress(null)).toBeNull();
+  });
+});
+
+describe("formatHostPort", () => {
+  it("brackets IPv6 literals", () => {
+    expect(formatHostPort("192.168.1.5", 6055)).toBe("192.168.1.5:6055");
+    expect(formatHostPort("fd00::a1", 6055)).toBe("[fd00::a1]:6055");
   });
 });

@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { pairingAddress } from "../../util/pairing-address.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import type { ESPHomeRemoteBuildPanel } from "../remote-build-panel.js";
+import { renderPairingAddress } from "../shared/pairing-address.js";
 import { renderPairingWindowStatus } from "../shared/pairing-window-status.js";
 
 /** Nothing paired yet: walk the operator through the receiver pairing flow. */
@@ -60,7 +61,7 @@ export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult 
             ? html`
                 <div class="step-action step-address">
                   ${host._localize("remote_build_dashboard.step_send_request_address")}
-                  <code>${address}</code>
+                  ${renderPairingAddress(host._identity.identity)}
                 </div>
               `
             : nothing

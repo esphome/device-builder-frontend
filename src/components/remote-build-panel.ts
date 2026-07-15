@@ -25,6 +25,7 @@ import {
   localizeContext,
   remoteBuildEnabledContext,
 } from "../context/index.js";
+import { pairingAddressStyles } from "../styles/pairing-address.js";
 import { pairingWindowStyles } from "../styles/pairing-window.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -140,6 +141,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   static styles = [
     espHomeStyles,
     pinHexStyles,
+    pairingAddressStyles,
     pairingWindowStyles,
     peerRowStyles,
     firmwareJobsListStyles,

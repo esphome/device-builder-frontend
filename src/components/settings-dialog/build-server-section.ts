@@ -22,11 +22,13 @@ import {
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
 } from "../../context/index.js";
+import { pairingAddressStyles } from "../../styles/pairing-address.js";
 import { peerRowStyles } from "../../styles/peer-rows.js";
 import { pinHexStyles } from "../../styles/pin-hex.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
 import { pairingAddress } from "../../util/pairing-address.js";
+import { renderPairingAddress } from "../shared/pairing-address.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
@@ -91,6 +93,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   static styles = [
     espHomeStyles,
     pinHexStyles,
+    pairingAddressStyles,
     settingsSharedStyles,
     settingsRowStyles,
     peerRowStyles,
@@ -303,7 +306,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
                   <span class="build-server-label">
                     ${this._localize("settings.remote_build_address_label")}
                   </span>
-                  <code>${address}</code>
+                  ${renderPairingAddress(identity)}
                 </div>
               `
             : nothing
