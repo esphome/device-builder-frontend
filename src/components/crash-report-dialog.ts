@@ -163,6 +163,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
         margin: 0 0 var(--wa-space-s);
       }
 
+      .describe-required {
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-warning-fill-loud, orange);
+        margin: 0 0 var(--wa-space-s);
+      }
+
       .describe-label {
         display: block;
         font-size: var(--wa-font-size-s);
@@ -404,6 +410,13 @@ export class ESPHomeCrashReportDialog extends LitElement {
         )}
       </ul>
       <p class="hint">${this._localize("crash_report.hint")}</p>
+      ${
+        described
+          ? nothing
+          : html`<p class="describe-required" role="status">
+              ${this._localize("crash_report.describe_required")}
+            </p>`
+      }
       <div class="actions">
         <button class="btn btn--cancel" @click=${() => (this._dialog.open = false)}>
           ${this._localize("layout.cancel")}
@@ -411,10 +424,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
         <button
           class="btn btn--confirm"
           ?disabled=${!described}
-          title=${described ? nothing : this._localize("crash_report.describe_required")}
           @click=${this._openIssue}
         >
-          ${this._localize("crash_report.open_issue")}
+          <wa-icon library="mdi" name="download"></wa-icon>
+          ${this._localize("crash_report.download_and_open")}
         </button>
       </div>
     `;
