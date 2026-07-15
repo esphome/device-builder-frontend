@@ -56,6 +56,13 @@ describe("renderPairingAddress", () => {
     expect(details.open).toBe(false);
   });
 
+  it("clicking the address text doesn't toggle the disclosure", () => {
+    const el = renderInto(renderPairingAddress(identityLocalize, IDENTITY));
+    const details = el.querySelector<HTMLDetailsElement>("details")!;
+    el.querySelector<HTMLElement>("summary code")!.click();
+    expect(details.open).toBe(false);
+  });
+
   it("renders a plain line without IPs and nothing without a port", () => {
     const plain = renderInto(
       renderPairingAddress(identityLocalize, {

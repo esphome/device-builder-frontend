@@ -42,7 +42,7 @@ function _addressLine(
 ): TemplateResult {
   return html`
     <span class="pairing-address-line ${extraClass}">
-      <code>${value}</code>
+      <code @click=${_preventToggle}>${value}</code>
       <button
         type="button"
         class="pairing-address-copy"
@@ -56,6 +56,12 @@ function _addressLine(
       </button>
     </span>
   `;
+}
+
+function _preventToggle(e: Event): void {
+  // Keep the address text selectable: a click that ends a manual
+  // drag-select inside the summary must not toggle the disclosure.
+  e.preventDefault();
 }
 
 async function _copyAddress(

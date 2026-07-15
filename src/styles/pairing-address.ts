@@ -15,9 +15,14 @@ export const pairingAddressStyles = css`
     user-select: none;
   }
 
+  /* The address itself stays hand-selectable: the summary's
+     user-select none only covers the chevron/padding, and clicks on
+     the text don't toggle the disclosure (see _preventToggle). */
   .pairing-address summary code,
   .pairing-address-line code {
     color: var(--wa-color-text-normal);
+    user-select: text;
+    cursor: text;
   }
 
   .pairing-address-line {
