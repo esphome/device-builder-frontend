@@ -335,7 +335,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     // The explainer sits below the toggle, often past the dialog's fold —
     // bring it into view so flipping the switch visibly does something.
     await this.updateComplete;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.shadowRoot
       ?.querySelector(".remote-feature-box")
       ?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
