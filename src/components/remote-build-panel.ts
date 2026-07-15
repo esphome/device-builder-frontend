@@ -258,27 +258,27 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
             ${this._localize("remote_build_dashboard.tagline")}
           </span>
           ${
-          this.collapsed && pendingCount > 0
-            ? html`
-                <span class="banner-badge banner-badge--requests">
-                  ${this._localize("remote_build_dashboard.badge_requests", {
+            this.collapsed && pendingCount > 0
+              ? html`
+                  <span class="banner-badge banner-badge--requests">
+                    ${this._localize("remote_build_dashboard.badge_requests", {
                     count: pendingCount,
                   })}
-                </span>
-              `
-            : nothing
-        }
+                  </span>
+                `
+              : nothing
+          }
           ${
-          this.collapsed && activeCount > 0
-            ? html`
-                <span class="banner-badge">
-                  ${this._localize("remote_build_dashboard.badge_active", {
+            this.collapsed && activeCount > 0
+              ? html`
+                  <span class="banner-badge">
+                    ${this._localize("remote_build_dashboard.badge_active", {
                     count: activeCount,
                   })}
-                </span>
-              `
-            : nothing
-        }
+                  </span>
+                `
+              : nothing
+          }
         </span>
         <wa-icon
           class="stack-bar-chevron"
