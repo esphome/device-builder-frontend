@@ -38,6 +38,11 @@ vi.mock("../../src/components/wizard/create-config-dialog.js", () => ({}));
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { JobStatus } from "../../src/api/types/firmware-jobs.js";
 import type { PeerSummary } from "../../src/api/types/remote-build.js";
+import {
+  clearTourPending,
+  setTourActive,
+  setTourPending,
+} from "../../src/components/guided-tour/tour-session.js";
 import type { ESPHomeRemoteBuildPanel } from "../../src/components/remote-build-panel.js";
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 import { flushMicrotasks } from "../_dom.js";
@@ -98,6 +103,8 @@ describe("dashboard remote-compute stacks", () => {
   afterEach(() => {
     window.history.replaceState({}, "", "/");
     sessionStorage.clear();
+    setTourActive(false);
+    clearTourPending();
     vi.restoreAllMocks();
   });
 
@@ -151,6 +158,21 @@ describe("dashboard remote-compute stacks", () => {
     await page.updateComplete;
     expect(panel.collapsed).toBe(true);
     expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("a paused tour releases the forced builder section", async () => {
+    setTourPending();
+    const page = await mountDashboard({ remote: false, peers: [makePeer()] });
+    setTourActive(true);
+    await page.updateComplete;
+    const panel = panelIn(page)!;
+    panel.shadowRoot?.querySelector<HTMLButtonElement>(".banner")?.click();
+    await page.updateComplete;
+    expect(panel.collapsed).toBe(true);
+    // Click-outside pause clears active but keeps the pending resume key.
+    setTourActive(false);
+    await page.updateComplete;
+    expect(panel.collapsed).toBe(false);
   });
 
   it("collapsed banner badges waiting requests and active jobs", async () => {

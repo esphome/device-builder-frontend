@@ -85,10 +85,7 @@ import {
 import { dashboardStyles } from "../components/dashboard/styles.js";
 import { yamlModeStyles } from "../components/dashboard/yaml-mode-styles.js";
 import { TourActivityController } from "../components/guided-tour/tour-activity-controller.js";
-import {
-  getActiveTourConfiguration,
-  isTourPending,
-} from "../components/guided-tour/tour-session.js";
+import { isTourActive } from "../components/guided-tour/tour-session.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import {
   activeJobsContext,
@@ -259,7 +256,7 @@ export class ESPHomePageDashboard extends LitElement {
    *  headers swap between them (clicking the open one swaps to the other,
    *  so neither can be closed). The preference picks the default. */
   get _expandedStack(): DashboardStack {
-    // A pending/active tour anchors builder content; never hide it.
+    // A live tour anchors builder content; never hide it.
     if (this._tourEngaged) return "builder";
     return this._expandedStackChoice ?? (this._remoteComputeReady ? "remote" : "builder");
   }
@@ -608,10 +605,11 @@ export class ESPHomePageDashboard extends LitElement {
     if (changed.has("_importableDevices") || changed.has("_showIgnored")) {
       this.toggleAttribute("has-discovered", this._visibleImportableDevices.length > 0);
     }
-    // One storage read per render cycle instead of one per
-    // ``_expandedStack`` evaluation — this getter sits on the hottest
-    // render path in the app.
-    this._tourEngaged = isTourPending() || getActiveTourConfiguration() !== null;
+    // Only a *live* spotlight forces the builder section: the pending
+    // key survives a click-outside pause (it's the resume-on-reload
+    // marker), and gating on it left the Build server bar dead until
+    // the tour was explicitly skipped.
+    this._tourEngaged = isTourActive();
     // ``stacks`` re-homes the discovery banner: floating at the page top
     // normally, in-flow inside the Device builder section when the
     // remote/builder stacks are shown; ``remote-open`` pins the page to
