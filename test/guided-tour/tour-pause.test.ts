@@ -28,7 +28,6 @@ import { navigate } from "../../src/util/navigation.js";
 
 interface TourInternals {
   _active: boolean;
-  _remoteComputeOnly: boolean;
   _showAnchorRecovery: boolean;
   _dialogReady: boolean;
   _stepIndex: number;
@@ -93,18 +92,6 @@ describe("guided-tour pause state", () => {
     expect(state._active).toBe(true);
     expect(state._stepIndex).toBe(0);
     expect(getPendingTourStep()).toBe(0);
-  });
-
-  it("does not start in remote-compute-only mode", () => {
-    setTourPending();
-    const tour = new ESPHomeGuidedTour();
-    const state = internals(tour);
-    state._remoteComputeOnly = true;
-
-    tour.start();
-
-    expect(state._active).toBe(false);
-    expect(isTourPending()).toBe(false);
   });
 
   it("reopens a pending tour on the next load", () => {

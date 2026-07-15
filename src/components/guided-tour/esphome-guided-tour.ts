@@ -3,7 +3,7 @@ import { mdiClose } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext, remoteComputeOnlyContext } from "../../context/index.js";
+import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isTypingTarget } from "../../util/typing-target.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -53,10 +53,6 @@ export class ESPHomeGuidedTour extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
-
-  @consume({ context: remoteComputeOnlyContext, subscribe: true })
-  @state()
-  private _remoteComputeOnly = false;
 
   @state() private _active = false;
   @state() private _stepIndex = 0;
@@ -132,11 +128,6 @@ export class ESPHomeGuidedTour extends LitElement {
   }
 
   start(stepIndex = 0): void {
-    if (this._remoteComputeOnly) {
-      clearTourConfiguration();
-      clearTourPending();
-      return;
-    }
     this._start(stepIndex, false);
   }
 
@@ -206,7 +197,7 @@ export class ESPHomeGuidedTour extends LitElement {
   protected firstUpdated(): void {
     this._consumeTourStepParam();
     const pendingStep = getPendingTourStep();
-    if (!this._remoteComputeOnly && !this._active && pendingStep !== null) {
+    if (!this._active && pendingStep !== null) {
       this._start(pendingStep, true);
     }
   }
@@ -554,12 +545,6 @@ export class ESPHomeGuidedTour extends LitElement {
   }
 
   protected updated(): void {
-    if (this._remoteComputeOnly) {
-      clearTourConfiguration();
-      clearTourPending();
-      if (this._active) this._deactivate();
-      return;
-    }
     const onDialogStep =
       this._active && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a));
     this._skipAffordance.setActive(onDialogStep);

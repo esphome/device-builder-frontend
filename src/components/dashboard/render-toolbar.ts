@@ -234,8 +234,6 @@ export function renderEmptySearch(host: ESPHomePageDashboard): TemplateResult {
 export function renderAddDeviceCard(
   host: ESPHomePageDashboard
 ): TemplateResult | typeof nothing {
-  // Remote-compute installs don't create devices.
-  if (host._hideDeviceCreation) return nothing;
   return html`
     <div
       class="add-device-card"
@@ -287,7 +285,7 @@ export function renderSelectBarOrFab(
       ></esphome-select-bar>
     `;
   }
-  if (host._view === DashboardView.CARDS && !host._hideDeviceCreation) {
+  if (host._view === DashboardView.CARDS) {
     return html`
       <div class="fab-container">
         <button

@@ -3,7 +3,7 @@
  *
  * Pins that the dashboard resumes a USB "Set it up" stashed from another
  * route: on mount it consumes the pending SerialPort and opens the wizard,
- * still honouring the _hideDeviceCreation gate.
+ * including on a remote-compute install (nothing is hidden there).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { markPendingSerialSetup } from "../../src/util/pending-serial-setup.js";
@@ -21,16 +21,13 @@ import { flushMicrotasks } from "../_dom.js";
 
 const fakePort = {} as SerialPort;
 
-async function mountDashboard(
-  hideDeviceCreation: boolean
-): Promise<ESPHomePageDashboard> {
+async function mountDashboard(remoteComputeOnly: boolean): Promise<ESPHomePageDashboard> {
   const page = new ESPHomePageDashboard();
-  // _hideDeviceCreation is `_remoteComputeOnly || !_prefsLoaded`; seed the
-  // consumed context fields directly before connectedCallback runs.
+  // Seed the consumed context fields directly before connectedCallback runs.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (page as any)._prefsLoaded = true;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (page as any)._remoteComputeOnly = hideDeviceCreation;
+  (page as any)._remoteComputeOnly = remoteComputeOnly;
   document.body.appendChild(page);
   await page.updateComplete;
   await flushMicrotasks(8);
@@ -59,10 +56,10 @@ describe("dashboard pending serial setup", () => {
     expect(detectAndOpenWizard).not.toHaveBeenCalled();
   });
 
-  it("suppresses the wizard when device creation is hidden", async () => {
+  it("opens the wizard on a remote-compute install too", async () => {
     markPendingSerialSetup(fakePort);
     await mountDashboard(true);
-    expect(detectAndOpenWizard).not.toHaveBeenCalled();
+    expect(detectAndOpenWizard).toHaveBeenCalledTimes(1);
   });
 
   it("does not open the wizard if the dashboard is torn down before first render", async () => {

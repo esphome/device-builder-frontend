@@ -39,9 +39,6 @@ function includeTourDevice(
 export function renderDiscoveredSection(
   host: ESPHomePageDashboard
 ): TemplateResult | string {
-  // Adopting a discovery creates a device, so hide the whole section on a
-  // remote-compute-only install.
-  if (host._hideDeviceCreation) return "";
   if (host._importableDevices.length === 0) return "";
   // Non-ignored discoveries first, then ignored ones — both
   // alphabetical by friendly name (fallback hostname) within each
@@ -236,19 +233,15 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       <div slot="below-controls" class="table-device-count-row">
         ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
       </div>
-      ${
-        host._hideDeviceCreation
-          ? ""
-          : html`<button
-              ${tourAnchor("create-device-fab")}
-              slot="actions"
-              class="table-create-btn"
-              @click=${() => host._createDialog.open()}
-            >
-              <wa-icon library="mdi" name="plus"></wa-icon>
-              <span class="label">${host._localize("dashboard.create_device")}</span>
-            </button>`
-      }
+      <button
+        ${tourAnchor("create-device-fab")}
+        slot="actions"
+        class="table-create-btn"
+        @click=${() => host._createDialog.open()}
+      >
+        <wa-icon library="mdi" name="plus"></wa-icon>
+        <span class="label">${host._localize("dashboard.create_device")}</span>
+      </button>
       <div slot="no-results-extra" class="yaml-preview-banner">
         ${renderNoResultsExtras(host)}
       </div>

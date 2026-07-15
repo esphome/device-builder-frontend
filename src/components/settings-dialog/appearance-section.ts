@@ -1,5 +1,12 @@
 import { consume } from "@lit/context";
-import { mdiCodeBraces, mdiFileCompare, mdiMagnify } from "@mdi/js";
+import {
+  mdiCodeBraces,
+  mdiFileCompare,
+  mdiHandshake,
+  mdiMagnify,
+  mdiServerNetwork,
+  mdiViewGridOutline,
+} from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
@@ -27,9 +34,36 @@ registerMdiIcons({
   "code-braces": mdiCodeBraces,
   magnify: mdiMagnify,
   "file-compare": mdiFileCompare,
+  handshake: mdiHandshake,
+  "server-network": mdiServerNetwork,
+  "view-grid-outline": mdiViewGridOutline,
 });
 
-const EXPERT_FEATURES: { icon: string; titleKey: string; descKey: string }[] = [
+interface FeatureItem {
+  icon: string;
+  titleKey: string;
+  descKey: string;
+}
+
+const REMOTE_COMPUTE_FEATURES: FeatureItem[] = [
+  {
+    icon: "server-network",
+    titleKey: "settings.remote_compute_feature_dashboard",
+    descKey: "settings.remote_compute_feature_dashboard_desc",
+  },
+  {
+    icon: "view-grid-outline",
+    titleKey: "settings.remote_compute_feature_builder",
+    descKey: "settings.remote_compute_feature_builder_desc",
+  },
+  {
+    icon: "handshake",
+    titleKey: "settings.remote_compute_feature_paired",
+    descKey: "settings.remote_compute_feature_paired_desc",
+  },
+];
+
+const EXPERT_FEATURES: FeatureItem[] = [
   {
     icon: "file-compare",
     titleKey: "settings.expert_mode_feature_diff",
@@ -68,9 +102,12 @@ export class ESPHomeSettingsAppearance extends LitElement {
   @state()
   private _theme: string = storedTheme();
 
-  // Collapsed by default so the feature list doesn't lengthen the page.
+  // Collapsed by default so the feature lists don't lengthen the page.
   @state()
   private _featuresOpen = false;
+
+  @state()
+  private _remoteFeaturesOpen = false;
 
   static styles = [
     espHomeStyles,
@@ -164,13 +201,24 @@ export class ESPHomeSettingsAppearance extends LitElement {
   }
 
   private _renderRemoteCompute() {
-    return renderToggleRow(this._localize, {
-      titleId: "remote-compute-title",
-      titleKey: "settings.remote_compute_only",
-      descKey: "settings.remote_compute_only_desc",
-      checked: this._remoteComputeOnly,
-      onToggle: this._onToggleRemoteCompute,
-    });
+    return html`
+      ${renderToggleRow(this._localize, {
+        titleId: "remote-compute-title",
+        titleKey: "settings.remote_compute_only",
+        descKey: "settings.remote_compute_only_desc",
+        checked: this._remoteComputeOnly,
+        onToggle: this._onToggleRemoteCompute,
+        rowClass: "expert-row",
+      })}
+      ${this._renderFeaturesBox(
+        "settings.remote_compute_features_title",
+        REMOTE_COMPUTE_FEATURES,
+        this._remoteFeaturesOpen,
+        () => {
+          this._remoteFeaturesOpen = !this._remoteFeaturesOpen;
+        }
+      )}
+    `;
   }
 
   private _renderExpertMode() {
@@ -183,16 +231,34 @@ export class ESPHomeSettingsAppearance extends LitElement {
         onToggle: this._onToggleExpertMode,
         rowClass: "expert-row",
       })}
+      ${this._renderFeaturesBox(
+        "settings.expert_mode_features_title",
+        EXPERT_FEATURES,
+        this._featuresOpen,
+        () => {
+          this._featuresOpen = !this._featuresOpen;
+        }
+      )}
+    `;
+  }
+
+  private _renderFeaturesBox(
+    labelKey: string,
+    features: FeatureItem[],
+    open: boolean,
+    onToggle: () => void
+  ) {
+    return html`
       <div class="expert-features">
         ${renderDisclosure({
-          open: this._featuresOpen,
-          onToggle: () => this._onToggleFeatures(),
+          open,
+          onToggle,
           localize: this._localize,
-          labelKey: "settings.expert_mode_features_title",
+          labelKey,
           variant: "heading",
           body: () => html`
             <ul class="expert-feature-list">
-              ${EXPERT_FEATURES.map(
+              ${features.map(
                 (f) => html`
                   <li class="expert-feature">
                     <wa-icon library="mdi" name=${f.icon}></wa-icon>
@@ -212,10 +278,6 @@ export class ESPHomeSettingsAppearance extends LitElement {
         })}
       </div>
     `;
-  }
-
-  private _onToggleFeatures() {
-    this._featuresOpen = !this._featuresOpen;
   }
 
   private _onChange(e: Event) {

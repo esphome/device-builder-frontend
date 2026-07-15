@@ -1,9 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the remote-compute-only dashboard takeover: with zero devices the
- * remote-build panel owns the page; with devices it stacks above the grid;
- * and it fails closed while preferences haven't loaded.
+ * Pins the dashboard's dual-stack behavior: the remote compute stack shows
+ * expanded (builder collapsed) when the preference is on, appears collapsed
+ * as soon as any sender pairs, and stays away otherwise. Nothing is hidden —
+ * creation affordances render whenever the builder stack is expanded.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,25 +36,45 @@ vi.mock("../../src/components/select-bar.js", () => ({}));
 vi.mock("../../src/components/wizard/create-config-dialog.js", () => ({}));
 
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import { JobStatus } from "../../src/api/types/firmware-jobs.js";
+import type { PeerSummary } from "../../src/api/types/remote-build.js";
+import type { ESPHomeRemoteBuildPanel } from "../../src/components/remote-build-panel.js";
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 import { flushMicrotasks } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
+
+function makePeer(overrides: Partial<PeerSummary> = {}): PeerSummary {
+  return {
+    dashboard_id: "dash-1",
+    pin_sha256: "ab".repeat(32),
+    label: "office",
+    paired_at: 1_700_000_000,
+    status: "approved",
+    peer_ip: "192.168.1.42",
+    connected: true,
+    ...overrides,
+  };
+}
 
 async function mountDashboard(opts: {
-  remote: boolean;
-  prefsLoaded: boolean;
-  devices: ConfiguredDevice[];
+  remote?: boolean;
+  prefsLoaded?: boolean;
+  devices?: ConfiguredDevice[];
+  peers?: PeerSummary[] | null;
 }): Promise<ESPHomePageDashboard> {
   const page = new ESPHomePageDashboard();
   // Context-provided fields, seeded directly for a bare mount.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (page as any)._remoteComputeOnly = opts.remote;
+  (page as any)._remoteComputeOnly = opts.remote ?? false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (page as any)._prefsLoaded = opts.prefsLoaded;
+  (page as any)._prefsLoaded = opts.prefsLoaded ?? true;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (page as any)._devicesLoaded = true;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (page as any)._devices = opts.devices;
+  (page as any)._devices = opts.devices ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (page as any)._buildServerPeers = opts.peers ?? null;
   document.body.appendChild(page);
   await page.updateComplete;
   await flushMicrotasks(8);
@@ -61,61 +82,105 @@ async function mountDashboard(opts: {
 }
 
 const panelIn = (page: ESPHomePageDashboard) =>
-  page.shadowRoot?.querySelector("esphome-remote-build-panel") ?? null;
+  page.shadowRoot?.querySelector<ESPHomeRemoteBuildPanel>("esphome-remote-build-panel") ??
+  null;
 const gridIn = (page: ESPHomePageDashboard) =>
   page.shadowRoot?.querySelector(".devices-grid") ?? null;
+const builderHeaderIn = (page: ESPHomePageDashboard) =>
+  page.shadowRoot?.querySelector<HTMLButtonElement>(".builder-stack-header") ?? null;
 
-describe("dashboard remote-build panel takeover", () => {
+describe("dashboard remote-compute stacks", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
+    sessionStorage.clear();
   });
 
   afterEach(() => {
     window.history.replaceState({}, "", "/");
+    sessionStorage.clear();
     vi.restoreAllMocks();
   });
 
-  it("takes over the whole page with zero devices", async () => {
-    const page = await mountDashboard({
-      remote: true,
-      prefsLoaded: true,
-      devices: [],
-    });
-    expect(panelIn(page)).not.toBeNull();
+  it("preference on: remote stack expanded, builder collapsed", async () => {
+    const page = await mountDashboard({ remote: true });
+    const panel = panelIn(page);
+    expect(panel).not.toBeNull();
+    expect(panel!.collapsed).toBe(false);
+    const header = builderHeaderIn(page);
+    expect(header?.getAttribute("aria-expanded")).toBe("false");
     expect(gridIn(page)).toBeNull();
   });
 
-  it("stacks above the device grid when devices exist", async () => {
-    const page = await mountDashboard({
-      remote: true,
-      prefsLoaded: true,
-      devices: [makeConfiguredDevice()],
-    });
-    const panel = panelIn(page);
-    const grid = gridIn(page);
-    expect(panel).not.toBeNull();
-    expect(grid).not.toBeNull();
-    expect(
-      panel!.compareDocumentPosition(grid!) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+  it("expanding the builder stack reveals the grid and creation card", async () => {
+    const page = await mountDashboard({ remote: true, devices: [] });
+    builderHeaderIn(page)!.click();
+    await page.updateComplete;
+    expect(gridIn(page)).not.toBeNull();
+    expect(page.shadowRoot?.querySelector(".add-device-card")).not.toBeNull();
   });
 
-  it("fails closed while preferences haven't loaded", async () => {
-    const page = await mountDashboard({
-      remote: true,
-      prefsLoaded: false,
-      devices: [],
-    });
-    expect(panelIn(page)).toBeNull();
-  });
-
-  it("stays out of the way on a normal install", async () => {
+  it("appears collapsed once a sender pairs, with the builder expanded", async () => {
     const page = await mountDashboard({
       remote: false,
-      prefsLoaded: true,
+      devices: [makeConfiguredDevice()],
+      peers: [makePeer()],
+    });
+    const panel = panelIn(page);
+    expect(panel).not.toBeNull();
+    expect(panel!.collapsed).toBe(true);
+    expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("true");
+    expect(gridIn(page)).not.toBeNull();
+  });
+
+  it("banner click toggles the remote stack and persists for the session", async () => {
+    const page = await mountDashboard({ remote: false, peers: [makePeer()] });
+    const panel = panelIn(page)!;
+    panel.shadowRoot?.querySelector<HTMLButtonElement>(".banner")?.click();
+    await page.updateComplete;
+    expect(panel.collapsed).toBe(false);
+    expect(sessionStorage.getItem("esphome-dashboard-stacks")).toContain(
+      '"remote":false'
+    );
+  });
+
+  it("collapsed banner badges waiting requests and active jobs", async () => {
+    const page = await mountDashboard({
+      remote: false,
+      peers: [makePeer(), makePeer({ dashboard_id: "dash-2", status: "pending" })],
+    });
+    const panel = panelIn(page)!;
+    expect(panel.collapsed).toBe(true);
+    // The bare page mount has no context providers; seed the panel's
+    // consumed fields directly like the page's own.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (panel as any)._peers = [makePeer({ dashboard_id: "dash-2", status: "pending" })];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (panel as any)._jobs = new Map([
+      ["job-1", makeFirmwareJob({ status: JobStatus.RUNNING })],
+    ]);
+    await panel.updateComplete;
+    const banner = panel.shadowRoot?.querySelector(".banner");
+    expect(banner?.textContent).toContain("remote_build_dashboard.badge_requests");
+    expect(banner?.textContent).toContain("remote_build_dashboard.badge_active");
+  });
+
+  it("stays out of the way with no preference and no senders", async () => {
+    const page = await mountDashboard({
+      remote: false,
       devices: [makeConfiguredDevice()],
     });
     expect(panelIn(page)).toBeNull();
+    expect(builderHeaderIn(page)).toBeNull();
     expect(gridIn(page)).not.toBeNull();
+  });
+
+  it("waits for preferences before honouring the toggle", async () => {
+    const page = await mountDashboard({ remote: true, prefsLoaded: false });
+    expect(panelIn(page)).toBeNull();
+  });
+
+  it("keeps the create FAB even with the preference on", async () => {
+    const page = await mountDashboard({ remote: true, devices: [] });
+    expect(page.shadowRoot?.querySelector(".fab-btn")).not.toBeNull();
   });
 });

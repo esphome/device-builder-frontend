@@ -18,7 +18,7 @@ import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
-import type { PairingSummary } from "../api/types/remote-build.js";
+import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
 import type { ArchivedDevice } from "../api/types/system.js";
 import { DashboardView } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -58,6 +58,11 @@ import {
   type PendingConfirm,
 } from "../components/dashboard/render-dialogs.js";
 import {
+  dashboardStacksStyles,
+  renderBuilderStack,
+  renderRemoteStack,
+} from "../components/dashboard/render-stacks.js";
+import {
   renderEmptySearch,
   renderSelectBarOrFab,
   renderToolbar,
@@ -79,11 +84,16 @@ import {
 import { dashboardStyles } from "../components/dashboard/styles.js";
 import { yamlModeStyles } from "../components/dashboard/yaml-mode-styles.js";
 import { TourActivityController } from "../components/guided-tour/tour-activity-controller.js";
+import {
+  getActiveTourConfiguration,
+  isTourPending,
+} from "../components/guided-tour/tour-session.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import {
   activeJobsContext,
   apiContext,
   buildOffloadPairingsContext,
+  buildServerPeersContext,
   devicesContext,
   devicesLoadedContext,
   expertModeContext,
@@ -102,6 +112,10 @@ import {
   loadDashboardFilters,
   saveDashboardFilters,
 } from "../util/dashboard-filters-session.js";
+import {
+  loadStackCollapsed,
+  saveStackCollapsed,
+} from "../util/dashboard-stacks-session.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import {
   activeFacetCount,
@@ -200,30 +214,62 @@ export class ESPHomePageDashboard extends LitElement {
     [];
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
-  // When true this install is a remote build node: every device-creation
-  // affordance (New device card, FAB, table Create, Adopt, serial wizard)
-  // is hidden. See _hideDeviceCreation for the actual gate.
+  // Remote-compute install: the dashboard leads with the remote build
+  // server stack. Nothing is hidden — the device builder keeps every
+  // affordance and just starts collapsed.
   @consume({ context: remoteComputeOnlyContext, subscribe: true })
   @state()
   _remoteComputeOnly = false;
 
-  // False until preferences load once. Creation fails closed while it's
-  // false so a remote-compute install can't flash creation UI when the
-  // initial prefs fetch fails (remote_compute_only would still be default).
+  // False until preferences load once; the remote stack's expanded-by-
+  // default treatment waits for the real preference value.
   @consume({ context: prefsLoadedContext, subscribe: true })
   @state()
   _prefsLoaded = false;
 
-  /** Whether every device-creation affordance should be hidden. */
-  get _hideDeviceCreation(): boolean {
-    return this._remoteComputeOnly || !this._prefsLoaded;
-  }
+  @consume({ context: buildServerPeersContext, subscribe: true })
+  @state()
+  _buildServerPeers: PeerSummary[] | null = null;
 
-  /** Whether the remote-build-server panel takes over / tops the dashboard.
-   *  Gated on _prefsLoaded so a slow prefs fetch can't flash the panel. */
-  get _showRemotePanel(): boolean {
+  // Session-scoped manual collapse choices; null = use the pref-driven
+  // default. Seeded once at construction, saved on every toggle.
+  @state() private _remoteCollapsedChoice = loadStackCollapsed("remote");
+  @state() private _builderCollapsedChoice = loadStackCollapsed("builder");
+
+  /** Remote-compute preference resolved (never flashes during prefs load). */
+  get _remoteComputeReady(): boolean {
     return this._remoteComputeOnly && this._prefsLoaded;
   }
+
+  /** The remote stack shows when opted in, or as soon as any sender has
+   *  asked to (pending) or been approved to build here. */
+  get _showRemoteStack(): boolean {
+    return this._remoteComputeReady || (this._buildServerPeers?.length ?? 0) > 0;
+  }
+
+  /** Expanded by default only via the preference; a stack that appeared
+   *  because a sender paired starts collapsed. */
+  get _remoteStackCollapsed(): boolean {
+    return this._remoteCollapsedChoice ?? !this._remoteComputeReady;
+  }
+
+  get _builderStackCollapsed(): boolean {
+    // A pending/active tour anchors builder content; never hide it.
+    if (isTourPending() || getActiveTourConfiguration() !== null) return false;
+    return this._builderCollapsedChoice ?? this._remoteComputeReady;
+  }
+
+  _onToggleRemoteStack = (): void => {
+    const next = !this._remoteStackCollapsed;
+    this._remoteCollapsedChoice = next;
+    saveStackCollapsed("remote", next);
+  };
+
+  _onToggleBuilderStack = (): void => {
+    const next = !this._builderStackCollapsed;
+    this._builderCollapsedChoice = next;
+    saveStackCollapsed("builder", next);
+  };
 
   // Passed to runBulkUpdate for the NO_COMPATIBLE_PEER toast
   // classifier. Same context the settings dialog reads; null until
@@ -321,6 +367,7 @@ export class ESPHomePageDashboard extends LitElement {
     espHomeStyles,
     inputStyles,
     dashboardStyles,
+    dashboardStacksStyles,
     deviceGridStyles,
     yamlModeStyles,
     skeletonStyles,
@@ -332,9 +379,6 @@ export class ESPHomePageDashboard extends LitElement {
   };
 
   private _startSerialSetup(port: SerialPort | null): void {
-    // Remote-compute installs don't create devices; a plugged-in board
-    // shouldn't pop the creation wizard.
-    if (this._hideDeviceCreation) return;
     void detectAndOpenWizard(this._api, this._createDialog, {
       port,
       devices: this._devices,
@@ -400,8 +444,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._tryConsumePendingScroll();
     }
     // USB "Set it up" actioned from another route stashes the port and
-    // navigates here. Defer to first render: _createDialog (@query) and
-    // the prefs contexts driving _hideDeviceCreation land during it.
+    // navigates here. Defer to first render so _createDialog (@query)
+    // lands during it.
     const pendingSerial = consumePendingSerialSetup();
     if (pendingSerial !== null) {
       void this.updateComplete.then(() => {
@@ -648,16 +692,6 @@ export class ESPHomePageDashboard extends LitElement {
       `;
     }
 
-    // Remote-compute-only install with nothing configured locally: the
-    // remote-build panel takes the whole page. With local devices it
-    // stacks above the grid/table instead (below).
-    if (this._showRemotePanel && this._devices.length === 0) {
-      return html`
-        <esphome-remote-build-panel></esphome-remote-build-panel>
-        ${renderDialogs(this)}
-      `;
-    }
-
     const q = this._search.trim().toLowerCase();
     const facetFiltered = this._applyFacetFilters(this._sortedDevices);
     const filtered = q
@@ -672,12 +706,7 @@ export class ESPHomePageDashboard extends LitElement {
       filtered.length === 0 &&
       this._hasActiveFilters;
 
-    return html`
-      ${
-        this._showRemotePanel
-          ? html`<esphome-remote-build-panel></esphome-remote-build-panel>`
-          : ""
-      }
+    const deviceContent = html`
       ${renderDiscoveredSection(this)}
       ${
         this._devices.length > 0 && this._view === DashboardView.CARDS
@@ -690,6 +719,11 @@ export class ESPHomePageDashboard extends LitElement {
           ? renderCardGrid(this, filtered)
           : renderTable(this)
       }
+    `;
+
+    return html`
+      ${this._showRemoteStack ? renderRemoteStack(this) : ""}
+      ${this._showRemoteStack ? renderBuilderStack(this, deviceContent) : deviceContent}
       ${renderDrawer(this)} ${renderSelectBarOrFab(this)} ${renderDialogs(this)}
     `;
   }

@@ -40,7 +40,6 @@ function makeHost(devices: ConfiguredDevice[]) {
     _visibleImportableDevices: [],
     _selectedDevices: new Set<string>(),
     _recentlyAdopted: null,
-    _hideDeviceCreation: true,
     _view: DashboardView.TABLE,
     _expertMode: false,
     _selectedLabels: [],

@@ -101,6 +101,51 @@ export const onboardingWizardStyles = css`
     line-height: 1.4;
   }
 
+  .remote-feature-list {
+    list-style: none;
+    width: 100%;
+    box-sizing: border-box;
+    margin: var(--wa-space-s) 0 0;
+    padding: var(--wa-space-s) var(--wa-space-m);
+    background: var(--wa-color-surface-lowered);
+    border-radius: var(--wa-border-radius-m);
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+    text-align: left;
+  }
+
+  .remote-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wa-space-s);
+  }
+
+  .remote-feature wa-icon {
+    font-size: 18px;
+    color: var(--esphome-primary);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .remote-feature-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .remote-feature-title {
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--wa-color-text-normal);
+  }
+
+  .remote-feature-desc {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+  }
+
   .welcome-screen {
     gap: var(--wa-space-xl);
   }

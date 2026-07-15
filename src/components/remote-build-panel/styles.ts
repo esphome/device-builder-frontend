@@ -16,17 +16,71 @@ export const remoteBuildPanelStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
+    padding: var(--wa-space-2xs) var(--wa-space-2xs);
+    margin: 0 calc(-1 * var(--wa-space-2xs));
+    border: none;
+    border-radius: var(--wa-border-radius-m);
+    background: transparent;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s;
   }
 
-  .banner wa-icon {
+  .banner:hover,
+  .banner:focus-visible {
+    background: var(--wa-color-surface-lowered);
+    outline: none;
+  }
+
+  .banner > wa-icon:first-child {
     font-size: 22px;
     color: var(--esphome-primary);
+    flex-shrink: 0;
+  }
+
+  /* Title/pill/badges wrap among themselves; the chevron stays pinned. */
+  .banner-main {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--wa-space-xs) var(--wa-space-s);
+    flex: 1;
+    min-width: 0;
   }
 
   .banner-title {
     font-size: var(--wa-font-size-l);
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
+  }
+
+  .banner-chevron {
+    margin-left: auto;
+    font-size: 22px;
+    color: var(--wa-color-text-quiet);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+
+  .banner[aria-expanded="true"] .banner-chevron {
+    transform: rotate(180deg);
+  }
+
+  .banner-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--wa-space-s);
+    border-radius: var(--wa-border-radius-pill, 999px);
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    background: var(--wa-color-surface-lowered);
+    color: var(--wa-color-text-quiet);
+  }
+
+  .banner-badge--requests {
+    background: var(--esphome-tint);
+    color: var(--esphome-primary);
   }
 
   .listener-badge {

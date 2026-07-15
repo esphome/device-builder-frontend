@@ -1,9 +1,14 @@
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import { consume } from "@lit/context";
-import { mdiHandshake, mdiMonitorDashboard, mdiServerNetwork } from "@mdi/js";
+import {
+  mdiChevronDown,
+  mdiHandshake,
+  mdiMonitorDashboard,
+  mdiServerNetwork,
+} from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -50,6 +55,7 @@ import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
 import { peerRowStyles } from "./settings-dialog/shared-styles.js";
 
 registerMdiIcons({
+  "chevron-down": mdiChevronDown,
   handshake: mdiHandshake,
   "monitor-dashboard": mdiMonitorDashboard,
   "server-network": mdiServerNetwork,
@@ -66,6 +72,10 @@ registerMdiIcons({
  */
 @customElement("esphome-remote-build-panel")
 export class ESPHomeRemoteBuildPanel extends LitElement {
+  /** Collapsed = banner only (with waiting/building badges); the embedding
+   *  page owns the flag and flips it on `toggle-collapsed`. */
+  @property({ type: Boolean }) collapsed = false;
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;
@@ -154,14 +164,12 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
     const pending = this._peers?.filter((p) => p.status === "pending") ?? [];
     return html`
       <section class="panel" aria-label=${this._localize("remote_build_dashboard.title")}>
-        <div class="banner">
-          <wa-icon library="mdi" name="server-network"></wa-icon>
-          <span class="banner-title">
-            ${this._localize("remote_build_dashboard.title")}
-          </span>
-          ${this._renderListenerBadge()}
-        </div>
-        ${pending.map((p) => renderRequestCard(this, p))} ${this._renderBody()}
+        ${this._renderBanner(pending.length)}
+        ${
+          this.collapsed
+            ? nothing
+            : html`${pending.map((p) => renderRequestCard(this, p))} ${this._renderBody()}`
+        }
       </section>
       <esphome-accept-peer-dialog
         @confirm=${this._onAcceptConfirm}
@@ -212,6 +220,60 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   _buckets() {
     return this._bucketJobs(this._jobs);
   }
+
+  private _renderBanner(pendingCount: number) {
+    const activeCount = this._buckets().active.length;
+    return html`
+      <button
+        type="button"
+        class="banner"
+        aria-expanded=${this.collapsed ? "false" : "true"}
+        @click=${this._onToggleCollapsed}
+      >
+        <wa-icon library="mdi" name="server-network"></wa-icon>
+        <span class="banner-main">
+          <span class="banner-title">
+            ${this._localize("remote_build_dashboard.title")}
+          </span>
+          ${this._renderListenerBadge()}
+          ${
+            this.collapsed && pendingCount > 0
+              ? html`
+                  <span class="banner-badge banner-badge--requests">
+                    ${this._localize("remote_build_dashboard.badge_requests", {
+                      count: pendingCount,
+                    })}
+                  </span>
+                `
+              : nothing
+          }
+          ${
+            this.collapsed && activeCount > 0
+              ? html`
+                  <span class="banner-badge">
+                    ${this._localize("remote_build_dashboard.badge_active", {
+                      count: activeCount,
+                    })}
+                  </span>
+                `
+              : nothing
+          }
+        </span>
+        <wa-icon
+          class="banner-chevron"
+          library="mdi"
+          name="chevron-down"
+          aria-hidden="true"
+        ></wa-icon>
+      </button>
+    `;
+  }
+
+  private _onToggleCollapsed = () => {
+    this.dispatchEvent(
+      new CustomEvent("toggle-collapsed", { bubbles: true, composed: true })
+    );
+  };
 
   private _renderListenerBadge() {
     const identity = this._identity.identity;

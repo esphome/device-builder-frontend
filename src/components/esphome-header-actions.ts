@@ -29,7 +29,6 @@ import {
   importableDevicesContext,
   localizeContext,
   onboardingPendingContext,
-  remoteComputeOnlyContext,
 } from "../context/index.js";
 import { dropdownMenuStyles } from "../styles/dropdown-menu.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -108,10 +107,6 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
   @consume({ context: onboardingPendingContext, subscribe: true })
   @state()
   private _onboardingPending = false;
-
-  @consume({ context: remoteComputeOnlyContext, subscribe: true })
-  @state()
-  private _remoteComputeOnly = false;
 
   /** Adoptable / ignored discoveries. Subscribed here so the
    *  kebab can gate the "Show ignored discoveries" entry on the
@@ -340,22 +335,18 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   <span class="menu-item-label">${this._localize("layout.search")}</span>
                   <kbd class="menu-item-shortcut">${searchShortcut}</kbd>
                 </div>
-                ${
-                  this._remoteComputeOnly
-                    ? nothing
-                    : html`<div
-                        class="menu-item"
-                        role="menuitem"
-                        tabindex="0"
-                        @click=${this._openGuidedTour}
-                        @keydown=${this._onItemKeydown}
-                      >
-                        <wa-icon library="mdi" name="compass-outline"></wa-icon>
-                        <span class="menu-item-label"
-                          >${this._localize("layout.guided_tour")}</span
-                        >
-                      </div>`
-                }
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openGuidedTour}
+                  @keydown=${this._onItemKeydown}
+                >
+                  <wa-icon library="mdi" name="compass-outline"></wa-icon>
+                  <span class="menu-item-label"
+                    >${this._localize("layout.guided_tour")}</span
+                  >
+                </div>
                 <div class="menu-divider" role="separator"></div>
                 <div
                   class="menu-item"

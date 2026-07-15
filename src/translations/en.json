@@ -376,7 +376,9 @@
     "archive_selected_aria": "Archive {count} selected",
     "delete_selected_aria": "Delete {count} selected",
     "update_selected_aria": "Update {count} selected",
-    "compile_selected_aria": "Compile {count} selected without installing"
+    "compile_selected_aria": "Compile {count} selected without installing",
+    "builder_stack_heading": "Device builder",
+    "builder_stack_count": "{count, plural, one {# device} other {# devices}}"
   },
   "command": {
     "install_title": "Install — {name}",
@@ -1021,8 +1023,8 @@
         "found": "Found on your network: {name}",
         "found_overflow": "Found on your network: {name}, and {count} more",
         "intro": "This app is a full ESPHome Device Builder and is ready to build firmware for the others. To send builds here, open Settings → Send builds on your existing dashboard and pair it with this machine.",
-        "remote_only_title": "Only use this for remote compute",
-        "remote_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards."
+        "remote_only_title": "Use the remote compute dashboard",
+        "remote_only_desc": "Lead with pairing and the build queue when you open this dashboard. Device creation stays available; the builder section just starts collapsed."
       },
       "experience": {
         "title": "Choose your experience level",
@@ -1265,8 +1267,15 @@
     "title": "Settings",
     "appearance": "Appearance",
     "experience_save_failed": "Failed to save your preference",
-    "remote_compute_only": "Only use this for remote compute",
-    "remote_compute_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards.",
+    "remote_compute_only": "Remote compute dashboard",
+    "remote_compute_only_desc": "Put this install's remote build server dashboard front and center. Nothing is removed; the device builder section just starts collapsed.",
+    "remote_compute_features_title": "What the remote compute dashboard changes",
+    "remote_compute_feature_dashboard": "Build server front and center",
+    "remote_compute_feature_dashboard_desc": "The dashboard opens with pairing requests, paired dashboards, and the build queue expanded.",
+    "remote_compute_feature_builder": "Device builder stays available",
+    "remote_compute_feature_builder_desc": "Device creation and your devices keep working; the builder section starts collapsed and expands with one click.",
+    "remote_compute_feature_paired": "Appears automatically once paired",
+    "remote_compute_feature_paired_desc": "Even with this off, the build server dashboard shows up collapsed as soon as another dashboard pairs with this one.",
     "version_history": "Save version history",
     "version_history_desc": "Keep a local Git history of your config changes so you can view and restore earlier versions. Turn this off to stop the automatic commits.",
     "language": "Language",
@@ -1616,6 +1625,8 @@
   },
   "remote_build_dashboard": {
     "title": "Remote build server",
+    "badge_requests": "{count, plural, one {# pairing request} other {# pairing requests}}",
+    "badge_active": "{count, plural, one {# active job} other {# active jobs}}",
     "intro_empty": "No dashboards are paired yet. Pair one to start receiving builds.",
     "step1_label": "Step 1 — here",
     "step1_title": "Open the pairing window",
