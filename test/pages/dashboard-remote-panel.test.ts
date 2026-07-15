@@ -163,7 +163,7 @@ describe("dashboard remote-compute stacks", () => {
     expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("hide_device_builder leaves only the expanded panel, banner inert", async () => {
+  it("hide_device_builder leaves only the expanded panel, no banner", async () => {
     const page = await mountDashboard({
       remote: true,
       hideBuilder: true,
@@ -176,10 +176,9 @@ describe("dashboard remote-compute stacks", () => {
     expect(builderHeaderIn(page)).toBeNull();
     expect(gridIn(page)).toBeNull();
     expect(page.shadowRoot?.querySelector("esphome-fab")).toBeNull();
-    // The banner is a heading, not an accordion header.
+    // No accordion banner at all — the panel content is the page.
     await panel.updateComplete;
-    expect(panel.shadowRoot?.querySelector("button.banner")).toBeNull();
-    expect(panel.shadowRoot?.querySelector("header.banner")).not.toBeNull();
+    expect(panel.shadowRoot?.querySelector(".banner")).toBeNull();
     expect(panel.shadowRoot?.querySelector(".stack-bar-chevron")).toBeNull();
   });
 

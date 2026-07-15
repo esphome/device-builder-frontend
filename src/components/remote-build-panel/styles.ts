@@ -30,14 +30,10 @@ export const remoteBuildPanelStyles = css`
     margin-right: var(--content-gutter, var(--wa-space-l));
   }
 
-  /* Solo (Device builder hidden): the banner is a plain heading, not
-     an accordion header. */
-  :host([solo]) .banner {
-    cursor: default;
-  }
-
-  :host([solo]) .banner:hover {
-    background: transparent;
+  /* Solo (Device builder hidden): no accordion banner at all; the
+     panel content provides its own top inset instead. */
+  :host([solo]) .panel {
+    padding-top: var(--stack-gap);
   }
 
   .banner-badge {

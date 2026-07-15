@@ -116,9 +116,8 @@ export interface UserPreferences {
    *  Wi-Fi step and device-creation entry points are hidden. */
   remote_compute_only: boolean;
   /** Hide the dashboard's Device builder section entirely; offered
-   *  only while ``remote_compute_only`` is on. Absent on pre-1.1
-   *  backends. */
-  hide_device_builder?: boolean;
+   *  only while ``remote_compute_only`` is on. */
+  hide_device_builder: boolean;
   /** Auto-commit config edits to a Git history. Default ``true``; the
    *  off switch is an expert-only Appearance toggle. */
   version_history_enabled: boolean;
