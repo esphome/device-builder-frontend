@@ -1,4 +1,4 @@
-import { APIError } from "../api/api-error.js";
+import { APIError, apiErrorDetails } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -42,15 +42,14 @@ export async function rejectPeerRequest(
 }
 
 function _toastApiFailure(localize: LocalizeFunc, prefix: string, err: unknown): void {
-  if (err instanceof APIError) {
-    if (err.errorCode === ErrorCode.NOT_FOUND) {
-      notify.warning(localize(`${prefix}_already_gone`));
-      return;
-    }
-    if (err.details) {
-      notify.error(localize(`${prefix}_failed_detail`, { reason: err.details }));
-      return;
-    }
+  if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
+    notify.warning(localize(`${prefix}_already_gone`));
+    return;
+  }
+  const reason = apiErrorDetails(err);
+  if (reason) {
+    notify.error(localize(`${prefix}_failed_detail`, { reason }));
+    return;
   }
   notify.error(localize(`${prefix}_failed`));
 }

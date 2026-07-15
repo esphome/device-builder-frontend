@@ -93,10 +93,7 @@ function renderPeerRow(host: ESPHomeRemoteBuildPanel, peer: PeerSummary): Templa
     <div class="peer-line">
       <wa-icon library="mdi" name="monitor-dashboard"></wa-icon>
       <div class="peer-line-body">
-        <span class="peer-line-title">
-          ${peer.label}
-          <span class=${pill.className}>${host._localize(pill.labelKey)}</span>
-        </span>
+        <span class="peer-line-title">${peer.label}</span>
         ${
           pairedAgo !== null
             ? html`
@@ -108,6 +105,7 @@ function renderPeerRow(host: ESPHomeRemoteBuildPanel, peer: PeerSummary): Templa
             : nothing
         }
       </div>
+      <span class=${pill.className}>${host._localize(pill.labelKey)}</span>
     </div>
   `;
 }

@@ -311,10 +311,15 @@ export const remoteBuildPanelStyles = css`
   }
 
   .peer-line-title {
-    display: flex;
-    align-items: center;
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-normal);
+  }
+
+  /* Status pills line up on the row's right edge, like the queue card's
+     status icons. */
+  .peer-line > .peer-connection-pill {
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .peer-line-meta {
