@@ -21,19 +21,13 @@ vi.mock("../../src/util/download-text.js", async (importOriginal) => ({
 
 import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dialog.js";
 import type { StreamCallbacks } from "../../src/api/types/streaming.js";
-import { CRASH_BLOCK as CRASH_LINES } from "../_crash-lines.js";
+import {
+  CRASH_BLOCK as CRASH_LINES,
+  VALIDATED_CONFIG_YAML,
+  VALIDATE_OUTPUT,
+} from "../_crash-lines.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
-const VALIDATE_OUTPUT = [
-  "\\033[32mINFO ESPHome 2026.6.4\\033[0m",
-  "\\033[32mINFO Reading configuration smallgarage.yaml...\\033[0m",
-  "esphome:",
-  "  name: smallgarage",
-  "wifi:",
-  "  password: <removed>",
-  "\\033[32mINFO Configuration is valid!\\033[0m",
-];
 
 describe("crash-report-dialog", () => {
   let el: ESPHomeCrashReportDialog;
@@ -80,9 +74,7 @@ describe("crash-report-dialog", () => {
     finishValidate();
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
-    expect((el as any)._configYaml).toBe(
-      "esphome:\n  name: smallgarage\nwifi:\n  password: <removed>"
-    );
+    expect((el as any)._configYaml).toBe(VALIDATED_CONFIG_YAML);
   });
 
   it("degrades to a config-unavailable note when validation fails", async () => {

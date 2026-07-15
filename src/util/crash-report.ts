@@ -1,4 +1,4 @@
-import { isCrashMarker, normalizeLogLine } from "./crash-detector.js";
+import { isCrashMarker, normalizeLogLine, tagged } from "./crash-detector.js";
 import { isCliLogLine } from "./validation-log.js";
 
 /**
@@ -35,12 +35,13 @@ const DECODED_CONTINUATION_RE = /^\s*\(inlined by\)/;
 
 // Lines that merely echo the backtrace the `problem` field already
 // carries in decoded form: the decode output itself, its progress
-// chatter, and the raw BT<n> address lines (optionally logger-tagged).
+// chatter, and the raw BT<n> address lines (optionally logger-tagged —
+// the shared `tagged` grammar keeps the prefix in one place).
 const DECODE_ECHO_RES = [
   DECODED_RE,
   DECODED_CONTINUATION_RE,
   /^(?:WARNING )?Found stack trace/,
-  /^(?:\[[A-Z]{1,2}\]\[[^\]]*\]:\s*)?BT\d+:\s*0x[0-9a-fA-F]{8}/,
+  tagged("BT\\d+:\\s*0x[0-9a-fA-F]{8}"),
 ];
 
 const isDecodeEcho = (line: string): boolean =>
@@ -398,44 +399,44 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // aren't already elsewhere in the URL — environment (in `problem`),
   // backtrace (in `problem`), config (in `config`) are deliberately not
   // repeated here, since the budget is tight.
-  const extras: string[] = [];
-  const tryAddSection = (text: string): void => {
-    params.set("additional", [...extras, text].join("\n\n"));
-    if (url.toString().length <= MAX_ISSUE_URL_LENGTH) {
-      extras.push(text);
-      return;
-    }
-    missing = true;
-    if (extras.length > 0) {
-      params.set("additional", extras.join("\n\n"));
-    } else {
-      params.delete("additional");
-    }
-  };
-  if (scrape.warnings.length > 0) {
-    tryAddSection(`Warnings and errors:\n${fence(scrape.warnings)}`);
-  }
-  if (scrape.configLines.length > 0) {
-    tryAddSection(`Config dump:\n${fence(scrape.configLines)}`);
-  }
+  const sections = [
+    scrape.warnings.length > 0 && `Warnings and errors:\n${fence(scrape.warnings)}`,
+    scrape.configLines.length > 0 && `Config dump:\n${fence(scrape.configLines)}`,
+  ].filter((s): s is string => Boolean(s));
+  let kept = packParam(url, params, "additional", sections);
+  if (kept.length < sections.length) missing = true;
 
-  // When content was truncated, a note (for the maintainer reading the
-  // issue) leads the additional field; the reporter can attach the
-  // downloaded report on request. Drop trailing sections until it fits,
-  // and drop `additional` entirely if even the note alone overflows.
+  // When anything was truncated (here or in logs/config), lead `additional`
+  // with a note for the maintainer; re-pack so the note can't push the URL
+  // over budget (dropping trailing sections, or `additional` itself).
   if (missing) {
-    const withNote = ["(Truncated to fit; full report available on request.)", ...extras];
-    for (;;) {
-      params.set("additional", withNote.join("\n\n"));
-      if (url.toString().length <= MAX_ISSUE_URL_LENGTH) break;
-      if (withNote.length === 1) {
-        params.delete("additional");
-        break;
-      }
-      withNote.pop();
-    }
+    kept = packParam(url, params, "additional", [
+      "(Truncated to fit; full report available on request.)",
+      ...kept,
+    ]);
   }
   return { url: url.toString(), complete: !missing };
+}
+
+/**
+ * Set `params[key]` to the longest run of *parts* (joined by blank lines)
+ * that keeps the whole URL within budget, deleting the param when none
+ * fit. Returns the parts that were kept.
+ */
+function packParam(
+  url: URL,
+  params: URLSearchParams,
+  key: string,
+  parts: string[]
+): string[] {
+  const kept: string[] = [];
+  for (const part of parts) {
+    params.set(key, [...kept, part].join("\n\n"));
+    if (url.toString().length <= MAX_ISSUE_URL_LENGTH) kept.push(part);
+  }
+  if (kept.length > 0) params.set(key, kept.join("\n\n"));
+  else params.delete(key);
+  return kept;
 }
 
 /**
@@ -480,14 +481,11 @@ const CONFIG_TRUNCATED_NOTE = "# [config truncated to fit the pre-filled URL]";
 function fitConfig(yaml: string, budget: number): { text: string; truncated: boolean } {
   if (budget <= 0) return { text: "", truncated: true };
   if (formEncodedLength(yaml) <= budget) return { text: yaml, truncated: false };
-  const kept: string[] = [];
-  let spent = encodedCost(CONFIG_TRUNCATED_NOTE);
-  for (const line of yaml.split("\n")) {
-    const lineCost = encodedCost(line);
-    if (spent + lineCost > budget) break;
-    kept.push(line);
-    spent += lineCost;
-  }
+  const { kept } = takeLinesUnderBudget(
+    yaml.split("\n"),
+    budget,
+    encodedCost(CONFIG_TRUNCATED_NOTE)
+  );
   if (kept.length === 0) return { text: "", truncated: true };
   kept.push(CONFIG_TRUNCATED_NOTE);
   return { text: kept.join("\n"), truncated: true };
@@ -521,6 +519,26 @@ const formEncodedLength = (s: string): number =>
 const encodedCost = (line: string): number => formEncodedLength(`${line}\n`);
 
 /**
+ * Greedily take the longest prefix of *lines* whose per-line
+ * `encodedCost` fits `budget - spent`. Returns the kept prefix, the
+ * running spend, and whether any line was dropped.
+ */
+function takeLinesUnderBudget(
+  lines: string[],
+  budget: number,
+  spent: number
+): { kept: string[]; spent: number; truncated: boolean } {
+  const kept: string[] = [];
+  for (const line of lines) {
+    const cost = encodedCost(line);
+    if (spent + cost > budget) return { kept, spent, truncated: true };
+    kept.push(line);
+    spent += cost;
+  }
+  return { kept, spent, truncated: false };
+}
+
+/**
  * Join as much of *lines* as fits *budget* once URL-encoded: the block
  * from *anchor* to the end first (truncating its tail if even that
  * overflows), then context lines walking backwards from the anchor.
@@ -540,32 +558,22 @@ function fitLines(lines: string[], anchor: number, budget: number): string {
   return fit.kept.length > (fit.truncated ? 1 : 0) ? fit.kept.join("\n") : "";
 }
 
+// Fit forward from *anchor* to the end, then walk backward over the
+// preceding context, sharing one budget and marker reserve.
 function fitWithReserve(
   lines: string[],
   anchor: number,
   budget: number,
   reserve: number
 ): { kept: string[]; truncated: boolean } {
-  const kept: string[] = [];
-  let spent = reserve;
-  let truncated = false;
-  for (let i = anchor; i < lines.length; i++) {
-    const lineCost = encodedCost(lines[i]);
-    if (spent + lineCost > budget) {
-      truncated = true;
-      break;
-    }
-    kept.push(lines[i]);
-    spent += lineCost;
-  }
-  for (let i = anchor - 1; i >= 0; i--) {
-    const lineCost = encodedCost(lines[i]);
-    if (spent + lineCost > budget) {
-      truncated = true;
-      break;
-    }
-    kept.unshift(lines[i]);
-    spent += lineCost;
-  }
-  return { kept, truncated };
+  const forward = takeLinesUnderBudget(lines.slice(anchor), budget, reserve);
+  const back = takeLinesUnderBudget(
+    lines.slice(0, anchor).reverse(),
+    budget,
+    forward.spent
+  );
+  return {
+    kept: [...back.kept.reverse(), ...forward.kept],
+    truncated: forward.truncated || back.truncated,
+  };
 }

@@ -197,6 +197,8 @@ export class ESPHomeCrashReportDialog extends LitElement {
         margin: 0 0 var(--wa-space-m);
       }
 
+      /* Primary-CTA colour only; shape and the disabled state come from
+         modalDialogStyles' shared .btn / .btn:disabled. */
       .btn--confirm {
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
@@ -204,11 +206,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
 
       .btn--confirm:hover:not(:disabled) {
         background: var(--esphome-primary-hover);
-      }
-
-      .btn--confirm:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
       }
     `,
   ];

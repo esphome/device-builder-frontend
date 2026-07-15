@@ -4,13 +4,11 @@ import {
   isCrashMarker,
   normalizeLogLine,
 } from "../../src/util/crash-detector.js";
+import { CRASH_BANNER_LINE } from "../_crash-lines.js";
 
 // Realistic crash lines, one per supported shape.
 const CRASH_LINES: ReadonlyArray<[string, string]> = [
-  [
-    "esp32 panic banner",
-    "Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.",
-  ],
+  ["esp32 panic banner", CRASH_BANNER_LINE],
   [
     "crash handler previous-boot banner (logger-tagged)",
     "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
@@ -94,7 +92,7 @@ describe("detectCrashKind", () => {
     expect(
       detectCrashKind([
         "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
-        "Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.",
+        CRASH_BANNER_LINE,
       ])
     ).toBe("live");
   });

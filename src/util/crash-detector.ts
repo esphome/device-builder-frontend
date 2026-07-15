@@ -37,9 +37,10 @@ export type CrashKind = "live" | "previous-boot";
 // The stored previous-boot crash report replays through ESPHome's logger,
 // so those lines carry a `[E][esp32.crash:NNN]:` header. Anchored markers
 // tolerate one optional level/tag prefix so both raw panic output and the
-// logger-replayed form match.
-const TAG = /(?:\[[A-Z]{1,2}\]\[[^\]]*\]:\s*)?/.source;
-const tagged = (source: string): RegExp => new RegExp(`^${TAG}${source}`);
+// logger-replayed form match. Exported so crash-report can build the same
+// tagged shapes without re-typing the grammar.
+export const TAG = /(?:\[[A-Z]{1,2}\]\[[^\]]*\]:\s*)?/.source;
+export const tagged = (source: string): RegExp => new RegExp(`^${TAG}${source}`);
 
 // One entry per crash shape; tested per normalized line. Anchored patterns
 // stay anchored (a prose sentence mentioning "Backtrace" must not trip the

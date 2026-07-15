@@ -8,7 +8,7 @@ import {
   issuePlatform,
   scrapeCrashData,
 } from "../../src/util/crash-report.js";
-import { CRASH_BLOCK } from "../_crash-lines.js";
+import { CRASH_BLOCK, VALIDATED_CONFIG_YAML } from "../_crash-lines.js";
 
 const FILLER = Array.from(
   { length: 40 },
@@ -43,7 +43,7 @@ const META = {
 const report = (overrides: Partial<CrashReport> = {}): CrashReport => ({
   scrape: scrapeCrashData(BUFFER),
   meta: META,
-  configYaml: "esphome:\n  name: smallgarage\nwifi:\n  password: <removed>",
+  configYaml: VALIDATED_CONFIG_YAML,
   userDescription: "Pressed the crash button in Home Assistant",
   ...overrides,
 });
@@ -194,9 +194,7 @@ describe("buildIssueUrl", () => {
     expect(p.get("problem")).toContain("0x400d9150: esphome::Application::setup()");
     expect(p.get("logs")).toContain("Backtrace: 0x400d9150");
     // The whole sanitized config lands in the form's config field.
-    expect(p.get("config")).toBe(
-      "esphome:\n  name: smallgarage\nwifi:\n  password: <removed>"
-    );
+    expect(p.get("config")).toBe(VALIDATED_CONFIG_YAML);
   });
 
   it("surfaces platform and installation in problem (dropdowns can't prefill)", () => {
