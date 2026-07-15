@@ -111,12 +111,13 @@ describe("dashboard remote-compute stacks", () => {
     expect(gridIn(page)).toBeNull();
   });
 
-  it("expanding the builder stack reveals the grid and creation card", async () => {
+  it("swapping to the builder collapses the remote stack (accordion)", async () => {
     const page = await mountDashboard({ remote: true, devices: [] });
     builderHeaderIn(page)!.click();
     await page.updateComplete;
     expect(gridIn(page)).not.toBeNull();
     expect(page.shadowRoot?.querySelector(".add-device-card")).not.toBeNull();
+    expect(panelIn(page)!.collapsed).toBe(true);
   });
 
   it("appears collapsed once a sender pairs, with the builder expanded", async () => {
@@ -132,14 +133,15 @@ describe("dashboard remote-compute stacks", () => {
     expect(gridIn(page)).not.toBeNull();
   });
 
-  it("banner click toggles the remote stack and persists for the session", async () => {
+  it("banner click swaps to the remote stack and persists for the session", async () => {
     const page = await mountDashboard({ remote: false, peers: [makePeer()] });
     const panel = panelIn(page)!;
     panel.shadowRoot?.querySelector<HTMLButtonElement>(".banner")?.click();
     await page.updateComplete;
     expect(panel.collapsed).toBe(false);
+    expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("false");
     expect(sessionStorage.getItem("esphome-dashboard-stacks")).toContain(
-      '"remote":false'
+      '"expanded":"remote"'
     );
   });
 
@@ -189,8 +191,11 @@ describe("dashboard remote-compute stacks", () => {
     expect(panelIn(page)).toBeNull();
   });
 
-  it("keeps the create FAB even with the preference on", async () => {
+  it("the create FAB belongs to the builder stack", async () => {
     const page = await mountDashboard({ remote: true, devices: [] });
+    expect(page.shadowRoot?.querySelector(".fab-btn")).toBeNull();
+    builderHeaderIn(page)!.click();
+    await page.updateComplete;
     expect(page.shadowRoot?.querySelector(".fab-btn")).not.toBeNull();
   });
 });

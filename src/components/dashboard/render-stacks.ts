@@ -76,6 +76,13 @@ export const dashboardStacksStyles = css`
     pointer-events: auto;
   }
 
+  /* In-flow means anchored: the pill and its expanded grid span the
+     section instead of floating as a centered strip mid-page. */
+  :host([stacks]) .discovered-section-header,
+  :host([stacks]) .discovered-section-grid {
+    width: 100%;
+  }
+
   :host([stacks]) .discovered-section-header {
     border-top: var(--wa-border-width-s) solid var(--esphome-primary);
     border-radius: var(--wa-border-radius-l) var(--wa-border-radius-l) 0 0;
@@ -88,23 +95,18 @@ export const dashboardStacksStyles = css`
     border-radius: var(--wa-border-radius-l);
   }
 
-  /* Hairline between the stacks so the two sections read separately. */
-  .builder-stack {
-    border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    padding-top: var(--wa-space-s);
-  }
-
   /* Geometry mirrors the panel banner exactly so the two icons and the
-     two chevrons sit on the same vertical lines. */
+     two chevrons sit on the same vertical lines. Outlined bar in the
+     discovery pill's visual language; hover tints the whole bar. */
   .builder-stack-header {
     display: flex;
     align-items: center;
     width: 100%;
     box-sizing: border-box;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-2xs) var(--wa-space-s);
+    padding: var(--wa-space-xs) var(--wa-space-s);
     margin: 0 0 var(--wa-space-s);
-    border: none;
+    border: var(--wa-border-width-s) solid var(--esphome-primary);
     border-radius: var(--wa-border-radius-m);
     background: transparent;
     font-family: inherit;
@@ -115,7 +117,7 @@ export const dashboardStacksStyles = css`
 
   .builder-stack-header:hover,
   .builder-stack-header:focus-visible {
-    background: var(--wa-color-surface-lowered);
+    background: var(--esphome-primary-light);
     outline: none;
   }
 

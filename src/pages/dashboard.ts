@@ -113,8 +113,9 @@ import {
   saveDashboardFilters,
 } from "../util/dashboard-filters-session.js";
 import {
-  loadStackCollapsed,
-  saveStackCollapsed,
+  type DashboardStack,
+  loadExpandedStack,
+  saveExpandedStack,
 } from "../util/dashboard-stacks-session.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import {
@@ -231,10 +232,9 @@ export class ESPHomePageDashboard extends LitElement {
   @state()
   _buildServerPeers: PeerSummary[] | null = null;
 
-  // Session-scoped manual collapse choices; null = use the pref-driven
-  // default. Seeded once at construction, saved on every toggle.
-  @state() private _remoteCollapsedChoice = loadStackCollapsed("remote");
-  @state() private _builderCollapsedChoice = loadStackCollapsed("builder");
+  // Session-scoped choice of which stack is expanded; null = use the
+  // pref-driven default. Seeded once at construction, saved on every swap.
+  @state() private _expandedStackChoice = loadExpandedStack();
 
   /** Remote-compute preference resolved (never flashes during prefs load). */
   get _remoteComputeReady(): boolean {
@@ -250,29 +250,34 @@ export class ESPHomePageDashboard extends LitElement {
     );
   }
 
-  /** Expanded by default only via the preference; a stack that appeared
-   *  because a sender paired starts collapsed. */
+  /** Strict accordion: exactly one stack expanded, filling the page; the
+   *  headers swap between them. The preference picks the default. */
+  get _expandedStack(): DashboardStack {
+    // A pending/active tour anchors builder content; never hide it.
+    if (isTourPending() || getActiveTourConfiguration() !== null) return "builder";
+    return this._expandedStackChoice ?? (this._remoteComputeReady ? "remote" : "builder");
+  }
+
   get _remoteStackCollapsed(): boolean {
-    return this._remoteCollapsedChoice ?? !this._remoteComputeReady;
+    return this._expandedStack !== "remote";
   }
 
   get _builderStackCollapsed(): boolean {
-    // A pending/active tour anchors builder content; never hide it.
-    if (isTourPending() || getActiveTourConfiguration() !== null) return false;
-    return this._builderCollapsedChoice ?? this._remoteComputeReady;
+    return this._expandedStack !== "builder";
   }
 
   _onToggleRemoteStack = (): void => {
-    const next = !this._remoteStackCollapsed;
-    this._remoteCollapsedChoice = next;
-    saveStackCollapsed("remote", next);
+    this._selectStack("remote");
   };
 
   _onToggleBuilderStack = (): void => {
-    const next = !this._builderStackCollapsed;
-    this._builderCollapsedChoice = next;
-    saveStackCollapsed("builder", next);
+    this._selectStack("builder");
   };
+
+  private _selectStack(stack: DashboardStack): void {
+    this._expandedStackChoice = stack;
+    saveExpandedStack(stack);
+  }
 
   // Passed to runBulkUpdate for the NO_COMPATIBLE_PEER toast
   // classifier. Same context the settings dialog reads; null until
@@ -737,7 +742,13 @@ export class ESPHomePageDashboard extends LitElement {
     return html`
       ${this._showRemoteStack ? renderRemoteStack(this) : ""}
       ${this._showRemoteStack ? renderBuilderStack(this, deviceContent) : deviceContent}
-      ${renderDrawer(this)} ${renderSelectBarOrFab(this)} ${renderDialogs(this)}
+      ${renderDrawer(this)}
+      ${
+        this._showRemoteStack && this._builderStackCollapsed
+          ? ""
+          : renderSelectBarOrFab(this)
+      }
+      ${renderDialogs(this)}
     `;
   }
 

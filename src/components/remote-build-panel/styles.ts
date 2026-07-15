@@ -20,13 +20,15 @@ export const remoteBuildPanelStyles = css`
     margin-right: var(--content-gutter, var(--wa-space-l));
   }
 
+  /* Outlined bar in the discovery pill's visual language; hover tints
+     the whole bar. Mirrors .builder-stack-header exactly. */
   .banner {
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-2xs) var(--wa-space-s);
+    padding: var(--wa-space-xs) var(--wa-space-s);
     margin: 0;
-    border: none;
+    border: var(--wa-border-width-s) solid var(--esphome-primary);
     border-radius: var(--wa-border-radius-m);
     background: transparent;
     font-family: inherit;
@@ -37,7 +39,7 @@ export const remoteBuildPanelStyles = css`
 
   .banner:hover,
   .banner:focus-visible {
-    background: var(--wa-color-surface-lowered);
+    background: var(--esphome-primary-light);
     outline: none;
   }
 
@@ -362,9 +364,10 @@ export const remoteBuildPanelStyles = css`
   }
 
   /* The shared list caps its own height inside the card so a long build
-     history scrolls in place instead of stretching the page. */
+     history scrolls in place instead of stretching the page. Viewport-
+     relative: the expanded stack owns the whole screen. */
   .jobs {
-    max-height: 420px;
+    max-height: 60vh;
     overflow-y: auto;
   }
 
