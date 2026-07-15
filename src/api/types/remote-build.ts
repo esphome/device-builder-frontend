@@ -286,6 +286,12 @@ export interface RemoteBuildPeer {
    * list filters those out; the Pair button there pre-fills a `> 0` port.
    */
   remote_build_port: number;
+  /**
+   * `true` when the discovered peer is the HA add-on (`ha_addon` TXT
+   * key). The add-on advertises `friendly_name: "Home Assistant"`, so
+   * this is mainly for badging; absent/false for every other install.
+   */
+  ha_addon?: boolean;
 }
 
 /**
@@ -308,4 +314,12 @@ export interface IdentityView {
   server_version: string;
   esphome_version: string;
   listener_bound: boolean;
+  /**
+   * mDNS-advertised pairing address: host is 'null' and addresses
+   * '[]' without a registered advertiser, port is 'null' while the
+   * listener is down.
+   */
+  listener_host?: string | null;
+  listener_addresses?: string[];
+  listener_port?: number | null;
 }

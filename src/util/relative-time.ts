@@ -126,6 +126,19 @@ export function remainingOf(
 }
 
 /**
+ * ``127.4`` → ``2:07``. Clock-style M:SS for a ticking countdown chip
+ * (the pairing window), where the compact fixed-width form beats
+ * :func:`formatDuration`'s prose "2m 7s". Pairs with :func:`remainingOf`.
+ */
+export function formatMinSec(seconds: number | null): string {
+  if (seconds === null) return "";
+  const whole = Math.floor(seconds);
+  const m = Math.floor(whole / 60);
+  const s = whole % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/**
  * Memoized ``Intl.NumberFormat`` per (locale, fraction-digits,
  * integer-padding) key.
  *

@@ -5,7 +5,7 @@
  * real row-count size (floored at 1), and the mounted table renders
  * every row on one page while a normal size paginates (discussion #3682).
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
@@ -15,10 +15,20 @@ vi.mock("../../../src/components/dashboard/table-row-menu.js", () => ({}));
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { ESPHomeDeviceTable } from "../../../src/components/dashboard/device-table.js";
 import {
+  clearTourConfiguration,
+  setTourActive,
+  setTourConfiguration,
+} from "../../../src/components/guided-tour/tour-session.js";
+import {
   ALL_PAGE_SIZE,
   effectiveTablePageSize,
 } from "../../../src/components/dashboard/pagination.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
+
+afterEach(() => {
+  setTourActive(false);
+  clearTourConfiguration();
+});
 
 describe("effectiveTablePageSize", () => {
   it("passes a normal page size through unchanged", () => {
@@ -74,6 +84,38 @@ describe("device-table All rendering", () => {
     const el = await mount(30, ALL_PAGE_SIZE);
     expect(rowCount(el)).toBe(30);
     expect(pageSizeAttr(el)).toBe("0");
+  });
+
+  it("moves to the page containing the quickstart target", async () => {
+    const el = await mount(30, 10);
+    setTourConfiguration("demo-20.yaml");
+    setTourActive(true);
+    el.requestUpdate();
+
+    await el.updateComplete;
+    await el.updateComplete;
+
+    expect(
+      el
+        .shadowRoot!.querySelector("tbody tr[data-configuration]")
+        ?.getAttribute("data-configuration")
+    ).toBe("demo-20.yaml");
+  });
+
+  it("finds the quickstart target through sorting and search filters", async () => {
+    const el = await mount(30, 10);
+    el.initialSorting = [{ id: "name", desc: true }];
+    el.search = "does-not-match";
+    setTourConfiguration("demo-0.yaml");
+    setTourActive(true);
+    el.requestUpdate();
+
+    await el.updateComplete;
+    await el.updateComplete;
+
+    expect(
+      el.shadowRoot!.querySelector('tbody tr[data-configuration="demo-0.yaml"]')
+    ).not.toBeNull();
   });
 });
 

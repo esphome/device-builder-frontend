@@ -14,6 +14,7 @@ import { mdiChevronDown } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { inputStyles } from "../styles/inputs.js";
+import { renderOptionStack } from "../util/option-stack.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { buildOptionsComboboxChangeEvent } from "./options-combobox-event.js";
 import { optionsComboboxStyles } from "./options-combobox.styles.js";
@@ -26,6 +27,8 @@ registerMdiIcons({ "chevron-down": mdiChevronDown });
 export interface ComboboxOption {
   label: string;
   value: string;
+  /** Prose explaining the choice, rendered as a quiet second line. */
+  description?: string;
 }
 
 @customElement("esphome-options-combobox")
@@ -152,16 +155,11 @@ export class ESPHomeOptionsCombobox extends LitElement {
                       @click=${() => this._select(opt)}
                       @mouseenter=${() => (this._active = i)}
                     >
-                      ${
-                        this._isDefault(opt)
-                          ? html`<span class="option-default-stack">
-                              <span class="option-label">${opt.label}</span>
-                              <small class="option-default-note"
-                                >${this.defaultNote}</small
-                              >
-                            </span>`
-                          : html`<span class="option-label">${opt.label}</span>`
-                      }
+                      ${renderOptionStack(
+                        opt.label,
+                        opt.description,
+                        this._isDefault(opt) ? this.defaultNote : undefined
+                      )}
                     </div>`
                 )}
               </div>`
@@ -184,7 +182,10 @@ export class ESPHomeOptionsCombobox extends LitElement {
     const q = this._query.trim().toLowerCase();
     if (!q) return this.options;
     return this.options.filter(
-      (o) => o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q)
+      (o) =>
+        o.value.toLowerCase().includes(q) ||
+        o.label.toLowerCase().includes(q) ||
+        o.description?.toLowerCase().includes(q)
     );
   }
 

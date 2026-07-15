@@ -1,12 +1,11 @@
 import { consume } from "@lit/context";
+import { mdiClose } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import { styleMap } from "lit/directives/style-map.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { stripBase } from "../../util/base-path.js";
-import { navigate } from "../../util/navigation.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { isTypingTarget } from "../../util/typing-target.js";
 import { guidedTourStyles } from "./esphome-guided-tour.styles.js";
 import {
@@ -14,21 +13,40 @@ import {
   requestTourReveal,
   type TourAnchorEventDetail,
 } from "./tour-anchor.js";
+import { TourBubbleFit } from "./tour-bubble-fit.js";
+import { renderTourBubble, renderTourRecovery } from "./tour-bubble.js";
 import {
   computeTourFrame,
+  toRect,
   unionRects,
   type Rect,
   type TourFrame,
 } from "./tour-geometry.js";
-import { clearTourSuggestedName, setTourSuggestedName } from "./tour-session.js";
+import { TOUR_LAYOUT_RESTORE_EVENT } from "./tour-layout-controller.js";
+import { TourNavigatorController } from "./tour-navigator-controller.js";
+import { captureTourConfiguration, navigateToTourStep } from "./tour-route.js";
+import {
+  clearTourConfiguration,
+  clearTourPending,
+  clearTourSuggestedName,
+  getPendingTourStep,
+  getTourConfiguration,
+  setTourActive,
+  setTourPending,
+  setTourSuggestedName,
+} from "./tour-session.js";
 import { TourSkipAffordance } from "./tour-skip-affordance.js";
-import { renderTourSpotlightBackdrop, tourSpotlightStyles } from "./tour-spotlight.js";
+import { tourSpotlightStyles } from "./tour-spotlight.js";
 import {
   DIALOG_ANCHORS,
   STARTER_DEVICE_NAME,
   TOUR_STEPS,
   type TourStep,
 } from "./tour-steps.js";
+
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+
+registerMdiIcons({ close: mdiClose });
 
 @customElement("esphome-guided-tour")
 export class ESPHomeGuidedTour extends LitElement {
@@ -39,9 +57,12 @@ export class ESPHomeGuidedTour extends LitElement {
   @state() private _active = false;
   @state() private _stepIndex = 0;
   @state() private _frame: TourFrame | null = null;
+  @state() private _showAnchorRecovery = false;
 
   @query(".tour-popover") private _popover?: HTMLElement;
+  @query(".bubble") private _bubbleEl?: HTMLElement;
   @query(".btn-skip") private _skipButton?: HTMLElement;
+  @query(".btn-pause") private _pauseButton?: HTMLElement;
 
   private readonly _anchors = new Map<string, Element>();
 
@@ -51,12 +72,29 @@ export class ESPHomeGuidedTour extends LitElement {
   private _revealRequested = false;
   private _reflowScheduled = false;
   private _tourListenersBound = false;
+  private _anchorRecoveryTimer?: number;
+  private _dialogReady = false;
 
   private readonly _skipAffordance = new TourSkipAffordance(this, {
     isDialogStep: () =>
       this._active && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a)),
     skipRect: () => this._skipButton?.getBoundingClientRect(),
+    pauseRect: () => this._pauseButton?.getBoundingClientRect(),
     onSkip: () => this._skip(),
+    onPause: () => this._pause(),
+  });
+  private readonly _bubbleFit = new TourBubbleFit(this, {
+    bubbleEl: () => this._bubbleEl,
+    frame: () => this._frame,
+    anchorEl: () => this._observedTarget,
+    isActionStep: () => this._step.kind === "action",
+    onHeightChange: () => this._refresh(),
+  });
+  private readonly _navigator = new TourNavigatorController(this, {
+    isNavigatorStep: () =>
+      this._step.actionAnchors?.some((id) => id.endsWith("core-item")) ?? false,
+    onCoreSelected: () => this._goToStep(this._stepIndex + 1),
+    onReflow: () => this._refresh(),
   });
 
   private _observeTarget(el: Element | null): void {
@@ -84,22 +122,56 @@ export class ESPHomeGuidedTour extends LitElement {
     super.disconnectedCallback();
     window.removeEventListener(TOUR_ANCHOR_EVENT, this._onAnchorEvent);
     window.removeEventListener("popstate", this._onPopState);
-    this._unbindTourListeners();
-    this._teardownClicks();
-    this._observeTarget(null);
+    this._deactivate();
     this._resizeObserver?.disconnect();
     this._resizeObserver = undefined;
   }
 
   start(stepIndex = 0): void {
+    this._start(stepIndex, false);
+  }
+
+  private _start(requestedStep: number, resuming: boolean): void {
+    let stepIndex =
+      Number.isInteger(requestedStep) &&
+      requestedStep >= 0 &&
+      requestedStep < TOUR_STEPS.length
+        ? requestedStep
+        : 0;
+    if (
+      resuming &&
+      TOUR_STEPS[stepIndex].anchors.some((anchor) => DIALOG_ANCHORS.has(anchor))
+    ) {
+      stepIndex = 0;
+    }
+    if (!resuming || stepIndex === 0) clearTourConfiguration();
+    if (resuming && TOUR_STEPS[stepIndex].route === "device" && !getTourConfiguration()) {
+      stepIndex = 0;
+    }
+    setTourPending(stepIndex);
     setTourSuggestedName(STARTER_DEVICE_NAME);
     this._active = true;
+    setTourActive(true);
     this._stepIndex = stepIndex;
     this._frame = null;
+    this._bubbleFit.reset();
+    this._dialogReady = false;
     this._revealRequested = false;
     this._bindTourListeners();
-    if (this._step.route === "dashboard" && this._onDeviceRoute()) void navigate("/");
-    this._scheduleMeasure();
+    if (
+      !navigateToTourStep(
+        this._step,
+        resuming,
+        () => {
+          if (this._active) this._scheduleMeasure();
+        },
+        () => {
+          if (this._active) this._pause();
+        }
+      )
+    ) {
+      this._scheduleMeasure();
+    }
   }
 
   private _bindTourListeners(): void {
@@ -109,6 +181,7 @@ export class ESPHomeGuidedTour extends LitElement {
     window.addEventListener("scroll", this._onReflow, true);
     window.addEventListener("keydown", this._onKeydown, true);
     window.addEventListener("wa-after-show", this._onDialogShown);
+    this._navigator.setActive(true);
   }
 
   private _unbindTourListeners(): void {
@@ -118,10 +191,15 @@ export class ESPHomeGuidedTour extends LitElement {
     window.removeEventListener("scroll", this._onReflow, true);
     window.removeEventListener("keydown", this._onKeydown, true);
     window.removeEventListener("wa-after-show", this._onDialogShown);
+    this._navigator.setActive(false);
   }
 
   protected firstUpdated(): void {
     this._consumeTourStepParam();
+    const pendingStep = getPendingTourStep();
+    if (!this._active && pendingStep !== null) {
+      this._start(pendingStep, true);
+    }
   }
 
   private _onPopState = (): void => {
@@ -129,7 +207,10 @@ export class ESPHomeGuidedTour extends LitElement {
   };
 
   private _onDialogShown = (): void => {
-    if (this._active && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) {
+    if (!this._active) return;
+    this._dialogReady = true;
+    if (this._maybeAutoAdvance()) return;
+    if (this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) {
       // The dialog's open animation is a transform (no layout-box change), so
       // the target ResizeObserver never fires; re-measure now that it settled.
       this._refresh();
@@ -157,10 +238,6 @@ export class ESPHomeGuidedTour extends LitElement {
     return TOUR_STEPS[this._stepIndex];
   }
 
-  private _onDeviceRoute(): boolean {
-    return stripBase(window.location.pathname).startsWith("/device/");
-  }
-
   private _onAnchorEvent = (event: Event): void => {
     const { id, el, action } = (event as CustomEvent<TourAnchorEventDetail>).detail;
     if (action === "register") {
@@ -170,21 +247,52 @@ export class ESPHomeGuidedTour extends LitElement {
     }
     // Anchors register from all over the app; only react while touring.
     if (!this._active) return;
+    captureTourConfiguration(this._active);
+    if (action === "register" && this._step.anchors.includes(id)) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        requestAnimationFrame(() => {
+          if (this._active && this._step.anchors.includes(id)) this._refresh();
+        });
+      }
+    }
+    if (action === "register" && id === "nav-mobile-core") {
+      this._navigator.anchorRegistered(id, el);
+    }
     if (this._maybeAutoAdvance()) return;
     this._refresh();
   };
 
   private _maybeAutoAdvance(): boolean {
     if (this._step.kind !== "action") return false;
+    // Explicit action anchors must receive their click; visual-anchor churn
+    // (for example opening the mobile navigator drawer) is not completion.
+    if ((this._step.actionAnchors?.length ?? 0) > 0) return false;
     const next = TOUR_STEPS[this._stepIndex + 1];
     if (!next) return false;
-    const currentPresent = this._step.anchors.some((a) => this._anchors.has(a));
-    const nextPresent = next.anchors.some((a) => this._anchors.has(a));
-    if (!currentPresent && nextPresent) {
-      this._goToStep(this._stepIndex + 1);
-      return true;
+    const enteringDialog =
+      !this._step.anchors.some((anchor) => DIALOG_ANCHORS.has(anchor)) &&
+      next.anchors.some((anchor) => DIALOG_ANCHORS.has(anchor));
+    if (enteringDialog) {
+      // Anchor churn can't signal completion here: the page keeps this
+      // step's anchors registered behind the modal, and a hidden dialog
+      // keeps the next step's registered but sizeless. The dialog visibly
+      // showing the next anchor after its open animation is the signal.
+      if (!this._dialogReady) return false;
+      const sized = next.anchors.some((a) => {
+        const el = this._anchors.get(a);
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 || r.height > 0;
+      });
+      if (!sized) return false;
+    } else {
+      const currentPresent = this._step.anchors.some((a) => this._anchors.has(a));
+      const nextPresent = next.anchors.some((a) => this._anchors.has(a));
+      if (currentPresent || !nextPresent) return false;
     }
-    return false;
+    this._goToStep(this._stepIndex + 1);
+    return true;
   }
 
   // Scroll/resize can fire many times per frame; coalesce the layout reads
@@ -204,7 +312,7 @@ export class ESPHomeGuidedTour extends LitElement {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      this._skip();
+      this._pause();
       return;
     }
 
@@ -230,8 +338,18 @@ export class ESPHomeGuidedTour extends LitElement {
     return els;
   }
 
+  private _actionAnchorEls(): Element[] {
+    const els: Element[] = [];
+    for (const id of this._step.actionAnchors ?? this._step.anchors) {
+      const el = this._anchors.get(id);
+      if (el) els.push(el);
+    }
+    return els;
+  }
+
   private _refresh(): void {
     if (!this._active) {
+      this._clearAnchorRecovery();
       this._teardownClicks();
       this._observeTarget(null);
       this._frame = null;
@@ -239,13 +357,7 @@ export class ESPHomeGuidedTour extends LitElement {
     }
     const present = this._presentAnchorEls();
 
-    this._teardownClicks();
-    if (this._step.kind === "action") {
-      for (const el of present) {
-        el.addEventListener("click", this._onAnchorClick);
-        this._clickTargets.push(el);
-      }
-    }
+    this._syncClickTargets();
 
     const target =
       present.find((el) => {
@@ -265,23 +377,26 @@ export class ESPHomeGuidedTour extends LitElement {
         if (presentId) requestTourReveal(presentId);
       }
       if (this._frame !== null) this._frame = null;
+      this._scheduleAnchorRecovery();
       return;
     }
 
+    this._clearAnchorRecovery();
     const appearing = this._frame === null;
     // On first paint of a step, pull an off-screen target into view — the dim
     // backdrop swallows scroll, so a target below the fold (or its bubble)
     // would otherwise be unreachable on a small screen.
     if (appearing) this._scrollTargetIntoView(target);
-    const tr = target.getBoundingClientRect();
     const rect = unionRects([
-      { x: tr.left, y: tr.top, w: tr.width, h: tr.height },
+      toRect(target.getBoundingClientRect()),
       ...this._highlightRects(),
     ]);
-    this._frame = computeTourFrame(rect, this._step.side, {
-      w: window.innerWidth,
-      h: window.innerHeight,
-    });
+    this._frame = computeTourFrame(
+      rect,
+      this._step.side,
+      { w: window.innerWidth, h: window.innerHeight },
+      { bubbleHeight: this._bubbleFit.measuredHeight }
+    );
     if (appearing && this._step.anchors.some((a) => DIALOG_ANCHORS.has(a))) {
       this._bouncePopover();
     }
@@ -295,7 +410,7 @@ export class ESPHomeGuidedTour extends LitElement {
       if (!el) continue;
       const r = el.getBoundingClientRect();
       if (r.width > 0 || r.height > 0) {
-        rects.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+        rects.push(toRect(r));
       }
     }
     return rects;
@@ -323,18 +438,46 @@ export class ESPHomeGuidedTour extends LitElement {
     this._clickTargets = [];
   }
 
+  private _syncClickTargets(): void {
+    // removeEventListener drops a listener from an in-flight dispatch even
+    // when it is re-added immediately, so a full teardown here would eat the
+    // very click _onAnchorClick waits for whenever that click's own handlers
+    // re-render an anchor. Only touch elements that actually changed.
+    const els = this._step.kind === "action" ? this._actionAnchorEls() : [];
+    for (const el of this._clickTargets) {
+      if (!els.includes(el)) el.removeEventListener("click", this._onAnchorClick);
+    }
+    for (const el of els) {
+      el.addEventListener("click", this._onAnchorClick);
+    }
+    this._clickTargets = els;
+  }
+
   private _goToStep(index: number): void {
     this._teardownClicks();
+    this._clearAnchorRecovery();
     // Consecutive dialog steps keep the affordance active; clear any hover
     // carried across so the cursor can't stay stuck until the next move.
     this._skipAffordance.reset();
     this._stepIndex = index;
+    setTourPending(index);
     this._frame = null;
+    this._bubbleFit.reset();
     this._revealRequested = false;
-    if (this._step.route === "dashboard" && this._onDeviceRoute()) {
-      void navigate("/");
+    if (
+      !navigateToTourStep(
+        this._step,
+        false,
+        () => {
+          if (this._active) this._scheduleMeasure();
+        },
+        () => {
+          if (this._active) this._pause();
+        }
+      )
+    ) {
+      this._scheduleMeasure();
     }
-    this._scheduleMeasure();
   }
 
   private _next(): void {
@@ -349,15 +492,29 @@ export class ESPHomeGuidedTour extends LitElement {
     this._finish();
   };
 
-  private _finish(): void {
+  private _pause = (): void => {
+    this._deactivate();
+    this.dispatchEvent(new CustomEvent("tour-paused", { bubbles: true, composed: true }));
+  };
+
+  private _deactivate(): void {
+    this._clearAnchorRecovery();
     this._active = false;
+    setTourActive(false);
     this._frame = null;
     this._unbindTourListeners();
     this._skipAffordance.reset();
     this._teardownClicks();
     this._observeTarget(null);
     clearTourSuggestedName();
+    window.dispatchEvent(new Event(TOUR_LAYOUT_RESTORE_EVENT));
     this._hidePopover();
+  }
+
+  private _finish(): void {
+    clearTourConfiguration();
+    clearTourPending();
+    this._deactivate();
     this.dispatchEvent(
       new CustomEvent("tour-finished", { bubbles: true, composed: true })
     );
@@ -373,6 +530,22 @@ export class ESPHomeGuidedTour extends LitElement {
       }
       this._refresh();
     });
+  }
+
+  private _scheduleAnchorRecovery(): void {
+    if (this._anchorRecoveryTimer !== undefined || this._showAnchorRecovery) return;
+    this._anchorRecoveryTimer = window.setTimeout(() => {
+      this._anchorRecoveryTimer = undefined;
+      if (this._active && this._frame === null) this._showAnchorRecovery = true;
+    }, 800);
+  }
+
+  private _clearAnchorRecovery(): void {
+    if (this._anchorRecoveryTimer !== undefined) {
+      clearTimeout(this._anchorRecoveryTimer);
+      this._anchorRecoveryTimer = undefined;
+    }
+    this._showAnchorRecovery = false;
   }
 
   private _showPopover(): void {
@@ -405,98 +578,25 @@ export class ESPHomeGuidedTour extends LitElement {
 
   protected render() {
     return html`<div class="tour-popover" popover="manual">
-      ${this._active && this._frame ? this._renderSpotlight(this._frame) : nothing}
+      ${
+        this._active && this._frame
+          ? renderTourBubble({
+              frame: this._frame,
+              step: this._step,
+              stepIndex: this._stepIndex,
+              totalSteps: TOUR_STEPS.length,
+              localize: this._localize,
+              skipHover: this._skipAffordance.hover,
+              pauseHover: this._skipAffordance.pauseHover,
+              onPause: this._pause,
+              onSkip: this._skip,
+              onNext: () => this._next(),
+            })
+          : this._active && this._showAnchorRecovery
+            ? renderTourRecovery(this._localize, this._pause, this._skip)
+            : nothing
+      }
     </div>`;
-  }
-
-  private _caretStyle(frame: TourFrame, side: TourStep["side"]): Record<string, string> {
-    const { hole, bubble } = frame;
-    const OUT = "-6px";
-
-    if (side === "left" || side === "right") {
-      const pos = this._caretPos(hole.y, hole.h, bubble.top ?? 0);
-      return side === "right" ? { left: OUT, top: pos } : { right: OUT, top: pos };
-    }
-    const pos = this._caretPos(hole.x, hole.w, bubble.left);
-    return side === "top" ? { bottom: OUT, left: pos } : { top: OUT, left: pos };
-  }
-
-  private _caretPos(start: number, size: number, bubbleStart: number): string {
-    const overlapStart = Math.max(0, start - bubbleStart);
-    const overlapEnd = start + size - bubbleStart;
-    return `clamp(12px, calc((${overlapStart}px + min(100%, ${overlapEnd}px)) / 2 - 6px), calc(100% - 20px))`;
-  }
-
-  private _renderSpotlight(frame: TourFrame) {
-    const { bubble } = frame;
-    const step = this._step;
-    const bubbleStyle: Record<string, string> = {
-      left: `${bubble.left}px`,
-      width: `${bubble.width}px`,
-      ...(bubble.bottom !== undefined
-        ? { bottom: `${bubble.bottom}px` }
-        : { top: `${bubble.top ?? 0}px` }),
-    };
-    return html`
-      ${renderTourSpotlightBackdrop(frame)}
-      <div
-        class="bubble"
-        role="dialog"
-        aria-live="polite"
-        aria-label=${this._localize(step.titleKey)}
-        style=${styleMap(bubbleStyle)}
-      >
-        ${
-          frame.overlay
-            ? nothing
-            : html`<div
-                class="caret"
-                style=${styleMap(this._caretStyle(frame, frame.side))}
-                aria-hidden="true"
-              ></div>`
-        }
-        <div class="step-label">
-          ${this._localize("tour.step_counter", {
-            current: this._stepIndex + 1,
-            total: TOUR_STEPS.length,
-          })}
-        </div>
-        <h2>${this._localize(step.titleKey)}</h2>
-        <p>${this._localize(step.bodyKey)}</p>
-        ${
-          step.kind === "action"
-            ? html`
-                <div class="hint">
-                  <span class="hint-dot" aria-hidden="true"></span>
-                  ${this._localize(step.hintKey ?? "tour.continue")}
-                </div>
-                <div class="actions action-only">
-                  <button
-                    type="button"
-                    class="btn btn-skip ${this._skipAffordance.hover ? "hovered" : ""}"
-                    @click=${this._skip}
-                  >
-                    ${this._localize("tour.skip")}
-                  </button>
-                </div>
-              `
-            : html`
-                <div class="actions">
-                  <button type="button" class="btn btn-skip" @click=${this._skip}>
-                    ${this._localize("tour.skip")}
-                  </button>
-                  <button type="button" class="btn btn-next" @click=${() => this._next()}>
-                    ${
-                      this._stepIndex >= TOUR_STEPS.length - 1
-                        ? this._localize("tour.finish")
-                        : this._localize("tour.next")
-                    }
-                  </button>
-                </div>
-              `
-        }
-      </div>
-    `;
   }
 }
 

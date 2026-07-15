@@ -39,6 +39,7 @@ import {
   tourAnchor,
   type TourRevealEventDetail,
 } from "../guided-tour/tour-anchor.js";
+import { TOUR_LAYOUT_CHANGE_EVENT } from "../guided-tour/tour-layout-controller.js";
 import type { ESPHomeYamlEditor, HighlightRange } from "../yaml-editor.js";
 import { renderEditorToolbar } from "./device-editor-toolbar.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
@@ -139,7 +140,15 @@ export class ESPHomeDeviceEditor extends LitElement {
   private _onTourReveal = (event: Event): void => {
     const { id } = (event as CustomEvent<TourRevealEventDetail>).detail;
     const next = layoutRevealingAnchor(id, this.layout, this._isMobile);
-    if (next) this._setLayout(next);
+    if (next) {
+      this.dispatchEvent(
+        new CustomEvent(TOUR_LAYOUT_CHANGE_EVENT, {
+          detail: next,
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
   };
 
   @property({ attribute: false })

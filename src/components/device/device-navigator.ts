@@ -480,6 +480,12 @@ export class ESPHomeDeviceNavigator extends LitElement {
                     filtering,
                     selectedLine: this._selectedLine,
                     hoveredLine: this._hoveredLine,
+                    tourAnchorId:
+                      i === 0 && this.tourAnchorId
+                        ? this.classList.contains("drawer-nav")
+                          ? "nav-mobile-core"
+                          : "nav-core"
+                        : undefined,
                     // Omitted when empty (the steady state) so rows skip
                     // the per-render key construction entirely.
                     errorCount: this.errorCounts.size

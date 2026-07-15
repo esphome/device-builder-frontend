@@ -3,9 +3,7 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { notify } from "../../util/notify.js";
 
-import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
-import { ErrorCode } from "../../api/types/protocol.js";
 import type { PairingWindowState, PeerSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
@@ -14,16 +12,18 @@ import {
   buildServerPeersContext,
   localizeContext,
 } from "../../context/index.js";
+import { pairingWindowStyles } from "../../styles/pairing-window.js";
+import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { remainingOf } from "../../util/relative-time.js";
-import type { ESPHomeAcceptPeerDialog } from "../accept-peer-dialog.js";
-import { pairingWindowStyles } from "./pairing-styles.js";
-import { renderStatusRow } from "./settings-rows.js";
+import { PairingWindowController } from "../../util/pairing-window-controller.js";
 import {
-  peerRowStyles,
-  settingsRowStyles,
-  settingsSharedStyles,
-} from "./shared-styles.js";
+  approvePeerRequest,
+  rejectPeerRequest,
+} from "../../util/peer-pairing-actions.js";
+import type { ESPHomeAcceptPeerDialog } from "../accept-peer-dialog.js";
+import { renderPairingWindowStatus } from "../shared/pairing-window-status.js";
+import { renderStatusRow } from "./settings-rows.js";
+import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "../accept-peer-dialog.js";
 
@@ -44,15 +44,19 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
   @state()
   private _windowState: PairingWindowState | null = null;
 
-  @state()
-  private _baselineSeconds: number | null = null;
-
-  private _anchorMs = 0;
-
-  @state()
-  private _tick = 0;
-
-  private _tickHandle: ReturnType<typeof setInterval> | null = null;
+  // Auto-open: intent="pair_request" Noise frames are accepted while the
+  // operator is on this screen. Refcounted server-side; closes on
+  // disconnect or 5min idle.
+  private readonly _window = new PairingWindowController(this, {
+    getApi: () => this._api,
+    autoOpen: true,
+    onOpenFailed: () =>
+      notify.warning(this._localize("settings.build_server_pairing_window_open_failed")),
+    onExtendFailed: () =>
+      notify.warning(
+        this._localize("settings.build_server_pairing_window_extend_failed")
+      ),
+  });
 
   @query("esphome-accept-peer-dialog")
   private _acceptPeerDialog!: ESPHomeAcceptPeerDialog;
@@ -65,40 +69,10 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
     pairingWindowStyles,
   ];
 
-  connectedCallback() {
-    super.connectedCallback();
-    // Open the receiver-side pairing window so intent="pair_request"
-    // Noise frames are accepted while the operator is on this screen.
-    // Refcounted server-side; closes on disconnect or 5min idle.
-    if (this._api !== undefined) {
-      void this._api.setRemoteBuildPairingWindow({ open: true }).catch(() => {
-        this._toast("warning", "settings.build_server_pairing_window_open_failed");
-      });
-    }
-  }
-
-  disconnectedCallback() {
-    this._stopTick();
-    if (this._api !== undefined) {
-      void this._api.setRemoteBuildPairingWindow({ open: false }).catch(() => {
-        // Idle timer is the safety net.
-      });
-    }
-    super.disconnectedCallback();
-  }
-
   protected updated(changed: Map<string, unknown>) {
     super.updated(changed);
     if (changed.has("_windowState")) {
-      const state = this._windowState;
-      if (state?.open && state.expires_in_seconds !== null) {
-        this._baselineSeconds = state.expires_in_seconds;
-        this._anchorMs = Date.now();
-        this._startTick();
-      } else {
-        this._baselineSeconds = null;
-        this._stopTick();
-      }
+      this._window.onStateChanged(this._windowState);
     }
   }
 
@@ -108,7 +82,12 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
     return html`
       <div class="section-heading">
         ${this._localize("settings.build_server_pairing_requests_heading")}
-        ${this._renderWindowStatus()}
+        ${renderPairingWindowStatus(
+          this._localize,
+          this._windowState,
+          this._window.remainingSeconds(),
+          this._onExtend
+        )}
       </div>
       <div class="section-intro">
         ${this._localize("settings.build_server_pairing_requests_desc")}
@@ -130,42 +109,6 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
         @confirm=${this._onAcceptConfirm}
         @reject=${this._onRejectFromDialog}
       ></esphome-accept-peer-dialog>
-    `;
-  }
-
-  private _renderWindowStatus() {
-    const state = this._windowState;
-    if (state === null) return nothing;
-    if (!state.open) {
-      return html`
-        <span class="pairing-window-pill pairing-window-closed">
-          ${this._localize("settings.build_server_pairing_window_closed")}
-        </span>
-      `;
-    }
-    const remaining = this._remainingSeconds();
-    return html`
-      <span class="pairing-window-pill pairing-window-open">
-        ${this._localize("settings.build_server_pairing_window_open")}
-      </span>
-      ${
-        remaining !== null
-          ? html`
-              <span
-                class="pairing-window-countdown"
-                aria-label=${this._localize(
-                  "settings.build_server_pairing_window_remaining_aria",
-                  { duration: this._formatDuration(remaining) }
-                )}
-              >
-                ${this._formatDuration(remaining)}
-              </span>
-            `
-          : nothing
-      }
-      <button type="button" class="pairing-window-extend" @click=${this._onExtend}>
-        ${this._localize("settings.build_server_pairing_window_extend")}
-      </button>
     `;
   }
 
@@ -206,88 +149,17 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
 
   private async _onAcceptConfirm(e: CustomEvent<{ dashboardId: string }>) {
     if (this._api === undefined) return;
-    const prefix = "settings.build_server_peer_approve";
-    try {
-      await this._api.approveRemoteBuildPeer({
-        dashboard_id: e.detail.dashboardId,
-      });
-    } catch (err) {
-      this._toastApiFailure(prefix, err);
-      return;
-    }
-    this._toast("success", `${prefix}_success`);
+    await approvePeerRequest(this._api, this._localize, e.detail.dashboardId);
   }
 
   private async _onRejectFromDialog(e: CustomEvent<{ dashboardId: string }>) {
     if (this._api === undefined) return;
-    const prefix = "settings.build_server_peer_reject";
-    try {
-      await this._api.removeRemoteBuildPeer({
-        dashboard_id: e.detail.dashboardId,
-      });
-    } catch (err) {
-      this._toastApiFailure(prefix, err);
-      return;
-    }
-    this._toast("success", `${prefix}_success`);
-  }
-
-  private _toastApiFailure(prefix: string, err: unknown) {
-    if (err instanceof APIError) {
-      if (err.errorCode === ErrorCode.NOT_FOUND) {
-        this._toast("warning", `${prefix}_already_gone`);
-        return;
-      }
-      if (err.details) {
-        this._toast("error", `${prefix}_failed_detail`, {
-          reason: err.details,
-        });
-        return;
-      }
-    }
-    this._toast("error", `${prefix}_failed`);
+    await rejectPeerRequest(this._api, this._localize, e.detail.dashboardId);
   }
 
   private _onExtend = () => {
-    if (this._api === undefined) return;
-    void this._api.setRemoteBuildPairingWindow({ open: true }).catch(() => {
-      this._toast("warning", "settings.build_server_pairing_window_extend_failed");
-    });
+    this._window.extend();
   };
-
-  private _startTick() {
-    if (this._tickHandle !== null) return;
-    this._tickHandle = setInterval(() => {
-      this._tick = (this._tick + 1) % 1000;
-    }, 1000);
-  }
-
-  private _stopTick() {
-    if (this._tickHandle !== null) {
-      clearInterval(this._tickHandle);
-      this._tickHandle = null;
-    }
-  }
-
-  private _remainingSeconds(): number | null {
-    return remainingOf(this._baselineSeconds, this._anchorMs, Date.now());
-  }
-
-  private _formatDuration(seconds: number | null): string {
-    if (seconds === null) return "";
-    const whole = Math.floor(seconds);
-    const m = Math.floor(whole / 60);
-    const s = whole % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  }
-
-  private _toast(
-    level: "success" | "warning" | "error",
-    key: string,
-    values?: Record<string, string | number>
-  ) {
-    notify[level](this._localize(key, values));
-  }
 }
 
 declare global {

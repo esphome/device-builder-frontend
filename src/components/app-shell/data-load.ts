@@ -1,4 +1,4 @@
-import { OnboardingStepId, type UserPreferences } from "../../api/types/system.js";
+import type { UserPreferences } from "../../api/types/system.js";
 import {
   isExperienceChosen,
   shouldAutoShowOnboarding,
@@ -11,6 +11,7 @@ export function applyPreferences(host: ESPHomeApp, prefs: UserPreferences): void
   host.applyTheme(prefs.theme);
   host._experienceLevel = prefs.experience_level;
   host._remoteComputeOnly = prefs.remote_compute_only;
+  host._hideDeviceBuilder = prefs.hide_device_builder;
   host._versionHistoryEnabled = prefs.version_history_enabled;
 }
 
@@ -22,17 +23,12 @@ export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
   const keysPromise = fetchSecretKeys(host._api);
   try {
     const state = await host._api.getOnboardingState();
-    host._onboardingHasUseCase = state.steps.some(
-      (s) => s.id === OnboardingStepId.USE_CASE
-    );
-    // Only the full first-run wizard (use-case + experience) auto-pops now;
-    // Wi-Fi is collected per-device in the create wizard, never auto-popped.
+    // Only the mandatory setup wizard auto-pops. Wi-Fi is collected when the
+    // first Wi-Fi device needs it, never during onboarding.
     host._onboardingShouldShow =
-      shouldAutoShowOnboarding(state, host._onboardingSessionDismissed) &&
-      !isExperienceChosen(state);
+      shouldAutoShowOnboarding(state) && !isExperienceChosen(state);
   } catch (err) {
-    // Non-critical — leave _onboardingShouldShow alone so a transient reload on
-    // a session-dismissed state can't re-open the wizard.
+    // Non-critical — leave the current visibility decision alone.
     console.warn("Failed to load onboarding state:", err);
   }
   host._onboardingPending = !hasSharedWifiSecret(await keysPromise);

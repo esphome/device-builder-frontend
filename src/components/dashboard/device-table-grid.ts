@@ -4,6 +4,8 @@ import { classMap } from "lit/directives/class-map.js";
 import { repeat } from "lit/directives/repeat.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
+import { getActiveTourConfiguration } from "../guided-tour/tour-session.js";
 
 export interface DeviceTableHeadProps {
   table: any;
@@ -110,6 +112,7 @@ export function renderDeviceTableHead(p: DeviceTableHeadProps): TemplateResult {
  * the host supplies.
  */
 export function renderDeviceTableBody(p: DeviceTableBodyProps): TemplateResult {
+  const tourConfiguration = getActiveTourConfiguration();
   return html`
     <tbody>
       ${
@@ -122,6 +125,9 @@ export function renderDeviceTableBody(p: DeviceTableBodyProps): TemplateResult {
               (row) => row.original.config,
               (row) => html`
                 <tr
+                  ${tourAnchor(
+                    row.original.config === tourConfiguration ? "tour-device" : undefined
+                  )}
                   role="row"
                   tabindex="0"
                   data-configuration=${row.original.config}

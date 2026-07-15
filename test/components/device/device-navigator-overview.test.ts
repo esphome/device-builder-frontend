@@ -38,4 +38,18 @@ describe("device-navigator section header icons", () => {
       SECTION_ICON.automations,
     ]);
   });
+
+  it("reports whether each keyboard-operable section is expanded", async () => {
+    const nav = await mountNavigator();
+    const firstHeader = nav.shadowRoot!.querySelector<HTMLElement>(".nav-content")!;
+    expect(firstHeader.getAttribute("role")).toBe("button");
+    expect(firstHeader.getAttribute("aria-expanded")).toBe("false");
+
+    nav.openSections = new Set([0]);
+    await nav.updateComplete;
+
+    expect(
+      nav.shadowRoot!.querySelector(".nav-content")?.getAttribute("aria-expanded")
+    ).toBe("true");
+  });
 });

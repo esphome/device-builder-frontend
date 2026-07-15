@@ -6,6 +6,8 @@ export type TourRoute = "dashboard" | "device";
 
 export interface TourStep {
   anchors: string[];
+  /** Optional click targets when the visual spotlight covers a larger region. */
+  actionAnchors?: string[];
   /** Extra anchors merged into the spotlight hole (not click targets) so the
    *  bubble also keeps clear of context the step talks about. */
   highlightAnchors?: string[];
@@ -15,12 +17,14 @@ export interface TourStep {
   titleKey: string;
   bodyKey: string;
   hintKey?: string;
+  nextLabelKey?: string;
 }
 
 export const DIALOG_ANCHORS: ReadonlySet<string> = new Set([
   "create-method-basic",
   "board-featured",
   "name-finish",
+  "wifi-tour-continue",
 ]);
 
 export const TOUR_STEPS: readonly TourStep[] = [
@@ -45,7 +49,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     anchors: ["board-featured"],
     route: "dashboard",
-    side: "right",
+    side: "top",
     kind: "action",
     titleKey: "tour.steps.board.title",
     bodyKey: "tour.steps.board.body",
@@ -55,20 +59,43 @@ export const TOUR_STEPS: readonly TourStep[] = [
     anchors: ["name-finish"],
     highlightAnchors: ["name-field"],
     route: "dashboard",
-    side: "right",
+    side: "top",
     kind: "action",
     titleKey: "tour.steps.name.title",
     bodyKey: "tour.steps.name.body",
     hintKey: "tour.steps.name.hint",
   },
   {
+    anchors: ["wifi-tour-continue"],
+    // Creation is asynchronous; anchor churn advances only after the device
+    // page mounts, so failures keep this step visible in the wizard.
+    actionAnchors: [],
+    // The credential inputs the hint asks for; keeping them in the hole
+    // keeps the bubble (and the dim) off them on small viewports.
+    highlightAnchors: ["wifi-fields"],
+    route: "dashboard",
+    side: "top",
+    kind: "action",
+    titleKey: "tour.steps.wifi.title",
+    bodyKey: "tour.steps.wifi.body",
+    hintKey: "tour.steps.wifi.hint",
+  },
+  {
     // The open navigator when visible, else the toggle that reveals it.
-    anchors: ["nav", "nav-toggle"],
+    anchors: [
+      "nav-mobile-core-item",
+      "nav-core-item",
+      "nav-mobile-core",
+      "nav",
+      "nav-toggle",
+    ],
+    actionAnchors: ["nav-mobile-core-item", "nav-core-item"],
     route: "device",
     side: "right",
-    kind: "info",
+    kind: "action",
     titleKey: "tour.steps.navigator.title",
     bodyKey: "tour.steps.navigator.body",
+    hintKey: "tour.steps.navigator.hint",
   },
   {
     anchors: ["central"],
@@ -77,6 +104,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     kind: "info",
     titleKey: "tour.steps.central.title",
     bodyKey: "tour.steps.central.body",
+    nextLabelKey: "tour.got_it",
   },
   {
     anchors: ["yaml"],
@@ -85,6 +113,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     kind: "info",
     titleKey: "tour.steps.yaml.title",
     bodyKey: "tour.steps.yaml.body",
+    nextLabelKey: "tour.got_it",
   },
   {
     anchors: ["layout-toggle"],
@@ -93,6 +122,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     kind: "info",
     titleKey: "tour.steps.layout.title",
     bodyKey: "tour.steps.layout.body",
+    nextLabelKey: "tour.got_it",
   },
   {
     anchors: ["install"],
@@ -101,21 +131,14 @@ export const TOUR_STEPS: readonly TourStep[] = [
     kind: "info",
     titleKey: "tour.steps.install.title",
     bodyKey: "tour.steps.install.body",
+    nextLabelKey: "tour.got_it",
   },
   {
-    anchors: ["view-toggle"],
+    anchors: ["tour-device"],
     route: "dashboard",
     side: "bottom",
     kind: "info",
     titleKey: "tour.steps.dashboard.title",
     bodyKey: "tour.steps.dashboard.body",
-  },
-  {
-    anchors: ["create-device-fab", "add-device-card"],
-    route: "dashboard",
-    side: "top",
-    kind: "info",
-    titleKey: "tour.steps.done.title",
-    bodyKey: "tour.steps.done.body",
   },
 ];

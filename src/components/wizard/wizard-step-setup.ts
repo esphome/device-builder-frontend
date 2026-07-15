@@ -15,6 +15,7 @@ import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import {
   clearTourSuggestedName,
   getTourSuggestedName,
+  isTourActive,
 } from "../guided-tour/tour-session.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
@@ -50,10 +51,12 @@ export class ESPHomeWizardStepSetup extends LitElement {
   @state()
   private _wifiConfigured = false;
 
-  /** Collect Wi-Fi only when the board needs it and no shared secret exists
-   *  yet; every other board skips the step. */
+  /** Show Wi-Fi when credentials are needed, or during the quickstart so users
+   *  learn that saved credentials are reused without revealing their values. */
   private get _collectWifi(): boolean {
-    return Boolean(this.board?.requires_wifi) && !this._wifiConfigured;
+    return (
+      Boolean(this.board?.requires_wifi) && (!this._wifiConfigured || isTourActive())
+    );
   }
 
   @state()
@@ -84,6 +87,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _canAdvance(): boolean {
     if (this._stage === "name") return !!this._deviceName.trim();
+    if (this._wifiConfigured) return true;
     // The Wi-Fi stage only appears when Wi-Fi is required, so an SSID is
     // mandatory; a too-short WPA passphrase is also rejected.
     return !!this._wifiSsid.trim() && !isWifiPasswordTooShort(this._wifiPassword);
@@ -219,6 +223,16 @@ export class ESPHomeWizardStepSetup extends LitElement {
         gap: var(--wa-space-s);
       }
 
+      .wifi-saved {
+        padding: var(--wa-space-m);
+        border-radius: var(--wa-border-radius-m);
+        background: var(--wa-color-surface-lowered);
+      }
+
+      .wifi-saved .section-title {
+        margin-bottom: var(--wa-space-2xs);
+      }
+
       .btn {
         display: inline-flex;
         align-items: center;
@@ -330,21 +344,40 @@ export class ESPHomeWizardStepSetup extends LitElement {
           ${this._localize("wizard.back")}
         </button>
         <div class="actions-right">
-          <button
-            class="btn btn-primary"
-            type="button"
-            ${tourAnchor("name-finish")}
-            ?disabled=${!this._canAdvance() || this.submitting}
-            aria-busy=${this.submitting || nothing}
-            @click=${this._onNext}
-          >
-            ${this.submitting ? html`<wa-spinner></wa-spinner>` : nothing}
-            ${
-              this._stage === "name" && this._collectWifi
-                ? this._localize("wizard.next")
-                : this._localize("wizard.finish_setup")
-            }
-          </button>
+          ${
+            this._stage === "wifi" && this._wifiConfigured
+              ? html`<button
+                  class="btn btn-primary wifi-confirm"
+                  type="button"
+                  ${tourAnchor("wifi-tour-continue")}
+                  ?disabled=${this.submitting}
+                  @click=${this._onUseSavedWifi}
+                >
+                  ${this._localize("wizard.wifi_use_saved")}
+                </button>`
+              : nothing
+          }
+          ${
+            this._stage === "wifi" && this._wifiConfigured
+              ? nothing
+              : html`<button
+                  class="btn btn-primary"
+                  type="button"
+                  ${tourAnchor(
+                    this._stage === "name" ? "name-finish" : "wifi-tour-continue"
+                  )}
+                  ?disabled=${!this._canAdvance() || this.submitting}
+                  aria-busy=${this.submitting || nothing}
+                  @click=${this._onNext}
+                >
+                  ${this.submitting ? html`<wa-spinner></wa-spinner>` : nothing}
+                  ${
+                    this._stage === "name" && this._collectWifi
+                      ? this._localize("wizard.next")
+                      : this._localize("wizard.finish_setup")
+                  }
+                </button>`
+          }
         </div>
       </div>
     `;
@@ -398,24 +431,41 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _renderWifiSection() {
     return html`
-      <section class="section">
+      <section class="section" ${tourAnchor("wifi-fields")}>
         <div>
           <h3 class="section-title">${this._localize("wizard.wifi_configuration")}</h3>
-          <p class="section-subtitle">${this._localize("wizard.wifi_required_desc")}</p>
+          <p class="section-subtitle">
+            ${this._localize(
+              this._wifiConfigured
+                ? "wizard.wifi_saved_desc"
+                : "wizard.wifi_required_desc"
+            )}
+          </p>
         </div>
 
-        ${renderWifiFields({
-          localize: this._localize,
-          ssid: this._wifiSsid,
-          password: this._wifiPassword,
-          disabled: false,
-          onSsidInput: (v) => {
-            this._wifiSsid = v;
-          },
-          onPasswordInput: (v) => {
-            this._wifiPassword = v;
-          },
-        })}
+        ${
+          this._wifiConfigured
+            ? html`<div class="wifi-saved" role="status">
+                <h4 class="section-title">
+                  ${this._localize("wizard.wifi_saved_title")}
+                </h4>
+                <p class="section-subtitle">
+                  ${this._localize("wizard.wifi_saved_reuse")}
+                </p>
+              </div>`
+            : renderWifiFields({
+                localize: this._localize,
+                ssid: this._wifiSsid,
+                password: this._wifiPassword,
+                disabled: false,
+                onSsidInput: (v) => {
+                  this._wifiSsid = v;
+                },
+                onPasswordInput: (v) => {
+                  this._wifiPassword = v;
+                },
+              })
+        }
       </section>
     `;
   }
@@ -453,10 +503,19 @@ export class ESPHomeWizardStepSetup extends LitElement {
       this._finish("", "");
       return;
     }
+    if (this._wifiConfigured) {
+      this._finish("", "");
+      return;
+    }
     // Pass the typed credentials through; the backend writes them to
     // secrets.yaml and emits !secret rather than inlining bare values.
     this._finish(this._wifiSsid, this._wifiPassword);
   }
+
+  private _onUseSavedWifi = () => {
+    if (this.submitting) return;
+    this._finish("", "");
+  };
 
   private _finish(wifiSsid: string, wifiPassword: string) {
     this.dispatchEvent(

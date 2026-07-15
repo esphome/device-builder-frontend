@@ -9,7 +9,21 @@ import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import { effectiveJobType } from "../../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
-import type { ESPHomeFirmwareJobsDialog } from "../firmware-jobs-dialog.js";
+
+/**
+ * What a host must expose to render the shared jobs list.
+ *
+ * Both the firmware-jobs dialog and the remote-build panel implement this;
+ * the row markup and grouping live here so the two stay pixel-identical.
+ */
+export interface FirmwareJobsListHost {
+  _localize: LocalizeFunc;
+  /** Wall-clock anchor for relative timestamps; hosts tick it while visible. */
+  _now: number;
+  _jobDisplayName(job: FirmwareJob): string;
+  _openJob(job: FirmwareJob): void;
+  _onCancelClick(e: Event, job: FirmwareJob): void;
+}
 
 const TYPE_ICONS: Record<JobType, string> = {
   [JobType.COMPILE]: "hammer-wrench",
@@ -19,6 +33,20 @@ const TYPE_ICONS: Record<JobType, string> = {
   [JobType.RESET_BUILD_ENV]: "cog-refresh",
   [JobType.RENAME]: "rename-outline",
 };
+
+/** Sort + split a jobs Map into active / terminal lists; wrap in memoizeOne per host. */
+export function bucketJobs(jobs: Map<string, FirmwareJob>): {
+  sorted: FirmwareJob[];
+  active: FirmwareJob[];
+  terminal: FirmwareJob[];
+} {
+  const sorted = [...jobs.values()].sort(compareJobs);
+  return {
+    sorted,
+    active: sorted.filter((j) => !isTerminal(j)),
+    terminal: sorted.filter((j) => isTerminal(j)),
+  };
+}
 
 export function renderEmpty(localize: LocalizeFunc): TemplateResult {
   return html`
@@ -31,7 +59,7 @@ export function renderEmpty(localize: LocalizeFunc): TemplateResult {
 }
 
 export function renderGroups(
-  host: ESPHomeFirmwareJobsDialog,
+  host: FirmwareJobsListHost,
   active: FirmwareJob[],
   terminal: FirmwareJob[]
 ): TemplateResult {
@@ -61,7 +89,7 @@ export function renderGroups(
   `;
 }
 
-function renderJob(host: ESPHomeFirmwareJobsDialog, job: FirmwareJob): TemplateResult {
+function renderJob(host: FirmwareJobsListHost, job: FirmwareJob): TemplateResult {
   const name = host._jobDisplayName(job);
   const effectiveType = effectiveJobType(job);
   const typeIcon = TYPE_ICONS[effectiveType] ?? "hammer-wrench";
@@ -98,10 +126,7 @@ function renderJob(host: ESPHomeFirmwareJobsDialog, job: FirmwareJob): TemplateR
   `;
 }
 
-function renderRowAction(
-  host: ESPHomeFirmwareJobsDialog,
-  job: FirmwareJob
-): TemplateResult {
+function renderRowAction(host: FirmwareJobsListHost, job: FirmwareJob): TemplateResult {
   if (job.status === JobStatus.COMPLETED) {
     return html`
       <span
@@ -151,7 +176,7 @@ function renderRowAction(
 // Exported for unit testing of the per-source row line (building-on /
 // waiting-for-server / submitted-by).
 export function renderSourceLine(
-  host: ESPHomeFirmwareJobsDialog,
+  host: FirmwareJobsListHost,
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
   if (job.source === JobSource.REMOTE && job.source_label) {
@@ -186,7 +211,7 @@ export function renderSourceLine(
 }
 
 function renderStatus(
-  host: ESPHomeFirmwareJobsDialog,
+  host: FirmwareJobsListHost,
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
   if (job.status === JobStatus.RUNNING) {
@@ -236,7 +261,7 @@ function renderStatus(
 // Active rows show relative ("started 2m ago") that ticks with _now;
 // terminal rows show absolute ("finished HH:MM") since the moment is fixed.
 function renderTimestamp(
-  host: ESPHomeFirmwareJobsDialog,
+  host: FirmwareJobsListHost,
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
   const locale = activeLocale();
@@ -275,7 +300,7 @@ function renderTimestamp(
 
 // running → queued → terminal. Active by oldest first (FIFO); terminal by
 // most recent first so the latest finished job tops the history.
-export function compareJobs(a: FirmwareJob, b: FirmwareJob): number {
+function compareJobs(a: FirmwareJob, b: FirmwareJob): number {
   const rank = (j: FirmwareJob) =>
     j.status === JobStatus.RUNNING ? 0 : j.status === JobStatus.QUEUED ? 1 : 2;
   const ra = rank(a);

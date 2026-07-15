@@ -70,10 +70,7 @@ describe("isExperienceChosen", () => {
 describe("shouldAutoShowOnboarding", () => {
   it("pops for a fresh-install user behind current with pending step", () => {
     expect(
-      shouldAutoShowOnboarding(
-        stateWith([experience(OnboardingStepStatus.PENDING)]),
-        false
-      )
+      shouldAutoShowOnboarding(stateWith([experience(OnboardingStepStatus.PENDING)]))
     ).toBe(true);
   });
 
@@ -82,10 +79,7 @@ describe("shouldAutoShowOnboarding", () => {
       "(completed_version=0 + step DONE must not interrupt)",
     () => {
       expect(
-        shouldAutoShowOnboarding(
-          stateWith([experience(OnboardingStepStatus.DONE)]),
-          false
-        )
+        shouldAutoShowOnboarding(stateWith([experience(OnboardingStepStatus.DONE)]))
       ).toBe(false);
     }
   );
@@ -93,8 +87,7 @@ describe("shouldAutoShowOnboarding", () => {
   it("does NOT pop when user is up to date even with pending step", () => {
     expect(
       shouldAutoShowOnboarding(
-        stateWith([experience(OnboardingStepStatus.PENDING)], 1, 1),
-        false
+        stateWith([experience(OnboardingStepStatus.PENDING)], 1, 1)
       )
     ).toBe(false);
   });
@@ -102,22 +95,12 @@ describe("shouldAutoShowOnboarding", () => {
   it("does NOT pop when user is ahead of current (rolled back from a future build)", () => {
     expect(
       shouldAutoShowOnboarding(
-        stateWith([experience(OnboardingStepStatus.PENDING)], 1, 2),
-        false
-      )
-    ).toBe(false);
-  });
-
-  it("respects session-dismissal even with pending work", () => {
-    expect(
-      shouldAutoShowOnboarding(
-        stateWith([experience(OnboardingStepStatus.PENDING)]),
-        true
+        stateWith([experience(OnboardingStepStatus.PENDING)], 1, 2)
       )
     ).toBe(false);
   });
 
   it("does NOT pop when behind current but step list is empty", () => {
-    expect(shouldAutoShowOnboarding(stateWith([], 2, 0), false)).toBe(false);
+    expect(shouldAutoShowOnboarding(stateWith([], 2, 0))).toBe(false);
   });
 });

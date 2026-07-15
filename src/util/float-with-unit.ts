@@ -16,14 +16,30 @@ export interface FloatWithUnit {
   unit: string;
 }
 
-// ESPHome accepts a textual spelling for some units whose unit_options carry a
-// non-ASCII symbol (resistance: 'Ohm' / 'OHM' for Ω). Keyed by the canonical
-// base symbol (unit_options[0]); the matched spelling is folded onto that
-// symbol before matching, so '5.6kOhm' lands on the kΩ option. Only the symbol
-// units a user cannot easily type need an entry. ESPHome rejects plural forms
-// ('Ohms'), so the patterns are anchored to the singular.
-const UNIT_SPELLING_ALIASES: Record<string, RegExp> = {
-  Ω: /ohm$/i,
+// ESPHome accepts textual spellings for some units whose unit_options carry a
+// symbol (resistance: 'Ohm' / 'OHM' for Ω; temperature: '21C', '70F', '21° C'
+// for the degree forms). Keyed by the canonical base symbol (unit_options[0]);
+// each matched spelling is folded onto its symbol before matching, so
+// '5.6kOhm' lands on the kΩ option and '21C' on °C. Plurals follow upstream:
+// resistance rejects 'Ohms' so that pattern stays singular, while current /
+// voltage / data size accept 'amps' / 'Volts' / 'bytes' and fold them. The
+// temperature patterns are case-sensitive: ESPHome parses a trailing
+// lowercase 'c' as the centi metric prefix ('21c' is 0.21 °C), never a degree.
+// The full spelling inventory mirrors esphome/config_validation.py's
+// float_with_unit alternations and validate_bytes; symbol-only lists
+// (°/deg, dB/dBm, FPS/Hz, bar) already match case-insensitively without help.
+const UNIT_SPELLING_ALIASES: Record<string, readonly (readonly [RegExp, string])[]> = {
+  Ω: [[/ohm$/i, "Ω"]],
+  "°C": [
+    [/(?:°\s*C|(?<!°)C|°)$/, "°C"],
+    [/(?:°\s*F|(?<!°)F)$/, "°F"],
+    [/°\s*K$/, "K"],
+  ],
+  mireds: [[/Kelvin$/, "K"]],
+  A: [[/(?:amp|ampere)s?$/i, "A"]],
+  V: [[/volts?$/i, "V"]],
+  bps: [[/bits?\/s$/, "bps"]],
+  B: [[/(?:bytes?|[Bb]s|b)$/, "B"]],
 };
 
 /**
@@ -64,10 +80,13 @@ export function parseFloatWithUnit(
   const trimmed = raw === null || raw === undefined ? "" : String(raw).trim();
   if (trimmed === "") return { value: null, unit: fallbackUnit };
 
-  // Fold a textual unit spelling onto its symbol when this picker uses one,
-  // so '5.6kOhm' matches the kΩ option (see UNIT_SPELLING_ALIASES).
-  const aliasPattern = UNIT_SPELLING_ALIASES[fallbackUnit];
-  const text = aliasPattern ? trimmed.replace(aliasPattern, fallbackUnit) : trimmed;
+  // Fold textual unit spellings onto their symbols when this picker uses
+  // them, so '5.6kOhm' matches the kΩ option and '21C' matches °C (see
+  // UNIT_SPELLING_ALIASES).
+  let text = trimmed;
+  for (const [pattern, symbol] of UNIT_SPELLING_ALIASES[fallbackUnit] ?? []) {
+    text = text.replace(pattern, symbol);
+  }
   const lowerText = text.toLowerCase();
   let match: string | undefined;
   let bestScore = -1;

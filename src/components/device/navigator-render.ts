@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { withBase } from "../../util/base-path.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { YamlSection } from "../../util/yaml-sections.js";
 import type { NavGroup } from "./navigator-groups.js";
 import { type NavRow, prettyDomain } from "./navigator-labels.js";
@@ -24,6 +25,7 @@ export interface NavSectionView {
   filtering: boolean;
   selectedLine: number | null;
   hoveredLine: number | null;
+  tourAnchorId?: string;
   /** Backend validation errors attributed to a row's section instance. */
   errorCount?: (item: YamlSection) => number;
   /** Localized accessible label for an error badge carrying count errors. */
@@ -80,6 +82,9 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
       class="nav-item ${
         v.selectedLine === item.fromLine ? "nav-item--selected" : ""
       } ${v.hoveredLine === item.fromLine ? "nav-item--hovered" : ""}"
+      ${tourAnchor(
+        item.key === "esphome" && v.tourAnchorId ? `${v.tourAnchorId}-item` : undefined
+      )}
       @mouseenter=${() => v.onItemEnter(item)}
       @mouseleave=${() => v.onItemLeave()}
       @click=${() => v.onItemClick(item)}
@@ -186,6 +191,12 @@ function renderNavAction(action: NavAction): TemplateResult {
   </div>`;
 }
 
+function onSectionKeydown(event: KeyboardEvent): void {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  (event.currentTarget as HTMLElement).click();
+}
+
 /**
  * One section block: header (collapsible when not filtering), its rows,
  * and the "+ Add X" actions. Returns ``nothing`` while filtering when the
@@ -194,7 +205,15 @@ function renderNavAction(action: NavAction): TemplateResult {
 export function renderNavSection(v: NavSectionView): TemplateResult | typeof nothing {
   if (v.filtering && v.rows.length === 0) return nothing;
   return html`
-    <div class="nav-content" @click=${() => v.onToggle()}>
+    <div
+      class="nav-content"
+      role=${ifDefined(v.filtering ? undefined : "button")}
+      tabindex=${ifDefined(v.filtering ? undefined : "0")}
+      aria-expanded=${ifDefined(v.filtering ? undefined : v.open ? "true" : "false")}
+      ${tourAnchor(v.tourAnchorId)}
+      @click=${v.filtering ? undefined : v.onToggle}
+      @keydown=${v.filtering ? undefined : onSectionKeydown}
+    >
       <div class="nav-content-label">
         <wa-icon library="mdi" name=${v.icon}></wa-icon>
         <p>${v.label}</p>

@@ -68,6 +68,11 @@ export const espHomeStyles = css`
     /* ─── Layout ─── */
     --esphome-header-height: 56px;
     --esphome-footer-height: 20px;
+    /* Footprints of the header's leading logo and trailing kebab button.
+       The dashboard's stack bars center their icons/chevrons in the same
+       boxes so the columns line up with the header by construction. */
+    --esphome-header-logo-box: 44px;
+    --esphome-header-action-box: 37px;
     /* Height shared by the toolbar's interactive controls (search input,
        view-toggle, facet pills, clear-filters) so the search row stays
        pixel-aligned from one source. */
@@ -88,6 +93,7 @@ export const espHomeStyles = css`
   @media (max-width: 870px) {
     :host {
       --esphome-header-height: 40px;
+      --esphome-header-logo-box: 32px;
     }
   }
 

@@ -24,9 +24,11 @@ import {
   offloaderVersionMatchPolicyContext,
   versionContext,
 } from "../../context/index.js";
+import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeEditPairingEndpointDialog } from "../edit-pairing-endpoint-dialog.js";
 import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.js";
@@ -36,11 +38,7 @@ import { renderOffloaderAlert } from "./build-offload-alert.js";
 import { latestJobForPin, renderPairingRow } from "./build-offload-pairing-row.js";
 import { offloaderAlertStyles, pairingRowStyles } from "./offload-styles.js";
 import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
-import {
-  peerRowStyles,
-  settingsRowStyles,
-  settingsSharedStyles,
-} from "./shared-styles.js";
+import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -323,8 +321,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
           esphome: peer.esphome_version,
         })
       : nothing;
-    // Prefer the friendly_name label; fall back to the instance name.
-    const displayName = trimTrailingDot(peer.friendly_name.trim() || peer.name);
+    const displayName = remoteBuildPeerName(peer);
     return html`
       <div class="row peer-row">
         <div class="row-label">

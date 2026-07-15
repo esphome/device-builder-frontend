@@ -2,9 +2,15 @@ import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import { html, type TemplateResult } from "lit";
 import type { AdoptableDevice, ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
-import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
+import {
+  DEVICE_SORT_COLLATOR,
+  deviceSortKey,
+  sortDevices,
+} from "../../util/device-sort.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
+import { tourAnchor } from "../guided-tour/tour-anchor.js";
+import { getActiveTourConfiguration } from "../guided-tour/tour-session.js";
 import { downloadYaml, editDevice } from "./actions.js";
 import { renderFacets } from "./render-facets.js";
 import {
@@ -15,12 +21,24 @@ import {
   renderViewToggle,
 } from "./render-toolbar.js";
 
+function includeTourDevice(
+  devices: ConfiguredDevice[],
+  allDevices: ConfiguredDevice[]
+): ConfiguredDevice[] {
+  const configuration = getActiveTourConfiguration();
+  if (
+    !configuration ||
+    devices.some((device) => device.configuration === configuration)
+  ) {
+    return devices;
+  }
+  const target = allDevices.find((device) => device.configuration === configuration);
+  return target ? sortDevices([...devices, target]) : devices;
+}
+
 export function renderDiscoveredSection(
   host: ESPHomePageDashboard
 ): TemplateResult | string {
-  // Adopting a discovery creates a device, so hide the whole section on a
-  // remote-compute-only install.
-  if (host._hideDeviceCreation) return "";
   if (host._importableDevices.length === 0) return "";
   // Non-ignored discoveries first, then ignored ones — both
   // alphabetical by friendly name (fallback hostname) within each
@@ -96,14 +114,19 @@ export function renderCardGrid(
   host: ESPHomePageDashboard,
   filtered: ConfiguredDevice[]
 ): TemplateResult {
+  const tourConfiguration = getActiveTourConfiguration();
+  const visibleDevices = includeTourDevice(filtered, host._devices);
   return html`
     <div class="devices-grid devices-grid--configured">
       ${host._devices.length === 0 ? renderAddDeviceCard(host) : ""}
-      ${filtered.map((device) => {
+      ${visibleDevices.map((device) => {
         const webUrl = buildWebUiUrl(device);
         const rt = device.runtime_state;
         return html`
           <esphome-device-card
+            ${tourAnchor(
+              device.configuration === tourConfiguration ? "tour-device" : undefined
+            )}
             data-configuration=${device.configuration}
             .name=${device.friendly_name || device.name}
             .configuration=${device.configuration}
@@ -148,7 +171,10 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
   // Sorted input so the no-column-sort default matches the card grid's
   // collator order instead of the backend's path order (#1917); an active
   // column sort still re-sorts on top.
-  const filteredDevices = host._applyFacetFilters(host._sortedDevices);
+  const filteredDevices = includeTourDevice(
+    host._applyFacetFilters(host._sortedDevices),
+    host._sortedDevices
+  );
   return html`
     <esphome-device-table
       .devices=${filteredDevices}
@@ -207,18 +233,15 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       <div slot="below-controls" class="table-device-count-row">
         ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
       </div>
-      ${
-        host._hideDeviceCreation
-          ? ""
-          : html`<button
-              slot="actions"
-              class="table-create-btn"
-              @click=${() => host._createDialog.open()}
-            >
-              <wa-icon library="mdi" name="plus"></wa-icon>
-              <span class="label">${host._localize("dashboard.create_device")}</span>
-            </button>`
-      }
+      <button
+        ${tourAnchor("create-device-fab")}
+        slot="actions"
+        class="table-create-btn"
+        @click=${() => host._createDialog.open()}
+      >
+        <wa-icon library="mdi" name="plus"></wa-icon>
+        <span class="label">${host._localize("dashboard.create_device")}</span>
+      </button>
       <div slot="no-results-extra" class="yaml-preview-banner">
         ${renderNoResultsExtras(host)}
       </div>

@@ -28,23 +28,13 @@ export function isExperienceChosen(state: OnboardingState): boolean {
 /**
  * True when the first-run wizard should auto-pop on load.
  *
- * Three conditions must hold simultaneously:
+ * Two conditions must hold simultaneously:
  *
  * 1. The user is behind the current onboarding version (a future
  *    bump re-prompts users who completed an earlier flow).
  * 2. *Something is actually pending.* A version bump alone isn't a
  *    reason to interrupt a user who already finished onboarding.
- * 3. The user hasn't already session-dismissed the dialog (the
- *    "Maybe later" / X / Escape paths set this so a refresh
- *    doesn't re-pop the dialog they just closed).
  */
-export function shouldAutoShowOnboarding(
-  state: OnboardingState,
-  sessionDismissed: boolean
-): boolean {
-  return (
-    state.completed_version < state.current_version &&
-    isOnboardingPending(state) &&
-    !sessionDismissed
-  );
+export function shouldAutoShowOnboarding(state: OnboardingState): boolean {
+  return state.completed_version < state.current_version && isOnboardingPending(state);
 }

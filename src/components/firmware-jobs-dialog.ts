@@ -31,8 +31,9 @@ import {
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
+import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
-import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
+import { NowTickController } from "../util/now-tick-controller.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./base-dialog.js";
@@ -40,12 +41,9 @@ import "./command-dialog.js";
 import type { ESPHomeCommandDialog } from "./command-dialog.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
-import {
-  compareJobs,
-  renderEmpty,
-  renderGroups,
-} from "./firmware-jobs-dialog/renderers.js";
 import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
+import { bucketJobs, renderEmpty, renderGroups } from "./shared/firmware-jobs-list.js";
+import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
 import "./logs-dialog.js";
 import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 
@@ -91,18 +89,20 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   );
 
   // Ticker for live relative-time strings ("started 2m ago"). Open-only.
-  @state() _now: number = Date.now();
-  private _tickHandle: ReturnType<typeof setInterval> | null = null;
+  private readonly _ticker = new NowTickController(this);
+
+  get _now(): number {
+    return this._ticker.now;
+  }
 
   open() {
-    this._now = Date.now();
     this._dialog.open = true;
-    this._startTicker();
+    this._ticker.start();
   }
 
   close() {
     this._dialog.open = false;
-    this._stopTicker();
+    this._ticker.stop();
   }
 
   // Open the Reset Build Environment confirm flow without needing this
@@ -122,26 +122,19 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this.openResetBuildEnv();
   };
 
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this._stopTicker();
-  }
-
-  static styles = [espHomeStyles, primaryDialogHeaderStyles, firmwareJobsDialogStyles];
+  static styles = [
+    espHomeStyles,
+    primaryDialogHeaderStyles,
+    firmwareJobsListStyles,
+    firmwareJobsDialogStyles,
+  ];
 
   /** Bucket the live jobs Map into sorted / active / terminal lists.
    *  Memoised on the upstream Map reference; the context provider
    *  hands out a new Map identity on every job-lifecycle push, so
    *  the cache invalidates exactly when the lists would change. One
    *  sort + two filter passes per push, not per render. */
-  private _bucketJobs = memoizeOne((jobs: Map<string, FirmwareJob>) => {
-    const sorted = [...jobs.values()].sort(compareJobs);
-    return {
-      sorted,
-      active: sorted.filter((j) => !isTerminal(j)),
-      terminal: sorted.filter((j) => isTerminal(j)),
-    };
-  });
+  private _bucketJobs = memoizeOne(bucketJobs);
 
   protected render() {
     const { sorted, active, terminal } = this._bucketJobs(this._jobs);
@@ -195,23 +188,9 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     `;
   }
 
-  private _startTicker() {
-    if (this._tickHandle !== null) return;
-    this._tickHandle = setInterval(() => {
-      this._now = Date.now();
-    }, 30_000);
-  }
-
-  private _stopTicker = () => {
-    if (this._tickHandle !== null) {
-      clearInterval(this._tickHandle);
-      this._tickHandle = null;
-    }
-  };
-
   private _onAfterHide = (): void => {
     this._dialog.open = false;
-    this._stopTicker();
+    this._ticker.stop();
   };
 
   _jobDisplayName(job: FirmwareJob): string {
@@ -228,11 +207,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   }
 
   private async _cancel(job: FirmwareJob) {
-    try {
-      await this._api.firmwareCancel(job.job_id);
-    } catch {
-      /* job may have finished — follow_jobs will reconcile */
-    }
+    await cancelFirmwareJob(this._api, this._localize, job.job_id);
   }
 
   private _onResetClick = () => {

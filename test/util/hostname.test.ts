@@ -3,6 +3,7 @@ import {
   friendlyHostname,
   normalizeHostnameForCompare,
   parsePortInput,
+  splitHostPort,
   trimTrailingDot,
 } from "../../src/util/hostname.js";
 
@@ -128,5 +129,40 @@ describe("parsePortInput", () => {
     expect(parsePortInput("0x6055")).toBeNull();
     expect(parsePortInput("-6055")).toBeNull();
     expect(parsePortInput("+6055")).toBeNull();
+  });
+});
+
+describe("splitHostPort", () => {
+  it("splits host:port and [v6]:port", () => {
+    expect(splitHostPort("esphome-builder-abc.local:6056")).toEqual({
+      host: "esphome-builder-abc.local",
+      port: 6056,
+    });
+    expect(splitHostPort("10.0.0.5:6055")).toEqual({ host: "10.0.0.5", port: 6055 });
+    expect(splitHostPort("[fd00::a1]:6055")).toEqual({ host: "fd00::a1", port: 6055 });
+    expect(splitHostPort("  host.lan:6055  ")).toEqual({ host: "host.lan", port: 6055 });
+  });
+
+  it("leaves bare hosts and bare IPv6 literals whole", () => {
+    expect(splitHostPort("buildserver.lan")).toBeNull();
+    expect(splitHostPort("fd00::a1")).toBeNull();
+    expect(splitHostPort("[fd00::a1]")).toBeNull();
+    // A digits-only final group must not be mistaken for a port.
+    expect(splitHostPort("fd00::6055")).toBeNull();
+    expect(splitHostPort("fdde:ad00:beef:cafe:c51:c7c8:7c1d:92f2")).toBeNull();
+  });
+
+  it("splits compressed and full IPv6 literals in brackets", () => {
+    expect(splitHostPort("[::1]:6055")).toEqual({ host: "::1", port: 6055 });
+    expect(splitHostPort("[fdde:ad00:beef:cafe:c51:c7c8:7c1d:92f2]:6056")).toEqual({
+      host: "fdde:ad00:beef:cafe:c51:c7c8:7c1d:92f2",
+      port: 6056,
+    });
+  });
+
+  it("rejects an invalid port suffix", () => {
+    expect(splitHostPort("host:0")).toBeNull();
+    expect(splitHostPort("host:99999")).toBeNull();
+    expect(splitHostPort("host:60x5")).toBeNull();
   });
 });

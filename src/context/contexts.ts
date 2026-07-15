@@ -70,6 +70,11 @@ export const devicesLoadedContext = createContext<boolean>(
 /** Context for whether the frontend is running inside HA ingress. */
 export const isHaIngressContext = createContext<boolean>(Symbol("esphome-is-ha-ingress"));
 
+/** Context for whether the backend is running as the HA add-on. Broader than
+ *  :member:`isHaIngressContext` (also true when the add-on is reached directly
+ *  on its exposed port, not just through Supervisor ingress). */
+export const isHaAddonContext = createContext<boolean>(Symbol("esphome-is-ha-addon"));
+
 /** Context for active firmware jobs, keyed by device configuration.
  *  Tracks the latest non-terminal job per device (used for the busy
  *  spinner on cards/tables). For the full multi-job view, see
@@ -122,6 +127,15 @@ export const experienceLevelContext = createContext<ExperienceLevel | null>(
  */
 export const remoteComputeOnlyContext = createContext<boolean>(
   Symbol("esphome-remote-compute-only")
+);
+
+/**
+ * Context for the raw ``hide_device_builder`` preference. The gating
+ * policy (remote-compute only, tour override) lives in
+ * ``DashboardStacksController.builderHidden``.
+ */
+export const hideDeviceBuilderContext = createContext<boolean>(
+  Symbol("esphome-hide-device-builder")
 );
 
 /**
@@ -218,6 +232,8 @@ export const onboardingPendingContext = createContext<boolean>(
  * * 'remote_build_identity_rotated' event lands a new X25519
  *   public-key fingerprint; another tab triggered a rotation
  *   we want to mirror.
+ * * 'remote_build_listener_changed' event lands a new advertised
+ *   pairing address (listener bind / teardown).
  * * The user toggles the "Enable remote build" switch
  *   (``setRemoteBuildSettings``); ``IdentityView.listener_bound``
  *   flips alongside the runner teardown / re-bind so the cached

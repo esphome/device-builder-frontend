@@ -378,7 +378,9 @@
     "archive_selected_aria": "Archive {count} selected",
     "delete_selected_aria": "Delete {count} selected",
     "update_selected_aria": "Update {count} selected",
-    "compile_selected_aria": "Compile {count} selected without installing"
+    "compile_selected_aria": "Compile {count} selected without installing",
+    "builder_stack_heading": "Device builder",
+    "builder_stack_tagline": "create and manage your devices"
   },
   "command": {
     "install_title": "Install — {name}",
@@ -549,7 +551,11 @@
     "full_setup_desc": "Adds this device's onboard components (relays, sensors, and more) so it's ready to use. You can change them afterwards in the editor.",
     "full_setup_partial": "{count, plural, one {Couldn't add recommended component {names}} other {Couldn't add recommended components {names}{extra, plural, =0 {} other { and # more}}}}; finish in the editor.",
     "wifi_configuration": "Wi-Fi Configuration",
-    "wifi_required_desc": "This board connects over Wi-Fi. Enter your network so the device can come online.",
+    "wifi_required_desc": "This board connects over Wi-Fi. Enter your network once and Device Builder will securely reuse it for future Wi-Fi devices.",
+    "wifi_saved_title": "Wi-Fi credentials already saved",
+    "wifi_saved_desc": "This board uses the shared Wi-Fi credentials already stored by Device Builder.",
+    "wifi_saved_reuse": "The saved values stay hidden and will be reused automatically.",
+    "wifi_use_saved": "Use saved credentials",
     "other_boards": "Other boards",
     "starter_kit": "Featured",
     "expand_board": "Expand details",
@@ -1004,18 +1010,23 @@
     "wizard": {
       "back": "Back",
       "continue": "Continue",
-      "finish": "Finish",
       "dismiss": "Maybe later",
+      "done": "Done",
       "recommended": "RECOMMENDED",
+      "start_tour": "Start guided tour",
       "saving": "Saving…",
       "ack_failed": "Saved your choices, but the wizard couldn't be marked as completed — it may reappear next time.",
-      "use_case": {
-        "title": "How will you use this?",
-        "intro": "This helps tailor the dashboard to what you need.",
-        "devices_title": "Build and manage devices",
-        "devices_desc": "Create, configure, and flash ESPHome devices from this dashboard.",
-        "remote_title": "Remote compute only",
-        "remote_desc": "Use this installation only as a remote build server for other dashboards. Device creation stays hidden."
+      "welcome": {
+        "title": "Welcome to ESPHome Device Builder",
+        "intro": "We’ll help you tailor your ESPHome experience in a few quick steps."
+      },
+      "existing_server": {
+        "title": "You already have ESPHome Device Builder",
+        "found": "Found on your network: {name}",
+        "found_overflow": "Found on your network: {name}, and {count} more",
+        "intro": "This app is a full ESPHome Device Builder and is ready to build firmware for the others. To send builds here, open Settings → Send builds on your existing dashboard and pair it with this machine.",
+        "remote_only_title": "Use the remote compute dashboard",
+        "remote_only_desc": "Lead with pairing and the build queue when you open this dashboard. Device creation stays available; the builder section just starts collapsed."
       },
       "experience": {
         "title": "Choose your experience level",
@@ -1024,13 +1035,27 @@
         "beginner_desc": "Start with a simple, guided interface.",
         "expert_title": "Expert",
         "expert_desc": "Unlock the diff viewer, navigator search, and YAML search."
+      },
+      "tour": {
+        "title": "You’re ready to build",
+        "ready": "Everything is set up and ready to use.",
+        "intro": "Take a guided tour to see how to create, configure, and install your first device. It takes about 5 minutes.",
+        "later": "You can always start the tour later from the menu in the top-right corner.",
+        "remote_title": "Setup complete",
+        "remote_ready": "Your remote build server is ready.",
+        "remote_intro": "This dashboard is configured to receive build jobs from other Device Builder installations."
       }
     }
   },
   "tour": {
+    "header": "Quickstart tour",
     "step_counter": "Step {current} of {total}",
     "skip": "Skip tour",
+    "pause": "Close for now",
+    "unavailable_title": "This tour step isn’t available",
+    "unavailable_body": "The highlighted control could not be shown. Close for now and try again later, or skip the tour.",
     "next": "Next",
+    "got_it": "Got it!",
     "finish": "Finish",
     "continue": "Continue",
     "steps": {
@@ -1041,30 +1066,36 @@
       },
       "method": {
         "title": "Choose how to start",
-        "body": "“Create new project” walks you through a starter kit or any ESP board.",
+        "body": "“Create new project” guides you through choosing and configuring your board step by step.",
         "hint": "Click “Create new project”"
       },
       "board": {
         "title": "Pick a board",
-        "body": "Starter kits come pre-configured and are ideal for your first device. Select the featured kit.",
-        "hint": "Click “Select” on the starter kit"
+        "body": "You can configure any board from the catalog. For this tour, we’ll use the featured Starter Kit as an example; the same workflow applies to other supported boards.",
+        "hint": "Click “Select” on the featured Starter Kit"
       },
       "name": {
-        "title": "Name it, then finish",
-        "body": "We’ve suggested a name and generated a working config. Finish to open it.",
-        "hint": "Click “Finish setup”"
+        "title": "Name your device",
+        "body": "We’ve suggested a name and generated a working configuration. Keep it or choose a name of your own.",
+        "hint": "Continue when the name looks right"
+      },
+      "wifi": {
+        "title": "Connect your device",
+        "body": "Enter your Wi-Fi details, or confirm the saved credentials. Device Builder stores them securely for future devices.",
+        "hint": "Enter or confirm Wi-Fi to continue"
       },
       "navigator": {
         "title": "Your device navigator",
-        "body": "Browse and edit core configuration, components, and automations. No YAML required."
+        "body": "Core Configuration contains essentials such as Wi-Fi, device identity, and hardware settings. Components add sensors and features; Automations define behavior.",
+        "hint": "Expand Core Configuration, then open ESPHome Core"
       },
       "central": {
         "title": "The main editor",
         "body": "Select a section in the navigator to open it here. Configure your board, components, and automations visually; every change updates the YAML on the right."
       },
       "yaml": {
-        "title": "Live YAML, kept in sync",
-        "body": "Everything you do is mirrored here. Try changing fields in the visual editor and watch the YAML update."
+        "title": "Your configuration in YAML",
+        "body": "YAML is the text version of your device configuration—the source ESPHome uses to build the firmware. It stays in sync with the visual editor. We show it by default, but you can hide it and configure everything visually if you prefer."
       },
       "layout": {
         "title": "Switch your view",
@@ -1075,12 +1106,8 @@
         "body": "Flash firmware to your device over USB or the network. Your edits are saved automatically first — that’s the whole loop: configure and install."
       },
       "dashboard": {
-        "title": "Find it on your dashboard",
-        "body": "Your device lives here now. Switch between card and list views as your collection grows."
-      },
-      "done": {
-        "title": "You’re all set",
-        "body": "That’s the full loop: create, configure, and install. Add your next device whenever you like."
+        "title": "Your device is ready",
+        "body": "Your device has been added to the dashboard. From here you can monitor its status, edit its configuration, install updates, and return to it whenever you need."
       }
     }
   },
@@ -1242,8 +1269,17 @@
     "title": "Settings",
     "appearance": "Appearance",
     "experience_save_failed": "Failed to save your preference",
-    "remote_compute_only": "Only use this for remote compute",
-    "remote_compute_only_desc": "Hide device creation and use this install purely as a remote build server for other dashboards.",
+    "remote_compute_only": "Remote compute dashboard",
+    "hide_device_builder": "Hide the Device builder",
+    "hide_device_builder_desc": "Show only the Build server view. Device creation and the device list come back the moment this is turned off.",
+    "remote_compute_only_desc": "Put this install's remote build server dashboard front and center. Nothing is removed; the device builder section just starts collapsed.",
+    "remote_compute_features_title": "What the remote compute dashboard changes",
+    "remote_compute_feature_dashboard": "Build server front and center",
+    "remote_compute_feature_dashboard_desc": "The dashboard opens with pairing requests, paired dashboards, and the build queue expanded.",
+    "remote_compute_feature_builder": "Device builder stays available",
+    "remote_compute_feature_builder_desc": "Device creation and your devices keep working; the builder section starts collapsed and expands with one click.",
+    "remote_compute_feature_paired": "Appears automatically once paired",
+    "remote_compute_feature_paired_desc": "Even with this off, a collapsed Build server bar appears once another dashboard pairs with this one; the Device builder stays front and center.",
     "version_history": "Save version history",
     "version_history_desc": "Keep a local Git history of your config changes so you can view and restore earlier versions. Turn this off to stop the automatic commits.",
     "language": "Language",
@@ -1448,6 +1484,11 @@
     "remote_build_pin_copied": "Fingerprint copied to clipboard.",
     "remote_build_pin_copy_failed": "Couldn't copy to the clipboard. Please select and copy the fingerprint manually.",
     "remote_build_dashboard_id_label": "Dashboard ID",
+    "remote_build_address_label": "Pairing address",
+    "remote_build_address_copy": "Copy address",
+    "remote_build_address_copy_aria": "Copy {address} to the clipboard",
+    "remote_build_address_copied": "Address copied to clipboard.",
+    "remote_build_address_copy_failed": "Couldn't copy to the clipboard. Please select and copy the address manually.",
     "remote_build_server_version_label": "Dashboard version",
     "remote_build_esphome_version_label": "ESPHome version",
     "remote_build_listener_up": "Listener active",
@@ -1572,6 +1613,8 @@
     "status_failed": "Failed",
     "status_cancelled": "Cancelled",
     "cancel": "Cancel",
+    "cancel_failed": "Couldn't cancel the job. Try again.",
+    "cancel_failed_detail": "Couldn't cancel the job: {reason}",
     "clear_history": "Clear history",
     "build_env_label": "(build environment)",
     "reset_build_env": "Reset build environment",
@@ -1723,5 +1766,33 @@
       "connect_failed_hint": "Failed to initialize. Try resetting your device or holding the BOOT button while selecting your serial port until it starts preparing the installation.",
       "no_firmware": "No firmware to flash."
     }
+  },
+  "remote_build_dashboard": {
+    "title": "Build server",
+    "tagline": "builds firmware for other dashboards",
+    "badge_requests": "{count, plural, one {# pairing request} other {# pairing requests}}",
+    "badge_active": "{count, plural, one {# active job} other {# active jobs}}",
+    "intro_empty": "No dashboards are paired yet. Pair one to start receiving builds.",
+    "step_open_window_label": "Step 1 — here",
+    "step_open_window_title": "Open the pairing window",
+    "step_open_window_desc": "Pair requests are only accepted while the window is open.",
+    "step_send_request_label": "Step 2 — on the sending dashboard",
+    "step_send_request_title": "Send a pair request",
+    "step_send_request_desc": "Open Settings → Send builds on the dashboard that should build here, then pair with this build server.",
+    "step_send_request_address": "This build server:",
+    "step_accept_request_label": "Step 3 — back here",
+    "step_accept_request_title": "Review and accept",
+    "step_accept_request_desc": "Compare the fingerprint below with what the sender shows, then accept the request.",
+    "open_pairing_window": "Open pairing window",
+    "open_pairing_window_tooltip": "Lets other dashboards send pair requests to this build server until the window closes again.",
+    "request_title": "{label} wants to pair",
+    "request_review": "Review request",
+    "peers_heading": "Paired dashboards",
+    "peers_manage": "Manage",
+    "queue_heading": "Build queue",
+    "queue_active_count": "{count} active",
+    "disabled_title": "Remote builds are disabled",
+    "disabled_desc": "This install is set up as a remote build server, but the remote build listener is turned off.",
+    "disabled_cta": "Open build server settings"
   }
 }

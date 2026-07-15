@@ -1,5 +1,12 @@
 import { consume } from "@lit/context";
-import { mdiCodeBraces, mdiFileCompare, mdiMagnify } from "@mdi/js";
+import {
+  mdiCodeBraces,
+  mdiFileCompare,
+  mdiHandshake,
+  mdiMagnify,
+  mdiServerNetwork,
+  mdiMemory,
+} from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
@@ -7,6 +14,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import {
   expertModeContext,
   localizeContext,
+  hideDeviceBuilderContext,
   remoteComputeOnlyContext,
   versionHistoryEnabledContext,
 } from "../../context/index.js";
@@ -16,6 +24,12 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { storedTheme } from "../../util/dark-mode.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderDisclosure } from "../shared/disclosure.js";
+import {
+  REMOTE_COMPUTE_FEATURES,
+  renderFeatureList,
+  type FeatureItem,
+} from "../shared/feature-list.js";
+import { featureListStyles } from "../shared/feature-list-styles.js";
 import { renderToggleRow } from "./settings-rows.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
@@ -27,9 +41,12 @@ registerMdiIcons({
   "code-braces": mdiCodeBraces,
   magnify: mdiMagnify,
   "file-compare": mdiFileCompare,
+  handshake: mdiHandshake,
+  "server-network": mdiServerNetwork,
+  memory: mdiMemory,
 });
 
-const EXPERT_FEATURES: { icon: string; titleKey: string; descKey: string }[] = [
+const EXPERT_FEATURES: FeatureItem[] = [
   {
     icon: "file-compare",
     titleKey: "settings.expert_mode_feature_diff",
@@ -61,6 +78,10 @@ export class ESPHomeSettingsAppearance extends LitElement {
   @state()
   private _remoteComputeOnly = false;
 
+  @consume({ context: hideDeviceBuilderContext, subscribe: true })
+  @state()
+  private _hideDeviceBuilder = false;
+
   @consume({ context: versionHistoryEnabledContext, subscribe: true })
   @state()
   private _versionHistoryEnabled = true;
@@ -68,9 +89,12 @@ export class ESPHomeSettingsAppearance extends LitElement {
   @state()
   private _theme: string = storedTheme();
 
-  // Collapsed by default so the feature list doesn't lengthen the page.
+  // Collapsed by default so the feature lists don't lengthen the page.
   @state()
   private _featuresOpen = false;
+
+  @state()
+  private _remoteFeaturesOpen = false;
 
   static styles = [
     espHomeStyles,
@@ -78,6 +102,7 @@ export class ESPHomeSettingsAppearance extends LitElement {
     settingsSharedStyles,
     settingsRowStyles,
     disclosureStyles,
+    featureListStyles,
     css`
       .expert-row {
         border-bottom: none;
@@ -89,46 +114,6 @@ export class ESPHomeSettingsAppearance extends LitElement {
         padding: var(--wa-space-s) var(--wa-space-m);
         background: var(--wa-color-surface-lowered);
         border-radius: var(--wa-border-radius-m);
-      }
-
-      .expert-feature-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-      }
-
-      .expert-feature {
-        display: flex;
-        align-items: flex-start;
-        gap: var(--wa-space-s);
-      }
-
-      .expert-feature wa-icon {
-        font-size: 18px;
-        color: var(--esphome-primary);
-        flex-shrink: 0;
-        margin-top: 1px;
-      }
-
-      .expert-feature-text {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        min-width: 0;
-      }
-
-      .expert-feature-title {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
-        color: var(--wa-color-text-normal);
-      }
-
-      .expert-feature-desc {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
       }
     `,
   ];
@@ -164,13 +149,36 @@ export class ESPHomeSettingsAppearance extends LitElement {
   }
 
   private _renderRemoteCompute() {
-    return renderToggleRow(this._localize, {
-      titleId: "remote-compute-title",
-      titleKey: "settings.remote_compute_only",
-      descKey: "settings.remote_compute_only_desc",
-      checked: this._remoteComputeOnly,
-      onToggle: this._onToggleRemoteCompute,
-    });
+    return html`
+      ${renderToggleRow(this._localize, {
+        titleId: "remote-compute-title",
+        titleKey: "settings.remote_compute_only",
+        descKey: "settings.remote_compute_only_desc",
+        checked: this._remoteComputeOnly,
+        onToggle: this._onToggleRemoteCompute,
+        rowClass: "expert-row",
+      })}
+      ${this._renderFeaturesBox(
+        "settings.remote_compute_features_title",
+        REMOTE_COMPUTE_FEATURES,
+        this._remoteFeaturesOpen,
+        () => {
+          this._remoteFeaturesOpen = !this._remoteFeaturesOpen;
+        }
+      )}
+      ${
+        this._remoteComputeOnly
+          ? renderToggleRow(this._localize, {
+              titleId: "hide-device-builder-title",
+              titleKey: "settings.hide_device_builder",
+              descKey: "settings.hide_device_builder_desc",
+              checked: this._hideDeviceBuilder,
+              onToggle: this._onToggleHideDeviceBuilder,
+              rowClass: "expert-row",
+            })
+          : nothing
+      }
+    `;
   }
 
   private _renderExpertMode() {
@@ -183,39 +191,35 @@ export class ESPHomeSettingsAppearance extends LitElement {
         onToggle: this._onToggleExpertMode,
         rowClass: "expert-row",
       })}
-      <div class="expert-features">
-        ${renderDisclosure({
-          open: this._featuresOpen,
-          onToggle: () => this._onToggleFeatures(),
-          localize: this._localize,
-          labelKey: "settings.expert_mode_features_title",
-          variant: "heading",
-          body: () => html`
-            <ul class="expert-feature-list">
-              ${EXPERT_FEATURES.map(
-                (f) => html`
-                  <li class="expert-feature">
-                    <wa-icon library="mdi" name=${f.icon}></wa-icon>
-                    <div class="expert-feature-text">
-                      <span class="expert-feature-title">
-                        ${this._localize(f.titleKey)}
-                      </span>
-                      <span class="expert-feature-desc">
-                        ${this._localize(f.descKey)}
-                      </span>
-                    </div>
-                  </li>
-                `
-              )}
-            </ul>
-          `,
-        })}
-      </div>
+      ${this._renderFeaturesBox(
+        "settings.expert_mode_features_title",
+        EXPERT_FEATURES,
+        this._featuresOpen,
+        () => {
+          this._featuresOpen = !this._featuresOpen;
+        }
+      )}
     `;
   }
 
-  private _onToggleFeatures() {
-    this._featuresOpen = !this._featuresOpen;
+  private _renderFeaturesBox(
+    labelKey: string,
+    features: FeatureItem[],
+    open: boolean,
+    onToggle: () => void
+  ) {
+    return html`
+      <div class="expert-features">
+        ${renderDisclosure({
+          open,
+          onToggle,
+          localize: this._localize,
+          labelKey,
+          variant: "heading",
+          body: () => renderFeatureList(this._localize, features),
+        })}
+      </div>
+    `;
   }
 
   private _onChange(e: Event) {
@@ -244,6 +248,16 @@ export class ESPHomeSettingsAppearance extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-remote-compute-only", {
         detail: !this._remoteComputeOnly,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onToggleHideDeviceBuilder() {
+    this.dispatchEvent(
+      new CustomEvent("set-hide-device-builder", {
+        detail: !this._hideDeviceBuilder,
         bubbles: true,
         composed: true,
       })

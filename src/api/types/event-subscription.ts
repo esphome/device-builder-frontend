@@ -11,7 +11,12 @@ import {
 } from "./devices.js";
 import { JobStatus, type FirmwareJob } from "./firmware-jobs.js";
 import type { OffloaderAlertSnapshotEntry } from "./remote-build-events.js";
-import type { PairingSummary, PeerSummary, RemoteBuildPeer } from "./remote-build.js";
+import type {
+  PairingSummary,
+  PeerSummary,
+  RemoteBuildPeer,
+  RemoteBuildSettings,
+} from "./remote-build.js";
 import type { UserPreferences } from "./system.js";
 
 // ─── Event Subscription ─────────────────────────────────────
@@ -42,6 +47,7 @@ export enum DeviceEventType {
   JOB_FAILED = "job_failed",
   // Remote-build events.
   REMOTE_BUILD_IDENTITY_ROTATED = "remote_build_identity_rotated",
+  REMOTE_BUILD_LISTENER_CHANGED = "remote_build_listener_changed",
   REMOTE_BUILD_PAIR_REQUEST_RECEIVED = "remote_build_pair_request_received",
   REMOTE_BUILD_PAIR_STATUS_CHANGED = "remote_build_pair_status_changed",
   REMOTE_BUILD_PAIRING_WINDOW_CHANGED = "remote_build_pairing_window_changed",
@@ -221,6 +227,17 @@ export interface InitialStateEventData {
    *  reason as ``pairings`` / ``peers`` — absent controller,
    *  omitted field. */
   remote_jobs?: OffloaderRemoteJobSnapshotEntry[];
+  /** Receiver-side settings scalars (RAM-canonical on the backend's
+   *  ReceiverState). Seed the Build server panel's first paint;
+   *  updates keep flowing through the loadRemoteBuildSettings
+   *  refreshes. Optional for the same reason as `peers` — absent
+   *  controller, omitted field. */
+  remote_build_settings?: Pick<RemoteBuildSettings, "enabled" | "cleanup_ttl_seconds">;
+  /** Firmware-jobs snapshot: the same rows follow_jobs would replay
+   *  (created_at order, output omitted), seeding the queue in one
+   *  shot. Optional for the same reason as above; follow_jobs stays
+   *  the live-update stream. */
+  firmware_jobs?: FirmwareJob[];
   /** Offloader-side master "Remote builds enabled" toggle (7b).
    *  When `false`, the backend's ``pick_build_path`` short-
    *  circuits every install to LOCAL; paired peer-link

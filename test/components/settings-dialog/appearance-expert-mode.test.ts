@@ -35,14 +35,14 @@ describe("appearance Expert Mode toggle", () => {
     const disclosure =
       el.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!;
     expect(disclosure.getAttribute("aria-expanded")).toBe("false");
-    expect(el.shadowRoot!.querySelectorAll(".expert-feature").length).toBe(0);
+    expect(el.shadowRoot!.querySelectorAll(".feature-item").length).toBe(0);
 
     disclosure.click();
     await el.updateComplete;
 
     expect(disclosure.getAttribute("aria-expanded")).toBe("true");
     // Editor diff view, navigator search, YAML content search.
-    expect(el.shadowRoot!.querySelectorAll(".expert-feature").length).toBe(3);
+    expect(el.shadowRoot!.querySelectorAll(".feature-item").length).toBe(3);
   });
 
   it("reflects the current value via aria-checked", async () => {

@@ -6,7 +6,7 @@
  * flow onto <esphome-device-card>, and the update indicator stays
  * gated on a live mDNS source.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
@@ -14,9 +14,19 @@ vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import { renderCardGrid } from "../../../src/components/dashboard/render-content.js";
+import {
+  clearTourConfiguration,
+  setTourActive,
+  setTourConfiguration,
+} from "../../../src/components/guided-tour/tour-session.js";
 import { renderInto } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { makeDashboardHost } from "./_host.js";
+
+afterEach(() => {
+  setTourActive(false);
+  clearTourConfiguration();
+});
 
 function makeHost(devices: ConfiguredDevice[]) {
   return makeDashboardHost({
@@ -69,5 +79,27 @@ describe("renderCardGrid", () => {
     const card = renderCard(device);
     expect(card.hasAttribute("show-update")).toBe(false);
     expect(card.hasAttribute("queued-update")).toBe(false);
+  });
+
+  it("keeps the tour target in canonical device order", () => {
+    const zulu = makeConfiguredDevice({
+      name: "zulu",
+      friendly_name: "Zulu",
+      configuration: "zulu.yaml",
+    });
+    const alpha = makeConfiguredDevice({
+      name: "alpha",
+      friendly_name: "Alpha",
+      configuration: "alpha.yaml",
+    });
+    setTourConfiguration(alpha.configuration);
+    setTourActive(true);
+
+    const container = renderInto(renderCardGrid(makeHost([zulu, alpha]), [zulu]));
+    const configurations = [...container.querySelectorAll("esphome-device-card")].map(
+      (card) => card.getAttribute("data-configuration")
+    );
+
+    expect(configurations).toEqual(["alpha.yaml", "zulu.yaml"]);
   });
 });

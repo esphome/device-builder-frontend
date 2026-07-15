@@ -122,10 +122,11 @@ export const inputStyles = css`
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-error), transparent 80%);
   }
 
-  /* Default option in a select menu: a label with a quiet second line, so
-     the default stays identifiable even though wa-select activates the
-     first option when nothing is committed. Mirrors the pin menu's notes. */
-  .option-default-stack {
+  /* Option row in a select menu: the label plus quiet annotation lines —
+     the option's catalog description and/or the default tag (wa-select
+     activates the first option when nothing is committed, so the default
+     must stay identifiable). Mirrors the pin menu's notes. */
+  .option-stack {
     display: inline-flex;
     flex-direction: column;
     gap: 1px;
@@ -136,6 +137,15 @@ export const inputStyles = css`
     font-size: var(--wa-font-size-2xs);
     color: var(--wa-color-text-quiet);
     font-style: italic;
+  }
+
+  /* Catalog prose for one option (quiet, non-italic so it reads as
+     content rather than the default-tag annotation). */
+  .option-description-note {
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+    max-width: 42ch;
+    white-space: normal;
   }
 
   wa-select::part(listbox) {

@@ -11,7 +11,6 @@ import {
   CLEANUP_TTL_DEFAULT_SECONDS,
   CLEANUP_TTL_MAX_SECONDS,
   CLEANUP_TTL_MIN_SECONDS,
-  type IdentityView,
   type PeerSummary,
 } from "../../api/types/remote-build.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
@@ -23,20 +22,22 @@ import {
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
 } from "../../context/index.js";
+import { pairingAddressStyles } from "../../styles/pairing-address.js";
+import { peerRowStyles } from "../../styles/peer-rows.js";
 import { pinHexStyles } from "../../styles/pin-hex.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
+import { pairingAddress } from "../../util/pairing-address.js";
+import { renderPairingAddress } from "../shared/pairing-address.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
 import { formatSecondsAgo } from "../../util/relative-time.js";
+import { RemoteBuildIdentityController } from "../../util/remote-build-identity-controller.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import { buildServerCardStyles, cleanupTtlStyles } from "./build-server-styles.js";
 import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
-import {
-  peerRowStyles,
-  settingsRowStyles,
-  settingsSharedStyles,
-} from "./shared-styles.js";
+import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../confirm-dialog.js";
@@ -72,11 +73,10 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   @state()
   private _rotationCounter = 0;
 
-  @state()
-  private _identity: IdentityView | null = null;
-
-  @state()
-  private _identityLoadFailed = false;
+  private readonly _identityCtrl = new RemoteBuildIdentityController(
+    this,
+    () => this._api
+  );
 
   @state()
   private _rotateInFlight = false;
@@ -93,17 +93,13 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   static styles = [
     espHomeStyles,
     pinHexStyles,
+    pairingAddressStyles,
     settingsSharedStyles,
     settingsRowStyles,
     peerRowStyles,
     buildServerCardStyles,
     cleanupTtlStyles,
   ];
-
-  connectedCallback() {
-    super.connectedCallback();
-    void this._loadIdentity();
-  }
 
   protected updated(changed: Map<string, unknown>) {
     super.updated(changed);
@@ -113,7 +109,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
       changed.has("_rotationCounter") &&
       changed.get("_rotationCounter") !== undefined
     ) {
-      void this._loadIdentity();
+      this._identityCtrl.onRotationCounterChanged();
     }
   }
 
@@ -165,30 +161,17 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   }
 
   private _renderApprovedPeerRow(peer: PeerSummary) {
-    const connectedClass = peer.connected
-      ? "peer-connection-connected"
-      : "peer-connection-disconnected";
-    const connectedLabel = peer.connected
-      ? this._localize("settings.build_server_peer_connected")
-      : this._localize("settings.build_server_peer_disconnected");
-    // ``paired_at`` is a Unix-seconds timestamp from the
-    // receiver's clock at the time the pairing was approved.
-    // We render it as a relative "paired N days ago" via the
-    // shared :func:`formatSecondsAgo` so the wording localises
-    // through ``Intl.RelativeTimeFormat`` (matching the device
-    // drawer's reachability strings). A row with ``paired_at``
-    // of 0 (legacy / corrupt) hides the line rather than
-    // showing a misleading "55 years ago".
-    const pairedAgoSeconds =
-      peer.paired_at > 0 ? Math.max(0, Date.now() / 1000 - peer.paired_at) : null;
+    const pill = peerConnectionPill(peer.connected);
+    // ``paired_at`` is a Unix-seconds timestamp from the receiver's clock
+    // at approval time, rendered as a relative "paired N days ago" so the
+    // wording localises through ``Intl.RelativeTimeFormat``.
+    const pairedAgo = pairedAgoSeconds(peer.paired_at, Date.now());
     return html`
       <div class="row peer-row peer-row-approved">
         <div class="row-label">
           <span class="row-title">
             ${peer.label}
-            <span class=${`peer-connection-pill ${connectedClass}`}>
-              ${connectedLabel}
-            </span>
+            <span class=${pill.className}>${this._localize(pill.labelKey)}</span>
           </span>
           <!--
             "Show details" disclosure. Matches the
@@ -207,12 +190,12 @@ export class ESPHomeSettingsBuildServer extends LitElement {
             </summary>
             <dl class="peer-details-list">
               ${
-                pairedAgoSeconds !== null
+                pairedAgo !== null
                   ? html`
                       <dt>
                         ${this._localize("settings.build_server_peer_paired_at_label")}
                       </dt>
-                      <dd>${formatSecondsAgo(pairedAgoSeconds, activeLocale())}</dd>
+                      <dd>${formatSecondsAgo(pairedAgo, activeLocale())}</dd>
                     `
                   : nothing
               }
@@ -264,18 +247,19 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   }
 
   private _renderCard() {
-    if (this._identityLoadFailed) {
+    if (this._identityCtrl.loadFailed) {
       return renderStatusRow(
         this._localize,
         "settings.remote_build_identity_load_failed",
         "alert"
       );
     }
-    if (this._identity === null) {
+    if (this._identityCtrl.identity === null) {
       return renderStatusRow(this._localize, "settings.remote_build_identity_loading");
     }
-    const identity = this._identity;
+    const identity = this._identityCtrl.identity;
     const formattedPin = formatPinSha256(identity.pin_sha256);
+    const address = pairingAddress(identity);
     return html`
       <div class="build-server-card">
         <div class="build-server-row build-server-row--pin">
@@ -315,6 +299,18 @@ export class ESPHomeSettingsBuildServer extends LitElement {
           </span>
           <code class="build-server-dashboard-id">${identity.dashboard_id}</code>
         </div>
+        ${
+          address
+            ? html`
+                <div class="build-server-row">
+                  <span class="build-server-label">
+                    ${this._localize("settings.remote_build_address_label")}
+                  </span>
+                  ${renderPairingAddress(this._localize, identity)}
+                </div>
+              `
+            : nothing
+        }
         <div class="build-server-row build-server-versions">
           <span>
             ${this._localize("settings.remote_build_server_version_label")}
@@ -385,17 +381,6 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     `;
   }
 
-  private async _loadIdentity(): Promise<void> {
-    if (this._api === undefined) return;
-    try {
-      this._identity = await this._api.getRemoteBuildIdentity();
-      this._identityLoadFailed = false;
-    } catch (err) {
-      console.warn("Could not load remote-build identity:", err);
-      this._identityLoadFailed = true;
-    }
-  }
-
   private _toast(
     level: "success" | "warning" | "error",
     key: string,
@@ -446,9 +431,8 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     if (this._api === undefined || this._rotateInFlight) return;
     this._rotateInFlight = true;
     try {
-      this._identity = await this._api.rotateRemoteBuildIdentity();
-      this._identityLoadFailed = false;
-      if (this._identity.listener_bound) {
+      this._identityCtrl.set(await this._api.rotateRemoteBuildIdentity());
+      if (this._identityCtrl.identity?.listener_bound) {
         this._toast("success", "settings.remote_build_rotate_success");
       } else {
         this._toast("warning", "settings.remote_build_rotate_listener_down");
@@ -465,7 +449,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   }
 
   private async _onCopyPin() {
-    const pin = this._identity?.pin_sha256;
+    const pin = this._identityCtrl.identity?.pin_sha256;
     if (!pin) {
       this._toast("warning", "settings.remote_build_pin_copy_failed");
       return;

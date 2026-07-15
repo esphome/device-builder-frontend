@@ -9,6 +9,7 @@ import {
   onSetOffloaderPairingEnabled,
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildEnabled,
+  onSetHideDeviceBuilder,
   onSetRemoteComputeOnly,
   onSetTheme,
   onSetVersionHistoryEnabled,
@@ -26,6 +27,7 @@ type PrefsHost = Pick<
   ESPHomeApp,
   | "_experienceLevel"
   | "_remoteComputeOnly"
+  | "_hideDeviceBuilder"
   | "_versionHistoryEnabled"
   | "_localize"
   | "_prefsWritesInFlight"
@@ -37,6 +39,7 @@ function makePrefsHost(
   return {
     _experienceLevel: null,
     _remoteComputeOnly: false,
+    _hideDeviceBuilder: false,
     _versionHistoryEnabled: true,
     _localize: identityLocalize as ESPHomeApp["_localize"],
     _prefsWritesInFlight: 0,
@@ -328,6 +331,91 @@ describe("onSetRemoteComputeOnly", () => {
     expect(host._remoteComputeOnly).toBe(true);
     await flush();
     expect(host._remoteComputeOnly).toBe(false);
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("turning off also clears the hide sub-toggle in the same write", async () => {
+    const update = vi.fn(async () => ({}));
+    const host = makePrefsHost(update);
+    host._remoteComputeOnly = true;
+    host._hideDeviceBuilder = true;
+    onSetRemoteComputeOnly(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: false })
+    );
+    expect(host._remoteComputeOnly).toBe(false);
+    expect(host._hideDeviceBuilder).toBe(false);
+    await flush();
+    expect(update).toHaveBeenCalledWith({
+      remote_compute_only: false,
+      hide_device_builder: false,
+    });
+  });
+
+  it("a failed cascade write reverts both fields together", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = makePrefsHost(
+      vi.fn(async () => {
+        throw new Error("no");
+      })
+    );
+    host._remoteComputeOnly = true;
+    host._hideDeviceBuilder = true;
+    onSetRemoteComputeOnly(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: false })
+    );
+    await flush();
+    expect(host._remoteComputeOnly).toBe(true);
+    expect(host._hideDeviceBuilder).toBe(true);
+  });
+
+  it("turning on leaves the hide sub-toggle alone", async () => {
+    const update = vi.fn(async () => ({}));
+    const host = makePrefsHost(update);
+    onSetRemoteComputeOnly(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    await flush();
+    expect(update).toHaveBeenCalledWith({ remote_compute_only: true });
+    expect(host._hideDeviceBuilder).toBe(false);
+  });
+});
+
+describe("onSetHideDeviceBuilder", () => {
+  beforeEach(() => toastError.mockClear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("optimistically flips and persists the preference on success", async () => {
+    const update = vi.fn(async () => ({}));
+    const host = makePrefsHost(update);
+    onSetHideDeviceBuilder(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    expect(host._hideDeviceBuilder).toBe(true);
+    await flush();
+    expect(host._hideDeviceBuilder).toBe(true);
+    expect(update).toHaveBeenCalledWith({ hide_device_builder: true });
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("reverts, logs, and toasts on backend rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = makePrefsHost(
+      vi.fn(async () => {
+        throw new Error("no");
+      })
+    );
+    onSetHideDeviceBuilder(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    expect(host._hideDeviceBuilder).toBe(true);
+    await flush();
+    expect(host._hideDeviceBuilder).toBe(false);
     expect(toastError).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalled();
   });

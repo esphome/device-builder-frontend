@@ -31,6 +31,13 @@ export const guidedTourStyles = css`
 
   .bubble {
     position: absolute;
+    display: flex;
+    flex-direction: column;
+    /* Cap the bubble so placement can always fit it somewhere on a small
+       screen; the body scrolls instead of covering the step's control. The
+       caret sits outside the box, so overflow lives on .bubble-scroll. */
+    max-height: min(60vh, calc(100vh - 32px));
+    max-height: min(60dvh, calc(100dvh - 32px));
     background: var(--wa-color-surface-raised, #fff);
     color: var(--wa-color-text-normal);
     border-radius: var(--wa-border-radius-l);
@@ -40,7 +47,67 @@ export const guidedTourStyles = css`
     box-sizing: border-box;
   }
 
+  .bubble-scroll {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+    overscroll-behavior: contain;
+  }
+
+  /* Only the body compresses when the bubble hits its max-height. */
+  .tour-header,
+  .hint,
+  .actions {
+    flex-shrink: 0;
+  }
+
+  .recovery-bubble {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(320px, calc(100vw - 32px));
+    transform: translate(-50%, -50%);
+  }
+
+  .btn-step-close {
+    position: absolute;
+    top: var(--wa-space-s);
+    right: var(--wa-space-s);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    color: var(--wa-color-text-quiet);
+  }
+
+  .btn-step-close:hover,
+  .btn-step-close.hovered {
+    color: var(--wa-color-text-normal);
+    background: var(--wa-color-surface-lowered);
+  }
+
+  .btn-step-close wa-icon {
+    font-size: 18px;
+  }
+
+  .tour-header {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+    padding: 0 var(--wa-space-xl) var(--wa-space-s) 0;
+    border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+  }
+
+  .tour-name {
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-normal);
+  }
+
   .step-label {
+    margin-left: auto;
     font-size: 11px;
     font-weight: var(--wa-font-weight-bold);
     letter-spacing: 0.07em;
@@ -49,7 +116,7 @@ export const guidedTourStyles = css`
   }
 
   .bubble h2 {
-    margin: var(--wa-space-2xs) 0 0;
+    margin: var(--wa-space-xs) 0 0;
     font-size: var(--wa-font-size-m);
     font-weight: var(--wa-font-weight-bold);
   }
@@ -130,6 +197,12 @@ export const guidedTourStyles = css`
 
   .btn-next:hover {
     background: var(--esphome-primary-hover);
+  }
+
+  @media (max-width: 480px) {
+    .bubble {
+      padding: var(--wa-space-m) var(--wa-space-m) var(--wa-space-s);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

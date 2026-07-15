@@ -91,6 +91,15 @@ describe("device-navigator search filtering", () => {
     expect(rowSubtitles(nav)).toEqual(["Living Temp"]);
   });
 
+  it("renders forced-open filtered headers as non-interactive", async () => {
+    const nav = await mountNavigator("living");
+    const header = sectionHeaders(nav)[0];
+
+    expect(header.hasAttribute("role")).toBe(false);
+    expect(header.hasAttribute("tabindex")).toBe(false);
+    expect(header.hasAttribute("aria-expanded")).toBe(false);
+  });
+
   it("matches on the id even when the displayed name differs", async () => {
     // "Living Temp" (name) has a space; only the id "living_temp" matches.
     const nav = await mountNavigator("living_temp");

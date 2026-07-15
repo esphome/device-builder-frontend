@@ -18,6 +18,7 @@ import { renderMultiValueField } from "../../../src/components/device/config-ent
 import {
   renderBooleanField,
   renderFloatWithUnitField,
+  renderNumberField,
   renderTextareaField,
   renderTimePeriodField,
 } from "../../../src/components/device/config-entry-renderers/primitives.js";
@@ -201,6 +202,142 @@ describe("renderTimePeriodField / renderFloatWithUnitField — bail on non-primi
     const tpl = renderFloatWithUnitField(entry, ["frequency"], ctx);
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
     expect(rendersBailBranch(json)).toBe(false);
+  });
+});
+
+// <input type="number"> silently blanks a non-numeric .value, so an
+// unparseable primitive under a FLOAT field ("250 steps/s" before the
+// catalog carried the unit) read as unset, and the first keystroke wrote
+// a bare number over it. Same class in the with-unit renderer: a value
+// the parser can't split ("21C") rendered an empty magnitude + unit
+// picker. Both bail to the YAML-only notice (#2056).
+describe("renderNumberField / renderFloatWithUnitField — bail on unparseable primitive", () => {
+  const floatEntry = (): ConfigEntry =>
+    makeConfigEntry({
+      key: "max_speed",
+      type: ConfigEntryType.FLOAT,
+      label: "Max Speed",
+    });
+
+  const withUnitEntry = (): ConfigEntry =>
+    makeConfigEntry({
+      key: "default_target_temperature",
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      label: "Default Target Temperature",
+      unit_options: ["°C", "°F", "K"],
+    });
+
+  it("bails on a unit-suffixed string under a FLOAT field", () => {
+    const { ctx } = makeCtx({ max_speed: "250 steps/s" });
+    const tpl = renderNumberField(floatEntry(), ["max_speed"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+  });
+
+  it("bails on a boolean under a FLOAT field", () => {
+    const { ctx } = makeCtx({ max_speed: true });
+    const tpl = renderNumberField(floatEntry(), ["max_speed"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+  });
+
+  it("renders the number input for a number and a numeric string", () => {
+    for (const value of [250, "250"]) {
+      const { ctx } = makeCtx({ max_speed: value });
+      const tpl = renderNumberField(floatEntry(), ["max_speed"], ctx);
+      const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+      expect(rendersBailBranch(json)).toBe(false);
+      expect(rendersEditableBranch(json)).toBe(true);
+    }
+  });
+
+  it("renders the number input when the value is unset", () => {
+    const { ctx } = makeCtx({});
+    const tpl = renderNumberField(floatEntry(), ["max_speed"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(rendersEditableBranch(json)).toBe(true);
+  });
+
+  it("bails on a malformed unit string under a float-with-unit field", () => {
+    const { ctx } = makeCtx({ default_target_temperature: "21X" });
+    const tpl = renderFloatWithUnitField(
+      withUnitEntry(),
+      ["default_target_temperature"],
+      ctx
+    );
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+  });
+
+  it("keeps a degree-less temperature spelling editable (21C is valid upstream)", () => {
+    const { ctx } = makeCtx({ default_target_temperature: "21C" });
+    const tpl = renderFloatWithUnitField(
+      withUnitEntry(),
+      ["default_target_temperature"],
+      ctx
+    );
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+  });
+
+  it("renders both fields as editable text for a ${substitution} value", () => {
+    // The validator skips numeric checks for substitution refs; the
+    // renderer must keep them editable, not lock them behind the notice.
+    const floatCtx = makeCtx({ max_speed: "${speed}" }).ctx;
+    const floatJson = JSON.stringify(
+      renderNumberField(floatEntry(), ["max_speed"], floatCtx),
+      (k, v) => (k === "_$litType$" ? 0 : v)
+    );
+    expect(rendersBailBranch(floatJson)).toBe(false);
+    expect(floatJson).toContain("${speed}");
+
+    const unitCtx = makeCtx({ default_target_temperature: "${target}" }).ctx;
+    const unitJson = JSON.stringify(
+      renderFloatWithUnitField(withUnitEntry(), ["default_target_temperature"], unitCtx),
+      (k, v) => (k === "_$litType$" ? 0 : v)
+    );
+    expect(rendersBailBranch(unitJson)).toBe(false);
+    expect(unitJson).toContain("${target}");
+  });
+
+  it("keeps the editable UI mid-edit even when the committed value is empty", () => {
+    const ctx = makeRenderCtx(
+      { default_target_temperature: "1e" },
+      {
+        board: null,
+        overrides: {
+          emitChange: vi.fn(),
+          renderEntry: () => "<rendered>",
+          getEditingMagnitude: () => "1e",
+        },
+      }
+    );
+    const tpl = renderFloatWithUnitField(
+      withUnitEntry(),
+      ["default_target_temperature"],
+      ctx
+    );
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+  });
+
+  it("renders the editable float-with-unit UI for a well-formed value and for unset", () => {
+    // A whitespace-only value is effectively unset, never a bail.
+    for (const values of [
+      { default_target_temperature: "21°C" },
+      { default_target_temperature: " " },
+      {},
+    ]) {
+      const { ctx } = makeCtx(values);
+      const tpl = renderFloatWithUnitField(
+        withUnitEntry(),
+        ["default_target_temperature"],
+        ctx
+      );
+      const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+      expect(rendersBailBranch(json)).toBe(false);
+    }
   });
 });
 

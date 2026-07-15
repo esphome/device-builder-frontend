@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { chipNameToVariant } from "../../../util/chip-variant.js";
 import { nearCanonicalOption } from "../../../util/config-validation.js";
+import { renderOptionStack } from "../../../util/option-stack.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
 import {
@@ -226,26 +227,24 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         ${shownOptions.map((opt) => {
           const selected = opt.value.toLowerCase() === valueLower;
           const isDefault = defaultStr !== "" && opt.value.toLowerCase() === defaultLower;
-          if (!isDefault) {
+          // wa-select activates the first option when nothing is committed,
+          // so the default gets a muted note (like the pin menu's notes) —
+          // the honest "this applies if you leave it" signal.
+          const defaultNote = isDefault
+            ? ctx.localize("device.default_option_tag")
+            : undefined;
+          if (!defaultNote && !opt.description) {
             return html`<wa-option value=${opt.value} ?selected=${selected}
-              >${opt.label}</wa-option
+              >${renderOptionStack(opt.label)}</wa-option
             >`;
           }
-          // wa-select activates the first option when nothing is committed,
-          // so give the default a muted second line (like the pin menu's
-          // notes) — the honest "this applies if you leave it" signal.
           // `.label` keeps the closed control showing just the label.
           return html`<wa-option
             value=${opt.value}
             .label=${opt.label}
             ?selected=${selected}
           >
-            <span class="option-default-stack">
-              <span>${opt.label}</span>
-              <small class="option-default-note"
-                >${ctx.localize("device.default_option_tag")}</small
-              >
-            </span>
+            ${renderOptionStack(opt.label, opt.description, defaultNote)}
           </wa-option>`;
         })}
       </wa-select>
