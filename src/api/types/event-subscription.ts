@@ -11,7 +11,12 @@ import {
 } from "./devices.js";
 import { JobStatus, type FirmwareJob } from "./firmware-jobs.js";
 import type { OffloaderAlertSnapshotEntry } from "./remote-build-events.js";
-import type { PairingSummary, PeerSummary, RemoteBuildPeer } from "./remote-build.js";
+import type {
+  PairingSummary,
+  PeerSummary,
+  RemoteBuildPeer,
+  RemoteBuildSettings,
+} from "./remote-build.js";
 import type { UserPreferences } from "./system.js";
 
 // ─── Event Subscription ─────────────────────────────────────
@@ -227,7 +232,7 @@ export interface InitialStateEventData {
    *  updates keep flowing through the loadRemoteBuildSettings
    *  refreshes. Optional for the same reason as `peers` — absent
    *  controller, omitted field. */
-  remote_build_settings?: { enabled: boolean; cleanup_ttl_seconds: number };
+  remote_build_settings?: Pick<RemoteBuildSettings, "enabled" | "cleanup_ttl_seconds">;
   /** Firmware-jobs snapshot: the same rows follow_jobs would replay
    *  (created_at order, output omitted), seeding the queue in one
    *  shot. Optional for the same reason as above; follow_jobs stays
