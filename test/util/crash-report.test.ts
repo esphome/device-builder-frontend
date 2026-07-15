@@ -168,12 +168,10 @@ describe("buildFullReport", () => {
 describe("buildIssueUrl", () => {
   const params = (r: CrashReport) => new URL(buildIssueUrl(r).url).searchParams;
 
-  it("prefills every form field, config into the YAML Config box", () => {
+  it("prefills the text fields, config into the YAML Config box", () => {
     const p = params(report());
     expect(p.get("template")).toBe("bug_report.yml");
     expect(p.get("version")).toBe("2026.6.4");
-    expect(p.get("installation")).toBe("Home Assistant Add-on");
-    expect(p.get("platform")).toBe("ESP32");
     expect(p.get("component_name")).toBe("wifi");
     expect(p.get("title")).toContain("Guru Meditation Error");
     expect(p.get("problem")).toContain("Pressed the crash button in Home Assistant");
@@ -186,14 +184,24 @@ describe("buildIssueUrl", () => {
     );
   });
 
+  it("surfaces platform and installation in problem (dropdowns can't prefill)", () => {
+    const p = params(report());
+    // GitHub ignores URL prefill on dropdown fields, so they are NOT set.
+    expect(p.has("platform")).toBe(false);
+    expect(p.has("installation")).toBe(false);
+    // The values ride in the problem text where the maintainer sees them.
+    expect(p.get("problem")).toContain("Platform: ESP32");
+    expect(p.get("problem")).toContain("Installation: Home Assistant Add-on");
+  });
+
   it("reports complete when everything fit", () => {
     expect(buildIssueUrl(report()).complete).toBe(true);
   });
 
-  it("omits installation and unknown platforms when unset", () => {
+  it("omits the platform fact when unknown", () => {
     const p = params(report({ meta: { ...META, installation: "", targetPlatform: "" } }));
-    expect(p.has("installation")).toBe(false);
-    expect(p.has("platform")).toBe(false);
+    expect(p.get("problem")).not.toContain("Platform:");
+    expect(p.get("problem")).not.toContain("Installation:");
   });
 
   it("packs supplementary sections into additional", () => {

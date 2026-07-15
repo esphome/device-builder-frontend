@@ -324,20 +324,29 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   const url = new URL(ISSUE_URL_BASE);
   const params = url.searchParams;
   params.set("title", buildIssueTitle(report));
+  // Only `input` / `textarea` form fields accept a URL prefill; GitHub
+  // ignores it on `dropdown` fields (installation / platform), so those
+  // are surfaced inside `problem` instead of set as dead params.
   const version = meta.esphomeVersion || meta.deployedVersion;
   if (version) params.set("version", version);
-  if (meta.installation) params.set("installation", meta.installation);
-  const platform = issuePlatform(meta.targetPlatform);
-  if (platform) params.set("platform", platform);
   const component = inferComponentName(scrape.decodedFrames);
   if (component) params.set("component_name", component);
+  const platform = issuePlatform(meta.targetPlatform);
   let missing = scrape.decodedFrames.length > MAX_PROBLEM_FRAMES;
 
-  // The user's own context leads the problem field; the technical
-  // payload follows it.
+  // The user's own context leads the problem field, then the platform /
+  // installation the dropdowns can't be prefilled with, then the trace.
   const problem: string[] = report.userDescription
     ? [report.userDescription, "", "(Crash detected in the Device Builder log viewer.)"]
     : [`The device crashed (crash detected in the Device Builder log viewer).`];
+  const facts = [
+    platform && `Platform: ${platform}`,
+    meta.installation && `Installation: ${meta.installation}`,
+    `ESPHome ${meta.esphomeVersion || "unknown"} (compiled)`,
+    meta.deployedVersion && `${meta.deployedVersion} (running)`,
+    meta.board && `Board: ${meta.board}`,
+  ].filter(Boolean);
+  problem.push("", ...facts.map((fact) => `- ${fact}`));
   if (scrape.decodedFrames.length > 0) {
     problem.push(
       "",
