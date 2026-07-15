@@ -13,7 +13,7 @@ export function renderRemoteStack(host: ESPHomePageDashboard): TemplateResult {
   return html`
     <esphome-remote-build-panel
       .collapsed=${host._remoteStackCollapsed}
-      @toggle-collapsed=${host._onToggleRemoteStack}
+      @toggle-collapsed=${host._onSwapStacks}
     ></esphome-remote-build-panel>
   `;
 }
@@ -25,7 +25,7 @@ export function renderRemoteStack(host: ESPHomePageDashboard): TemplateResult {
  */
 export function renderBuilderStack(
   host: ESPHomePageDashboard,
-  content: TemplateResult
+  content: () => TemplateResult
 ): TemplateResult {
   const collapsed = host._builderStackCollapsed;
   return html`
@@ -37,7 +37,7 @@ export function renderBuilderStack(
         type="button"
         class="builder-stack-header stack-bar"
         aria-expanded=${collapsed ? "false" : "true"}
-        @click=${host._onToggleBuilderStack}
+        @click=${host._onSwapStacks}
       >
         <wa-icon library="mdi" name="memory"></wa-icon>
         <span class="stack-bar-main">
@@ -55,7 +55,7 @@ export function renderBuilderStack(
           aria-hidden="true"
         ></wa-icon>
       </button>
-      ${collapsed ? "" : content}
+      ${collapsed ? "" : content()}
     </section>
   `;
 }
@@ -75,19 +75,6 @@ export const dashboardStacksStyles = css`
     --toolbar-pad-top: var(--wa-space-s);
   }
 
-  /* The pill keeps its classic hanging look, but hangs from the Device
-     builder header bar instead of the page header: pulled up over the
-     bar's bottom border so the two read as one attached element. */
-  :host([stacks]) .discovered-section {
-    position: static;
-    margin: calc(-1 * var(--stack-gap) - var(--wa-border-width-s)) 0 0;
-    pointer-events: auto;
-  }
-
-  :host([stacks]) .discovered-section-header {
-    animation: none;
-  }
-
   /* Visuals live in the shared stack-bar fragment; here only the
      section rhythm (one --stack-gap below the bar while its content is
      open — a collapsed bar sits flush) and the joined-unit overlap. */
@@ -103,13 +90,17 @@ export const dashboardStacksStyles = css`
   /* Use the whole viewport: the page fills down to the footer and the
      expanded remote section stretches into whatever is left — and never
      past it; anything long scrolls inside the section. */
+  /* vh fallback then dvh — matches the vh/dvh pairing convention in
+     dashboard/styles.ts and device-styles.ts for older mobile browsers. */
   :host([stacks][view="cards"]) {
+    min-height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
     min-height: calc(
       100dvh - var(--esphome-header-height) - var(--esphome-footer-height)
     );
   }
 
   :host([stacks][remote-open][view="cards"]) {
+    height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
     height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
     /* The height calc already reserves the footer; the base view="cards"

@@ -13,6 +13,7 @@ import {
   localizeContext,
 } from "../../context/index.js";
 import { pairingWindowStyles } from "../../styles/pairing-window.js";
+import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { PairingWindowController } from "../../util/pairing-window-controller.js";
 import {
@@ -22,11 +23,7 @@ import {
 import type { ESPHomeAcceptPeerDialog } from "../accept-peer-dialog.js";
 import { renderPairingWindowStatus } from "../shared/pairing-window-status.js";
 import { renderStatusRow } from "./settings-rows.js";
-import {
-  peerRowStyles,
-  settingsRowStyles,
-  settingsSharedStyles,
-} from "./shared-styles.js";
+import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "../accept-peer-dialog.js";
 

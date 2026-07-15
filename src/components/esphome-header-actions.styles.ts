@@ -11,6 +11,9 @@ export const headerActionsStyles = css`
     position: relative;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    width: var(--esphome-header-action-box);
+    box-sizing: border-box;
     border: none;
     background: none;
     color: var(--esphome-on-primary);

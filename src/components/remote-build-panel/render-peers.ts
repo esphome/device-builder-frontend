@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { PeerSummary } from "../../api/types/remote-build.js";
 import { activeLocale } from "../../common/localize.js";
+import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
 import { formatSecondsAgo } from "../../util/relative-time.js";
 import type { ESPHomeRemoteBuildPanel } from "../remote-build-panel.js";
 import { renderPairingWindowStatus } from "../shared/pairing-window-status.js";
@@ -86,30 +87,22 @@ export function renderPeersCard(
 }
 
 function renderPeerRow(host: ESPHomeRemoteBuildPanel, peer: PeerSummary): TemplateResult {
-  const connectedClass = peer.connected
-    ? "peer-connection-connected"
-    : "peer-connection-disconnected";
-  const connectedLabel = peer.connected
-    ? host._localize("settings.build_server_peer_connected")
-    : host._localize("settings.build_server_peer_disconnected");
-  const pairedAgoSeconds =
-    peer.paired_at > 0 ? Math.max(0, host._now / 1000 - peer.paired_at) : null;
+  const pill = peerConnectionPill(peer.connected);
+  const pairedAgo = pairedAgoSeconds(peer.paired_at, host._now);
   return html`
     <div class="peer-line">
       <wa-icon library="mdi" name="monitor-dashboard"></wa-icon>
       <div class="peer-line-body">
         <span class="peer-line-title">
           ${peer.label}
-          <span class=${`peer-connection-pill ${connectedClass}`}>
-            ${connectedLabel}
-          </span>
+          <span class=${pill.className}>${host._localize(pill.labelKey)}</span>
         </span>
         ${
-          pairedAgoSeconds !== null
+          pairedAgo !== null
             ? html`
                 <span class="peer-line-meta">
                   ${host._localize("settings.build_server_peer_paired_at_label")}
-                  ${formatSecondsAgo(pairedAgoSeconds, activeLocale())}
+                  ${formatSecondsAgo(pairedAgo, activeLocale())}
                 </span>
               `
             : nothing

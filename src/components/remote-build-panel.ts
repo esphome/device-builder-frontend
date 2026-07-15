@@ -53,7 +53,7 @@ import { remoteBuildPanelStyles } from "./remote-build-panel/styles.js";
 import { bucketJobs } from "./shared/firmware-jobs-list.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
 import { stackBarStyles } from "./shared/stack-bar-styles.js";
-import { peerRowStyles } from "./settings-dialog/shared-styles.js";
+import { peerRowStyles } from "../styles/peer-rows.js";
 
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
@@ -122,7 +122,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
 
   readonly _identity = new RemoteBuildIdentityController(this, () => this._api);
 
-  private readonly _ticker = new NowTickController(this, { autoStart: true });
+  private readonly _ticker = new NowTickController(this);
 
   private _bucketJobs = memoizeOne(bucketJobs);
 
@@ -155,6 +155,14 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
     if (changed.has("_windowState")) {
       this._window.onStateChanged(this._windowState);
     }
+    // Neither ticker has visible output while collapsed (the countdown
+    // chip and relative timestamps only render expanded), so both
+    // suspend rather than re-rendering a static banner every second.
+    if (changed.has("collapsed")) {
+      this._window.setTickSuspended(this.collapsed);
+    }
+    if (this.collapsed) this._ticker.stop();
+    else this._ticker.start();
     if (
       changed.has("_rotationCounter") &&
       changed.get("_rotationCounter") !== undefined
@@ -234,8 +242,8 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
         @click=${this._onToggleCollapsed}
       >
         <wa-icon library="mdi" name="server-network"></wa-icon>
-        <span class="banner-main stack-bar-main">
-          <span class="banner-title stack-bar-title">
+        <span class="stack-bar-main">
+          <span class="stack-bar-title">
             ${this._localize("remote_build_dashboard.title")}
           </span>
           <span class="stack-bar-subtitle">
@@ -265,7 +273,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
           }
         </span>
         <wa-icon
-          class="banner-chevron stack-bar-chevron"
+          class="stack-bar-chevron"
           library="mdi"
           name="chevron-down"
           aria-hidden="true"

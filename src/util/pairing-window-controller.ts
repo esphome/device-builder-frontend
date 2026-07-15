@@ -36,6 +36,7 @@ export class PairingWindowController implements ReactiveController {
   private _tickHandle: ReturnType<typeof setInterval> | null = null;
   private _openedHere = false;
   private _autoOpenPending = false;
+  private _tickSuspended = false;
 
   constructor(
     private readonly _host: ReactiveControllerHost,
@@ -111,6 +112,15 @@ export class PairingWindowController implements ReactiveController {
     return remainingOf(this._baselineSeconds, this._anchorMs, Date.now());
   }
 
+  /** Pause the 1 Hz countdown re-render while its chip isn't visible
+   *  (collapsed panel). State pushes keep flowing so the baseline stays
+   *  correctly anchored; only the display tick stops. */
+  setTickSuspended(suspended: boolean): void {
+    this._tickSuspended = suspended;
+    if (suspended) this._stopTick();
+    else if (this._baselineSeconds !== null) this._startTick();
+  }
+
   /** Mount-time open: no user click behind it, so an unresolved api isn't
    *  a failure — park and retry from :meth:`hostUpdated` instead. */
   private _autoOpen(): void {
@@ -123,7 +133,7 @@ export class PairingWindowController implements ReactiveController {
   }
 
   private _startTick(): void {
-    if (this._tickHandle !== null) return;
+    if (this._tickSuspended || this._tickHandle !== null) return;
     this._tickHandle = setInterval(() => {
       this._host.requestUpdate();
     }, 1000);

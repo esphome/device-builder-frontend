@@ -46,25 +46,6 @@ export const remoteBuildPanelStyles = css`
     color: var(--esphome-primary);
   }
 
-  .listener-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px var(--wa-space-s);
-    border-radius: var(--wa-border-radius-pill, 999px);
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-semibold);
-  }
-
-  .listener-up {
-    background: var(--wa-color-success-quiet, #d6f5dd);
-    color: var(--wa-color-success-on-quiet, #036a1c);
-  }
-
-  .listener-down {
-    background: var(--wa-color-warning-quiet, #fff3cd);
-    color: var(--wa-color-warning-on-quiet, #8a6d3b);
-  }
-
   .intro {
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-quiet);

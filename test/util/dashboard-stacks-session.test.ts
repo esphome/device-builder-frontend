@@ -29,12 +29,9 @@ describe("dashboard-stacks-session", () => {
   });
 
   it.each([
-    ["malformed JSON", "{nope"],
-    ["a non-object", '"remote"'],
-    ["an array", '["remote"]'],
-    ["a null literal", "null"],
-    ["an unknown value", '{"expanded":"sideways"}'],
-    ["a legacy shape", '{"remote":false,"builder":true}'],
+    ["an unknown value", "sideways"],
+    ["a legacy JSON shape", '{"expanded":"remote"}'],
+    ["an empty string", ""],
   ])("falls back to null on %s", (_label, raw) => {
     sessionStorage.setItem(STORAGE_KEY, raw);
     expect(loadExpandedStack()).toBeNull();

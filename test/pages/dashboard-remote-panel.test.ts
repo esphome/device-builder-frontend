@@ -140,9 +140,7 @@ describe("dashboard remote-compute stacks", () => {
     await page.updateComplete;
     expect(panel.collapsed).toBe(false);
     expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("false");
-    expect(sessionStorage.getItem("esphome-dashboard-stacks")).toContain(
-      '"expanded":"remote"'
-    );
+    expect(sessionStorage.getItem("esphome-dashboard-stacks")).toBe("remote");
   });
 
   it("clicking the open section's header swaps to the other (never both closed)", async () => {

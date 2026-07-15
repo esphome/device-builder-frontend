@@ -22,21 +22,19 @@ import {
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
 } from "../../context/index.js";
+import { peerRowStyles } from "../../styles/peer-rows.js";
 import { pinHexStyles } from "../../styles/pin-hex.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
 import { formatSecondsAgo } from "../../util/relative-time.js";
 import { RemoteBuildIdentityController } from "../../util/remote-build-identity-controller.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import { buildServerCardStyles, cleanupTtlStyles } from "./build-server-styles.js";
 import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
-import {
-  peerRowStyles,
-  settingsRowStyles,
-  settingsSharedStyles,
-} from "./shared-styles.js";
+import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../confirm-dialog.js";
@@ -159,30 +157,17 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   }
 
   private _renderApprovedPeerRow(peer: PeerSummary) {
-    const connectedClass = peer.connected
-      ? "peer-connection-connected"
-      : "peer-connection-disconnected";
-    const connectedLabel = peer.connected
-      ? this._localize("settings.build_server_peer_connected")
-      : this._localize("settings.build_server_peer_disconnected");
-    // ``paired_at`` is a Unix-seconds timestamp from the
-    // receiver's clock at the time the pairing was approved.
-    // We render it as a relative "paired N days ago" via the
-    // shared :func:`formatSecondsAgo` so the wording localises
-    // through ``Intl.RelativeTimeFormat`` (matching the device
-    // drawer's reachability strings). A row with ``paired_at``
-    // of 0 (legacy / corrupt) hides the line rather than
-    // showing a misleading "55 years ago".
-    const pairedAgoSeconds =
-      peer.paired_at > 0 ? Math.max(0, Date.now() / 1000 - peer.paired_at) : null;
+    const pill = peerConnectionPill(peer.connected);
+    // ``paired_at`` is a Unix-seconds timestamp from the receiver's clock
+    // at approval time, rendered as a relative "paired N days ago" so the
+    // wording localises through ``Intl.RelativeTimeFormat``.
+    const pairedAgo = pairedAgoSeconds(peer.paired_at, Date.now());
     return html`
       <div class="row peer-row peer-row-approved">
         <div class="row-label">
           <span class="row-title">
             ${peer.label}
-            <span class=${`peer-connection-pill ${connectedClass}`}>
-              ${connectedLabel}
-            </span>
+            <span class=${pill.className}>${this._localize(pill.labelKey)}</span>
           </span>
           <!--
             "Show details" disclosure. Matches the
@@ -201,12 +186,12 @@ export class ESPHomeSettingsBuildServer extends LitElement {
             </summary>
             <dl class="peer-details-list">
               ${
-                pairedAgoSeconds !== null
+                pairedAgo !== null
                   ? html`
                       <dt>
                         ${this._localize("settings.build_server_peer_paired_at_label")}
                       </dt>
-                      <dd>${formatSecondsAgo(pairedAgoSeconds, activeLocale())}</dd>
+                      <dd>${formatSecondsAgo(pairedAgo, activeLocale())}</dd>
                     `
                   : nothing
               }

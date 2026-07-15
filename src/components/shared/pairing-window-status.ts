@@ -1,15 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { PairingWindowState } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-
-/** ``127.4`` → ``2:07`` for the countdown chip. */
-export function formatWindowDuration(seconds: number | null): string {
-  if (seconds === null) return "";
-  const whole = Math.floor(seconds);
-  const m = Math.floor(whole / 60);
-  const s = whole % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { formatMinSec } from "../../util/relative-time.js";
 
 /**
  * Open/closed pill + live countdown + Extend for the receiver pairing window.
@@ -42,10 +34,10 @@ export function renderPairingWindowStatus(
               class="pairing-window-countdown"
               aria-label=${localize(
                 "settings.build_server_pairing_window_remaining_aria",
-                { duration: formatWindowDuration(remaining) }
+                { duration: formatMinSec(remaining) }
               )}
             >
-              ${formatWindowDuration(remaining)}
+              ${formatMinSec(remaining)}
             </span>
           `
         : nothing

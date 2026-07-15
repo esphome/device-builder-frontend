@@ -165,8 +165,8 @@ export class ESPHomeApp extends LitElement {
   @state()
   _versionHistoryEnabled = true;
   // False until the subscribe snapshot delivers preferences; the dashboard
-  // fails device creation closed while it's false so a remote-compute install
-  // can't flash creation UI before its prefs are known.
+  // waits on it before honouring remote_compute_only so the accordion's
+  // default section can't flip after first paint.
   @provide({ context: prefsLoadedContext })
   @state()
   _prefsLoaded = false;

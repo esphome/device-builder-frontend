@@ -30,6 +30,8 @@ import { notifyWarning } from "../../util/notify.js";
 import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { closeOpenDialogs } from "../base-dialog.js";
+import { REMOTE_COMPUTE_FEATURES, renderFeatureList } from "../shared/feature-list.js";
+import { featureListStyles } from "../shared/feature-list-styles.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { onChoiceGroupKeydown, renderChoiceCard, rovingTabbable } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
@@ -48,30 +50,6 @@ registerMdiIcons({
   sprout: mdiSprout,
   memory: mdiMemory,
 });
-
-// Mirrors the settings explainer so the wizard and Settings tell the same
-// story about what the remote compute dashboard changes.
-const REMOTE_COMPUTE_ONBOARDING_FEATURES: {
-  icon: string;
-  titleKey: string;
-  descKey: string;
-}[] = [
-  {
-    icon: "server-network",
-    titleKey: "settings.remote_compute_feature_dashboard",
-    descKey: "settings.remote_compute_feature_dashboard_desc",
-  },
-  {
-    icon: "memory",
-    titleKey: "settings.remote_compute_feature_builder",
-    descKey: "settings.remote_compute_feature_builder_desc",
-  },
-  {
-    icon: "handshake",
-    titleKey: "settings.remote_compute_feature_paired",
-    descKey: "settings.remote_compute_feature_paired_desc",
-  },
-];
 
 /**
  * Mandatory first-run onboarding flow.
@@ -149,6 +127,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     dialogActionButtonStyles,
     choiceCardStyles,
     onboardingWizardStyles,
+    featureListStyles,
     fullscreenMobileDialog("esphome-base-dialog"),
   ];
 
@@ -341,23 +320,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         ${
           this._remoteCompute
             ? html`
-                <ul class="remote-feature-list">
-                  ${REMOTE_COMPUTE_ONBOARDING_FEATURES.map(
-                    (f) => html`
-                      <li class="remote-feature">
-                        <wa-icon library="mdi" name=${f.icon}></wa-icon>
-                        <div class="remote-feature-text">
-                          <span class="remote-feature-title">
-                            ${this._localize(f.titleKey)}
-                          </span>
-                          <span class="remote-feature-desc">
-                            ${this._localize(f.descKey)}
-                          </span>
-                        </div>
-                      </li>
-                    `
-                  )}
-                </ul>
+                <div class="remote-feature-box">
+                  ${renderFeatureList(this._localize, REMOTE_COMPUTE_FEATURES)}
+                </div>
               `
             : nothing
         }

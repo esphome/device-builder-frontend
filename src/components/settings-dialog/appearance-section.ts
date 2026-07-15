@@ -23,6 +23,12 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { storedTheme } from "../../util/dark-mode.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderDisclosure } from "../shared/disclosure.js";
+import {
+  REMOTE_COMPUTE_FEATURES,
+  renderFeatureList,
+  type FeatureItem,
+} from "../shared/feature-list.js";
+import { featureListStyles } from "../shared/feature-list-styles.js";
 import { renderToggleRow } from "./settings-rows.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
@@ -38,30 +44,6 @@ registerMdiIcons({
   "server-network": mdiServerNetwork,
   memory: mdiMemory,
 });
-
-interface FeatureItem {
-  icon: string;
-  titleKey: string;
-  descKey: string;
-}
-
-const REMOTE_COMPUTE_FEATURES: FeatureItem[] = [
-  {
-    icon: "server-network",
-    titleKey: "settings.remote_compute_feature_dashboard",
-    descKey: "settings.remote_compute_feature_dashboard_desc",
-  },
-  {
-    icon: "memory",
-    titleKey: "settings.remote_compute_feature_builder",
-    descKey: "settings.remote_compute_feature_builder_desc",
-  },
-  {
-    icon: "handshake",
-    titleKey: "settings.remote_compute_feature_paired",
-    descKey: "settings.remote_compute_feature_paired_desc",
-  },
-];
 
 const EXPERT_FEATURES: FeatureItem[] = [
   {
@@ -115,6 +97,7 @@ export class ESPHomeSettingsAppearance extends LitElement {
     settingsSharedStyles,
     settingsRowStyles,
     disclosureStyles,
+    featureListStyles,
     css`
       .expert-row {
         border-bottom: none;
@@ -126,46 +109,6 @@ export class ESPHomeSettingsAppearance extends LitElement {
         padding: var(--wa-space-s) var(--wa-space-m);
         background: var(--wa-color-surface-lowered);
         border-radius: var(--wa-border-radius-m);
-      }
-
-      .expert-feature-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-      }
-
-      .expert-feature {
-        display: flex;
-        align-items: flex-start;
-        gap: var(--wa-space-s);
-      }
-
-      .expert-feature wa-icon {
-        font-size: 18px;
-        color: var(--esphome-primary);
-        flex-shrink: 0;
-        margin-top: 1px;
-      }
-
-      .expert-feature-text {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        min-width: 0;
-      }
-
-      .expert-feature-title {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
-        color: var(--wa-color-text-normal);
-      }
-
-      .expert-feature-desc {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
       }
     `,
   ];
@@ -256,25 +199,7 @@ export class ESPHomeSettingsAppearance extends LitElement {
           localize: this._localize,
           labelKey,
           variant: "heading",
-          body: () => html`
-            <ul class="expert-feature-list">
-              ${features.map(
-                (f) => html`
-                  <li class="expert-feature">
-                    <wa-icon library="mdi" name=${f.icon}></wa-icon>
-                    <div class="expert-feature-text">
-                      <span class="expert-feature-title">
-                        ${this._localize(f.titleKey)}
-                      </span>
-                      <span class="expert-feature-desc">
-                        ${this._localize(f.descKey)}
-                      </span>
-                    </div>
-                  </li>
-                `
-              )}
-            </ul>
-          `,
+          body: () => renderFeatureList(this._localize, features),
         })}
       </div>
     `;

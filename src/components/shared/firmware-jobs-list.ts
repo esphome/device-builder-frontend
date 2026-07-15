@@ -300,7 +300,7 @@ function renderTimestamp(
 
 // running → queued → terminal. Active by oldest first (FIFO); terminal by
 // most recent first so the latest finished job tops the history.
-export function compareJobs(a: FirmwareJob, b: FirmwareJob): number {
+function compareJobs(a: FirmwareJob, b: FirmwareJob): number {
   const rank = (j: FirmwareJob) =>
     j.status === JobStatus.RUNNING ? 0 : j.status === JobStatus.QUEUED ? 1 : 2;
   const ra = rank(a);

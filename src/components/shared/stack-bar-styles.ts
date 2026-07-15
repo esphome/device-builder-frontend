@@ -14,11 +14,11 @@ import { css } from "lit";
 export const stackBarStyles = css`
   :host {
     --stack-gap: var(--wa-space-m);
-    /* The header logo's width — centers the leading icon under it. */
-    --stack-bar-icon-box: 32px;
-    /* The header kebab's footprint (6px padding + 25px icon) — centers
-       the chevron under its dots. */
-    --stack-bar-chevron-box: 37px;
+    /* The header's logo / kebab footprints (shared tokens from
+       espHomeStyles), so icon and chevron centers line up with the
+       header at every breakpoint. */
+    --stack-bar-icon-box: var(--esphome-header-logo-box, 32px);
+    --stack-bar-chevron-box: var(--esphome-header-action-box, 37px);
     --stack-bar-icon-size: 20px;
     --stack-bar-title-size: var(--wa-font-size-s);
     --stack-bar-subtitle-size: var(--wa-font-size-xs);

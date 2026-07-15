@@ -184,8 +184,8 @@ export class ESPHomeLayout extends LitElement {
       }
 
       .header-logo {
-        width: 44px;
-        height: 44px;
+        width: var(--esphome-header-logo-box);
+        height: var(--esphome-header-logo-box);
         border-radius: var(--wa-border-radius-l);
         display: flex;
         align-items: center;
@@ -292,8 +292,8 @@ export class ESPHomeLayout extends LitElement {
            doesn't crowd the 40px bar's edges. box-sizing keeps the
            padding inside the 32px box; the img fills what's left. */
         .header-logo {
-          width: 32px;
-          height: 32px;
+          width: var(--esphome-header-logo-box);
+          height: var(--esphome-header-logo-box);
           padding: 3px 0;
           box-sizing: border-box;
         }

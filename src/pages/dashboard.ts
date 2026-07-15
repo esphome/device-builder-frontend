@@ -12,7 +12,7 @@ import {
   mdiWeb,
 } from "@mdi/js";
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
-import { LitElement, html, type PropertyValues } from "lit";
+import { LitElement, html, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -237,6 +237,10 @@ export class ESPHomePageDashboard extends LitElement {
   // pref-driven default. Seeded once at construction, saved on every swap.
   @state() private _expandedStackChoice = loadExpandedStack();
 
+  // Tour session state, cached once per render cycle in willUpdate()
+  // (reading it live would hit localStorage on every getter call).
+  private _tourEngaged = false;
+
   /** Remote-compute preference resolved (never flashes during prefs load). */
   get _remoteComputeReady(): boolean {
     return this._remoteComputeOnly && this._prefsLoaded;
@@ -256,7 +260,7 @@ export class ESPHomePageDashboard extends LitElement {
    *  so neither can be closed). The preference picks the default. */
   get _expandedStack(): DashboardStack {
     // A pending/active tour anchors builder content; never hide it.
-    if (isTourPending() || getActiveTourConfiguration() !== null) return "builder";
+    if (this._tourEngaged) return "builder";
     return this._expandedStackChoice ?? (this._remoteComputeReady ? "remote" : "builder");
   }
 
@@ -268,18 +272,13 @@ export class ESPHomePageDashboard extends LitElement {
     return this._expandedStack !== "builder";
   }
 
-  _onToggleRemoteStack = (): void => {
-    this._selectStack(this._expandedStack === "remote" ? "builder" : "remote");
-  };
-
-  _onToggleBuilderStack = (): void => {
-    this._selectStack(this._expandedStack === "builder" ? "remote" : "builder");
-  };
-
-  private _selectStack(stack: DashboardStack): void {
+  /** Both headers share this: with two stacks and always-one-open, every
+   *  header click means "show the other section". */
+  _onSwapStacks = (): void => {
+    const stack = this._expandedStack === "remote" ? "builder" : "remote";
     this._expandedStackChoice = stack;
     saveExpandedStack(stack);
-  }
+  };
 
   // Passed to runBulkUpdate for the NO_COMPATIBLE_PEER toast
   // classifier. Same context the settings dialog reads; null until
@@ -609,23 +608,22 @@ export class ESPHomePageDashboard extends LitElement {
     if (changed.has("_importableDevices") || changed.has("_showIgnored")) {
       this.toggleAttribute("has-discovered", this._visibleImportableDevices.length > 0);
     }
+    // One storage read per render cycle instead of one per
+    // ``_expandedStack`` evaluation — this getter sits on the hottest
+    // render path in the app.
+    this._tourEngaged = isTourPending() || getActiveTourConfiguration() !== null;
     // ``stacks`` re-homes the discovery banner: floating at the page top
     // normally, in-flow inside the Device builder section when the
-    // remote/builder stacks are shown.
-    if (
-      changed.has("_remoteComputeOnly") ||
-      changed.has("_prefsLoaded") ||
-      changed.has("_buildServerPeers") ||
-      changed.has("_expandedStackChoice")
-    ) {
-      this.toggleAttribute("stacks", this._showRemoteStack);
-      // remote-open pins the page to the viewport (internal scroll only)
-      // while the remote section is the expanded one.
-      this.toggleAttribute(
-        "remote-open",
-        this._showRemoteStack && !this._remoteStackCollapsed
-      );
-    }
+    // remote/builder stacks are shown; ``remote-open`` pins the page to
+    // the viewport (internal scroll only) while the remote section is
+    // the expanded one. Toggled unconditionally — the inputs span six
+    // properties plus tour session state, and toggleAttribute is an
+    // idempotent no-op when nothing changed.
+    this.toggleAttribute("stacks", this._showRemoteStack);
+    this.toggleAttribute(
+      "remote-open",
+      this._showRemoteStack && !this._remoteStackCollapsed
+    );
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.
     // Resolve any URL-sourced pending label names the moment it does.
@@ -713,55 +711,53 @@ export class ESPHomePageDashboard extends LitElement {
     // matches drop out and matching ones expand to show their YAML
     // snippets.
     if (this._yamlMode) {
-      const yamlContent = html`
-        ${renderDiscoveredSection(this)} ${renderYamlToolbar(this)}
-        ${renderYamlMode(this)}
-      `;
-      return html`
-        ${this._showRemoteStack ? renderRemoteStack(this) : ""}
-        ${this._showRemoteStack ? renderBuilderStack(this, yamlContent) : yamlContent}
-        ${renderDrawer(this)}
-        ${
-          this._showRemoteStack && this._builderStackCollapsed
-            ? ""
-            : renderSelectBarOrFab(this)
-        }
-        ${renderDialogs(this)}
-      `;
+      return this._renderStacked(
+        () => html`
+          ${renderDiscoveredSection(this)} ${renderYamlToolbar(this)}
+          ${renderYamlMode(this)}
+        `
+      );
     }
 
-    const q = this._search.trim().toLowerCase();
-    const facetFiltered = this._applyFacetFilters(this._sortedDevices);
-    const filtered = q
-      ? facetFiltered.filter((d) => matchesDeviceName(d, q))
-      : facetFiltered;
-    // Show the no-results pivot whenever facets and/or search hide
-    // every device that actually exists — facet-only filtering used
-    // to silently leave the card grid empty with no escape hatch.
-    const showCardEmptyState =
-      this._view === DashboardView.CARDS &&
-      this._devices.length > 0 &&
-      filtered.length === 0 &&
-      this._hasActiveFilters;
+    return this._renderStacked(() => {
+      const q = this._search.trim().toLowerCase();
+      const facetFiltered = this._applyFacetFilters(this._sortedDevices);
+      const filtered = q
+        ? facetFiltered.filter((d) => matchesDeviceName(d, q))
+        : facetFiltered;
+      // Show the no-results pivot whenever facets and/or search hide
+      // every device that actually exists — facet-only filtering used
+      // to silently leave the card grid empty with no escape hatch.
+      const showCardEmptyState =
+        this._view === DashboardView.CARDS &&
+        this._devices.length > 0 &&
+        filtered.length === 0 &&
+        this._hasActiveFilters;
 
-    const deviceContent = html`
-      ${renderDiscoveredSection(this)}
-      ${
-        this._devices.length > 0 && this._view === DashboardView.CARDS
-          ? renderToolbar(this, filtered.length, this._devices.length)
-          : ""
-      }
-      ${showCardEmptyState ? renderEmptySearch(this) : ""}
-      ${
-        this._view === DashboardView.CARDS
-          ? renderCardGrid(this, filtered)
-          : renderTable(this)
-      }
-    `;
+      return html`
+        ${renderDiscoveredSection(this)}
+        ${
+          this._devices.length > 0 && this._view === DashboardView.CARDS
+            ? renderToolbar(this, filtered.length, this._devices.length)
+            : ""
+        }
+        ${showCardEmptyState ? renderEmptySearch(this) : ""}
+        ${
+          this._view === DashboardView.CARDS
+            ? renderCardGrid(this, filtered)
+            : renderTable(this)
+        }
+      `;
+    });
+  }
 
+  /** The accordion scaffold shared by the YAML and cards/table branches.
+   *  *content* is a thunk so a collapsed builder section never pays for
+   *  building the device grid it would immediately discard. */
+  private _renderStacked(content: () => TemplateResult): TemplateResult {
     return html`
       ${this._showRemoteStack ? renderRemoteStack(this) : ""}
-      ${this._showRemoteStack ? renderBuilderStack(this, deviceContent) : deviceContent}
+      ${this._showRemoteStack ? renderBuilderStack(this, content) : content()}
       ${renderDrawer(this)}
       ${
         this._showRemoteStack && this._builderStackCollapsed

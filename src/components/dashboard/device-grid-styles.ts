@@ -33,6 +33,21 @@ export const deviceGridStyles = css`
     pointer-events: none;
   }
 
+  /* Stacks mode (remote-compute accordion, render-stacks.ts): the pill
+     keeps its classic hanging look but flows in place, hung from the
+     Device builder header bar instead of the page header — pulled up
+     over the bar's bottom border so the two read as one attached
+     element. */
+  :host([stacks]) .discovered-section {
+    position: static;
+    margin: calc(-1 * var(--stack-gap) - var(--wa-border-width-s)) 0 0;
+    pointer-events: auto;
+  }
+
+  :host([stacks]) .discovered-section-header {
+    animation: none;
+  }
+
   /* Inner elements re-enable pointer events so they're still
      clickable; only the empty space inside the wrapper is
      pass-through. */

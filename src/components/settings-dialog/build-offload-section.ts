@@ -24,6 +24,7 @@ import {
   offloaderVersionMatchPolicyContext,
   versionContext,
 } from "../../context/index.js";
+import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -37,11 +38,7 @@ import { renderOffloaderAlert } from "./build-offload-alert.js";
 import { latestJobForPin, renderPairingRow } from "./build-offload-pairing-row.js";
 import { offloaderAlertStyles, pairingRowStyles } from "./offload-styles.js";
 import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
-import {
-  peerRowStyles,
-  settingsRowStyles,
-  settingsSharedStyles,
-} from "./shared-styles.js";
+import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
