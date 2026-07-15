@@ -332,12 +332,13 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
       event.target as HTMLInputElement & { checked: boolean }
     ).checked;
     if (!this._remoteCompute) return;
-    // The explainer renders below the toggle, past the dialog's fold —
+    // The explainer sits below the toggle, often past the dialog's fold —
     // bring it into view so flipping the switch visibly does something.
     await this.updateComplete;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.shadowRoot
       ?.querySelector(".remote-feature-box")
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      ?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
   }
 
   private _renderTourOffer() {

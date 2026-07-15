@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -125,9 +125,15 @@ describe("onboarding existing-server orientation", () => {
 
   it("scrolls the explainer into view when the switch turns on", async () => {
     const scrolled: string[] = [];
+    // Not vi.spyOn — happy-dom may not define scrollIntoView at all;
+    // save/restore keeps the prototype clean for later tests either way.
+    const original = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (this: Element) {
       scrolled.push(this.className);
     };
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = original;
+    });
     const wizard = new ESPHomeOnboardingWizardDialog();
     document.body.appendChild(wizard);
     const state = internals(wizard);
@@ -146,7 +152,7 @@ describe("onboarding existing-server orientation", () => {
     } as unknown as Event);
     expect(scrolled).toEqual(["remote-feature-box"]);
 
-    // Turning it back off scrolls nothing (the box is gone).
+    // Turning it back off scrolls nothing (the box stays put).
     await state._onToggleRemoteCompute({
       target: { checked: false },
     } as unknown as Event);
