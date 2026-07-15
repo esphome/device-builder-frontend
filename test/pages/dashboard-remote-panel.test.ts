@@ -121,6 +121,20 @@ describe("dashboard remote-compute stacks", () => {
     expect(gridIn(page)).toBeNull();
   });
 
+  it("the no-peers walkthrough scrolls as a unit inside the panel", async () => {
+    const page = await mountDashboard({ remote: true, peers: [] });
+    const panel = panelIn(page)!;
+    // Context-provided panel fields, seeded directly for a bare mount.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (panel as any)._remoteBuildEnabled = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (panel as any)._peers = [];
+    await panel.updateComplete;
+    const scroller = panel.shadowRoot?.querySelector(".onboarding");
+    expect(scroller).not.toBeNull();
+    expect(scroller?.querySelector(".steps")).not.toBeNull();
+  });
+
   it("swapping to the builder collapses the remote stack (accordion)", async () => {
     const page = await mountDashboard({ remote: true, devices: [] });
     builderHeaderIn(page)!.click();

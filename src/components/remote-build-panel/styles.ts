@@ -30,6 +30,18 @@ export const remoteBuildPanelStyles = css`
     margin-right: var(--content-gutter, var(--wa-space-l));
   }
 
+  /* The no-peers walkthrough can outgrow the viewport-pinned section on
+     narrow screens; it scrolls as a unit inside the panel instead of
+     overflowing into the Device builder bar below. */
+  .onboarding {
+    display: flex;
+    flex-direction: column;
+    gap: var(--stack-gap);
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
   /* Solo (Device builder hidden): no accordion banner at all; the
      panel content provides its own top inset instead. */
   :host([solo]) .panel {

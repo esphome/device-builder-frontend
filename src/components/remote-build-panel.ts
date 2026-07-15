@@ -306,7 +306,9 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
       `;
     }
     const approved = this._peers.filter((p) => p.status === "approved");
-    if (approved.length === 0) return renderOnboarding(this);
+    if (approved.length === 0) {
+      return html`<div class="onboarding">${renderOnboarding(this)}</div>`;
+    }
     return html`
       <div class="cards">${renderPeersCard(this, approved)} ${renderQueueCard(this)}</div>
     `;
