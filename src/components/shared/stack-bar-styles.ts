@@ -14,7 +14,11 @@ import { css } from "lit";
 export const stackBarStyles = css`
   :host {
     --stack-gap: var(--wa-space-m);
+    /* The header logo's width — centers the leading icon under it. */
     --stack-bar-icon-box: 32px;
+    /* The header kebab's footprint (6px padding + 25px icon) — centers
+       the chevron under its dots. */
+    --stack-bar-chevron-box: 37px;
   }
 
   .stack-bar {
@@ -77,7 +81,7 @@ export const stackBarStyles = css`
 
   .stack-bar-chevron {
     margin-left: auto;
-    width: var(--stack-bar-icon-box);
+    width: var(--stack-bar-chevron-box);
     display: inline-flex;
     justify-content: center;
     font-size: 20px;
