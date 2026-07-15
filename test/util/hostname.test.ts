@@ -147,6 +147,17 @@ describe("splitHostPort", () => {
     expect(splitHostPort("buildserver.lan")).toBeNull();
     expect(splitHostPort("fd00::a1")).toBeNull();
     expect(splitHostPort("[fd00::a1]")).toBeNull();
+    // A digits-only final group must not be mistaken for a port.
+    expect(splitHostPort("fd00::6055")).toBeNull();
+    expect(splitHostPort("fdde:ad00:beef:cafe:c51:c7c8:7c1d:92f2")).toBeNull();
+  });
+
+  it("splits compressed and full IPv6 literals in brackets", () => {
+    expect(splitHostPort("[::1]:6055")).toEqual({ host: "::1", port: 6055 });
+    expect(splitHostPort("[fdde:ad00:beef:cafe:c51:c7c8:7c1d:92f2]:6056")).toEqual({
+      host: "fdde:ad00:beef:cafe:c51:c7c8:7c1d:92f2",
+      port: 6056,
+    });
   });
 
   it("rejects an invalid port suffix", () => {

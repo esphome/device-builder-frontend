@@ -34,6 +34,7 @@ function _isAlreadyFinished(err: APIError): boolean {
   // The terminal-job rejection rides INVALID_ARGS with this message
   // (backend firmware jobs.cancel); other INVALID_ARGS failures toast.
   return (
-    err.errorCode === ErrorCode.INVALID_ARGS && err.details.startsWith("Cannot cancel a")
+    err.errorCode === ErrorCode.INVALID_ARGS &&
+    apiErrorDetails(err).startsWith("Cannot cancel a")
   );
 }
