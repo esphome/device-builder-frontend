@@ -1,6 +1,23 @@
 import { css, html, type TemplateResult } from "lit";
+import type { ESPHomeAPI } from "../api/esphome-api.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { getErrorMessage } from "../util/error-message.js";
+import { notifyError, notifySuccess } from "../util/notify.js";
 import { splitTemplate } from "../util/template-split.js";
+
+/**
+ * Whether the remote build-env reset can be offered for a pairing: it's an
+ * approved, connected build server that advertised the capability. Single
+ * home for the rule the pairing row and both failure-hint renderers gate on.
+ */
+export function canResetBuildEnv(pairing: PairingSummary): boolean {
+  return (
+    pairing.status === "approved" &&
+    pairing.connected &&
+    pairing.reset_build_env_supported
+  );
+}
 
 // Visual boundary around the user-controlled receiver label inlined in the
 // remote-build hint — keeps a hostile pairing label from blending into the
@@ -27,6 +44,37 @@ export interface RemoteBuildHintHost {
   _tryCleanBuild: () => void;
   _tryResetRemoteBuildEnv: (pin: string) => void;
   _remoteResetPending: boolean;
+}
+
+// What a dialog host must expose for the shared remote-reset action below.
+export interface RemoteBuildResetHost {
+  _api?: ESPHomeAPI;
+  _localize: LocalizeFunc;
+  _remoteResetPending: boolean;
+}
+
+/**
+ * Reset a paired build server's build environment for this dashboard.
+ *
+ * In-flight-guarded, toasts the outcome. Shared by the command dialog and
+ * the firmware-install dialog so the two failure-hint hosts can't drift.
+ */
+export async function resetRemoteBuildEnv(
+  host: RemoteBuildResetHost,
+  pin: string
+): Promise<void> {
+  if (host._remoteResetPending || host._api === undefined) return;
+  host._remoteResetPending = true;
+  try {
+    await host._api.remoteBuildResetPeerBuildEnv({ pin_sha256: pin });
+    notifySuccess(host._localize("command.reset_remote_success"));
+  } catch (err) {
+    notifyError(
+      host._localize("command.reset_remote_failed", { detail: getErrorMessage(err) })
+    );
+  } finally {
+    host._remoteResetPending = false;
+  }
 }
 
 // Build-failure hint shown when the failed compile ran on a paired

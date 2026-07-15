@@ -4,6 +4,7 @@ import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { isPinnableVersion } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
@@ -151,7 +152,7 @@ function remoteResetPin(host: ESPHomeCommandDialog): string | null {
   if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
   const pin = live?.source_pin_sha256 ?? primed?.source_pin_sha256 ?? "";
   const pairing = pin ? host._pairings?.get(pin) : undefined;
-  return pairing?.reset_build_env_supported && pairing.connected ? pin : null;
+  return pairing && canResetBuildEnv(pairing) ? pin : null;
 }
 
 // Resolve the receiver label for a REMOTE-sourced job. Returns null for

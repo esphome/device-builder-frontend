@@ -5,6 +5,7 @@ import { activeLocale } from "../../common/localize.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
   renderOffloadHint,
@@ -76,8 +77,7 @@ export function renderResetSuggestion(
   const pairing = host._jobSourcePin
     ? host._pairings?.get(host._jobSourcePin)
     : undefined;
-  const resetPin =
-    pairing?.reset_build_env_supported && pairing.connected ? host._jobSourcePin : null;
+  const resetPin = pairing && canResetBuildEnv(pairing) ? host._jobSourcePin : null;
   return renderBuildFailureSuggestion(host, remoteLabel, resetPin);
 }
 

@@ -29,9 +29,7 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
-import { getErrorMessage } from "../util/error-message.js";
 import { LineBatcher } from "../util/line-batcher.js";
-import { notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import type { DetectedChip } from "../util/web-serial.js";
@@ -56,7 +54,7 @@ import {
   renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
+import { remoteBuildHintStyles, resetRemoteBuildEnv } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./ansi-log.js";
@@ -413,25 +411,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   };
 
   _tryResetRemoteBuildEnv = (pin: string) => {
-    void this._resetRemoteBuildEnv(pin);
+    void resetRemoteBuildEnv(this, pin);
   };
-
-  private async _resetRemoteBuildEnv(pin: string): Promise<void> {
-    if (this._remoteResetPending || this._api === undefined) return;
-    this._remoteResetPending = true;
-    try {
-      await this._api.remoteBuildResetPeerBuildEnv({ pin_sha256: pin });
-      notifySuccess(this._localize("command.reset_remote_success"));
-    } catch (err) {
-      notifyError(
-        this._localize("command.reset_remote_failed", {
-          detail: getErrorMessage(err),
-        })
-      );
-    } finally {
-      this._remoteResetPending = false;
-    }
-  }
 
   _toggleShowLogsAfterInstall = () => {
     this._showLogsAfterInstall = !this._showLogsAfterInstall;

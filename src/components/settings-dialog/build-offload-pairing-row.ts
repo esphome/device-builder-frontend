@@ -5,6 +5,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { trimTrailingDot } from "../../util/hostname.js";
 import { pairingDisplayName } from "../../util/pairing-display-name.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 import {
   classifyVersionMismatch,
   isPinnableVersion,
@@ -147,9 +148,7 @@ export function renderPairingRow(
             : nothing
         }
         ${
-          pairing.status === "approved" &&
-          pairing.connected &&
-          pairing.reset_build_env_supported
+          canResetBuildEnv(pairing)
             ? html`
                 <button
                   type="button"
