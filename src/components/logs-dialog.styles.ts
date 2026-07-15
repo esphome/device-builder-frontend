@@ -60,6 +60,45 @@ export const logsDialogStyles = css`
     display: none;
   }
 
+  /* Crash callout — slotted into the terminal's suggestion slot. Louder
+     than the muted reset-suggestion idiom on purpose: this is the primary
+     "report it" affordance, shown the moment a crash lands in the log. */
+  .crash-callout {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+    padding: 8px 20px;
+    border-top: 1px solid var(--term-border);
+    background: color-mix(in srgb, var(--esphome-error, #d32f2f) 14%, var(--term-bg));
+    color: var(--term-fg);
+    font-size: var(--wa-font-size-s);
+  }
+
+  .crash-callout wa-icon {
+    flex-shrink: 0;
+    color: var(--esphome-error, #d32f2f);
+  }
+
+  .crash-callout-text {
+    flex: 1;
+  }
+
+  .crash-callout-button {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    border: none;
+    border-radius: var(--wa-border-radius-m);
+    background: var(--esphome-primary);
+    color: var(--esphome-on-primary);
+    font: inherit;
+    font-weight: var(--wa-font-weight-semibold);
+    cursor: pointer;
+  }
+
+  .crash-callout-button:hover {
+    background: var(--esphome-primary-hover);
+  }
+
   /* Expanded → "just give me logs": full viewport, the terminal fills the
      space between the slim title bar and the toolbar. The component fills the
      dialog body (height: 100%) and its content stretches via the height vars. */

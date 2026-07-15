@@ -1660,5 +1660,21 @@
     "disabled_title": "Remote builds are disabled",
     "disabled_desc": "This install is set up as a remote build server, but the remote build listener is turned off.",
     "disabled_cta": "Open build server settings"
+  },
+  "crash_report": {
+    "banner": "This device crashed",
+    "report_button": "Report this crash",
+    "title": "Report crash - {name}",
+    "collecting": "Collecting crash details and validating the configuration...",
+    "includes_backtrace_decoded": "Decoded backtrace captured",
+    "includes_backtrace_raw": "Backtrace captured, but it was not decoded in this session",
+    "crash_scrolled_out": "The crash output scrolled out of the log buffer",
+    "includes_log_lines": "{warnings} warning/error lines and {config} config lines included",
+    "includes_config": "Configuration included, secrets redacted",
+    "config_unavailable": "Configuration could not be validated, so it is not included",
+    "hint": "The full report will be copied to your clipboard and a pre-filled GitHub issue will open. Paste the report into the issue's \"Additional information\" field.",
+    "copy_failed_hint": "Copying to the clipboard failed. Download the report instead and attach it to the issue.",
+    "copy_and_open": "Copy report & open GitHub issue",
+    "download_and_open": "Download report & open GitHub issue"
   }
 }

@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiAlertCircle,
   mdiArrowCollapse,
   mdiArrowExpand,
   mdiArrowLeft,
@@ -19,11 +20,13 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { CrashDetector } from "../util/crash-detector.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LineBatcher } from "../util/line-batcher.js";
 import { notifyError } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
   type LogsSession,
@@ -43,9 +46,11 @@ import { renderTermButton, renderTermToggle } from "./process-terminal/toolbar-b
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
+import "./crash-report-dialog.js";
 import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
+  "alert-circle": mdiAlertCircle,
   "arrow-collapse": mdiArrowCollapse,
   "arrow-expand": mdiArrowExpand,
   "arrow-left": mdiArrowLeft,
@@ -113,6 +118,15 @@ export class ESPHomeLogsDialog extends LitElement {
 
   @state()
   _lines: string[] = [];
+
+  // Latched once a crash marker flows through _appendCapped; drives the
+  // "Report this crash" callout for the rest of the session.
+  @state()
+  private _crashDetected = false;
+  private _crashDetector = new CrashDetector();
+
+  @query("esphome-crash-report-dialog")
+  private _crashReportDialog?: ESPHomeCrashReportDialog;
 
   // rAF batch buffer: coalesce per-line appends into one render per frame
   // instead of one per line (mirrors command-dialog, #348). A fast serial
@@ -190,6 +204,8 @@ export class ESPHomeLogsDialog extends LitElement {
     void this._teardownSession();
     this._resetPendingLines();
     this._lines = [];
+    this._crashDetector.reset();
+    this._crashDetected = false;
     this._expanded = false;
     this._showStates = true;
     this._backToInstallHandler = onBackToInstall ?? null;
@@ -336,6 +352,23 @@ export class ESPHomeLogsDialog extends LitElement {
                 </div>`
               : ""
           }
+          ${
+            this._crashDetected
+              ? html`<div class="crash-callout" role="status" slot="suggestion">
+                  <wa-icon library="mdi" name="alert-circle"></wa-icon>
+                  <span class="crash-callout-text"
+                    >${this._localize("crash_report.banner")}</span
+                  >
+                  <button
+                    type="button"
+                    class="crash-callout-button"
+                    @click=${this._openCrashReport}
+                  >
+                    ${this._localize("crash_report.report_button")}
+                  </button>
+                </div>`
+              : ""
+          }
           <div class="toolbar-slot" slot="toolbar-right">
             ${
               passive
@@ -399,8 +432,17 @@ export class ESPHomeLogsDialog extends LitElement {
           </div>
         </esphome-process-terminal>
       </esphome-base-dialog>
+      <esphome-crash-report-dialog></esphome-crash-report-dialog>
     `;
   }
+
+  // Snapshot the buffer (post-flush, so nothing batched for the next frame
+  // is missed) and hand it to the report dialog. The logs dialog stays open
+  // underneath; the stream keeps running.
+  private _openCrashReport = () => {
+    this._flushPendingLines();
+    this._crashReportDialog?.open(this.configuration, this.name, [...this._lines]);
+  };
 
   // Start button (only shown while not streaming; the leading guard also
   // absorbs a double-click in the same microtask). Per state:
@@ -519,6 +561,8 @@ export class ESPHomeLogsDialog extends LitElement {
   private _clearLogs() {
     this._resetPendingLines();
     this._lines = [];
+    this._crashDetector.reset();
+    this._crashDetected = false;
   }
 
   // Buffer a streamed line; flushed on the next animation frame. The serial
@@ -533,6 +577,15 @@ export class ESPHomeLogsDialog extends LitElement {
   private _appendCapped(lines: string[]): void {
     const merged = [...this._lines, ...lines];
     this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+    if (!this._crashDetected) {
+      this._crashDetector.feed(lines);
+      if (this._crashDetector.detected) {
+        this._crashDetected = true;
+        // The callout shrinks the log container; re-pin so the crash
+        // tail stays visible.
+        this.updateComplete.then(() => this._terminal?.scrollToBottom());
+      }
+    }
   }
 
   // Drain pending lines into ``_lines`` now, trimmed to the newest
