@@ -194,7 +194,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   };
 
   _reviewRequest(peer: PeerSummary) {
-    this._acceptPeerDialog?.open(peer);
+    this._acceptPeerDialog.open(peer);
   }
 
   _openBuildServerSettings = () => {
