@@ -90,8 +90,19 @@ describe("crash-report-dialog", () => {
     finishValidate(["\\033[31mERROR something\\033[0m"], false);
     await el.updateComplete;
     expect((el as any)._configYaml).toBe("");
+    expect((el as any)._configError).toBe("invalid");
     expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
     expect(el.shadowRoot!.textContent).toContain("crash_report.config_unavailable");
+  });
+
+  it("distinguishes a transport failure from an invalid config", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    validateCallbacks!.onError!("WebSocket not connected");
+    await el.updateComplete;
+    expect((el as any)._configYaml).toBe("");
+    expect((el as any)._configError).toBe("transport");
+    expect(el.shadowRoot!.textContent).toContain("crash_report.config_capture_failed");
+    expect(el.shadowRoot!.textContent).not.toContain("crash_report.config_unavailable");
   });
 
   it("requires a description before the report can be opened", async () => {
@@ -137,6 +148,8 @@ describe("crash-report-dialog", () => {
       expect((el as any)._configYaml).toBeNull();
       vi.advanceTimersByTime(90_000);
       expect((el as any)._configYaml).toBe("");
+      // A stall is a transport issue, not an invalid config.
+      expect((el as any)._configError).toBe("transport");
       expect((el as any)._api.stopStream).toHaveBeenCalledWith("v1");
     } finally {
       vi.useRealTimers();

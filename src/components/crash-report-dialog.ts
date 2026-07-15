@@ -86,6 +86,13 @@ export class ESPHomeCrashReportDialog extends LitElement {
   @state()
   private _configYaml: string | null = null;
 
+  // Why the config is unavailable, so a transport failure reads
+  // differently from a genuinely invalid config. "" once config is
+  // present; "invalid" when validation rejected; "transport" when the
+  // stream errored or stalled (a connection issue, not the user's YAML).
+  @state()
+  private _configError: "" | "invalid" | "transport" = "";
+
   // The user's own "what was the device doing" context; required before
   // the report can be sent — a crash report without it isn't actionable.
   @state()
@@ -213,6 +220,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._name = name;
     this._session += 1;
     this._configYaml = null;
+    this._configError = "";
     this._delivered = false;
     this._userDescription = "";
     this._reportText = "";
@@ -225,28 +233,33 @@ export class ESPHomeCrashReportDialog extends LitElement {
   private _captureConfig(session: number): void {
     const collected: string[] = [];
     let timer = 0;
-    const finish = (yaml: string) => {
+    const finish = (yaml: string, error: "" | "invalid" | "transport") => {
       clearTimeout(timer);
       if (session !== this._session) return;
       this._validateStreamId = "";
-      if (this._dialog.open) this._configYaml = yaml;
+      if (this._dialog.open) {
+        this._configYaml = yaml;
+        this._configError = error;
+      }
     };
-    // A stream dropped without a result must not stick the spinner
-    // forever; degrade to the config-unavailable note instead.
+    // A stalled stream must not stick the spinner forever; a stall is a
+    // transport issue, not the user's config.
     timer = window.setTimeout(() => {
       if (session !== this._session) return;
       this._stopValidateStream();
-      finish("");
+      finish("", "transport");
     }, VALIDATE_TIMEOUT_MS);
     this._validateStreamId = this._api.validate(this._configuration, {
       onOutput: (line) => collected.push(line),
       onResult: (result) =>
-        finish(result.success ? distillValidatedConfig(collected) : ""),
+        result.success
+          ? finish(distillValidatedConfig(collected), "")
+          : finish("", "invalid"),
       onError: (err) => {
-        // Degrades to the same config-unavailable note as an invalid
-        // config; log so a real transport failure is distinguishable.
+        // A WS/transport failure, distinct from an invalid config; log it
+        // and surface a "capture failed" note rather than "invalid".
         console.warn("Config validation stream failed", err);
-        finish("");
+        finish("", "transport");
       },
     });
   }
@@ -409,9 +422,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
         )}
         ${this._renderSummaryRow(
           this._localize(
-            configFailed
-              ? "crash_report.config_unavailable"
-              : "crash_report.includes_config"
+            this._configError === "transport"
+              ? "crash_report.config_capture_failed"
+              : configFailed
+                ? "crash_report.config_unavailable"
+                : "crash_report.includes_config"
           ),
           configFailed
         )}

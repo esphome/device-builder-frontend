@@ -1684,6 +1684,7 @@
     "banner_previous_boot": "This device crashed on a previous boot",
     "delivered_hint_complete": "The full report was downloaded and a pre-filled GitHub issue opened in a new tab; everything fit, so nothing needs to be pasted. If the tab didn't open, use \"Open GitHub issue\" below. You can also re-download or copy the report here.",
     "copy_report": "Copy report",
-    "download_and_open": "Download report & open GitHub issue"
+    "download_and_open": "Download report & open GitHub issue",
+    "config_capture_failed": "Couldn't reach the server to capture the config; it's not included (this is a connection issue, not a problem with your YAML)"
   }
 }
