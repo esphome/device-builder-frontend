@@ -73,8 +73,9 @@ registerMdiIcons({
 @customElement("esphome-remote-build-panel")
 export class ESPHomeRemoteBuildPanel extends LitElement {
   /** Collapsed = banner only (with waiting/building badges); the embedding
-   *  page owns the flag and flips it on `toggle-collapsed`. */
-  @property({ type: Boolean }) collapsed = false;
+   *  page owns the flag and flips it on `toggle-collapsed`. Reflected so
+   *  the page can join the collapsed bar with the builder header below. */
+  @property({ type: Boolean, reflect: true }) collapsed = false;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()

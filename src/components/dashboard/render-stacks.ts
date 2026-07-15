@@ -70,29 +70,17 @@ export const dashboardStacksStyles = css`
     --toolbar-pad-top: var(--wa-space-s);
   }
 
+  /* The pill keeps its classic hanging look, but hangs from the Device
+     builder header bar instead of the page header: pulled up over the
+     bar's bottom border so the two read as one attached element. */
   :host([stacks]) .discovered-section {
     position: static;
-    margin: 0;
+    margin: calc(-1 * var(--wa-space-s) - var(--wa-border-width-s)) 0 0;
     pointer-events: auto;
   }
 
-  /* In-flow means anchored: the pill and its expanded grid span the
-     section instead of floating as a centered strip mid-page. */
-  :host([stacks]) .discovered-section-header,
-  :host([stacks]) .discovered-section-grid {
-    width: 100%;
-  }
-
   :host([stacks]) .discovered-section-header {
-    border-top: var(--wa-border-width-s) solid var(--esphome-primary);
-    border-radius: var(--wa-border-radius-l) var(--wa-border-radius-l) 0 0;
     animation: none;
-  }
-
-  :host([stacks])
-    .discovered-section:has(.discovered-section-grid[hidden])
-    .discovered-section-header {
-    border-radius: var(--wa-border-radius-l);
   }
 
   /* Geometry mirrors the panel banner exactly so the two icons and the
@@ -119,6 +107,14 @@ export const dashboardStacksStyles = css`
   .builder-stack-header:focus-visible {
     background: var(--esphome-primary-light);
     outline: none;
+  }
+
+  /* Single accordion unit: when the remote section is collapsed, its bar
+     and this one join on a shared border line. */
+  esphome-remote-build-panel[collapsed] + .builder-stack .builder-stack-header {
+    margin-top: calc(-1 * var(--wa-border-width-s));
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
   }
 
   .builder-stack-header > wa-icon:first-child {

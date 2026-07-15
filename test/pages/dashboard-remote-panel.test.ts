@@ -145,6 +145,16 @@ describe("dashboard remote-compute stacks", () => {
     );
   });
 
+  it("clicking the open section's header collapses it (both closed)", async () => {
+    const page = await mountDashboard({ remote: true });
+    const panel = panelIn(page)!;
+    expect(panel.collapsed).toBe(false);
+    panel.shadowRoot?.querySelector<HTMLButtonElement>(".banner")?.click();
+    await page.updateComplete;
+    expect(panel.collapsed).toBe(true);
+    expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("collapsed banner badges waiting requests and active jobs", async () => {
     const page = await mountDashboard({
       remote: false,

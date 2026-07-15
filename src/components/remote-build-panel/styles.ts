@@ -12,6 +12,18 @@ export const remoteBuildPanelStyles = css`
     margin-bottom: var(--wa-space-s);
   }
 
+  /* Single accordion unit while collapsed: flush against the builder bar
+     below, joining on a shared border line (page side squares the bar's
+     top corners and overlaps the border). */
+  :host([collapsed]) .panel {
+    margin-bottom: 0;
+  }
+
+  :host([collapsed]) .banner {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
   /* Content shares the Device builder's horizontal gutter (the toolbar /
      card-grid inset inherited from esphome-layout); only the banner runs
      to the section edge like the builder header does. */
