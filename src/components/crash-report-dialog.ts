@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiAlertCircleOutline, mdiClipboardTextOutline, mdiDownload } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
@@ -23,6 +23,7 @@ import {
   buildFullReport,
   buildIssueUrl,
   distillValidatedConfig,
+  platformFromIntegrations,
   scrapeCrashData,
 } from "../util/crash-report.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
@@ -45,8 +46,10 @@ const VALIDATE_TIMEOUT_MS = 90_000;
 /**
  * "Report this crash" flow: scrape the log buffer handed over by the
  * logs dialog, capture the sanitized config via `devices/validate`,
- * then copy the full report to the clipboard and open a pre-filled
- * esphome/esphome issue.
+ * then open a fully pre-filled esphome/esphome issue. The URL prefill
+ * is the sole delivery channel (it survives GitHub's form rehydration;
+ * manual pasting does not); truncated content stays available via the
+ * downloadable report.
  */
 @customElement("esphome-crash-report-dialog")
 export class ESPHomeCrashReportDialog extends LitElement {
@@ -83,8 +86,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
   @state()
   private _configYaml: string | null = null;
 
+  // The user's own "what was the device doing" context; required before
+  // the report can be sent — a crash report without it isn't actionable.
   @state()
-  private _copyFailed = false;
+  private _userDescription = "";
 
   // Set once the report was delivered (copied/downloaded) and the issue
   // opened; the dialog then stays up offering copy-again / download, so a
@@ -97,6 +102,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // a tab opened.
   @state()
   private _popupBlocked = false;
+
+  // True when the whole report fit the pre-filled URL — no paste needed.
+  @state()
+  private _prefillComplete = false;
 
   private _configuration = "";
   private _name = "";
@@ -160,13 +169,39 @@ export class ESPHomeCrashReportDialog extends LitElement {
         margin: 0 0 var(--wa-space-s);
       }
 
+      .describe-label {
+        display: block;
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-semibold);
+        margin: 0 0 var(--wa-space-2xs);
+      }
+
+      .describe-input {
+        width: 100%;
+        box-sizing: border-box;
+        resize: vertical;
+        font: inherit;
+        font-size: var(--wa-font-size-s);
+        padding: var(--wa-space-xs);
+        border-radius: var(--wa-border-radius-m);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        background: var(--wa-color-surface-default);
+        color: var(--wa-color-text-normal);
+        margin: 0 0 var(--wa-space-m);
+      }
+
       .btn--confirm {
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
       }
 
-      .btn--confirm:hover {
+      .btn--confirm:hover:not(:disabled) {
         background: var(--esphome-primary-hover);
+      }
+
+      .btn--confirm:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
     `,
   ];
@@ -178,9 +213,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._name = name;
     this._session += 1;
     this._configYaml = null;
-    this._copyFailed = false;
     this._delivered = false;
     this._popupBlocked = false;
+    this._userDescription = "";
     this._reportText = "";
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
@@ -227,56 +262,60 @@ export class ESPHomeCrashReportDialog extends LitElement {
     return {
       scrape: this._scrape,
       configYaml: this._configYaml ?? "",
+      userDescription: this._userDescription.trim(),
       meta: {
         deviceName: this._name,
         configuration: this._configuration,
         esphomeVersion: device?.current_version || this._esphomeVersion,
         deployedVersion: device?.runtime_state.deployed_version ?? "",
         dashboardVersion: this._serverVersion,
-        targetPlatform: device?.target_platform ?? "",
+        // Plain-ESP32 sidecars can leave target_platform empty; the
+        // integration list always names the platform component.
+        targetPlatform:
+          device?.target_platform ||
+          platformFromIntegrations(device?.loaded_integrations ?? []),
         board: device?.board_id ?? "",
-        isHaAddon: this._isHaAddon,
+        installation: this._detectInstallation(),
       },
     };
   }
 
-  private async _copyAndOpen(): Promise<void> {
-    const report = this._buildReport();
-    this._reportText = buildFullReport(report);
-    if (!(await copyToClipboard(this._reportText))) {
-      this._copyFailed = true;
-      return;
-    }
-    this._openIssue(report, "clipboard");
+  // Maps the deployment signals onto the bug form's installation
+  // dropdown. The desktop app has no matching option, so it stays ""
+  // and the user picks in the form.
+  private _detectInstallation(): string {
+    if (this._isHaAddon) return "Home Assistant Add-on";
+    const info = this._api.serverInfo;
+    if (info?.desktop_version) return "";
+    return info?.in_docker ? "Docker" : "pip";
   }
 
-  private _downloadAndOpen(): void {
+  // Download the full report first — the user always keeps a complete
+  // copy even if the pre-fill was truncated — then open the issue. The
+  // dialog stays open so the download / copy / issue link stay one click
+  // away until the user closes it themselves.
+  private _openIssue(): void {
     const report = this._buildReport();
     this._reportText = buildFullReport(report);
+    const { url, complete } = buildIssueUrl(report);
+    this._issueUrl = url;
+    this._prefillComplete = complete;
     this._downloadReport();
-    this._openIssue(report, "download");
-  }
-
-  // The dialog stays open after delivery: switching to the GitHub tab can
-  // cost the user the clipboard contents, so copy-again / download / the
-  // issue link stay one click away until they close it themselves.
-  private _openIssue(report: CrashReport, delivery: "clipboard" | "download"): void {
-    this._issueUrl = buildIssueUrl(report, delivery);
-    this._popupBlocked = window.open(this._issueUrl, "_blank", "noopener") === null;
+    this._popupBlocked = window.open(url, "_blank", "noopener") === null;
     this._delivered = true;
-  }
-
-  private async _copyAgain(): Promise<void> {
-    if (await copyToClipboard(this._reportText)) {
-      notifySuccess(this._localize("crash_report.copied"));
-    } else {
-      notifyError(this._localize("crash_report.copy_failed"));
-    }
   }
 
   private _downloadReport(): void {
     const stem = configurationStem(this._configuration, "device");
     downloadBlob(this._reportText, `${stem}-crash-report.md`, "text/markdown");
+  }
+
+  private async _copyReport(): Promise<void> {
+    if (await copyToClipboard(this._reportText)) {
+      notifySuccess(this._localize("crash_report.copied"));
+    } else {
+      notifyError(this._localize("crash_report.copy_failed"));
+    }
   }
 
   private _renderSummaryRow(text: string, degraded: boolean) {
@@ -294,25 +333,26 @@ export class ESPHomeCrashReportDialog extends LitElement {
     return html`
       <p class="hint">
         ${this._localize(
-          blocked ? "crash_report.popup_blocked_hint" : "crash_report.delivered_hint"
+          blocked
+            ? "crash_report.popup_blocked_hint"
+            : this._prefillComplete
+              ? "crash_report.delivered_hint_complete"
+              : "crash_report.delivered_hint"
         )}
       </p>
       <div class="actions">
         <button class="btn btn--cancel" @click=${() => (this._dialog.open = false)}>
           ${this._localize("layout.close")}
         </button>
+        <button class="btn btn--cancel" @click=${this._copyReport}>
+          ${this._localize("crash_report.copy_report")}
+        </button>
         <button class="btn btn--cancel" @click=${this._downloadReport}>
           <wa-icon library="mdi" name="download"></wa-icon>
           ${this._localize("crash_report.download_report")}
         </button>
-        <button
-          class="btn ${blocked ? "btn--cancel" : "btn--confirm"}"
-          @click=${this._copyAgain}
-        >
-          ${this._localize("crash_report.copy_again")}
-        </button>
         <a
-          class="btn ${blocked ? "btn--confirm" : "btn--cancel"}"
+          class="btn btn--confirm"
           href=${this._issueUrl}
           target="_blank"
           rel="noopener noreferrer"
@@ -323,11 +363,27 @@ export class ESPHomeCrashReportDialog extends LitElement {
     `;
   }
 
+  private _onDescriptionInput = (e: Event): void => {
+    this._userDescription = (e.target as HTMLTextAreaElement).value;
+  };
+
   private _renderReady() {
     const scrape = this._scrape;
     const decoded = scrape.decodedFrames.length > 0;
     const configFailed = this._configYaml === "";
+    const described = this._userDescription.trim() !== "";
     return html`
+      <label class="describe-label" for="crash-description"
+        >${this._localize("crash_report.describe_label")}</label
+      >
+      <textarea
+        id="crash-description"
+        class="describe-input"
+        rows="3"
+        placeholder=${this._localize("crash_report.describe_placeholder")}
+        .value=${this._userDescription}
+        @input=${this._onDescriptionInput}
+      ></textarea>
       <ul class="summary">
         ${this._renderSummaryRow(
           this._localize(
@@ -355,25 +411,19 @@ export class ESPHomeCrashReportDialog extends LitElement {
           configFailed
         )}
       </ul>
-      <p class="hint">
-        ${this._localize(
-          this._copyFailed ? "crash_report.copy_failed_hint" : "crash_report.hint"
-        )}
-      </p>
+      <p class="hint">${this._localize("crash_report.hint")}</p>
       <div class="actions">
         <button class="btn btn--cancel" @click=${() => (this._dialog.open = false)}>
           ${this._localize("layout.cancel")}
         </button>
-        ${
-          this._copyFailed
-            ? html`<button class="btn btn--confirm" @click=${this._downloadAndOpen}>
-                <wa-icon library="mdi" name="download"></wa-icon>
-                ${this._localize("crash_report.download_and_open")}
-              </button>`
-            : html`<button class="btn btn--confirm" @click=${this._copyAndOpen}>
-                ${this._localize("crash_report.copy_and_open")}
-              </button>`
-        }
+        <button
+          class="btn btn--confirm"
+          ?disabled=${!described}
+          title=${described ? nothing : this._localize("crash_report.describe_required")}
+          @click=${this._openIssue}
+        >
+          ${this._localize("crash_report.open_issue")}
+        </button>
       </div>
     `;
   }

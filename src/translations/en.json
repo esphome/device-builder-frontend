@@ -1672,16 +1672,18 @@
     "includes_log_lines": "{warnings} warning/error lines and {config} config lines included",
     "includes_config": "Configuration included, secrets redacted",
     "config_unavailable": "Configuration could not be validated, so it is not included",
-    "hint": "The full report will be copied to your clipboard and a pre-filled GitHub issue will open. Paste the report into the issue's \"Additional information\" field.",
-    "copy_failed_hint": "Copying to the clipboard failed. Download the report instead and attach it to the issue.",
-    "copy_and_open": "Copy report & open GitHub issue",
-    "download_and_open": "Download report & open GitHub issue",
-    "delivered_hint": "The report is on your clipboard and the GitHub issue form opened in a new tab. If something overwrites your clipboard before you paste, copy or download the report again from here.",
-    "copy_again": "Copy report again",
+    "hint": "A copy of the full report will be downloaded, then a pre-filled GitHub issue opens with the crash details, config, and logs.",
+    "delivered_hint": "The full report was downloaded. Some sections were too large for the pre-filled form; drag the downloaded file onto the issue's \"Additional information\" field to include everything.",
     "download_report": "Download report",
     "copied": "Report copied to clipboard",
     "copy_failed": "Copying the report failed",
-    "popup_blocked_hint": "Your browser blocked the GitHub tab. The report is on your clipboard; use \"Open GitHub issue\" below and paste it there.",
-    "open_issue": "Open GitHub issue"
+    "popup_blocked_hint": "The full report was downloaded, but your browser blocked the GitHub tab. Use \"Open GitHub issue\" below to continue.",
+    "open_issue": "Open GitHub issue",
+    "describe_label": "What was the device doing when it crashed?",
+    "describe_placeholder": "e.g. Pressed the garage button in Home Assistant; crashes every time a BLE device connects",
+    "describe_required": "Describe what the device was doing first; a report without context is hard to act on",
+    "banner_previous_boot": "This device crashed on a previous boot",
+    "delivered_hint_complete": "The full report was downloaded and everything fit into the pre-filled GitHub form, so nothing needs to be pasted. You can re-download or copy the report here.",
+    "copy_report": "Copy report"
   }
 }

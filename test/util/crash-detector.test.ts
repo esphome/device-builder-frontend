@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  hasCrashMarker,
+  detectCrashKind,
   isCrashMarker,
   normalizeLogLine,
 } from "../../src/util/crash-detector.js";
@@ -11,8 +11,16 @@ const CRASH_LINES: ReadonlyArray<[string, string]> = [
     "esp32 panic banner",
     "Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.",
   ],
+  [
+    "crash handler previous-boot banner (logger-tagged)",
+    "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+  ],
   ["esp32 backtrace", "Backtrace: 0x400d9150:0x3ffb4f60 0x400da73c:0x3ffb4f90"],
   ["stored previous-boot backtrace", "BT0: 0x400d9150"],
+  [
+    "stored backtrace replayed through the logger",
+    "[E][esp32.crash:305]:   BT0: 0x4015482D  (backtrace)",
+  ],
   ["esp32 bad-alloc", "last failed alloc call: 4009ac2c(1024)"],
   ["esp-idf abort", "abort() was called at PC 0x401a2b3c on core 1"],
   ["esp-idf assert", "assert failed: xQueueSemaphoreTake queue.c:1549 (( pxQueue ))"],
@@ -62,14 +70,32 @@ describe("isCrashMarker", () => {
   });
 });
 
-describe("hasCrashMarker", () => {
-  it("spots a crash line arriving wrapped in ANSI + timestamp", () => {
-    expect(hasCrashMarker(["[12:00:00][I][app:029]: boot"])).toBe(false);
+describe("detectCrashKind", () => {
+  it("spots a live crash line arriving wrapped in ANSI + timestamp", () => {
+    expect(detectCrashKind(["[12:00:00][I][app:029]: boot"])).toBeNull();
     expect(
-      hasCrashMarker([
+      detectCrashKind([
         "[12:00:00][I][app:029]: boot",
         wrapEsc("Guru Meditation Error: Core 1 panic'ed (StoreProhibited)."),
       ])
-    ).toBe(true);
+    ).toBe("live");
+  });
+
+  it("classifies the crash handler's boot replay as previous-boot", () => {
+    expect(
+      detectCrashKind([
+        "[11:21:19.093][E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+        "[11:21:19.167][E][esp32.crash:305]:   BT0: 0x4015482D  (backtrace)",
+      ])
+    ).toBe("previous-boot");
+  });
+
+  it("live wins when both kinds appear in one batch", () => {
+    expect(
+      detectCrashKind([
+        "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+        "Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.",
+      ])
+    ).toBe("live");
   });
 });

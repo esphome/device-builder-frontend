@@ -37,13 +37,14 @@ const META = {
   dashboardVersion: "1.6.1",
   targetPlatform: "ESP32S3",
   board: "esp32dev",
-  isHaAddon: true,
+  installation: "Home Assistant Add-on",
 };
 
 const report = (overrides: Partial<CrashReport> = {}): CrashReport => ({
   scrape: scrapeCrashData(BUFFER),
   meta: META,
   configYaml: "esphome:\n  name: smallgarage\nwifi:\n  password: <removed>",
+  userDescription: "Pressed the crash button in Home Assistant",
   ...overrides,
 });
 
@@ -85,6 +86,28 @@ describe("scrapeCrashData", () => {
     expect(scrolled.crashFound).toBe(false);
     expect(scrolled.excerpt).toEqual([]);
   });
+
+  // Pinned against real ol (esp32-poe-iso) output: the crash handler
+  // replays the previous-boot crash through the logger with [E] tags,
+  // and the inline decoder emits multi-line frames for inlined calls.
+  it("handles the logger-replayed previous-boot crash report", () => {
+    const scrape = scrapeCrashData([
+      "[11:21:19.093][E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
+      "[11:21:19.096][E][esp32.crash:335]:   Reason: Fault - StoreProhibited",
+      "[11:21:19.096][E][esp32.crash:340]:   PC:  0x40154830  (fault location)",
+      "[11:21:19.167][E][esp32.crash:305]:   BT0: 0x4015482D  (backtrace)",
+      "WARNING Decoded 0x4015482d: setup()::{lambda()#1}::_FUN() at configs/ol.yaml:52",
+      " (inlined by) _FUN at configs/ol.yaml:53",
+      "[11:21:19.211][E][esp32.crash:305]:   BT1: 0x40154879  (backtrace)",
+      "WARNING Decoded 0x40154879: esphome::StatelessLambdaAction<>::play() at base_automation.h:247",
+    ]);
+    expect(scrape.crashFound).toBe(true);
+    expect(scrape.decodedFrames).toEqual([
+      "0x4015482d: setup()::{lambda()#1}::_FUN() at configs/ol.yaml:52\n" +
+        "  (inlined by) _FUN at configs/ol.yaml:53",
+      "0x40154879: esphome::StatelessLambdaAction<>::play() at base_automation.h:247",
+    ]);
+  });
 });
 
 describe("distillValidatedConfig", () => {
@@ -118,9 +141,10 @@ describe("issuePlatform / inferComponentName", () => {
 });
 
 describe("buildFullReport", () => {
-  it("orders sections decoded-backtrace-first", () => {
+  it("leads with the user's context, then the decoded backtrace", () => {
     const text = buildFullReport(report());
     const order = [
+      "## What happened",
       "## Decoded backtrace",
       "## Crash log",
       "## Warnings and errors",
@@ -130,6 +154,7 @@ describe("buildFullReport", () => {
     ].map((heading) => text.indexOf(heading));
     expect(order.every((index) => index !== -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(text).toContain("Pressed the crash button in Home Assistant");
     expect(text).toContain("password: <removed>");
   });
 
@@ -141,10 +166,9 @@ describe("buildFullReport", () => {
 });
 
 describe("buildIssueUrl", () => {
-  const params = (r: CrashReport, mode: "clipboard" | "download" = "clipboard") =>
-    new URL(buildIssueUrl(r, mode)).searchParams;
+  const params = (r: CrashReport) => new URL(buildIssueUrl(r).url).searchParams;
 
-  it("prefills the form fields and never sets config", () => {
+  it("prefills every form field, config into the YAML Config box", () => {
     const p = params(report());
     expect(p.get("template")).toBe("bug_report.yml");
     expect(p.get("version")).toBe("2026.6.4");
@@ -152,24 +176,34 @@ describe("buildIssueUrl", () => {
     expect(p.get("platform")).toBe("ESP32");
     expect(p.get("component_name")).toBe("wifi");
     expect(p.get("title")).toContain("Guru Meditation Error");
+    expect(p.get("problem")).toContain("Pressed the crash button in Home Assistant");
     expect(p.get("problem")).toContain("Decoded backtrace:");
     expect(p.get("problem")).toContain("0x400d9150: esphome::Application::setup()");
     expect(p.get("logs")).toContain("Backtrace: 0x400d9150");
-    expect(p.has("config")).toBe(false);
+    // The whole sanitized config lands in the form's config field.
+    expect(p.get("config")).toBe(
+      "esphome:\n  name: smallgarage\nwifi:\n  password: <removed>"
+    );
   });
 
-  it("omits installation outside the add-on and unknown platforms", () => {
-    const p = params(report({ meta: { ...META, isHaAddon: false, targetPlatform: "" } }));
+  it("reports complete when everything fit", () => {
+    expect(buildIssueUrl(report()).complete).toBe(true);
+  });
+
+  it("omits installation and unknown platforms when unset", () => {
+    const p = params(report({ meta: { ...META, installation: "", targetPlatform: "" } }));
     expect(p.has("installation")).toBe(false);
     expect(p.has("platform")).toBe(false);
   });
 
-  it("tells the user where the full report went", () => {
-    expect(params(report(), "clipboard").get("additional")).toContain("clipboard");
-    expect(params(report(), "download").get("additional")).toContain("markdown file");
+  it("packs supplementary sections into additional", () => {
+    const p = params(report());
+    const additional = p.get("additional") ?? "";
+    expect(additional).toContain("Environment:");
+    expect(additional).toContain("Warnings and errors:");
   });
 
-  it("stays under the URL budget, dropping context before the crash block", () => {
+  it("stays under budget, truncating config then logs, and reports incomplete", () => {
     const noisy = [
       ...Array.from(
         { length: 200 },
@@ -177,11 +211,17 @@ describe("buildIssueUrl", () => {
       ),
       ...CRASH_BLOCK,
     ];
-    const r = report({ scrape: scrapeCrashData(noisy) });
-    const url = buildIssueUrl(r, "clipboard");
-    expect(url.length).toBeLessThanOrEqual(6000);
-    const logs = new URL(url).searchParams.get("logs") ?? "";
-    expect(logs).toContain("Guru Meditation Error");
-    expect(logs).toContain("trimmed");
+    const bigConfig = Array.from(
+      { length: 2000 },
+      (_, i) => `  key_${i}: value_${i}`
+    ).join("\n");
+    const result = buildIssueUrl(
+      report({ scrape: scrapeCrashData(noisy), configYaml: `esphome:\n${bigConfig}` })
+    );
+    expect(result.url.length).toBeLessThanOrEqual(8000);
+    expect(result.complete).toBe(false);
+    const p = new URL(result.url).searchParams;
+    expect(p.get("logs")).toContain("Guru Meditation Error");
+    expect(p.get("config")).toContain("config truncated");
   });
 });

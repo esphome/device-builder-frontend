@@ -68,6 +68,10 @@ describe("crash-report-dialog", () => {
     validateCallbacks!.onResult!({ success, code: success ? 0 : 1 });
   };
 
+  const describe_ = (text: string) => {
+    (el as any)._userDescription = text;
+  };
+
   it("collects, filters CLI log noise out of the config, then goes ready", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
     await el.updateComplete;
@@ -90,6 +94,20 @@ describe("crash-report-dialog", () => {
     expect(el.shadowRoot!.textContent).toContain("crash_report.config_unavailable");
   });
 
+  it("requires a description before the report can be opened", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    await el.updateComplete;
+    const button = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      ".actions .btn--confirm"
+    );
+    expect(button!.disabled).toBe(true);
+
+    describe_("Pressed the crash button");
+    await el.updateComplete;
+    expect(button!.disabled).toBe(false);
+  });
+
   it("does not claim the tab opened when the popup was blocked", async () => {
     vi.stubGlobal(
       "open",
@@ -98,18 +116,16 @@ describe("crash-report-dialog", () => {
         return null; // popup blocker
       })
     );
-    copyToClipboard.mockResolvedValue(true);
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
     finishValidate();
+    describe_("Pressed the crash button");
     await el.updateComplete;
 
-    await (el as any)._copyAndOpen();
+    (el as any)._openIssue();
     await el.updateComplete;
     expect((el as any)._popupBlocked).toBe(true);
     expect(el.shadowRoot!.textContent).toContain("crash_report.popup_blocked_hint");
-    // The manual link is the primary action when the popup was blocked.
     const anchor = el.shadowRoot!.querySelector<HTMLAnchorElement>(".actions a");
-    expect(anchor!.classList.contains("btn--confirm")).toBe(true);
     expect(anchor!.href).toBe(openedUrls[0]);
   });
 
@@ -137,68 +153,41 @@ describe("crash-report-dialog", () => {
     expect(stopStream).toHaveBeenCalledTimes(2);
   });
 
-  it("copies the full report and opens the pre-filled issue", async () => {
-    copyToClipboard.mockResolvedValue(true);
+  it("downloads the report, then opens the pre-filled issue", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
     finishValidate();
+    describe_("Pressed the crash button");
     await el.updateComplete;
 
-    await (el as any)._copyAndOpen();
-    expect(copyToClipboard).toHaveBeenCalledTimes(1);
-    const reportText = copyToClipboard.mock.calls[0][0] as string;
-    expect(reportText).toContain("## Decoded backtrace");
-    expect(reportText.indexOf("## Decoded backtrace")).toBeLessThan(
-      reportText.indexOf("## Configuration")
+    (el as any)._openIssue();
+    // The full report is downloaded up front so the user always keeps it.
+    expect(downloadBlob).toHaveBeenCalledTimes(1);
+    const reportText = downloadBlob.mock.calls[0][0] as string;
+    expect(downloadBlob.mock.calls[0][1]).toBe("smallgarage-crash-report.md");
+    expect(reportText).toContain("## What happened");
+    expect(reportText.indexOf("## What happened")).toBeLessThan(
+      reportText.indexOf("## Decoded backtrace")
     );
     expect(reportText).toContain("password: <removed>");
-    expect(openedUrls).toHaveLength(1);
-    expect(openedUrls[0]).toContain("github.com/esphome/esphome/issues/new");
-    expect(new URL(openedUrls[0]).searchParams.get("additional")).toContain("clipboard");
 
-    // The dialog stays open in the delivered state so a clipboard lost to
-    // the tab switch can be re-copied (or downloaded) without redoing the
-    // validate round-trip.
+    expect(openedUrls).toHaveLength(1);
+    const params = new URL(openedUrls[0]).searchParams;
+    expect(openedUrls[0]).toContain("github.com/esphome/esphome/issues/new");
+    // Config lands in the form's YAML Config box, backtrace in problem.
+    expect(params.get("config")).toContain("password: <removed>");
+    expect(params.get("problem")).toContain("Pressed the crash button");
+
     await el.updateComplete;
     expect((el as any)._dialog.open).toBe(true);
     expect((el as any)._delivered).toBe(true);
     expect((el as any)._popupBlocked).toBe(false);
-    // The delivered state keeps a manual link to the issue as well.
     const anchor = el.shadowRoot!.querySelector<HTMLAnchorElement>(".actions a");
     expect(anchor!.href).toBe(openedUrls[0]);
 
-    await (el as any)._copyAgain();
-    expect(copyToClipboard).toHaveBeenCalledTimes(2);
-    expect(copyToClipboard.mock.calls[1][0]).toBe(reportText);
-
-    (el as any)._downloadReport();
-    expect(downloadBlob).toHaveBeenCalledWith(
-      reportText,
-      "smallgarage-crash-report.md",
-      "text/markdown"
-    );
-  });
-
-  it("falls back to a report download when the copy fails", async () => {
-    copyToClipboard.mockResolvedValue(false);
-    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
-    finishValidate();
-    await el.updateComplete;
-
-    await (el as any)._copyAndOpen();
-    expect(openedUrls).toHaveLength(0); // no tab until the report is delivered
-    await el.updateComplete;
-    expect((el as any)._copyFailed).toBe(true);
-
-    (el as any)._downloadAndOpen();
-    expect(downloadBlob).toHaveBeenCalledWith(
-      expect.stringContaining("## Decoded backtrace"),
-      "smallgarage-crash-report.md",
-      "text/markdown"
-    );
-    expect(openedUrls).toHaveLength(1);
-    expect(new URL(openedUrls[0]).searchParams.get("additional")).toContain(
-      "markdown file"
-    );
+    // Copy-to-clipboard stays available on demand.
+    copyToClipboard.mockResolvedValue(true);
+    await (el as any)._copyReport();
+    expect(copyToClipboard).toHaveBeenCalledWith(reportText);
   });
 
   it("ignores a stale validate result from a previous open", async () => {

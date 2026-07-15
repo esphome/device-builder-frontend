@@ -20,7 +20,7 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { hasCrashMarker } from "../util/crash-detector.js";
+import { type CrashKind, detectCrashKind } from "../util/crash-detector.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LineBatcher } from "../util/line-batcher.js";
@@ -120,9 +120,10 @@ export class ESPHomeLogsDialog extends LitElement {
   _lines: string[] = [];
 
   // Latched once a crash marker flows through _appendCapped; drives the
-  // "Report this crash" callout for the rest of the session.
+  // "Report this crash" callout for the rest of the session. A live panic
+  // upgrades a previous-boot report; nothing downgrades it.
   @state()
-  private _crashDetected = false;
+  private _crashKind: CrashKind | null = null;
 
   // Rendered unconditionally in this dialog's template, so the query is
   // always resolved by the time the callout button can be clicked.
@@ -205,7 +206,7 @@ export class ESPHomeLogsDialog extends LitElement {
     void this._teardownSession();
     this._resetPendingLines();
     this._lines = [];
-    this._crashDetected = false;
+    this._crashKind = null;
     this._expanded = false;
     this._showStates = true;
     this._backToInstallHandler = onBackToInstall ?? null;
@@ -353,13 +354,17 @@ export class ESPHomeLogsDialog extends LitElement {
               : ""
           }
           ${
-            this._crashDetected
+            this._crashKind !== null
               ? html`<div class="crash-callout" slot="suggestion">
                   <wa-icon library="mdi" name="alert-circle"></wa-icon>
                   <!-- Live region on the text only: announcing the whole row
                        would read the button as part of a status message. -->
                   <span class="crash-callout-text" role="status"
-                    >${this._localize("crash_report.banner")}</span
+                    >${this._localize(
+                      this._crashKind === "previous-boot"
+                        ? "crash_report.banner_previous_boot"
+                        : "crash_report.banner"
+                    )}</span
                   >
                   <button
                     type="button"
@@ -563,7 +568,7 @@ export class ESPHomeLogsDialog extends LitElement {
   private _clearLogs() {
     this._resetPendingLines();
     this._lines = [];
-    this._crashDetected = false;
+    this._crashKind = null;
   }
 
   // Buffer a streamed line; flushed on the next animation frame. The serial
@@ -578,11 +583,17 @@ export class ESPHomeLogsDialog extends LitElement {
   private _appendCapped(lines: string[]): void {
     const merged = [...this._lines, ...lines];
     this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
-    if (!this._crashDetected && hasCrashMarker(lines)) {
-      this._crashDetected = true;
-      // The callout shrinks the log container; re-pin so the crash
-      // tail stays visible.
-      this.updateComplete.then(() => this._terminal?.scrollToBottom());
+    if (this._crashKind !== "live") {
+      const kind = detectCrashKind(lines);
+      if (kind && kind !== this._crashKind) {
+        const firstDetection = this._crashKind === null;
+        this._crashKind = kind;
+        // The callout shrinks the log container; re-pin so the crash
+        // tail stays visible.
+        if (firstDetection) {
+          this.updateComplete.then(() => this._terminal?.scrollToBottom());
+        }
+      }
     }
   }
 

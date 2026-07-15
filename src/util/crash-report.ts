@@ -16,19 +16,39 @@ const MAX_LINES_AFTER_MARKER = 60;
 // Terminators of a crash dump — the excerpt window closes here.
 const CRASH_END_RE = /<<<stack<<<|^ELF file SHA256:|^Rebooting\.\.\./;
 
-// Total pre-filled URL budget. GitHub 414s somewhere past ~8k; staying
-// at 6k leaves headroom for their own redirect/query additions.
-const MAX_ISSUE_URL_LENGTH = 6000;
+// Total pre-filled URL budget. GitHub's server returns 414 past roughly
+// 8 KB of URL; 8000 keeps a small margin for their redirect/query
+// additions while fitting as much of the report as possible.
+const MAX_ISSUE_URL_LENGTH = 8000;
 
 // Cap on decoded frames placed in the issue's `problem` field; the full
 // list always rides in the clipboard report.
 const MAX_PROBLEM_FRAMES = 40;
 
+// Prefilling the YAML Config box must still leave room for a meaningful
+// crash-log excerpt in the `logs` field.
+const MIN_LOGS_BUDGET = 1500;
+
 const ISSUE_URL_BASE =
   "https://github.com/esphome/esphome/issues/new?template=bug_report.yml";
 
-// esphome logs' inline decoder emits `WARNING Decoded 0x...: func at file:line`.
+// esphome logs' inline decoder emits `WARNING Decoded 0x...: func at
+// file:line`, with ` (inlined by) ...` continuation lines for inlined frames.
 const DECODED_RE = /^(?:WARNING )?Decoded (0x[0-9a-fA-F]{8}.*)$/;
+const DECODED_CONTINUATION_RE = /^\s*\(inlined by\)/;
+
+// Lines that merely echo the backtrace the `problem` field already
+// carries in decoded form: the decode output itself, its progress
+// chatter, and the raw BT<n> address lines (optionally logger-tagged).
+const DECODE_ECHO_RES = [
+  DECODED_RE,
+  DECODED_CONTINUATION_RE,
+  /^(?:WARNING )?Found stack trace/,
+  /^(?:\[[A-Z]{1,2}\]\[[^\]]*\]:\s*)?BT\d+:\s*0x[0-9a-fA-F]{8}/,
+];
+
+const isDecodeEcho = (line: string): boolean =>
+  DECODE_ECHO_RES.some((re) => re.test(line));
 
 // A line that carries crash payload past the marker: any 8-hex-digit
 // address (registers, stack dumps, backtrace continuations) or a
@@ -65,7 +85,8 @@ export interface CrashReportMeta {
   dashboardVersion: string;
   targetPlatform: string;
   board: string;
-  isHaAddon: boolean;
+  /** Bug-form installation dropdown value; "" when unknown (desktop). */
+  installation: string;
 }
 
 export interface CrashScrape {
@@ -129,9 +150,17 @@ function extractCrashExcerpt(lines: string[]): { lines: string[]; crashIndex: nu
 
 function extractDecodedFrames(excerpt: string[]): string[] {
   const frames: string[] = [];
+  let inFrame = false;
   for (const line of excerpt) {
     const match = DECODED_RE.exec(line);
-    if (match) frames.push(match[1]);
+    if (match) {
+      frames.push(match[1]);
+      inFrame = true;
+    } else if (inFrame && DECODED_CONTINUATION_RE.test(line)) {
+      frames[frames.length - 1] += `\n  ${line.trim()}`;
+    } else {
+      inFrame = false;
+    }
   }
   return frames;
 }
@@ -178,6 +207,25 @@ export interface CrashReport {
   meta: CrashReportMeta;
   /** Sanitized `esphome config` dump; "" when unavailable. */
   configYaml: string;
+  /** The user's own account of what the device was doing when it crashed. */
+  userDescription: string;
+}
+
+// Every platform component that can appear in `loaded_integrations`;
+// fallback source for devices whose `target_platform` field is empty.
+const PLATFORM_INTEGRATIONS = [
+  "esp32",
+  "esp8266",
+  "rp2040",
+  "bk72xx",
+  "rtl87xx",
+  "ln882x",
+  "host",
+];
+
+/** Platform name from the integration list, for empty `target_platform`. */
+export function platformFromIntegrations(integrations: string[]): string {
+  return PLATFORM_INTEGRATIONS.find((platform) => integrations.includes(platform)) ?? "";
 }
 
 /** Component owning the top decoded frame, for the form's component field. */
@@ -200,6 +248,9 @@ const fence = (lines: string[], language = "text"): string =>
 export function buildFullReport(report: CrashReport): string {
   const { scrape, meta, configYaml } = report;
   const sections: string[] = [`# Crash report: ${meta.deviceName}`];
+  if (report.userDescription) {
+    sections.push("## What happened", report.userDescription);
+  }
   sections.push("## Decoded backtrace");
   if (scrape.decodedFrames.length > 0) {
     sections.push(fence(scrape.decodedFrames));
@@ -228,19 +279,20 @@ export function buildFullReport(report: CrashReport): string {
       ? fence([configYaml.trimEnd()], "yaml")
       : "The configuration could not be validated when this report was created."
   );
-  sections.push(
-    "## Environment",
-    [
-      `- Device: ${meta.deviceName} (${meta.configuration})`,
-      `- Board: ${meta.board || "unknown"}`,
-      `- Platform: ${meta.targetPlatform || "unknown"}`,
-      `- ESPHome (compiled): ${meta.esphomeVersion || "unknown"}`,
-      `- ESPHome (running): ${meta.deployedVersion || "unknown"}`,
-      `- Device Builder: ${meta.dashboardVersion || "unknown"}` +
-        (meta.isHaAddon ? " (Home Assistant add-on)" : ""),
-    ].join("\n")
-  );
+  sections.push("## Environment", environmentSection(meta));
   return `${sections.join("\n\n")}\n`;
+}
+
+function environmentSection(meta: CrashReportMeta): string {
+  return [
+    `- Device: ${meta.deviceName} (${meta.configuration})`,
+    `- Board: ${meta.board || "unknown"}`,
+    `- Platform: ${meta.targetPlatform || "unknown"}`,
+    `- ESPHome (compiled): ${meta.esphomeVersion || "unknown"}`,
+    `- ESPHome (running): ${meta.deployedVersion || "unknown"}`,
+    `- Device Builder: ${meta.dashboardVersion || "unknown"}` +
+      (meta.installation ? ` (${meta.installation})` : ""),
+  ].join("\n");
 }
 
 /** Issue title: the crash banner line when present, else a generic one. */
@@ -251,31 +303,41 @@ function buildIssueTitle(report: CrashReport): string {
   return title.length > 100 ? `${title.slice(0, 97)}...` : title;
 }
 
+export interface IssueUrl {
+  url: string;
+  /** False when some report content was truncated to fit the URL. */
+  complete: boolean;
+}
+
 /**
- * Pre-filled issue-form URL. Everything except the crash excerpt is
- * fixed; the excerpt fills whatever budget remains under
- * MAX_ISSUE_URL_LENGTH, prioritizing the crash block over the context
- * lines that precede it.
+ * Pre-filled issue-form URL — the sole delivery channel (URL prefill
+ * survives GitHub's form rehydration; manual pasting does not). Field
+ * priority under the budget: problem (description + decoded backtrace,
+ * fixed), config (truncated with a marker when needed), logs (crash
+ * excerpt, elastic), then the supplementary sections (environment,
+ * warnings, config dump) packed whole-section-at-a-time into
+ * `additional`. Truncated content stays available via the downloadable
+ * report.
  */
-export function buildIssueUrl(
-  report: CrashReport,
-  fullReportDelivery: "clipboard" | "download"
-): string {
+export function buildIssueUrl(report: CrashReport): IssueUrl {
   const { scrape, meta } = report;
   const url = new URL(ISSUE_URL_BASE);
   const params = url.searchParams;
   params.set("title", buildIssueTitle(report));
   const version = meta.esphomeVersion || meta.deployedVersion;
   if (version) params.set("version", version);
-  if (meta.isHaAddon) params.set("installation", "Home Assistant Add-on");
+  if (meta.installation) params.set("installation", meta.installation);
   const platform = issuePlatform(meta.targetPlatform);
   if (platform) params.set("platform", platform);
   const component = inferComponentName(scrape.decodedFrames);
   if (component) params.set("component_name", component);
+  let missing = scrape.decodedFrames.length > MAX_PROBLEM_FRAMES;
 
-  const problem: string[] = [
-    `The device crashed (crash detected in the Device Builder log viewer).`,
-  ];
+  // The user's own context leads the problem field; the technical
+  // payload follows it.
+  const problem: string[] = report.userDescription
+    ? [report.userDescription, "", "(Crash detected in the Device Builder log viewer.)"]
+    : [`The device crashed (crash detected in the Device Builder log viewer).`];
   if (scrape.decodedFrames.length > 0) {
     problem.push(
       "",
@@ -284,47 +346,144 @@ export function buildIssueUrl(
     );
   }
   params.set("problem", problem.join("\n"));
-  params.set(
-    "additional",
-    fullReportDelivery === "clipboard"
-      ? "The full crash report (decoded backtrace, warnings/errors, config dump, " +
-          "sanitized YAML config) was copied to the clipboard by ESPHome Device " +
-          "Builder. Please paste it here."
-      : "The full crash report was saved as a markdown file by ESPHome Device " +
-          "Builder. Please attach or paste it here."
-  );
 
-  // The `logs` field is the elastic part: fit the crash block first,
-  // then as many preceding context lines as the budget allows.
+  // The sanitized YAML goes into the form's YAML Config box, truncated
+  // line-wise with a marker when it can't fit whole alongside a useful
+  // log excerpt — the downloadable report always carries the full dump.
+  const configYaml = report.configYaml.trimEnd();
+  if (configYaml) {
+    const configBudget = MAX_ISSUE_URL_LENGTH - url.toString().length - MIN_LOGS_BUDGET;
+    const fitted = fitConfig(configYaml, configBudget);
+    if (fitted.text) params.set("config", fitted.text);
+    if (fitted.truncated) missing = true;
+  }
+
+  // The `logs` field fits the crash block first, then as many preceding
+  // context lines as the budget allows. When the decoded backtrace
+  // already rides in `problem`, its echo lines are dropped here so the
+  // trace appears only once in the issue.
+  const { lines: logLines, anchor } =
+    scrape.decodedFrames.length > 0
+      ? excerptWithoutDecodeEchoes(scrape.excerpt, scrape.crashIndex)
+      : { lines: scrape.excerpt, anchor: Math.max(0, scrape.crashIndex) };
   params.set("logs", "");
-  const overhead = url.toString().length;
-  const budget = MAX_ISSUE_URL_LENGTH - overhead;
-  const logs = fitLines(scrape.excerpt, Math.max(0, scrape.crashIndex), budget);
+  const logs = fitLines(logLines, anchor, MAX_ISSUE_URL_LENGTH - url.toString().length);
   if (logs) {
     params.set("logs", logs);
+    if (logs.includes(TRIM_MARKER)) missing = true;
   } else {
     params.delete("logs");
+    if (logLines.length > 0) missing = true;
   }
-  return url.toString();
+
+  // Pack the supplementary sections into `additional`, whole sections
+  // at a time, so the common case needs no manual paste at all.
+  const extras: string[] = [];
+  const tryAddSection = (text: string): void => {
+    params.set("additional", [...extras, text].join("\n\n"));
+    if (url.toString().length <= MAX_ISSUE_URL_LENGTH) {
+      extras.push(text);
+      return;
+    }
+    missing = true;
+    if (extras.length > 0) {
+      params.set("additional", extras.join("\n\n"));
+    } else {
+      params.delete("additional");
+    }
+  };
+  tryAddSection(`Environment:\n${environmentSection(meta)}`);
+  if (scrape.warnings.length > 0) {
+    tryAddSection(`Warnings and errors:\n${fence(scrape.warnings)}`);
+  }
+  if (scrape.configLines.length > 0) {
+    tryAddSection(`Config dump:\n${fence(scrape.configLines)}`);
+  }
+
+  // When content was truncated, a note (for the maintainer reading the
+  // issue) leads the additional field; the reporter can attach the
+  // downloaded report on request. Drop trailing sections until the note
+  // fits so prepending it can't push the URL over budget.
+  if (missing) {
+    const note =
+      "(Some sections were truncated to fit this pre-filled form; the " +
+      "reporter has the full crash report and can attach it on request.)";
+    for (;;) {
+      params.set("additional", [note, ...extras].join("\n\n"));
+      if (url.toString().length <= MAX_ISSUE_URL_LENGTH || extras.length === 0) break;
+      extras.pop();
+    }
+  }
+  return { url: url.toString(), complete: !missing };
+}
+
+const CONFIG_TRUNCATED_NOTE = "# [config truncated to fit the pre-filled URL]";
+
+function fitConfig(yaml: string, budget: number): { text: string; truncated: boolean } {
+  if (budget <= 0) return { text: "", truncated: true };
+  if (encodeURIComponent(yaml).length <= budget) return { text: yaml, truncated: false };
+  const kept: string[] = [];
+  let spent = encodedCost(CONFIG_TRUNCATED_NOTE);
+  for (const line of yaml.split("\n")) {
+    const lineCost = encodedCost(line);
+    if (spent + lineCost > budget) break;
+    kept.push(line);
+    spent += lineCost;
+  }
+  if (kept.length === 0) return { text: "", truncated: true };
+  kept.push(CONFIG_TRUNCATED_NOTE);
+  return { text: kept.join("\n"), truncated: true };
+}
+
+function excerptWithoutDecodeEchoes(
+  excerpt: string[],
+  crashIndex: number
+): { lines: string[]; anchor: number } {
+  const lines: string[] = [];
+  let anchor = 0;
+  for (let i = 0; i < excerpt.length; i++) {
+    if (isDecodeEcho(excerpt[i])) continue;
+    if (i <= crashIndex) anchor = lines.length;
+    lines.push(excerpt[i]);
+  }
+  return { lines, anchor: Math.min(anchor, Math.max(0, lines.length - 1)) };
 }
 
 const TRIM_MARKER = "[log excerpt trimmed; full logs in the attached report]";
+
+const encodedCost = (line: string): number => encodeURIComponent(`${line}\n`).length;
 
 /**
  * Join as much of *lines* as fits *budget* once URL-encoded: the block
  * from *anchor* to the end first (truncating its tail if even that
  * overflows), then context lines walking backwards from the anchor.
+ *
+ * Two passes: the first spends the whole budget on content; only when
+ * that truncates does the second re-fit with the trim marker's cost
+ * reserved, so the marker never pushes the result past the budget and
+ * an untrimmed excerpt never sacrifices content to an unused reserve.
  */
 function fitLines(lines: string[], anchor: number, budget: number): string {
   if (lines.length === 0 || budget <= 0) return "";
-  const cost = (line: string): number => encodeURIComponent(`${line}\n`).length;
+  let fit = fitWithReserve(lines, anchor, budget, 0);
+  if (fit.truncated) {
+    fit = fitWithReserve(lines, anchor, budget, encodedCost(TRIM_MARKER));
+    fit.kept.push(TRIM_MARKER);
+  }
+  return fit.kept.length > (fit.truncated ? 1 : 0) ? fit.kept.join("\n") : "";
+}
+
+function fitWithReserve(
+  lines: string[],
+  anchor: number,
+  budget: number,
+  reserve: number
+): { kept: string[]; truncated: boolean } {
   const kept: string[] = [];
-  // Reserve the marker's cost up front so appending it on truncation
-  // can't push the result past the budget.
-  let spent = cost(TRIM_MARKER);
+  let spent = reserve;
   let truncated = false;
   for (let i = anchor; i < lines.length; i++) {
-    const lineCost = cost(lines[i]);
+    const lineCost = encodedCost(lines[i]);
     if (spent + lineCost > budget) {
       truncated = true;
       break;
@@ -333,7 +492,7 @@ function fitLines(lines: string[], anchor: number, budget: number): string {
     spent += lineCost;
   }
   for (let i = anchor - 1; i >= 0; i--) {
-    const lineCost = cost(lines[i]);
+    const lineCost = encodedCost(lines[i]);
     if (spent + lineCost > budget) {
       truncated = true;
       break;
@@ -341,7 +500,5 @@ function fitLines(lines: string[], anchor: number, budget: number): string {
     kept.unshift(lines[i]);
     spent += lineCost;
   }
-  if (kept.length === 0) return "";
-  if (truncated) kept.push(TRIM_MARKER);
-  return kept.join("\n");
+  return { kept, truncated };
 }
