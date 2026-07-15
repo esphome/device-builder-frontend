@@ -241,13 +241,14 @@ export const remoteBuildPanelStyles = css`
     padding: var(--wa-space-s) var(--wa-space-m) var(--wa-space-m);
   }
 
+  /* Real headers for the card sections, sized with the stack-bar titles. */
   .card-heading {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: var(--wa-space-xs);
     padding-bottom: var(--wa-space-s);
-    font-size: var(--wa-font-size-s);
+    font-size: var(--wa-font-size-m);
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
   }

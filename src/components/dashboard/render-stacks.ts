@@ -44,6 +44,9 @@ export function renderBuilderStack(
           <span class="stack-bar-title">
             ${host._localize("dashboard.builder_stack_heading")}
           </span>
+          <span class="stack-bar-subtitle">
+            ${host._localize("dashboard.builder_stack_tagline")}
+          </span>
         </span>
         <wa-icon
           class="stack-bar-chevron"
