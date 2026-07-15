@@ -104,6 +104,20 @@ describe("handleEvent INITIAL_STATE panel seeds", () => {
     expect(host._activeJobs.get("c.yaml")?.job_id).toBe("j-new");
   });
 
+  it("mirrors a live RENAME job under its soon-to-be-renamed key", () => {
+    const host = makeHost();
+    const rename = makeFirmwareJob({
+      job_id: "j-ren",
+      configuration: "old.yaml",
+      job_type: JobType.RENAME,
+      status: JobStatus.RUNNING,
+      new_name: "brand-new",
+    });
+    dispatch(host, { firmware_jobs: [rename] });
+    expect(host._activeJobs.get("old.yaml")?.job_id).toBe("j-ren");
+    expect(host._activeJobs.get("brand-new.yaml")?.job_id).toBe("j-ren");
+  });
+
   it("seeds the jobs snapshot in one shot, terminal jobs history-only", () => {
     const host = makeHost();
     const running = makeFirmwareJob({
