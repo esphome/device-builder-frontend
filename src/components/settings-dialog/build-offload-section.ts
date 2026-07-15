@@ -28,7 +28,7 @@ import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { pairingDisplayName, peerEndpointName } from "../../util/pairing-display-name.js";
+import { pairingDisplayName } from "../../util/pairing-display-name.js";
 import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeEditPairingEndpointDialog } from "../edit-pairing-endpoint-dialog.js";
@@ -485,22 +485,30 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       pin_sha256: alert.pin_sha256,
       hostname: alert.receiver_hostname,
       port: alert.receiver_port,
-      label: alert.receiver_label,
+      label: this._pairingLabelForPin(alert.pin_sha256, alert.receiver_label),
     };
     this._unpairConfirmDialog?.open();
   };
 
   private _onUnpairRequest = (pairing: PairingSummary): void => {
-    // Endpoint-centric surface: the confirm dialog + toasts name the
-    // exact endpoint being dropped, not just the display name.
+    // Bare display name: the confirm-body template already appends
+    // ``({hostname}:{port})``, and the success toast reads "Unpaired
+    // {label}." — either endpoint copy comes from the template, not here.
     this._pendingUnpair = {
       pin_sha256: pairing.pin_sha256,
       hostname: pairing.receiver_hostname,
       port: pairing.receiver_port,
-      label: peerEndpointName(pairing),
+      label: pairingDisplayName(pairing),
     };
     this._unpairConfirmDialog?.open();
   };
+
+  // Resolved display name for a pin, falling back to a snapshot label when
+  // the live pairing is gone (an alert can outlive its pairing).
+  private _pairingLabelForPin(pin: string, fallback: string): string {
+    const pairing = this._pairings?.get(pin);
+    return pairing ? pairingDisplayName(pairing) : fallback;
+  }
 
   private _onUnpairConfirm = async (): Promise<void> => {
     const pending = this._pendingUnpair;

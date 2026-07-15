@@ -1,6 +1,6 @@
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
-import { friendlyHostname, trimTrailingDot } from "./hostname.js";
+import { friendlyHostname } from "./hostname.js";
 import { remoteBuildPeerName } from "./remote-build-peer-name.js";
 
 /**
@@ -75,19 +75,4 @@ export function jobPeerDisplayName(
     ? peers?.find((p) => p.dashboard_id === job.remote_peer)
     : undefined;
   return peer ? peerDisplayName(peer) : job.remote_peer_label || job.remote_peer || "";
-}
-
-/**
- * "Name (hostname:port)" for endpoint-centric surfaces (reauth
- * wizard, pairing alerts, unpair confirm) where the user verifies
- * a specific endpoint. Collapses to the bare endpoint when the
- * display name IS the hostname-derived label (no doubled text).
- */
-export function peerEndpointName(pairing: PairingSummary): string {
-  const endpoint = `${trimTrailingDot(pairing.receiver_hostname)}:${pairing.receiver_port}`;
-  const name = pairingDisplayName(pairing);
-  if (name === friendlyHostname(pairing.receiver_hostname)) {
-    return endpoint;
-  }
-  return `${name} (${endpoint})`;
 }

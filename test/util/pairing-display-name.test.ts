@@ -5,7 +5,6 @@ import {
   jobSourceDisplayName,
   pairingDisplayName,
   peerDisplayName,
-  peerEndpointName,
 } from "../../src/util/pairing-display-name.js";
 
 function pairing(overrides: Partial<PairingSummary> = {}): PairingSummary {
@@ -119,17 +118,5 @@ describe("jobPeerDisplayName", () => {
     expect(jobPeerDisplayName(null, { remote_peer: "zz", remote_peer_label: "" })).toBe(
       "zz"
     );
-  });
-});
-
-describe("peerEndpointName", () => {
-  it("combines the display name with the endpoint", () => {
-    expect(peerEndpointName(pairing({ friendly_name: "Nicks-Mac-Studio" }))).toBe(
-      "Nicks-Mac-Studio (esphome-builder-xnnspgdv.local:6056)"
-    );
-  });
-
-  it("collapses to the bare endpoint when the name is the hostname stem", () => {
-    expect(peerEndpointName(pairing())).toBe("esphome-builder-xnnspgdv.local:6056");
   });
 });

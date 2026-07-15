@@ -6,6 +6,7 @@ import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
+import { pairingDisplayName } from "../util/pairing-display-name.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
@@ -88,7 +89,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
    *  knows. */
   open(pairing: PairingSummary): void {
     this._pinSha256 = pairing.pin_sha256;
-    this._label = pairing.label;
+    this._label = pairingDisplayName(pairing);
     // Render with the trailing dot stripped — a typo-prone
     // FQDN-form like ``desktop.local.`` reads as
     // ``desktop.local`` in the dashboard's host-display
