@@ -40,15 +40,8 @@ export function renderBuilderStack(
         @click=${host._onToggleBuilderStack}
       >
         <wa-icon library="mdi" name="memory"></wa-icon>
-        <span class="builder-stack-main">
-          <span class="builder-stack-title">
-            ${host._localize("dashboard.builder_stack_heading")}
-          </span>
-          <span class="builder-stack-count">
-            ${host._localize("dashboard.builder_stack_count", {
-              count: host._devices.length,
-            })}
-          </span>
+        <span class="builder-stack-title">
+          ${host._localize("dashboard.builder_stack_heading")}
         </span>
         <wa-icon
           class="builder-stack-chevron"
@@ -120,16 +113,6 @@ export const dashboardStacksStyles = css`
     transition: background 0.1s;
   }
 
-  /* Title + count on one text baseline. */
-  .builder-stack-main {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: var(--wa-space-xs) var(--wa-space-s);
-    flex: 1;
-    min-width: 0;
-  }
-
   .builder-stack-header:hover,
   .builder-stack-header:focus-visible {
     background: var(--wa-color-surface-lowered);
@@ -145,11 +128,6 @@ export const dashboardStacksStyles = css`
     font-size: var(--wa-font-size-l);
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
-  }
-
-  .builder-stack-count {
-    font-size: var(--wa-font-size-xs);
-    color: var(--wa-color-text-quiet);
   }
 
   .builder-stack-chevron {

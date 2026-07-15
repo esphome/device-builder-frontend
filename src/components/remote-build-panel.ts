@@ -235,7 +235,6 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
           <span class="banner-title">
             ${this._localize("remote_build_dashboard.title")}
           </span>
-          ${this._renderListenerBadge()}
           ${
             this.collapsed && pendingCount > 0
               ? html`
@@ -274,23 +273,6 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
       new CustomEvent("toggle-collapsed", { bubbles: true, composed: true })
     );
   };
-
-  private _renderListenerBadge() {
-    const identity = this._identity.identity;
-    if (identity === null) return nothing;
-    return html`
-      <span
-        class=${`listener-badge listener-${identity.listener_bound ? "up" : "down"}`}
-        role="status"
-      >
-        ${
-          identity.listener_bound
-            ? this._localize("settings.remote_build_listener_up")
-            : this._localize("settings.remote_build_listener_down")
-        }
-      </span>
-    `;
-  }
 
   private _renderBody() {
     if (!this._remoteBuildEnabled) return renderDisabledCta(this);

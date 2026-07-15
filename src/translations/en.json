@@ -377,8 +377,7 @@
     "delete_selected_aria": "Delete {count} selected",
     "update_selected_aria": "Update {count} selected",
     "compile_selected_aria": "Compile {count} selected without installing",
-    "builder_stack_heading": "Device builder",
-    "builder_stack_count": "{count, plural, one {# device} other {# devices}}"
+    "builder_stack_heading": "Device builder"
   },
   "command": {
     "install_title": "Install — {name}",

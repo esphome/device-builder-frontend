@@ -267,14 +267,16 @@ export const remoteBuildPanelStyles = css`
     word-break: break-all;
   }
 
+  /* Default grid stretch keeps side-by-side cards the same height. */
   .cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: var(--wa-space-m);
-    align-items: start;
   }
 
   .card {
+    display: flex;
+    flex-direction: column;
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-m);
     padding: var(--wa-space-s) var(--wa-space-m) var(--wa-space-m);
