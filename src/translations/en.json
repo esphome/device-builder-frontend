@@ -1660,5 +1660,31 @@
     "disabled_title": "Remote builds are disabled",
     "disabled_desc": "This install is set up as a remote build server, but the remote build listener is turned off.",
     "disabled_cta": "Open build server settings"
+  },
+  "crash_report": {
+    "banner": "This device crashed",
+    "report_button": "Report this crash",
+    "title": "Report crash - {name}",
+    "collecting": "Collecting crash details and validating the configuration...",
+    "includes_backtrace_decoded": "Decoded backtrace captured",
+    "includes_backtrace_raw": "Backtrace captured, but it was not decoded in this session",
+    "crash_scrolled_out": "The crash output scrolled out of the log buffer",
+    "includes_log_lines": "{warnings} warning/error lines and {config} config lines included",
+    "includes_config": "Configuration included, secrets redacted",
+    "config_unavailable": "Configuration could not be validated, so it is not included",
+    "hint": "When you continue, the full report downloads first, then a pre-filled GitHub issue opens in a new tab with the crash details, config, and logs.",
+    "delivered_hint": "The full report was downloaded and a pre-filled GitHub issue opened in a new tab. Some sections were too large for the form; drag the downloaded file onto the issue's \"Additional information\" field to include everything. If the tab didn't open, use \"Open GitHub issue\" below.",
+    "download_report": "Download report",
+    "copied": "Report copied to clipboard",
+    "copy_failed": "Copying the report failed",
+    "open_issue": "Open GitHub issue",
+    "describe_label": "What was the device doing when it crashed?",
+    "describe_placeholder": "e.g. Pressed the garage button in Home Assistant; crashes every time a BLE device connects",
+    "describe_required": "Describe what the device was doing first; a report without context is hard to act on",
+    "banner_previous_boot": "This device crashed on a previous boot",
+    "delivered_hint_complete": "The full report was downloaded and a pre-filled GitHub issue opened in a new tab; everything fit, so nothing needs to be pasted. If the tab didn't open, use \"Open GitHub issue\" below. You can also re-download or copy the report here.",
+    "copy_report": "Copy report",
+    "download_and_open": "Download report & open GitHub issue",
+    "config_capture_failed": "Couldn't reach the server to capture the config; it's not included (this is a connection issue, not a problem with your YAML)"
   }
 }
