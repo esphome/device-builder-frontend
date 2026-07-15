@@ -9,6 +9,7 @@ import {
   onSetOffloaderPairingEnabled,
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildEnabled,
+  onSetHideDeviceBuilder,
   onSetRemoteComputeOnly,
   onSetTheme,
   onSetVersionHistoryEnabled,
@@ -380,6 +381,43 @@ describe("onSetRemoteComputeOnly", () => {
     await flush();
     expect(update).toHaveBeenCalledWith({ remote_compute_only: true });
     expect(host._hideDeviceBuilder).toBe(false);
+  });
+});
+
+describe("onSetHideDeviceBuilder", () => {
+  beforeEach(() => toastError.mockClear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("optimistically flips and persists the preference on success", async () => {
+    const update = vi.fn(async () => ({}));
+    const host = makePrefsHost(update);
+    onSetHideDeviceBuilder(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    expect(host._hideDeviceBuilder).toBe(true);
+    await flush();
+    expect(host._hideDeviceBuilder).toBe(true);
+    expect(update).toHaveBeenCalledWith({ hide_device_builder: true });
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("reverts, logs, and toasts on backend rejection", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = makePrefsHost(
+      vi.fn(async () => {
+        throw new Error("no");
+      })
+    );
+    onSetHideDeviceBuilder(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    expect(host._hideDeviceBuilder).toBe(true);
+    await flush();
+    expect(host._hideDeviceBuilder).toBe(false);
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
   });
 });
 
