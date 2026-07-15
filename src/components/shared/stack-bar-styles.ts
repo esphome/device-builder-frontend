@@ -84,10 +84,19 @@ export const stackBarStyles = css`
   }
 
   /* Quiet inline tagline after the title ("builds firmware for other
-     dashboards"); wraps under the title on narrow viewports. */
+     dashboards"). Hidden on phones — it wraps under the title there and
+     doubles each bar's height; the titles carry the meaning alone. The
+     870px cutoff matches the header's compact breakpoint the bars align
+     to (--esphome-header-logo-box). */
   .stack-bar-subtitle {
     font-size: var(--stack-bar-subtitle-size);
     color: var(--wa-color-text-quiet);
+  }
+
+  @media (max-width: 870px) {
+    .stack-bar-subtitle {
+      display: none;
+    }
   }
 
   .stack-bar-chevron {
