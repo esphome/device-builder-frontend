@@ -593,7 +593,7 @@ export class ESPHomeLogsDialog extends LitElement {
         if (firstDetection) {
           void this.updateComplete
             .then(() => this._terminal?.scrollToBottom())
-            .catch(() => undefined);
+            .catch((err) => console.warn("crash callout re-pin scroll failed", err));
         }
       }
     }
