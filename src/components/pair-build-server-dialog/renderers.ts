@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import {
   friendlyHostname,
   parsePortInput,
+  splitHostPort,
   trimTrailingDot,
 } from "../../util/hostname.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
@@ -62,6 +63,19 @@ export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateRes
           ?disabled=${host._busy}
           placeholder=${host._localize("settings.pair_build_server_hostname_placeholder")}
           .value=${host._hostname}
+          @paste=${(e: ClipboardEvent) => {
+            // A pasted "host:port" (the receiver's pairing-address copy)
+            // fills both fields instead of landing whole in this one.
+            const split = splitHostPort(e.clipboardData?.getData("text") ?? "");
+            if (!split) return;
+            e.preventDefault();
+            host._hostname = split.host;
+            host._port = String(split.port);
+            if (!host._receiverLabelTouched) {
+              host._receiverLabel = friendlyHostname(split.host);
+            }
+            host._error = null;
+          }}
           @input=${(e: Event) => {
             host._hostname = (e.target as HTMLInputElement).value;
             // Track receiver label off hostname until user edits it manually.

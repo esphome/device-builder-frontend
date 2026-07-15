@@ -98,6 +98,22 @@ export function normalizeHostnameForCompare(host: string): string {
  * accepted range so a value that passes here is guaranteed
  * to round-trip through the WS validator without raising.
  */
+/**
+ * Split a pasted "host:6055" / "[fd00::1]:6055" into its parts.
+ *
+ * Null when there's no valid port suffix — a bare hostname, a bare
+ * IPv6 literal (multiple colons, no brackets), or an out-of-range
+ * port all stay whole.
+ */
+export function splitHostPort(value: string): { host: string; port: number } | null {
+  const trimmed = value.trim();
+  const match =
+    /^\[([^\]]+)\]:(\d{1,5})$/.exec(trimmed) ?? /^([^:\s]+):(\d{1,5})$/.exec(trimmed);
+  if (!match) return null;
+  const port = parsePortInput(match[2]);
+  return port === null ? null : { host: match[1], port };
+}
+
 export function parsePortInput(input: string): number | null {
   const trimmed = input.trim();
   if (!/^\d+$/.test(trimmed)) return null;
