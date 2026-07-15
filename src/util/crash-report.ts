@@ -468,10 +468,7 @@ function fitProblem(
   const budget = MAX_ISSUE_URL_LENGTH - url.toString().length;
   const text = head.join("\n");
   let end = Math.max(0, Math.min(text.length, budget - 20));
-  while (
-    end > 0 &&
-    encodeURIComponent(`${text.slice(0, end)}\n…[truncated]`).length > budget
-  ) {
+  while (end > 0 && formEncodedLength(`${text.slice(0, end)}\n…[truncated]`) > budget) {
     end -= 32;
   }
   params.set("problem", `${text.slice(0, Math.max(0, end))}\n…[truncated]`);
@@ -482,7 +479,7 @@ const CONFIG_TRUNCATED_NOTE = "# [config truncated to fit the pre-filled URL]";
 
 function fitConfig(yaml: string, budget: number): { text: string; truncated: boolean } {
   if (budget <= 0) return { text: "", truncated: true };
-  if (encodeURIComponent(yaml).length <= budget) return { text: yaml, truncated: false };
+  if (formEncodedLength(yaml) <= budget) return { text: yaml, truncated: false };
   const kept: string[] = [];
   let spent = encodedCost(CONFIG_TRUNCATED_NOTE);
   for (const line of yaml.split("\n")) {
@@ -512,7 +509,16 @@ function excerptWithoutDecodeEchoes(
 
 const TRIM_MARKER = "[log excerpt trimmed; full logs in the attached report]";
 
-const encodedCost = (line: string): number => encodeURIComponent(`${line}\n`).length;
+// Encoded length of *s* the way the prefilled URL actually serializes it:
+// URLSearchParams uses application/x-www-form-urlencoded, which differs
+// from encodeURIComponent for `! ~ ' ( )` (3 chars vs 1) — and ESPHome
+// backtraces are full of parens, so encodeURIComponent under-counts and
+// can produce a >8000-char URL (414). Measuring via URLSearchParams is
+// exact; the trailing "v=" (2 chars) is subtracted off.
+const formEncodedLength = (s: string): number =>
+  new URLSearchParams({ v: s }).toString().length - 2;
+
+const encodedCost = (line: string): number => formEncodedLength(`${line}\n`);
 
 /**
  * Join as much of *lines* as fits *budget* once URL-encoded: the block

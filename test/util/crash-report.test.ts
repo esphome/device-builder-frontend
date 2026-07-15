@@ -220,6 +220,25 @@ describe("buildIssueUrl", () => {
     expect(new URL(result.url).searchParams.get("problem")).toContain("truncated");
   });
 
+  it("stays under budget with paren/!-heavy content (form-encoding cost)", () => {
+    // encodeURIComponent leaves ( ) ! ~ ' as 1 char but URLSearchParams
+    // encodes them as 3 — a real budget hazard for C++ backtraces and
+    // !lambda/!secret YAML. The real URL must still be under the cap.
+    const heavy =
+      "esphome::Callback<void ()>::create()::{lambda(void*)#1}::operator()() !~'";
+    const result = buildIssueUrl(
+      report({
+        userDescription: heavy.repeat(120),
+        configYaml: `esphome:\n${`  x: ${heavy}\n`.repeat(120)}`,
+        scrape: scrapeCrashData([
+          "Guru Meditation Error: crash",
+          ...Array.from({ length: 60 }, () => `  ${heavy}`),
+        ]),
+      })
+    );
+    expect(result.url.length).toBeLessThanOrEqual(8000);
+  });
+
   it("omits the platform fact when unknown", () => {
     const p = params(report({ meta: { ...META, installation: "", targetPlatform: "" } }));
     expect(p.get("problem")).not.toContain("Platform:");
