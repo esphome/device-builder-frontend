@@ -64,15 +64,20 @@ export function renderBuilderStack(
 export const dashboardStacksStyles = css`
   /* Stacks mode: the discovery banner belongs to the Device builder
      section, so it flows in place of its usual float at the page top
-     (and the float's compensating top padding goes too). */
+     (and the float's compensating top padding goes too). The toolbar's
+     top padding tightens to match — the pill is a row now, not a float
+     the toolbar needs to clear. */
   :host([stacks][has-discovered]) {
     padding-top: 0;
   }
 
+  :host([stacks]) {
+    --toolbar-pad-top: var(--wa-space-s);
+  }
+
   :host([stacks]) .discovered-section {
     position: static;
-    align-items: flex-start;
-    margin: 0 0 var(--wa-space-s);
+    margin: 0;
     pointer-events: auto;
   }
 
@@ -86,6 +91,12 @@ export const dashboardStacksStyles = css`
     .discovered-section:has(.discovered-section-grid[hidden])
     .discovered-section-header {
     border-radius: var(--wa-border-radius-l);
+  }
+
+  /* Hairline between the stacks so the two sections read separately. */
+  .builder-stack {
+    border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    padding-top: var(--wa-space-s);
   }
 
   /* Width mirrors the panel banner (a stretched flex item with the same

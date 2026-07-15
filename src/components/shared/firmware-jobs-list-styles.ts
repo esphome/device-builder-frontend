@@ -105,6 +105,7 @@ export const firmwareJobsListStyles = css`
     color: var(--wa-color-text-quiet);
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: var(--wa-space-xs);
   }
 

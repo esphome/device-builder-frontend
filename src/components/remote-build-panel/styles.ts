@@ -12,6 +12,14 @@ export const remoteBuildPanelStyles = css`
     margin-bottom: var(--wa-space-s);
   }
 
+  /* Content shares the Device builder's horizontal gutter (the toolbar /
+     card-grid inset inherited from esphome-layout); only the banner runs
+     to the section edge like the builder header does. */
+  .panel > :not(.banner) {
+    margin-left: var(--content-gutter, var(--wa-space-l));
+    margin-right: var(--content-gutter, var(--wa-space-l));
+  }
+
   .banner {
     display: flex;
     align-items: center;
