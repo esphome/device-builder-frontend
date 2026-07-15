@@ -1623,7 +1623,8 @@
     "submitted_by": "from {label}"
   },
   "remote_build_dashboard": {
-    "title": "Remote build server",
+    "title": "Build server",
+    "tagline": "builds firmware for other dashboards",
     "badge_requests": "{count, plural, one {# pairing request} other {# pairing requests}}",
     "badge_active": "{count, plural, one {# active job} other {# active jobs}}",
     "intro_empty": "No dashboards are paired yet. Pair one to start receiving builds.",

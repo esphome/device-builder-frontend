@@ -68,6 +68,13 @@ export const stackBarStyles = css`
     color: var(--wa-color-text-normal);
   }
 
+  /* Quiet inline tagline after the title ("builds firmware for other
+     dashboards"); wraps under the title on narrow viewports. */
+  .stack-bar-subtitle {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+  }
+
   .stack-bar-chevron {
     margin-left: auto;
     width: var(--stack-bar-icon-box);

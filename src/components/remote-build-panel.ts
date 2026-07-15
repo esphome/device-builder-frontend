@@ -238,6 +238,9 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
           <span class="banner-title stack-bar-title">
             ${this._localize("remote_build_dashboard.title")}
           </span>
+          <span class="stack-bar-subtitle">
+            ${this._localize("remote_build_dashboard.tagline")}
+          </span>
           ${
             this.collapsed && pendingCount > 0
               ? html`
