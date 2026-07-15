@@ -124,6 +124,7 @@ export async function onConfirmSubmit(host: ESPHomePairBuildServerDialog): Promi
       pin_sha256: host._previewedPin,
       receiver_label: receiverLabel,
       offloader_label: offloaderLabel,
+      offloader_label_auto: !host._offloaderLabelTouched,
       ...(pairingKey ? { pairing_key: pairingKey } : {}),
     });
     host._step = "sent";

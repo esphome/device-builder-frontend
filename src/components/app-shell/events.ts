@@ -24,6 +24,7 @@ import type {
   OffloaderRemoteBuildsToggledEventData,
   OffloaderVersionMatchPolicyChangedEventData,
   ReceiverPeerLinkSessionEventData,
+  ReceiverPeerLinkSessionOpenedEventData,
   RemoteBuildHostAddedEventData,
   RemoteBuildHostRemovedEventData,
   RemoteBuildPairingWindowChangedEventData,
@@ -225,6 +226,9 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         status: "pending",
         peer_ip: evt.peer_ip,
         connected: false,
+        friendly_name: evt.friendly_name,
+        ha_addon: evt.ha_addon,
+        label_auto: evt.label_auto,
       };
       const current = host._buildServerPeers ?? [];
       const idx = current.findIndex((p) => p.dashboard_id === incoming.dashboard_id);
@@ -248,13 +252,28 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       }
       break;
     }
-    case DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED:
+    case DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED: {
+      // OPENED also refreshes the offloader's display identity —
+      // the event carries the stored row's post-refresh values.
+      if (host._buildServerPeers === null) break;
+      const evt = data as ReceiverPeerLinkSessionOpenedEventData;
+      host._buildServerPeers = host._buildServerPeers.map((p) =>
+        p.dashboard_id === evt.dashboard_id
+          ? {
+              ...p,
+              connected: true,
+              ha_addon: evt.ha_addon,
+              ...(evt.friendly_name ? { friendly_name: evt.friendly_name } : {}),
+            }
+          : p
+      );
+      break;
+    }
     case DeviceEventType.RECEIVER_PEER_LINK_SESSION_CLOSED: {
       if (host._buildServerPeers === null) break;
       const evt = data as ReceiverPeerLinkSessionEventData;
-      const connected = event === DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED;
       host._buildServerPeers = host._buildServerPeers.map((p) =>
-        p.dashboard_id === evt.dashboard_id ? { ...p, connected } : p
+        p.dashboard_id === evt.dashboard_id ? { ...p, connected: false } : p
       );
       break;
     }
@@ -312,13 +331,18 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
     case DeviceEventType.OFFLOADER_PEER_LINK_OPENED: {
       // OPENED clears the failure record: a successful session-open
-      // invalidates whatever caused the previous close.
+      // invalidates whatever caused the previous close. friendly_name
+      // patches non-empty-only (mirror of the backend persist policy)
+      // so an older receiver can't blank a captured name.
       const evt = data as OffloaderPeerLinkOpenedEventData;
       patchOffloadPairing(host, evt.pin_sha256, {
         connected: true,
         connecting: false,
         last_connect_error: "",
         esphome_version: evt.esphome_version,
+        auto_provision_supported: evt.auto_provision_supported,
+        ha_addon: evt.ha_addon,
+        ...(evt.friendly_name ? { friendly_name: evt.friendly_name } : {}),
       });
       break;
     }

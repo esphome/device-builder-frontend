@@ -138,6 +138,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // (e.g. WS dropped) still shows the local hint.
   @state() _jobSource: JobSource = JobSource.LOCAL;
   @state() _jobSourceLabel = "";
+  @state() _jobSourcePin = "";
 
   @state() _logLines: string[] = [];
   @state() _logsExpanded = false;
@@ -286,6 +287,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._failedDuringValidate = false;
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
+    this._jobSourcePin = "";
     this._timer.reset();
     this._usbFirmware = null;
     this._usbFirmwareName = "";

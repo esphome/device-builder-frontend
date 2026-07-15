@@ -18,6 +18,8 @@ function makeSummary(pin: string): PairingSummary {
     esphome_version: "",
     enabled: true,
     auto_provision_supported: false,
+    friendly_name: "",
+    ha_addon: false,
   };
 }
 

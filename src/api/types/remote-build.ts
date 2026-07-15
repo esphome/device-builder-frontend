@@ -80,6 +80,23 @@ export interface PeerSummary {
    * session.
    */
   connected: boolean;
+  /**
+   * Offloader's human machine label (its mDNS `friendly_name`)
+   * from the pair request / session handshake, refreshed on
+   * session-open (non-empty values only). Empty from old
+   * offloaders.
+   */
+  friendly_name: string;
+  /** Offloader's HA add-on flag from the handshake. */
+  ha_addon: boolean;
+  /**
+   * True when the offloader's pair-dialog label was left at its
+   * auto-derived prefill (often the browser's URL host, e.g.
+   * "localhost") — the signal that `peerDisplayName` may replace
+   * `label` with `friendly_name`. Old offloaders never send it,
+   * so a possibly-custom label always wins.
+   */
+  label_auto: boolean;
 }
 
 /**
@@ -185,6 +202,17 @@ export interface PairingSummary {
    * skew warning.
    */
   auto_provision_supported: boolean;
+  /**
+   * Receiver's human machine label (its mDNS `friendly_name`)
+   * from the session handshake, refreshed on every session-open
+   * (non-empty values only, so an older receiver can't clobber a
+   * captured name). Empty until a new-enough receiver connects.
+   * `pairingDisplayName` prefers it over an auto-derived
+   * hostname label.
+   */
+  friendly_name: string;
+  /** Receiver's HA add-on flag from the session handshake. */
+  ha_addon: boolean;
 }
 
 /**

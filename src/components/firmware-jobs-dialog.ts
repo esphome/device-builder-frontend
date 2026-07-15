@@ -24,6 +24,8 @@ import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
+  buildOffloadPairingsContext,
+  buildServerPeersContext,
   devicesContext,
   firmwareJobsContext,
   localizeContext,
@@ -42,6 +44,7 @@ import type { ESPHomeCommandDialog } from "./command-dialog.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
+import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
 import { bucketJobs, renderEmpty, renderGroups } from "./shared/firmware-jobs-list.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
 import "./logs-dialog.js";
@@ -75,6 +78,12 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   @consume({ context: devicesContext, subscribe: true })
   @state()
   _devices: ConfiguredDevice[] = [];
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  _pairings: Map<string, PairingSummary> | null = null;
+  @consume({ context: buildServerPeersContext, subscribe: true })
+  @state()
+  _buildServerPeers: PeerSummary[] | null = null;
 
   private readonly _dialog = new DialogOpenController(this);
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;

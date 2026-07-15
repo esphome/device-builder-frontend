@@ -19,15 +19,25 @@ function makeSummary(pin: string, esphome_version: string): PairingSummary {
     esphome_version,
     enabled: true,
     auto_provision_supported: false,
+    friendly_name: "",
+    ha_addon: false,
   };
 }
 
-function opened(pin: string, esphome_version: string): OffloaderPeerLinkOpenedEventData {
+function opened(
+  pin: string,
+  esphome_version: string,
+  extra?: Partial<OffloaderPeerLinkOpenedEventData>
+): OffloaderPeerLinkOpenedEventData {
   return {
     receiver_hostname: "192.168.1.50",
     receiver_port: 6052,
     pin_sha256: pin,
     esphome_version,
+    auto_provision_supported: false,
+    friendly_name: "",
+    ha_addon: false,
+    ...extra,
   };
 }
 
@@ -59,5 +69,36 @@ describe("handleEvent OFFLOADER_PEER_LINK_OPENED", () => {
     dispatch(host, opened("b".repeat(64), "2026.6.0"));
 
     expect(host._buildOffloadPairings?.size).toBe(0);
+  });
+
+  it("patches capability and display identity; a non-empty name refreshes", () => {
+    const pin = "a".repeat(64);
+    const host: Host = {
+      _buildOffloadPairings: new Map([[pin, makeSummary(pin, "2026.5.0")]]),
+    };
+
+    dispatch(
+      host,
+      opened(pin, "2026.6.0", {
+        auto_provision_supported: true,
+        friendly_name: "Nicks-Mac-Studio",
+        ha_addon: true,
+      })
+    );
+
+    const row = host._buildOffloadPairings?.get(pin);
+    expect(row?.auto_provision_supported).toBe(true);
+    expect(row?.friendly_name).toBe("Nicks-Mac-Studio");
+    expect(row?.ha_addon).toBe(true);
+  });
+
+  it("keeps a captured friendly_name when an OPENED carries an empty one", () => {
+    const pin = "a".repeat(64);
+    const seeded = { ...makeSummary(pin, "2026.5.0"), friendly_name: "Nicks-Mac-Studio" };
+    const host: Host = { _buildOffloadPairings: new Map([[pin, seeded]]) };
+
+    dispatch(host, opened(pin, "2026.6.0", { friendly_name: "" }));
+
+    expect(host._buildOffloadPairings?.get(pin)?.friendly_name).toBe("Nicks-Mac-Studio");
   });
 });

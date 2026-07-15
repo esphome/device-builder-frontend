@@ -86,6 +86,11 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   // Resets on open() so the next pair attempt re-derives from hostname.
   @state() _receiverLabelTouched = false;
 
+  // Mirrors _receiverLabelTouched for the offloader-label field. An
+  // untouched prefill is sent as offloader_label_auto so the receiver's
+  // UI may replace it with this dashboard's advertised friendly name.
+  @state() _offloaderLabelTouched = false;
+
   // True when the confirm step was reached by auto-preview (mDNS-discovered
   // host), so the input step was never shown. Drives the confirm step's
   // secondary button: Cancel (close) rather than Back (to the skipped form).
@@ -152,6 +157,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
       prefill?.receiverLabel?.trim() || friendlyHostname(this._hostname);
     this._receiverLabelTouched = false;
     this._offloaderLabel = friendlyHostname(window.location.hostname);
+    this._offloaderLabelTouched = false;
     this._pairingKey = "";
     this._pairingKeyRequired = false;
     this._error = null;

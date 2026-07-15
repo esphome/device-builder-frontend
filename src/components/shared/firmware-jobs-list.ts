@@ -5,10 +5,15 @@ import {
   JobStatus,
   JobType,
 } from "../../api/types/firmware-jobs.js";
+import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import { effectiveJobType } from "../../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
+import {
+  jobPeerDisplayName,
+  jobSourceDisplayName,
+} from "../../util/pairing-display-name.js";
 
 /**
  * What a host must expose to render the shared jobs list.
@@ -20,6 +25,13 @@ export interface FirmwareJobsListHost {
   _localize: LocalizeFunc;
   /** Wall-clock anchor for relative timestamps; hosts tick it while visible. */
   _now: number;
+  /**
+   * Live pairing / peer registries for display-name resolution — the
+   * handshake friendly name wins over the job's snapshot label. Either
+   * may be null on hosts (or deployments) without the matching side.
+   */
+  _pairings: Map<string, PairingSummary> | null;
+  _buildServerPeers: PeerSummary[] | null;
   _jobDisplayName(job: FirmwareJob): string;
   _openJob(job: FirmwareJob): void;
   _onCancelClick(e: Event, job: FirmwareJob): void;
@@ -180,9 +192,14 @@ export function renderSourceLine(
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
   if (job.source === JobSource.REMOTE && job.source_label) {
+    const name = jobSourceDisplayName(
+      host._pairings,
+      job.source_pin_sha256,
+      job.source_label
+    );
     const display = job.source_esphome_version
-      ? `${job.source_label} (${job.source_esphome_version})`
-      : job.source_label;
+      ? `${name} (${job.source_esphome_version})`
+      : name;
     return html`
       <div class="job-source">
         ${host._localize("firmware_jobs.building_on", {
@@ -200,7 +217,7 @@ export function renderSourceLine(
     `;
   }
   if (job.remote_peer) {
-    const peer = job.remote_peer_label || job.remote_peer;
+    const peer = jobPeerDisplayName(host._buildServerPeers, job);
     return html`
       <div class="job-source">
         ${host._localize("firmware_jobs.submitted_by", { label: peer })}

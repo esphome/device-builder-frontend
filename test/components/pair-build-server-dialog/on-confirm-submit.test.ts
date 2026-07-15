@@ -29,6 +29,7 @@ function makeHost(pairingKey: string): {
     _offloaderLabel: "ha-green",
     _pairingKey: pairingKey,
     _pairingKeyRequired: false,
+    _offloaderLabelTouched: false,
     _error: null,
     _step: "confirm",
     _sentKey: null,
@@ -52,6 +53,24 @@ describe("onConfirmSubmit", () => {
       offloader_label: "ha-green",
     });
     expect(host._step).toBe("sent");
+  });
+
+  it("marks an untouched offloader label as auto-derived", async () => {
+    const { host, request } = makeHost("");
+    await onConfirmSubmit(host);
+
+    const args = request.mock.calls[0][0] as RequestArgs;
+    expect(args.offloader_label_auto).toBe(true);
+  });
+
+  it("marks a user-edited offloader label as not auto-derived", async () => {
+    const { host, request } = makeHost("");
+    (host as unknown as { _offloaderLabelTouched: boolean })._offloaderLabelTouched =
+      true;
+    await onConfirmSubmit(host);
+
+    const args = request.mock.calls[0][0] as RequestArgs;
+    expect(args.offloader_label_auto).toBe(false);
   });
 
   it("omits the pairing_key arg entirely when the field is blank", async () => {

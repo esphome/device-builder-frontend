@@ -4,6 +4,7 @@ import type { PairingSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { trimTrailingDot } from "../../util/hostname.js";
+import { pairingDisplayName } from "../../util/pairing-display-name.js";
 import {
   classifyVersionMismatch,
   isPinnableVersion,
@@ -65,11 +66,12 @@ export function renderPairingRow(
     onUnpair,
   } = ctx;
   const { pillClass, pillLabel } = pillFor(pairing, localize);
+  const displayName = pairingDisplayName(pairing);
   return html`
     <div class="row peer-row row--stacked">
       <div class="row-label">
         <span class="row-title">
-          ${pairing.label}
+          ${displayName}
           <span class=${pillClass}>${pillLabel}</span>
           ${
             pairing.status === "approved"
@@ -78,7 +80,7 @@ export function renderPairingRow(
                     class="toggle pairing-toggle"
                     role="switch"
                     aria-label=${localize("settings.build_offload_pairing_enabled_aria", {
-                      label: pairing.label,
+                      label: displayName,
                     })}
                     aria-checked=${pairing.enabled}
                     title=${localize("settings.build_offload_pairing_enabled_title")}
@@ -114,7 +116,7 @@ export function renderPairingRow(
                   type="button"
                   class="btn-build-remote"
                   aria-label=${localize("settings.remote_build_submit_aria", {
-                    label: pairing.label,
+                    label: displayName,
                   })}
                   @click=${() => onBuildRemote(pairing)}
                 >
@@ -130,7 +132,7 @@ export function renderPairingRow(
                   type="button"
                   class="btn-view-remote-build"
                   aria-label=${localize("settings.remote_build_view_aria", {
-                    label: pairing.label,
+                    label: displayName,
                   })}
                   @click=${() => onViewBuild(latestJob.job_id)}
                 >
@@ -146,10 +148,10 @@ export function renderPairingRow(
                   type="button"
                   class="btn-edit-endpoint"
                   aria-label=${localize("settings.edit_pairing_endpoint_aria", {
-                    label: pairing.label,
+                    label: displayName,
                   })}
                   title=${localize("settings.edit_pairing_endpoint_aria", {
-                    label: pairing.label,
+                    label: displayName,
                   })}
                   @click=${() => onEditEndpoint(pairing)}
                 >
@@ -161,7 +163,7 @@ export function renderPairingRow(
         <button
           type="button"
           class="peer-remove"
-          aria-label=${localize("settings.unpair_aria", { label: pairing.label })}
+          aria-label=${localize("settings.unpair_aria", { label: displayName })}
           title=${localize("settings.unpair_action")}
           @click=${() => onUnpair(pairing)}
         >

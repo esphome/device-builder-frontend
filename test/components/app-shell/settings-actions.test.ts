@@ -205,6 +205,8 @@ function makePairing(enabled: boolean): PairingSummary {
     esphome_version: "",
     enabled,
     auto_provision_supported: false,
+    friendly_name: "",
+    ha_addon: false,
   };
 }
 

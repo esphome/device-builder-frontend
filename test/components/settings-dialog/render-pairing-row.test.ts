@@ -22,6 +22,8 @@ function makeSummary(esphome_version: string): PairingSummary {
     esphome_version,
     enabled: true,
     auto_provision_supported: false,
+    friendly_name: "",
+    ha_addon: false,
   };
 }
 
@@ -66,6 +68,8 @@ describe("renderPairingRow version line", () => {
     const pairing = {
       ...makeSummary("2026.5.0"),
       auto_provision_supported: true,
+      friendly_name: "",
+      ha_addon: false,
     };
     const text = renderedText(renderPairingRow(pairing, ctx()));
     expect(text).toContain("settings.build_offload_pairing_version_auto_provision");
@@ -83,5 +87,30 @@ describe("renderPairingRow version line", () => {
     const pending = { ...makeSummary("2026.6.0"), status: "pending" as const };
     const text = renderedText(renderPairingRow(pending, ctx()));
     expect(text).not.toContain("settings.remote_build_peer_version_line");
+  });
+});
+
+describe("renderPairingRow display name", () => {
+  it("shows the friendly name when the label is the auto-derived hostname stem", () => {
+    const pairing = {
+      ...makeSummary("2026.6.0"),
+      label: "mac",
+      friendly_name: "Nicks-Mac-Studio",
+    };
+    const text = renderedText(renderPairingRow(pairing, ctx()));
+    expect(text).toContain("Nicks-Mac-Studio");
+    // The hostname:port sub-line still shows the real endpoint.
+    expect(text).toContain("mac.local");
+  });
+
+  it("keeps a custom label over the friendly name", () => {
+    const pairing = {
+      ...makeSummary("2026.6.0"),
+      label: "Office Server",
+      friendly_name: "Nicks-Mac-Studio",
+    };
+    const text = renderedText(renderPairingRow(pairing, ctx()));
+    expect(text).toContain("Office Server");
+    expect(text).not.toContain("Nicks-Mac-Studio");
   });
 });

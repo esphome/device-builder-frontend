@@ -31,6 +31,8 @@ function makePairing(auto: boolean): PairingSummary {
     esphome_version: "2026.6.5",
     enabled: true,
     auto_provision_supported: auto,
+    friendly_name: "",
+    ha_addon: false,
   };
 }
 
@@ -69,5 +71,19 @@ describe("renderRemoteBuilderSubLine version", () => {
       renderRemoteBuilderSubLine(makeHost({ auto: true, localVersion: "2026.8.0-dev" }))
     );
     expect(el.textContent).toContain("builder (2026.6.5)");
+  });
+
+  it("prefers the pairing's friendly name over the auto-derived snapshot label", () => {
+    const host = makeHost({ auto: false });
+    const pairing = {
+      ...makePairing(false),
+      label: "esphome-builder-x",
+      friendly_name: "Nicks-Mac-Studio",
+    };
+    (host as unknown as { _pairings: Map<string, PairingSummary> })._pairings = new Map([
+      [PIN, pairing],
+    ]);
+    const el = renderInto(renderRemoteBuilderSubLine(host));
+    expect(el.textContent).toContain("Nicks-Mac-Studio (2026.6.5)");
   });
 });

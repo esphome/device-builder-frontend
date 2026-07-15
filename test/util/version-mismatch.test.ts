@@ -20,6 +20,8 @@ function pairing(overrides: Partial<PairingSummary>): PairingSummary {
     esphome_version: "2026.5.0",
     enabled: true,
     auto_provision_supported: false,
+    friendly_name: "",
+    ha_addon: false,
     ...overrides,
   };
 }
