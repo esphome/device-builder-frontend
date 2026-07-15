@@ -11,6 +11,8 @@ interface DashboardStacksInputs {
   remoteComputeReady(): boolean;
   /** A sender is approved to build here. */
   hasApprovedSender(): boolean;
+  /** The raw hide_device_builder preference. */
+  hideBuilder(): boolean;
 }
 
 /**
@@ -43,9 +45,21 @@ export class DashboardStacksController implements ReactiveController {
     return this._inputs.remoteComputeReady() || this._inputs.hasApprovedSender();
   }
 
+  /** The Device builder section is gone entirely (Build server only).
+   *  Honoured only with the remote-compute pref on; a live tour
+   *  overrides — its anchors must stay visible. */
+  get builderHidden(): boolean {
+    return (
+      !this._tourEngaged &&
+      this._inputs.hideBuilder() &&
+      this._inputs.remoteComputeReady()
+    );
+  }
+
   get expanded(): DashboardStack {
     // A live tour anchors builder content; never hide it.
     if (this._tourEngaged) return "builder";
+    if (this.builderHidden) return "remote";
     return this._choice ?? (this._inputs.remoteComputeReady() ? "remote" : "builder");
   }
 

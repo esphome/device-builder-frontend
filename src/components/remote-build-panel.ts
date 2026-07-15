@@ -80,6 +80,11 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
    *  the page can join the collapsed bar with the builder header below. */
   @property({ type: Boolean, reflect: true }) collapsed = false;
 
+  /** The Device builder section is hidden (hide_device_builder pref):
+   *  this panel is the whole dashboard, so the accordion banner isn't
+   *  rendered at all. */
+  @property({ type: Boolean, reflect: true }) solo = false;
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;
@@ -178,7 +183,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
     const pending = this._peers?.filter((p) => p.status === "pending") ?? [];
     return html`
       <section class="panel" aria-label=${this._localize("remote_build_dashboard.title")}>
-        ${this._renderBanner(pending.length)}
+        ${this.solo ? nothing : this._renderBanner(pending.length)}
         ${
           this.collapsed
             ? nothing

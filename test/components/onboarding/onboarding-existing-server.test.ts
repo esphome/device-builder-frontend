@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -23,6 +23,7 @@ interface WizardInternals {
     markOnboardingAcknowledged: ReturnType<typeof vi.fn>;
   };
   _onContinue(): Promise<void>;
+  _onToggleRemoteCompute(event: Event): Promise<void>;
 }
 
 const internals = (wizard: ESPHomeOnboardingWizardDialog) =>
@@ -120,6 +121,56 @@ describe("onboarding existing-server orientation", () => {
     expect(state._api.updatePreferences).toHaveBeenCalledWith(
       expect.objectContaining({ remote_compute_only: true })
     );
+  });
+
+  it("scrolls the explainer into view when the switch turns on", async () => {
+    const scrolled: string[] = [];
+    // Not vi.spyOn — happy-dom may not define scrollIntoView at all;
+    // restore the exact prototype shape (delete when it didn't exist).
+    const hadOwn = Object.prototype.hasOwnProperty.call(
+      Element.prototype,
+      "scrollIntoView"
+    );
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this.className);
+    };
+    onTestFinished(() => {
+      if (hadOwn) Element.prototype.scrollIntoView = original;
+      else delete (Element.prototype as Partial<Element>).scrollIntoView;
+    });
+    const wizard = new ESPHomeOnboardingWizardDialog();
+    document.body.appendChild(wizard);
+    const state = internals(wizard);
+    wizard.open();
+    state._isHaAddon = false;
+    state._discoveredHosts = hosts({ name: "living-room" });
+
+    await state._onContinue(); // welcome -> experience
+    await state._onContinue(); // experience -> existing_server
+    await wizard.updateComplete;
+    // The explainer is visible before the switch is touched.
+    expect(wizard.shadowRoot?.querySelector(".remote-feature-box")).not.toBeNull();
+    expect(wizard.shadowRoot?.querySelector(".remote-feature-heading")).not.toBeNull();
+    await state._onToggleRemoteCompute({
+      target: { checked: true },
+    } as unknown as Event);
+    expect(scrolled).toEqual(["remote-feature-box"]);
+
+    // Turning it back off scrolls nothing (the box stays put).
+    await state._onToggleRemoteCompute({
+      target: { checked: false },
+    } as unknown as Event);
+    expect(scrolled).toEqual(["remote-feature-box"]);
+
+    // An on-flip immediately reverted before the render lands scrolls
+    // nothing either.
+    const pending = state._onToggleRemoteCompute({
+      target: { checked: true },
+    } as unknown as Event);
+    state._remoteCompute = false;
+    await pending;
+    expect(scrolled).toEqual(["remote-feature-box"]);
   });
 
   it("names the discovered server, preferring its friendly name", async () => {

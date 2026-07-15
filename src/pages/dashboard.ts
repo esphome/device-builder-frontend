@@ -94,6 +94,7 @@ import {
   devicesContext,
   devicesLoadedContext,
   expertModeContext,
+  hideDeviceBuilderContext,
   importableDevicesContext,
   labelsContext,
   localizeContext,
@@ -214,6 +215,9 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: remoteComputeOnlyContext, subscribe: true })
   @state()
   _remoteComputeOnly = false;
+  @consume({ context: hideDeviceBuilderContext, subscribe: true })
+  @state()
+  _hideDeviceBuilder = false;
 
   // False until preferences load once; the remote stack's expanded-by-
   // default treatment waits for the real preference value.
@@ -230,6 +234,7 @@ export class ESPHomePageDashboard extends LitElement {
     remoteComputeReady: () => this._remoteComputeOnly && this._prefsLoaded,
     hasApprovedSender: () =>
       this._buildServerPeers?.some((p) => p.status === "approved") ?? false,
+    hideBuilder: () => this._hideDeviceBuilder,
   });
 
   // Passed to runBulkUpdate for the NO_COMPATIBLE_PEER toast
@@ -706,7 +711,13 @@ export class ESPHomePageDashboard extends LitElement {
   private _renderStacked(content: () => TemplateResult): TemplateResult {
     return html`
       ${this._stacks.show ? renderRemoteStack(this) : ""}
-      ${this._stacks.show ? renderBuilderStack(this, content) : content()}
+      ${
+        this._stacks.builderHidden
+          ? ""
+          : this._stacks.show
+            ? renderBuilderStack(this, content)
+            : content()
+      }
       ${renderDrawer(this)}
       ${
         this._stacks.show && this._stacks.builderCollapsed

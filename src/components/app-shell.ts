@@ -52,6 +52,7 @@ import {
   recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
+  hideDeviceBuilderContext,
   remoteComputeOnlyContext,
   serverVersionContext,
   versionContext,
@@ -95,6 +96,7 @@ import {
   onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
+  onSetHideDeviceBuilder,
   onSetRemoteComputeOnly,
   onSetTheme,
   onSetVersionHistoryEnabled,
@@ -159,6 +161,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: remoteComputeOnlyContext })
   @state()
   _remoteComputeOnly = false;
+  @provide({ context: hideDeviceBuilderContext })
+  @state()
+  _hideDeviceBuilder = false;
   // Default true until the subscribe snapshot delivers preferences, matching
   // the backend default so the expert toggle paints as on before first load.
   @provide({ context: versionHistoryEnabledContext })
@@ -593,6 +598,8 @@ export class ESPHomeApp extends LitElement {
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
           onSetRemoteComputeOnly(this, e)}
+        @set-hide-device-builder=${(e: CustomEvent<boolean>) =>
+          onSetHideDeviceBuilder(this, e)}
         @set-version-history-enabled=${(e: CustomEvent<boolean>) =>
           onSetVersionHistoryEnabled(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>

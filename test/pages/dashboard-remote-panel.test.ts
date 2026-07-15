@@ -64,6 +64,7 @@ function makePeer(overrides: Partial<PeerSummary> = {}): PeerSummary {
 
 async function mountDashboard(opts: {
   remote?: boolean;
+  hideBuilder?: boolean;
   prefsLoaded?: boolean;
   devices?: ConfiguredDevice[];
   peers?: PeerSummary[] | null;
@@ -72,6 +73,8 @@ async function mountDashboard(opts: {
   // Context-provided fields, seeded directly for a bare mount.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (page as any)._remoteComputeOnly = opts.remote ?? false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (page as any)._hideDeviceBuilder = opts.hideBuilder ?? false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (page as any)._prefsLoaded = opts.prefsLoaded ?? true;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,6 +161,48 @@ describe("dashboard remote-compute stacks", () => {
     await page.updateComplete;
     expect(panel.collapsed).toBe(true);
     expect(builderHeaderIn(page)?.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("hide_device_builder leaves only the expanded panel, no banner", async () => {
+    const page = await mountDashboard({
+      remote: true,
+      hideBuilder: true,
+      devices: [makeConfiguredDevice()],
+    });
+    const panel = panelIn(page)!;
+    expect(panel.collapsed).toBe(false);
+    expect(panel.solo).toBe(true);
+    // No builder section, no grid, no FAB / select bar.
+    expect(builderHeaderIn(page)).toBeNull();
+    expect(gridIn(page)).toBeNull();
+    expect(page.shadowRoot?.querySelector("esphome-fab")).toBeNull();
+    // No accordion banner at all — the panel content is the page.
+    await panel.updateComplete;
+    expect(panel.shadowRoot?.querySelector(".banner")).toBeNull();
+    expect(panel.shadowRoot?.querySelector(".stack-bar-chevron")).toBeNull();
+  });
+
+  it("hide_device_builder is ignored without the remote-compute pref", async () => {
+    const page = await mountDashboard({
+      remote: false,
+      hideBuilder: true,
+      peers: [makePeer()],
+    });
+    expect(builderHeaderIn(page)).not.toBeNull();
+    expect(panelIn(page)!.collapsed).toBe(true);
+  });
+
+  it("a live tour overrides hide_device_builder so its anchors exist", async () => {
+    setTourPending();
+    const page = await mountDashboard({ remote: true, hideBuilder: true });
+    setTourActive(true);
+    await page.updateComplete;
+    expect(builderHeaderIn(page)).not.toBeNull();
+    expect(panelIn(page)!.collapsed).toBe(true);
+    setTourActive(false);
+    await page.updateComplete;
+    expect(builderHeaderIn(page)).toBeNull();
+    expect(panelIn(page)!.collapsed).toBe(false);
   });
 
   it("a paused tour releases the forced builder section", async () => {

@@ -24,6 +24,13 @@ export const onboardingWizardStyles = css`
     overflow-y: auto;
   }
 
+  /* The existing-server step carries the toggle plus the always-visible
+     explainer; give it enough height that the explainer isn't below the
+     fold on desktop (viewport-capped so short screens still fit). */
+  .body:has(.existing-server) {
+    height: min(560px, 72vh);
+  }
+
   .intro {
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-quiet);
@@ -109,6 +116,15 @@ export const onboardingWizardStyles = css`
     background: var(--wa-color-surface-lowered);
     border-radius: var(--wa-border-radius-m);
     text-align: left;
+  }
+
+  .remote-feature-heading {
+    margin: 0 0 var(--wa-space-2xs);
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--wa-color-text-quiet);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .welcome-screen {

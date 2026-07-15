@@ -16,6 +16,7 @@ export {
   experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,
+  hideDeviceBuilderContext,
   importableDevicesContext,
   integrationDocsContext,
   isHaAddonContext,

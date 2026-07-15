@@ -130,6 +130,15 @@ export const remoteComputeOnlyContext = createContext<boolean>(
 );
 
 /**
+ * Context for the raw ``hide_device_builder`` preference. The gating
+ * policy (remote-compute only, tour override) lives in
+ * ``DashboardStacksController.builderHidden``.
+ */
+export const hideDeviceBuilderContext = createContext<boolean>(
+  Symbol("esphome-hide-device-builder")
+);
+
+/**
  * Context for whether Git version-history auto-commit is enabled.
  *
  * Default ``true``. Set from the ``subscribe_events`` ``initial_state``

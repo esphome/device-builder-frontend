@@ -317,23 +317,32 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
             @change=${this._onToggleRemoteCompute}
           ></wa-switch>
         </label>
-        ${
-          this._remoteCompute
-            ? html`
-                <div class="remote-feature-box">
-                  ${renderFeatureList(this._localize, REMOTE_COMPUTE_FEATURES)}
-                </div>
-              `
-            : nothing
-        }
+        <div class="remote-feature-box">
+          <p class="remote-feature-heading">
+            ${this._localize("settings.remote_compute_features_title")}
+          </p>
+          ${renderFeatureList(this._localize, REMOTE_COMPUTE_FEATURES)}
+        </div>
       </div>
     `;
   }
 
-  private _onToggleRemoteCompute(event: Event) {
+  private async _onToggleRemoteCompute(event: Event) {
     this._remoteCompute = (
       event.target as HTMLInputElement & { checked: boolean }
     ).checked;
+    if (!this._remoteCompute) return;
+    // The explainer sits below the toggle, often past the dialog's fold —
+    // bring it into view so flipping the switch visibly does something.
+    await this.updateComplete;
+    // A quick off-flip while the render was pending cancels the scroll.
+    if (!this._remoteCompute) return;
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this.shadowRoot
+      ?.querySelector(".remote-feature-box")
+      ?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
   }
 
   private _renderTourOffer() {
