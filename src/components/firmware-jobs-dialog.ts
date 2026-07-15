@@ -31,6 +31,7 @@ import {
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
+import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { NowTickController } from "../util/now-tick-controller.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -206,11 +207,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   }
 
   private async _cancel(job: FirmwareJob) {
-    try {
-      await this._api.firmwareCancel(job.job_id);
-    } catch {
-      /* job may have finished — follow_jobs will reconcile */
-    }
+    await cancelFirmwareJob(this._api, this._localize, job.job_id);
   }
 
   private _onResetClick = () => {

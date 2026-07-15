@@ -224,7 +224,8 @@ export const remoteBuildPanelStyles = css`
     padding: var(--wa-space-s) var(--wa-space-m) var(--wa-space-m);
   }
 
-  /* Real headers for the card sections, sized with the stack-bar titles. */
+  /* Real headers for the card sections, one size up from the stack-bar
+     titles so they read as headings inside the expanded section. */
   .card-heading {
     display: flex;
     align-items: center;

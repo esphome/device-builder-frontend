@@ -42,6 +42,7 @@ export enum DeviceEventType {
   JOB_FAILED = "job_failed",
   // Remote-build events.
   REMOTE_BUILD_IDENTITY_ROTATED = "remote_build_identity_rotated",
+  REMOTE_BUILD_LISTENER_CHANGED = "remote_build_listener_changed",
   REMOTE_BUILD_PAIR_REQUEST_RECEIVED = "remote_build_pair_request_received",
   REMOTE_BUILD_PAIR_STATUS_CHANGED = "remote_build_pair_status_changed",
   REMOTE_BUILD_PAIRING_WINDOW_CHANGED = "remote_build_pairing_window_changed",

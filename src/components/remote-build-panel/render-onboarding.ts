@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
+import { pairingAddress } from "../../util/pairing-address.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import type { ESPHomeRemoteBuildPanel } from "../remote-build-panel.js";
 import { renderPairingWindowStatus } from "../shared/pairing-window-status.js";
@@ -6,7 +7,7 @@ import { renderPairingWindowStatus } from "../shared/pairing-window-status.js";
 /** Nothing paired yet: walk the operator through the receiver pairing flow. */
 export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult {
   const windowOpen = host._windowState?.open === true;
-  const listenerPort = host._identity.identity?.listener_port;
+  const address = pairingAddress(host._identity.identity);
   return html`
     <div class="intro">${host._localize("remote_build_dashboard.intro_empty")}</div>
     <div class="steps">
@@ -55,11 +56,11 @@ export function renderOnboarding(host: ESPHomeRemoteBuildPanel): TemplateResult 
           ${host._localize("remote_build_dashboard.step_send_request_desc")}
         </div>
         ${
-          listenerPort
+          address
             ? html`
                 <div class="step-action step-address">
                   ${host._localize("remote_build_dashboard.step_send_request_address")}
-                  <code>${window.location.hostname}:${listenerPort}</code>
+                  <code>${address}</code>
                 </div>
               `
             : nothing

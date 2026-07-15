@@ -223,6 +223,8 @@ export const onboardingPendingContext = createContext<boolean>(
  * * 'remote_build_identity_rotated' event lands a new X25519
  *   public-key fingerprint; another tab triggered a rotation
  *   we want to mirror.
+ * * 'remote_build_listener_changed' event lands a new advertised
+ *   pairing address (listener bind / teardown).
  * * The user toggles the "Enable remote build" switch
  *   (``setRemoteBuildSettings``); ``IdentityView.listener_bound``
  *   flips alongside the runner teardown / re-bind so the cached

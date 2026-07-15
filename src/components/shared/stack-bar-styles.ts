@@ -6,8 +6,10 @@ import { css } from "lit";
  *
  * Square edge-to-edge strips (top/bottom borders only) that read as an
  * extension of the app header: the horizontal padding is the header's
- * content gutter, and the leading icon / trailing chevron sit in 32px boxes
- * so their centers line up with the header logo and kebab above.
+ * content gutter, and the leading icon / trailing chevron sit in boxes
+ * sized from the header footprint tokens (logo box / action box) so
+ * their centers line up with the header logo and kebab above at every
+ * breakpoint.
  * ``--stack-gap`` is the one vertical rhythm token between a bar and its
  * section content (both sides, so top and bottom spacing match).
  */

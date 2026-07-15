@@ -26,6 +26,7 @@ import { peerRowStyles } from "../../styles/peer-rows.js";
 import { pinHexStyles } from "../../styles/pin-hex.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
+import { pairingAddress } from "../../util/pairing-address.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
@@ -255,6 +256,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     }
     const identity = this._identityCtrl.identity;
     const formattedPin = formatPinSha256(identity.pin_sha256);
+    const address = pairingAddress(identity);
     return html`
       <div class="build-server-card">
         <div class="build-server-row build-server-row--pin">
@@ -294,6 +296,18 @@ export class ESPHomeSettingsBuildServer extends LitElement {
           </span>
           <code class="build-server-dashboard-id">${identity.dashboard_id}</code>
         </div>
+        ${
+          address
+            ? html`
+                <div class="build-server-row">
+                  <span class="build-server-label">
+                    ${this._localize("settings.remote_build_address_label")}
+                  </span>
+                  <code>${address}</code>
+                </div>
+              `
+            : nothing
+        }
         <div class="build-server-row build-server-versions">
           <span>
             ${this._localize("settings.remote_build_server_version_label")}

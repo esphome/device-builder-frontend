@@ -79,22 +79,27 @@ describe("renderOnboarding", () => {
     expect(el.textContent).not.toContain("remote_build_dashboard.open_pairing_window");
   });
 
-  it("shows this server's pairing address once identity carries the port", () => {
-    const withPort = fakePanel({
-      _identity: {
-        loadFailed: false,
-        identity: {
-          dashboard_id: "dash-0",
-          pin_sha256: "cd".repeat(32),
-          server_version: "1.2.0",
-          esphome_version: "2026.6.1",
-          listener_bound: true,
-          listener_port: 6055,
-        },
-      },
-    });
-    const el = renderInto(renderOnboarding(withPort));
+  it("shows the mDNS-advertised pairing address once identity carries it", () => {
+    const identity = {
+      dashboard_id: "dash-0",
+      pin_sha256: "cd".repeat(32),
+      server_version: "1.2.0",
+      esphome_version: "2026.6.1",
+      listener_bound: true,
+      listener_host: "esphome-builder-abc.local",
+      listener_port: 6055,
+    };
+    const advertised = fakePanel({ _identity: { loadFailed: false, identity } });
+    const el = renderInto(renderOnboarding(advertised));
     expect(el.querySelector(".step-address code")?.textContent).toBe(
+      "esphome-builder-abc.local:6055"
+    );
+    // No advertiser attached: fall back to the browser's hostname.
+    const noAdvertiser = fakePanel({
+      _identity: { loadFailed: false, identity: { ...identity, listener_host: null } },
+    });
+    const fallback = renderInto(renderOnboarding(noAdvertiser));
+    expect(fallback.querySelector(".step-address code")?.textContent).toBe(
       `${window.location.hostname}:6055`
     );
     // Unbound listener / pre-port backend: no address line.

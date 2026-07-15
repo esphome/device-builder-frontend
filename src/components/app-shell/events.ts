@@ -199,7 +199,8 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       host._labels = host._labels.filter((l) => l.id !== label_id);
       break;
     }
-    case DeviceEventType.REMOTE_BUILD_IDENTITY_ROTATED: {
+    case DeviceEventType.REMOTE_BUILD_IDENTITY_ROTATED:
+    case DeviceEventType.REMOTE_BUILD_LISTENER_CHANGED: {
       host._buildServerIdentityRotationCounter += 1;
       break;
     }

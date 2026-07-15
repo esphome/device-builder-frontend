@@ -28,6 +28,7 @@ import {
 import { pairingWindowStyles } from "../styles/pairing-window.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { notify } from "../util/notify.js";
 import { NowTickController } from "../util/now-tick-controller.js";
@@ -313,11 +314,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   }
 
   private async _cancel(job: FirmwareJob) {
-    try {
-      await this._api.firmwareCancel(job.job_id);
-    } catch {
-      /* job may have finished — follow_jobs will reconcile */
-    }
+    await cancelFirmwareJob(this._api, this._localize, job.job_id);
   }
 }
 
