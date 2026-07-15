@@ -3,8 +3,8 @@ import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware
 import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
-import { isPinnableVersion } from "../../util/version-mismatch.js";
 import { formatElapsed } from "../../util/format-job-time.js";
+import { isPinnableVersion } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 import {
   renderOffloadHint,
@@ -44,10 +44,10 @@ export function renderRemoteBuilderSubLine(
   const pin = liveJob?.source_pin_sha256 ?? host._primedSource?.source_pin_sha256 ?? "";
   const buildsLocalVersion =
     receiverVersion !== "" &&
-    receiverVersion !== host._esphomeVersion &&
-    isPinnableVersion(host._esphomeVersion) &&
+    receiverVersion !== host._appVersion &&
+    isPinnableVersion(host._appVersion) &&
     (host._pairings?.get(pin)?.auto_provision_supported ?? false);
-  const version = buildsLocalVersion ? host._esphomeVersion : receiverVersion;
+  const version = buildsLocalVersion ? host._appVersion : receiverVersion;
   const display = version ? `${label} (${version})` : label;
   // Only allow override for in-flight install — switching mid-upload or
   // mid-compile is a power-user shape without a UI today.

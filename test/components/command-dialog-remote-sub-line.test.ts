@@ -47,7 +47,7 @@ function makeHost(opts: { auto: boolean; localVersion?: string }): ESPHomeComman
       source_pin_sha256: PIN,
     },
     _pairings: new Map([[PIN, makePairing(opts.auto)]]),
-    _esphomeVersion: opts.localVersion ?? "2026.7.0b2",
+    _appVersion: opts.localVersion ?? "2026.7.0b2",
     _commandType: "compile",
     _switchingToLocal: false,
   } as unknown as ESPHomeCommandDialog;

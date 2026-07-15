@@ -129,10 +129,6 @@ export class ESPHomeCommandDialog extends LitElement {
   @state()
   _pairings: Map<string, PairingSummary> | null = null;
 
-  @consume({ context: versionContext, subscribe: true })
-  @state()
-  _esphomeVersion = "";
-
   @consume({ context: desktopVersionContext, subscribe: true })
   @state()
   _desktopVersion = "";
