@@ -14,7 +14,11 @@ import { makeFirmwareJob } from "../../_make-firmware-job.js";
 
 type Host = { [key: string]: unknown } & Pick<
   ESPHomeApp,
-  "_remoteBuildEnabled" | "_remoteBuildCleanupTtl" | "_firmwareJobs" | "_activeJobs"
+  | "_remoteBuildEnabled"
+  | "_remoteBuildCleanupTtl"
+  | "_remoteBuildSetInFlight"
+  | "_firmwareJobs"
+  | "_activeJobs"
 >;
 
 function makeHost(): Host {
@@ -62,18 +66,41 @@ describe("handleEvent INITIAL_STATE panel seeds", () => {
   it("keeps the optimistic value while a settings write is in flight", () => {
     const host = makeHost();
     host._remoteBuildEnabled = true;
-    (host as Record<string, unknown>)._remoteBuildSetInFlight = true;
+    host._remoteBuildSetInFlight = true;
     dispatch(host, {
       remote_build_settings: { enabled: false, cleanup_ttl_seconds: 3600 },
     });
     expect(host._remoteBuildEnabled).toBe(true);
   });
 
-  it("leaves the defaults alone when the field is absent (old backend)", () => {
+  it("leaves the defaults alone when the receiver controller is absent", () => {
     const host = makeHost();
     dispatch(host, {});
     expect(host._remoteBuildEnabled).toBe(false);
     expect(host._remoteBuildCleanupTtl).toBeNull();
+  });
+
+  it("keeps a job a follow_jobs frame delivered ahead of the snapshot", () => {
+    const host = makeHost();
+    const raced = makeFirmwareJob({
+      job_id: "j-new",
+      configuration: "c.yaml",
+      job_type: JobType.COMPILE,
+      status: JobStatus.QUEUED,
+    });
+    host._firmwareJobs = new Map([[raced.job_id, raced]]);
+    host._activeJobs = new Map([[raced.configuration, raced]]);
+    const snapshotOnly = makeFirmwareJob({
+      job_id: "j-old",
+      configuration: "d.yaml",
+      job_type: JobType.COMPILE,
+      status: JobStatus.COMPLETED,
+    });
+    dispatch(host, { firmware_jobs: [snapshotOnly] });
+    // The frozen snapshot predates the raced frame; both survive.
+    expect(host._firmwareJobs.get("j-new")?.status).toBe(JobStatus.QUEUED);
+    expect(host._firmwareJobs.has("j-old")).toBe(true);
+    expect(host._activeJobs.get("c.yaml")?.job_id).toBe("j-new");
   });
 
   it("seeds the jobs snapshot in one shot, terminal jobs history-only", () => {

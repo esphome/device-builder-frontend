@@ -317,7 +317,7 @@ export interface IdentityView {
   /**
    * mDNS-advertised pairing address: host is 'null' and addresses
    * '[]' without a registered advertiser, port is 'null' while the
-   * listener is down. All absent from pre-1.1 backends.
+   * listener is down.
    */
   listener_host?: string | null;
   listener_addresses?: string[];
