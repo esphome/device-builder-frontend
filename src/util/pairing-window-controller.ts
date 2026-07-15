@@ -35,6 +35,7 @@ export class PairingWindowController implements ReactiveController {
   private _anchorMs = 0;
   private _tickHandle: ReturnType<typeof setInterval> | null = null;
   private _openedHere = false;
+  private _autoOpenPending = false;
 
   constructor(
     private readonly _host: ReactiveControllerHost,
@@ -44,11 +45,17 @@ export class PairingWindowController implements ReactiveController {
   }
 
   hostConnected(): void {
-    if (this._opts.autoOpen) this.open();
+    if (this._opts.autoOpen) this._autoOpen();
+  }
+
+  hostUpdated(): void {
+    // The api context can land a tick after hostConnected; retry then.
+    if (this._autoOpenPending) this._autoOpen();
   }
 
   hostDisconnected(): void {
     this._stopTick();
+    this._autoOpenPending = false;
     if (this._openedHere) {
       this._openedHere = false;
       void this._opts
@@ -102,6 +109,17 @@ export class PairingWindowController implements ReactiveController {
 
   remainingSeconds(): number | null {
     return remainingOf(this._baselineSeconds, this._anchorMs, Date.now());
+  }
+
+  /** Mount-time open: no user click behind it, so an unresolved api isn't
+   *  a failure — park and retry from :meth:`hostUpdated` instead. */
+  private _autoOpen(): void {
+    if (this._opts.getApi() === undefined) {
+      this._autoOpenPending = true;
+      return;
+    }
+    this._autoOpenPending = false;
+    this.open();
   }
 
   private _startTick(): void {

@@ -78,6 +78,28 @@ describe("PairingWindowController", () => {
     expect(api.setRemoteBuildPairingWindow).not.toHaveBeenCalled();
   });
 
+  it("auto-open parks quietly until the api context lands, then opens", () => {
+    let api: ReturnType<typeof makeApi> | undefined;
+    const onOpenFailed = vi.fn();
+    const host = new FakeHost();
+    const ctrl = new PairingWindowController(host, {
+      getApi: () => api as unknown as ESPHomeAPI | undefined,
+      autoOpen: true,
+      onOpenFailed,
+    });
+    ctrl.hostConnected();
+    expect(onOpenFailed).not.toHaveBeenCalled();
+    ctrl.hostUpdated();
+    expect(onOpenFailed).not.toHaveBeenCalled();
+    api = makeApi();
+    ctrl.hostUpdated();
+    expect(api.setRemoteBuildPairingWindow).toHaveBeenCalledWith({ open: true });
+    ctrl.hostDisconnected();
+    expect(api.setRemoteBuildPairingWindow).toHaveBeenLastCalledWith({
+      open: false,
+    });
+  });
+
   it("a failed auto-open claims nothing, so disconnect closes nothing", async () => {
     const api = makeApi(true);
     const onOpenFailed = vi.fn();
