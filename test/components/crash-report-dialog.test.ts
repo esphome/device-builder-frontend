@@ -108,12 +108,14 @@ describe("crash-report-dialog", () => {
     expect(button!.disabled).toBe(false);
   });
 
-  it("does not claim the tab opened when the popup was blocked", async () => {
+  it("always offers the manual issue link in the delivered state", async () => {
+    // window.open with noopener returns null by spec even on success, so
+    // the delivered state can't infer blocking; the link is always there.
     vi.stubGlobal(
       "open",
       vi.fn((url: string) => {
         openedUrls.push(url);
-        return null; // popup blocker
+        return null;
       })
     );
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
@@ -123,10 +125,9 @@ describe("crash-report-dialog", () => {
 
     (el as any)._openIssue();
     await el.updateComplete;
-    expect((el as any)._popupBlocked).toBe(true);
-    expect(el.shadowRoot!.textContent).toContain("crash_report.popup_blocked_hint");
     const anchor = el.shadowRoot!.querySelector<HTMLAnchorElement>(".actions a");
     expect(anchor!.href).toBe(openedUrls[0]);
+    expect(anchor!.classList.contains("btn--confirm")).toBe(true);
   });
 
   it("degrades to config-unavailable when the validate stream stalls", async () => {
@@ -180,7 +181,6 @@ describe("crash-report-dialog", () => {
     await el.updateComplete;
     expect((el as any)._dialog.open).toBe(true);
     expect((el as any)._delivered).toBe(true);
-    expect((el as any)._popupBlocked).toBe(false);
     const anchor = el.shadowRoot!.querySelector<HTMLAnchorElement>(".actions a");
     expect(anchor!.href).toBe(openedUrls[0]);
 

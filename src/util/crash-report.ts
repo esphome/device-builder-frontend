@@ -414,9 +414,7 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // downloaded report on request. Drop trailing sections until the note
   // fits so prepending it can't push the URL over budget.
   if (missing) {
-    const note =
-      "(Some sections were truncated to fit this pre-filled form; the " +
-      "reporter has the full crash report and can attach it on request.)";
+    const note = "(Truncated to fit; full report available on request.)";
     for (;;) {
       params.set("additional", [note, ...extras].join("\n\n"));
       if (url.toString().length <= MAX_ISSUE_URL_LENGTH || extras.length === 0) break;

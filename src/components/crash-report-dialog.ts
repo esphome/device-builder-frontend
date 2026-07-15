@@ -97,12 +97,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
   @state()
   private _delivered = false;
 
-  // window.open returned null (popup blocker); the delivered state then
-  // leads with the manual "Open GitHub issue" link instead of claiming
-  // a tab opened.
-  @state()
-  private _popupBlocked = false;
-
   // True when the whole report fit the pre-filled URL — no paste needed.
   @state()
   private _prefillComplete = false;
@@ -214,7 +208,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._session += 1;
     this._configYaml = null;
     this._delivered = false;
-    this._popupBlocked = false;
     this._userDescription = "";
     this._reportText = "";
     this._issueUrl = "";
@@ -293,7 +286,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // Download the full report first — the user always keeps a complete
   // copy even if the pre-fill was truncated — then open the issue. The
   // dialog stays open so the download / copy / issue link stay one click
-  // away until the user closes it themselves.
+  // away until the user closes it themselves. window.open with noopener
+  // returns null by spec, so blocking can't be detected here; the manual
+  // "Open GitHub issue" link in the delivered state is the fallback.
   private _openIssue(): void {
     const report = this._buildReport();
     this._reportText = buildFullReport(report);
@@ -301,7 +296,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._issueUrl = url;
     this._prefillComplete = complete;
     this._downloadReport();
-    this._popupBlocked = window.open(url, "_blank", "noopener") === null;
+    window.open(url, "_blank", "noopener");
     this._delivered = true;
   }
 
@@ -329,15 +324,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
   }
 
   private _renderDelivered() {
-    const blocked = this._popupBlocked;
     return html`
       <p class="hint">
         ${this._localize(
-          blocked
-            ? "crash_report.popup_blocked_hint"
-            : this._prefillComplete
-              ? "crash_report.delivered_hint_complete"
-              : "crash_report.delivered_hint"
+          this._prefillComplete
+            ? "crash_report.delivered_hint_complete"
+            : "crash_report.delivered_hint"
         )}
       </p>
       <div class="actions">
