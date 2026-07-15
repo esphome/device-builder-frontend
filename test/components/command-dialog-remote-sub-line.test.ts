@@ -13,7 +13,7 @@ import { JobSource } from "../../src/api/types/firmware-jobs.js";
 import type { PairingSummary } from "../../src/api/types/remote-build.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import { renderRemoteBuilderSubLine } from "../../src/components/command-dialog/renderers.js";
-import { identityLocalize, renderInto } from "../_dom.js";
+import { renderInto } from "../_dom.js";
 
 const PIN = "a".repeat(64);
 
