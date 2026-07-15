@@ -75,7 +75,12 @@ export class PairingWindowController implements ReactiveController {
 
   open(): void {
     const api = this._opts.getApi();
-    if (api === undefined) return;
+    if (api === undefined) {
+      // Shouldn't happen (apiContext resolves before hosts mount), but a
+      // click must never be dropped without feedback.
+      this._opts.onOpenFailed?.();
+      return;
+    }
     this._openedHere = true;
     void api.setRemoteBuildPairingWindow({ open: true }).catch(() => {
       this._openedHere = false;
@@ -85,7 +90,10 @@ export class PairingWindowController implements ReactiveController {
 
   extend(): void {
     const api = this._opts.getApi();
-    if (api === undefined) return;
+    if (api === undefined) {
+      this._opts.onExtendFailed?.();
+      return;
+    }
     void api.setRemoteBuildPairingWindow({ open: true }).catch(() => {
       this._opts.onExtendFailed?.();
     });

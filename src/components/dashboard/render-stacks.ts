@@ -112,6 +112,9 @@ export const dashboardStacksStyles = css`
   :host([stacks][remote-open][view="cards"]) {
     height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
+    /* The height calc already reserves the footer; the base view="cards"
+       padding would double it as dead space under the bottom bar. */
+    padding-bottom: 0;
   }
 
   :host([stacks]) esphome-remote-build-panel:not([collapsed]) {
