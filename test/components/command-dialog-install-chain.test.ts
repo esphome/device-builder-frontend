@@ -107,6 +107,7 @@ describe("command-dialog install chain follow", () => {
       source: JobSource.REMOTE,
       source_label: "builder",
       source_esphome_version: "",
+      source_pin_sha256: "",
     };
 
     host._jobId = "c1";
