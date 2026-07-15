@@ -126,13 +126,18 @@ describe("onboarding existing-server orientation", () => {
   it("scrolls the explainer into view when the switch turns on", async () => {
     const scrolled: string[] = [];
     // Not vi.spyOn — happy-dom may not define scrollIntoView at all;
-    // save/restore keeps the prototype clean for later tests either way.
+    // restore the exact prototype shape (delete when it didn't exist).
+    const hadOwn = Object.prototype.hasOwnProperty.call(
+      Element.prototype,
+      "scrollIntoView"
+    );
     const original = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (this: Element) {
       scrolled.push(this.className);
     };
     onTestFinished(() => {
-      Element.prototype.scrollIntoView = original;
+      if (hadOwn) Element.prototype.scrollIntoView = original;
+      else delete (Element.prototype as Partial<Element>).scrollIntoView;
     });
     const wizard = new ESPHomeOnboardingWizardDialog();
     document.body.appendChild(wizard);
@@ -156,6 +161,15 @@ describe("onboarding existing-server orientation", () => {
     await state._onToggleRemoteCompute({
       target: { checked: false },
     } as unknown as Event);
+    expect(scrolled).toEqual(["remote-feature-box"]);
+
+    // An on-flip immediately reverted before the render lands scrolls
+    // nothing either.
+    const pending = state._onToggleRemoteCompute({
+      target: { checked: true },
+    } as unknown as Event);
+    state._remoteCompute = false;
+    await pending;
     expect(scrolled).toEqual(["remote-feature-box"]);
   });
 

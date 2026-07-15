@@ -335,6 +335,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     // The explainer sits below the toggle, often past the dialog's fold —
     // bring it into view so flipping the switch visibly does something.
     await this.updateComplete;
+    // A quick off-flip while the render was pending cancels the scroll.
+    if (!this._remoteCompute) return;
     const reduceMotion =
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
