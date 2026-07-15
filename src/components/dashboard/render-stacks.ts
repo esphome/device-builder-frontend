@@ -89,9 +89,9 @@ export const dashboardStacksStyles = css`
   }
 
   /* Visuals live in the shared stack-bar fragment; here only the
-     section rhythm (one --stack-gap on both sides of a bar) and the
-     joined-unit overlap. */
-  .builder-stack-header {
+     section rhythm (one --stack-gap below the bar while its content is
+     open — a collapsed bar sits flush) and the joined-unit overlap. */
+  .builder-stack-header[aria-expanded="true"] {
     margin-bottom: var(--stack-gap);
   }
 
