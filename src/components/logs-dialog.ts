@@ -124,8 +124,10 @@ export class ESPHomeLogsDialog extends LitElement {
   @state()
   private _crashDetected = false;
 
+  // Rendered unconditionally in this dialog's template, so the query is
+  // always resolved by the time the callout button can be clicked.
   @query("esphome-crash-report-dialog")
-  private _crashReportDialog?: ESPHomeCrashReportDialog;
+  private _crashReportDialog!: ESPHomeCrashReportDialog;
 
   // rAF batch buffer: coalesce per-line appends into one render per frame
   // instead of one per line (mirrors command-dialog, #348). A fast serial
@@ -352,9 +354,11 @@ export class ESPHomeLogsDialog extends LitElement {
           }
           ${
             this._crashDetected
-              ? html`<div class="crash-callout" role="status" slot="suggestion">
+              ? html`<div class="crash-callout" slot="suggestion">
                   <wa-icon library="mdi" name="alert-circle"></wa-icon>
-                  <span class="crash-callout-text"
+                  <!-- Live region on the text only: announcing the whole row
+                       would read the button as part of a status message. -->
+                  <span class="crash-callout-text" role="status"
                     >${this._localize("crash_report.banner")}</span
                   >
                   <button
@@ -439,7 +443,7 @@ export class ESPHomeLogsDialog extends LitElement {
   // underneath; the stream keeps running.
   private _openCrashReport = () => {
     this._flushPendingLines();
-    this._crashReportDialog?.open(this.configuration, this.name, [...this._lines]);
+    this._crashReportDialog.open(this.configuration, this.name, [...this._lines]);
   };
 
   // Start button (only shown while not streaming; the leading guard also

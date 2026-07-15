@@ -308,6 +308,8 @@ export function buildIssueUrl(
   return url.toString();
 }
 
+const TRIM_MARKER = "[log excerpt trimmed; full logs in the attached report]";
+
 /**
  * Join as much of *lines* as fits *budget* once URL-encoded: the block
  * from *anchor* to the end first (truncating its tail if even that
@@ -317,7 +319,9 @@ function fitLines(lines: string[], anchor: number, budget: number): string {
   if (lines.length === 0 || budget <= 0) return "";
   const cost = (line: string): number => encodeURIComponent(`${line}\n`).length;
   const kept: string[] = [];
-  let spent = 0;
+  // Reserve the marker's cost up front so appending it on truncation
+  // can't push the result past the budget.
+  let spent = cost(TRIM_MARKER);
   let truncated = false;
   for (let i = anchor; i < lines.length; i++) {
     const lineCost = cost(lines[i]);
@@ -338,6 +342,6 @@ function fitLines(lines: string[], anchor: number, budget: number): string {
     spent += lineCost;
   }
   if (kept.length === 0) return "";
-  if (truncated) kept.push("[log excerpt trimmed; full logs in the attached report]");
+  if (truncated) kept.push(TRIM_MARKER);
   return kept.join("\n");
 }
