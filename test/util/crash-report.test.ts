@@ -178,6 +178,13 @@ describe("buildFullReport", () => {
     expect(text).toContain("could not be validated");
     expect(text).not.toContain("```yaml");
   });
+
+  it("widens the code fence when content contains a backtick run", () => {
+    // A config with a ``` run must not close the fence early.
+    const text = buildFullReport(report({ configYaml: "note: |\n  ``` not a fence" }));
+    expect(text).toContain("````yaml");
+    expect(text).toContain("note: |\n  ``` not a fence");
+  });
 });
 
 describe("buildIssueUrl", () => {

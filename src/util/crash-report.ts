@@ -241,8 +241,15 @@ export function inferComponentName(decodedFrames: string[]): string {
   return "";
 }
 
-const fence = (lines: string[], language = "text"): string =>
-  `\`\`\`${language}\n${lines.join("\n")}\n\`\`\``;
+// Wrap *lines* in a code fence longer than any backtick run they contain,
+// so user-controlled content (YAML strings, logs, descriptions) with a
+// ``` sequence can't close the fence early and corrupt the markdown.
+const fence = (lines: string[], language = "text"): string => {
+  const body = lines.join("\n");
+  const longestRun = Math.max(0, ...[...body.matchAll(/`+/g)].map((m) => m[0].length));
+  const bar = "`".repeat(Math.max(3, longestRun + 1));
+  return `${bar}${language}\n${body}\n${bar}`;
+};
 
 /**
  * The complete report, ordered decoded-backtrace-first per the issue
