@@ -122,8 +122,8 @@ describe("decodeCrashBacktrace", () => {
     try {
       expect(await decodeCrashBacktrace(api, "kitchen.yaml", SERIAL)).toBeNull();
     } finally {
-      // Nothing restores spies between files here, so an escaped one would
-      // swallow warnings in whatever runs next on this worker.
+      // No restoreMocks in the vitest config, so a spy outlives its test and
+      // silently swallows warnings in the ones after it.
       warn.mockRestore();
     }
   });
