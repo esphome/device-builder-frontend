@@ -66,18 +66,16 @@ export function seedJobs(host: ESPHomeApp, jobs: FirmwareJob[]): void {
   }
   host._firmwareJobs = all;
   host._activeJobs = active;
-  for (const id of all.keys()) evictLocallyOwnedRow(host, id);
+  // Cold-load eviction of locally-owned wire rows happens in the
+  // initial_state handler's remote_jobs merge, which runs after this.
 }
 
 // Drop a wire row for a job the firmware-job UI owns (a server-pinned install
 // or pool-routed compile echoes wire events under its FirmwareJob id). Called
-// wherever ownership is established so a row stubbed by a pre-ownership wire
+// where ownership is established so a row stubbed by a pre-ownership wire
 // event can't linger waiting for a follow-up event that may never arrive.
-export function evictLocallyOwnedRow(host: ESPHomeApp, job_id: string): void {
-  if (!host._buildOffloadJobs?.has(job_id)) return;
-  const next = new Map(host._buildOffloadJobs);
-  next.delete(job_id);
-  host._buildOffloadJobs = next;
+function evictLocallyOwnedRow(host: ESPHomeApp, job_id: string): void {
+  host.dismissRemoteBuildJob(job_id);
 }
 
 export function handleJobEvent(host: ESPHomeApp, event: string, data: unknown): void {

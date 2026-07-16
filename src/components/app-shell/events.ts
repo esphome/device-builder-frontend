@@ -39,7 +39,7 @@ import {
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { applyPreferences } from "./data-load.js";
-import { evictLocallyOwnedRow, seedJobs } from "./jobs.js";
+import { seedJobs } from "./jobs.js";
 
 // Merge a partial diff into the matching offloader pairing row keyed by pin_sha256.
 // _buildOffloadPairings === null = snapshot not seeded; missing row = event raced
@@ -423,16 +423,10 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
     case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {
       const evt = data as OffloaderJobStateChangedEventData;
-      // A job_id that exists locally is a REMOTE-source FirmwareJob (a
-      // server-pinned install or a pool-routed compile) whose lifecycle the
-      // firmware-job UI owns; a wire row here would be a blank ghost that
-      // flips "completed" while the local half still runs. Evict any row a
-      // pre-ownership event stubbed — later events are filtered too, so it
-      // would otherwise linger forever.
-      if (host._firmwareJobs.has(evt.job_id)) {
-        evictLocallyOwnedRow(host, evt.job_id);
-        break;
-      }
+      // A job_id that exists locally is a REMOTE-source FirmwareJob whose
+      // lifecycle the firmware-job UI owns; pre-ownership rows are evicted
+      // at ownership establishment (jobs.ts's evictLocallyOwnedRow).
+      if (host._firmwareJobs.has(evt.job_id)) break;
       const base =
         host._buildOffloadJobs.get(evt.job_id) ??
         stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
@@ -445,10 +439,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
     case DeviceEventType.OFFLOADER_JOB_OUTPUT: {
       const evt = data as OffloaderJobOutputEventData;
-      if (host._firmwareJobs.has(evt.job_id)) {
-        evictLocallyOwnedRow(host, evt.job_id);
-        break;
-      }
+      if (host._firmwareJobs.has(evt.job_id)) break;
       const base =
         host._buildOffloadJobs.get(evt.job_id) ??
         stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);

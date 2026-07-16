@@ -12,6 +12,7 @@ function makeHost(): ESPHomeApp {
     _activeJobs: new Map(),
     _recentJobs: new Map(),
     _recentJobTimers: new Map(),
+    dismissRemoteBuildJob: () => {},
   } as unknown as ESPHomeApp;
 }
 

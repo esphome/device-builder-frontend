@@ -83,12 +83,9 @@ const FRESH_ROW_STATE: JobRowUIState = {
  * without the dispatch the list view would fall back to empty
  * placeholders.
  *
- * "Compile and upload" is the exception: the backend queues a
- * server-pinned INSTALL FirmwareJob (remote compile, local OTA
- * flash), so the dialog dispatches remote-build-install-submitted
- * and closes — app-shell attaches the firmware-job command dialog,
- * which tracks the whole lifecycle where this list would stop at
- * the receiver's compile.
+ * "Compile and upload" is the exception: it dispatches
+ * remote-build-install-submitted and closes — the firmware-job
+ * UI owns that lifecycle.
  */
 @customElement("esphome-remote-build-job-dialog")
 export class ESPHomeRemoteBuildJobDialog extends LitElement {

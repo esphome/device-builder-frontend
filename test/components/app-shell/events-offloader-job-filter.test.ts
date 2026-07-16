@@ -35,15 +35,27 @@ function output(job_id: string): OffloaderJobOutputEventData {
 
 // The filter only reads _firmwareJobs keys, so the host models entries as
 // bare { job_id } stubs instead of full FirmwareJob rows.
-type Host = Pick<ESPHomeApp, "_buildOffloadJobs"> & {
+type Host = Pick<
+  ESPHomeApp,
+  "_buildOffloadJobs" | "_activeJobs" | "dismissRemoteBuildJob"
+> & {
   _firmwareJobs: Map<string, { job_id: string }>;
 };
 
 function makeHost(firmwareJobIds: string[] = []): Host {
-  return {
+  const host: Host = {
     _buildOffloadJobs: new Map(),
+    _activeJobs: new Map(),
     _firmwareJobs: new Map(firmwareJobIds.map((id) => [id, { job_id: id }])),
+    // Eviction at ownership establishment routes through this host seam;
+    // mirror the real method's row removal.
+    dismissRemoteBuildJob: (job_id: string) => {
+      const next = new Map(host._buildOffloadJobs);
+      next.delete(job_id);
+      host._buildOffloadJobs = next;
+    },
   };
+  return host;
 }
 
 describe("offloader job events skip locally-owned FirmwareJobs", () => {
