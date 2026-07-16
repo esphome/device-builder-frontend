@@ -89,7 +89,7 @@ registerMdiIcons({
 });
 
 export type CommandType =
-  "install" | "compile" | "validate" | "clean" | "reset" | "rename";
+  "install" | "compile" | "offline_compile" | "validate" | "clean" | "reset" | "rename";
 
 export type CommandState = "running" | "success" | "error";
 

@@ -24,6 +24,9 @@ export function deriveFollowCommandType(
   jobs: Map<string, FirmwareJob>,
   job: FirmwareJob
 ): CommandType {
+  if (job.is_deferred_install) {
+    return "offline_compile";
+  }
   if (job.job_type === JobType.COMPILE && !isTerminalJobStatus(job.status)) {
     const dependent = [...jobs.values()].find((j) => j.depends_on === job.job_id);
     if (dependent?.job_type === JobType.RENAME) return "rename";

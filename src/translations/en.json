@@ -385,6 +385,7 @@
   "command": {
     "install_title": "Install — {name}",
     "compile_title": "Compile — {name}",
+    "offline_compile_title": "Offline compile — {name}",
     "validate_title": "Validate — {name}",
     "clean_title": "Clean — {name}",
     "reset_title": "Reset build environment",
