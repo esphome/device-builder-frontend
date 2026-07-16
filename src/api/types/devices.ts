@@ -331,6 +331,11 @@ export interface DecodeBacktraceResponse {
   stale_build: boolean;
   /** Why nothing was decoded: "no_backtrace" | "no_build" |
    *  "unsupported_platform" | "decode_failed" | "helper_failed"; "" on
-   *  success. */
+   *  success.
+   *
+   *  Deliberately unread: the report states that the backtrace was not
+   *  decoded without naming a cause, because most of these are indistinguishable
+   *  to a reader and a caught timeout reaches the same branch anyway. Declared
+   *  so the wire contract is documented where the response is typed. */
   unavailable_reason: string;
 }
