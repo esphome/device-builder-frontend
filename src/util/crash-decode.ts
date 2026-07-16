@@ -18,8 +18,6 @@ export interface CrashDecode {
   /** The local build no longer matches the running firmware, so the frames
    *  are confident but wrong. */
   staleBuild: boolean;
-  /** Backend's reason for decoding nothing; "" when it decoded. */
-  unavailableReason: string;
 }
 
 /**
@@ -58,11 +56,7 @@ export async function decodeCrashBacktrace(
     // same scraper that reads the inline path reads this one.
     const frames = extractDecodedFrames(result.decoded.map((line) => line.text));
     if (frames.length === 0) return null;
-    return {
-      frames,
-      staleBuild: result.stale_build,
-      unavailableReason: result.unavailable_reason,
-    };
+    return { frames, staleBuild: result.stale_build };
   } catch (err) {
     console.warn("Backtrace decoding failed", err);
     return null;

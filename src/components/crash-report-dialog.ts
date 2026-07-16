@@ -109,11 +109,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
   @state()
   private _prefillComplete = false;
 
-  // Set when the decode ran against a build that no longer matches the
-  // running firmware, so the frames name the wrong lines.
-  @state()
-  private _staleBuild = false;
-
   private _configuration = "";
   private _name = "";
   // The rendered report backing the delivered-state re-copy / download.
@@ -126,6 +121,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // Handle for the validate-stall timeout, cleared alongside the stream so
   // a dialog closed/reopened mid-validate doesn't leave the timer to fire.
   private _validateTimer = 0;
+  // Set when the decode ran against a build that no longer matches the
+  // running firmware, so the frames name the wrong lines. Read only when
+  // the report is built on click, so it drives no render.
+  private _staleBuild = false;
 
   static styles = [
     espHomeStyles,
