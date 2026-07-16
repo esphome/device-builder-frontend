@@ -3,9 +3,10 @@
  *
  * MAC address and deployed config hash show "Waiting for mDNS discovery" while a
  * native-API device hasn't announced (#1453), but "This device does not have
- * Native API" for a no-api device whose MAC / config hash can never arrive; the
+ * Native API" for a no-api device, whose MAC / config hash arrive only on
+ * ESPHome 2026.7.0+ (_http._tcp identity TXT) and never on older firmware; the
  * ethernet / bluetooth waiting rows hide entirely for such devices. The deployed
- * version row is exempt: it can still arrive over the _http._tcp fallback.
+ * version row is exempt: it can arrive over the _http._tcp fallback on any firmware.
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
