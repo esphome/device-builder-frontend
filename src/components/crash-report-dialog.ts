@@ -513,7 +513,17 @@ export class ESPHomeCrashReportDialog extends LitElement {
           this._configYaml === null || this._decoding
             ? html`<div class="collecting">
                 <wa-spinner></wa-spinner>
-                <span>${this._localize("crash_report.collecting")}</span>
+                <span>
+                  ${this._localize(
+                    // Once config is captured the remaining wait is the
+                    // decode, which can run to a minute; a spinner still
+                    // claiming to validate the config reads as a hang, and a
+                    // user who closes the dialog abandons the decode.
+                    this._configYaml === null
+                      ? "crash_report.collecting"
+                      : "crash_report.decoding"
+                  )}
+                </span>
               </div>`
             : this._delivered
               ? this._renderDelivered()

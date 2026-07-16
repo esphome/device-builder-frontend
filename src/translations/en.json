@@ -1675,6 +1675,7 @@
     "report_button": "Report this crash",
     "title": "Report crash - {name}",
     "collecting": "Collecting crash details and validating the configuration...",
+    "decoding": "Decoding the backtrace...",
     "includes_backtrace_decoded": "Decoded backtrace captured",
     "includes_backtrace_raw": "Backtrace captured, but it was not decoded in this session",
     "crash_scrolled_out": "The crash output scrolled out of the log buffer",

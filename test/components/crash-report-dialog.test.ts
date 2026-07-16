@@ -153,8 +153,10 @@ describe("crash-report-dialog", () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES_UNDECODED);
     finishValidate();
     await el.updateComplete;
-    // Config is captured, but the decode is still in flight.
+    // Config is captured, but the decode is still in flight, and the spinner
+    // names the decode rather than the config round-trip it already finished.
     expect(el.shadowRoot!.querySelector(".collecting")).not.toBeNull();
+    expect(el.shadowRoot!.textContent).toContain("crash_report.decoding");
 
     resolveDecode({
       decoded: [{ index: 3, text: "Decoded 0x400d9150: setup() at application.cpp:59" }],
