@@ -62,9 +62,9 @@ describe("renderJob type label", () => {
       is_deferred_install: true,
     });
     const el = renderInto(renderGroups(groupsHost() as never, [job], []));
-    
+
     expect(el.textContent).toContain("firmware_jobs.type_offline_compile");
-    
+
     expect(el.textContent).not.toContain("firmware_jobs.type_compile");
     expect(el.textContent).not.toContain("firmware_jobs.type_install");
   });
