@@ -215,9 +215,9 @@ export interface PairingSummary {
   ha_addon: boolean;
   /**
    * Receiver capability from the session handshake: it accepts the
-   * remote `reset_build_env` frame, so the UI may offer wiping this
-   * dashboard's isolated build environment on the server. False
-   * from old receivers.
+   * remote `reset_build_env` frame, so the UI may offer resetting the
+   * server's entire build environment (shared toolchain, every cached
+   * ESPHome version, all build trees). False from old receivers.
    */
   reset_build_env_supported: boolean;
 }
