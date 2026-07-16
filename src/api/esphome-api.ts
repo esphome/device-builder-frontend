@@ -2175,8 +2175,8 @@ export class ESPHomeAPI {
    * - INVALID_ARGS: pin / target / configuration shape
    *   error, or bundle build failed (the receiver's
    *   validator diagnostic is in the message verbatim).
-   * - NOT_FOUND: no pairing for this pin, or the YAML is
-   *   missing from config_dir.
+   * - NOT_FOUND: no pairing for this pin, or (COMPILE only)
+   *   the YAML is missing from config_dir.
    * - PRECONDITION_FAILED: pairing isn't APPROVED, or the
    *   peer-link session isn't currently live (orphaned,
    *   unreachable, mid-reconnect).
@@ -2190,8 +2190,7 @@ export class ESPHomeAPI {
    * The returned job_id is target-dependent: COMPILE gets the
    * offloader-local wire id tracked via
    * ``buildOffloadJobsContext``; UPLOAD gets a local
-   * ``FirmwareJob`` id tracked via ``firmwareJobsContext``,
-   * and the missing-YAML NOT_FOUND above doesn't apply.
+   * ``FirmwareJob`` id tracked via ``firmwareJobsContext``.
    *
    * Phase 5c-3 backend, 5c-4 frontend.
    */

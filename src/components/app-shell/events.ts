@@ -57,6 +57,16 @@ export function patchOffloadPairing(
   host._buildOffloadPairings = next;
 }
 
+// Drop a wire row for a job the firmware-job UI owns. A row can predate
+// ownership (an event raced the firmware job's seeding); the ownership
+// filter would otherwise strand it forever.
+function evictLocallyOwnedRow(host: ESPHomeApp, job_id: string): void {
+  if (!host._buildOffloadJobs.has(job_id)) return;
+  const next = new Map(host._buildOffloadJobs);
+  next.delete(job_id);
+  host._buildOffloadJobs = next;
+}
+
 export function handleEvent(host: ESPHomeApp, event: string, data: unknown): void {
   switch (event) {
     case DeviceEventType.INITIAL_STATE: {
@@ -426,8 +436,13 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       // A job_id that exists locally is a REMOTE-source FirmwareJob (a
       // server-pinned install or a pool-routed compile) whose lifecycle the
       // firmware-job UI owns; a wire row here would be a blank ghost that
-      // flips "completed" while the local half still runs.
-      if (host._firmwareJobs.has(evt.job_id)) break;
+      // flips "completed" while the local half still runs. Evict any row a
+      // pre-ownership event stubbed — later events are filtered too, so it
+      // would otherwise linger forever.
+      if (host._firmwareJobs.has(evt.job_id)) {
+        evictLocallyOwnedRow(host, evt.job_id);
+        break;
+      }
       const base =
         host._buildOffloadJobs.get(evt.job_id) ??
         stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
@@ -440,7 +455,10 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
     case DeviceEventType.OFFLOADER_JOB_OUTPUT: {
       const evt = data as OffloaderJobOutputEventData;
-      if (host._firmwareJobs.has(evt.job_id)) break;
+      if (host._firmwareJobs.has(evt.job_id)) {
+        evictLocallyOwnedRow(host, evt.job_id);
+        break;
+      }
       const base =
         host._buildOffloadJobs.get(evt.job_id) ??
         stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
