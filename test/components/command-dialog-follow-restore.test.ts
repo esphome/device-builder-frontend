@@ -259,6 +259,21 @@ describe("command-dialog compile detail (total never shorter than compile)", () 
     );
   });
 
+  it("degrades to unknown for a stampless-end INSTALL (completion includes flash)", () => {
+    const job = makeFirmwareJob({
+      job_id: "d5",
+      job_type: JobType.INSTALL,
+      started_at: "2026-01-01T00:00:00Z",
+      completed_at: "2026-01-01T00:12:00Z",
+      compile_started_at: "2026-01-01T00:01:54Z",
+      compile_ended_at: null,
+    });
+    const el = mount([job]);
+    el._timerJobId = "d5";
+    el._timer.now = Date.parse("2026-01-01T00:00:30Z");
+    expect(el._timer.compileDetailMs).toBeNull();
+  });
+
   it("is null for an old finished job with no backend stamps (not shown)", () => {
     const job = makeFirmwareJob({
       job_id: "d3",
