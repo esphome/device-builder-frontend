@@ -253,7 +253,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   }
 
   _openJob(job: FirmwareJob) {
-    this._commandDialog.followJob(job, this._jobDisplayName(job));
+    this.followJob(job);
   }
 
   _onCancelClick(e: Event, job: FirmwareJob) {

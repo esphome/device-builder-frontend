@@ -108,9 +108,8 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       // remote_jobs: backend snapshot is authoritative for which jobs exist,
       // but merge onto local entries so a reconnect doesn't wipe display fields
       // (configuration / target / receiver_label) that submit_job seeded.
-      // Runs after seedJobs so the local-FirmwareJob filter sees a fresh map
-      // on a cold load: an id that exists locally is a REMOTE-source
-      // FirmwareJob the firmware-job UI owns, not a wire row.
+      // Runs after seedJobs so the local-FirmwareJob filter (see
+      // OFFLOADER_JOB_STATE_CHANGED) sees a fresh map on a cold load.
       if (remote_jobs !== undefined) {
         const seeded = new Map<string, RemoteBuildJobState>();
         for (const entry of remote_jobs) {
