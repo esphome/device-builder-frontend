@@ -1,9 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the version-prefill routing: Device Builder rows carry the server
+ * Pins the version-prefill routing (Device Builder rows carry the server
  * version, the ESPHome row carries the installed core version, and rows
- * without a source (or version) are left untouched.
+ * without a source or version are left untouched) and the write-in-English
+ * note that only the "Report a new issue" drill screen shows.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -74,21 +75,29 @@ describe("feedback-dialog version prefill", () => {
 
 describe("feedback-dialog write-in-English note", () => {
   const NOTE = "feedback.write_in_english";
-  const setScreen = (el: ESPHomeFeedbackDialog, screen: string) => {
-    (el as unknown as { _screen: string })._screen = screen;
-  };
 
   it("shows the note on the new-issue screen only", async () => {
     const el = await mount(new ESPHomeFeedbackDialog());
     el.open();
     await el.updateComplete;
+    const drill = (screen: string) =>
+      el.shadowRoot!.querySelector<HTMLButtonElement>(
+        `button.link[data-drill="${screen}"]`
+      );
+    const back = () => el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button");
+
+    // Main screen: no note.
     expect(el.shadowRoot!.textContent).not.toContain(NOTE);
 
-    setScreen(el, "bug");
+    // Drill into "Report a new issue" the way a user does: the note is there.
+    drill("bug")!.click();
     await el.updateComplete;
     expect(el.shadowRoot!.textContent).toContain(NOTE);
 
-    setScreen(el, "browse");
+    // Back out and into the read-only browse screen: no note.
+    back()!.click();
+    await el.updateComplete;
+    drill("browse")!.click();
     await el.updateComplete;
     expect(el.shadowRoot!.textContent).not.toContain(NOTE);
   });

@@ -410,11 +410,14 @@ export class ESPHomeCrashReportDialog extends LitElement {
         id="crash-description"
         class="describe-input"
         rows="3"
+        aria-describedby="crash-description-note"
         placeholder=${this._localize("crash_report.describe_placeholder")}
         .value=${this._userDescription}
         @input=${this._onDescriptionInput}
       ></textarea>
-      <p class="describe-note">${this._localize("crash_report.describe_english")}</p>
+      <p id="crash-description-note" class="describe-note">
+        ${this._localize("crash_report.describe_english")}
+      </p>
       <ul class="summary">
         ${this._renderSummaryRow(
           this._localize(
