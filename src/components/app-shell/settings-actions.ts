@@ -323,6 +323,23 @@ export function onRemoteBuildJobDismissed(
   host.dismissRemoteBuildJob(e.detail.job_id);
 }
 
+// "Compile and upload" queued a server-pinned INSTALL FirmwareJob; attach
+// the firmware-jobs dialog's command dialog so the user watches the whole
+// lifecycle (remote compile + local flash), with a working Stop.
+export function onRemoteBuildInstallSubmitted(
+  host: ESPHomeApp,
+  e: CustomEvent<{ job_id: string }>
+): void {
+  const job = host._firmwareJobs.get(e.detail.job_id);
+  if (job === undefined) {
+    // The job_queued push precedes the submit response on the same WS, so
+    // a miss is theoretical; the jobs list is the graceful landing spot.
+    host._firmwareJobsDialog?.open();
+    return;
+  }
+  host._firmwareJobsDialog?.followJob(job);
+}
+
 export async function onSetLanguage(
   host: ESPHomeApp,
   e: CustomEvent<SupportedLocale | "system">

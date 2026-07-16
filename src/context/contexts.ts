@@ -442,7 +442,11 @@ export const buildOffloadAlertsContext = createContext<Map<
  * The receiver runs the build; the offloader doesn't own a
  * FirmwareJob row for these. App-shell maintains a Map keyed
  * on job_id, upserting on OFFLOADER_JOB_STATE_CHANGED and
- * appending output on OFFLOADER_JOB_OUTPUT.
+ * appending output on OFFLOADER_JOB_OUTPUT. Compile-only
+ * dispatches land here; "Compile and upload" queues a local
+ * server-pinned INSTALL FirmwareJob instead, so events whose
+ * job_id exists in firmwareJobsContext are filtered out —
+ * that job's owner is the firmware-job UI.
  *
  * Display fields (configuration, target, receiver_label) come
  * from the submit_job call site rather than the wire frame

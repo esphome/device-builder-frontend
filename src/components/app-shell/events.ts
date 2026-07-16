@@ -97,12 +97,24 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
       }
       host._buildOffloadAlerts = seededMap(offloader_alerts, (a) => a.pin_sha256);
+      // Receiver settings scalars: same skip-while-write guard the
+      // loadRemoteBuildSettings refresh uses, so a reconnect snapshot
+      // can't revert an optimistic toggle mid-write.
+      if (remote_build_settings !== undefined && !host._remoteBuildSetInFlight) {
+        host._remoteBuildEnabled = remote_build_settings.enabled;
+        host._remoteBuildCleanupTtl = remote_build_settings.cleanup_ttl_seconds;
+      }
+      if (firmware_jobs !== undefined) seedJobs(host, firmware_jobs);
       // remote_jobs: backend snapshot is authoritative for which jobs exist,
       // but merge onto local entries so a reconnect doesn't wipe display fields
       // (configuration / target / receiver_label) that submit_job seeded.
+      // Runs after seedJobs so the local-FirmwareJob filter sees a fresh map
+      // on a cold load: an id that exists locally is a REMOTE-source
+      // FirmwareJob the firmware-job UI owns, not a wire row.
       if (remote_jobs !== undefined) {
         const seeded = new Map<string, RemoteBuildJobState>();
         for (const entry of remote_jobs) {
+          if (host._firmwareJobs.has(entry.job_id)) continue;
           const existing = host._buildOffloadJobs.get(entry.job_id);
           const base =
             existing ?? stubRemoteBuildJobState(entry.job_id, entry.pin_sha256);
@@ -115,14 +127,6 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         }
         host._buildOffloadJobs = seeded;
       }
-      // Receiver settings scalars: same skip-while-write guard the
-      // loadRemoteBuildSettings refresh uses, so a reconnect snapshot
-      // can't revert an optimistic toggle mid-write.
-      if (remote_build_settings !== undefined && !host._remoteBuildSetInFlight) {
-        host._remoteBuildEnabled = remote_build_settings.enabled;
-        host._remoteBuildCleanupTtl = remote_build_settings.cleanup_ttl_seconds;
-      }
-      if (firmware_jobs !== undefined) seedJobs(host, firmware_jobs);
       // Skip re-applying offloader settings while a toggle write is in flight,
       // so a reconnect's snapshot can't revert the optimistic value mid-write.
       if (host._offloaderWritesInFlight === 0) {
@@ -420,6 +424,11 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
     case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {
       const evt = data as OffloaderJobStateChangedEventData;
+      // A job_id that exists locally is a REMOTE-source FirmwareJob (a
+      // server-pinned install or a pool-routed compile) whose lifecycle the
+      // firmware-job UI owns; a wire row here would be a blank ghost that
+      // flips "completed" while the local half still runs.
+      if (host._firmwareJobs.has(evt.job_id)) break;
       const base =
         host._buildOffloadJobs.get(evt.job_id) ??
         stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
@@ -432,6 +441,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
     case DeviceEventType.OFFLOADER_JOB_OUTPUT: {
       const evt = data as OffloaderJobOutputEventData;
+      if (host._firmwareJobs.has(evt.job_id)) break;
       const base =
         host._buildOffloadJobs.get(evt.job_id) ??
         stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);

@@ -86,6 +86,7 @@ import { createRouter } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
+  onRemoteBuildInstallSubmitted,
   onRemoteBuildJobDismissed,
   onRemoteBuildJobSubmitted,
   onSetExpertMode,
@@ -247,8 +248,9 @@ export class ESPHomeApp extends LitElement {
   private _router = createRouter(this);
 
   @query("esphome-settings-dialog") private _settingsDialog!: ESPHomeSettingsDialog;
+  // Non-private: settings-actions' onRemoteBuildInstallSubmitted reaches it.
   @query("esphome-firmware-jobs-dialog")
-  private _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
+  _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
   @query("esphome-feedback-dialog") private _feedbackDialog!: ESPHomeFeedbackDialog;
   @query("esphome-update-all-dialog")
   private _updateAllDialog!: ESPHomeUpdateAllDialog;
@@ -501,20 +503,6 @@ export class ESPHomeApp extends LitElement {
     this._guidedTour?.start();
   };
 
-  // "Compile and upload" queued a server-pinned INSTALL FirmwareJob; attach
-  // the firmware-jobs dialog's command dialog so the user watches the whole
-  // lifecycle (remote compile + local flash), with a working Stop.
-  private _onRemoteBuildInstallSubmitted = (e: CustomEvent<{ job_id: string }>) => {
-    const job = this._firmwareJobs.get(e.detail.job_id);
-    if (job === undefined) {
-      // The job_queued push precedes the submit response on the same WS, so
-      // a miss is theoretical; the jobs list is the graceful landing spot.
-      this._firmwareJobsDialog.open();
-      return;
-    }
-    this._firmwareJobsDialog.followJob(job);
-  };
-
   // Kebab "Set up / Change Wi-Fi credentials" — open the manual Wi-Fi dialog.
   private _onOpenOnboarding = () => {
     this._onboardingDialog?.open();
@@ -646,7 +634,8 @@ export class ESPHomeApp extends LitElement {
           )}
         @remote-build-job-dismissed=${(e: CustomEvent<{ job_id: string }>) =>
           onRemoteBuildJobDismissed(this, e)}
-        @remote-build-install-submitted=${this._onRemoteBuildInstallSubmitted}
+        @remote-build-install-submitted=${(e: CustomEvent<{ job_id: string }>) =>
+          onRemoteBuildInstallSubmitted(this, e)}
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}

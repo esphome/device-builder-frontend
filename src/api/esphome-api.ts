@@ -2187,6 +2187,15 @@ export class ESPHomeAPI {
    * job (queue full, manifest unsupported, hash mismatch);
    * reason carries the structured rejection code.
    *
+   * The returned job_id is target-dependent: COMPILE gets the
+   * offloader-local wire id tracked via
+   * ``buildOffloadJobsContext``; UPLOAD gets a local
+   * ``FirmwareJob`` id — the backend queues a server-pinned
+   * INSTALL (remote compile, local OTA flash) tracked via
+   * ``firmwareJobsContext``, and the missing-YAML NOT_FOUND
+   * above doesn't apply (a missing YAML fails the job at
+   * bundle time instead).
+   *
    * Phase 5c-3 backend, 5c-4 frontend.
    */
   async submitRemoteBuildJob(args: {
@@ -2204,11 +2213,16 @@ export class ESPHomeAPI {
   /**
    * Send a cooperative cancel for a remote build job (phase 5d).
    *
-   * Routes through ``remote_build/cancel_job`` to the paired
-   * receiver behind *pin_sha256*; the receiver maps *job_id*
-   * (the offloader-local id ``submitRemoteBuildJob`` returned)
-   * back to its local ``FirmwareJob`` and dispatches the same
-   * cancel primitive an operator-driven cancel uses.
+   * Routes through ``remote_build/cancel_job``. A *job_id*
+   * matching a local ``FirmwareJob`` (a server-pinned INSTALL
+   * from ``target: UPLOAD``) cancels through the local firmware
+   * primitive — covering the queued, remote-compile, and
+   * local-flash phases — and never touches the wire. Otherwise
+   * the frame goes to the paired receiver behind *pin_sha256*,
+   * which maps *job_id* (the offloader-local id
+   * ``submitRemoteBuildJob`` returned) back to its local
+   * ``FirmwareJob`` and dispatches the same cancel primitive
+   * an operator-driven cancel uses.
    *
    * Fire-and-forget on the wire — the resolved payload's
    * ``sent`` flag reflects whether the cancel frame made it

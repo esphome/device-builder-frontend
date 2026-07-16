@@ -76,7 +76,7 @@ describe("remote-build-job-dialog submit routing", () => {
     expect((el as any)._open).toBe(false);
   });
 
-  test("a rejected ack stays on the input step for either target", async () => {
+  test("a rejected upload ack stays on the input step", async () => {
     const el = await mountForSubmit(JobType.UPLOAD);
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     (el as any)._api.submitRemoteBuildJob = vi.fn().mockResolvedValue({

@@ -4,6 +4,7 @@ import type { PairingSummary } from "../../../src/api/types/remote-build.js";
 import { ExperienceLevel } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
+  onRemoteBuildInstallSubmitted,
   onSetExpertMode,
   onSetOffloaderIncludeLocal,
   onSetOffloaderPairingEnabled,
@@ -578,5 +579,47 @@ describe("prefs-write in-flight counter", () => {
     resolvers[1]();
     await flush();
     expect(host._prefsWritesInFlight).toBe(0);
+  });
+});
+
+describe("onRemoteBuildInstallSubmitted", () => {
+  type InstallHost = {
+    _firmwareJobs: Map<string, unknown>;
+    _firmwareJobsDialog: {
+      open: ReturnType<typeof vi.fn>;
+      followJob: ReturnType<typeof vi.fn>;
+    };
+  };
+
+  function makeInstallHost(jobs: Map<string, unknown>): InstallHost {
+    return {
+      _firmwareJobs: jobs,
+      _firmwareJobsDialog: { open: vi.fn(), followJob: vi.fn() },
+    };
+  }
+
+  it("attaches the command dialog to the submitted firmware job", () => {
+    const job = { job_id: "job-1" };
+    const host = makeInstallHost(new Map([["job-1", job]]));
+
+    onRemoteBuildInstallSubmitted(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("remote-build-install-submitted", { detail: { job_id: "job-1" } })
+    );
+
+    expect(host._firmwareJobsDialog.followJob).toHaveBeenCalledWith(job);
+    expect(host._firmwareJobsDialog.open).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the jobs list when the id is not in the map", () => {
+    const host = makeInstallHost(new Map());
+
+    onRemoteBuildInstallSubmitted(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("remote-build-install-submitted", { detail: { job_id: "job-1" } })
+    );
+
+    expect(host._firmwareJobsDialog.open).toHaveBeenCalled();
+    expect(host._firmwareJobsDialog.followJob).not.toHaveBeenCalled();
   });
 });
