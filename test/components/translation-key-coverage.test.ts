@@ -56,6 +56,7 @@ describe("command dialog title translation keys", () => {
   const COMMAND_TYPES: Record<CommandType, true> = {
     install: true,
     compile: true,
+    offline_compile: true,
     validate: true,
     clean: true,
     reset: true,
