@@ -137,7 +137,13 @@ export class RunTimerController implements ReactiveController {
     const job = this._options.job();
     const beStart = parseIsoMs(job?.compile_started_at);
     if (beStart !== null) {
-      return Math.max(0, (parseIsoMs(job?.compile_ended_at) ?? this.now) - beStart);
+      // An ESP-IDF build never prints the "Took" banner, so its end stamp
+      // stays null; on a terminal job substitute completed_at rather than
+      // ``now`` — the ticker stopped whenever the dialog last closed, and a
+      // stale ``now`` before the start stamp clamps the readout to 0s.
+      const end =
+        parseIsoMs(job?.compile_ended_at) ?? parseIsoMs(job?.completed_at) ?? this.now;
+      return Math.max(0, end - beStart);
     }
     return this.isRunFrozen ? null : this.compileElapsedMs;
   }

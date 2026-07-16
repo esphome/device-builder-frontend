@@ -414,7 +414,7 @@
     "timer_detail_title": "Build time breakdown",
     "compile_time_label": "Compile time",
     "total_run_time_label": "Total run time",
-    "timer_offload_hint": "This compile is taking a while. Send builds to a faster machine on your network to speed it up.",
+    "timer_offload_hint": "This compile took a while. Send builds to a faster machine on your network to speed it up.",
     "validate_success": "Configuration is valid!",
     "validate_failed": "Validation failed.",
     "show_secrets": "Show secrets",
