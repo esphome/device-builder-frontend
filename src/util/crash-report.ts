@@ -1,4 +1,11 @@
 import { isCrashMarker } from "./crash-detector.js";
+import {
+  TRIM_MARKER,
+  encodedCost,
+  fitLines,
+  formEncodedLength,
+  takeLinesUnderBudget,
+} from "./crash-report-budget.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";
 
@@ -542,77 +549,4 @@ function excerptWithoutDecodeEchoes(
     lines.push(excerpt[i]);
   }
   return { lines, anchor: Math.min(anchor, Math.max(0, lines.length - 1)) };
-}
-
-const TRIM_MARKER = "[log excerpt trimmed; full logs in the attached report]";
-
-// Encoded length of *s* the way the prefilled URL actually serializes it:
-// URLSearchParams uses application/x-www-form-urlencoded, which differs
-// from encodeURIComponent for `! ~ ' ( )` (3 chars vs 1) — and ESPHome
-// backtraces are full of parens, so encodeURIComponent under-counts and
-// can produce a >8000-char URL (414). Measuring via URLSearchParams is
-// exact; the trailing "v=" (2 chars) is subtracted off.
-const formEncodedLength = (s: string): number =>
-  new URLSearchParams({ v: s }).toString().length - 2;
-
-const encodedCost = (line: string): number => formEncodedLength(`${line}\n`);
-
-/**
- * Greedily take the longest prefix of *lines* whose per-line
- * `encodedCost` fits `budget - spent`. Returns the kept prefix, the
- * running spend, and whether any line was dropped.
- */
-function takeLinesUnderBudget(
-  lines: string[],
-  budget: number,
-  spent: number
-): { kept: string[]; spent: number; truncated: boolean } {
-  const kept: string[] = [];
-  for (const line of lines) {
-    const cost = encodedCost(line);
-    if (spent + cost > budget) return { kept, spent, truncated: true };
-    kept.push(line);
-    spent += cost;
-  }
-  return { kept, spent, truncated: false };
-}
-
-/**
- * Join as much of *lines* as fits *budget* once URL-encoded: the block
- * from *anchor* to the end first (truncating its tail if even that
- * overflows), then context lines walking backwards from the anchor.
- *
- * Two passes: the first spends the whole budget on content; only when
- * that truncates does the second re-fit with the trim marker's cost
- * reserved, so the marker never pushes the result past the budget and
- * an untrimmed excerpt never sacrifices content to an unused reserve.
- */
-function fitLines(lines: string[], anchor: number, budget: number): string {
-  if (lines.length === 0 || budget <= 0) return "";
-  let fit = fitWithReserve(lines, anchor, budget, 0);
-  if (fit.truncated) {
-    fit = fitWithReserve(lines, anchor, budget, encodedCost(TRIM_MARKER));
-    fit.kept.push(TRIM_MARKER);
-  }
-  return fit.kept.length > (fit.truncated ? 1 : 0) ? fit.kept.join("\n") : "";
-}
-
-// Fit forward from *anchor* to the end, then walk backward over the
-// preceding context, sharing one budget and marker reserve.
-function fitWithReserve(
-  lines: string[],
-  anchor: number,
-  budget: number,
-  reserve: number
-): { kept: string[]; truncated: boolean } {
-  const forward = takeLinesUnderBudget(lines.slice(anchor), budget, reserve);
-  const back = takeLinesUnderBudget(
-    lines.slice(0, anchor).reverse(),
-    budget,
-    forward.spent
-  );
-  return {
-    kept: [...back.kept.reverse(), ...forward.kept],
-    truncated: forward.truncated || back.truncated,
-  };
 }

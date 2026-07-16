@@ -114,11 +114,17 @@ describe("decodeCrashBacktrace", () => {
 
   it("returns null rather than throwing when the command fails", async () => {
     // The report is still worth filing without a decode.
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const api = fakeApi(async () => {
       throw new Error("timed out");
     });
 
-    expect(await decodeCrashBacktrace(api, "kitchen.yaml", SERIAL)).toBeNull();
+    try {
+      expect(await decodeCrashBacktrace(api, "kitchen.yaml", SERIAL)).toBeNull();
+    } finally {
+      // Nothing restores spies between files here, so an escaped one would
+      // swallow warnings in whatever runs next on this worker.
+      warn.mockRestore();
+    }
   });
 });
