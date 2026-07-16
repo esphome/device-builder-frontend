@@ -502,6 +502,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
   };
 
   protected render() {
+    // Once config capture lands the remaining wait is the decode, which can
+    // run to a minute; a spinner still claiming to validate the config reads
+    // as a hang, and a user who closes the dialog abandons the decode.
+    const waiting =
+      this._configYaml === null ? "crash_report.collecting" : "crash_report.decoding";
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
@@ -513,17 +518,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
           this._configYaml === null || this._decoding
             ? html`<div class="collecting">
                 <wa-spinner></wa-spinner>
-                <span>
-                  ${this._localize(
-                    // Once config is captured the remaining wait is the
-                    // decode, which can run to a minute; a spinner still
-                    // claiming to validate the config reads as a hang, and a
-                    // user who closes the dialog abandons the decode.
-                    this._configYaml === null
-                      ? "crash_report.collecting"
-                      : "crash_report.decoding"
-                  )}
-                </span>
+                <span>${this._localize(waiting)}</span>
               </div>`
             : this._delivered
               ? this._renderDelivered()
