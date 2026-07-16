@@ -184,11 +184,15 @@ describe("resolveLogDocLink — actionable", () => {
   it("maps the CLI wifi-AP validation warning to the captive portal docs", () => {
     const line =
       "\\033[33mWARNING WiFi AP is configured but neither captive_portal nor web_server is enabled. The AP will not be usable for configuration or monitoring. Add 'captive_portal:' or 'web_server:' to your configuration.\\033[0m";
-    expect(resolveLogDocLink(line, {})?.actionable).toEqual({
+    const links = resolveLogDocLink(line, {});
+    expect(links?.actionable).toEqual({
       kind: "actionable",
       url: "https://esphome.io/components/captive_portal/",
       body: "wifi_ap_no_portal",
     });
+    // The icon inherits the container colour, so a tag-less CLI line still
+    // reports its level for the renderer to colour it like the warning text.
+    expect(links?.level).toBe("W");
   });
 
   it("ignores an uncurated CLI warning line", () => {

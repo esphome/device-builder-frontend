@@ -209,6 +209,14 @@ const ACTIONABLE_CLI: readonly ActionableCliEntry[] = (
 // Group 1 is the level word; the message follows, matched by pattern.
 const CLI_LINE_RE = /^(?:[\d:.\s-]*\s)?(WARNING|ERROR)\s/;
 
+// The CLI level word maps to the same single-letter level the firmware
+// lines carry, so a matched CLI line colours its icon like the firmware
+// path (``links.level`` -> ``LOG_LEVEL_COLORS`` in the renderer).
+const CLI_LEVEL_LETTER: Record<ActionableCliEntry["level"], string> = {
+  WARNING: "W",
+  ERROR: "E",
+};
+
 /** First ``https://esphome.io`` URL in a line (trailing sentence punctuation
  *  trimmed in ``resolveLogDocLink``). */
 const EMBEDDED_URL_RE = /https:\/\/esphome\.io\/[^\s)"']+/;
@@ -263,12 +271,14 @@ export function resolveLogDocLink(
   }
   // CLI validation lines (``WARNING <msg>``) carry no tag, so they miss
   // the firmware parse above; match them on the level word + message.
+  let cliLevel: string | undefined;
   if (!actionable) {
     const cli = clean.match(CLI_LINE_RE);
     if (cli) {
       for (const entry of ACTIONABLE_CLI) {
         if (entry.level === cli[1] && entry.pattern.test(clean)) {
           actionable = { kind: "actionable", url: entry.url, body: entry.body };
+          cliLevel = CLI_LEVEL_LETTER[entry.level];
           break;
         }
       }
@@ -315,6 +325,7 @@ export function resolveLogDocLink(
   if (actionable) links.actionable = actionable;
   if (component) links.component = component;
   if (parsed) links.level = parsed.level;
+  else if (cliLevel) links.level = cliLevel;
   return links;
 }
 
