@@ -153,6 +153,7 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
   let job: FirmwareJob;
   try {
     switch (host._commandType) {
+      case "offline_compile":
       case "install":
         job = await host._api.firmwareInstall(
           host.configuration,

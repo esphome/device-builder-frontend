@@ -386,6 +386,8 @@
     "install_title": "Install — {name}",
     "compile_title": "Compile — {name}",
     "offline_compile_title": "Offline compile — {name}",
+    "offline_compile_success": "Offline compile successful",
+    "offline_compile_failed": "Offline compile failed",
     "validate_title": "Validate — {name}",
     "clean_title": "Clean — {name}",
     "reset_title": "Reset build environment",
