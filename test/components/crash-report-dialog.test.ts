@@ -23,6 +23,7 @@ import { ESPHomeCrashReportDialog } from "../../src/components/crash-report-dial
 import type { StreamCallbacks } from "../../src/api/types/streaming.js";
 import {
   CRASH_BLOCK as CRASH_LINES,
+  CRASH_BLOCK_UNDECODED as CRASH_LINES_UNDECODED,
   VALIDATED_CONFIG_YAML,
   VALIDATE_OUTPUT,
 } from "../_crash-lines.js";
@@ -33,6 +34,7 @@ describe("crash-report-dialog", () => {
   let el: ESPHomeCrashReportDialog;
   let validateCallbacks: StreamCallbacks | null;
   let openedUrls: string[];
+  let decodeBacktrace: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     copyToClipboard.mockReset();
@@ -47,12 +49,16 @@ describe("crash-report-dialog", () => {
       })
     );
     el = new ESPHomeCrashReportDialog();
+    decodeBacktrace = vi.fn(() =>
+      Promise.resolve({ decoded: [], stale_build: false, unavailable_reason: "no_build" })
+    );
     (el as any)._api = {
       validate: (_config: string, callbacks: StreamCallbacks) => {
         validateCallbacks = callbacks;
         return "v1";
       },
       stopStream: vi.fn(() => Promise.resolve()),
+      decodeBacktrace,
     };
     document.body.appendChild(el);
   });
@@ -80,6 +86,51 @@ describe("crash-report-dialog", () => {
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
     expect((el as any)._configYaml).toBe(VALIDATED_CONFIG_YAML);
+  });
+
+  it("decodes a Web Serial crash through the backend and folds it into the report", async () => {
+    decodeBacktrace.mockResolvedValue({
+      decoded: [
+        {
+          index: 3,
+          text: "Decoded 0x400d9150: setup() at esphome/core/application.cpp:59",
+        },
+      ],
+      stale_build: false,
+      unavailable_reason: "",
+    });
+
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES_UNDECODED);
+    finishValidate();
+    await vi.waitFor(() => expect((el as any)._scrape.decodedFrames).toHaveLength(1));
+    describe_("it crashed on boot");
+
+    expect(decodeBacktrace).toHaveBeenCalledWith(
+      "smallgarage.yaml",
+      (el as any)._scrape.excerpt
+    );
+    expect((el as any)._buildReport().scrape.decodedFrames).toEqual([
+      "0x400d9150: setup() at esphome/core/application.cpp:59",
+    ]);
+  });
+
+  it("does not ask the backend when the session already decoded inline", async () => {
+    // A backend-streamed session arrives decoded; asking again is pure cost.
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    await el.updateComplete;
+
+    expect(decodeBacktrace).not.toHaveBeenCalled();
+  });
+
+  it("keeps the report usable when there is no build to decode against", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES_UNDECODED);
+    finishValidate();
+    await el.updateComplete;
+
+    expect((el as any)._scrape.decodedFrames).toEqual([]);
+    expect((el as any)._staleBuild).toBe(false);
+    expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
   });
 
   it("degrades to a config-unavailable note when validation fails", async () => {

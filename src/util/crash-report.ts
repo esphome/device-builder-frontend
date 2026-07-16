@@ -51,7 +51,7 @@ const isDecodeEcho = (line: string): boolean =>
 // A line that carries crash payload past the marker: any 8-hex-digit
 // address (registers, stack dumps, backtrace continuations) or a
 // decoded frame.
-const CRASH_RELATED_RE = /(?:0x)?[0-9a-fA-F]{8}(?::|\b)|Decoded 0x/;
+export const CRASH_RELATED_RE = /(?:0x)?[0-9a-fA-F]{8}(?::|\b)|Decoded 0x/;
 
 // `target_platform` → the bug form's platform dropdown values. ESP32 is a
 // prefix match (variants like ESP32S3 report as ESP32).
@@ -144,7 +144,13 @@ function extractCrashExcerpt(lines: string[]): { lines: string[]; crashIndex: nu
   return { lines: lines.slice(from, end + 1), crashIndex: start - from };
 }
 
-function extractDecodedFrames(excerpt: string[]): string[] {
+/** Pull `0x...: func at file:line` frames out of decoder output.
+ *
+ * Runs over inline decoder output scraped from the log buffer, and over
+ * the backend decoder's reply in crash-decode — both are the same text,
+ * so both fold inlined-frame continuations the same way.
+ */
+export function extractDecodedFrames(excerpt: string[]): string[] {
   const frames: string[] = [];
   let inFrame = false;
   for (const line of excerpt) {
@@ -211,6 +217,9 @@ export interface CrashReport {
   configYaml: string;
   /** The user's own account of what the device was doing when it crashed. */
   userDescription: string;
+  /** Frames were decoded against a build that no longer matches the running
+   *  firmware, so they name the wrong lines. */
+  staleBuild?: boolean;
 }
 
 // Every platform component that can appear in `loaded_integrations`;
@@ -265,10 +274,17 @@ export function buildFullReport(report: CrashReport): string {
   sections.push("## Decoded backtrace");
   if (scrape.decodedFrames.length > 0) {
     sections.push(fence(scrape.decodedFrames));
+    if (report.staleBuild) {
+      sections.push(
+        "Decoded against a local build that no longer matches the firmware " +
+          "running on the device, so these frames may name the wrong lines."
+      );
+    }
   } else if (scrape.crashFound) {
     sections.push(
-      "The backtrace was not decoded in this log session (captured over " +
-        "Web Serial, or decoding was unavailable). Raw crash output is below."
+      "The backtrace was not decoded in this log session, and could not be " +
+        "decoded afterwards (the device has no local build to decode " +
+        "against, or its platform has no decoder). Raw crash output is below."
     );
   } else {
     sections.push(

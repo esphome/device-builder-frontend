@@ -316,3 +316,21 @@ export interface UpdateDeviceResponse {
 export interface AddComponentResponse {
   yaml: string;
 }
+
+/** One line of decoder output, tagged with the excerpt line that produced it. */
+export interface DecodedBacktraceLine {
+  index: number;
+  text: string;
+}
+
+/** Response from devices/decode_backtrace. */
+export interface DecodeBacktraceResponse {
+  decoded: DecodedBacktraceLine[];
+  /** The running firmware was built from a different config than the local
+   *  build, so the symbols are confident but wrong. */
+  stale_build: boolean;
+  /** Why nothing was decoded: "no_backtrace" | "no_build" |
+   *  "unsupported_platform" | "decode_failed" | "helper_failed"; "" on
+   *  success. */
+  unavailable_reason: string;
+}

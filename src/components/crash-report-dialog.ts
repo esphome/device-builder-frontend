@@ -16,6 +16,7 @@ import {
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
+import { decodeCrashBacktrace } from "../util/crash-decode.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import {
   type CrashReport,
@@ -107,6 +108,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // True when the whole report fit the pre-filled URL — no paste needed.
   @state()
   private _prefillComplete = false;
+
+  // Set when the decode ran against a build that no longer matches the
+  // running firmware, so the frames name the wrong lines.
+  @state()
+  private _staleBuild = false;
 
   private _configuration = "";
   private _name = "";
@@ -226,8 +232,25 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._reportText = "";
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
+    this._staleBuild = false;
     this._dialog.open = true;
     this._captureConfig(this._session);
+    this._decodeBacktrace(this._session);
+  }
+
+  // Fills in the decode for a session that arrived without one (Web
+  // Serial). Fire-and-forget alongside _captureConfig: the report is
+  // usable without it, so nothing here blocks the dialog.
+  private _decodeBacktrace(session: number): void {
+    void decodeCrashBacktrace(this._api, this._configuration, this._scrape).then(
+      (decode) => {
+        if (decode === null || session !== this._session) return;
+        // Reassign rather than mutate; _scrape is the reactive handle the
+        // report and the summary row both read.
+        this._scrape = { ...this._scrape, decodedFrames: decode.frames };
+        this._staleBuild = decode.staleBuild;
+      }
+    );
   }
 
   private _captureConfig(session: number): void {
@@ -284,6 +307,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
       scrape: this._scrape,
       configYaml: this._configYaml ?? "",
       userDescription: this._userDescription.trim(),
+      staleBuild: this._staleBuild,
       meta: {
         deviceName: this._name,
         configuration: this._configuration,

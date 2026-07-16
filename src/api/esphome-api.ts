@@ -38,6 +38,7 @@ import type { DesktopUpdateCheck, DesktopUpdateStarted } from "./types/desktop.j
 import type {
   AddComponentResponse,
   ConfiguredDevice,
+  DecodeBacktraceResponse,
   DevicesResponse,
   ImportBundleResponse,
   Label,
@@ -89,6 +90,10 @@ interface AuthLoginResult {
   token: string;
   expires_at: number;
 }
+
+// The backend caps the decoder subprocess at 60s; the margin covers the
+// esphome import the child pays before addr2line runs, plus WS latency.
+const DECODE_BACKTRACE_TIMEOUT_MS = 90_000;
 
 /** Mask sensitive auth fields when logging — tokens / passwords show
  *  up in support tickets via attached browser console logs. The
@@ -905,6 +910,25 @@ export class ESPHomeAPI {
     return this.sendCommand<{ configuration: string; rewritten: boolean }>(
       "devices/edit_friendly_name",
       { configuration, new_friendly_name: newFriendlyName }
+    );
+  }
+
+  /** Decode a crash excerpt against the device's local build.
+   *
+   *  For logs captured over Web Serial, where nothing decoded the
+   *  backtrace on the way in. Pass the normalized crash excerpt; each
+   *  returned entry's `index` is its position in `lines`. Decoding needs a
+   *  local build of that exact device, so a populated `unavailable_reason`
+   *  (never an error) is a routine answer.
+   */
+  async decodeBacktrace(
+    configuration: string,
+    lines: string[]
+  ): Promise<DecodeBacktraceResponse> {
+    return this.sendCommand<DecodeBacktraceResponse>(
+      "devices/decode_backtrace",
+      { configuration, lines },
+      DECODE_BACKTRACE_TIMEOUT_MS
     );
   }
 

@@ -156,6 +156,18 @@ describe("issuePlatform / inferComponentName", () => {
 });
 
 describe("buildFullReport", () => {
+  it("captions a backend decode made against a build that has since changed", () => {
+    // The frames look authoritative but name the wrong lines; a reader of
+    // the issue has no other way to tell.
+    const text = buildFullReport(report({ staleBuild: true }));
+
+    expect(text).toContain("no longer matches the firmware");
+  });
+
+  it("does not caption a decode made against the matching build", () => {
+    expect(buildFullReport(report())).not.toContain("no longer matches the firmware");
+  });
+
   it("leads with the user's context, then the decoded backtrace", () => {
     const text = buildFullReport(report());
     const order = [
