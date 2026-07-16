@@ -32,12 +32,16 @@ function output(job_id: string): OffloaderJobOutputEventData {
   };
 }
 
-type Host = Pick<ESPHomeApp, "_buildOffloadJobs" | "_firmwareJobs">;
+// The filter only reads _firmwareJobs keys, so the host models entries as
+// bare { job_id } stubs instead of full FirmwareJob rows.
+type Host = Pick<ESPHomeApp, "_buildOffloadJobs"> & {
+  _firmwareJobs: Map<string, { job_id: string }>;
+};
 
 function makeHost(firmwareJobIds: string[] = []): Host {
   return {
     _buildOffloadJobs: new Map(),
-    _firmwareJobs: new Map(firmwareJobIds.map((id) => [id, { job_id: id } as never])),
+    _firmwareJobs: new Map(firmwareJobIds.map((id) => [id, { job_id: id }])),
   };
 }
 
@@ -45,12 +49,12 @@ describe("offloader job events skip locally-owned FirmwareJobs", () => {
   it("a wire-only job id still stubs a row", () => {
     const host = makeHost();
     handleEvent(
-      host as ESPHomeApp,
+      host as unknown as ESPHomeApp,
       DeviceEventType.OFFLOADER_JOB_STATE_CHANGED,
       stateChanged("wire-1")
     );
     handleEvent(
-      host as ESPHomeApp,
+      host as unknown as ESPHomeApp,
       DeviceEventType.OFFLOADER_JOB_OUTPUT,
       output("wire-1")
     );
@@ -62,14 +66,18 @@ describe("offloader job events skip locally-owned FirmwareJobs", () => {
   it("evicts a row stubbed before the firmware job was seeded", () => {
     const host = makeHost();
     handleEvent(
-      host as ESPHomeApp,
+      host as unknown as ESPHomeApp,
       DeviceEventType.OFFLOADER_JOB_STATE_CHANGED,
       stateChanged("fw-1")
     );
     expect(host._buildOffloadJobs.size).toBe(1);
 
-    host._firmwareJobs.set("fw-1", { job_id: "fw-1" } as never);
-    handleEvent(host as ESPHomeApp, DeviceEventType.OFFLOADER_JOB_OUTPUT, output("fw-1"));
+    host._firmwareJobs.set("fw-1", { job_id: "fw-1" });
+    handleEvent(
+      host as unknown as ESPHomeApp,
+      DeviceEventType.OFFLOADER_JOB_OUTPUT,
+      output("fw-1")
+    );
 
     expect(host._buildOffloadJobs.size).toBe(0);
   });
@@ -80,11 +88,15 @@ describe("offloader job events skip locally-owned FirmwareJobs", () => {
     // firmware-job UI owns that lifecycle, so the offload list stays clear.
     const host = makeHost(["fw-1"]);
     handleEvent(
-      host as ESPHomeApp,
+      host as unknown as ESPHomeApp,
       DeviceEventType.OFFLOADER_JOB_STATE_CHANGED,
       stateChanged("fw-1")
     );
-    handleEvent(host as ESPHomeApp, DeviceEventType.OFFLOADER_JOB_OUTPUT, output("fw-1"));
+    handleEvent(
+      host as unknown as ESPHomeApp,
+      DeviceEventType.OFFLOADER_JOB_OUTPUT,
+      output("fw-1")
+    );
     expect(host._buildOffloadJobs.size).toBe(0);
   });
 });
