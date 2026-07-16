@@ -301,6 +301,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         onBuildRemote: this._onBuildRemoteClick,
         onViewBuild: (jobId) => this._jobDialog?.openForJob(jobId),
         onEditEndpoint: this._onEditEndpointClick,
+        onResetBuildEnv: this._onResetBuildEnvRequest,
         onUnpair: this._onUnpairRequest,
       })
     );
@@ -496,6 +497,18 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       ),
     };
     this._unpairConfirmDialog?.open();
+  };
+
+  private _onResetBuildEnvRequest = (pairing: PairingSummary): void => {
+    // The confirm + enqueue + follow flow lives in the firmware-jobs
+    // dialog (the local reset's home); app-shell routes this event there.
+    this.dispatchEvent(
+      new CustomEvent("open-reset-peer-build-env", {
+        detail: { pin_sha256: pairing.pin_sha256 },
+        bubbles: true,
+        composed: true,
+      })
+    );
   };
 
   private _onUnpairRequest = (pairing: PairingSummary): void => {

@@ -4,6 +4,7 @@ import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { isPinnableVersion } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
@@ -139,7 +140,19 @@ export function renderResetSuggestion(
   if (host._commandType !== "install" && host._commandType !== "compile") {
     return nothing;
   }
-  return renderBuildFailureSuggestion(host, remotePeerLabel(host));
+  return renderBuildFailureSuggestion(host, remotePeerLabel(host), remoteResetPin(host));
+}
+
+// The pin to offer a remote build-env reset against: non-null only when
+// the failed job ran on a pairing that advertises the capability and is
+// still connected.
+function remoteResetPin(host: ESPHomeCommandDialog): string | null {
+  const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
+  const primed = host._primedSource;
+  if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
+  const pin = live?.source_pin_sha256 ?? primed?.source_pin_sha256 ?? "";
+  const pairing = pin ? host._pairings?.get(pin) : undefined;
+  return pairing && canResetBuildEnv(pairing) ? pin : null;
 }
 
 // Resolve the receiver label for a REMOTE-sourced job. Returns null for

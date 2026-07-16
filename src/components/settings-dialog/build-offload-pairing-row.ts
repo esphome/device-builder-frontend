@@ -5,6 +5,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { trimTrailingDot } from "../../util/hostname.js";
 import { pairingDisplayName } from "../../util/pairing-display-name.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 import {
   classifyVersionMismatch,
   isPinnableVersion,
@@ -48,6 +49,7 @@ interface PairingRowContext {
   onBuildRemote: (pairing: PairingSummary) => void;
   onViewBuild: (jobId: string) => void;
   onEditEndpoint: (pairing: PairingSummary) => void;
+  onResetBuildEnv: (pairing: PairingSummary) => void;
   onUnpair: (pairing: PairingSummary) => void;
 }
 
@@ -63,6 +65,7 @@ export function renderPairingRow(
     onBuildRemote,
     onViewBuild,
     onEditEndpoint,
+    onResetBuildEnv,
     onUnpair,
   } = ctx;
   const { pillClass, pillLabel } = pillFor(pairing, localize);
@@ -137,6 +140,25 @@ export function renderPairingRow(
                   @click=${() => onViewBuild(latestJob.job_id)}
                 >
                   ${localize("settings.remote_build_view_action")}
+                </button>
+              `
+            : nothing
+        }
+        ${
+          canResetBuildEnv(pairing)
+            ? html`
+                <button
+                  type="button"
+                  class="btn-reset-peer-env"
+                  aria-label=${localize("settings.reset_peer_env_aria", {
+                    label: displayName,
+                  })}
+                  title=${localize("settings.reset_peer_env_aria", {
+                    label: displayName,
+                  })}
+                  @click=${() => onResetBuildEnv(pairing)}
+                >
+                  <wa-icon library="mdi" name="broom"></wa-icon>
                 </button>
               `
             : nothing

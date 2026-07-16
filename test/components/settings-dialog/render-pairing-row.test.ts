@@ -24,6 +24,7 @@ function makeSummary(esphome_version: string): PairingSummary {
     auto_provision_supported: false,
     friendly_name: "",
     ha_addon: false,
+    reset_build_env_supported: false,
   };
 }
 
@@ -38,6 +39,7 @@ function ctx() {
     onBuildRemote: vi.fn(),
     onViewBuild: vi.fn(),
     onEditEndpoint: vi.fn(),
+    onResetBuildEnv: vi.fn(),
     onUnpair: vi.fn(),
   };
 }
@@ -70,6 +72,7 @@ describe("renderPairingRow version line", () => {
       auto_provision_supported: true,
       friendly_name: "",
       ha_addon: false,
+      reset_build_env_supported: false,
     };
     const text = renderedText(renderPairingRow(pairing, ctx()));
     expect(text).toContain("settings.build_offload_pairing_version_auto_provision");
@@ -87,6 +90,36 @@ describe("renderPairingRow version line", () => {
     const pending = { ...makeSummary("2026.6.0"), status: "pending" as const };
     const text = renderedText(renderPairingRow(pending, ctx()));
     expect(text).not.toContain("settings.remote_build_peer_version_line");
+  });
+});
+
+describe("renderPairingRow reset-build-env button", () => {
+  function renderWith(overrides: Partial<PairingSummary>) {
+    return renderedText(
+      renderPairingRow({ ...makeSummary("2026.6.0"), ...overrides }, ctx())
+    );
+  }
+
+  it("shows the button on an approved, connected, capable pairing", () => {
+    const text = renderWith({ reset_build_env_supported: true });
+    expect(text).toContain("settings.reset_peer_env_aria");
+  });
+
+  it("hides the button without the capability", () => {
+    expect(renderWith({})).not.toContain("settings.reset_peer_env_aria");
+  });
+
+  it("hides the button while disconnected", () => {
+    const text = renderWith({ reset_build_env_supported: true, connected: false });
+    expect(text).not.toContain("settings.reset_peer_env_aria");
+  });
+
+  it("hides the button on a pending row", () => {
+    const text = renderWith({
+      reset_build_env_supported: true,
+      status: "pending" as const,
+    });
+    expect(text).not.toContain("settings.reset_peer_env_aria");
   });
 });
 

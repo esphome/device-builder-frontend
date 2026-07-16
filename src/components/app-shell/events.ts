@@ -342,6 +342,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         esphome_version: evt.esphome_version,
         auto_provision_supported: evt.auto_provision_supported,
         ha_addon: evt.ha_addon,
+        reset_build_env_supported: evt.reset_build_env_supported,
         ...(evt.friendly_name ? { friendly_name: evt.friendly_name } : {}),
       });
       break;

@@ -33,9 +33,12 @@ import {
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
+import { getErrorMessage } from "../util/error-message.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { notifyError } from "../util/notify.js";
 import { NowTickController } from "../util/now-tick-controller.js";
+import { pairingDisplayName } from "../util/pairing-display-name.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./base-dialog.js";
@@ -45,6 +48,7 @@ import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
 import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
+import { canResetBuildEnv } from "./remote-build-hint.js";
 import { bucketJobs, renderEmpty, renderGroups } from "./shared/firmware-jobs-list.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
 import "./logs-dialog.js";
@@ -90,7 +94,12 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   // Logs dialog for the post-install hand-off when reattaching from this
   // surface. Without one, request-show-logs-after-install would no-op. (#139)
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
-  @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
+  @query("#reset-local-confirm") private _confirmDialog!: ESPHomeConfirmDialog;
+  @query("#reset-peer-confirm") private _resetPeerConfirmDialog!: ESPHomeConfirmDialog;
+
+  // The pairing a pending remote-reset confirm targets; null when the
+  // confirm dialog is closed.
+  @state() private _pendingResetPeer: { pin_sha256: string; label: string } | null = null;
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
@@ -122,6 +131,18 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._confirmDialog.open();
   }
 
+  // Same entry-point shape for the REMOTE reset: resolve the pairing,
+  // confirm the whole-server wipe, enqueue the mirror job, follow it.
+  openResetPeerBuildEnv(pin_sha256: string) {
+    const pairing = this._pairings?.get(pin_sha256);
+    if (pairing === undefined || !canResetBuildEnv(pairing)) return;
+    this._pendingResetPeer = {
+      pin_sha256,
+      label: pairingDisplayName(pairing),
+    };
+    this._resetPeerConfirmDialog.open();
+  }
+
   // Catch open-reset-build-env from the inner command-dialog so the
   // post-failure hint works when reviewing a past failed install from this
   // list. The app-shell listener sits on esphome-layout, but this dialog is
@@ -129,6 +150,11 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   private _onLocalResetEvent = (e: Event) => {
     e.stopPropagation();
     this.openResetBuildEnv();
+  };
+
+  private _onRemoteResetEvent = (e: CustomEvent<{ pin_sha256: string }>) => {
+    e.stopPropagation();
+    this.openResetPeerBuildEnv(e.detail.pin_sha256);
   };
 
   static styles = [
@@ -185,14 +211,27 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       </esphome-base-dialog>
       <esphome-command-dialog
         @open-reset-build-env=${this._onLocalResetEvent}
+        @open-reset-peer-build-env=${this._onRemoteResetEvent}
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
       ></esphome-command-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-confirm-dialog
+        id="reset-local-confirm"
         heading=${this._localize("firmware_jobs.reset_confirm_title")}
         confirm-label=${this._localize("firmware_jobs.reset_confirm_button")}
         message=${this._localize("firmware_jobs.reset_confirm_message")}
         @confirm=${this._onResetConfirmed}
+      ></esphome-confirm-dialog>
+      <esphome-confirm-dialog
+        id="reset-peer-confirm"
+        heading=${this._localize("firmware_jobs.reset_peer_confirm_title", {
+          label: this._pendingResetPeer?.label ?? "",
+        })}
+        confirm-label=${this._localize("firmware_jobs.reset_peer_confirm_button")}
+        message=${this._localize("firmware_jobs.reset_peer_confirm_message", {
+          label: this._pendingResetPeer?.label ?? "",
+        })}
+        @confirm=${this._onResetPeerConfirmed}
       ></esphome-confirm-dialog>
     `;
   }
@@ -232,6 +271,30 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       return;
     }
     // Drop the user into the log viewer so they can watch the wipe.
+    this._commandDialog.followJob(job, this._jobDisplayName(job));
+  };
+
+  private _onResetPeerConfirmed = async () => {
+    const pending = this._pendingResetPeer;
+    this._pendingResetPeer = null;
+    if (pending === null) return;
+    let job: FirmwareJob;
+    try {
+      job = await this._api.remoteBuildResetPeerBuildEnv({
+        pin_sha256: pending.pin_sha256,
+      });
+    } catch (err) {
+      notifyError(
+        this._localize("firmware_jobs.reset_peer_failed", {
+          label: pending.label,
+          detail: getErrorMessage(err),
+        })
+      );
+      return;
+    }
+    // Same landing as the local reset: watch the server-side wipe live.
+    // A busy refusal surfaces in this job's stream (the mirror fails
+    // with a retry-when-idle message), not as a command error.
     this._commandDialog.followJob(job, this._jobDisplayName(job));
   };
 

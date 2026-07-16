@@ -457,6 +457,17 @@ export class ESPHomeCommandDialog extends LitElement {
     );
   };
 
+  _tryResetRemoteBuildEnv = (pin: string) => {
+    this.close();
+    this.dispatchEvent(
+      new CustomEvent("open-reset-peer-build-env", {
+        detail: { pin_sha256: pin },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
   _toggleShowLogsAfterInstall = () => {
     this._showLogsAfterInstall = !this._showLogsAfterInstall;
   };

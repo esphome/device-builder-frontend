@@ -207,6 +207,7 @@ function makePairing(enabled: boolean): PairingSummary {
     auto_provision_supported: false,
     friendly_name: "",
     ha_addon: false,
+    reset_build_env_supported: false,
   };
 }
 

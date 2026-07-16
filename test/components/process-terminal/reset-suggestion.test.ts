@@ -17,6 +17,7 @@ function makeHost(): SuggestionHost {
     _tryOpenInEditor: vi.fn(),
     _tryCleanBuild: vi.fn(),
     _tryResetBuildEnv: vi.fn(),
+    _tryResetRemoteBuildEnv: vi.fn(),
   };
 }
 
@@ -41,5 +42,24 @@ describe("shared reset-suggestion renderers", () => {
       host,
       "Receiver A"
     );
+  });
+
+  it("remote failure with a reset-capable receiver offers the remote reset", () => {
+    const host = makeHost();
+    const pin = "a".repeat(64);
+    const tree = renderBuildFailureSuggestion(host, "Receiver A", pin);
+    const matches = findTemplatesByAnchor(tree, 'class="reset-suggestion"');
+    expect(matches.length).toBe(1);
+    const values = matches[0].values;
+    expect(values).toContain(host._tryCleanBuild);
+    // The local reset link stays out; the remote-reset click handler is an
+    // inline closure over the pin, so invoke it and assert the delegation.
+    expect(values).not.toContain(host._tryResetBuildEnv);
+    const remoteClick = values.find(
+      (v): v is () => void => typeof v === "function" && v !== host._tryCleanBuild
+    );
+    expect(remoteClick).toBeDefined();
+    remoteClick?.();
+    expect(host._tryResetRemoteBuildEnv).toHaveBeenCalledWith(pin);
   });
 });

@@ -204,6 +204,7 @@ export interface OffloaderPeerLinkOpenedEventData extends OffloaderPeerLinkSessi
   auto_provision_supported: boolean;
   friendly_name: string;
   ha_addon: boolean;
+  reset_build_env_supported: boolean;
 }
 
 /**
