@@ -126,11 +126,45 @@ describe("crash-report-dialog", () => {
   it("keeps the report usable when there is no build to decode against", async () => {
     el.open("smallgarage.yaml", "Small Garage", CRASH_LINES_UNDECODED);
     finishValidate();
-    await el.updateComplete;
+    // The decode holds the collecting spinner; once it settles empty the
+    // report shows anyway.
+    await vi.waitFor(() =>
+      expect(el.shadowRoot!.querySelector(".collecting")).toBeNull()
+    );
 
     expect((el as any)._scrape.decodedFrames).toEqual([]);
     expect((el as any)._staleBuild).toBe(false);
-    expect(el.shadowRoot!.querySelector(".collecting")).toBeNull();
+  });
+
+  it("holds the report behind the spinner until a pending decode settles", async () => {
+    // A fast user must not file the raw dump before the decode this feature
+    // adds; the collecting gate covers the decode like it covers config.
+    let resolveDecode!: (v: {
+      decoded: { index: number; text: string }[];
+      stale_build: boolean;
+      unavailable_reason: string;
+    }) => void;
+    decodeBacktrace.mockReturnValue(
+      new Promise((resolve) => {
+        resolveDecode = resolve;
+      })
+    );
+
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES_UNDECODED);
+    finishValidate();
+    await el.updateComplete;
+    // Config is captured, but the decode is still in flight.
+    expect(el.shadowRoot!.querySelector(".collecting")).not.toBeNull();
+
+    resolveDecode({
+      decoded: [{ index: 3, text: "Decoded 0x400d9150: setup() at application.cpp:59" }],
+      stale_build: false,
+      unavailable_reason: "",
+    });
+    await vi.waitFor(() =>
+      expect(el.shadowRoot!.querySelector(".collecting")).toBeNull()
+    );
+    expect((el as any)._scrape.decodedFrames).toHaveLength(1);
   });
 
   it("degrades to a config-unavailable note when validation fails", async () => {

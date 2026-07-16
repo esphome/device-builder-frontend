@@ -242,6 +242,20 @@ describe("buildIssueUrl", () => {
     expect(buildIssueUrl(report()).complete).toBe(true);
   });
 
+  it("captions a stale build in problem, where the maintainer reads the frames", () => {
+    // The prefilled issue is the delivery channel; a warning only in the
+    // downloadable report would miss the frames a maintainer actually sees.
+    const p = params(report({ staleBuild: true }));
+    expect(p.get("problem")).toContain("Decoded backtrace:");
+    expect(p.get("problem")).toContain("no longer matches the firmware");
+  });
+
+  it("does not caption a fresh build", () => {
+    expect(params(report()).get("problem")).not.toContain(
+      "no longer matches the firmware"
+    );
+  });
+
   it("fences the description in problem so a backtick run can't hide the trace", () => {
     const p = params(report({ userDescription: "ran:\n```\ncode\n```\ncrash" }));
     // The prose is fenced wider than its own ``` run, so the facts and the

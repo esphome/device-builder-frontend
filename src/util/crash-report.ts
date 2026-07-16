@@ -26,6 +26,12 @@ const MAX_ISSUE_URL_LENGTH = 8000;
 // list always rides in the downloadable report.
 const MAX_PROBLEM_FRAMES = 40;
 
+// One wording for the stale-build caption, shared by the downloadable report
+// and the prefilled issue so they can't drift.
+const STALE_BUILD_NOTE =
+  "Decoded against a local build that no longer matches the firmware running " +
+  "on the device, so these frames may name the wrong lines.";
+
 const ISSUE_URL_BASE =
   "https://github.com/esphome/esphome/issues/new?template=bug_report.yml";
 
@@ -275,10 +281,7 @@ export function buildFullReport(report: CrashReport): string {
   if (scrape.decodedFrames.length > 0) {
     sections.push(fence(scrape.decodedFrames));
     if (report.staleBuild) {
-      sections.push(
-        "Decoded against a local build that no longer matches the firmware " +
-          "running on the device, so these frames may name the wrong lines."
-      );
+      sections.push(STALE_BUILD_NOTE);
     }
   } else if (scrape.crashFound) {
     sections.push(
@@ -383,7 +386,9 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // `problem` is set first but still bounded: a long description and/or
   // many long decoded frames could blow the budget before logs/config
   // trim. Drop trailing frames (then hard-truncate) until it fits.
-  if (fitProblem(url, params, head, scrape.decodedFrames)) missing = true;
+  if (fitProblem(url, params, head, scrape.decodedFrames, report.staleBuild ?? false)) {
+    missing = true;
+  }
 
   // The crash logs get first claim on the budget: they're a one-time
   // capture, whereas the config can always be re-obtained from the YAML
@@ -477,12 +482,18 @@ function fitProblem(
   url: URL,
   params: URLSearchParams,
   head: string[],
-  frames: string[]
+  frames: string[],
+  staleBuild: boolean
 ): boolean {
   let used = Math.min(frames.length, MAX_PROBLEM_FRAMES);
   let dropped = frames.length > used;
+  // The prefilled issue is the channel a maintainer actually reads, so the
+  // stale-build caption has to ride with the frames here, not only in the
+  // downloadable report. Only meaningful when a frame is actually shown.
+  const caption = staleBuild && used > 0 ? [STALE_BUILD_NOTE] : [];
   for (;;) {
-    const body = used > 0 ? ["", "Decoded backtrace:", ...frames.slice(0, used)] : [];
+    const body =
+      used > 0 ? ["", "Decoded backtrace:", ...caption, ...frames.slice(0, used)] : [];
     const note =
       frames.length > used
         ? ["", `(+${frames.length - used} more frames in the report)`]

@@ -16,7 +16,7 @@ import {
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
-import { decodeCrashBacktrace } from "../util/crash-decode.js";
+import { decodeCrashBacktrace, needsBackendDecode } from "../util/crash-decode.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import {
   type CrashReport,
@@ -108,6 +108,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // True when the whole report fit the pre-filled URL — no paste needed.
   @state()
   private _prefillComplete = false;
+
+  // True while a Web Serial backtrace is being decoded. Holds the report
+  // behind the collecting spinner (like config capture does) so a fast user
+  // can't file the raw dump before the decode this feature exists to add.
+  @state()
+  private _decoding = false;
 
   private _configuration = "";
   private _name = "";
@@ -232,24 +238,30 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
     this._staleBuild = false;
+    // Decided synchronously so the collecting gate is right on first paint;
+    // the common backend-streamed session already has its frames and waits
+    // for nothing.
+    this._decoding = needsBackendDecode(this._scrape);
     this._dialog.open = true;
     this._captureConfig(this._session);
     this._decodeBacktrace(this._session);
   }
 
-  // Fills in the decode for a session that arrived without one (Web
-  // Serial). Fire-and-forget alongside _captureConfig: the report is
-  // usable without it, so nothing here blocks the dialog.
+  // Fills in the decode for a session that arrived without one (Web Serial).
+  // Runs alongside _captureConfig; both hold the collecting spinner until
+  // they settle so the report can't be filed mid-decode.
   private _decodeBacktrace(session: number): void {
-    void decodeCrashBacktrace(this._api, this._configuration, this._scrape).then(
-      (decode) => {
+    void decodeCrashBacktrace(this._api, this._configuration, this._scrape)
+      .then((decode) => {
         if (decode === null || session !== this._session) return;
         // Reassign rather than mutate; _scrape is the reactive handle the
         // report and the summary row both read.
         this._scrape = { ...this._scrape, decodedFrames: decode.frames };
         this._staleBuild = decode.staleBuild;
-      }
-    );
+      })
+      .finally(() => {
+        if (session === this._session) this._decoding = false;
+      });
   }
 
   private _captureConfig(session: number): void {
@@ -498,7 +510,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
         @after-hide=${this._onAfterHide}
       >
         ${
-          this._configYaml === null
+          this._configYaml === null || this._decoding
             ? html`<div class="collecting">
                 <wa-spinner></wa-spinner>
                 <span>${this._localize("crash_report.collecting")}</span>
