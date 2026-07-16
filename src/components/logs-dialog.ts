@@ -20,15 +20,17 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { type CrashKind, detectCrashKind } from "../util/crash-detector.js";
+import { type CrashKind, classifyLine } from "../util/crash-detector.js";
 import {
   type CrashDecode,
   type CrashDecodeCache,
   type CrashRegion,
   CrashRegionCollector,
+  colorizeCrash,
   decodeCrashRegion,
   interleaveDecoded,
 } from "../util/crash-decode.js";
+import { normalizeLogLine } from "../util/log-line.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LineBatcher } from "../util/line-batcher.js";
@@ -141,13 +143,18 @@ export class ESPHomeLogsDialog extends LitElement {
   // different lines, so a decode must not outlive its buffer.
   private _decodeCache: CrashDecodeCache = new Map();
   private _streamIndex = 0;
-  private _dropped = 0;
-  private _inserted = 0;
+  // Maps an absolute stream position onto _lines: the cap drops lines off the
+  // front and decoding splices lines in, and both move everything after them.
+  private _indexShift = 0;
   // Bumped whenever the buffer is reset; a decode in flight against the old
   // buffer must not splice into the new one.
   private _bufferEpoch = 0;
   // Serialises decodes so each splice lands before the next is positioned.
   private _decodeChain: Promise<void> = Promise.resolve();
+  // Set once any decode this session came back against a mismatched build.
+  // The report captions its frames from this rather than re-reading the
+  // warning line out of the buffer.
+  private _staleBuild = false;
 
   // Rendered unconditionally in this dialog's template, so the query is
   // always resolved by the time the callout button can be clicked.
@@ -473,7 +480,12 @@ export class ESPHomeLogsDialog extends LitElement {
   // underneath; the stream keeps running.
   private _openCrashReport = () => {
     this._flushPendingLines();
-    this._crashReportDialog.open(this.configuration, this.name, [...this._lines]);
+    this._crashReportDialog.open(
+      this.configuration,
+      this.name,
+      [...this._lines],
+      this._staleBuild
+    );
   };
 
   // Start button (only shown while not streaming; the leading guard also
@@ -607,30 +619,59 @@ export class ESPHomeLogsDialog extends LitElement {
   // single place the cap is enforced, shared by the batched flush and the
   // direct recovery-path append (setSerialOpenFailed).
   private _appendCapped(lines: string[]): void {
-    const merged = [...this._lines, ...lines];
-    // Track what scrolled off, so an absolute stream position still maps onto
-    // this array once the cap starts dropping from the front.
-    this._dropped += Math.max(0, merged.length - MAX_LOG_LINES);
-    this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+    this._setLinesCapped([...this._lines, ...lines]);
+    // One normalization per line, shared by the crash classifier and the
+    // region collector: this runs for every line of a stream that can push
+    // thousands a second.
+    const regions: CrashRegion[] = [];
+    let kind: CrashKind | null = null;
     for (const line of lines) {
-      const region = this._crashRegion.push(line, this._streamIndex);
+      const normalized = normalizeLogLine(line);
+      const region = this._crashRegion.push(line, normalized, this._streamIndex);
       this._streamIndex += 1;
-      if (region) this._queueDecode(region);
+      if (region) regions.push(region);
+      const lineKind = classifyLine(normalized);
+      if (lineKind === "live" || (lineKind && !kind)) kind = lineKind;
     }
-    if (this._crashKind !== "live") {
-      const kind = detectCrashKind(lines);
-      if (kind && kind !== this._crashKind) {
-        const firstDetection = this._crashKind === null;
-        this._crashKind = kind;
-        // The callout shrinks the log container; re-pin so the crash
-        // tail stays visible.
-        if (firstDetection) {
-          void this.updateComplete
-            .then(() => this._terminal?.scrollToBottom())
-            .catch((err) => console.warn("crash callout re-pin scroll failed", err));
-        }
+    for (const region of regions) this._onCrashRegion(region);
+    if (this._crashKind !== "live" && kind && kind !== this._crashKind) {
+      const firstDetection = this._crashKind === null;
+      this._crashKind = kind;
+      // The callout shrinks the log container; re-pin so the crash
+      // tail stays visible.
+      if (firstDetection) {
+        void this.updateComplete
+          .then(() => this._terminal?.scrollToBottom())
+          .catch((err) => console.warn("crash callout re-pin scroll failed", err));
       }
     }
+  }
+
+  // The single place MAX_LOG_LINES is enforced, so the cap policy and the
+  // index shift it causes can't drift apart.
+  private _setLinesCapped(next: string[]): void {
+    const overflow = Math.max(0, next.length - MAX_LOG_LINES);
+    this._indexShift -= overflow;
+    this._lines = overflow ? next.slice(-MAX_LOG_LINES) : next;
+  }
+
+  // A crash region just finished streaming. Paint it, so it stands out the
+  // way an OTA crash does, then decode it if nothing already has.
+  private _onCrashRegion(region: CrashRegion): void {
+    const painted = this._paintCrash(region);
+    this._queueDecode(painted);
+  }
+
+  // The raw UART panic handler emits no colour of its own, so a serial crash
+  // would scroll past looking like ordinary output. Replaces the region in
+  // place and returns it as it now sits in the buffer, so a later decode
+  // splice still recognises it.
+  private _paintCrash(region: CrashRegion): CrashRegion {
+    const raw = colorizeCrash(region.raw);
+    if (raw.every((line, i) => line === region.raw[i])) return region;
+    const painted = { raw, startIndex: region.startIndex };
+    this._replaceRegion(region, painted.raw);
+    return painted;
   }
 
   // Decode completed crash regions one at a time, so each splice lands before
@@ -649,32 +690,33 @@ export class ESPHomeLogsDialog extends LitElement {
           this._decodeCache
         );
         if (decode === null || epoch !== this._bufferEpoch) return;
+        if (decode.staleBuild) this._staleBuild = true;
         this._spliceDecoded(region, decode);
       })
       .catch((err) => console.warn("Inline backtrace decode failed", err));
   }
 
-  // Replace the region in the buffer with the same lines plus the decoder's
-  // output. Positioned by absolute stream index, then verified against the
-  // buffer: on a miss the region has churned and is left alone rather than
-  // decorated in the wrong place.
   private _spliceDecoded(region: CrashRegion, decode: CrashDecode): void {
+    this._replaceRegion(region, interleaveDecoded(region.raw, decode));
+  }
+
+  // Swap a region for *replacement*, positioned by absolute stream index and
+  // then verified against the buffer: on a miss the region has churned, and
+  // is left alone rather than decorated in the wrong place.
+  //
+  // Verifies every line, not just the ends. A crash loop repeats one dump
+  // verbatim, so its regions share a first and last line; ends-only would
+  // accept a mispositioned splice in exactly the case that produces two
+  // regions to confuse.
+  private _replaceRegion(region: CrashRegion, replacement: string[]): void {
     const { raw, startIndex } = region;
-    const at = startIndex - this._dropped + this._inserted;
+    const at = startIndex + this._indexShift;
     if (at < 0 || at + raw.length > this._lines.length) return;
-    if (
-      this._lines[at] !== raw[0] ||
-      this._lines[at + raw.length - 1] !== raw[raw.length - 1]
-    ) {
-      return;
-    }
-    const decorated = interleaveDecoded(raw, decode);
+    if (raw.some((line, i) => this._lines[at + i] !== line)) return;
     const next = [...this._lines];
-    next.splice(at, raw.length, ...decorated);
-    this._inserted += decorated.length - raw.length;
-    const overflow = Math.max(0, next.length - MAX_LOG_LINES);
-    this._dropped += overflow;
-    this._lines = overflow ? next.slice(-MAX_LOG_LINES) : next;
+    next.splice(at, raw.length, ...replacement);
+    this._indexShift += replacement.length - raw.length;
+    this._setLinesCapped(next);
   }
 
   // Reset the inline-decode bookkeeping; every field is relative to the
@@ -682,9 +724,9 @@ export class ESPHomeLogsDialog extends LitElement {
   private _resetCrashDecode(): void {
     this._bufferEpoch += 1;
     this._streamIndex = 0;
-    this._dropped = 0;
-    this._inserted = 0;
-    this._crashRegion.take();
+    this._indexShift = 0;
+    this._staleBuild = false;
+    this._crashRegion = new CrashRegionCollector();
     this._decodeCache.clear();
   }
 

@@ -1,7 +1,12 @@
 import type { ESPHomeAPI } from "../api/index.js";
 import type { DecodedBacktraceLine } from "../api/types/devices.js";
-import { isCrashMarker } from "./crash-detector.js";
-import { STALE_BUILD_NOTE } from "./crash-report.js";
+import {
+  ADDRESS_RE,
+  CRASH_END_RE,
+  DECODED_RE,
+  MAX_LINES_AFTER_MARKER,
+  isCrashMarker,
+} from "./crash-detector.js";
 import { normalizeLogLine } from "./log-line.js";
 
 /**
@@ -16,16 +21,14 @@ import { normalizeLogLine } from "./log-line.js";
  * crash report picks the frames up through the scraper it already has.
  */
 
-// Terminators of a crash dump: the region is complete and can be sent.
-const REGION_END_RE = /<<<stack<<<|^ELF file SHA256:|^Rebooting\.\.\./;
+// The marker line plus everything the shared window allows after it.
+const MAX_REGION_LINES = MAX_LINES_AFTER_MARKER + 1;
 
-// Cap on a region with no terminator, mirroring the report scraper's window
-// so the backend sees the same shape from either path.
-const MAX_REGION_LINES = 61;
-
-// Any 8-hex-digit address, optionally 0x-prefixed. Without one there is
-// nothing to resolve, so the region isn't worth a request.
-const ADDRESS_RE = /(?:0x)?[0-9a-fA-F]{8}(?::|\b)/;
+// Bold red, matching the colour esphome's logger gives an ERROR record. The
+// raw UART panic handler emits no colour of its own, so a serial crash would
+// otherwise scroll past in the same plain text as everything else.
+const ANSI_CRASH = "\u001b[1;31m";
+const ANSI_RESET = "\u001b[0m";
 
 // Decoding the same crash again costs a fresh ~70 MiB esphome import in the
 // backend's child for an answer we already have, and a crash loop repeats one
@@ -37,10 +40,11 @@ const MAX_CACHE_ENTRIES = 16;
 /** Decodes already seen this log session, keyed on the region text. */
 export type CrashDecodeCache = Map<string, CrashDecode>;
 
-// Mirrors what esphome logs would print: the decoder's caveat arrives as a
-// log line, so it reaches the reader and the crash report the same way the
-// frames do.
-export const STALE_BUILD_LOG_LINE = `WARNING ${STALE_BUILD_NOTE}`;
+// Shown where the reader is looking. The report gets the same verdict as a
+// typed value, so this line is presentation, not transport.
+export const STALE_BUILD_LOG_LINE =
+  "WARNING Decoded against a local build that no longer matches the firmware " +
+  "running on the device; these frames may name the wrong lines.";
 
 export interface CrashDecode {
   /** Decoder output, each tagged with its line's offset into the region. */
@@ -70,9 +74,15 @@ export class CrashRegionCollector {
   private _raw: string[] | null = null;
   private _startIndex = -1;
 
-  /** Offer the next raw line at absolute stream position *index*. */
-  push(raw: string, index: number): CrashRegion | null {
-    const line = normalizeLogLine(raw);
+  /**
+   * Offer the next line at absolute stream position *index*.
+   *
+   * Takes both forms because the caller has already normalized to classify
+   * the line: *normalized* drives the grammar, *raw* is what gets kept, so
+   * the region can be found in the buffer again.
+   */
+  push(raw: string, normalized: string, index: number): CrashRegion | null {
+    const line = normalized;
     if (this._raw === null) {
       if (!isCrashMarker(line)) return null;
       this._raw = [raw];
@@ -80,7 +90,7 @@ export class CrashRegionCollector {
       return null;
     }
     this._raw.push(raw);
-    if (REGION_END_RE.test(line) || this._raw.length >= MAX_REGION_LINES)
+    if (CRASH_END_RE.test(line) || this._raw.length >= MAX_REGION_LINES)
       return this.take();
     return null;
   }
@@ -93,6 +103,36 @@ export class CrashRegionCollector {
     this._startIndex = -1;
     return region;
   }
+}
+
+/**
+ * True when *region* still needs decoding: it has an address, and nothing has
+ * decoded it already.
+ *
+ * An OTA session's crash arrives with esphome's inline `Decoded` lines
+ * present. Decoding again would spend a backend child to splice a second copy
+ * of frames the log already shows.
+ */
+export function needsDecode(normalized: string[]): boolean {
+  return (
+    normalized.some((line) => ADDRESS_RE.test(line)) &&
+    !normalized.some((line) => DECODED_RE.test(line))
+  );
+}
+
+/**
+ * Paint *raw* the colour esphome gives an ERROR record.
+ *
+ * The raw UART panic handler emits no colour, so a serial crash scrolls past
+ * looking like ordinary output. An OTA crash already arrives red from the
+ * device's logger, so lines that carry their own colour are left alone.
+ */
+export function colorizeCrash(raw: string[]): string[] {
+  return raw.map((line) =>
+    line.includes("\u001b[") || line.includes("\\033[") || line.trim() === ""
+      ? line
+      : `${ANSI_CRASH}${line}${ANSI_RESET}`
+  );
 }
 
 /**
@@ -145,7 +185,7 @@ export async function decodeCrashRegion(
   // normalization is one-for-one, so a decoded entry's index addresses the
   // raw line at the same offset.
   const lines = raw.map(normalizeLogLine);
-  if (!lines.some((line) => ADDRESS_RE.test(line))) return null;
+  if (!needsDecode(lines)) return null;
   const key = `${configuration}\n${lines.join("\n")}`;
   const hit = cache.get(key);
   if (hit) return hit;

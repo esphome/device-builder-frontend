@@ -8,6 +8,7 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
 import { STALE_BUILD_LOG_LINE } from "../../src/util/crash-decode.js";
+import { stripAnsi } from "../../src/util/ansi-escapes.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const append = (el: ESPHomeLogsDialog, lines: string[]) =>
@@ -95,7 +96,7 @@ describe("logs-dialog inline backtrace decode", () => {
     expect(lines(el)[warn + 1]).toBe("Decoded 0x400d1a2c: loop()");
   });
 
-  it("leaves the raw dump untouched when the decode fails", async () => {
+  it("leaves the dump readable when the decode fails", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     decodeBacktrace.mockRejectedValue(new Error("backend down"));
 
@@ -103,10 +104,47 @@ describe("logs-dialog inline backtrace decode", () => {
       append(el, CRASH);
       await flush();
 
-      expect(lines(el)).toEqual(CRASH);
+      // Still painted (that needs no backend) but no frames invented.
+      expect(lines(el).map(stripAnsi)).toEqual(CRASH);
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it("paints a serial crash red, the way an OTA one already arrives", async () => {
+    append(el, ["[12:00:00]boot", ...CRASH]);
+    await flush();
+
+    // The raw UART panic handler emits no colour, so it would otherwise
+    // scroll past looking like ordinary output.
+    const guru = lines(el).find((l) => l.includes("Guru Meditation"))!;
+    expect(guru.startsWith("\u001b[1;31m")).toBe(true);
+    expect(guru.endsWith("\u001b[0m")).toBe(true);
+    // Only the crash, not the line before it.
+    expect(lines(el)[0]).toBe("[12:00:00]boot");
+  });
+
+  it("does not repaint a crash that already carries colour", async () => {
+    const red = CRASH.map((l) => `\u001b[1;31m${l}\u001b[0m`);
+
+    append(el, red);
+    await flush();
+
+    expect(lines(el).filter((l) => l.includes("Guru Meditation"))[0]).toBe(red[0]);
+  });
+
+  it("does not decode a crash esphome already decoded inline", async () => {
+    append(el, [
+      "[12:00:01]Guru Meditation Error: crash",
+      "[12:00:01]Backtrace: 0x400d1a2c:0x3ffc3f40",
+      "[12:00:01]WARNING Decoded 0x400d1a2c: loop() at main.cpp:42",
+      "[12:00:01]Rebooting...",
+    ]);
+    await flush();
+
+    // An OTA session arrives decoded; asking again would splice a second
+    // copy of the frames it already shows.
+    expect(decodeBacktrace).not.toHaveBeenCalled();
   });
 
   it("decodes a crash loop's repeat without asking the backend again", async () => {
@@ -119,6 +157,24 @@ describe("logs-dialog inline backtrace decode", () => {
     // its frames.
     expect(decodeBacktrace).toHaveBeenCalledTimes(1);
     expect(lines(el).filter((l) => l.startsWith("Decoded 0x400d1a2c"))).toHaveLength(2);
+  });
+
+  it("hands the stale-build verdict to the report as a value", async () => {
+    decodeBacktrace.mockResolvedValue({
+      decoded: [{ index: 2, text: "Decoded 0x400d1a2c: loop()" }],
+      stale_build: true,
+      unavailable_reason: "",
+    });
+    const open = vi.fn();
+    Object.defineProperty(el, "_crashReportDialog", { value: { open } });
+
+    append(el, CRASH);
+    await flush();
+    (el as any)._openCrashReport();
+
+    // Not re-read out of the warning line it injected: that would make report
+    // copy load-bearing data.
+    expect(open.mock.calls[0]![3]).toBe(true);
   });
 
   it("drops a decode that lands after the buffer was cleared", async () => {

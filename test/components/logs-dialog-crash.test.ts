@@ -77,10 +77,14 @@ describe("logs-dialog crash callout", () => {
     el.configuration = "smallgarage.yaml";
     el.name = "Small Garage";
     callout()!.querySelector("button")!.click();
-    expect(open).toHaveBeenCalledWith("smallgarage.yaml", "Small Garage", [
-      "[I][app] boot",
-      CRASH_LINE,
-    ]);
+    // The stale-build verdict rides along as a value; the report captions
+    // its frames from it rather than re-reading the log it came from.
+    expect(open).toHaveBeenCalledWith(
+      "smallgarage.yaml",
+      "Small Garage",
+      ["[I][app] boot", CRASH_LINE],
+      false
+    );
   });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

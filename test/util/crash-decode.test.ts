@@ -8,6 +8,7 @@ import {
   decodeCrashRegion,
   interleaveDecoded,
 } from "../../src/util/crash-decode.js";
+import { normalizeLogLine } from "../../src/util/log-line.js";
 import { CRASH_BLOCK_UNDECODED } from "../_crash-lines.js";
 
 const reply = (over: Partial<DecodeBacktraceResponse> = {}): DecodeBacktraceResponse => ({
@@ -28,7 +29,7 @@ describe("CrashRegionCollector", () => {
   const feed = (lines: string[]) => {
     const collector = new CrashRegionCollector();
     const regions = lines
-      .map((line, i) => collector.push(line, i))
+      .map((line, i) => collector.push(line, normalizeLogLine(line), i))
       .filter((r) => r !== null);
     return { collector, regions };
   };
@@ -158,6 +159,27 @@ describe("decodeCrashRegion", () => {
     // The backend's contract is ANSI- and timestamp-free lines.
     expect(seen[0]![0]).toBe("Guru Meditation Error: crash");
     expect(decode?.decoded).toHaveLength(1);
+  });
+
+  it("does not ask when esphome already decoded it inline", async () => {
+    const decodeBacktrace = vi.fn();
+
+    // An OTA session's crash arrives decoded; asking again would splice a
+    // second copy of frames the log already shows.
+    const decode = await decodeCrashRegion(
+      fakeApi(decodeBacktrace),
+      "ota.yaml",
+      [
+        "Guru Meditation Error: crash",
+        "Backtrace: 0x400d9150:0x3ffb4f60",
+        "WARNING Decoded 0x400d9150: setup() at application.cpp:59",
+        "Rebooting...",
+      ],
+      cache
+    );
+
+    expect(decodeBacktrace).not.toHaveBeenCalled();
+    expect(decode).toBeNull();
   });
 
   it("does not ask when the region carries no address", async () => {

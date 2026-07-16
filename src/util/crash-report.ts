@@ -1,4 +1,11 @@
-import { isCrashMarker } from "./crash-detector.js";
+import { STALE_BUILD_LOG_LINE } from "./crash-decode.js";
+import {
+  ADDRESS_RE,
+  CRASH_END_RE,
+  DECODED_RE,
+  MAX_LINES_AFTER_MARKER,
+  isCrashMarker,
+} from "./crash-detector.js";
 import {
   TRIM_MARKER,
   encodedCost,
@@ -16,13 +23,9 @@ import { isCliLogLine } from "./validation-log.js";
  * GitHub issue URL against esphome/esphome's bug-report form.
  */
 
-// Context kept ahead of the first crash marker, and the hard cap on how
-// far past it the excerpt extends when no explicit end marker arrives.
+// Context kept ahead of the first crash marker. How far past it the window
+// runs, and where it closes, are the shared crash grammar.
 const CONTEXT_LINES_BEFORE = 25;
-const MAX_LINES_AFTER_MARKER = 60;
-
-// Terminators of a crash dump — the excerpt window closes here.
-const CRASH_END_RE = /<<<stack<<<|^ELF file SHA256:|^Rebooting\.\.\./;
 
 // Total pre-filled URL budget. GitHub's server returns 414 past roughly
 // 8 KB of URL; 8000 keeps a small margin for their redirect/query
@@ -44,9 +47,7 @@ export const STALE_BUILD_NOTE =
 const ISSUE_URL_BASE =
   "https://github.com/esphome/esphome/issues/new?template=bug_report.yml";
 
-// esphome logs' inline decoder emits `WARNING Decoded 0x...: func at
-// file:line`, with ` (inlined by) ...` continuation lines for inlined frames.
-const DECODED_RE = /^(?:WARNING )?Decoded (0x[0-9a-fA-F]{8}.*)$/;
+// ` (inlined by) ...` continuation lines follow a decoded frame.
 const DECODED_CONTINUATION_RE = /^\s*\(inlined by\)/;
 
 // Lines that merely echo the backtrace the `problem` field already
@@ -58,18 +59,17 @@ const DECODE_ECHO_RES = [
   DECODED_CONTINUATION_RE,
   /^(?:WARNING )?Found stack trace/,
   tagged("BT\\d+:\\s*0x[0-9a-fA-F]{8}"),
-  // crash-decode injects this next to the frames; the report captions it in
-  // `problem`, so echoing it in `logs` too would say it twice.
-  new RegExp(STALE_BUILD_NOTE.slice(0, 40).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
 ];
 
 const isDecodeEcho = (line: string): boolean =>
-  DECODE_ECHO_RES.some((re) => re.test(line));
+  // The stale-build caveat crash-decode injects next to the frames is
+  // compared whole: the report captions it in `problem`, and matching a
+  // substring of the prose would drop any log line that quoted it.
+  line === STALE_BUILD_LOG_LINE || DECODE_ECHO_RES.some((re) => re.test(line));
 
-// A line that carries crash payload past the marker: any 8-hex-digit
-// address (registers, stack dumps, backtrace continuations) or a
-// decoded frame.
-export const CRASH_RELATED_RE = /(?:0x)?[0-9a-fA-F]{8}(?::|\b)|Decoded 0x/;
+// A line that carries crash payload past the marker: an address, or a
+// decoded frame naming one.
+const CRASH_RELATED_RE = new RegExp(`${ADDRESS_RE.source}|Decoded 0x`);
 
 // `target_platform` → the bug form's platform dropdown values. ESP32 is a
 // prefix match (variants like ESP32S3 report as ESP32).
@@ -112,9 +112,6 @@ export interface CrashScrape {
   crashFound: boolean;
   /** `0x...: func at file:line` frames from the inline decoder. */
   decodedFrames: string[];
-  /** The frames were decoded against a build that no longer matches the
-   *  running firmware, so they name the wrong lines. */
-  staleBuild: boolean;
   /** All `[W]` / `[E]` lines (duplicates folded). */
   warnings: string[];
   /** All `[C]` dump_config lines. */
@@ -131,7 +128,6 @@ export function scrapeCrashData(rawLines: string[]): CrashScrape {
     crashIndex: excerpt.crashIndex,
     crashFound: excerpt.crashIndex !== -1,
     decodedFrames: extractDecodedFrames(excerpt.lines),
-    staleBuild: excerpt.lines.some((line) => line.includes(STALE_BUILD_NOTE)),
     warnings,
     configLines,
   };
@@ -239,6 +235,11 @@ export interface CrashReport {
   configYaml: string;
   /** The user's own account of what the device was doing when it crashed. */
   userDescription: string;
+  /** The frames were decoded against a build that no longer matches the
+   *  running firmware, so they name the wrong lines. The log viewer's decode
+   *  is what knows; scraping it back out of its own warning line would make
+   *  report copy load-bearing. */
+  staleBuild?: boolean;
 }
 
 // Every platform component that can appear in `loaded_integrations`;
@@ -293,7 +294,7 @@ export function buildFullReport(report: CrashReport): string {
   sections.push("## Decoded backtrace");
   if (scrape.decodedFrames.length > 0) {
     sections.push(fence(scrape.decodedFrames));
-    if (scrape.staleBuild) {
+    if (report.staleBuild) {
       sections.push(STALE_BUILD_NOTE);
     }
   } else if (scrape.crashFound) {
@@ -398,7 +399,7 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // `problem` is set first but still bounded: a long description and/or
   // many long decoded frames could blow the budget before logs/config
   // trim. Drop trailing frames (then hard-truncate) until it fits.
-  if (fitProblem(url, params, head, scrape.decodedFrames, scrape.staleBuild)) {
+  if (fitProblem(url, params, head, scrape.decodedFrames, report.staleBuild ?? false)) {
     missing = true;
   }
 

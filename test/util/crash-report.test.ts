@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   type CrashReport,
-  STALE_BUILD_NOTE,
   buildFullReport,
   buildIssueUrl,
   distillValidatedConfig,
@@ -40,17 +39,6 @@ const META = {
   board: "esp32dev",
   installation: "Home Assistant Add-on",
 };
-
-// What the buffer looks like once crash-decode splices a stale decode in:
-// the caveat sits inside the crash region, right above the frames it
-// qualifies, so it lands within the excerpt window rather than past its
-// Rebooting... terminator.
-const STALE_BUFFER = BUFFER.flatMap((line) =>
-  line.startsWith("WARNING Decoded 0x400d9150")
-    ? [`WARNING ${STALE_BUILD_NOTE}`, line]
-    : [line]
-);
-const STALE_SCRAPE = scrapeCrashData(STALE_BUFFER);
 
 const report = (overrides: Partial<CrashReport> = {}): CrashReport => ({
   scrape: scrapeCrashData(BUFFER),
@@ -169,11 +157,10 @@ describe("issuePlatform / inferComponentName", () => {
 
 describe("buildFullReport", () => {
   it("captions a backend decode made against a build that has since changed", () => {
-    // crash-decode injects the caveat as a log line, so it reaches the report
-    // through the buffer exactly like the frames do.
-    const text = buildFullReport(report({ scrape: STALE_SCRAPE }));
+    // The frames look authoritative but name the wrong lines; a reader of the
+    // issue has no other way to tell.
+    const text = buildFullReport(report({ staleBuild: true }));
 
-    expect(STALE_SCRAPE.staleBuild).toBe(true);
     expect(text).toContain("no longer matches the firmware");
   });
 
@@ -275,7 +262,7 @@ describe("buildIssueUrl", () => {
   it("captions a stale build in problem, where the maintainer reads the frames", () => {
     // The prefilled issue is the delivery channel; a warning only in the
     // downloadable report would miss the frames a maintainer actually sees.
-    const p = params(report({ scrape: STALE_SCRAPE }));
+    const p = params(report({ staleBuild: true }));
     expect(p.get("problem")).toContain("Decoded backtrace:");
     expect(p.get("problem")).toContain("no longer matches the firmware");
   });
