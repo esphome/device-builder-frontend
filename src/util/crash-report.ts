@@ -33,9 +33,11 @@ const MAX_ISSUE_URL_LENGTH = 8000;
 // list always rides in the downloadable report.
 const MAX_PROBLEM_FRAMES = 40;
 
-// One wording for the stale-build caption, shared by the downloadable report
-// and the prefilled issue so they can't drift.
-const STALE_BUILD_NOTE =
+// One wording for the stale-build caption, shared by the downloadable report,
+// the prefilled issue, and the log line crash-decode injects, so they can't
+// drift. The injected line is how the flag reaches here: staleness is a
+// backend verdict, and the log buffer carries it in like everything else.
+export const STALE_BUILD_NOTE =
   "Decoded against a local build that no longer matches the firmware running " +
   "on the device, so these frames may name the wrong lines.";
 
@@ -56,6 +58,9 @@ const DECODE_ECHO_RES = [
   DECODED_CONTINUATION_RE,
   /^(?:WARNING )?Found stack trace/,
   tagged("BT\\d+:\\s*0x[0-9a-fA-F]{8}"),
+  // crash-decode injects this next to the frames; the report captions it in
+  // `problem`, so echoing it in `logs` too would say it twice.
+  new RegExp(STALE_BUILD_NOTE.slice(0, 40).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
 ];
 
 const isDecodeEcho = (line: string): boolean =>
@@ -107,6 +112,9 @@ export interface CrashScrape {
   crashFound: boolean;
   /** `0x...: func at file:line` frames from the inline decoder. */
   decodedFrames: string[];
+  /** The frames were decoded against a build that no longer matches the
+   *  running firmware, so they name the wrong lines. */
+  staleBuild: boolean;
   /** All `[W]` / `[E]` lines (duplicates folded). */
   warnings: string[];
   /** All `[C]` dump_config lines. */
@@ -123,6 +131,7 @@ export function scrapeCrashData(rawLines: string[]): CrashScrape {
     crashIndex: excerpt.crashIndex,
     crashFound: excerpt.crashIndex !== -1,
     decodedFrames: extractDecodedFrames(excerpt.lines),
+    staleBuild: excerpt.lines.some((line) => line.includes(STALE_BUILD_NOTE)),
     warnings,
     configLines,
   };
@@ -230,9 +239,6 @@ export interface CrashReport {
   configYaml: string;
   /** The user's own account of what the device was doing when it crashed. */
   userDescription: string;
-  /** Frames were decoded against a build that no longer matches the running
-   *  firmware, so they name the wrong lines. */
-  staleBuild?: boolean;
 }
 
 // Every platform component that can appear in `loaded_integrations`;
@@ -287,7 +293,7 @@ export function buildFullReport(report: CrashReport): string {
   sections.push("## Decoded backtrace");
   if (scrape.decodedFrames.length > 0) {
     sections.push(fence(scrape.decodedFrames));
-    if (report.staleBuild) {
+    if (scrape.staleBuild) {
       sections.push(STALE_BUILD_NOTE);
     }
   } else if (scrape.crashFound) {
@@ -392,7 +398,7 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // `problem` is set first but still bounded: a long description and/or
   // many long decoded frames could blow the budget before logs/config
   // trim. Drop trailing frames (then hard-truncate) until it fits.
-  if (fitProblem(url, params, head, scrape.decodedFrames, report.staleBuild ?? false)) {
+  if (fitProblem(url, params, head, scrape.decodedFrames, scrape.staleBuild)) {
     missing = true;
   }
 

@@ -16,7 +16,6 @@ import {
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
-import { decodeCrashBacktrace, needsBackendDecode } from "../util/crash-decode.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
 import {
   type CrashReport,
@@ -109,12 +108,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
   @state()
   private _prefillComplete = false;
 
-  // True while a Web Serial backtrace is being decoded. Holds the report
-  // behind the collecting spinner (like config capture does) so a fast user
-  // can't file the raw dump before the decode this feature exists to add.
-  @state()
-  private _decoding = false;
-
   private _configuration = "";
   private _name = "";
   // The rendered report backing the delivered-state re-copy / download.
@@ -127,10 +120,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // Handle for the validate-stall timeout, cleared alongside the stream so
   // a dialog closed/reopened mid-validate doesn't leave the timer to fire.
   private _validateTimer = 0;
-  // Set when the decode ran against a build that no longer matches the
-  // running firmware, so the frames name the wrong lines. Read only when
-  // the report is built on click, so it drives no render.
-  private _staleBuild = false;
 
   static styles = [
     espHomeStyles,
@@ -243,31 +232,8 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._reportText = "";
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
-    this._staleBuild = false;
-    // Decided synchronously so the collecting gate is right on first paint;
-    // the common backend-streamed session already has its frames and waits
-    // for nothing.
-    this._decoding = needsBackendDecode(this._scrape);
     this._dialog.open = true;
     this._captureConfig(this._session);
-    this._decodeBacktrace(this._session);
-  }
-
-  // Fills in the decode for a session that arrived without one (Web Serial).
-  // Runs alongside _captureConfig; both hold the collecting spinner until
-  // they settle so the report can't be filed mid-decode.
-  private _decodeBacktrace(session: number): void {
-    void decodeCrashBacktrace(this._api, this._configuration, this._scrape)
-      .then((decode) => {
-        if (decode === null || session !== this._session) return;
-        // Reassign rather than mutate; _scrape is the reactive handle the
-        // report and the summary row both read.
-        this._scrape = { ...this._scrape, decodedFrames: decode.frames };
-        this._staleBuild = decode.staleBuild;
-      })
-      .finally(() => {
-        if (session === this._session) this._decoding = false;
-      });
   }
 
   private _captureConfig(session: number): void {
@@ -324,7 +290,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
       scrape: this._scrape,
       configYaml: this._configYaml ?? "",
       userDescription: this._userDescription.trim(),
-      staleBuild: this._staleBuild,
       meta: {
         deviceName: this._name,
         configuration: this._configuration,
@@ -512,11 +477,6 @@ export class ESPHomeCrashReportDialog extends LitElement {
   };
 
   protected render() {
-    // Once config capture lands the remaining wait is the decode, which can
-    // run to a minute; a spinner still claiming to validate the config reads
-    // as a hang, and a user who closes the dialog abandons the decode.
-    const waiting =
-      this._configYaml === null ? "crash_report.collecting" : "crash_report.decoding";
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
@@ -525,10 +485,10 @@ export class ESPHomeCrashReportDialog extends LitElement {
         @after-hide=${this._onAfterHide}
       >
         ${
-          this._configYaml === null || this._decoding
+          this._configYaml === null
             ? html`<div class="collecting">
                 <wa-spinner></wa-spinner>
-                <span>${this._localize(waiting)}</span>
+                <span>${this._localize("crash_report.collecting")}</span>
               </div>`
             : this._delivered
               ? this._renderDelivered()

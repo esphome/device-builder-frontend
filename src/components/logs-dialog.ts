@@ -21,6 +21,14 @@ import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { type CrashKind, detectCrashKind } from "../util/crash-detector.js";
+import {
+  type CrashDecode,
+  type CrashDecodeCache,
+  type CrashRegion,
+  CrashRegionCollector,
+  decodeCrashRegion,
+  interleaveDecoded,
+} from "../util/crash-decode.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LineBatcher } from "../util/line-batcher.js";
@@ -125,6 +133,22 @@ export class ESPHomeLogsDialog extends LitElement {
   @state()
   private _crashKind: CrashKind | null = null;
 
+  // Inline crash decoding. The collector accumulates a region as it streams;
+  // the counters map an absolute stream position onto _lines, which shifts as
+  // the cap drops from the front and as decoded output is spliced in.
+  private _crashRegion = new CrashRegionCollector();
+  // Scoped to the session: a reflash can leave the same addresses meaning
+  // different lines, so a decode must not outlive its buffer.
+  private _decodeCache: CrashDecodeCache = new Map();
+  private _streamIndex = 0;
+  private _dropped = 0;
+  private _inserted = 0;
+  // Bumped whenever the buffer is reset; a decode in flight against the old
+  // buffer must not splice into the new one.
+  private _bufferEpoch = 0;
+  // Serialises decodes so each splice lands before the next is positioned.
+  private _decodeChain: Promise<void> = Promise.resolve();
+
   // Rendered unconditionally in this dialog's template, so the query is
   // always resolved by the time the callout button can be clicked.
   @query("esphome-crash-report-dialog")
@@ -206,6 +230,7 @@ export class ESPHomeLogsDialog extends LitElement {
     void this._teardownSession();
     this._resetPendingLines();
     this._lines = [];
+    this._resetCrashDecode();
     this._crashKind = null;
     this._expanded = false;
     this._showStates = true;
@@ -568,6 +593,7 @@ export class ESPHomeLogsDialog extends LitElement {
   private _clearLogs() {
     this._resetPendingLines();
     this._lines = [];
+    this._resetCrashDecode();
     this._crashKind = null;
   }
 
@@ -582,7 +608,15 @@ export class ESPHomeLogsDialog extends LitElement {
   // direct recovery-path append (setSerialOpenFailed).
   private _appendCapped(lines: string[]): void {
     const merged = [...this._lines, ...lines];
+    // Track what scrolled off, so an absolute stream position still maps onto
+    // this array once the cap starts dropping from the front.
+    this._dropped += Math.max(0, merged.length - MAX_LOG_LINES);
     this._lines = merged.length > MAX_LOG_LINES ? merged.slice(-MAX_LOG_LINES) : merged;
+    for (const line of lines) {
+      const region = this._crashRegion.push(line, this._streamIndex);
+      this._streamIndex += 1;
+      if (region) this._queueDecode(region);
+    }
     if (this._crashKind !== "live") {
       const kind = detectCrashKind(lines);
       if (kind && kind !== this._crashKind) {
@@ -597,6 +631,61 @@ export class ESPHomeLogsDialog extends LitElement {
         }
       }
     }
+  }
+
+  // Decode completed crash regions one at a time, so each splice lands before
+  // the next region's position is computed. Fire-and-forget: the log keeps
+  // streaming while the backend's child works, and a failure leaves the raw
+  // dump untouched.
+  private _queueDecode(region: CrashRegion): void {
+    const epoch = this._bufferEpoch;
+    this._decodeChain = this._decodeChain
+      .then(async () => {
+        if (epoch !== this._bufferEpoch) return;
+        const decode = await decodeCrashRegion(
+          this._api,
+          this.configuration,
+          region.raw,
+          this._decodeCache
+        );
+        if (decode === null || epoch !== this._bufferEpoch) return;
+        this._spliceDecoded(region, decode);
+      })
+      .catch((err) => console.warn("Inline backtrace decode failed", err));
+  }
+
+  // Replace the region in the buffer with the same lines plus the decoder's
+  // output. Positioned by absolute stream index, then verified against the
+  // buffer: on a miss the region has churned and is left alone rather than
+  // decorated in the wrong place.
+  private _spliceDecoded(region: CrashRegion, decode: CrashDecode): void {
+    const { raw, startIndex } = region;
+    const at = startIndex - this._dropped + this._inserted;
+    if (at < 0 || at + raw.length > this._lines.length) return;
+    if (
+      this._lines[at] !== raw[0] ||
+      this._lines[at + raw.length - 1] !== raw[raw.length - 1]
+    ) {
+      return;
+    }
+    const decorated = interleaveDecoded(raw, decode);
+    const next = [...this._lines];
+    next.splice(at, raw.length, ...decorated);
+    this._inserted += decorated.length - raw.length;
+    const overflow = Math.max(0, next.length - MAX_LOG_LINES);
+    this._dropped += overflow;
+    this._lines = overflow ? next.slice(-MAX_LOG_LINES) : next;
+  }
+
+  // Reset the inline-decode bookkeeping; every field is relative to the
+  // current buffer, so anything in flight against the old one must be dropped.
+  private _resetCrashDecode(): void {
+    this._bufferEpoch += 1;
+    this._streamIndex = 0;
+    this._dropped = 0;
+    this._inserted = 0;
+    this._crashRegion.take();
+    this._decodeCache.clear();
   }
 
   // Drain pending lines into ``_lines`` now, trimmed to the newest
