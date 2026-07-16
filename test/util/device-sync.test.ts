@@ -20,36 +20,18 @@ describe("device-sync mDNS gating", () => {
     }
   });
 
-  it("trusts an api device's deployed identity only while mDNS is the live source", () => {
-    expect(
-      deployedIdentityTrusted(
-        makeConfiguredDevice({
-          api_enabled: true,
-          runtime_state: { active_source: "mdns" },
-        })
-      )
-    ).toBe(true);
-    for (const s of ["ping", "mqtt", "unknown"] as const) {
-      expect(
-        deployedIdentityTrusted(
-          makeConfiguredDevice({ api_enabled: true, runtime_state: { active_source: s } })
-        )
-      ).toBe(false);
-    }
-  });
-
-  it("trusts a no-api device's deployed identity regardless of the live source", () => {
-    // Delivered over _http._tcp, which never claims reachability, so
-    // active_source can't vouch for it.
+  it("trusts the deployed identity per api_enabled and live source", () => {
+    // An api device needs a live mDNS; a no-api device's identity arrives
+    // over _http._tcp, which never claims reachability, so active_source
+    // can't vouch for it and the delivered value is trusted as-is.
     for (const s of ["mdns", "ping", "mqtt", "unknown"] as const) {
-      expect(
-        deployedIdentityTrusted(
-          makeConfiguredDevice({
-            api_enabled: false,
-            runtime_state: { active_source: s },
-          })
-        )
-      ).toBe(true);
+      for (const api_enabled of [true, false]) {
+        expect(
+          deployedIdentityTrusted(
+            makeConfiguredDevice({ api_enabled, runtime_state: { active_source: s } })
+          )
+        ).toBe(api_enabled ? s === "mdns" : true);
+      }
     }
   });
 

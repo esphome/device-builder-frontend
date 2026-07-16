@@ -23,15 +23,10 @@ export enum DeviceState {
 export interface DeviceRuntimeState {
   state: DeviceState;
   /** Reachability channel currently driving the device's online state
-   *  (``mdns`` > ``mqtt`` > ``ping``). For an api: device the deployed
-   *  version / config hash come from the same ``_esphomelib._tcp``
-   *  broadcast that claims mDNS, so the out-of-sync / update indicators
-   *  are gated on ``active_source === "mdns"`` (see
-   *  ``src/util/device-sync.ts``): when mDNS is dark those values are
-   *  stale. A device without api: receives them on ``_http._tcp``,
-   *  which never claims reachability, so this field can't vouch for
-   *  them. ``"unknown"`` means no source has claimed the device yet,
-   *  which reads as "not mDNS". */
+   *  (``mdns`` > ``mqtt`` > ``ping``). The out-of-sync / update
+   *  indicators gate on it per the rule in ``deployedIdentityTrusted``
+   *  (``src/util/device-sync.ts``). ``"unknown"`` means no source has
+   *  claimed the device yet, which reads as "not mDNS". */
   active_source: ReachabilitySource;
   /** All resolved addresses from mDNS (IPv4 + IPv6) — empty array until
    *  the device is seen online. ``ip_addresses[0]`` matches the flat

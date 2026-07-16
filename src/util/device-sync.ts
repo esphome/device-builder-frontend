@@ -1,23 +1,23 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 
-// The deployed version / config hash come only from the device's mDNS
-// broadcast, so they are trustworthy only while mDNS is the live source. When
-// mDNS is dark (a ping/MQTT-only "odd setup", e.g. a Docker-bridge dashboard),
-// those values go stale, so we gate the out-of-sync / update indicators on a
-// live mDNS rather than flagging a false "out of sync". The device reappears
-// as out-of-sync once mDNS hears from it again.
+// Whether mDNS is the channel currently driving the device's online state.
+// For gating the deployed identity (version / config hash) use
+// deployedIdentityTrusted below, never this directly — this predicate can
+// never be true for a device without api:.
 export const mdnsOnline = (d: ConfiguredDevice): boolean =>
   d.runtime_state.active_source === "mdns";
 
 // Whether the mDNS-sourced deployed identity (version / config hash) is
 // trustworthy. An api: device broadcasts it on _esphomelib._tcp, the same
 // service that claims active_source === "mdns", so that source doubles as the
-// freshness signal. A device without api: broadcasts the same identity trio on
-// _http._tcp (ESPHome 2026.7.0+), which by backend design never claims
-// reachability, so active_source can't vouch for it and would blank the values
-// forever; trust what the backend delivered instead. The drawer's mDNS-stale
-// warning already covers the "reachable but mDNS dark, values may be stale"
-// case for these devices.
+// freshness signal: when mDNS is dark (a ping/MQTT-only "odd setup", e.g. a
+// Docker-bridge dashboard) the values go stale, so blanking them avoids a
+// false "out of sync". A device without api: broadcasts the same identity
+// trio on _http._tcp (ESPHome 2026.7.0+), which by backend design never
+// claims reachability, so active_source can't vouch for it and would blank
+// the values forever; trust what the backend delivered instead. The drawer's
+// mDNS-stale warning already covers the "reachable but mDNS dark, values may
+// be stale" case for these devices.
 export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
   d.api_enabled ? mdnsOnline(d) : true;
 
