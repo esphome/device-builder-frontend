@@ -1,10 +1,10 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 
 // Whether mDNS is the channel currently driving the device's online state.
-// For gating the deployed identity (version / config hash) use
-// deployedIdentityTrusted below, never this directly — this predicate can
-// never be true for a device without api:.
-export const mdnsOnline = (d: ConfiguredDevice): boolean =>
+// Deliberately unexported: for gating the deployed identity (version /
+// config hash) use deployedIdentityTrusted below, never this directly —
+// this predicate can never be true for a device without api:.
+const mdnsOnline = (d: ConfiguredDevice): boolean =>
   d.runtime_state.active_source === "mdns";
 
 // Whether the mDNS-sourced deployed identity (version / config hash) is
@@ -17,7 +17,9 @@ export const mdnsOnline = (d: ConfiguredDevice): boolean =>
 // claims reachability, so active_source can't vouch for it and would blank
 // the values forever; trust what the backend delivered instead. The drawer's
 // mDNS-stale warning already covers the "reachable but mDNS dark, values may
-// be stale" case for these devices.
+// be stale" case for these devices; a fully OFFLINE device falls outside that
+// warning yet still renders its last-heard identity — accepted, since that's
+// the best information available for a powered-down device.
 export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
   d.api_enabled ? mdnsOnline(d) : true;
 

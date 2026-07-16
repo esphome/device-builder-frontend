@@ -2,24 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   deployedIdentityTrusted,
-  mdnsOnline,
   showPendingChanges,
   showUpdateAvailable,
 } from "../../src/util/device-sync.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 describe("device-sync mDNS gating", () => {
-  it("is mDNS-online only when the live source is mDNS", () => {
-    expect(
-      mdnsOnline(makeConfiguredDevice({ runtime_state: { active_source: "mdns" } }))
-    ).toBe(true);
-    for (const s of ["ping", "mqtt", "unknown"] as const) {
-      expect(
-        mdnsOnline(makeConfiguredDevice({ runtime_state: { active_source: s } }))
-      ).toBe(false);
-    }
-  });
-
   it("trusts the deployed identity per api_enabled and live source", () => {
     // An api device needs a live mDNS; a no-api device's identity arrives
     // over _http._tcp, which never claims reachability, so active_source
