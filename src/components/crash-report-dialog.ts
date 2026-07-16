@@ -117,6 +117,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // populate this session's config.
   private _session = 0;
   private _validateStreamId = "";
+  // Handle for the validate-stall timeout, cleared alongside the stream so
+  // a dialog closed/reopened mid-validate doesn't leave the timer to fire.
+  private _validateTimer = 0;
 
   static styles = [
     espHomeStyles,
@@ -229,9 +232,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
 
   private _captureConfig(session: number): void {
     const collected: string[] = [];
-    let timer = 0;
     const finish = (yaml: string, error: "" | "invalid" | "transport") => {
-      clearTimeout(timer);
+      clearTimeout(this._validateTimer);
+      this._validateTimer = 0;
       if (session !== this._session) return;
       this._validateStreamId = "";
       if (this._dialog.open) {
@@ -241,7 +244,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     };
     // A stalled stream must not stick the spinner forever; a stall is a
     // transport issue, not the user's config.
-    timer = window.setTimeout(() => {
+    this._validateTimer = window.setTimeout(() => {
       if (session !== this._session) return;
       this._stopValidateStream();
       finish("", "transport");
@@ -264,6 +267,8 @@ export class ESPHomeCrashReportDialog extends LitElement {
   // Kill an in-flight validate so an abandoned session doesn't leave the
   // backend's esphome config subprocess running to completion.
   private _stopValidateStream(): void {
+    clearTimeout(this._validateTimer);
+    this._validateTimer = 0;
     if (!this._validateStreamId) return;
     void this._api
       .stopStream(this._validateStreamId)

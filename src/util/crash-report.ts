@@ -260,7 +260,9 @@ export function buildFullReport(report: CrashReport): string {
   const { scrape, meta, configYaml } = report;
   const sections: string[] = [`# Crash report: ${meta.deviceName}`];
   if (report.userDescription) {
-    sections.push("## What happened", report.userDescription);
+    // Fence the user's prose so a stray ``` run in it can't close the
+    // surrounding markdown and hide the sections below.
+    sections.push("## What happened", fence([report.userDescription], ""));
   }
   sections.push("## Decoded backtrace");
   if (scrape.decodedFrames.length > 0) {
@@ -348,7 +350,13 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // The user's own context leads the problem field, then the platform /
   // installation the dropdowns can't be prefilled with, then the trace.
   const head: string[] = report.userDescription
-    ? [report.userDescription, "", "(Crash detected in the Device Builder log viewer.)"]
+    ? [
+        // Fenced so a stray ``` in the prose can't swallow the facts and
+        // backtrace that follow it in this field.
+        fence([report.userDescription], ""),
+        "",
+        "(Crash detected in the Device Builder log viewer.)",
+      ]
     : [`The device crashed (crash detected in the Device Builder log viewer).`];
   const facts = [
     platform && `Platform: ${platform}`,

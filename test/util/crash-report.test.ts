@@ -179,6 +179,18 @@ describe("buildFullReport", () => {
     expect(text).not.toContain("```yaml");
   });
 
+  it("fences the user description so a stray backtick run can't hide sections", () => {
+    const text = buildFullReport(
+      report({ userDescription: "ran this:\n```\ncode\n```\nthen it crashed" })
+    );
+    // The description is fenced wider than its own ``` run, so every
+    // heading below "What happened" survives intact.
+    expect(text).toContain("````");
+    expect(text).toContain("ran this:");
+    expect(text).toContain("## Decoded backtrace");
+    expect(text).toContain("## Environment");
+  });
+
   it("widens the code fence when content contains a backtick run", () => {
     // A config with a ``` run must not close the fence early.
     const text = buildFullReport(report({ configYaml: "note: |\n  ``` not a fence" }));
