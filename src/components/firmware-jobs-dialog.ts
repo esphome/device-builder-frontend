@@ -275,8 +275,9 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   };
 
   private _onResetPeerConfirmed = async () => {
+    // Deliberately not cleared: the closing dialog's heading/message still
+    // bind to it, and the next openResetPeerBuildEnv overwrites it anyway.
     const pending = this._pendingResetPeer;
-    this._pendingResetPeer = null;
     if (pending === null) return;
     let job: FirmwareJob;
     try {

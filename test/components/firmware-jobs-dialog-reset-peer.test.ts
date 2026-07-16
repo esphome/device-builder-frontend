@@ -112,7 +112,9 @@ describe("_onResetPeerConfirmed", () => {
     });
     expect(followJob).toHaveBeenCalledTimes(1);
     expect(followJob.mock.calls[0][0]).toBe(job);
-    expect(el._pendingResetPeer).toBeNull();
+    // Stays set so the closing confirm dialog keeps its label; the next
+    // openResetPeerBuildEnv overwrites it.
+    expect(el._pendingResetPeer).toEqual({ pin_sha256: PIN, label: "mac-studio" });
   });
 
   it("toasts the failure with the pairing label when the command rejects", async () => {
