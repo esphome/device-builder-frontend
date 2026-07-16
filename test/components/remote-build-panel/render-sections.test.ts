@@ -32,6 +32,9 @@ function makePeer(overrides: Partial<PeerSummary> = {}): PeerSummary {
     status: "approved",
     peer_ip: "192.168.1.42",
     connected: true,
+    friendly_name: "",
+    ha_addon: false,
+    label_auto: false,
     ...overrides,
   };
 }

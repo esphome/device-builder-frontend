@@ -5,10 +5,15 @@ import {
   JobStatus,
   JobType,
 } from "../../api/types/firmware-jobs.js";
+import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import { effectiveJobType } from "../../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
+import {
+  jobPeerDisplayName,
+  pairingDisplayNameForPin,
+} from "../../util/pairing-display-name.js";
 
 /**
  * What a host must expose to render the shared jobs list.
@@ -20,6 +25,13 @@ export interface FirmwareJobsListHost {
   _localize: LocalizeFunc;
   /** Wall-clock anchor for relative timestamps; hosts tick it while visible. */
   _now: number;
+  /**
+   * Live pairing / peer registries for display-name resolution — the
+   * handshake friendly name wins over the job's snapshot label. Either
+   * may be null on hosts (or deployments) without the matching side.
+   */
+  _pairings: Map<string, PairingSummary> | null;
+  _buildServerPeers: PeerSummary[] | null;
   _jobDisplayName(job: FirmwareJob): string;
   _openJob(job: FirmwareJob): void;
   _onCancelClick(e: Event, job: FirmwareJob): void;
@@ -169,10 +181,11 @@ function renderRowAction(host: FirmwareJobsListHost, job: FirmwareJob): Template
   `;
 }
 
-// Picked up from source_label (snapshotted at job creation) so the row text
-// doesn't churn if the pairing is later renamed. Symmetric receiver-side
-// rendering: when remote_peer is set, the job was submitted from another
-// dashboard's offloader.
+// Names the build server from the live pairing (rename-aware, handshake
+// friendly name) via pairingDisplayNameForPin, falling back to the job's
+// creation-time source_label snapshot when the pairing is gone. Symmetric
+// receiver-side rendering: when remote_peer is set, the job was submitted
+// from another dashboard's offloader.
 // Exported for unit testing of the per-source row line (building-on /
 // waiting-for-server / submitted-by).
 export function renderSourceLine(
@@ -180,9 +193,14 @@ export function renderSourceLine(
   job: FirmwareJob
 ): TemplateResult | typeof nothing {
   if (job.source === JobSource.REMOTE && job.source_label) {
+    const name = pairingDisplayNameForPin(
+      host._pairings,
+      job.source_pin_sha256,
+      job.source_label
+    );
     const display = job.source_esphome_version
-      ? `${job.source_label} (${job.source_esphome_version})`
-      : job.source_label;
+      ? `${name} (${job.source_esphome_version})`
+      : name;
     return html`
       <div class="job-source">
         ${host._localize("firmware_jobs.building_on", {
@@ -200,7 +218,7 @@ export function renderSourceLine(
     `;
   }
   if (job.remote_peer) {
-    const peer = job.remote_peer_label || job.remote_peer;
+    const peer = jobPeerDisplayName(host._buildServerPeers, job);
     return html`
       <div class="job-source">
         ${host._localize("firmware_jobs.submitted_by", { label: peer })}

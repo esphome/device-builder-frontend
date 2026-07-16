@@ -4,7 +4,12 @@ import type { PairingSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { trimTrailingDot } from "../../util/hostname.js";
-import { classifyVersionMismatch } from "../../util/version-mismatch.js";
+import { pairingDisplayName } from "../../util/pairing-display-name.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
+import {
+  classifyVersionMismatch,
+  isPinnableVersion,
+} from "../../util/version-mismatch.js";
 
 interface PillResult {
   pillClass: string;
@@ -44,6 +49,7 @@ interface PairingRowContext {
   onBuildRemote: (pairing: PairingSummary) => void;
   onViewBuild: (jobId: string) => void;
   onEditEndpoint: (pairing: PairingSummary) => void;
+  onResetBuildEnv: (pairing: PairingSummary) => void;
   onUnpair: (pairing: PairingSummary) => void;
 }
 
@@ -59,14 +65,16 @@ export function renderPairingRow(
     onBuildRemote,
     onViewBuild,
     onEditEndpoint,
+    onResetBuildEnv,
     onUnpair,
   } = ctx;
   const { pillClass, pillLabel } = pillFor(pairing, localize);
+  const displayName = pairingDisplayName(pairing);
   return html`
     <div class="row peer-row row--stacked">
       <div class="row-label">
         <span class="row-title">
-          ${pairing.label}
+          ${displayName}
           <span class=${pillClass}>${pillLabel}</span>
           ${
             pairing.status === "approved"
@@ -75,7 +83,7 @@ export function renderPairingRow(
                     class="toggle pairing-toggle"
                     role="switch"
                     aria-label=${localize("settings.build_offload_pairing_enabled_aria", {
-                      label: pairing.label,
+                      label: displayName,
                     })}
                     aria-checked=${pairing.enabled}
                     title=${localize("settings.build_offload_pairing_enabled_title")}
@@ -111,7 +119,7 @@ export function renderPairingRow(
                   type="button"
                   class="btn-build-remote"
                   aria-label=${localize("settings.remote_build_submit_aria", {
-                    label: pairing.label,
+                    label: displayName,
                   })}
                   @click=${() => onBuildRemote(pairing)}
                 >
@@ -127,7 +135,7 @@ export function renderPairingRow(
                   type="button"
                   class="btn-view-remote-build"
                   aria-label=${localize("settings.remote_build_view_aria", {
-                    label: pairing.label,
+                    label: displayName,
                   })}
                   @click=${() => onViewBuild(latestJob.job_id)}
                 >
@@ -137,33 +145,59 @@ export function renderPairingRow(
             : nothing
         }
         ${
+          canResetBuildEnv(pairing)
+            ? html`
+                <button
+                  type="button"
+                  id="btn-reset-${pairing.pin_sha256}"
+                  class="btn-reset-peer-env"
+                  aria-label=${localize("settings.reset_peer_env_aria", {
+                    label: displayName,
+                  })}
+                  @click=${() => onResetBuildEnv(pairing)}
+                >
+                  <wa-icon library="mdi" name="broom"></wa-icon>
+                </button>
+                <wa-tooltip for="btn-reset-${pairing.pin_sha256}">
+                  ${localize("settings.reset_peer_env_aria", { label: displayName })}
+                </wa-tooltip>
+              `
+            : nothing
+        }
+        ${
           pairing.status === "approved"
             ? html`
                 <button
                   type="button"
+                  id="btn-edit-${pairing.pin_sha256}"
                   class="btn-edit-endpoint"
                   aria-label=${localize("settings.edit_pairing_endpoint_aria", {
-                    label: pairing.label,
-                  })}
-                  title=${localize("settings.edit_pairing_endpoint_aria", {
-                    label: pairing.label,
+                    label: displayName,
                   })}
                   @click=${() => onEditEndpoint(pairing)}
                 >
                   <wa-icon library="mdi" name="pencil"></wa-icon>
                 </button>
+                <wa-tooltip for="btn-edit-${pairing.pin_sha256}">
+                  ${localize("settings.edit_pairing_endpoint_aria", {
+                    label: displayName,
+                  })}
+                </wa-tooltip>
               `
             : nothing
         }
         <button
           type="button"
+          id="btn-unpair-${pairing.pin_sha256}"
           class="peer-remove"
-          aria-label=${localize("settings.unpair_aria", { label: pairing.label })}
-          title=${localize("settings.unpair_action")}
+          aria-label=${localize("settings.unpair_aria", { label: displayName })}
           @click=${() => onUnpair(pairing)}
         >
           <wa-icon library="mdi" name="delete"></wa-icon>
         </button>
+        <wa-tooltip for="btn-unpair-${pairing.pin_sha256}">
+          ${localize("settings.unpair_aria", { label: displayName })}
+        </wa-tooltip>
       </div>
     </div>
   `;
@@ -179,6 +213,22 @@ function renderPeerVersion(
   // doesn't. Hidden until the first handshake fills in esphome_version.
   if (pairing.status !== "approved" || !pairing.esphome_version) return nothing;
   const kind = classifyVersionMismatch(appVersion, pairing.esphome_version);
+  // A mismatch the receiver can auto-provision isn't a caution: builds
+  // run with this dashboard's own version in a venv on the server.
+  if (
+    kind !== null &&
+    pairing.auto_provision_supported &&
+    isPinnableVersion(appVersion)
+  ) {
+    return html`
+      <span class="row-desc">
+        ${localize("settings.build_offload_pairing_version_auto_provision", {
+          peer: pairing.esphome_version,
+          local: appVersion,
+        })}
+      </span>
+    `;
+  }
   if (kind === null) {
     return html`
       <span class="row-desc">

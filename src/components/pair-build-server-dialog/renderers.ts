@@ -251,6 +251,7 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
         )}
         @input=${(e: Event) => {
           host._offloaderLabel = (e.target as HTMLInputElement).value;
+          host._offloaderLabelTouched = true;
           host._error = null;
         }}
       />

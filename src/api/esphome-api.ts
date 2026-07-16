@@ -2078,6 +2078,8 @@ export class ESPHomeAPI {
     receiver_label: string;
     offloader_label: string;
     pairing_key?: string;
+    offloader_label_auto?: boolean;
+    receiver_label_auto?: boolean;
   }): Promise<PairingSummary> {
     return this.sendCommand<PairingSummary>("remote_build/request_pair", args);
   }
@@ -2232,6 +2234,15 @@ export class ESPHomeAPI {
     job_id: string;
   }): Promise<{ sent: boolean }> {
     return this.sendCommand<{ sent: boolean }>("remote_build/cancel_job", args);
+  }
+
+  /**
+   * Enqueue a mirror job that resets the whole build environment on
+   * the build server behind ``pin_sha256``; progress streams through
+   * the normal job events. Gated on `reset_build_env_supported`.
+   */
+  async remoteBuildResetPeerBuildEnv(args: { pin_sha256: string }): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("remote_build/reset_peer_build_env", args);
   }
 
   // ─── Remote build: receiver identity ──────────

@@ -54,7 +54,7 @@ import {
   renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
+import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./ansi-log.js";
@@ -138,6 +138,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // (e.g. WS dropped) still shows the local hint.
   @state() _jobSource: JobSource = JobSource.LOCAL;
   @state() _jobSourceLabel = "";
+  @state() _jobSourcePin = "";
 
   @state() _logLines: string[] = [];
   @state() _logsExpanded = false;
@@ -286,6 +287,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._failedDuringValidate = false;
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
+    this._jobSourcePin = "";
     this._timer.reset();
     this._usbFirmware = null;
     this._usbFirmwareName = "";
@@ -403,6 +405,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this.dispatchEvent(
       new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
     );
+  };
+
+  _tryResetRemoteBuildEnv = (pin: string) => {
+    this._close();
+    requestResetPeerBuildEnv(this, pin);
   };
 
   _toggleShowLogsAfterInstall = () => {

@@ -192,6 +192,7 @@ function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
     source: job.source,
     source_label: job.source_label,
     source_esphome_version: job.source_esphome_version,
+    source_pin_sha256: job.source_pin_sha256,
   };
   followJob(host, job.job_id);
 }

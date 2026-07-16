@@ -6,11 +6,16 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { OffloaderPinMismatchAlert } from "../api/types/remote-build-events.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { apiContext, localizeContext } from "../context/index.js";
+import {
+  apiContext,
+  buildOffloadPairingsContext,
+  localizeContext,
+} from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { friendlyHostname, trimTrailingDot } from "../util/hostname.js";
+import { pairingDisplayNameForPin } from "../util/pairing-display-name.js";
 import { formatPinSha256 } from "../util/pin-format.js";
 import {
   buildReauthPairRequest,
@@ -114,6 +119,10 @@ export class ESPHomeReauthWizardDialog extends LitElement {
   @consume({ context: apiContext })
   private _api?: ESPHomeAPI;
 
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  private _pairings: Map<string, PairingSummary> | null = null;
+
   @state() private _open = false;
   @state() private _step: Step = 1;
   @state() private _alert: OffloaderPinMismatchAlert | null = null;
@@ -146,6 +155,19 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     this._busy = false;
     this._errorKey = null;
     this._open = true;
+  }
+
+  // Display name for the alert's receiver. The alert snapshot carries only
+  // the pair-time ``receiver_label`` (the auto-derived hostname for an
+  // unnamed pairing), so prefer the live pairing's resolved name; the
+  // ``target`` line shows the endpoint separately, so the bare name is
+  // right here. Falls back to the snapshot when the pairing is gone.
+  private _displayLabel(alert: OffloaderPinMismatchAlert): string {
+    return pairingDisplayNameForPin(
+      this._pairings,
+      alert.pin_sha256,
+      alert.receiver_label
+    );
   }
 
   close(): void {
@@ -211,7 +233,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
           // restart from the alert so they re-OOB against a
           // fresh observation. Retrying inline would silently
           // rebind verification to a pin they never saw.
-          this._dispatchResult("pin_changed", alert.receiver_label);
+          this._dispatchResult("pin_changed", this._displayLabel(alert));
           this._open = false;
           return;
         }
@@ -255,7 +277,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
         composed: true,
       })
     );
-    this._dispatchResult("success", alert.receiver_label);
+    this._dispatchResult("success", this._displayLabel(alert));
     this._open = false;
   };
 
@@ -277,7 +299,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     return html`
       <p class="lede">
         ${this._localize("settings.reauth_wizard_step1_body", {
-          label: alert.receiver_label,
+          label: this._displayLabel(alert),
           target,
         })}
       </p>
@@ -334,7 +356,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     return html`
       <p class="lede">
         ${this._localize("settings.reauth_wizard_step3_lede", {
-          label: alert.receiver_label,
+          label: this._displayLabel(alert),
         })}
       </p>
       <div class="pin-block pin-block-solo">
@@ -361,7 +383,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
           ? html`
               <div class="step-error" role="alert">
                 ${this._localize(this._errorKey, {
-                  label: alert.receiver_label,
+                  label: this._displayLabel(alert),
                 })}
               </div>
             `

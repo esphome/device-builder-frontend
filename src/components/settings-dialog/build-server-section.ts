@@ -32,6 +32,7 @@ import { renderPairingAddress } from "../shared/pairing-address.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
+import { peerDisplayName } from "../../util/pairing-display-name.js";
 import { formatSecondsAgo } from "../../util/relative-time.js";
 import { RemoteBuildIdentityController } from "../../util/remote-build-identity-controller.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
@@ -170,7 +171,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
       <div class="row peer-row peer-row-approved">
         <div class="row-label">
           <span class="row-title">
-            ${peer.label}
+            ${peerDisplayName(peer)}
             <span class=${pill.className}>${this._localize(pill.labelKey)}</span>
           </span>
           <!--
@@ -221,7 +222,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
           type="button"
           class="peer-remove"
           aria-label=${this._localize("settings.build_server_peer_remove_aria", {
-            label: peer.label,
+            label: peerDisplayName(peer),
           })}
           title=${this._localize("settings.build_server_peer_remove")}
           @click=${() => this._onRemovePeerRequest(peer.dashboard_id)}

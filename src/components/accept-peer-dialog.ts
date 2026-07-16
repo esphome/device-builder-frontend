@@ -3,6 +3,7 @@ import { mdiShieldAlertOutline } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { PeerSummary } from "../api/types/remote-build.js";
+import { peerDisplayName } from "../util/pairing-display-name.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
@@ -190,7 +191,7 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
             peer
               ? html`
                   <div class="peer-card">
-                    <div class="peer-name">${peer.label}</div>
+                    <div class="peer-name">${peerDisplayName(peer)}</div>
                     <div class="peer-row">
                       <span class="label">
                         ${this._localize(

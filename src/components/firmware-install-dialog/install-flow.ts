@@ -7,6 +7,7 @@ import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { triggerDownload } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import { openFlasher } from "../../util/usb-flasher.js";
@@ -307,7 +308,11 @@ function failNoBinaries(
 ): void {
   if (isEmpty && host._jobSource === JobSource.REMOTE) {
     const receiver =
-      host._jobSourceLabel || host._localize("firmware.no_binaries_remote_server");
+      pairingDisplayNameForPin(
+        host._pairings,
+        host._jobSourcePin,
+        host._jobSourceLabel
+      ) || host._localize("firmware.no_binaries_remote_server");
     host._fail(
       host._localize("firmware.no_binaries_remote", { receiver }),
       host._localize("firmware.no_binaries_remote_detail")
@@ -601,6 +606,7 @@ export function compileAndWait(
       // "ask the operator of <receiver>" instruction.
       host._jobSource = job.source;
       host._jobSourceLabel = job.source_label;
+      host._jobSourcePin = job.source_pin_sha256;
       host._streamId = host._api.firmwareFollowJob(job.job_id, {
         onOutput: (line) => {
           if (host._step === "queued") {

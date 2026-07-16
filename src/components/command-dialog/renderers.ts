@@ -3,7 +3,10 @@ import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware
 import { activeLocale } from "../../common/localize.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 import { formatElapsed } from "../../util/format-job-time.js";
+import { isPinnableVersion } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 import {
   renderOffloadHint,
@@ -35,10 +38,22 @@ export function renderRemoteBuilderSubLine(
   if (source !== JobSource.REMOTE || !label) return nothing;
   // source_esphome_version is also a job-creation-time snapshot; empty when
   // the pairing hadn't completed a peer-link session yet. Render "<label>
-  // (<version>)" so the operator can spot version skew vs the offloader.
-  const version =
+  // (<version>)" with the version that actually builds the firmware: a
+  // receiver that auto-provisions a mismatch compiles with this
+  // dashboard's own esphome in a venv, not its installed one.
+  const receiverVersion =
     liveJob?.source_esphome_version ?? host._primedSource?.source_esphome_version ?? "";
-  const display = version ? `${label} (${version})` : label;
+  const pin = liveJob?.source_pin_sha256 ?? host._primedSource?.source_pin_sha256 ?? "";
+  const buildsLocalVersion =
+    receiverVersion !== "" &&
+    receiverVersion !== host._appVersion &&
+    isPinnableVersion(host._appVersion) &&
+    (host._pairings?.get(pin)?.auto_provision_supported ?? false);
+  const version = buildsLocalVersion ? host._appVersion : receiverVersion;
+  // The live pairing's display name (handshake friendly name, rename-aware)
+  // wins over the job's creation-time source_label snapshot.
+  const name = pairingDisplayNameForPin(host._pairings, pin, label);
+  const display = version ? `${name} (${version})` : name;
   // Only allow override for in-flight install — switching mid-upload or
   // mid-compile is a power-user shape without a UI today.
   const canOverride = host._commandType === "install";
@@ -125,7 +140,19 @@ export function renderResetSuggestion(
   if (host._commandType !== "install" && host._commandType !== "compile") {
     return nothing;
   }
-  return renderBuildFailureSuggestion(host, remotePeerLabel(host));
+  return renderBuildFailureSuggestion(host, remotePeerLabel(host), remoteResetPin(host));
+}
+
+// The pin to offer a remote build-env reset against: non-null only when
+// the failed job ran on a pairing that advertises the capability and is
+// still connected.
+function remoteResetPin(host: ESPHomeCommandDialog): string | null {
+  const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
+  const primed = host._primedSource;
+  if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
+  const pin = live?.source_pin_sha256 ?? primed?.source_pin_sha256 ?? "";
+  const pairing = pin ? host._pairings?.get(pin) : undefined;
+  return pairing && canResetBuildEnv(pairing) ? pin : null;
 }
 
 // Resolve the receiver label for a REMOTE-sourced job. Returns null for
@@ -135,7 +162,10 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
   const primed = host._primedSource;
   if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
-  return live?.source_label || primed?.source_label || null;
+  const label = live?.source_label || primed?.source_label || null;
+  if (label === null) return null;
+  const pin = live?.source_pin_sha256 ?? primed?.source_pin_sha256 ?? "";
+  return pairingDisplayNameForPin(host._pairings, pin, label);
 }
 
 // Don't show the run timer until it would read at least "1s" — below that it

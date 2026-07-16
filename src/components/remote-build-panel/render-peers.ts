@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { PeerSummary } from "../../api/types/remote-build.js";
 import { activeLocale } from "../../common/localize.js";
+import { peerDisplayName } from "../../util/pairing-display-name.js";
 import { pairedAgoSeconds, peerConnectionPill } from "../../util/peer-display.js";
 import { formatSecondsAgo } from "../../util/relative-time.js";
 import type { ESPHomeRemoteBuildPanel } from "../remote-build-panel.js";
@@ -17,7 +18,7 @@ export function renderRequestCard(
       <div class="request-body">
         <div class="request-title">
           ${host._localize("remote_build_dashboard.request_title", {
-            label: peer.label,
+            label: peerDisplayName(peer),
           })}
         </div>
         ${
@@ -35,7 +36,7 @@ export function renderRequestCard(
         type="button"
         class="primary-action"
         aria-label=${host._localize("settings.build_server_peer_review_aria", {
-          label: peer.label,
+          label: peerDisplayName(peer),
         })}
         @click=${() => host._reviewRequest(peer)}
       >
@@ -98,7 +99,7 @@ function renderPeerRow(host: ESPHomeRemoteBuildPanel, peer: PeerSummary): Templa
     <div class="peer-line">
       <wa-icon library="mdi" name="monitor-dashboard"></wa-icon>
       <div class="peer-line-body">
-        <span class="peer-line-title">${peer.label}</span>
+        <span class="peer-line-title">${peerDisplayName(peer)}</span>
         ${
           pairedAgo !== null
             ? html`

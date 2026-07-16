@@ -1172,6 +1172,24 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
+  it("remoteBuildResetPeerBuildEnv sends remote_build/reset_peer_build_env and returns the mirror job", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.remoteBuildResetPeerBuildEnv({
+      pin_sha256: "a".repeat(64),
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/reset_peer_build_env");
+    expect(sent.args).toEqual({ pin_sha256: "a".repeat(64) });
+    const result = { job_id: "reset-1", job_type: "reset_build_env", status: "queued" };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
   it("unpairRemoteBuild sends remote_build/unpair with pin_sha256", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);

@@ -20,6 +20,11 @@ function makeSummary(pin: string, enabled: boolean): PairingSummary {
     last_connect_error: "",
     esphome_version: "",
     enabled,
+    auto_provision_supported: false,
+    friendly_name: "",
+    ha_addon: false,
+    reset_build_env_supported: false,
+    receiver_label_auto: false,
   };
 }
 

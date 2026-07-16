@@ -68,7 +68,7 @@ import {
   termButtonStyles,
   termTokens,
 } from "./process-terminal/process-terminal.styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
+import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
@@ -182,6 +182,7 @@ export class ESPHomeCommandDialog extends LitElement {
     source: JobSource;
     source_label: string;
     source_esphome_version: string;
+    source_pin_sha256: string;
   } | null = null;
 
   // True while "Build locally instead" override is mid-flight.
@@ -345,6 +346,7 @@ export class ESPHomeCommandDialog extends LitElement {
       source: job.source,
       source_label: job.source_label,
       source_esphome_version: job.source_esphome_version,
+      source_pin_sha256: job.source_pin_sha256,
     };
     // Reattaching to a still-running (or finished) build: restore the true
     // compile clock so the replayed buffer doesn't restart the timer from now.
@@ -453,6 +455,11 @@ export class ESPHomeCommandDialog extends LitElement {
     this.dispatchEvent(
       new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
     );
+  };
+
+  _tryResetRemoteBuildEnv = (pin: string) => {
+    this.close();
+    requestResetPeerBuildEnv(this, pin);
   };
 
   _toggleShowLogsAfterInstall = () => {

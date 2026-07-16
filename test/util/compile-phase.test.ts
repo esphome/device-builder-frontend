@@ -127,6 +127,19 @@ describe("isCompileEndLine", () => {
     );
   });
 
+  it("matches esphome's success line on native esp-idf (no pio banner)", () => {
+    expect(
+      isCompileEndLine(
+        "\x1b[32mINFO Successfully compiled program to path '/data/build/x/.pioenvs/x/program'\x1b[0m\n"
+      )
+    ).toBe(true);
+    expect(isCompileEndLine("INFO Successfully compiled program.")).toBe(true);
+  });
+
+  it("matches ninja's build-stopped closer on a failed esp-idf build", () => {
+    expect(isCompileEndLine("ninja: build stopped: subcommand failed.")).toBe(true);
+  });
+
   it("does not match ordinary build output", () => {
     expect(isCompileEndLine("Compiling .pio/build/esp32dev/src/main.cpp.o")).toBe(false);
     expect(isCompileEndLine("[117/1247] Building C object")).toBe(false);

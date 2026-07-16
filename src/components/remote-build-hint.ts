@@ -1,6 +1,31 @@
 import { css, html, type TemplateResult } from "lit";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { splitTemplate } from "../util/template-split.js";
+
+/**
+ * Whether the remote build-env reset can be offered for a pairing: it's an
+ * approved, connected build server that advertised the capability. Single
+ * home for the rule the pairing row and both failure-hint renderers gate on.
+ */
+export function canResetBuildEnv(pairing: PairingSummary): boolean {
+  return (
+    pairing.status === "approved" &&
+    pairing.connected &&
+    pairing.reset_build_env_supported
+  );
+}
+
+/** Route *pin*'s confirm-then-follow remote reset to the firmware-jobs dialog. */
+export function requestResetPeerBuildEnv(el: HTMLElement, pin: string): void {
+  el.dispatchEvent(
+    new CustomEvent("open-reset-peer-build-env", {
+      detail: { pin_sha256: pin },
+      bubbles: true,
+      composed: true,
+    })
+  );
+}
 
 // Visual boundary around the user-controlled receiver label inlined in the
 // remote-build hint — keeps a hostile pairing label from blending into the
@@ -25,15 +50,15 @@ export const remoteBuildHintStyles = css`
 export interface RemoteBuildHintHost {
   _localize: LocalizeFunc;
   _tryCleanBuild: () => void;
+  _tryResetRemoteBuildEnv: (pin: string) => void;
 }
 
 // Build-failure hint shown when the failed compile ran on a paired
 // receiver. firmware/reset_build_env wipes the LOCAL toolchain cache, so
-// the link half is useless when the broken cache is on the receiver. Per
-// esphome/device-builder#608 we deliberately don't fan reset out to
-// receivers; clean still works (db#608 fans clean out), so the helper
-// keeps the clean link and replaces the reset link with a plain-text
-// "ask the operator of <receiver>" instruction.
+// the link half is useless when the broken cache is on the receiver.
+// A non-null `resetPin` (capable + connected pairing) offers the remote
+// reset directly; otherwise the "ask the operator of <receiver>"
+// fallback stays for old receivers.
 //
 // The receiver label is user-controlled (set during pairing on another
 // machine). Wrapping it in a styled <code> gives a visual boundary so a
@@ -43,8 +68,29 @@ export interface RemoteBuildHintHost {
 // is a presentational guard, not an XSS defense.
 export function renderRemoteBuildFailureSuggestion(
   host: RemoteBuildHintHost,
-  receiver: string
+  receiver: string,
+  resetPin: string | null = null
 ): TemplateResult {
+  if (resetPin !== null) {
+    const template = host._localize("command.try_reset_suggestion_remote_capable");
+    const [before, middle, after] = splitTemplate(
+      template,
+      "{clean_action}",
+      "{reset_remote_action}"
+    );
+    return html`
+      <div class="reset-suggestion" role="status" slot="suggestion">
+        ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
+          ${host._localize("command.try_clean_button")}</button
+        >${middle}<button
+          class="reset-suggestion-link"
+          @click=${() => host._tryResetRemoteBuildEnv(resetPin)}
+        >
+          ${host._localize("command.try_reset_remote_button")}</button
+        >${after}
+      </div>
+    `;
+  }
   const template = host._localize("command.try_reset_suggestion_remote");
   const [before, middle, after] = splitTemplate(template, "{clean_action}", "{receiver}");
   return html`

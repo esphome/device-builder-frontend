@@ -5,6 +5,7 @@ import { notify } from "../../util/notify.js";
 
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { PairingWindowState, PeerSummary } from "../../api/types/remote-build.js";
+import { peerDisplayName } from "../../util/pairing-display-name.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
@@ -116,7 +117,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
     return html`
       <div class="row peer-row peer-row-pending">
         <div class="row-label">
-          <span class="row-title">${peer.label}</span>
+          <span class="row-title">${peerDisplayName(peer)}</span>
           ${
             peer.peer_ip
               ? html`
@@ -132,7 +133,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
           <button
             type="button"
             aria-label=${this._localize("settings.build_server_peer_review_aria", {
-              label: peer.label,
+              label: peerDisplayName(peer),
             })}
             @click=${() => this._onReviewRequest(peer)}
           >

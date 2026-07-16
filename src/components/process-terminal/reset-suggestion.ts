@@ -42,15 +42,17 @@ export function renderValidationFailureSuggestion(host: SuggestionHost): Templat
 /**
  * C++ build failure. ``remoteLabel`` non-null → the build ran on a paired
  * receiver, so the local reset link is useless: delegate to the remote hint
- * (clean link + "ask the operator of <receiver>"). Null → the local
+ * (a direct remote-reset offer when ``resetPin`` is non-null, else the
+ * "ask the operator of <receiver>" fallback). Null → the local
  * clean → reset staircase.
  */
 export function renderBuildFailureSuggestion(
   host: SuggestionHost,
-  remoteLabel: string | null
+  remoteLabel: string | null,
+  resetPin: string | null = null
 ): TemplateResult {
   if (remoteLabel !== null) {
-    return renderRemoteBuildFailureSuggestion(host, remoteLabel);
+    return renderRemoteBuildFailureSuggestion(host, remoteLabel, resetPin);
   }
   const text = host._localize("command.try_reset_suggestion");
   const [before, middle, after] = splitTemplate(text, "{clean_action}", "{reset_action}");

@@ -80,6 +80,23 @@ export interface PeerSummary {
    * session.
    */
   connected: boolean;
+  /**
+   * Offloader's human machine label (its mDNS `friendly_name`)
+   * from the pair request / session handshake, refreshed on
+   * session-open (non-empty values only). Empty from old
+   * offloaders.
+   */
+  friendly_name: string;
+  /** Offloader's HA add-on flag from the handshake. */
+  ha_addon: boolean;
+  /**
+   * True when the offloader's pair-dialog label was left at its
+   * auto-derived prefill (often the browser's URL host, e.g.
+   * "localhost") — the signal that `peerDisplayName` may replace
+   * `label` with `friendly_name`. Old offloaders never send it,
+   * so a possibly-custom label always wins.
+   */
+  label_auto: boolean;
 }
 
 /**
@@ -178,6 +195,39 @@ export interface PairingSummary {
    * eligible).
    */
   enabled: boolean;
+  /**
+   * Receiver capability from the session handshake: a mismatched
+   * version is built in a venv provisioned with this offloader's
+   * own esphome, so the row shows informative copy instead of a
+   * skew warning.
+   */
+  auto_provision_supported: boolean;
+  /**
+   * Receiver's human machine label (its mDNS `friendly_name`)
+   * from the session handshake, refreshed on every session-open
+   * (non-empty values only, so an older receiver can't clobber a
+   * captured name). Empty until a new-enough receiver connects.
+   * `pairingDisplayName` prefers it over `label` when
+   * `receiver_label_auto` is set.
+   */
+  friendly_name: string;
+  /** Receiver's HA add-on flag from the session handshake. */
+  ha_addon: boolean;
+  /**
+   * Receiver capability from the session handshake: it accepts the
+   * remote `reset_build_env` frame, so the UI may offer resetting the
+   * server's entire build environment (shared toolchain, every cached
+   * ESPHome version, all build trees). False from old receivers.
+   */
+  reset_build_env_supported: boolean;
+  /**
+   * True when the pair-dialog `label` was left at its auto-derived
+   * hostname prefill — the explicit signal that `pairingDisplayName`
+   * may replace `label` with `friendly_name`. Offloader-local (the
+   * receiver never sees it); a pairing persisted before this flag,
+   * or from an older backend, reads `false` so its label wins.
+   */
+  receiver_label_auto: boolean;
 }
 
 /**

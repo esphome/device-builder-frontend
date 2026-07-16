@@ -144,6 +144,10 @@ const CURATED_COPY: Record<
     title: "dashboard.logs_doc_wifi_reconnect_title",
     body: "dashboard.logs_doc_wifi_reconnect_body",
   },
+  wifi_ap_no_portal: {
+    title: "dashboard.logs_doc_wifi_ap_no_portal_title",
+    body: "dashboard.logs_doc_wifi_ap_no_portal_body",
+  },
   boot_loop: {
     title: "dashboard.logs_doc_boot_loop_title",
     body: "dashboard.logs_doc_boot_loop_body",

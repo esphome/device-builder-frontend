@@ -1,5 +1,5 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { type FirmwareJob, JobType } from "../api/types/firmware-jobs.js";
 import { isCompileEndLine, isCompilePhaseLine } from "./compile-phase.js";
 import {
   getCompileTiming,
@@ -137,7 +137,18 @@ export class RunTimerController implements ReactiveController {
     const job = this._options.job();
     const beStart = parseIsoMs(job?.compile_started_at);
     if (beStart !== null) {
-      return Math.max(0, (parseIsoMs(job?.compile_ended_at) ?? this.now) - beStart);
+      const beEnd = parseIsoMs(job?.compile_ended_at);
+      if (beEnd !== null) return Math.max(0, beEnd - beStart);
+      // Old backends never stamp an ESP-IDF build's end; for a pure COMPILE
+      // job completion bounds the compile, so substitute completed_at rather
+      // than ``now`` — the ticker stopped whenever the dialog last closed,
+      // and a stale ``now`` before the start stamp clamps the readout to 0s.
+      // An INSTALL keeps flashing after the compile, so its completion would
+      // fold the flash into the readout — degrade to unknown instead.
+      const end =
+        job?.job_type === JobType.COMPILE ? parseIsoMs(job?.completed_at) : null;
+      if (end !== null) return Math.max(0, end - beStart);
+      return this.isRunFrozen ? null : Math.max(0, this.now - beStart);
     }
     return this.isRunFrozen ? null : this.compileElapsedMs;
   }

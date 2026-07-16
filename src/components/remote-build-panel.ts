@@ -13,12 +13,17 @@ import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
-import type { PairingWindowState, PeerSummary } from "../api/types/remote-build.js";
+import type {
+  PairingSummary,
+  PairingWindowState,
+  PeerSummary,
+} from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
+  buildOffloadPairingsContext,
   buildServerPeersContext,
   devicesContext,
   firmwareJobsContext,
@@ -94,6 +99,16 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   @consume({ context: buildServerPeersContext, subscribe: true })
   @state()
   _peers: PeerSummary[] | null = null;
+
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  _pairings: Map<string, PairingSummary> | null = null;
+
+  // FirmwareJobsListHost's receiver-side registry — same value as _peers,
+  // named for the shared list renderer.
+  get _buildServerPeers(): PeerSummary[] | null {
+    return this._peers;
+  }
 
   @consume({ context: buildServerPairingWindowStateContext, subscribe: true })
   @state()

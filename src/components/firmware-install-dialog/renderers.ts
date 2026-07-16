@@ -4,6 +4,8 @@ import { FLASHER_HOST } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
 import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
+import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
+import { canResetBuildEnv } from "../remote-build-hint.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import {
   renderOffloadHint,
@@ -70,9 +72,13 @@ export function renderResetSuggestion(
   if (isPeerLinkSessionLostError(host._errorMessage)) return nothing;
   const remoteLabel =
     host._jobSource === JobSource.REMOTE && host._jobSourceLabel
-      ? host._jobSourceLabel
+      ? pairingDisplayNameForPin(host._pairings, host._jobSourcePin, host._jobSourceLabel)
       : null;
-  return renderBuildFailureSuggestion(host, remoteLabel);
+  const pairing = host._jobSourcePin
+    ? host._pairings?.get(host._jobSourcePin)
+    : undefined;
+  const resetPin = pairing && canResetBuildEnv(pairing) ? host._jobSourcePin : null;
+  return renderBuildFailureSuggestion(host, remoteLabel, resetPin);
 }
 
 // ── card status mapping ──────────────────────────────────────────────

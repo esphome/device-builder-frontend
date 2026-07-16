@@ -51,6 +51,10 @@ export interface ServerInfoMessage {
    * ESPHOME_DESKTOP_BIN; gates the "Check for updates" menu item. Older
    * desktop apps set desktop_version but not this. */
   desktop_update_capable?: boolean;
+  /** True when the backend runs inside a container (/.dockerenv probe).
+   * With ha_addon and desktop_version, distinguishes the bug-report
+   * form's installation kinds (add-on / Docker / pip). */
+  in_docker?: boolean;
 }
 
 export type ServerMessage = ResultMessage | ErrorMessage | EventMessage;

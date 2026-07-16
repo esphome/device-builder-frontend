@@ -3,6 +3,7 @@ import type { PairingSummary } from "../../src/api/types/remote-build.js";
 import {
   classifyNoCompatiblePeerReason,
   classifyVersionMismatch,
+  isPinnableVersion,
 } from "../../src/util/version-mismatch.js";
 
 function pairing(overrides: Partial<PairingSummary>): PairingSummary {
@@ -18,6 +19,11 @@ function pairing(overrides: Partial<PairingSummary>): PairingSummary {
     last_connect_error: "",
     esphome_version: "2026.5.0",
     enabled: true,
+    auto_provision_supported: false,
+    friendly_name: "",
+    ha_addon: false,
+    reset_build_env_supported: false,
+    receiver_label_auto: false,
     ...overrides,
   };
 }
@@ -120,5 +126,16 @@ describe("classifyNoCompatiblePeerReason", () => {
     expect(
       classifyNoCompatiblePeerReason([pairing({ esphome_version: "2026.4.0" })], "")
     ).toBe("mixed");
+  });
+});
+
+describe("isPinnableVersion", () => {
+  it("accepts releases and a/b/rc pre-releases, rejects dev and local", () => {
+    expect(isPinnableVersion("2026.6.4")).toBe(true);
+    expect(isPinnableVersion("2026.7.0b2")).toBe(true);
+    expect(isPinnableVersion("2026.7.0rc1")).toBe(true);
+    expect(isPinnableVersion("2026.7.0-dev")).toBe(false);
+    expect(isPinnableVersion("1.0.0+local")).toBe(false);
+    expect(isPinnableVersion("")).toBe(false);
   });
 });

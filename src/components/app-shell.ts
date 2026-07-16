@@ -577,6 +577,8 @@ export class ESPHomeApp extends LitElement {
           this._settingsDialog?.open(e.detail?.section)}
         @open-firmware-jobs=${() => this._firmwareJobsDialog?.open()}
         @open-reset-build-env=${() => this._firmwareJobsDialog?.openResetBuildEnv()}
+        @open-reset-peer-build-env=${(e: CustomEvent<{ pin_sha256: string }>) =>
+          this._firmwareJobsDialog?.openResetPeerBuildEnv(e.detail.pin_sha256)}
         @open-feedback=${() => this._feedbackDialog?.open()}
         @open-check-updates=${() => this._desktopUpdateDialog?.open()}
         @open-onboarding-wifi=${this._onOpenOnboarding}
@@ -594,6 +596,8 @@ export class ESPHomeApp extends LitElement {
       <esphome-update-all-dialog></esphome-update-all-dialog>
       <esphome-desktop-update-dialog></esphome-desktop-update-dialog>
       <esphome-settings-dialog
+        @open-reset-peer-build-env=${(e: CustomEvent<{ pin_sha256: string }>) =>
+          this._firmwareJobsDialog?.openResetPeerBuildEnv(e.detail.pin_sha256)}
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-remote-compute-only=${(e: CustomEvent<boolean>) =>
