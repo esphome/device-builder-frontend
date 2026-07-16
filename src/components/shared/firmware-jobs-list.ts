@@ -7,10 +7,7 @@ import {
 } from "../../api/types/firmware-jobs.js";
 import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
-import {
-  effectiveJobType,
-  firmwareJobTypeLabel,
-} from "../../util/firmware-job-display.js";
+import { firmwareJobTypeLabel } from "../../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
 import {
@@ -106,9 +103,9 @@ export function renderGroups(
 
 function renderJob(host: FirmwareJobsListHost, job: FirmwareJob): TemplateResult {
   const name = host._jobDisplayName(job);
-  const effectiveType = effectiveJobType(job);
-  const typeIcon = TYPE_ICONS[effectiveType] ?? "hammer-wrench";
+  const typeIcon = TYPE_ICONS[job.job_type] ?? "hammer-wrench";
   const typeLabel = firmwareJobTypeLabel(job, host._localize);
+  
   const showProgress =
     job.status === JobStatus.RUNNING && typeof job.progress === "number";
   const terminal = isTerminal(job);
