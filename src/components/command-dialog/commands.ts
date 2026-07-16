@@ -1,7 +1,6 @@
 import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
-import { effectiveJobType } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
@@ -32,7 +31,7 @@ export function deriveFollowCommandType(
     if (dependent?.job_type === JobType.RENAME) return "rename";
     if (dependent?.job_type === JobType.UPLOAD) return "install";
   }
-  return JOB_TYPE_TO_COMMAND[effectiveJobType(job)] ?? "install";
+  return JOB_TYPE_TO_COMMAND[job.job_type];
 }
 
 // An install chain is followed via its COMPILE head, but the flash target
