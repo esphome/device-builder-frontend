@@ -138,8 +138,8 @@ export function renderVersionSection(
 ): TemplateResult | typeof nothing {
   const local = d.current_version || "";
   // mDNS-sourced; treat as unknown when it can't be trusted (see
-  // deployedIdentityTrusted) so the empty-deployed path shows the waiting /
-  // no-native-API text instead of a false "out of sync".
+  // deployedIdentityTrusted) so the empty-deployed path shows the waiting
+  // text instead of a false "out of sync".
   const deployed = deployedIdentityTrusted(d) ? d.runtime_state.deployed_version : "";
   if (!local && !deployed) return nothing;
   const matches = !!local && !!deployed && local === deployed;
