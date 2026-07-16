@@ -1170,7 +1170,8 @@
     "bug_esphome_desc": "Compile errors, firmware crashes, boot loops, or component bugs in ESPHome itself; these belong in the core repo, not Device Builder.",
     "browse_features": "Browse feature requests",
     "new_feature": "Request a new feature",
-    "discord": "Chat on the ESPHome Discord"
+    "discord": "Chat on the ESPHome Discord",
+    "write_in_english": "Please write in English so the ESPHome maintainers can read your report."
   },
   "command_palette": {
     "title": "Command palette",
@@ -1690,6 +1691,7 @@
     "describe_label": "What was the device doing when it crashed?",
     "describe_placeholder": "e.g. Pressed the garage button in Home Assistant; crashes every time a BLE device connects",
     "describe_required": "Describe what the device was doing first; a report without context is hard to act on",
+    "describe_english": "Please write in English so the ESPHome maintainers can read your report.",
     "banner_previous_boot": "This device crashed on a previous boot",
     "delivered_hint_complete": "The full report was downloaded and a pre-filled GitHub issue opened in a new tab; everything fit, so nothing needs to be pasted. If the tab didn't open, use \"Open GitHub issue\" below. You can also re-download or copy the report here.",
     "copy_report": "Copy report",

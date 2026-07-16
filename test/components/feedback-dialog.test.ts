@@ -5,9 +5,13 @@
  * version, the ESPHome row carries the installed core version, and rows
  * without a source (or version) are left untouched.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeFeedbackDialog } from "../../src/components/feedback-dialog.js";
+import { mount } from "../_dom.js";
 
 interface HrefLink {
   href?: string;
@@ -65,5 +69,27 @@ describe("feedback-dialog version prefill", () => {
 
   it("returns an empty string for a drill row with no href", () => {
     expect(dialog()._hrefFor({})).toBe("");
+  });
+});
+
+describe("feedback-dialog write-in-English note", () => {
+  const NOTE = "feedback.write_in_english";
+  const setScreen = (el: ESPHomeFeedbackDialog, screen: string) => {
+    (el as unknown as { _screen: string })._screen = screen;
+  };
+
+  it("shows the note on the new-issue screen only", async () => {
+    const el = await mount(new ESPHomeFeedbackDialog());
+    el.open();
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).not.toContain(NOTE);
+
+    setScreen(el, "bug");
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain(NOTE);
+
+    setScreen(el, "browse");
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).not.toContain(NOTE);
   });
 });
