@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  detectCrashKind,
-  isCrashMarker,
-  normalizeLogLine,
-} from "../../src/util/crash-detector.js";
+import { detectCrashKind, isCrashMarker } from "../../src/util/crash-detector.js";
 import { CRASH_BANNER_LINE } from "../_crash-lines.js";
 
 // Realistic crash lines, one per supported shape.
@@ -42,21 +38,8 @@ const NON_CRASH_LINES: ReadonlyArray<[string, string]> = [
   ["empty line", ""],
 ];
 
-// The dialog's real transport wrapping: timestamp prefix + ANSI color in
-// both the ESC-byte (UART) and literal-\033 (backend) forms.
+// The dialog's real transport wrapping: timestamp prefix + ANSI color.
 const wrapEsc = (line: string) => `[12:34:56]\u001b[31m${line}\u001b[0m`;
-const wrapLiteral = (line: string) => `\\033[31m[12:34:56]${line}\\033[0m`;
-
-describe("normalizeLogLine", () => {
-  it("strips ANSI (both forms), the timestamp prefix, and trailing CRLF", () => {
-    expect(normalizeLogLine(wrapEsc("Soft WDT reset\r\n"))).toBe("Soft WDT reset");
-    expect(normalizeLogLine(wrapLiteral("Soft WDT reset"))).toBe("Soft WDT reset");
-  });
-
-  it("keeps a line with no wrapping untouched", () => {
-    expect(normalizeLogLine("Exception (28):")).toBe("Exception (28):");
-  });
-});
 
 describe("isCrashMarker", () => {
   it.each(CRASH_LINES)("matches %s", (_name, line) => {

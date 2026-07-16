@@ -1,4 +1,5 @@
-import { isCrashMarker, normalizeLogLine, tagged } from "./crash-detector.js";
+import { isCrashMarker } from "./crash-detector.js";
+import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";
 
 /**
@@ -51,8 +52,6 @@ const isDecodeEcho = (line: string): boolean =>
 // address (registers, stack dumps, backtrace continuations) or a
 // decoded frame.
 const CRASH_RELATED_RE = /(?:0x)?[0-9a-fA-F]{8}(?::|\b)|Decoded 0x/;
-
-const TAGGED_LINE_RE = /^\[([CWE])\]\[[^\]]*\]/;
 
 // `target_platform` → the bug form's platform dropdown values. ESP32 is a
 // prefix match (variants like ESP32S3 report as ESP32).
@@ -173,13 +172,12 @@ function extractTaggedLines(lines: string[]): {
   const warnings: string[] = [];
   const configLines: string[] = [];
   for (const line of lines) {
-    const match = TAGGED_LINE_RE.exec(line);
-    if (!match) continue;
-    if (match[1] === "C") {
+    const level = parseLogLine(line)?.level;
+    if (level === "C") {
       // Config-dump lines are structured output, not spam — keep them
       // verbatim (folding would silently collapse repeated values).
       configLines.push(line);
-    } else {
+    } else if (level === "W" || level === "E") {
       appendFolded(warnings, line);
     }
   }
