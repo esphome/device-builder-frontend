@@ -170,18 +170,40 @@ describe("renderVersionSection deployed row", () => {
 
   it("shows the deployed version for a no-api device reachable over MQTT", () => {
     // Delivered via the _http._tcp identity TXT; active_source never claims
-    // mDNS for these devices, so the value must not be gated on it.
+    // mDNS for these devices, so the gate is http_identity_live instead.
     const result = renderVersionSection(
       _device({
         current_version: "2026.7.1",
         api_enabled: false,
-        runtime_state: { active_source: "mqtt", deployed_version: "2026.7.0" },
+        runtime_state: {
+          active_source: "mqtt",
+          deployed_version: "2026.7.0",
+          http_identity_live: true,
+        },
       }),
       _localize
     );
     const texts = valueTexts(result);
     expect(texts).toContain("2026.7.1");
     expect(texts).toContain("2026.7.0");
+  });
+
+  it("blanks a no-api device's deployed version when the identity TXT went dark", () => {
+    const result = renderVersionSection(
+      _device({
+        current_version: "2026.7.1",
+        api_enabled: false,
+        runtime_state: {
+          active_source: "mqtt",
+          deployed_version: "2026.7.0",
+          http_identity_live: false,
+        },
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).not.toContain("2026.7.0");
+    expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
   });
 
   it("blanks an api device's deployed version while mDNS is dark", () => {
@@ -233,13 +255,35 @@ describe("renderConfigHashSection deployed row", () => {
       _device({
         expected_config_hash: "abc123",
         api_enabled: false,
-        runtime_state: { active_source: "mqtt", deployed_config_hash: "22e8e223" },
+        runtime_state: {
+          active_source: "mqtt",
+          deployed_config_hash: "22e8e223",
+          http_identity_live: true,
+        },
       }),
       _localize
     );
     const texts = valueTexts(result);
     expect(texts).toContain("abc123");
     expect(texts).toContain("22e8e223");
+  });
+
+  it("blanks a no-api device's deployed hash when the identity TXT went dark", () => {
+    const result = renderConfigHashSection(
+      _device({
+        expected_config_hash: "abc123",
+        api_enabled: false,
+        runtime_state: {
+          active_source: "mqtt",
+          deployed_config_hash: "22e8e223",
+          http_identity_live: false,
+        },
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).not.toContain("22e8e223");
+    expect(texts).toContain("dashboard.drawer_no_native_api");
   });
 
   it("blanks an api device's deployed hash while mDNS is dark", () => {

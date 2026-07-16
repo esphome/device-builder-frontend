@@ -62,6 +62,13 @@ export interface DeviceRuntimeState {
    * mismatch / plaintext.
    */
   api_encryption_active: string | null;
+  /** Whether an unexpired ``_http._tcp`` identity TXT currently backs
+   *  the deployed identity of a device without api:. Session-only —
+   *  false on backend cold start until the broadcast is heard.
+   *  ``deployedIdentityTrusted`` gates the non-api deployed identity
+   *  on it, mirroring the ``active_source === "mdns"`` gate api
+   *  devices use. */
+  http_identity_live: boolean;
 }
 
 /** A configured ESPHome device. */

@@ -47,6 +47,9 @@ const _BASE = {
     deployed_config_hash: "",
     queued_update: false,
     api_encryption_active: null,
+    // Same happy-path default for the no-api gate; tests covering the
+    // identity-went-dark behaviour override this to false.
+    http_identity_live: true,
   },
   expected_config_hash: "",
   has_pending_changes: false,

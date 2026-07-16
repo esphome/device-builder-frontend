@@ -14,14 +14,12 @@ const mdnsOnline = (d: ConfiguredDevice): boolean =>
 // Docker-bridge dashboard) the values go stale, so blanking them avoids a
 // false "out of sync". A device without api: broadcasts the same identity
 // trio on _http._tcp (ESPHome 2026.7.0+), which by backend design never
-// claims reachability, so active_source can't vouch for it and would blank
-// the values forever; trust what the backend delivered instead. The drawer's
-// mDNS-stale warning already covers the "reachable but mDNS dark, values may
-// be stale" case for these devices; a fully OFFLINE device falls outside that
-// warning yet still renders its last-heard identity — accepted, since that's
-// the best information available for a powered-down device.
+// claims reachability, so active_source can't vouch for it — the backend
+// tracks that broadcast's freshness itself and ships it as
+// runtime_state.http_identity_live (session-only; false on backend cold
+// start until the broadcast is heard).
 export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
-  d.api_enabled ? mdnsOnline(d) : true;
+  d.api_enabled ? mdnsOnline(d) : d.runtime_state.http_identity_live;
 
 // Whether to SHOW the "modified" (needs-install) and "update available"
 // indicators, gated so a stale mDNS-dark value can't flag a false "out of

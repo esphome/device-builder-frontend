@@ -8,17 +8,22 @@ import {
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 describe("device-sync mDNS gating", () => {
-  it("trusts the deployed identity per api_enabled and live source", () => {
+  it("trusts the deployed identity per api_enabled, live source, and http identity", () => {
     // An api device needs a live mDNS; a no-api device's identity arrives
     // over _http._tcp, which never claims reachability, so active_source
-    // can't vouch for it and the delivered value is trusted as-is.
+    // can't vouch for it — the backend's http_identity_live does.
     for (const s of ["mdns", "ping", "mqtt", "unknown"] as const) {
       for (const api_enabled of [true, false]) {
-        expect(
-          deployedIdentityTrusted(
-            makeConfiguredDevice({ api_enabled, runtime_state: { active_source: s } })
-          )
-        ).toBe(api_enabled ? s === "mdns" : true);
+        for (const http_identity_live of [true, false]) {
+          expect(
+            deployedIdentityTrusted(
+              makeConfiguredDevice({
+                api_enabled,
+                runtime_state: { active_source: s, http_identity_live },
+              })
+            )
+          ).toBe(api_enabled ? s === "mdns" : http_identity_live);
+        }
       }
     }
   });
@@ -63,12 +68,24 @@ describe("device-sync mDNS gating", () => {
   it("shows a no-api device's hash-driven modified / update signals without mDNS reachability", () => {
     const mqttOnly = makeConfiguredDevice({
       api_enabled: false,
-      runtime_state: { active_source: "mqtt" },
+      runtime_state: { active_source: "mqtt", http_identity_live: true },
       has_pending_changes: true,
       pending_changes_via_hash: true,
       update_available: true,
     });
     expect(showPendingChanges(mqttOnly)).toBe(true);
     expect(showUpdateAvailable(mqttOnly)).toBe(true);
+  });
+
+  it("hides a no-api device's hash-driven signals when the identity TXT went dark", () => {
+    const dark = makeConfiguredDevice({
+      api_enabled: false,
+      runtime_state: { active_source: "mqtt", http_identity_live: false },
+      has_pending_changes: true,
+      pending_changes_via_hash: true,
+      update_available: true,
+    });
+    expect(showPendingChanges(dark)).toBe(false);
+    expect(showUpdateAvailable(dark)).toBe(false);
   });
 });
