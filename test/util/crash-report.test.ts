@@ -230,6 +230,14 @@ describe("buildIssueUrl", () => {
     expect(buildIssueUrl(report()).complete).toBe(true);
   });
 
+  it("fences the description in problem so a backtick run can't hide the trace", () => {
+    const p = params(report({ userDescription: "ran:\n```\ncode\n```\ncrash" }));
+    // The prose is fenced wider than its own ``` run, so the facts and the
+    // decoded backtrace that follow it in the problem field survive.
+    expect(p.get("problem")).toContain("ran:");
+    expect(p.get("problem")).toContain("Decoded backtrace:");
+  });
+
   it("keeps the URL under budget even with a huge user description", () => {
     const result = buildIssueUrl(report({ userDescription: "x".repeat(20000) }));
     expect(result.url.length).toBeLessThanOrEqual(8000);
