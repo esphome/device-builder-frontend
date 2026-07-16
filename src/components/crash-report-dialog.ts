@@ -208,6 +208,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         background: var(--wa-color-surface-default);
         color: var(--wa-color-text-normal);
+        margin: 0 0 var(--wa-space-2xs);
+      }
+
+      .describe-note {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
         margin: 0 0 var(--wa-space-m);
       }
 
@@ -439,10 +445,14 @@ export class ESPHomeCrashReportDialog extends LitElement {
         id="crash-description"
         class="describe-input"
         rows="3"
+        aria-describedby="crash-description-note"
         placeholder=${this._localize("crash_report.describe_placeholder")}
         .value=${this._userDescription}
         @input=${this._onDescriptionInput}
       ></textarea>
+      <p id="crash-description-note" class="describe-note">
+        ${this._localize("crash_report.describe_english")}
+      </p>
       <ul class="summary">
         ${this._renderSummaryRow(
           this._localize(
