@@ -25,6 +25,7 @@ function makeSummary(esphome_version: string): PairingSummary {
     friendly_name: "",
     ha_addon: false,
     reset_build_env_supported: false,
+    receiver_label_auto: false,
   };
 }
 
@@ -124,11 +125,12 @@ describe("renderPairingRow reset-build-env button", () => {
 });
 
 describe("renderPairingRow display name", () => {
-  it("shows the friendly name when the label is the auto-derived hostname stem", () => {
+  it("shows the friendly name when the label was left at its auto-derived prefill", () => {
     const pairing = {
       ...makeSummary("2026.6.0"),
       label: "mac",
       friendly_name: "Nicks-Mac-Studio",
+      receiver_label_auto: true,
     };
     const text = renderedText(renderPairingRow(pairing, ctx()));
     expect(text).toContain("Nicks-Mac-Studio");

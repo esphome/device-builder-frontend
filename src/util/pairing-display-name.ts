@@ -1,21 +1,20 @@
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
-import { friendlyHostname } from "./hostname.js";
 import { remoteBuildPeerName } from "./remote-build-peer-name.js";
 
 /**
  * Display name for a paired build server (offloader side).
  *
- * A label the user typed always wins. A label that still equals
- * the hostname-derived prefill (the pair wizard's default, and
- * what the walkthrough's paste-the-address flow produces) is
- * replaced by the receiver's handshake-advertised friendly name
- * when one has been captured — with the HA add-on container
- * hostname mapped to "Home Assistant App" the same way discovery
- * rows are.
+ * A label the user typed always wins. A label left at its
+ * auto-derived prefill (`receiver_label_auto`, the pair wizard's
+ * default and what the walkthrough's paste-the-address flow
+ * produces) is replaced by the receiver's handshake-advertised
+ * friendly name when one has been captured — with the HA add-on
+ * container hostname mapped to "Home Assistant App" the same way
+ * discovery rows are. Mirrors `peerDisplayName`.
  */
 export function pairingDisplayName(pairing: PairingSummary): string {
-  if (pairing.label !== friendlyHostname(pairing.receiver_hostname)) {
+  if (!pairing.receiver_label_auto) {
     return pairing.label;
   }
   return remoteBuildPeerName({

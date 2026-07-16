@@ -207,8 +207,8 @@ export interface PairingSummary {
    * from the session handshake, refreshed on every session-open
    * (non-empty values only, so an older receiver can't clobber a
    * captured name). Empty until a new-enough receiver connects.
-   * `pairingDisplayName` prefers it over an auto-derived
-   * hostname label.
+   * `pairingDisplayName` prefers it over `label` when
+   * `receiver_label_auto` is set.
    */
   friendly_name: string;
   /** Receiver's HA add-on flag from the session handshake. */
@@ -220,6 +220,14 @@ export interface PairingSummary {
    * ESPHome version, all build trees). False from old receivers.
    */
   reset_build_env_supported: boolean;
+  /**
+   * True when the pair-dialog `label` was left at its auto-derived
+   * hostname prefill — the explicit signal that `pairingDisplayName`
+   * may replace `label` with `friendly_name`. Offloader-local (the
+   * receiver never sees it); a pairing persisted before this flag,
+   * or from an older backend, reads `false` so its label wins.
+   */
+  receiver_label_auto: boolean;
 }
 
 /**

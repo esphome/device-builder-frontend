@@ -24,6 +24,7 @@ function makeSummary(pin: string, enabled: boolean): PairingSummary {
     friendly_name: "",
     ha_addon: false,
     reset_build_env_supported: false,
+    receiver_label_auto: false,
   };
 }
 

@@ -2079,6 +2079,7 @@ export class ESPHomeAPI {
     offloader_label: string;
     pairing_key?: string;
     offloader_label_auto?: boolean;
+    receiver_label_auto?: boolean;
   }): Promise<PairingSummary> {
     return this.sendCommand<PairingSummary>("remote_build/request_pair", args);
   }

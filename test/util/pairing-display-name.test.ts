@@ -24,6 +24,7 @@ function pairing(overrides: Partial<PairingSummary> = {}): PairingSummary {
     friendly_name: "",
     ha_addon: false,
     reset_build_env_supported: false,
+    receiver_label_auto: false,
     ...overrides,
   };
 }
@@ -45,10 +46,12 @@ function peer(overrides: Partial<PeerSummary> = {}): PeerSummary {
 }
 
 describe("pairingDisplayName", () => {
-  it("replaces an auto-derived hostname label with the friendly name", () => {
-    expect(pairingDisplayName(pairing({ friendly_name: "Nicks-Mac-Studio" }))).toBe(
-      "Nicks-Mac-Studio"
-    );
+  it("replaces an auto-prefilled label with the friendly name", () => {
+    expect(
+      pairingDisplayName(
+        pairing({ receiver_label_auto: true, friendly_name: "Nicks-Mac-Studio" })
+      )
+    ).toBe("Nicks-Mac-Studio");
   });
 
   it("keeps a custom label even when a friendly name is known", () => {
@@ -60,19 +63,27 @@ describe("pairingDisplayName", () => {
   });
 
   it("falls back to the label when no friendly name was captured", () => {
-    expect(pairingDisplayName(pairing())).toBe("esphome-builder-xnnspgdv");
+    expect(pairingDisplayName(pairing({ receiver_label_auto: true }))).toBe(
+      "esphome-builder-xnnspgdv"
+    );
   });
 
   it("maps the HA add-on container hostname to a human label", () => {
     expect(
-      pairingDisplayName(pairing({ friendly_name: "0123abcd-esphome", ha_addon: true }))
+      pairingDisplayName(
+        pairing({
+          receiver_label_auto: true,
+          friendly_name: "0123abcd-esphome",
+          ha_addon: true,
+        })
+      )
     ).toBe("Home Assistant App");
   });
 });
 
 describe("pairingDisplayNameForPin", () => {
   it("prefers the live pairing's display name over the snapshot", () => {
-    const p = pairing({ friendly_name: "Nicks-Mac-Studio" });
+    const p = pairing({ receiver_label_auto: true, friendly_name: "Nicks-Mac-Studio" });
     const map = new Map([[p.pin_sha256, p]]);
     expect(pairingDisplayNameForPin(map, p.pin_sha256, "esphome-builder-xnnspgdv")).toBe(
       "Nicks-Mac-Studio"

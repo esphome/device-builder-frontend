@@ -34,6 +34,7 @@ function makePairing(auto: boolean): PairingSummary {
     friendly_name: "",
     ha_addon: false,
     reset_build_env_supported: false,
+    receiver_label_auto: false,
   };
 }
 
@@ -80,6 +81,7 @@ describe("renderRemoteBuilderSubLine version", () => {
       ...makePairing(false),
       label: "esphome-builder-x",
       friendly_name: "Nicks-Mac-Studio",
+      receiver_label_auto: true,
     };
     (host as unknown as { _pairings: Map<string, PairingSummary> })._pairings = new Map([
       [PIN, pairing],
