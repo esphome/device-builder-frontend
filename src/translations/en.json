@@ -62,6 +62,8 @@
     "logs_doc_slow_component_body": "Something is stalling the main loop, which can cause disconnects and missed updates. The troubleshooting guide explains how to find and fix the slow component.",
     "logs_doc_wifi_reconnect_title": "Wi-Fi keeps disconnecting",
     "logs_doc_wifi_reconnect_body": "The FAQ covers the common causes of unstable Wi-Fi, from signal and power problems to router settings.",
+    "logs_doc_wifi_ap_no_portal_title": "Access point can't serve config",
+    "logs_doc_wifi_ap_no_portal_body": "The fallback access point has no captive portal or web server, so it can't show a configuration page. The captive portal documentation explains how to add one.",
     "logs_doc_boot_loop_title": "Repeated resets detected",
     "logs_doc_boot_loop_body": "The device is resetting before boot completes and will enter safe mode soon. The troubleshooting guide explains how to find the cause.",
     "logs_doc_ota_rollback_title": "OTA update rolled back",

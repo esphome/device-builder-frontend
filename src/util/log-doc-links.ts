@@ -30,6 +30,7 @@ export interface ActionableLogDocLink {
     | "ota_rollback"
     | "slow_component"
     | "sram1_as_iram"
+    | "wifi_ap_no_portal"
     | "wifi_reconnect";
 }
 
@@ -177,6 +178,37 @@ for (const entry of ACTIONABLE) {
   }
 }
 
+/** Curated actionable message emitted by the esphome CLI (config /
+ *  compile / logs validation phase), not the firmware. These lines are
+ *  ``<LEVEL> <message>`` with no ``[tag:line]`` token, so they can't
+ *  key off the tag index above. */
+interface ActionableCliEntry {
+  /** CLI level word as printed by ``ESPHomeLogFormatter``. */
+  level: "WARNING" | "ERROR";
+  pattern: RegExp;
+  url: string;
+  body: ActionableLogDocLink["body"];
+}
+
+// Verified live against esphome.io (200, no redirect). Kept small and
+// URL-verified, same bar as ``ACTIONABLE`` above.
+const ACTIONABLE_CLI: readonly ActionableCliEntry[] = (
+  [
+    {
+      // wifi/__init__.py final_validate: an ``ap:`` with no captive_portal
+      // or web_server can't serve its config page.
+      level: "WARNING",
+      pattern: /AP is configured but neither captive_portal nor web_server/,
+      url: "https://esphome.io/components/captive_portal/",
+      body: "wifi_ap_no_portal",
+    },
+  ] satisfies readonly ActionableCliEntry[]
+).filter((entry) => isSafeDocsUrl(entry.url));
+
+// CLI log record: ``<LEVEL> <message>`` (optionally a leading timestamp).
+// Group 1 is the level word; the message follows, matched by pattern.
+const CLI_LINE_RE = /^(?:[\d:.\s-]*\s)?(WARNING|ERROR)\s/;
+
 /** First ``https://esphome.io`` URL in a line (trailing sentence punctuation
  *  trimmed in ``resolveLogDocLink``). */
 const EMBEDDED_URL_RE = /https:\/\/esphome\.io\/[^\s)"']+/;
@@ -226,6 +258,19 @@ export function resolveLogDocLink(
       if (entry.level === parsed.level && entry.pattern.test(clean)) {
         actionable = { kind: "actionable", url: entry.url, body: entry.body };
         break;
+      }
+    }
+  }
+  // CLI validation lines (``WARNING <msg>``) carry no tag, so they miss
+  // the firmware parse above; match them on the level word + message.
+  if (!actionable) {
+    const cli = clean.match(CLI_LINE_RE);
+    if (cli) {
+      for (const entry of ACTIONABLE_CLI) {
+        if (entry.level === cli[1] && entry.pattern.test(clean)) {
+          actionable = { kind: "actionable", url: entry.url, body: entry.body };
+          break;
+        }
       }
     }
   }
