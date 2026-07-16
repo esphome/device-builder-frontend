@@ -16,6 +16,17 @@ export function canResetBuildEnv(pairing: PairingSummary): boolean {
   );
 }
 
+/** Route *pin*'s confirm-then-follow remote reset to the firmware-jobs dialog. */
+export function requestResetPeerBuildEnv(el: HTMLElement, pin: string): void {
+  el.dispatchEvent(
+    new CustomEvent("open-reset-peer-build-env", {
+      detail: { pin_sha256: pin },
+      bubbles: true,
+      composed: true,
+    })
+  );
+}
+
 // Visual boundary around the user-controlled receiver label inlined in the
 // remote-build hint — keeps a hostile pairing label from blending into the
 // system-tone copy and crafting coherent-sounding instructions. Shared by
@@ -45,13 +56,9 @@ export interface RemoteBuildHintHost {
 // Build-failure hint shown when the failed compile ran on a paired
 // receiver. firmware/reset_build_env wipes the LOCAL toolchain cache, so
 // the link half is useless when the broken cache is on the receiver.
-// When the job's pairing advertises reset_build_env_supported and is
-// connected (`resetPin` non-null), the hint offers the remote reset
-// directly — the click routes to the confirm-then-follow flow in the
-// firmware-jobs dialog, mirroring the local reset's destructive-action
-// shape. Otherwise the plain-text "ask the operator of <receiver>"
-// fallback stays for old receivers (clean still works — db#608 fans
-// clean out).
+// A non-null `resetPin` (capable + connected pairing) offers the remote
+// reset directly; otherwise the "ask the operator of <receiver>"
+// fallback stays for old receivers.
 //
 // The receiver label is user-controlled (set during pairing on another
 // machine). Wrapping it in a styled <code> gives a visual boundary so a

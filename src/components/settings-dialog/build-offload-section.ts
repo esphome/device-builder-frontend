@@ -39,6 +39,7 @@ import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.j
 import type { ESPHomeReauthWizardDialog } from "../reauth-wizard-dialog.js";
 import type { ESPHomeRemoteBuildJobDialog } from "../remote-build-job-dialog.js";
 import { renderOffloaderAlert } from "./build-offload-alert.js";
+import { requestResetPeerBuildEnv } from "../remote-build-hint.js";
 import { latestJobForPin, renderPairingRow } from "./build-offload-pairing-row.js";
 import { offloaderAlertStyles, pairingRowStyles } from "./offload-styles.js";
 import { renderStatusRow, renderToggleRow } from "./settings-rows.js";
@@ -502,13 +503,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   private _onResetBuildEnvRequest = (pairing: PairingSummary): void => {
     // The confirm + enqueue + follow flow lives in the firmware-jobs
     // dialog (the local reset's home); app-shell routes this event there.
-    this.dispatchEvent(
-      new CustomEvent("open-reset-peer-build-env", {
-        detail: { pin_sha256: pairing.pin_sha256 },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    requestResetPeerBuildEnv(this, pairing.pin_sha256);
   };
 
   private _onUnpairRequest = (pairing: PairingSummary): void => {

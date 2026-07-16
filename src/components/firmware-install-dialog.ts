@@ -54,7 +54,7 @@ import {
   renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
+import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./ansi-log.js";
@@ -409,13 +409,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   _tryResetRemoteBuildEnv = (pin: string) => {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-reset-peer-build-env", {
-        detail: { pin_sha256: pin },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    requestResetPeerBuildEnv(this, pin);
   };
 
   _toggleShowLogsAfterInstall = () => {

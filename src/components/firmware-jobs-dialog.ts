@@ -131,8 +131,8 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._confirmDialog.open();
   }
 
-  // Same entry-point shape for the REMOTE reset: resolve the pairing,
-  // confirm the whole-server wipe, enqueue the mirror job, follow it.
+  // Same entry-point shape for the REMOTE reset, gated on the pairing
+  // still being reset-capable (a race with disconnect/unpair no-ops).
   openResetPeerBuildEnv(pin_sha256: string) {
     const pairing = this._pairings?.get(pin_sha256);
     if (pairing === undefined || !canResetBuildEnv(pairing)) return;

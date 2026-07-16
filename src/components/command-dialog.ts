@@ -68,7 +68,7 @@ import {
   termButtonStyles,
   termTokens,
 } from "./process-terminal/process-terminal.styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
+import { remoteBuildHintStyles, requestResetPeerBuildEnv } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
@@ -459,13 +459,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   _tryResetRemoteBuildEnv = (pin: string) => {
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("open-reset-peer-build-env", {
-        detail: { pin_sha256: pin },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    requestResetPeerBuildEnv(this, pin);
   };
 
   _toggleShowLogsAfterInstall = () => {
