@@ -66,6 +66,18 @@ export function seedJobs(host: ESPHomeApp, jobs: FirmwareJob[]): void {
   }
   host._firmwareJobs = all;
   host._activeJobs = active;
+  for (const id of all.keys()) evictLocallyOwnedRow(host, id);
+}
+
+// Drop a wire row for a job the firmware-job UI owns (a server-pinned install
+// or pool-routed compile echoes wire events under its FirmwareJob id). Called
+// wherever ownership is established so a row stubbed by a pre-ownership wire
+// event can't linger waiting for a follow-up event that may never arrive.
+export function evictLocallyOwnedRow(host: ESPHomeApp, job_id: string): void {
+  if (!host._buildOffloadJobs?.has(job_id)) return;
+  const next = new Map(host._buildOffloadJobs);
+  next.delete(job_id);
+  host._buildOffloadJobs = next;
 }
 
 export function handleJobEvent(host: ESPHomeApp, event: string, data: unknown): void {
@@ -103,6 +115,7 @@ function upsertJob(host: ESPHomeApp, job: FirmwareJob): void {
   const next = new Map(host._firmwareJobs);
   next.set(job.job_id, job);
   host._firmwareJobs = next;
+  evictLocallyOwnedRow(host, job.job_id);
   // Snapshots replay terminal jobs too — those belong only in history.
   if (isTerminalJobStatus(job.status)) return;
   const active = new Map(host._activeJobs);
@@ -116,6 +129,7 @@ function upsertJob(host: ESPHomeApp, job: FirmwareJob): void {
 // this device (a re-compile replaces the prior compile, not its upload); clear
 // the active slot. A cancellation with a live successor is a supersede — drop it.
 function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
+  evictLocallyOwnedRow(host, job.job_id);
   // Release the active slot whenever it points at *this* job, before the
   // supersede branch can return early. Stopping an install's compile cascades
   // a cancel onto its still-queued dependent upload; that non-terminal upload

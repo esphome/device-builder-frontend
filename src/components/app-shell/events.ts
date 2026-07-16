@@ -39,7 +39,7 @@ import {
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { applyPreferences } from "./data-load.js";
-import { seedJobs } from "./jobs.js";
+import { evictLocallyOwnedRow, seedJobs } from "./jobs.js";
 
 // Merge a partial diff into the matching offloader pairing row keyed by pin_sha256.
 // _buildOffloadPairings === null = snapshot not seeded; missing row = event raced
@@ -55,16 +55,6 @@ export function patchOffloadPairing(
   const next = new Map(host._buildOffloadPairings);
   next.set(pin, { ...existing, ...diff });
   host._buildOffloadPairings = next;
-}
-
-// Drop a wire row for a job the firmware-job UI owns. A row can predate
-// ownership (an event raced the firmware job's seeding); the ownership
-// filter would otherwise strand it forever.
-function evictLocallyOwnedRow(host: ESPHomeApp, job_id: string): void {
-  if (!host._buildOffloadJobs.has(job_id)) return;
-  const next = new Map(host._buildOffloadJobs);
-  next.delete(job_id);
-  host._buildOffloadJobs = next;
 }
 
 export function handleEvent(host: ESPHomeApp, event: string, data: unknown): void {

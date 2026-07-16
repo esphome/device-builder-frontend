@@ -7,6 +7,7 @@ import type {
 } from "../../../src/api/types/remote-build-events.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import { handleEvent } from "../../../src/components/app-shell/events.js";
+import { handleJobEvent } from "../../../src/components/app-shell/jobs.js";
 
 const PIN = "a".repeat(64);
 
@@ -63,7 +64,7 @@ describe("offloader job events skip locally-owned FirmwareJobs", () => {
     expect(row?.output).toEqual(["compiling...\n"]);
   });
 
-  it("evicts a row stubbed before the firmware job was seeded", () => {
+  it("establishing ownership evicts a stubbed row without another wire event", () => {
     const host = makeHost();
     handleEvent(
       host as unknown as ESPHomeApp,
@@ -72,12 +73,11 @@ describe("offloader job events skip locally-owned FirmwareJobs", () => {
     );
     expect(host._buildOffloadJobs.size).toBe(1);
 
-    host._firmwareJobs.set("fw-1", { job_id: "fw-1" });
-    handleEvent(
-      host as unknown as ESPHomeApp,
-      DeviceEventType.OFFLOADER_JOB_OUTPUT,
-      output("fw-1")
-    );
+    handleJobEvent(host as unknown as ESPHomeApp, "job_queued", {
+      job_id: "fw-1",
+      configuration: "kitchen.yaml",
+      status: JobStatus.QUEUED,
+    });
 
     expect(host._buildOffloadJobs.size).toBe(0);
   });
