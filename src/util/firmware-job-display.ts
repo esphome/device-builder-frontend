@@ -18,15 +18,6 @@ export function effectiveJobType(job: FirmwareJob): JobType {
   return job.is_deferred_install ? JobType.INSTALL : job.job_type;
 }
 
-const JOB_TYPE_LABEL_KEYS: Record<JobType, string> = {
-  [JobType.COMPILE]: "type_compile",
-  [JobType.UPLOAD]: "type_upload",
-  [JobType.INSTALL]: "type_install",
-  [JobType.CLEAN]: "type_clean",
-  [JobType.RESET_BUILD_ENV]: "type_reset_build_env",
-  [JobType.RENAME]: "type_rename",
-};
-
 /**
  * Resolve the human-readable label for a job's *type* (as opposed to
  * ``firmwareJobDisplayName``, which names the job itself).
@@ -40,7 +31,7 @@ export function firmwareJobTypeLabel(job: FirmwareJob, localize: LocalizeFunc): 
   if (job.is_deferred_install) {
     return localize("firmware_jobs.type_offline_compile");
   }
-  return localize(`firmware_jobs.${JOB_TYPE_LABEL_KEYS[job.job_type]}`);
+  return localize(`firmware_jobs.type_${job.job_type}`);
 }
 
 /**
