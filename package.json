@@ -36,7 +36,7 @@
     "@tanstack/lit-table": "^8.21.3",
     "codemirror": "^6.0.2",
     "esptool-js": "^0.6.0",
-    "intl-messageformat": "^11.2.10",
+    "intl-messageformat": "^11.2.12",
     "lit": "3.3.3",
     "lit-html": "3.3.3",
     "memoize-one": "^6.0.0",
