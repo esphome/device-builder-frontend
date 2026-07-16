@@ -209,5 +209,23 @@ describe("crash-report-dialog", () => {
     // Still collecting: the stale stream must not flip this session ready.
     expect((el as any)._configYaml).toBeNull();
   });
+
+  it("keeps the new session's stall timer when a stale result arrives", () => {
+    vi.useFakeTimers();
+    try {
+      el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+      const stale = validateCallbacks!;
+      el.open("other.yaml", "Other", CRASH_LINES);
+      // A late result from the previous session must not clear the new
+      // session's stall timer (the shared instance-field hazard).
+      stale.onResult!({ success: true, code: 0 });
+      expect((el as any)._configYaml).toBeNull();
+      vi.advanceTimersByTime(90_000);
+      expect((el as any)._configYaml).toBe("");
+      expect((el as any)._configError).toBe("transport");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

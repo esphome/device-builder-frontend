@@ -233,9 +233,11 @@ export class ESPHomeCrashReportDialog extends LitElement {
   private _captureConfig(session: number): void {
     const collected: string[] = [];
     const finish = (yaml: string, error: "" | "invalid" | "transport") => {
+      // Guard the session first: a stale stream's result must not clear the
+      // timer a newer open() already armed for the current session.
+      if (session !== this._session) return;
       clearTimeout(this._validateTimer);
       this._validateTimer = 0;
-      if (session !== this._session) return;
       this._validateStreamId = "";
       if (this._dialog.open) {
         this._configYaml = yaml;
