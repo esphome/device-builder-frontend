@@ -15,6 +15,18 @@ export function effectiveJobType(job: FirmwareJob): JobType {
 }
 
 /**
+ * The display type for a job when rendering in the firmware tasks list.
+ * For offline compiles (deferred installs), returns "offline_compile" to
+ * distinguish them from normal installs in the UI.
+ */
+export function displayJobType(job: FirmwareJob): string {
+  if (job.is_deferred_install && job.job_type === JobType.COMPILE) {
+    return "offline_compile";
+  }
+  return effectiveJobType(job).toLowerCase();
+}
+
+/**
  * Resolve the human-readable label for a firmware job.
  *
  * Used by both the firmware-tasks dialog and the command dialog's
