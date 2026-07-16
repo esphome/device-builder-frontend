@@ -278,7 +278,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       return;
     }
     // Drop the user into the log viewer so they can watch the wipe.
-    this._commandDialog.followJob(job, this._jobDisplayName(job));
+    this.followJob(job);
   };
 
   private _onResetPeerConfirmed = async () => {
@@ -303,7 +303,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     // Same landing as the local reset: watch the server-side wipe live.
     // A busy refusal surfaces in this job's stream (the mirror fails
     // with a retry-when-idle message), not as a command error.
-    this._commandDialog.followJob(job, this._jobDisplayName(job));
+    this.followJob(job);
   };
 
   private _onClearHistory = async () => {

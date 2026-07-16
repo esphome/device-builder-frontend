@@ -6,8 +6,10 @@ import type {
   OffloaderJobStateChangedEventData,
 } from "../../../src/api/types/remote-build-events.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
+import { type InitialStateEventData } from "../../../src/api/types/event-subscription.js";
 import { handleEvent } from "../../../src/components/app-shell/events.js";
 import { handleJobEvent } from "../../../src/components/app-shell/jobs.js";
+import { makeFirmwareJob } from "../../_make-firmware-job.js";
 
 const PIN = "a".repeat(64);
 
@@ -110,5 +112,62 @@ describe("offloader job events skip locally-owned FirmwareJobs", () => {
       output("fw-1")
     );
     expect(host._buildOffloadJobs.size).toBe(0);
+  });
+});
+
+// The cold-load eviction path: the initial_state remote_jobs merge runs
+// after seedJobs and filters locally-owned ids. One assertion pins both
+// the filter and the block ordering it depends on.
+describe("initial_state remote_jobs merge skips locally-owned FirmwareJobs", () => {
+  it("drops a snapshot row whose id the firmware snapshot owns", () => {
+    const host = {
+      _buildOffloadJobs: new Map(),
+      _firmwareJobs: new Map(),
+      _activeJobs: new Map(),
+      // Fields the INITIAL_STATE handler writes unconditionally.
+      _remoteBuildEnabled: false,
+      _remoteBuildCleanupTtl: 0,
+      _remoteBuildSetInFlight: false,
+      _prefsLoaded: false,
+      _prefsWritesInFlight: 0,
+      _devices: [],
+      _importableDevices: [],
+      _devicesLoaded: false,
+      _buildServerPeers: null,
+      _buildOffloadDiscoveredHosts: null,
+      _buildOffloadPairings: null,
+      _offloaderWritesInFlight: 0,
+      _buildOffloadAlerts: null,
+      _offloaderRemoteBuildsEnabled: null,
+      _offloaderVersionMatchPolicy: null,
+      _offloaderIncludeLocalInPool: null,
+    };
+
+    handleEvent(host as unknown as ESPHomeApp, DeviceEventType.INITIAL_STATE, {
+      devices: [],
+      importable: [],
+      firmware_jobs: [makeFirmwareJob({ job_id: "fw-1" })],
+      remote_jobs: [
+        {
+          receiver_hostname: "192.168.1.50",
+          receiver_port: 6052,
+          pin_sha256: PIN,
+          job_id: "fw-1",
+          status: JobStatus.RUNNING,
+          error_message: "",
+        },
+        {
+          receiver_hostname: "192.168.1.50",
+          receiver_port: 6052,
+          pin_sha256: PIN,
+          job_id: "wire-1",
+          status: JobStatus.RUNNING,
+          error_message: "",
+        },
+      ],
+    } as unknown as InitialStateEventData);
+
+    expect(host._buildOffloadJobs.has("fw-1")).toBe(false);
+    expect(host._buildOffloadJobs.has("wire-1")).toBe(true);
   });
 });
