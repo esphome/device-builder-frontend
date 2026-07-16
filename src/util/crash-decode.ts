@@ -28,6 +28,11 @@ const MAX_REGION_LINES = MAX_LINES_AFTER_MARKER + 1;
 // raw UART panic handler emits no colour of its own, so a serial crash would
 // otherwise scroll past in the same plain text as everything else.
 const ANSI_CRASH = "\u001b[1;31m";
+// Yellow, matching a WARNING record: over OTA the decoder's output comes from
+// esphome's own logger at warning level, which is what gives it the
+// `WARNING ` prefix and the colour. Ours arrives as bare text, so it wears
+// both here and a serial session reads the same as an OTA one.
+const ANSI_DECODED = "\u001b[0;33m";
 const ANSI_RESET = "\u001b[0m";
 
 // Decoding the same crash again costs a fresh ~70 MiB esphome import in the
@@ -142,6 +147,14 @@ export function colorizeCrash(raw: string[]): string[] {
  * Web Serial session read like the OTA one rather than showing a decode
  * detached from its addresses.
  */
+// Dress one decoder line as esphome logs would print it. A continuation
+// (` (inlined by) ...`) belongs to the record above it, so it carries the
+// colour but not a second level prefix.
+function asWarning(text: string): string {
+  const body = /^\s/.test(text) || text.startsWith("WARNING ") ? text : `WARNING ${text}`;
+  return `${ANSI_DECODED}${body}${ANSI_RESET}`;
+}
+
 export function interleaveDecoded(raw: string[], decode: CrashDecode): string[] {
   const byIndex = new Map<number, string[]>();
   for (const { index, text } of decode.decoded) {
@@ -157,10 +170,10 @@ export function interleaveDecoded(raw: string[], decode: CrashDecode): string[] 
     if (!group) return;
     if (stalePending) {
       // Say it where the reader is looking, above the frames it qualifies.
-      out.push(STALE_BUILD_LOG_LINE);
+      out.push(asWarning(STALE_BUILD_LOG_LINE));
       stalePending = false;
     }
-    out.push(...group);
+    out.push(...group.map(asWarning));
   });
   return out;
 }

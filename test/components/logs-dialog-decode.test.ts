@@ -53,12 +53,16 @@ describe("logs-dialog inline backtrace decode", () => {
     append(el, ["[12:00:00]boot", ...CRASH, "[12:00:02]rebooted"]);
     await flush();
 
-    const at = lines(el).indexOf("Decoded 0x400d1a2c: loop() at main.cpp:42");
+    const plain = lines(el).map(stripAnsi);
+    const at = plain.indexOf("WARNING Decoded 0x400d1a2c: loop() at main.cpp:42");
     // Directly under the Backtrace line it decodes, the way esphome logs
     // shows it, rather than appended after the reboot.
     expect(at).toBeGreaterThan(-1);
-    expect(lines(el)[at - 1]).toContain("Backtrace:");
-    expect(lines(el)[at + 1]).toContain("Rebooting...");
+    expect(plain[at - 1]).toContain("Backtrace:");
+    expect(plain[at + 1]).toContain("Rebooting...");
+    // Yellow, like the WARNING record it is over OTA; the panic stays red.
+    expect(lines(el)[at]).toContain("\u001b[0;33m");
+    expect(lines(el)[at - 1]).toContain("\u001b[1;31m");
   });
 
   it("sends the crash region only, normalized, once it terminates", async () => {
@@ -91,9 +95,10 @@ describe("logs-dialog inline backtrace decode", () => {
     append(el, CRASH);
     await flush();
 
-    const warn = lines(el).indexOf(STALE_BUILD_LOG_LINE);
+    const plain = lines(el).map(stripAnsi);
+    const warn = plain.indexOf(STALE_BUILD_LOG_LINE);
     expect(warn).toBeGreaterThan(-1);
-    expect(lines(el)[warn + 1]).toBe("Decoded 0x400d1a2c: loop()");
+    expect(plain[warn + 1]).toBe("WARNING Decoded 0x400d1a2c: loop()");
   });
 
   it("leaves the dump readable when the decode fails", async () => {
@@ -156,7 +161,11 @@ describe("logs-dialog inline backtrace decode", () => {
     // Same backtrace, so one child pays for both; each crash still renders
     // its frames.
     expect(decodeBacktrace).toHaveBeenCalledTimes(1);
-    expect(lines(el).filter((l) => l.startsWith("Decoded 0x400d1a2c"))).toHaveLength(2);
+    expect(
+      lines(el)
+        .map(stripAnsi)
+        .filter((l) => l.startsWith("WARNING Decoded 0x400d1a2c"))
+    ).toHaveLength(2);
   });
 
   it("hands the stale-build verdict to the report as a value", async () => {

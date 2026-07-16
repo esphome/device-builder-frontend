@@ -8,6 +8,7 @@ import {
   decodeCrashRegion,
   interleaveDecoded,
 } from "../../src/util/crash-decode.js";
+import { stripAnsi } from "../../src/util/ansi-escapes.js";
 import { normalizeLogLine } from "../../src/util/log-line.js";
 import { CRASH_BLOCK_UNDECODED } from "../_crash-lines.js";
 
@@ -101,12 +102,32 @@ describe("interleaveDecoded", () => {
       staleBuild: false,
     });
 
-    expect(out).toEqual([
+    // Dressed as esphome logs prints it over OTA: warning-prefixed, yellow.
+    expect(out.map(stripAnsi)).toEqual([
       "Guru Meditation Error: crash",
       "PC: 0x400d1a2c",
-      "Decoded 0x400d1a2c: loop()",
+      "WARNING Decoded 0x400d1a2c: loop()",
       "Rebooting...",
     ]);
+    expect(out[2]).toContain("\u001b[0;33m");
+  });
+
+  it("carries the colour but not a second prefix onto a continuation", () => {
+    const out = interleaveDecoded(["PC: 0x1"], {
+      decoded: [
+        { index: 0, text: "Decoded 0x1: loop()" },
+        { index: 0, text: " (inlined by) tick() at main.cpp:11" },
+      ],
+      staleBuild: false,
+    });
+
+    // The continuation belongs to the record above it.
+    expect(out.map(stripAnsi)).toEqual([
+      "PC: 0x1",
+      "WARNING Decoded 0x1: loop()",
+      " (inlined by) tick() at main.cpp:11",
+    ]);
+    expect(out[2]).toContain("\u001b[0;33m");
   });
 
   it("captions a stale build once, above the frames it qualifies", () => {
@@ -120,8 +141,11 @@ describe("interleaveDecoded", () => {
       staleBuild: true,
     });
 
-    expect(out.filter((l) => l === STALE_BUILD_LOG_LINE)).toHaveLength(1);
-    expect(out.indexOf(STALE_BUILD_LOG_LINE)).toBe(out.indexOf("Decoded a") - 1);
+    const plain = out.map(stripAnsi);
+    expect(plain.filter((l) => l === STALE_BUILD_LOG_LINE)).toHaveLength(1);
+    expect(plain.indexOf(STALE_BUILD_LOG_LINE)).toBe(
+      plain.indexOf("WARNING Decoded a") - 1
+    );
   });
 
   it("returns the region untouched when nothing decoded", () => {
