@@ -149,17 +149,18 @@ export function renderPairingRow(
             ? html`
                 <button
                   type="button"
+                  id="btn-reset-${pairing.pin_sha256}"
                   class="btn-reset-peer-env"
                   aria-label=${localize("settings.reset_peer_env_aria", {
-                    label: displayName,
-                  })}
-                  title=${localize("settings.reset_peer_env_aria", {
                     label: displayName,
                   })}
                   @click=${() => onResetBuildEnv(pairing)}
                 >
                   <wa-icon library="mdi" name="broom"></wa-icon>
                 </button>
+                <wa-tooltip for="btn-reset-${pairing.pin_sha256}">
+                  ${localize("settings.reset_peer_env_aria", { label: displayName })}
+                </wa-tooltip>
               `
             : nothing
         }
@@ -168,29 +169,35 @@ export function renderPairingRow(
             ? html`
                 <button
                   type="button"
+                  id="btn-edit-${pairing.pin_sha256}"
                   class="btn-edit-endpoint"
                   aria-label=${localize("settings.edit_pairing_endpoint_aria", {
-                    label: displayName,
-                  })}
-                  title=${localize("settings.edit_pairing_endpoint_aria", {
                     label: displayName,
                   })}
                   @click=${() => onEditEndpoint(pairing)}
                 >
                   <wa-icon library="mdi" name="pencil"></wa-icon>
                 </button>
+                <wa-tooltip for="btn-edit-${pairing.pin_sha256}">
+                  ${localize("settings.edit_pairing_endpoint_aria", {
+                    label: displayName,
+                  })}
+                </wa-tooltip>
               `
             : nothing
         }
         <button
           type="button"
+          id="btn-unpair-${pairing.pin_sha256}"
           class="peer-remove"
           aria-label=${localize("settings.unpair_aria", { label: displayName })}
-          title=${localize("settings.unpair_action")}
           @click=${() => onUnpair(pairing)}
         >
           <wa-icon library="mdi" name="delete"></wa-icon>
         </button>
+        <wa-tooltip for="btn-unpair-${pairing.pin_sha256}">
+          ${localize("settings.unpair_aria", { label: displayName })}
+        </wa-tooltip>
       </div>
     </div>
   `;
