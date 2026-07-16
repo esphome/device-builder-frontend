@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
+import { mdiBroom, mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { notify, notifyError, notifySuccess } from "../../util/notify.js";
@@ -57,6 +57,7 @@ import "../remote-build-job-dialog.js";
 import "./build-offload-advanced.js";
 
 registerMdiIcons({
+  broom: mdiBroom,
   delete: mdiDelete,
   "lan-connect": mdiLanConnect,
   pencil: mdiPencil,
