@@ -1630,6 +1630,7 @@
     "reset_peer_confirm_button": "Reset build environment",
     "reset_peer_failed": "Couldn't start the build environment reset on {label}: {detail}",
     "type_compile": "Compile",
+    "type_offline_compile": "Offline compile",
     "type_upload": "Upload",
     "type_install": "Install",
     "type_clean": "Clean",
