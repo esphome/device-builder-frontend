@@ -284,11 +284,10 @@ export function buildFullReport(report: CrashReport): string {
       sections.push(STALE_BUILD_NOTE);
     }
   } else if (scrape.crashFound) {
-    sections.push(
-      "The backtrace was not decoded in this log session, and could not be " +
-        "decoded afterwards (the device has no local build to decode " +
-        "against, or its platform has no decoder). Raw crash output is below."
-    );
+    // Deliberately states no cause: this branch covers a crash with no
+    // decodable addresses, a device with no local build, a platform with no
+    // decoder, and a decoder that failed, and the report can't tell which.
+    sections.push("The backtrace was not decoded. Raw crash output is below.");
   } else {
     sections.push(
       "The crash scrolled out of the log buffer before the report was created."

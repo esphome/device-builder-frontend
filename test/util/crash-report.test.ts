@@ -168,6 +168,23 @@ describe("buildFullReport", () => {
     expect(buildFullReport(report())).not.toContain("no longer matches the firmware");
   });
 
+  it("reports an undecoded backtrace without guessing why", () => {
+    // No frames covers "no addresses to decode", "never compiled here",
+    // "platform has no decoder" and "the decoder failed"; the report can't
+    // tell which, so it must not name one.
+    const undecoded = scrapeCrashData([
+      "Guru Meditation Error: crash",
+      "Backtrace: 0x400d9150:0x3ffb4f60",
+      "Rebooting...",
+    ]);
+    const text = buildFullReport(report({ scrape: undecoded }));
+
+    expect(undecoded.decodedFrames).toEqual([]);
+    expect(text).toContain("The backtrace was not decoded.");
+    expect(text).not.toContain("no local build");
+    expect(text).not.toContain("no decoder");
+  });
+
   it("leads with the user's context, then the decoded backtrace", () => {
     const text = buildFullReport(report());
     const order = [
