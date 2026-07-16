@@ -49,14 +49,24 @@ export function isCompilePhaseLine(line: string): boolean {
 // PlatformIO closes each environment with a summary banner —
 // ``========= [SUCCESS] Took 15.36 seconds =========`` (or ``[FAILED]``). For
 // an install the flash phase streams after this, so freezing the compile clock
-// here keeps the upload out of the count.
-const COMPILE_END_LINE = /\[(?:SUCCESS|FAILED)\] Took /;
+// here keeps the upload out of the count. esp-idf's native (non-pio) build
+// prints no banner — there esphome's own ``Successfully compiled program``
+// INFO line (emitted right after ninja returns) closes the span, and ninja's
+// ``ninja: build stopped: subcommand failed.`` closes a failed build.
+const COMPILE_END_LINE =
+  /\[(?:SUCCESS|FAILED)\] Took |Successfully compiled program|ninja: build stopped/;
 
 /** True once a streamed line shows the compile has finished (or failed). */
 export function isCompileEndLine(line: string): boolean {
-  // Runs per streamed line for the whole compile window; "Took " is plain
-  // text in the banner (only the [SUCCESS]/[FAILED] token carries inline
-  // ANSI), so this skips the strip + regex on essentially every other line.
-  if (!line.includes("Took ")) return false;
+  // Runs per streamed line for the whole compile window; every end marker
+  // carries a plain-text token (only the [SUCCESS]/[FAILED] word carries
+  // inline ANSI), so this skips the strip + regex on essentially every line.
+  if (
+    !line.includes("Took ") &&
+    !line.includes("Successfully compiled") &&
+    !line.includes("build stopped")
+  ) {
+    return false;
+  }
   return COMPILE_END_LINE.test(stripAnsi(line));
 }
