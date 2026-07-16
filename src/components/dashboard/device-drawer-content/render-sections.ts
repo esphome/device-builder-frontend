@@ -37,11 +37,13 @@ export function renderRow(
   `;
 }
 
-// A device with no api: only broadcasts the identity trio (mac, version,
-// config hash) on _http._tcp from ESPHome 2026.7.0; on older firmware the
-// field never arrives, so a "waiting for mDNS" spinner would spin forever.
-// The no-native-API text stays as the "may never arrive" explanation for the
-// empty case. Mirrors the api_enabled gate in encryption-state.
+// Empty-state text for the MAC and deployed-config-hash rows. A device with
+// no api: only broadcasts those on _http._tcp from ESPHome 2026.7.0; on older
+// firmware the field never arrives, so a "waiting for mDNS" spinner would
+// spin forever — the no-native-API text stays as the "may never arrive"
+// explanation. The deployed-version row deliberately doesn't use this helper:
+// version also rides the older _http._tcp fallback, so waiting is honest
+// there. Mirrors the api_enabled gate in encryption-state.
 function emptyMdnsText(d: ConfiguredDevice, localize: LocalizeFunc): string {
   return localize(
     d.api_enabled ? "dashboard.drawer_waiting_for_mdns" : "dashboard.drawer_no_native_api"

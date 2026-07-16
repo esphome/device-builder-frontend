@@ -24,9 +24,10 @@ export interface DeviceRuntimeState {
   state: DeviceState;
   /** Reachability channel currently driving the device's online state
    *  (``mdns`` > ``mqtt`` > ``ping``). The out-of-sync / update
-   *  indicators gate on it per the rule in ``deployedIdentityTrusted``
-   *  (``src/util/device-sync.ts``). ``"unknown"`` means no source has
-   *  claimed the device yet, which reads as "not mDNS". */
+   *  indicators consult it only for api: devices, via
+   *  ``deployedIdentityTrusted`` (``src/util/device-sync.ts``), which
+   *  owns the gating rule. ``"unknown"`` means no source has claimed
+   *  the device yet, which reads as "not mDNS". */
   active_source: ReachabilitySource;
   /** All resolved addresses from mDNS (IPv4 + IPv6) — empty array until
    *  the device is seen online. ``ip_addresses[0]`` matches the flat
