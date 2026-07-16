@@ -501,6 +501,20 @@ export class ESPHomeApp extends LitElement {
     this._guidedTour?.start();
   };
 
+  // "Compile and upload" queued a server-pinned INSTALL FirmwareJob; attach
+  // the firmware-jobs dialog's command dialog so the user watches the whole
+  // lifecycle (remote compile + local flash), with a working Stop.
+  private _onRemoteBuildInstallSubmitted = (e: CustomEvent<{ job_id: string }>) => {
+    const job = this._firmwareJobs.get(e.detail.job_id);
+    if (job === undefined) {
+      // The job_queued push precedes the submit response on the same WS, so
+      // a miss is theoretical; the jobs list is the graceful landing spot.
+      this._firmwareJobsDialog.open();
+      return;
+    }
+    this._firmwareJobsDialog.followJob(job);
+  };
+
   // Kebab "Set up / Change Wi-Fi credentials" — open the manual Wi-Fi dialog.
   private _onOpenOnboarding = () => {
     this._onboardingDialog?.open();
@@ -632,6 +646,7 @@ export class ESPHomeApp extends LitElement {
           )}
         @remote-build-job-dismissed=${(e: CustomEvent<{ job_id: string }>) =>
           onRemoteBuildJobDismissed(this, e)}
+        @remote-build-install-submitted=${this._onRemoteBuildInstallSubmitted}
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}

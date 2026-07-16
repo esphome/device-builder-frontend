@@ -123,6 +123,13 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._ticker.stop();
   }
 
+  // Attach the embedded command dialog to *job* without opening the list.
+  // Same sibling-in-shadow-DOM shape as the reset entry points below —
+  // surfaces like the Send-builds dialog can hand a job off directly.
+  followJob(job: FirmwareJob) {
+    this._commandDialog.followJob(job, this._jobDisplayName(job));
+  }
+
   // Open the Reset Build Environment confirm flow without needing this
   // dialog open. The confirm + command dialogs are siblings of the jobs
   // dialog in this host's shadow DOM, so they work even when it's closed

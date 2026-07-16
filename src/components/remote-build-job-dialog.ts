@@ -82,6 +82,13 @@ const FRESH_ROW_STATE: JobRowUIState = {
  * display fields. Wire frames don't carry those fields;
  * without the dispatch the list view would fall back to empty
  * placeholders.
+ *
+ * "Compile and upload" is the exception: the backend queues a
+ * server-pinned INSTALL FirmwareJob (remote compile, local OTA
+ * flash), so the dialog dispatches remote-build-install-submitted
+ * and closes — app-shell attaches the firmware-job command dialog,
+ * which tracks the whole lifecycle where this list would stop at
+ * the receiver's compile.
  */
 @customElement("esphome-remote-build-job-dialog")
 export class ESPHomeRemoteBuildJobDialog extends LitElement {
@@ -223,6 +230,22 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           { reason: result.reason ?? "" }
         );
         this._step = "input";
+        return;
+      }
+      if (this._target === JobType.UPLOAD) {
+        // "Compile and upload" queues a server-pinned INSTALL
+        // FirmwareJob (remote compile, then a local OTA flash).
+        // Hand tracking to the firmware-job UI — this dialog's
+        // wire-event list ends at the receiver's compile, so it
+        // would show "completed" while the flash still runs.
+        this.dispatchEvent(
+          new CustomEvent("remote-build-install-submitted", {
+            bubbles: true,
+            composed: true,
+            detail: { job_id: result.job_id },
+          })
+        );
+        this._close();
         return;
       }
       // Bubble the seed up so app-shell stamps the in-flight
