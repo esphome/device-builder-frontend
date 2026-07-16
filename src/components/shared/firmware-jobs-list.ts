@@ -105,7 +105,7 @@ function renderJob(host: FirmwareJobsListHost, job: FirmwareJob): TemplateResult
   const name = host._jobDisplayName(job);
   const typeIcon = TYPE_ICONS[job.job_type] ?? "hammer-wrench";
   const typeLabel = firmwareJobTypeLabel(job, host._localize);
-  
+
   const showProgress =
     job.status === JobStatus.RUNNING && typeof job.progress === "number";
   const terminal = isTerminal(job);
