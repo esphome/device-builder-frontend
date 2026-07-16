@@ -71,9 +71,10 @@ describe("renderCardGrid", () => {
     expect(card.hasAttribute("show-update")).toBe(true);
   });
 
-  it("hides the update indicator when mDNS is dark", () => {
+  it("hides the update indicator when an api device's mDNS is dark", () => {
     const device = makeConfiguredDevice({
       update_available: true,
+      api_enabled: true,
       runtime_state: { active_source: "ping" },
     });
     const card = renderCard(device);

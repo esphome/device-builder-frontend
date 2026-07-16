@@ -9,6 +9,18 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 export const mdnsOnline = (d: ConfiguredDevice): boolean =>
   d.runtime_state.active_source === "mdns";
 
+// Whether the mDNS-sourced deployed identity (version / config hash) is
+// trustworthy. An api: device broadcasts it on _esphomelib._tcp, the same
+// service that claims active_source === "mdns", so that source doubles as the
+// freshness signal. A device without api: broadcasts the same identity trio on
+// _http._tcp (ESPHome 2026.7.0+), which by backend design never claims
+// reachability, so active_source can't vouch for it and would blank the values
+// forever; trust what the backend delivered instead. The drawer's mDNS-stale
+// warning already covers the "reachable but mDNS dark, values may be stale"
+// case for these devices.
+export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
+  d.api_enabled ? mdnsOnline(d) : true;
+
 // Whether to SHOW the "modified" (needs-install) and "update available"
 // indicators, gated so a stale mDNS-dark value can't flag a false "out of
 // sync". The raw truth stays on the device fields (``has_pending_changes`` /
@@ -16,12 +28,13 @@ export const mdnsOnline = (d: ConfiguredDevice): boolean =>
 // derives from these so the rule lives in one place.
 //
 // ``update_available`` (device version vs server) is purely mDNS-sourced, so it
-// always needs a live mDNS. ``has_pending_changes`` is only mDNS-dependent when
-// it came from the config-hash compare (``pending_changes_via_hash``); a local
-// mtime-driven edit is trustworthy without mDNS, so it still cues "install".
+// always needs a trusted deployed identity. ``has_pending_changes`` is only
+// mDNS-dependent when it came from the config-hash compare
+// (``pending_changes_via_hash``); a local mtime-driven edit is trustworthy
+// without mDNS, so it still cues "install".
 export const showPendingChanges = (d: ConfiguredDevice): boolean =>
   d.has_pending_changes === true &&
-  (mdnsOnline(d) || d.pending_changes_via_hash !== true);
+  (deployedIdentityTrusted(d) || d.pending_changes_via_hash !== true);
 
 export const showUpdateAvailable = (d: ConfiguredDevice): boolean =>
-  d.update_available === true && mdnsOnline(d);
+  d.update_available === true && deployedIdentityTrusted(d);
