@@ -29,8 +29,9 @@ export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
 // ``update_available``); these say whether to surface it. Every indicator site
 // derives from these so the rule lives in one place.
 //
-// ``update_available`` (device version vs server) is purely mDNS-sourced, so it
-// always needs a trusted deployed identity. ``has_pending_changes`` is only
+// ``update_available`` (``deployed_version`` vs ``current_version``) is purely
+// mDNS-sourced, so it always needs a trusted deployed identity.
+// ``has_pending_changes`` is only
 // mDNS-dependent when it came from the config-hash compare
 // (``pending_changes_via_hash``); a local mtime-driven edit is trustworthy
 // without mDNS, so it still cues "install".
