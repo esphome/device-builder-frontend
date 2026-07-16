@@ -1444,7 +1444,6 @@
     "edit_pairing_endpoint_generic_error": "Couldn't update the endpoint. Check the dashboard logs for details.",
     "unpair_action": "Unpair",
     "unpair_aria": "Unpair {label}",
-    "reset_peer_env_action": "Clean server files",
     "reset_peer_env_aria": "Reset this dashboard's build environment on {label}",
     "reset_peer_env_confirm_title": "Reset the build environment on {label}?",
     "reset_peer_env_confirm_body": "This wipes the build files this dashboard has cached on the build server (toolchains, compiled objects, uploaded configs). Nothing on this machine is touched. The next remote build re-downloads everything from scratch, so it will take noticeably longer.",
