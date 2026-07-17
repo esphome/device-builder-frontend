@@ -82,7 +82,7 @@ describe("renderCardGrid", () => {
     expect(card.hasAttribute("queued-update")).toBe(false);
   });
 
-  it("keeps the update indicator off Native-API evidence when an api device's mDNS is dark", () => {
+  it("shows the update indicator on Native-API evidence when an api device's mDNS is dark", () => {
     const device = makeConfiguredDevice({
       update_available: true,
       api_enabled: true,

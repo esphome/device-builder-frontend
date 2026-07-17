@@ -19,8 +19,8 @@ const mdnsOnline = (d: ConfiguredDevice): boolean =>
 // lifecycle. In an mDNS-dark deployment the flag deliberately never
 // expires — no evidence of staleness can arrive, so the last-confirmed
 // identity stays up and reachability is signalled separately by the
-// state indicator. Full semantics: backend docs/API.md,
-// Device.runtime_state.
+// state indicator. Full semantics: docs/API.md in the backend repo
+// (esphome/device-builder), Device.runtime_state.
 export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
   (d.api_enabled && mdnsOnline(d)) || d.runtime_state.deployed_identity_live;
 
