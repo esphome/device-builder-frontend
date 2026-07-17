@@ -13,9 +13,10 @@ import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 // computeUpdateFacet reads update_available / has_pending_changes, gated
 // through showUpdateAvailable / showPendingChanges. The shared fixture
-// defaults to a trusted identity, so update/modified buckets surface;
-// mDNS-dark cases must clear deployed_identity_live, and an api device
-// also needs a non-mdns active_source (the gate trusts either).
+// defaults to a trusted identity, so update/modified buckets surface.
+// These fixtures are no-api (api_enabled defaults false), so the gate
+// reduces to deployed_identity_live — override that to go dark; a case
+// that also sets api_enabled: true must override active_source too.
 const device = makeConfiguredDevice;
 
 // Echo the key so assertions key off the i18n id, not display copy.

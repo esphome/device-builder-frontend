@@ -22,9 +22,10 @@ import {
 
 function device(over: ConfiguredDeviceOverrides = {}): ConfiguredDevice {
   // Online with a trusted identity by default, so update/modified
-  // filters match; mDNS-dark cases must clear deployed_identity_live,
-  // and an api device also needs a non-mdns active_source (the gate
-  // trusts either).
+  // filters match. These fixtures are no-api (api_enabled defaults
+  // false), so the gate reduces to deployed_identity_live — override
+  // that to go dark; a case that also sets api_enabled: true must
+  // override active_source too.
   return makeConfiguredDevice({
     friendly_name: "Kitchen Lamp",
     ...over,

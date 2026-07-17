@@ -139,12 +139,12 @@ export interface ConfiguredDevice {
   expected_config_hash: string;
   /** True until successfully compiled + deployed */
   has_pending_changes: boolean;
-  /** True when ``has_pending_changes`` came from the mDNS-sourced
+  /** True when ``has_pending_changes`` came from the deployed
    *  config-hash compare (vs the local mtime fallback). The UI gates
    *  only this case on a trusted deployed identity (see
    *  ``deployedIdentityTrusted``), so a local YAML edit still cues
-   *  "install" when mDNS is dark. Optional / absent reads as a local
-   *  (non-mDNS-dependent) pending. */
+   *  "install" when the deployed identity can't be trusted. Optional /
+   *  absent reads as a local (mtime-driven) pending. */
   pending_changes_via_hash?: boolean;
   /** True if compiled with older ESPHome version */
   update_available: boolean;
