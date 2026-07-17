@@ -49,6 +49,17 @@ const MAX_CACHE_ENTRIES = 16;
  */
 export type CrashDecodeCache = Map<string, CrashDecode | null>;
 
+// Reasons that describe the backend rather than the region (mirroring
+// constants.DecodeUnavailable). They say nothing about whether this region is
+// decodable, so a decode that returns none of them is remembered and one that
+// returns them is asked again: a child killed under memory pressure must not
+// leave the crash it was decoding undecodable for the rest of the session,
+// which is the crash loop this feature exists for.
+const BACKEND_FAULT_REASONS: ReadonlySet<string> = new Set([
+  "decode_failed",
+  "helper_failed",
+]);
+
 // Shown where the reader is looking. The report gets the same verdict as a
 // typed value, so this line is presentation, not transport.
 /**
@@ -233,11 +244,13 @@ export async function decodeCrashRegion(
     const decode: CrashDecode | null = result.decoded.length
       ? { decoded: result.decoded, staleBuild: result.stale_build }
       : null;
-    if (cache.size >= MAX_CACHE_ENTRIES) {
-      // Map iterates in insertion order, so this drops the oldest.
-      cache.delete(cache.keys().next().value!);
+    if (decode !== null || !BACKEND_FAULT_REASONS.has(result.unavailable_reason)) {
+      if (cache.size >= MAX_CACHE_ENTRIES) {
+        // Map iterates in insertion order, so this drops the oldest.
+        cache.delete(cache.keys().next().value!);
+      }
+      cache.set(key, decode);
     }
-    cache.set(key, decode);
     return decode;
   } catch (err) {
     // Not cached: unlike a decline, a failure says nothing about the region,

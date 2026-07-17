@@ -299,6 +299,39 @@ describe("decodeCrashRegion", () => {
     expect(decodeBacktrace).toHaveBeenCalledTimes(1);
   });
 
+  it("asks again after the backend failed to decode, as after a throw", async () => {
+    const decodeBacktrace = vi
+      .fn<() => Promise<DecodeBacktraceResponse>>()
+      .mockResolvedValueOnce(reply({ decoded: [], unavailable_reason: "helper_failed" }))
+      .mockResolvedValue(reply());
+    const api = fakeApi(decodeBacktrace);
+    const region = ["Guru: x", "PC: 0x400d1a2c", "Rebooting..."];
+
+    expect(await decodeCrashRegion(api, "f.yaml", region, cache)).toBeNull();
+    // A child killed under memory pressure reports through the reply rather
+    // than by throwing, but it is the same fact about the backend: it says
+    // nothing about whether this region can be decoded.
+    expect(await decodeCrashRegion(api, "f.yaml", region, cache)).not.toBeNull();
+    expect(decodeBacktrace).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a partial decode rather than re-spawning for the same frames", async () => {
+    const decodeBacktrace = vi.fn(async () =>
+      reply({ unavailable_reason: "decode_failed" })
+    );
+    const api = fakeApi(decodeBacktrace);
+    const region = ["Guru: x", "PC: 0x400d1a2c", "Rebooting..."];
+
+    const first = await decodeCrashRegion(api, "g.yaml", region, cache);
+    const second = await decodeCrashRegion(api, "g.yaml", region, cache);
+
+    // The decoder latched off partway but returned the frames it had. Those
+    // are real, so a repeat shows them again rather than buying a second child.
+    expect(first).not.toBeNull();
+    expect(second).toEqual(first);
+    expect(decodeBacktrace).toHaveBeenCalledTimes(1);
+  });
+
   it("asks again after a failure, which says nothing about the region", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const decodeBacktrace = vi
