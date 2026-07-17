@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+  Stands in for the hosted decoder so the unit tests never touch the network.
+
+  happy-dom really loads an iframe's src, and the src here is the production
+  decoder URL, so without this every run would fetch esphome.github.io: slow,
+  offline-hostile, and impolite. It is mapped over that URL by the
+  virtualServers option in stacktrace-decoder.test.ts.
+
+  Deliberately inert. The tests drive the protocol by dispatching messages
+  themselves; all this has to do is exist, so the frame gets a contentWindow to
+  use as the message source. The real page's behaviour is covered in the
+  device-builder repo, in a real browser, against a real ELF.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>decoder stub</title>
+  </head>
+  <body>
+    stub
+  </body>
+</html>

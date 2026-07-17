@@ -1,9 +1,18 @@
 /**
  * @vitest-environment happy-dom
+ * @vitest-environment-options { "settings": { "fetch": { "virtualServers": [ { "url": "https://esphome.github.io/device-builder/esp-stacktrace-decoder/", "directory": "./test/fixtures/decoder-stub" } ] } } }
  *
  * Pins the hosted decoder's contract: it frames the page once, authenticates
  * with a one-way nonce, and treats every failure as "no decode" rather than
  * letting it reach the log.
+ *
+ * The decoder URL is served from a local stub, because happy-dom really loads
+ * an iframe's src and the src here is the production URL: without this, every
+ * run would fetch esphome.github.io, which is slow, fails offline, and is the
+ * exact coupling this design exists to avoid. Disabling iframe loading outright
+ * would be simpler but leaves contentWindow null, and that window is what the
+ * source check authenticates against. The real page is covered in the
+ * device-builder repo, in a real browser, against a real ELF.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DECODER_ORIGIN } from "../../src/common/docs.js";
@@ -20,9 +29,9 @@ const frame = () => document.querySelector("iframe");
 /**
  * Answer as the hosted page would.
  *
- * happy-dom does not load the iframe's document, so its contentWindow never
- * speaks; stand in for it. `source` has to be the real contentWindow, because
- * that identity check is half of what authenticates the channel.
+ * The stub the frame loads is inert, so nothing inside it ever speaks; stand in
+ * for it. `source` has to be the frame's real contentWindow, because that
+ * identity check is half of what authenticates the channel.
  */
 function reply(data: unknown): void {
   window.dispatchEvent(
