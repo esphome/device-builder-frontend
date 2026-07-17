@@ -28,8 +28,11 @@ export class LineBatcher {
   enqueue(line: string): void {
     this._pending.push(line);
     // Trim with headroom — one slice per maxLines pushes, not every push.
+    // Counted from the front rather than as slice(-maxLines): a maxLines of 0
+    // makes -maxLines a negative zero, which keeps the whole array, so nothing
+    // would ever be dropped and a hidden tab would buffer without bound.
     if (this._maxLines !== undefined && this._pending.length > 2 * this._maxLines) {
-      this._pending = this._pending.slice(-this._maxLines);
+      this._pending = this._pending.slice(this._pending.length - this._maxLines);
     }
     if (this._scheduled) return;
     this._scheduled = requestAnimationFrame(() => {

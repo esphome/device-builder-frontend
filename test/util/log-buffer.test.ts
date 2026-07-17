@@ -87,6 +87,19 @@ describe("LogBuffer", () => {
     expect(buf.indexOf(0, ["a"])).toBeNull();
   });
 
+  it("buffers nothing at a maxLines of 0 either, so a hidden tab can't grow it", () => {
+    // maxLines is forwarded to the batcher, which hit the same negative zero:
+    // rAF doesn't fire while the tab is hidden, so an untrimmed pending buffer
+    // grows for as long as the device talks.
+    const raf = withManualRaf();
+    const onAppend = vi.fn();
+    const buf = new LogBuffer(new FakeHost(), { maxLines: 0, onAppend });
+    for (let i = 0; i < 500; i++) buf.enqueue(String(i));
+    raf.fire();
+    expect(buf.lines).toEqual([]);
+    expect(onAppend).not.toHaveBeenCalled();
+  });
+
   it("moves tracked positions by what the cap trimmed", () => {
     const buf = new LogBuffer(new FakeHost(), { maxLines: 100 });
     for (let i = 0; i < 100; i++) buf.append([String(i)]);
