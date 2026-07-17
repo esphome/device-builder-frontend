@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VersionMatchPolicy } from "../../src/api/types/event-subscription.js";
-import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
+import { JobType } from "../../src/api/types/firmware-jobs.js";
 import type { CommandType } from "../../src/components/command-dialog.js";
 import enMessages from "../../src/translations/en.json";
 
