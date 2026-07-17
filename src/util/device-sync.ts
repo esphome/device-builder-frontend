@@ -25,17 +25,16 @@ export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
   (d.api_enabled && mdnsOnline(d)) || d.runtime_state.deployed_identity_live;
 
 // Whether to SHOW the "modified" (needs-install) and "update available"
-// indicators, gated so a stale mDNS-dark value can't flag a false "out of
+// indicators, gated so a stale untrusted value can't flag a false "out of
 // sync". The raw truth stays on the device fields (``has_pending_changes`` /
 // ``update_available``); these say whether to surface it. Every indicator site
 // derives from these so the rule lives in one place.
 //
 // ``update_available`` (``deployed_version`` vs ``current_version``) is purely
-// mDNS-sourced, so it always needs a trusted deployed identity.
-// ``has_pending_changes`` is only
-// mDNS-dependent when it came from the config-hash compare
-// (``pending_changes_via_hash``); a local mtime-driven edit is trustworthy
-// without mDNS, so it still cues "install".
+// deployed-identity-sourced, so it always needs a trusted deployed identity.
+// ``has_pending_changes`` is only identity-dependent when it came from the
+// config-hash compare (``pending_changes_via_hash``); a local mtime-driven
+// edit is trustworthy without it, so it still cues "install".
 export const showPendingChanges = (d: ConfiguredDevice): boolean =>
   d.has_pending_changes === true &&
   (deployedIdentityTrusted(d) || d.pending_changes_via_hash !== true);
