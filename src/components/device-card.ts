@@ -189,27 +189,39 @@ export class ESPHomeDeviceCard extends LitElement {
               ${
                 this.showModified
                   ? html`<span
-                      class="indicator-dot indicator-dot--modified"
-                      title=${this._localize("dashboard.status_modified")}
-                    ></span>`
+                        id="ind-modified"
+                        class="indicator-dot indicator-dot--modified"
+                        tabindex="0"
+                      ></span>
+                      <wa-tooltip for="ind-modified">
+                        ${this._localize("dashboard.status_modified")}
+                      </wa-tooltip>`
                   : nothing
               }
               ${
                 this.showUpdate
                   ? html`<span
-                      class="indicator-dot indicator-dot--update"
-                      title=${this._localize("dashboard.status_update_available")}
-                    ></span>`
+                        id="ind-update"
+                        class="indicator-dot indicator-dot--update"
+                        tabindex="0"
+                      ></span>
+                      <wa-tooltip for="ind-update">
+                        ${this._localize("dashboard.status_update_available")}
+                      </wa-tooltip>`
                   : nothing
               }
               ${
                 this.queuedUpdate
                   ? html`<wa-icon
-                      class="indicator-queued"
-                      library="mdi"
-                      name="clock-outline"
-                      title=${this._localize("dashboard.status_queued_update")}
-                    ></wa-icon>`
+                        id="ind-queued"
+                        class="indicator-queued"
+                        library="mdi"
+                        name="clock-outline"
+                        tabindex="0"
+                      ></wa-icon>
+                      <wa-tooltip for="ind-queued">
+                        ${this._localize("dashboard.status_queued_update")}
+                      </wa-tooltip>`
                   : nothing
               }
               ${renderEncryptionIcon(this)}

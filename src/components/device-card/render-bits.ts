@@ -52,11 +52,13 @@ export function renderEncryptionIcon(
   });
   if (!visual) return nothing;
   return html`<wa-icon
-    class="encryption-icon ${visual.cssClass}"
-    library="mdi"
-    name=${visual.iconName}
-    title=${card._localize(visual.tooltipKey)}
-  ></wa-icon>`;
+      id="ind-encryption"
+      class="encryption-icon ${visual.cssClass}"
+      library="mdi"
+      name=${visual.iconName}
+      tabindex="0"
+    ></wa-icon>
+    <wa-tooltip for="ind-encryption">${card._localize(visual.tooltipKey)}</wa-tooltip>`;
 }
 
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
@@ -82,10 +84,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
     const status = card.recentJob.status;
     const icon = RECENT_JOB_ICON[status];
     if (icon) {
-      return html`<div
-        class="device-status ${RECENT_JOB_VARIANT[status]}"
-        title=${card._localize(RECENT_JOB_LABEL[status])}
-      >
+      return html`<div class="device-status ${RECENT_JOB_VARIANT[status]}">
         <wa-icon library="mdi" name=${icon}></wa-icon>
         ${card._localize(RECENT_JOB_LABEL[status])}
       </div>`;

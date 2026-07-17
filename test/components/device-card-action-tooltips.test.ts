@@ -55,3 +55,43 @@ describe("device-card action tooltips", () => {
     expect(tooltipFor(el, "btn-web-ui")).toBeNull();
   });
 });
+
+describe("device-card indicator tooltips", () => {
+  it("names the modified dot", async () => {
+    const el = await mount({ showModified: true });
+    const dot = el.shadowRoot!.querySelector("#ind-modified")!;
+    expect(dot.hasAttribute("title")).toBe(false);
+    expect(dot.getAttribute("tabindex")).toBe("0");
+    expect(tooltipFor(el, "ind-modified")!.textContent).toContain(
+      "dashboard.status_modified"
+    );
+  });
+
+  it("names the update dot", async () => {
+    const el = await mount({ showUpdate: true });
+    expect(tooltipFor(el, "ind-update")!.textContent).toContain(
+      "dashboard.status_update_available"
+    );
+  });
+
+  it("names the queued-update clock", async () => {
+    const el = await mount({ queuedUpdate: true });
+    expect(tooltipFor(el, "ind-queued")!.textContent).toContain(
+      "dashboard.status_queued_update"
+    );
+  });
+
+  it("names the encryption indicator with its state tooltip", async () => {
+    const el = await mount({
+      hasPendingChanges: true,
+      apiEnabled: true,
+      apiEncrypted: true,
+      apiEncryptionActive: null,
+    });
+    const icon = el.shadowRoot!.querySelector("#ind-encryption")!;
+    expect(icon.hasAttribute("title")).toBe(false);
+    expect(tooltipFor(el, "ind-encryption")!.textContent).toContain(
+      "dashboard.table_status_encryption_pending_tooltip"
+    );
+  });
+});
