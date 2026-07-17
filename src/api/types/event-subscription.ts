@@ -80,17 +80,11 @@ export enum DeviceEventType {
   OFFLOADER_PEER_LINK_CLOSED = "offloader_peer_link_closed",
   // Offloader-side remote-build job lifecycle. Fired by the
   // offloader's PeerLinkClient receive loop when an inbound
-  // job_state_changed / job_output frame lands from the
-  // paired receiver this dashboard submitted the job to. The
-  // offloader doesn't own a FirmwareJob row for these (the
-  // receiver runs the build); it just fans the wire frames
-  // onto its local bus so subscribe_events re-broadcasts to
-  // frontend tabs. Settings dialog's Send-builds section
-  // consumes both to render the live progress drawer per
-  // in-flight remote job: STATE_CHANGED drives the lifecycle
-  // pill (queued / running / completed / failed / cancelled),
-  // OUTPUT appends each per-line stdout / stderr chunk to the
-  // ansi-log buffer. Phase 5c-3 wired the backend.
+  // job_state_changed frame lands from the paired receiver
+  // running this dashboard's build. Feeds buildOffloadJobsContext;
+  // the one UI consumer is the command dialog's remote-queued
+  // indicator (a pool-routed compile parked behind another
+  // offloader's build).
   OFFLOADER_JOB_STATE_CHANGED = "offloader_job_state_changed",
   // mDNS-discovered peer dashboards. Replaces the deleted
   // ``remote_build/list_hosts`` WS command — the controller fires

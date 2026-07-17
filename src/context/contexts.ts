@@ -431,8 +431,8 @@ export const buildOffloadAlertsContext = createContext<Map<
 > | null>(Symbol("esphome-build-offload-alerts"));
 
 /**
- * One in-flight (or recently terminal) remote-build job the
- * offloader's jobs running on paired receivers.
+ * One in-flight (or recently terminal) remote-build job
+ * running on a paired receiver.
  *
  * The receiver runs the build; the offloader doesn't own the
  * receiver-side row. App-shell maintains a Map keyed on the
@@ -451,8 +451,9 @@ export interface RemoteBuildJobState {
 }
 
 /**
- * Context for in-flight remote-build jobs the offloader's
- * user dispatched. Keyed on job_id. null until app-shell
+ * Context for in-flight remote-build jobs running on paired
+ * receivers, fed by OFFLOADER_JOB_STATE_CHANGED and the
+ * remote_jobs snapshot. Keyed on job_id. null until app-shell
  * initialises (always immediately on app boot today, but
  * keeps the same null-vs-empty distinction sibling contexts
  * use for "still loading" vs "loaded but empty").

@@ -4,7 +4,7 @@
  * Part of the src/api/types.ts barrel split.
  */
 import type { VersionMatchPolicy } from "./event-subscription.js";
-import { JobStatus, JobStream } from "./firmware-jobs.js";
+import { JobStatus } from "./firmware-jobs.js";
 import type {
   PairingSummary,
   PairingWindowState,

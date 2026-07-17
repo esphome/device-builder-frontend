@@ -23,12 +23,6 @@ export enum JobType {
   RENAME = "rename",
 }
 
-/** Output stream discriminator on a single line of build output. */
-export enum JobStream {
-  STDOUT = "stdout",
-  STDERR = "stderr",
-}
-
 /** Where the bytes for a firmware build come from.
  *
  *  Mirrors the backend's ``JobSource`` StrEnum (7a-2a). ``LOCAL`` is

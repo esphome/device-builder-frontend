@@ -96,17 +96,14 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
       }
       host._buildOffloadAlerts = seededMap(offloader_alerts, (a) => a.pin_sha256);
-      // remote_jobs: backend snapshot is authoritative for which jobs exist,
-      // but merge onto local entries so a reconnect doesn't wipe display fields
-      // (configuration / target / receiver_label) that submit_job seeded.
+      // remote_jobs: backend snapshot is authoritative for which jobs exist;
+      // every field the slimmed row carries rides the snapshot, so build
+      // straight from it.
       if (remote_jobs !== undefined) {
         const seeded = new Map<string, RemoteBuildJobState>();
         for (const entry of remote_jobs) {
-          const existing = host._buildOffloadJobs.get(entry.job_id);
-          const base =
-            existing ?? stubRemoteBuildJobState(entry.job_id, entry.pin_sha256);
           seeded.set(entry.job_id, {
-            ...base,
+            job_id: entry.job_id,
             pin_sha256: entry.pin_sha256,
             status: entry.status,
             error_message: entry.error_message,
