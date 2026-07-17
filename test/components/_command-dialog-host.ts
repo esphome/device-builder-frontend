@@ -49,7 +49,9 @@ export function makeCommandDialogHost(
     _flipToLogs: () => {
       flipped = true;
     },
-    _enqueueLine: () => {},
+    _enqueueLine(line: string) {
+      this._log.enqueue(line);
+    },
     ...overrides,
   };
   return {
