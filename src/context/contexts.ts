@@ -9,12 +9,7 @@ import { ESPHomeAPI } from "../api/index.js";
 import type { IntegrationDoc } from "../api/types/components.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
 import type { VersionMatchPolicy } from "../api/types/event-subscription.js";
-import {
-  type FirmwareJob,
-  JobStatus,
-  JobType,
-  type RemoteBuildSubmitTarget,
-} from "../api/types/firmware-jobs.js";
+import { type FirmwareJob, JobStatus } from "../api/types/firmware-jobs.js";
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
 import type {
   PairingSummary,
@@ -436,53 +431,29 @@ export const buildOffloadAlertsContext = createContext<Map<
 > | null>(Symbol("esphome-build-offload-alerts"));
 
 /**
- * One in-flight (or recently terminal) remote-build job the
- * offloader's user dispatched via remote_build/submit_job.
+ * One in-flight (or recently terminal) remote-build job
+ * running on a paired receiver.
  *
- * The receiver runs the build; the offloader doesn't own a
- * FirmwareJob row for these. App-shell maintains a Map keyed
- * on job_id, upserting on OFFLOADER_JOB_STATE_CHANGED and
- * appending output on OFFLOADER_JOB_OUTPUT.
- *
- * Display fields (configuration, target, receiver_label) come
- * from the submit_job call site rather than the wire frame
- * because the receiver doesn't echo them back; app-shell
- * gets them by listening to the submit dialog's success event
- * (or by retaining what submit_job's caller passed in).
- *
- * Snapshot-seeded from
+ * The receiver runs the build; the offloader doesn't own the
+ * receiver-side row. App-shell maintains a Map keyed on the
+ * offloader-local job_id, upserting on
+ * OFFLOADER_JOB_STATE_CHANGED and snapshot-seeding from
  * ``subscribe_events.initial_state.remote_jobs`` so a page
- * reload mid-build paints the lifecycle pill immediately
- * instead of waiting for the next event. The snapshot doesn't
- * carry the output buffer (would balloon for any in-flight
- * compile) or the display fields (configuration / target /
- * receiver_label — the receiver doesn't echo them through the
- * wire), so reload-time rows start with an empty output buffer
- * and empty display strings; the dialog's re-attach view
- * tolerates the empty fields and live OFFLOADER_JOB_OUTPUT
- * events repopulate from the subscribe point forward. The
- * cache is offloader-side: receiver owns the underlying
- * FirmwareJob row, the offloader keeps a thin projection of
- * what's needed to render its in-flight UI.
+ * reload mid-build re-seeds immediately. Consumer: the command
+ * dialog's remote-queued indicator, which surfaces a pool-routed
+ * compile parked behind another offloader's build.
  */
 export interface RemoteBuildJobState {
   job_id: string;
   pin_sha256: string;
-  receiver_label: string;
-  configuration: string;
-  target: RemoteBuildSubmitTarget;
   status: JobStatus;
   error_message: string;
-  output: string[];
-  /** Client-side monotonic timestamp; absent until the
-   *  submit dialog seeds the entry (live event before
-   *  seeding leaves it 0). */
-  started_at: number;
 }
 
 /**
- * Context for in-flight remote-build jobs the offloader's
- * user dispatched. Keyed on job_id. null until app-shell
+ * Context for in-flight remote-build jobs running on paired
+ * receivers, fed by OFFLOADER_JOB_STATE_CHANGED and the
+ * remote_jobs snapshot. Keyed on job_id. null until app-shell
  * initialises (always immediately on app boot today, but
  * keeps the same null-vs-empty distinction sibling contexts
  * use for "still loading" vs "loaded but empty").
@@ -491,30 +462,3 @@ export const buildOffloadJobsContext = createContext<Map<
   string,
   RemoteBuildJobState
 > | null>(Symbol("esphome-build-offload-jobs"));
-
-/**
- * Build a fresh RemoteBuildJobState with empty display
- * fields, used by app-shell when an event arrives before the
- * dispatch dialog has stamped the entry.
- *
- * The dispatch helper (registerRemoteBuildJob on app-shell)
- * backfills configuration / target / receiver_label /
- * started_at on its success bubble; until then the dialog
- * tolerates the empty strings.
- */
-export function stubRemoteBuildJobState(
-  job_id: string,
-  pin_sha256: string
-): RemoteBuildJobState {
-  return {
-    job_id,
-    pin_sha256,
-    receiver_label: "",
-    configuration: "",
-    target: JobType.COMPILE as RemoteBuildSubmitTarget,
-    status: JobStatus.QUEUED,
-    error_message: "",
-    output: [],
-    started_at: 0,
-  };
-}

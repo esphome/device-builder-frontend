@@ -11,7 +11,6 @@ import type {
 import { DeviceEventType } from "../../api/types/event-subscription.js";
 import type {
   OffloaderIncludeLocalChangedEventData,
-  OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
   OffloaderPairingAddedEventData,
@@ -32,10 +31,7 @@ import type {
   RemoteBuildPairStatusChangedEventData,
 } from "../../api/types/remote-build-events.js";
 import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
-import {
-  type RemoteBuildJobState,
-  stubRemoteBuildJobState,
-} from "../../context/index.js";
+import { type RemoteBuildJobState } from "../../context/index.js";
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { applyPreferences } from "./data-load.js";
@@ -97,17 +93,15 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
       }
       host._buildOffloadAlerts = seededMap(offloader_alerts, (a) => a.pin_sha256);
-      // remote_jobs: backend snapshot is authoritative for which jobs exist,
-      // but merge onto local entries so a reconnect doesn't wipe display fields
-      // (configuration / target / receiver_label) that submit_job seeded.
-      if (remote_jobs !== undefined) {
+      // remote_jobs: backend snapshot is authoritative for which jobs exist;
+      // every field the slimmed row carries rides the snapshot, so rebuild
+      // straight from it. Omitted means the offloader controller is down —
+      // clear rather than carry stale rows across the reconnect.
+      {
         const seeded = new Map<string, RemoteBuildJobState>();
-        for (const entry of remote_jobs) {
-          const existing = host._buildOffloadJobs.get(entry.job_id);
-          const base =
-            existing ?? stubRemoteBuildJobState(entry.job_id, entry.pin_sha256);
+        for (const entry of remote_jobs ?? []) {
           seeded.set(entry.job_id, {
-            ...base,
+            job_id: entry.job_id,
             pin_sha256: entry.pin_sha256,
             status: entry.status,
             error_message: entry.error_message,
@@ -420,24 +414,13 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
     case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {
       const evt = data as OffloaderJobStateChangedEventData;
-      const base =
-        host._buildOffloadJobs.get(evt.job_id) ??
-        stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
+      // The slimmed row is wholly event-derived; building it fresh keeps a
+      // stale entry from ever contributing identity fields.
       host._buildOffloadJobs = new Map(host._buildOffloadJobs).set(evt.job_id, {
-        ...base,
+        job_id: evt.job_id,
+        pin_sha256: evt.pin_sha256,
         status: evt.status,
         error_message: evt.error_message,
-      });
-      break;
-    }
-    case DeviceEventType.OFFLOADER_JOB_OUTPUT: {
-      const evt = data as OffloaderJobOutputEventData;
-      const base =
-        host._buildOffloadJobs.get(evt.job_id) ??
-        stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
-      host._buildOffloadJobs = new Map(host._buildOffloadJobs).set(evt.job_id, {
-        ...base,
-        output: [...base.output, evt.line],
       });
       break;
     }

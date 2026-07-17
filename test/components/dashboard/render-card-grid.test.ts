@@ -71,14 +71,25 @@ describe("renderCardGrid", () => {
     expect(card.hasAttribute("show-update")).toBe(true);
   });
 
-  it("hides the update indicator when mDNS is dark", () => {
+  it("hides the update indicator when an api device's mDNS is dark", () => {
     const device = makeConfiguredDevice({
       update_available: true,
+      api_enabled: true,
       runtime_state: { active_source: "ping" },
     });
     const card = renderCard(device);
     expect(card.hasAttribute("show-update")).toBe(false);
     expect(card.hasAttribute("queued-update")).toBe(false);
+  });
+
+  it("hides the update indicator when a no-api device's identity TXT went dark", () => {
+    const device = makeConfiguredDevice({
+      update_available: true,
+      api_enabled: false,
+      runtime_state: { active_source: "mqtt", http_identity_live: false },
+    });
+    const card = renderCard(device);
+    expect(card.hasAttribute("show-update")).toBe(false);
   });
 
   it("keeps the tour target in canonical device order", () => {

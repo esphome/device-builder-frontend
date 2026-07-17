@@ -3,7 +3,7 @@ import type { IntegrationDoc } from "../../../api/types/components.js";
 import type { ConfiguredDevice } from "../../../api/types/devices.js";
 import { isSafeDocsUrl } from "../../../common/docs.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { mdnsOnline } from "../../../util/device-sync.js";
+import { deployedIdentityTrusted } from "../../../util/device-sync.js";
 import {
   getEncryptionVisual,
   type EncryptionState,
@@ -37,11 +37,13 @@ export function renderRow(
   `;
 }
 
-// MAC address and deployed config hash reach the dashboard only over the
-// native-API mDNS service (_esphomelib._tcp); a device with no api: never
-// broadcasts them, so a "waiting for mDNS" spinner would spin forever. Gate on
-// api_enabled (the field can never arrive), not mdnsOnline() (only whether mDNS
-// is live right now). Mirrors the api_enabled gate in encryption-state.
+// Empty-state text for the MAC and deployed-config-hash rows. A device with
+// no api: only broadcasts those on _http._tcp from ESPHome 2026.7.0; on older
+// firmware the field never arrives, so a "waiting for mDNS" spinner would
+// spin forever — the no-native-API text stays as the "may never arrive"
+// explanation. The deployed-version row deliberately doesn't use this helper:
+// version also rides the older _http._tcp fallback, so waiting is honest
+// there. Mirrors the api_enabled gate in encryption-state.
 function emptyMdnsText(d: ConfiguredDevice, localize: LocalizeFunc): string {
   return localize(
     d.api_enabled ? "dashboard.drawer_waiting_for_mdns" : "dashboard.drawer_no_native_api"
@@ -135,10 +137,10 @@ export function renderVersionSection(
   localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   const local = d.current_version || "";
-  // The deployed version comes only from mDNS; when mDNS is dark it's stale, so
-  // treat it as unknown and let the existing empty-deployed path show
-  // "waiting for mDNS" instead of a false "out of sync".
-  const deployed = mdnsOnline(d) ? d.runtime_state.deployed_version : "";
+  // mDNS-sourced; treat as unknown when it can't be trusted (see
+  // deployedIdentityTrusted) so the empty-deployed path shows the waiting
+  // text instead of a false "out of sync".
+  const deployed = deployedIdentityTrusted(d) ? d.runtime_state.deployed_version : "";
   if (!local && !deployed) return nothing;
   const matches = !!local && !!deployed && local === deployed;
   const statusIcon = matches ? "check-circle-outline" : "sync";
@@ -190,8 +192,8 @@ export function renderConfigHashSection(
   localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   const expected = d.expected_config_hash || "";
-  // mDNS-sourced; treat as unknown when mDNS is dark (see renderVersionSection).
-  const deployed = mdnsOnline(d) ? d.runtime_state.deployed_config_hash : "";
+  // mDNS-sourced; treat as unknown when it can't be trusted (see renderVersionSection).
+  const deployed = deployedIdentityTrusted(d) ? d.runtime_state.deployed_config_hash : "";
   if (!expected && !deployed) return nothing;
   const matches = !!expected && !!deployed && expected === deployed;
   const statusIcon = matches ? "check-circle-outline" : "sync";

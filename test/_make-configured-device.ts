@@ -38,15 +38,19 @@ const _BASE = {
   loaded_integrations: [],
   runtime_state: {
     state: DeviceState.UNKNOWN,
-    // Default to a live mDNS source so the happy-path fixture shows its
-    // out-of-sync / update indicators as before; tests covering the mDNS-dark
-    // "hide indicators" behaviour override this to "ping" / "unknown".
+    // Live mDNS source so an api-enabled test device shows its out-of-sync /
+    // update indicators (the fixture defaults to no-api, whose gate is
+    // http_identity_live below); tests covering the mDNS-dark "hide
+    // indicators" behaviour override this to "ping" / "unknown".
     active_source: "mdns",
     ip_addresses: [],
     deployed_version: "",
     deployed_config_hash: "",
     queued_update: false,
     api_encryption_active: null,
+    // Same happy-path default for the no-api gate; tests covering the
+    // identity-went-dark behaviour override this to false.
+    http_identity_live: true,
   },
   expected_config_hash: "",
   has_pending_changes: false,
