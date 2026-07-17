@@ -17,7 +17,10 @@ const mdnsOnline = (d: ConfiguredDevice): boolean =>
 // claims reachability, so active_source can't vouch for it — the backend
 // tracks that broadcast's freshness itself and ships it as
 // runtime_state.http_identity_live (session-only; false on backend cold
-// start until the broadcast is heard).
+// start until the broadcast is heard). A powered-down device blanks
+// rather than showing its last-heard identity: an arbitrarily old
+// broadcast is not evidence, matching how an api: device blanks when
+// mDNS goes dark.
 export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
   d.api_enabled ? mdnsOnline(d) : d.runtime_state.http_identity_live;
 
