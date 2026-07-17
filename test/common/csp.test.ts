@@ -13,8 +13,12 @@ import { DECODER_ORIGIN, DECODER_URL } from "../../src/common/docs.js";
 // duplicate would pass while the real page blocked everything.
 import html from "../../public/index.html?raw";
 
-const csp =
-  /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html)?.[1] ?? "";
+// Find the CSP meta tag, then read its content, so attribute order or an added
+// attribute (a reformat) doesn't break the test while the policy is unchanged.
+const cspMeta = /<meta\b[^>]*\bhttp-equiv="Content-Security-Policy"[^>]*>/i.exec(
+  html
+)?.[0];
+const csp = cspMeta ? (/\bcontent="([^"]*)"/i.exec(cspMeta)?.[1] ?? "") : "";
 
 /** One directive's values, or the empty string when it isn't declared. */
 const directive = (name: string): string =>
