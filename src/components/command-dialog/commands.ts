@@ -23,7 +23,9 @@ export function deriveFollowCommandType(
   jobs: Map<string, FirmwareJob>,
   job: FirmwareJob
 ): CommandType {
-  if (job.is_deferred_install) {
+  // COMPILE-gated like firmwareJobTypeLabel: a failed OTA upload converted
+  // offline also carries the flag but reopens as the Install it was.
+  if (job.is_deferred_install && job.job_type === JobType.COMPILE) {
     return "offline_compile";
   }
   if (job.job_type === JobType.COMPILE && !isTerminalJobStatus(job.status)) {

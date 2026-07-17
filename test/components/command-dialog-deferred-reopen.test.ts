@@ -69,4 +69,21 @@ describe("deriveFollowCommandType for deferred installs", () => {
     });
     expect(deriveFollowCommandType(new Map(), compile)).toBe("offline_compile");
   });
+
+  it("keeps a plain compile deriving compile", () => {
+    const compile = makeFirmwareJob({
+      job_type: JobType.COMPILE,
+      status: JobStatus.RUNNING,
+    });
+    expect(deriveFollowCommandType(new Map(), compile)).toBe("compile");
+  });
+
+  it("reopens a failed upload converted offline as the install it was", () => {
+    const upload = makeFirmwareJob({
+      job_type: JobType.UPLOAD,
+      status: JobStatus.FAILED,
+      is_deferred_install: true,
+    });
+    expect(deriveFollowCommandType(new Map(), upload)).toBe("install");
+  });
 });

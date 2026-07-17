@@ -80,6 +80,17 @@ describe("renderJob type label", () => {
     const el = renderInto(renderGroups(groupsHost() as never, [job], []));
     expect(el.textContent).toContain("firmware_jobs.type_install");
   });
+
+  it("keeps Upload on a failed upload converted offline", () => {
+    const job = makeFirmwareJob({
+      job_type: JobType.UPLOAD,
+      status: JobStatus.FAILED,
+      is_deferred_install: true,
+    });
+    const el = renderInto(renderGroups(groupsHost() as never, [job], []));
+    expect(el.textContent).toContain("firmware_jobs.type_upload");
+    expect(el.textContent).not.toContain("firmware_jobs.type_offline_compile");
+  });
 });
 
 describe("bucketJobs", () => {

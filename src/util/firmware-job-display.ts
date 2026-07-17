@@ -11,9 +11,13 @@ import type { LocalizeFunc } from "../common/localize.js";
  * is offline, so nothing installs yet — but "Compile" alone loses the
  * context that an install is queued behind it. This surfaces it as
  * "Offline compile" instead of letting it read as an outright Install.
+ *
+ * COMPILE-gated: a failed OTA upload the backend converts offline also
+ * carries ``is_deferred_install``, but what ran there was a flash of a
+ * finished build — it keeps its honest Upload label.
  */
 export function firmwareJobTypeLabel(job: FirmwareJob, localize: LocalizeFunc): string {
-  if (job.is_deferred_install) {
+  if (job.is_deferred_install && job.job_type === JobType.COMPILE) {
     return localize("firmware_jobs.type_offline_compile");
   }
   return localize(`firmware_jobs.type_${job.job_type}`);
