@@ -3,9 +3,10 @@
  *
  * MAC address and deployed config hash show "Waiting for mDNS discovery" while a
  * native-API device hasn't announced (#1453), but "This device does not have
- * Native API" for a no-api device whose MAC / config hash can never arrive; the
+ * Native API" for a no-api device, whose MAC / config hash arrive only on
+ * ESPHome 2026.7.0+ (_http._tcp identity TXT) and never on older firmware; the
  * ethernet / bluetooth waiting rows hide entirely for such devices. The deployed
- * version row is exempt: it can still arrive over the _http._tcp fallback.
+ * version row is exempt: it can arrive over the _http._tcp fallback on any firmware.
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
@@ -166,6 +167,36 @@ describe("renderVersionSection deployed row", () => {
     expect(texts).toContain("2026.5.2");
     expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
   });
+
+  it("shows the deployed version for a no-api device reachable over MQTT", () => {
+    // Delivered via the _http._tcp identity TXT; active_source never claims
+    // mDNS for these devices, so the value must not be gated on it.
+    const result = renderVersionSection(
+      _device({
+        current_version: "2026.7.1",
+        api_enabled: false,
+        runtime_state: { active_source: "mqtt", deployed_version: "2026.7.0" },
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).toContain("2026.7.1");
+    expect(texts).toContain("2026.7.0");
+  });
+
+  it("blanks an api device's deployed version while mDNS is dark", () => {
+    const result = renderVersionSection(
+      _device({
+        current_version: "2026.7.1",
+        api_enabled: true,
+        runtime_state: { active_source: "ping", deployed_version: "2026.7.0" },
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).not.toContain("2026.7.0");
+    expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
+  });
 });
 
 describe("renderConfigHashSection deployed row", () => {
@@ -195,5 +226,33 @@ describe("renderConfigHashSection deployed row", () => {
     const texts = valueTexts(result);
     expect(texts).toContain("abc123");
     expect(texts).toContain("dashboard.drawer_no_native_api");
+  });
+
+  it("shows the deployed hash for a no-api device reachable over MQTT", () => {
+    const result = renderConfigHashSection(
+      _device({
+        expected_config_hash: "abc123",
+        api_enabled: false,
+        runtime_state: { active_source: "mqtt", deployed_config_hash: "22e8e223" },
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).toContain("abc123");
+    expect(texts).toContain("22e8e223");
+  });
+
+  it("blanks an api device's deployed hash while mDNS is dark", () => {
+    const result = renderConfigHashSection(
+      _device({
+        expected_config_hash: "abc123",
+        api_enabled: true,
+        runtime_state: { active_source: "ping", deployed_config_hash: "22e8e223" },
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).not.toContain("22e8e223");
+    expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
   });
 });

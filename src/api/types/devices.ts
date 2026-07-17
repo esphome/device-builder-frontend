@@ -23,12 +23,11 @@ export enum DeviceState {
 export interface DeviceRuntimeState {
   state: DeviceState;
   /** Reachability channel currently driving the device's online state
-   *  (``mdns`` > ``mqtt`` > ``ping``). The deployed version / config
-   *  hash come only from the mDNS broadcast, so the out-of-sync /
-   *  update indicators are gated on ``active_source === "mdns"`` (see
-   *  ``src/util/device-sync.ts``): when mDNS is dark those values are
-   *  stale. ``"unknown"`` means no source has claimed the device yet,
-   *  which reads as "not mDNS". */
+   *  (``mdns`` > ``mqtt`` > ``ping``). The out-of-sync / update
+   *  indicators consult it only for api: devices, via
+   *  ``deployedIdentityTrusted`` (``src/util/device-sync.ts``), which
+   *  owns the gating rule. ``"unknown"`` means no source has claimed
+   *  the device yet, which reads as "not mDNS". */
   active_source: ReachabilitySource;
   /** All resolved addresses from mDNS (IPv4 + IPv6) — empty array until
    *  the device is seen online. ``ip_addresses[0]`` matches the flat
@@ -38,7 +37,8 @@ export interface DeviceRuntimeState {
   /**
    * 8-char hex hash the running firmware reports via the
    * ``config_hash`` TXT record on its ``_esphomelib._tcp`` mDNS
-   * broadcast. Drives ``has_pending_changes`` together with
+   * broadcast — or on ``_http._tcp`` for a device without api:
+   * (ESPHome 2026.7.0+). Drives ``has_pending_changes`` together with
    * ``expected_config_hash``. Empty string when the device hasn't
    * announced yet, or runs firmware older than the broadcast
    * (esphome/esphome#16145) — the dashboard then falls back to
@@ -132,7 +132,8 @@ export interface ConfiguredDevice {
   has_pending_changes: boolean;
   /** True when ``has_pending_changes`` came from the mDNS-sourced
    *  config-hash compare (vs the local mtime fallback). The UI gates
-   *  only this case on a live mDNS, so a local YAML edit still cues
+   *  only this case on a trusted deployed identity (see
+   *  ``deployedIdentityTrusted``), so a local YAML edit still cues
    *  "install" when mDNS is dark. Optional / absent reads as a local
    *  (non-mDNS-dependent) pending. */
   pending_changes_via_hash?: boolean;
@@ -156,8 +157,9 @@ export interface ConfiguredDevice {
    * ``devices/get_api_key``.
    */
   api_encrypted: boolean;
-  /** Canonical ``XX:XX:XX:XX:XX:XX`` MAC observed in the device's
-   *  ``_esphomelib._tcp.local.`` ``mac`` TXT record (e.g.
+  /** Canonical ``XX:XX:XX:XX:XX:XX`` MAC observed in the ``mac`` TXT
+   *  record of the device's ``_esphomelib._tcp.local.`` broadcast, or
+   *  of ``_http._tcp.local.`` for a device without api: (e.g.
    *  ``"94:C9:60:1F:8C:F1"``). Empty string when mDNS hasn't surfaced
    *  one yet. The backend normalizes at ingest so this field always
    *  carries the colon-separated uppercase form regardless of which
