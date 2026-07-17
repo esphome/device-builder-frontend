@@ -93,8 +93,11 @@ const BACKEND_FAULT_REASONS: ReadonlySet<string> = new Set([
 //
 // `elf_only` is the one this exists for: the backend has the ELF but
 // not the build tree it was compiled in, so nothing there can resolve
-// addr2line. The fault reasons join it for the same reason they are not cached
-// above. `no_build` is absent and must stay absent: it means the ELF isn't here
+// addr2line. The fault reasons join it, and unlike `elf_only` they are a
+// transient fault rather than a verdict, so a region that hit one is cached
+// null (the region text differs between crashes, so a loop still recovers on
+// the next one, and the ELF download itself retries per KeyedPromiseCache).
+// `no_build` is absent and must stay absent: it means the ELF isn't here
 // either, so there is nothing to send.
 const HOSTED_FALLBACK_REASONS: ReadonlySet<string> = new Set([
   ...BACKEND_FAULT_REASONS,
@@ -371,25 +374,30 @@ function framesToDecodedLines(
 }
 
 /**
- * The session's ELF bytes for *configuration*'s *buildHash*, fetched once.
+ * The session's ELF bytes for *configuration* at *configHash*, fetched once.
  *
- * Keyed on the build, not just the device: a rebuild mid-session replaces the
- * ELF on disk, and serving the old bytes would decode the next crash against
- * the wrong build and report it without a caveat (`stale_build` goes false the
- * moment the device is reflashed to match). A new hash simply misses.
+ * Keyed on the config hash, not just the device: a rebuild mid-session replaces
+ * the ELF on disk, and serving the old bytes would decode the next crash
+ * against the wrong build and report it without a caveat (`stale_build` goes
+ * false the moment the device is reflashed to match). A new hash simply misses.
+ *
+ * The bound is the config hash, not the binary: a recompile that changes the
+ * binary without changing the YAML (a toolchain or library bump) keeps the same
+ * key. That is the same precision the backend's `stale_build` has, and the
+ * accepted ceiling here.
  *
  * Throws as the download does, which the caller turns into "no decode".
  */
 function loadElf(
   api: ESPHomeAPI,
   configuration: string,
-  buildHash: string
+  configHash: string
 ): Promise<ArrayBuffer> {
   // No hash means the build can't be told apart from the next one (an ELF
   // present without a build_info.json). Caching under a hash-less key would
   // serve one build's bytes for another after a rebuild, so fetch uncached.
-  if (!buildHash) return api.firmwareDownloadBytes(configuration, ELF_FILE);
-  const key = `${configuration}\n${buildHash}`;
+  if (!configHash) return api.firmwareDownloadBytes(configuration, ELF_FILE);
+  const key = `${configuration}\n${configHash}`;
   if (key !== elfCacheKey) {
     elfCache.clear();
     elfCacheKey = key;
