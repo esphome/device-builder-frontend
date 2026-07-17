@@ -240,6 +240,25 @@ describe("logs-dialog inline backtrace decode", () => {
     );
   });
 
+  it("does not decode a region the cap dropped before it terminated", async () => {
+    // A flooding device: the region straddles a batch big enough that its head
+    // is trimmed off the front before its terminator arrives. The splice can
+    // never land, so buying a backend child for it is pure waste.
+    append(
+      el,
+      Array.from({ length: 4990 }, (_, i) => `[12:00:00]before ${i}`)
+    );
+    append(el, CRASH.slice(0, 3));
+    append(el, [
+      CRASH[3],
+      ...Array.from({ length: 4998 }, (_, i) => `[12:00:03]flood ${i}`),
+    ]);
+    await flush();
+
+    expect(lines(el).some((l) => l.includes("Guru Meditation"))).toBe(false);
+    expect(decodeBacktrace).not.toHaveBeenCalled();
+  });
+
   it("hands the stale-build verdict to the report as a value", async () => {
     decodeBacktrace.mockResolvedValue({
       decoded: [{ index: 2, text: "Decoded 0x400d1a2c: loop()" }],
@@ -270,7 +289,7 @@ describe("logs-dialog inline backtrace decode", () => {
 
     append(el, CRASH);
     await inFlight;
-    (el as any)._crashDecode.reset();
+    (el as any)._clearLogs();
 
     // The abandoned decode is still hanging (a real one has up to 90s to go).
     // The new session's crash must not wait it out to be decorated.
@@ -301,7 +320,7 @@ describe("logs-dialog inline backtrace decode", () => {
     // Reset only once the decode is genuinely in flight, so it is holding the
     // cache it was handed across the reset rather than racing to reach it.
     await inFlight;
-    (el as any)._crashDecode.reset();
+    (el as any)._clearLogs();
     land(null);
     await flush();
 

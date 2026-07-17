@@ -63,7 +63,12 @@ export class CrashDecodeController {
     // Paint before decoding: colouring is 1:1, so it never moves the shift,
     // and the region comes back as it now sits in the buffer so a decode
     // splice landing later still recognises it.
-    this._queueDecode(this._paint(region));
+    const painted = this._paint(region);
+    // Gone already: a batch big enough to trim the region's head can land
+    // between its marker and its terminator. Nothing to decorate, so decoding
+    // would spend a backend child on a splice that cannot land.
+    if (painted === null) return;
+    this._queueDecode(painted);
   }
 
   /** The cap dropped *count* lines off the front of the buffer. */
@@ -90,13 +95,18 @@ export class CrashDecodeController {
   }
 
   // The raw UART panic handler emits no colour of its own, so a serial crash
-  // would scroll past looking like ordinary output.
-  private _paint(region: CrashRegion): CrashRegion {
+  // would scroll past looking like ordinary output. Null when the region is no
+  // longer in the buffer to colour.
+  private _paint(region: CrashRegion): CrashRegion | null {
     const raw = colorizeCrash(region.raw);
-    if (raw.every((line, i) => line === region.raw[i])) return region;
-    const painted = { raw, startIndex: region.startIndex };
-    this._replaceRegion(region, painted.raw);
-    return painted;
+    if (raw.every((line, i) => line === region.raw[i])) {
+      // An OTA crash arrives red from the device's logger, so there is nothing
+      // to replace. It still has to be present to be worth decoding.
+      return this._positionOf(region) === null ? null : region;
+    }
+    return this._replaceRegion(region, raw)
+      ? { raw, startIndex: region.startIndex }
+      : null;
   }
 
   // Decode regions one at a time, so each splice lands before the next
@@ -124,23 +134,30 @@ export class CrashDecodeController {
     this._replaceRegion(region, interleaveDecoded(region.raw, decode));
   }
 
-  // Swap a region for *replacement*, positioned by absolute stream index and
-  // then verified against the buffer: on a miss the region has churned, and
-  // is left alone rather than decorated in the wrong place.
+  // Where *region* currently sits in the buffer; null when it isn't there.
   //
   // Verifies every line, not just the ends. A crash loop repeats one dump
   // verbatim, so its regions share a first and last line; ends-only would
   // accept a mispositioned splice in exactly the case that produces two
   // regions to confuse.
-  private _replaceRegion(region: CrashRegion, replacement: string[]): void {
+  private _positionOf(region: CrashRegion): number | null {
     const { raw, startIndex } = region;
     const lines = this.host.getLines();
     const at = startIndex + this._indexShift;
-    if (at < 0 || at + raw.length > lines.length) return;
-    if (raw.some((line, i) => lines[at + i] !== line)) return;
-    const next = [...lines];
-    next.splice(at, raw.length, ...replacement);
-    this._indexShift += replacement.length - raw.length;
+    if (at < 0 || at + raw.length > lines.length) return null;
+    if (raw.some((line, i) => lines[at + i] !== line)) return null;
+    return at;
+  }
+
+  // Swap a region for *replacement*; false when it has churned out from under
+  // us and was left alone rather than decorated in the wrong place.
+  private _replaceRegion(region: CrashRegion, replacement: string[]): boolean {
+    const at = this._positionOf(region);
+    if (at === null) return false;
+    const next = [...this.host.getLines()];
+    next.splice(at, region.raw.length, ...replacement);
+    this._indexShift += replacement.length - region.raw.length;
     this.host.setLines(next);
+    return true;
   }
 }
