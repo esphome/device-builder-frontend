@@ -1,0 +1,189 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * Pins the hosted decoder's contract: it frames the page once, authenticates
+ * with a one-way nonce, and treats every failure as "no decode" rather than
+ * letting it reach the log.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DECODER_ORIGIN } from "../../src/common/docs.js";
+import { hostedDecoder, resetHostedDecoder } from "../../src/util/stacktrace-decoder.js";
+
+const READY = "esphome-stacktrace-decode:ready";
+const REQUEST = "esphome-stacktrace-decode:request";
+const RESULT = "esphome-stacktrace-decode:result";
+const ERROR = "esphome-stacktrace-decode:error";
+
+/** The one iframe the decoder framed. */
+const frame = () => document.querySelector("iframe");
+
+/**
+ * Answer as the hosted page would.
+ *
+ * happy-dom does not load the iframe's document, so its contentWindow never
+ * speaks; stand in for it. `source` has to be the real contentWindow, because
+ * that identity check is half of what authenticates the channel.
+ */
+function reply(data: unknown): void {
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      data,
+      origin: DECODER_ORIGIN,
+      source: frame()!.contentWindow as Window,
+    })
+  );
+}
+
+/** Answer `ready` as soon as the page is framed, as the real one does. */
+function autoReady(version = 1): void {
+  queueMicrotask(() => reply({ type: READY, version }));
+}
+
+beforeEach(() => {
+  resetHostedDecoder();
+  document.body.innerHTML = "";
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+describe("hostedDecoder", () => {
+  it("frames the decoder hidden, with a nonce and the dashboard's origin", async () => {
+    autoReady();
+    await hostedDecoder().available();
+
+    const el = frame()!;
+    expect(el.hidden).toBe(true);
+    const hash = new URLSearchParams(new URL(el.src).hash.slice(1));
+    expect(hash.get("nonce")).toMatch(/^[0-9a-f]{32}$/);
+    // Pins the outbound targetOrigin from frame zero rather than leaving the
+    // page broadcasting until it learns ours.
+    expect(hash.get("origin")).toBe(location.origin);
+  });
+
+  it("reports unavailable when the decoder never answers", async () => {
+    // GitHub down, or an install with no internet. An iframe that never loads
+    // fires no error worth trusting, so this is the timeout path.
+    const available = hostedDecoder().available();
+    await vi.advanceTimersByTimeAsync(11_000);
+
+    expect(await available).toBe(false);
+    // ...and the dead frame is cleaned up rather than left in the document.
+    expect(frame()).toBeNull();
+  });
+
+  it("remembers the verdict, so a crash loop reframes nothing", async () => {
+    autoReady();
+    expect(await hostedDecoder().available()).toBe(true);
+    expect(await hostedDecoder().available()).toBe(true);
+
+    expect(document.querySelectorAll("iframe")).toHaveLength(1);
+  });
+
+  it("sends the ELF with the nonce and resolves the frames", async () => {
+    autoReady();
+    await hostedDecoder().available();
+    const post = vi.spyOn(frame()!.contentWindow as Window, "postMessage");
+    const elf = new ArrayBuffer(8);
+
+    const pending = hostedDecoder().decode(elf, "Backtrace: 0x400d1a2c");
+    await vi.advanceTimersByTimeAsync(0); // decode() awaits available() before it posts
+    // The 3-arg (message, targetOrigin, transfer) overload; the spy's inferred
+    // signature is the 2-arg (message, options) one, so name the shape we sent.
+    const call = post.mock.calls[0] as unknown as [
+      { type: string; nonce: string; id: string },
+      string,
+      Transferable[],
+    ];
+    const sent = call[0];
+    expect(sent.type).toBe(REQUEST);
+    expect(sent.nonce).toMatch(/^[0-9a-f]{32}$/);
+    // Targeted, never '*': the ELF is the user's firmware.
+    expect(call[1]).toBe(DECODER_ORIGIN);
+    // Transferred, so the page doesn't copy tens of megabytes again.
+    expect(call[2]).toEqual([elf]);
+
+    reply({
+      type: RESULT,
+      id: sent.id,
+      frames: [{ address: 0x400d1a2c, function_name: "setup()", location: "a.cpp:1" }],
+    });
+
+    expect(await pending).toEqual([
+      { address: 0x400d1a2c, function_name: "setup()", location: "a.cpp:1" },
+    ]);
+  });
+
+  it("resolves null when the decoder reports an error", async () => {
+    autoReady();
+    await hostedDecoder().available();
+    const post = vi.spyOn(frame()!.contentWindow as Window, "postMessage");
+
+    const pending = hostedDecoder().decode(new ArrayBuffer(8), "Backtrace: 0x1");
+    await vi.advanceTimersByTimeAsync(0); // decode() awaits available() before it posts
+    const { id } = post.mock.calls[0][0] as { id: string };
+    reply({ type: ERROR, id, message: "unreadable elf" });
+
+    expect(await pending).toBeNull();
+  });
+
+  it("resolves null when the decode never comes back", async () => {
+    autoReady();
+    await hostedDecoder().available();
+
+    const pending = hostedDecoder().decode(new ArrayBuffer(8), "Backtrace: 0x1");
+    await vi.advanceTimersByTimeAsync(61_000);
+
+    expect(await pending).toBeNull();
+  });
+
+  it("ignores a reply from the wrong origin", async () => {
+    autoReady();
+    await hostedDecoder().available();
+    const post = vi.spyOn(frame()!.contentWindow as Window, "postMessage");
+
+    const pending = hostedDecoder().decode(new ArrayBuffer(8), "Backtrace: 0x1");
+    await vi.advanceTimersByTimeAsync(0); // decode() awaits available() before it posts
+    const { id } = post.mock.calls[0][0] as { id: string };
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: RESULT,
+          id,
+          frames: [{ address: 1, function_name: "evil", location: "" }],
+        },
+        origin: "https://evil.example.com",
+        source: frame()!.contentWindow as Window,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(61_000);
+
+    expect(await pending).toBeNull();
+  });
+
+  it("ignores a reply correlated to a different request", async () => {
+    autoReady();
+    await hostedDecoder().available();
+    const post = vi.spyOn(frame()!.contentWindow as Window, "postMessage");
+
+    const pending = hostedDecoder().decode(new ArrayBuffer(8), "Backtrace: 0x1");
+    reply({ type: RESULT, id: "someone-else", frames: [] });
+    await vi.advanceTimersByTimeAsync(61_000);
+
+    expect(await pending).toBeNull();
+    expect(post).toHaveBeenCalled();
+  });
+
+  it("proceeds against a decoder speaking a newer protocol", async () => {
+    // Additive changes don't bump the version, so a newer page still
+    // understands our v1 frame; warn rather than refuse to decode.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    autoReady(99);
+
+    expect(await hostedDecoder().available()).toBe(true);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("v99"));
+  });
+});

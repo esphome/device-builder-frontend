@@ -8,6 +8,8 @@ import {
   isCrashMarker,
 } from "./crash-detector.js";
 import { normalizeLogLine } from "./log-line.js";
+import type { DecodedFrame } from "./stacktrace-decoder.js";
+import { hostedDecoder } from "./stacktrace-decoder.js";
 
 /**
  * Backend-decoded backtraces for crashes captured over Web Serial.
@@ -42,6 +44,27 @@ const ANSI_RESET = "\u001b[0m";
 // see genuinely different crashes.
 const MAX_CACHE_ENTRIES = 16;
 
+// The artifact the hosted decoder needs, as `firmware/get_binaries` names it.
+const ELF_FILE = "firmware.elf";
+
+/**
+ * ELF bytes per configuration, for the hosted-decoder path.
+ *
+ * Module-level and unbounded on purpose: an ELF is tens of megabytes and a
+ * crash loop decodes region after region, so refetching per region is the cost
+ * worth avoiding. The entry is the in-flight promise, so concurrent regions
+ * share one download rather than racing. Bounded in practice by how many
+ * distinct devices one tab streams logs from; the tab reload that ends the
+ * session clears it, which is also what makes it safe to keep a build's bytes
+ * after a reflash.
+ */
+const elfCache = new Map<string, Promise<ArrayBuffer | null>>();
+
+/** Drop the session's ELF bytes. Tests only; production keeps them for the tab. */
+export function resetElfCache(): void {
+  elfCache.clear();
+}
+
 /**
  * Decode outcomes already seen this log session, keyed on the region text.
  *
@@ -56,6 +79,23 @@ export type CrashDecodeCache = Map<string, CrashDecode | null>;
 // leave the crash it was decoding undecodable for the rest of the session,
 // which is the crash loop this feature exists for.
 const BACKEND_FAULT_REASONS: ReadonlySet<string> = new Set([
+  "decode_failed",
+  "helper_failed",
+]);
+
+// Reasons worth a second opinion from the hosted decoder (mirroring
+// constants.DecodeUnavailable).
+//
+// `no_build` is the one this exists for: a device built on a remote server has
+// no CMake build tree here, and native ESP-IDF resolves addr2line only through
+// that tree's cache, so the backend cannot decode a crash it has the ELF for.
+// The fault reasons are worth retrying for the same reason they are not cached.
+//
+// Deliberately absent: `no_backtrace`, where there is nothing to decode and the
+// hosted decoder would find nothing either, and `unsupported_platform`, where
+// the target is not an ESP the decoder handles.
+const HOSTED_FALLBACK_REASONS: ReadonlySet<string> = new Set([
+  "no_build",
   "decode_failed",
   "helper_failed",
 ]);
@@ -241,9 +281,20 @@ export async function decodeCrashRegion(
   if (cache.has(key)) return cache.get(key) ?? null;
   try {
     const result = await api.decodeBacktrace(configuration, lines);
-    const decode: CrashDecode | null = result.decoded.length
+    let decode: CrashDecode | null = result.decoded.length
       ? { decoded: result.decoded, staleBuild: result.stale_build }
       : null;
+    // The backend first: it decodes against the exact toolchain the build used,
+    // and costs no ELF transfer. Only when it says it cannot is the hosted
+    // decoder worth the round trip.
+    if (decode === null && HOSTED_FALLBACK_REASONS.has(result.unavailable_reason)) {
+      decode = await decodeViaHostedDecoder(
+        api,
+        configuration,
+        lines,
+        result.stale_build
+      );
+    }
     if (decode !== null || !BACKEND_FAULT_REASONS.has(result.unavailable_reason)) {
       if (cache.size >= MAX_CACHE_ENTRIES) {
         // Map iterates in insertion order, so this drops the oldest.
@@ -258,4 +309,95 @@ export async function decodeCrashRegion(
     console.warn("Backtrace decoding failed", err);
     return null;
   }
+}
+
+/**
+ * Decode *lines* in the browser, against the ELF the backend already serves.
+ *
+ * The path a remote-built device takes: the build tree it was compiled in lives
+ * on the build server, so nothing here can resolve addr2line, but the ELF
+ * itself was materialised locally and is all a decoder needs.
+ *
+ * Every step is allowed to decline, and declining means the raw dump stands.
+ * The gates run cheapest first so the common no-op costs the least: whether the
+ * ELF exists at all is a local list, whether the decoder is reachable is one
+ * page load, and only then is a multi-megabyte ELF worth fetching.
+ *
+ * *backendStaleBuild* rides through from the backend's reply, which knows both
+ * the running firmware's config hash and the local build's whether or not it
+ * could decode.
+ */
+async function decodeViaHostedDecoder(
+  api: ESPHomeAPI,
+  configuration: string,
+  lines: string[],
+  backendStaleBuild: boolean
+): Promise<CrashDecode | null> {
+  try {
+    const binaries = await api.firmwareGetBinaries(configuration);
+    // Absent for a device that was never built here, which is the other half of
+    // what `no_build` means and the case that must not reach the network.
+    if (!binaries.some((b) => b.file === ELF_FILE)) return null;
+    if (!(await hostedDecoder().available())) return null;
+    const elf = await loadElf(api, configuration);
+    if (elf === null) return null;
+    // Hand over a copy: postMessage transfers it (detaching what it is given),
+    // and the cached original has to survive for the next region of a crash loop.
+    const frames = await hostedDecoder().decode(elf.slice(0), lines.join("\n"));
+    if (!frames?.length) return null;
+    // Checked after mapping, not before: frames that resolve to no line leave
+    // nothing to splice, and an empty decode would be cached and reported as a
+    // success while rendering exactly like a failure.
+    const decoded = framesToDecodedLines(frames, lines);
+    if (!decoded.length) return null;
+    return { decoded, staleBuild: backendStaleBuild };
+  } catch (err) {
+    console.warn("Hosted backtrace decoding failed", err);
+    return null;
+  }
+}
+
+/**
+ * Attribute each frame to the log line whose text carries its address.
+ *
+ * The backend keys its output by line offset; the decoder keys by address,
+ * having found them itself. Mapping back is what lets a decode land under the
+ * line that produced it, which is the whole shape `interleaveDecoded` renders.
+ * A frame whose address matches no line is dropped rather than guessed at.
+ */
+function framesToDecodedLines(
+  frames: DecodedFrame[],
+  lines: string[]
+): DecodedBacktraceLine[] {
+  const decoded: DecodedBacktraceLine[] = [];
+  for (const frame of frames) {
+    // Addresses print as 8 hex digits, with or without the 0x, in either case.
+    const hex = frame.address.toString(16).padStart(8, "0");
+    const index = lines.findIndex((line) => line.toLowerCase().includes(hex));
+    if (index === -1) continue;
+    const location = frame.location ? ` at ${frame.location}` : "";
+    // The wording esphome's own decoders log, so a Web Serial decode reads like
+    // the OTA one the device's logger would have printed.
+    decoded.push({ index, text: `Decoded 0x${hex}: ${frame.function_name}${location}` });
+  }
+  return decoded;
+}
+
+/** The session's ELF bytes for *configuration*, fetched once. */
+async function loadElf(
+  api: ESPHomeAPI,
+  configuration: string
+): Promise<ArrayBuffer | null> {
+  const cached = elfCache.get(configuration);
+  if (cached !== undefined) return cached;
+  // Awaited by every region of a crash loop, so the fetch is shared rather than
+  // raced: an ELF runs to tens of megabytes.
+  const pending = api
+    .firmwareDownloadBytes(configuration, ELF_FILE)
+    .catch((err): null => {
+      console.warn("Could not download the ELF for decoding", err);
+      return null;
+    });
+  elfCache.set(configuration, pending);
+  return pending;
 }
