@@ -31,10 +31,7 @@ import type {
   RemoteBuildPairStatusChangedEventData,
 } from "../../api/types/remote-build-events.js";
 import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
-import {
-  type RemoteBuildJobState,
-  stubRemoteBuildJobState,
-} from "../../context/index.js";
+import { type RemoteBuildJobState } from "../../context/index.js";
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
 import { applyPreferences } from "./data-load.js";
@@ -97,11 +94,12 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       }
       host._buildOffloadAlerts = seededMap(offloader_alerts, (a) => a.pin_sha256);
       // remote_jobs: backend snapshot is authoritative for which jobs exist;
-      // every field the slimmed row carries rides the snapshot, so build
-      // straight from it.
-      if (remote_jobs !== undefined) {
+      // every field the slimmed row carries rides the snapshot, so rebuild
+      // straight from it. Omitted means the offloader controller is down —
+      // clear rather than carry stale rows across the reconnect.
+      {
         const seeded = new Map<string, RemoteBuildJobState>();
-        for (const entry of remote_jobs) {
+        for (const entry of remote_jobs ?? []) {
           seeded.set(entry.job_id, {
             job_id: entry.job_id,
             pin_sha256: entry.pin_sha256,
@@ -416,11 +414,11 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
     case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {
       const evt = data as OffloaderJobStateChangedEventData;
-      const base =
-        host._buildOffloadJobs.get(evt.job_id) ??
-        stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
+      // The slimmed row is wholly event-derived; building it fresh keeps a
+      // stale entry from ever contributing identity fields.
       host._buildOffloadJobs = new Map(host._buildOffloadJobs).set(evt.job_id, {
-        ...base,
+        job_id: evt.job_id,
+        pin_sha256: evt.pin_sha256,
         status: evt.status,
         error_message: evt.error_message,
       });

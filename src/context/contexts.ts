@@ -462,16 +462,3 @@ export const buildOffloadJobsContext = createContext<Map<
   string,
   RemoteBuildJobState
 > | null>(Symbol("esphome-build-offload-jobs"));
-
-/** Build a fresh RemoteBuildJobState for an id seen only on the wire so far. */
-export function stubRemoteBuildJobState(
-  job_id: string,
-  pin_sha256: string
-): RemoteBuildJobState {
-  return {
-    job_id,
-    pin_sha256,
-    status: JobStatus.QUEUED,
-    error_message: "",
-  };
-}
