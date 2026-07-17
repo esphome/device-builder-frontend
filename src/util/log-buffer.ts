@@ -112,6 +112,10 @@ export class LogBuffer {
   /**
    * Swap the run at *streamPosition* for *replacement*.
    *
+   * Only the newest tracked run may be replaced: the position map is a single
+   * shift, so rewriting an earlier run would silently move every position that
+   * precedes it.
+   *
    * False when the run has churned out from under the caller and was left alone
    * rather than written in the wrong place.
    */
@@ -120,8 +124,6 @@ export class LogBuffer {
     if (at === null) return false;
     const next = [...this._lines];
     next.splice(at, expected.length, ...replacement);
-    // Everything after `at` moves; nothing before it does. Callers only ever
-    // rewrite the newest run, so no live position precedes this one.
     this._shift += replacement.length - expected.length;
     this._setLines(next);
     return true;
@@ -129,9 +131,16 @@ export class LogBuffer {
 
   private _setLines(next: string[]): void {
     const max = this._maxLines;
-    const overflow = max === undefined ? 0 : Math.max(0, next.length - max);
-    if (overflow) this._shift -= overflow;
-    this._lines = overflow ? next.slice(-max!) : next;
+    if (max === undefined || next.length <= max) {
+      this._lines = next;
+      this._host.requestUpdate();
+      return;
+    }
+    // Counted from the front rather than as slice(-max): a maxLines of 0 makes
+    // -max a negative zero, which slices the whole array while the shift below
+    // says every line went.
+    this._shift -= next.length - max;
+    this._lines = next.slice(next.length - max);
     this._host.requestUpdate();
   }
 }

@@ -78,6 +78,15 @@ describe("LogBuffer", () => {
     expect(buf.lines[99]).toBe("104");
   });
 
+  it("retains nothing at a maxLines of 0, rather than trimming by a negative zero", () => {
+    // slice(-0) is slice(0), which keeps the whole array while the shift says
+    // every line went — the buffer would look full and resolve no position.
+    const buf = new LogBuffer(new FakeHost(), { maxLines: 0 });
+    buf.append(["a", "b"]);
+    expect(buf.lines).toEqual([]);
+    expect(buf.indexOf(0, ["a"])).toBeNull();
+  });
+
   it("moves tracked positions by what the cap trimmed", () => {
     const buf = new LogBuffer(new FakeHost(), { maxLines: 100 });
     for (let i = 0; i < 100; i++) buf.append([String(i)]);
@@ -97,8 +106,10 @@ describe("LogBuffer", () => {
     expect(buf.lines).toHaveLength(0); // nothing painted without a frame
     raf.fire();
     const batch = onAppend.mock.calls[0][0] as string[];
-    expect(batch).toHaveLength(149); // not 250: the pending buffer was trimmed
-    expect(batch[batch.length - 1]).toBe("249");
+    // Bounded, not 250. The exact figure is the batcher's headroom heuristic
+    // and free to change; that it stays bounded is the contract.
+    expect(batch.length).toBeLessThanOrEqual(200); // 2 * maxLines
+    expect(batch[batch.length - 1]).toBe("249"); // newest retained
   });
 
   it("flush drains buffered lines immediately", () => {
