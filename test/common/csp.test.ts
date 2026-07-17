@@ -8,7 +8,7 @@
  * loads this file. That is exactly how the decoder iframe shipped blocked.
  */
 import { describe, expect, it } from "vitest";
-import { DECODER_ORIGIN } from "../../src/common/docs.js";
+import { DECODER_ORIGIN, DECODER_URL } from "../../src/common/docs.js";
 // The shipped file itself, not a copy of its text: a policy asserted against a
 // duplicate would pass while the real page blocked everything.
 import html from "../../public/index.html?raw";
@@ -34,7 +34,13 @@ describe("the shipped Content-Security-Policy", () => {
     // frame-src falls back through child-src to default-src 'self', so an
     // undeclared directive blocks the decoder outright and every crash on a
     // remote-built device silently stays raw.
-    expect(directive("frame-src")).toContain(DECODER_ORIGIN);
+    expect(directive("frame-src")).toContain(DECODER_URL);
+  });
+
+  it("grants framing to the decoder's page, not to everything on its origin", () => {
+    // esphome.github.io serves every project's Pages site. The path scopes the
+    // grant to the one page we frame; CSP matches source expressions by path.
+    expect(directive("frame-src")).not.toBe(DECODER_ORIGIN);
   });
 
   it("does not let the decoder's origin do anything but be framed", () => {

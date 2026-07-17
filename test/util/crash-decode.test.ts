@@ -18,7 +18,7 @@ const reply = (over: Partial<DecodeBacktraceResponse> = {}): DecodeBacktraceResp
   decoded: [{ index: 2, text: "Decoded 0x400d9150: setup() at application.cpp:59" }],
   stale_build: false,
   unavailable_reason: "",
-  local_build_hash: "build-1",
+  local_config_hash: "build-1",
   ...over,
 });
 
@@ -301,7 +301,7 @@ describe("decodeCrashRegion", () => {
     // The remote-build shape: no CMake tree here, so the backend can't decode,
     // but the ELF was materialised locally and is all a decoder needs.
     const remoteBuilt = () =>
-      vi.fn(async () => reply({ decoded: [], unavailable_reason: "no_local_toolchain" }));
+      vi.fn(async () => reply({ decoded: [], unavailable_reason: "elf_only" }));
     const region = ["Guru Meditation Error", "PC: 0x400d1a2c", "Rebooting..."];
 
     /** Assert the reason never reaches the decoder: no frame, no download. */
@@ -382,7 +382,7 @@ describe("decodeCrashRegion", () => {
         async () =>
           reply({
             decoded: [],
-            unavailable_reason: "no_local_toolchain",
+            unavailable_reason: "elf_only",
             stale_build: true,
           }),
         { firmwareDownloadBytes: async () => new ArrayBuffer(8) }
@@ -421,8 +421,8 @@ describe("decodeCrashRegion", () => {
         async () =>
           reply({
             decoded: [],
-            unavailable_reason: "no_local_toolchain",
-            local_build_hash: hash,
+            unavailable_reason: "elf_only",
+            local_config_hash: hash,
           }),
         { firmwareDownloadBytes }
       );
@@ -436,6 +436,35 @@ describe("decodeCrashRegion", () => {
       await decodeCrashRegion(api, "r.yaml", [...region, "boot 2"], cache);
 
       expect(firmwareDownloadBytes).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps only the live build's ELF, not one per rebuild", async () => {
+      // Each entry is 5-18MB, and every build but the newest is provably dead:
+      // the key names the build, so nothing asks for the old one again. Keeping
+      // them would strand a build's bytes per rebuild for the life of the tab.
+      const firmwareDownloadBytes = vi.fn(async () => new ArrayBuffer(8));
+      let hash = "build-1";
+      const api = fakeApi(
+        async () =>
+          reply({
+            decoded: [],
+            unavailable_reason: "elf_only",
+            local_config_hash: hash,
+          }),
+        { firmwareDownloadBytes }
+      );
+      vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
+      vi.spyOn(hostedDecoder(), "decode").mockResolvedValue([
+        { address: 0x400d1a2c, function_name: "setup()", location: "application.cpp:59" },
+      ]);
+
+      await decodeCrashRegion(api, "e.yaml", [...region, "boot 1"], cache);
+      hash = "build-2";
+      await decodeCrashRegion(api, "e.yaml", [...region, "boot 2"], cache);
+      hash = "build-1"; // back to the first build: its bytes must be gone
+      await decodeCrashRegion(api, "e.yaml", [...region, "boot 3"], cache);
+
+      expect(firmwareDownloadBytes).toHaveBeenCalledTimes(3);
     });
 
     it("downloads the ELF once across a crash loop", async () => {

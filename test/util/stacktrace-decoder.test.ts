@@ -134,8 +134,11 @@ describe("hostedDecoder", () => {
     expect(sent.nonce).toMatch(/^[0-9a-f]{32}$/);
     // Targeted, never '*': the ELF is the user's firmware.
     expect(call[1]).toBe(DECODER_ORIGIN);
-    // Transferred, so the page doesn't copy tens of megabytes again.
-    expect(call[2]).toEqual([elf]);
+    // Not transferred. The decoder is a foreign origin, so the bytes are copied
+    // across the process boundary either way; transferring would only detach
+    // the caller's cached ELF and force it to copy first.
+    expect(call[2]).toBeUndefined();
+    expect(elf.byteLength).toBe(8); // still ours, not detached
 
     reply({
       type: RESULT,

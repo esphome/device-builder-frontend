@@ -52,18 +52,23 @@ const MAX_CACHE_ENTRIES = 16;
 const ELF_FILE = "firmware.elf";
 
 /**
- * ELF bytes per configuration, for the hosted-decoder path.
+ * ELF bytes for the hosted-decoder path, keyed on configuration + build.
  *
- * Unbounded on purpose: an ELF runs to tens of megabytes and a crash loop
- * decodes region after region, so refetching per region is the cost worth
- * avoiding. A rejected download is evicted (the default), so one blip doesn't
- * leave the device undecodable for the rest of the session.
+ * Holding them is the point: an ELF runs to tens of megabytes and a crash loop
+ * decodes region after region. Holding *more than one* is not. Every entry but
+ * the newest is provably dead, because the key names the build and a rebuild
+ * only ever asks for the new one; keeping them would strand 5-18MB per rebuild
+ * for the life of the tab, in exactly the edit-rebuild-crash session this
+ * feature exists for. A rejected download evicts itself (the default), so one
+ * blip doesn't leave the device undecodable either.
  */
 const elfCache = new KeyedPromiseCache<ArrayBuffer>();
+let elfCacheKey = "";
 
 /** Drop the session's ELF bytes. Tests only; production keeps them for the tab. */
 export function resetElfCache(): void {
   elfCache.clear();
+  elfCacheKey = "";
 }
 
 /**
@@ -86,14 +91,14 @@ const BACKEND_FAULT_REASONS: ReadonlySet<string> = new Set([
 
 // Reasons worth a second opinion from the hosted decoder.
 //
-// `no_local_toolchain` is the one this exists for: the backend has the ELF but
+// `elf_only` is the one this exists for: the backend has the ELF but
 // not the build tree it was compiled in, so nothing there can resolve
 // addr2line. The fault reasons join it for the same reason they are not cached
 // above. `no_build` is absent and must stay absent: it means the ELF isn't here
 // either, so there is nothing to send.
 const HOSTED_FALLBACK_REASONS: ReadonlySet<string> = new Set([
   ...BACKEND_FAULT_REASONS,
-  "no_local_toolchain",
+  "elf_only",
 ]);
 
 // Shown where the reader is looking. The report gets the same verdict as a
@@ -322,10 +327,8 @@ async function decodeViaHostedDecoder(
   const decoder = hostedDecoder();
   try {
     if (!(await decoder.available())) return null;
-    const elf = await loadElf(api, configuration, backend.local_build_hash);
-    // Hand over a copy: postMessage transfers it (detaching what it is given),
-    // and the cached original has to survive for the next region of a crash loop.
-    const frames = await decoder.decode(elf.slice(0), lines.join("\n"));
+    const elf = await loadElf(api, configuration, backend.local_config_hash);
+    const frames = await decoder.decode(elf, lines.join("\n"));
     if (!frames?.length) return null;
     // Checked after mapping, not before: frames that resolve to no line leave
     // nothing to splice, and an empty decode would be cached and reported as a
@@ -352,10 +355,12 @@ function framesToDecodedLines(
   lines: string[]
 ): DecodedBacktraceLine[] {
   const decoded: DecodedBacktraceLine[] = [];
+  // Lowered once, not once per frame: the scan below is frames x lines.
+  const lower = lines.map((line) => line.toLowerCase());
   for (const frame of frames) {
     // Addresses print as 8 hex digits, with or without the 0x, in either case.
     const hex = frame.address.toString(16).padStart(8, "0");
-    const index = lines.findIndex((line) => line.toLowerCase().includes(hex));
+    const index = lower.findIndex((line) => line.includes(hex));
     if (index === -1) continue;
     const location = frame.location ? ` at ${frame.location}` : "";
     // The wording esphome's own decoders log, so a Web Serial decode reads like
@@ -380,7 +385,10 @@ function loadElf(
   configuration: string,
   buildHash: string
 ): Promise<ArrayBuffer> {
-  return elfCache.fetch(`${configuration}\n${buildHash}`, () =>
-    api.firmwareDownloadBytes(configuration, ELF_FILE)
-  );
+  const key = `${configuration}\n${buildHash}`;
+  if (key !== elfCacheKey) {
+    elfCache.clear();
+    elfCacheKey = key;
+  }
+  return elfCache.fetch(key, () => api.firmwareDownloadBytes(configuration, ELF_FILE));
 }

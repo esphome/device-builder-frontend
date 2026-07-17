@@ -78,8 +78,9 @@ class HostedDecoder {
       window.addEventListener("message", onMessage);
       timer = setTimeout(() => done(null), DECODE_TIMEOUT_MS);
       try {
-        // The ELF is transferred, not copied: it runs to tens of megabytes and
-        // this side has no use for it afterwards (the cache holds its own copy).
+        // Cloned, not transferred. The decoder is a foreign origin, so the
+        // bytes cross a process boundary and get copied either way; transferring
+        // would only detach the caller's cached ELF, forcing it to copy first.
         target.postMessage(
           {
             type: MSG_REQUEST,
@@ -89,8 +90,7 @@ class HostedDecoder {
             elf,
             dump,
           },
-          DECODER_ORIGIN,
-          [elf]
+          DECODER_ORIGIN
         );
       } catch (err) {
         // postMessage can throw (a detached buffer, DataCloneError). Converge to

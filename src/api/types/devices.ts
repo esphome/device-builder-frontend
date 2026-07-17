@@ -345,9 +345,9 @@ export interface DecodeBacktraceResponse {
    *  those bytes can tell a rebuild from a re-crash; `stale_build` can't answer
    *  that, since it goes false the moment the device catches up with the local
    *  build, which is exactly when cached bytes are stale. */
-  local_build_hash: string;
+  local_config_hash: string;
   /** Why nothing was decoded: "no_backtrace" | "no_build" |
-   *  "no_local_toolchain" | "unsupported_platform" | "decode_failed" |
+   *  "elf_only" | "unsupported_platform" | "decode_failed" |
    *  "helper_failed"; "" on success.
    *
    *  Never shown: the report states that the backtrace was not decoded without
