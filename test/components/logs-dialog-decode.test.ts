@@ -258,6 +258,31 @@ describe("logs-dialog inline backtrace decode", () => {
     expect(open.mock.calls[0]![3]).toBe(true);
   });
 
+  it("does not queue the next session behind a decode it will discard", async () => {
+    let land: (v: unknown) => void = () => {};
+    let started: () => void = () => {};
+    const inFlight = new Promise<void>((resolve) => (started = resolve));
+    decodeBacktrace.mockImplementationOnce(async () => {
+      started();
+      await new Promise((resolve) => (land = resolve));
+      return { decoded: [], stale_build: false, unavailable_reason: "" };
+    });
+
+    append(el, CRASH);
+    await inFlight;
+    (el as any)._crashDecode.reset();
+
+    // The abandoned decode is still hanging (a real one has up to 90s to go).
+    // The new session's crash must not wait it out to be decorated.
+    append(el, CRASH);
+    await flush();
+
+    expect(lines(el).map(stripAnsi)).toContain(
+      "WARNING Decoded 0x400d1a2c: loop() at main.cpp:42"
+    );
+    land(null);
+  });
+
   it("does not let a decode in flight at reset seed the next session", async () => {
     let land: (v: unknown) => void = () => {};
     let started: () => void = () => {};

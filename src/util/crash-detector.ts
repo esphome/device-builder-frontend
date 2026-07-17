@@ -1,4 +1,4 @@
-import { normalizeLogLine, tagged } from "./log-line.js";
+import { tagged } from "./log-line.js";
 
 /**
  * Crash detection over device log lines.

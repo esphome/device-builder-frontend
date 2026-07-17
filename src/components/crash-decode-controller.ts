@@ -82,6 +82,11 @@ export class CrashDecodeController {
     // old map and writes its result on return, which would seed the new
     // session with frames decoded against the buffer it just replaced.
     this._cache = new Map();
+    // Detached for the same reason. The old chain still settles, and its epoch
+    // check drops the splice, but the new session must not queue behind a
+    // decode it is going to discard: that is a whole backend timeout of the
+    // next crash going undecorated.
+    this._chain = Promise.resolve();
   }
 
   // The raw UART panic handler emits no colour of its own, so a serial crash
