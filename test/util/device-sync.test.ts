@@ -9,24 +9,39 @@ import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 describe("device-sync mDNS gating", () => {
   it("trusts the deployed identity per api_enabled, live source, and identity evidence", () => {
-    // An api device is trusted under mdns ownership OR the backend's
-    // first-party evidence flag (a direct Native API connection where
-    // mDNS is dark). A no-api device is trusted on the flag alone: its
-    // mdns ownership is a bare A-record resolve — reachability only —
-    // so that disjunct is deliberately api-scoped.
-    for (const s of ["mdns", "ping", "mqtt", "unknown"] as const) {
-      for (const api_enabled of [true, false]) {
-        for (const deployed_identity_live of [true, false]) {
-          expect(
-            deployedIdentityTrusted(
-              makeConfiguredDevice({
-                api_enabled,
-                runtime_state: { active_source: s, deployed_identity_live },
-              })
-            )
-          ).toBe((api_enabled && s === "mdns") || deployed_identity_live);
-        }
-      }
+    // Literal truth table (not the production expression) so a gate
+    // regression can't hide behind a mirrored oracle. Two trusted
+    // shapes only: the backend's first-party evidence flag, or an api
+    // device under mdns ownership — a no-api device's mdns ownership
+    // is a bare A-record resolve (reachability only) and earns nothing.
+    const rows = [
+      // [api_enabled, active_source, deployed_identity_live, trusted]
+      [true, "mdns", true, true],
+      [true, "mdns", false, true],
+      [true, "ping", true, true],
+      [true, "ping", false, false],
+      [true, "mqtt", true, true],
+      [true, "mqtt", false, false],
+      [true, "unknown", true, true],
+      [true, "unknown", false, false],
+      [false, "mdns", true, true],
+      [false, "mdns", false, false],
+      [false, "ping", true, true],
+      [false, "ping", false, false],
+      [false, "mqtt", true, true],
+      [false, "mqtt", false, false],
+      [false, "unknown", true, true],
+      [false, "unknown", false, false],
+    ] as const;
+    for (const [api_enabled, active_source, deployed_identity_live, trusted] of rows) {
+      expect(
+        deployedIdentityTrusted(
+          makeConfiguredDevice({
+            api_enabled,
+            runtime_state: { active_source, deployed_identity_live },
+          })
+        )
+      ).toBe(trusted);
     }
   });
 
@@ -41,16 +56,6 @@ describe("device-sync mDNS gating", () => {
     expect(deployedIdentityTrusted(probed)).toBe(true);
     expect(showPendingChanges(probed)).toBe(true);
     expect(showUpdateAvailable(probed)).toBe(true);
-  });
-
-  it("never trusts a no-api device off mdns ownership alone", () => {
-    // A no-api mdns claim comes from the active A-record resolve; it
-    // says the host answers, not that any identity broadcast is fresh.
-    const resolvedOnly = makeConfiguredDevice({
-      api_enabled: false,
-      runtime_state: { active_source: "mdns", deployed_identity_live: false },
-    });
-    expect(deployedIdentityTrusted(resolvedOnly)).toBe(false);
   });
 
   it("hides an api device's hash-driven modified / update signals while mDNS is dark", () => {

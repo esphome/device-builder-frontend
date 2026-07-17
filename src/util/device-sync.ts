@@ -8,21 +8,15 @@ const mdnsOnline = (d: ConfiguredDevice): boolean =>
 
 // Whether the deployed identity (version / config hash) is trustworthy.
 // Two evidence channels, one per disjunct. An api: device broadcasts the
-// identity on _esphomelib._tcp, the same service that claims
-// active_source === "mdns", so mdns ownership doubles as the freshness
-// signal — and the api_enabled guard on that disjunct is load-bearing:
-// a device without api: can also hold active_source === "mdns", but off
-// a bare A-record resolve that vouches for reachability only, never
-// identity. Everywhere mdns ownership can't vouch, the backend tracks
-// its own first-party evidence and ships it as
-// runtime_state.deployed_identity_live: the _http._tcp identity TXT for
-// devices without api: (ESPHome 2026.7.0+), a direct Native API
-// device_info connection for api: devices mDNS can't reach (the
-// Docker-bridge dashboard), and the dashboard's own flash. Session-only,
-// false on backend cold start until evidence arrives; the backend
-// clears it when mDNS takes ownership of an api: device, so a
-// powered-down device still blanks through the announce lifecycle
-// rather than showing its last-heard identity.
+// identity on _esphomelib._tcp, the service mdns ownership rides on —
+// and the api_enabled guard there is load-bearing: a device without
+// api: can also hold active_source === "mdns", but off a bare A-record
+// resolve that vouches for reachability only, never identity.
+// Everywhere mdns can't vouch, the backend ships its own first-party
+// evidence as runtime_state.deployed_identity_live (session-only; the
+// backend clears it when mDNS takes ownership of an api: device, so a
+// powered-down device still blanks through the announce lifecycle).
+// Full semantics: backend docs/API.md, Device.runtime_state.
 export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
   (d.api_enabled && mdnsOnline(d)) || d.runtime_state.deployed_identity_live;
 
