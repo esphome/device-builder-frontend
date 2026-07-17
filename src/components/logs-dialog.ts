@@ -24,7 +24,7 @@ import { type CrashKind, classifyLine } from "../util/crash-detector.js";
 import { normalizeLogLine } from "../util/log-line.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
-import { LineBatcher } from "../util/line-batcher.js";
+import { LogBuffer } from "../util/log-buffer.js";
 import { notifyError } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
@@ -118,37 +118,30 @@ export class ESPHomeLogsDialog extends LitElement {
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
   private _reconnect: (() => Promise<void>) | null = null;
 
-  @state()
-  _lines: string[] = [];
+  // The visible log, its cap, and the stream-position map inline decoding
+  // needs. Owns every line the dialog shows; the dialog holds no counters.
+  _log = new LogBuffer(this, {
+    maxLines: MAX_LOG_LINES,
+    onAppend: (lines, start) => this._onLinesAppended(lines, start),
+  });
 
-  // Latched once a crash marker flows through _appendCapped; drives the
+  // Latched once a crash marker flows through _onLinesAppended; drives the
   // "Report this crash" callout for the rest of the session. A live panic
   // upgrades a previous-boot report; nothing downgrades it.
   @state()
   private _crashKind: CrashKind | null = null;
 
-  // Inline crash decoding, including the absolute-position-onto-_lines map it
-  // needs. Read lazily so field-initialisation order doesn't matter.
+  // Read lazily so field-initialisation order doesn't matter.
   private _crashDecode = new CrashDecodeController({
     api: () => this._api,
     configuration: () => this.configuration,
-    getLines: () => this._lines,
-    setLines: (next) => this._setLinesCapped(next),
+    buffer: () => this._log,
   });
 
   // Rendered unconditionally in this dialog's template, so the query is
   // always resolved by the time the callout button can be clicked.
   @query("esphome-crash-report-dialog")
   private _crashReportDialog!: ESPHomeCrashReportDialog;
-
-  // rAF batch buffer: coalesce per-line appends into one render per frame
-  // instead of one per line (mirrors command-dialog, #348). A fast serial
-  // stream would otherwise schedule a full re-render of the whole list per
-  // line and freeze the tab. maxLines bounds the pending buffer while the
-  // tab is hidden; _appendCapped bounds the visible one.
-  private _lineBatch = new LineBatcher((batch) => this._appendCapped(batch), {
-    maxLines: MAX_LOG_LINES,
-  });
 
   @state()
   private _open = false;
@@ -215,10 +208,7 @@ export class ESPHomeLogsDialog extends LitElement {
    *  behaves the same way every time unless the user flips it this session. */
   private _beginSession(onBackToInstall?: () => void) {
     void this._teardownSession();
-    this._resetPendingLines();
-    this._lines = [];
-    this._crashDecode.reset();
-    this._crashKind = null;
+    this._clearLogs();
     this._expanded = false;
     this._showStates = true;
     this._backToInstallHandler = onBackToInstall ?? null;
@@ -267,8 +257,8 @@ export class ESPHomeLogsDialog extends LitElement {
     // an OTA session — don't tear that unrelated session down or flip it dead.
     if (!this._open || !isPassive(this._session)) return;
     void this._teardownSession();
-    this._resetPendingLines();
-    this._appendCapped([message]);
+    this._log.dropPending();
+    this._log.append([message]);
     this._session = { kind: "dead" };
   }
 
@@ -292,7 +282,7 @@ export class ESPHomeLogsDialog extends LitElement {
   private _teardownSession(): Promise<void> {
     // Drain any batched lines into the visible buffer before the session ends
     // so a stop/close doesn't drop what was buffered for the next frame.
-    this._flushPendingLines();
+    this._log.flush();
     const s = this._session;
     this._session = { kind: "idle" };
     if (s.kind === "serial") {
@@ -348,7 +338,7 @@ export class ESPHomeLogsDialog extends LitElement {
       >
         <span slot="header-suffix" class="source-chip" title=${source}>${source}</span>
         <esphome-process-terminal
-          .lines=${this._lines}
+          .lines=${this._log.lines}
           placeholder=${this._localize("dashboard.logs_placeholder")}
           ?light=${!this._darkMode}
           ?streaming=${streaming}
@@ -459,11 +449,11 @@ export class ESPHomeLogsDialog extends LitElement {
   // is missed) and hand it to the report dialog. The logs dialog stays open
   // underneath; the stream keeps running.
   private _openCrashReport = () => {
-    this._flushPendingLines();
+    this._log.flush();
     this._crashReportDialog.open(
       this.configuration,
       this.name,
-      [...this._lines],
+      [...this._log.lines],
       this._crashDecode.staleBuild
     );
   };
@@ -558,9 +548,9 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _downloadLogs() {
-    this._flushPendingLines();
+    this._log.flush();
     const stem = configurationStem(this.configuration, "logs");
-    downloadAnsiText(this._lines, `${stem}-logs.txt`);
+    downloadAnsiText(this._log.lines, `${stem}-logs.txt`);
   }
 
   private _toggleExpanded() {
@@ -582,9 +572,10 @@ export class ESPHomeLogsDialog extends LitElement {
     this._startOtaStream();
   }
 
+  // Reset the log and everything derived from it. The single place that
+  // pairing lives, so a new caller can't reset the lines and forget the rest.
   private _clearLogs() {
-    this._resetPendingLines();
-    this._lines = [];
+    this._log.reset();
     this._crashDecode.reset();
     this._crashKind = null;
   }
@@ -592,21 +583,19 @@ export class ESPHomeLogsDialog extends LitElement {
   // Buffer a streamed line; flushed on the next animation frame. The serial
   // reader (streamSerialToDialog) and the OTA stream both feed through here.
   _enqueueLine(line: string): void {
-    this._lineBatch.enqueue(line);
+    this._log.enqueue(line);
   }
 
-  // Append to the visible buffer, trimmed to the newest MAX_LOG_LINES. The
-  // single place the cap is enforced, shared by the batched flush and the
-  // direct recovery-path append (setSerialOpenFailed).
-  private _appendCapped(lines: string[]): void {
-    this._setLinesCapped([...this._lines, ...lines]);
+  // Every line the buffer takes on, batched or direct, passes through here.
+  private _onLinesAppended(lines: string[], start: number): void {
     // One normalization per line, shared by the crash classifier and the
     // decode controller: this runs for every line of a stream that can push
     // thousands a second.
     let kind: CrashKind | null = null;
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       const normalized = normalizeLogLine(line);
-      this._crashDecode.observe(line, normalized);
+      this._crashDecode.observe(line, normalized, start + i);
       const lineKind = classifyLine(normalized);
       if (lineKind === "live" || (lineKind && !kind)) kind = lineKind;
     }
@@ -621,27 +610,6 @@ export class ESPHomeLogsDialog extends LitElement {
           .catch((err) => console.warn("crash callout re-pin scroll failed", err));
       }
     }
-  }
-
-  // The single place MAX_LOG_LINES is enforced, so the cap policy and the
-  // index shift it causes can't drift apart.
-  private _setLinesCapped(next: string[]): void {
-    const overflow = Math.max(0, next.length - MAX_LOG_LINES);
-    if (overflow) this._crashDecode.noteTrimmed(overflow);
-    this._lines = overflow ? next.slice(-MAX_LOG_LINES) : next;
-  }
-
-  // Drain pending lines into ``_lines`` now, trimmed to the newest
-  // MAX_LOG_LINES. Called from teardown / clear / download so consumers
-  // don't race the rAF.
-  _flushPendingLines(): void {
-    this._lineBatch.flush();
-  }
-
-  // Drop the pending batch and cancel any scheduled flush. Paired with every
-  // ``_lines = []`` reset.
-  _resetPendingLines(): void {
-    this._lineBatch.reset();
   }
 
   // Reset Device button (Web Serial only). Pulses RTS (wired to EN on the
@@ -665,7 +633,7 @@ export class ESPHomeLogsDialog extends LitElement {
   /**
    * Flip ``_open`` false the moment the user initiates a close (X / Esc /
    * outside-click), before wa-dialog finishes its hide animation. Streamed
-   * lines push into ``_lines`` and each push re-renders with
+   * lines push into the buffer and each push re-renders with
    * ``?open=${this._open}``; were ``_open`` still true mid-animation the
    * re-asserted ``open=true`` could cancel wa-dialog's hide. No
    * ``preventDefault`` — the close proceeds and ``after-hide`` tears down.

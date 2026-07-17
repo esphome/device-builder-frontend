@@ -11,9 +11,8 @@ import { STALE_BUILD_LOG_LINE } from "../../src/util/crash-decode.js";
 import { stripAnsi } from "../../src/util/ansi-escapes.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const append = (el: ESPHomeLogsDialog, lines: string[]) =>
-  (el as any)._appendCapped(lines);
-const lines = (el: ESPHomeLogsDialog): string[] => (el as any)._lines;
+const append = (el: ESPHomeLogsDialog, lines: string[]) => (el as any)._log.append(lines);
+const lines = (el: ESPHomeLogsDialog): string[] => (el as any)._log.lines;
 
 // A Web Serial crash: no decoder attached, so no Decoded lines arrive.
 const CRASH = [
@@ -232,7 +231,7 @@ describe("logs-dialog inline backtrace decode", () => {
       await inFlight;
       append(el, ["Guru Meditation Error: crash", "PC: 0x400d2222", "Rebooting..."]);
       // Point the first region's splice at the second one.
-      (el as any)._crashDecode._indexShift = 3;
+      (el as any)._log._shift = 3;
       land(null);
       await flush();
 

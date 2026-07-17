@@ -375,7 +375,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     expect(session(el).kind).toBe("reconnecting");
     el.abortSerialReconnect();
     expect(session(el).kind).toBe("dead");
-    expect((el as any)._lines).toEqual([]); // a cancel isn't a failure
+    expect((el as any)._log.lines).toEqual([]); // a cancel isn't a failure
     expect(toastError).not.toHaveBeenCalled();
   });
 
