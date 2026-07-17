@@ -423,7 +423,10 @@ describe("decodeCrashRegion", () => {
 
       const noToken = [
         "Guru Meditation Error",
+        // The hex sits inside a longer run, and once trailed by a word char
+        // (which ADDRESS_RE's \b rejects too), so neither is a token.
         "ELF file SHA256: 0x4201b6e0abcdef1234567890",
+        "note 0x4201b6e0x",
         "Rebooting...",
       ];
       expect(await decodeCrashRegion(api, "c.yaml", noToken, cache)).toBeNull();

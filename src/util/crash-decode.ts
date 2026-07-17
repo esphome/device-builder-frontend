@@ -359,11 +359,13 @@ function framesToDecodedLines(
 ): DecodedBacktraceLine[] {
   // The address values in each line, once. Compared by value, not substring:
   // 4201b6e0 must not attach to a line where it only appears inside a longer
-  // hex run like 0x4201b6e0abcd. The lookbehind/lookahead pin it to a whole
-  // 8-digit token (optionally 0x-prefixed), the boundary ADDRESS_RE uses.
+  // hex run like 0x4201b6e0abcd. The `\w` boundaries pin it to a whole 8-digit
+  // token (optionally 0x-prefixed), rejecting both a hex neighbour and any word
+  // char after it, the same terminator ADDRESS_RE's `\b` gives (so `0x1234abcdx`
+  // is not a token here either).
   const addressesPerLine = lines.map((line) => {
     const found = new Set<number>();
-    for (const m of line.matchAll(/(?<![0-9a-fx])(?:0x)?([0-9a-f]{8})(?![0-9a-f])/gi)) {
+    for (const m of line.matchAll(/(?<!\w)(?:0x)?([0-9a-f]{8})(?!\w)/gi)) {
       found.add(parseInt(m[1], 16));
     }
     return found;
