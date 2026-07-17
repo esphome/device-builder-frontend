@@ -385,6 +385,10 @@ function loadElf(
   configuration: string,
   buildHash: string
 ): Promise<ArrayBuffer> {
+  // No hash means the build can't be told apart from the next one (an ELF
+  // present without a build_info.json). Caching under a hash-less key would
+  // serve one build's bytes for another after a rebuild, so fetch uncached.
+  if (!buildHash) return api.firmwareDownloadBytes(configuration, ELF_FILE);
   const key = `${configuration}\n${buildHash}`;
   if (key !== elfCacheKey) {
     elfCache.clear();

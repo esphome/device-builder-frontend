@@ -467,6 +467,27 @@ describe("decodeCrashRegion", () => {
       expect(firmwareDownloadBytes).toHaveBeenCalledTimes(3);
     });
 
+    it("does not cache the ELF when the build can't be identified", async () => {
+      // An empty hash (ELF present, no build_info.json) can't tell two builds
+      // apart, so caching under a hash-less key would serve stale bytes after a
+      // rebuild. Fetch fresh instead.
+      const firmwareDownloadBytes = vi.fn(async () => new ArrayBuffer(8));
+      const api = fakeApi(
+        async () =>
+          reply({ decoded: [], unavailable_reason: "elf_only", local_config_hash: "" }),
+        { firmwareDownloadBytes }
+      );
+      vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
+      vi.spyOn(hostedDecoder(), "decode").mockResolvedValue([
+        { address: 0x400d1a2c, function_name: "setup()", location: "application.cpp:59" },
+      ]);
+
+      await decodeCrashRegion(api, "h.yaml", [...region, "boot 1"], cache);
+      await decodeCrashRegion(api, "h.yaml", [...region, "boot 2"], cache);
+
+      expect(firmwareDownloadBytes).toHaveBeenCalledTimes(2);
+    });
+
     it("downloads the ELF once across a crash loop", async () => {
       const firmwareDownloadBytes = vi.fn(async () => new ArrayBuffer(8));
       const api = fakeApi(remoteBuilt(), { firmwareDownloadBytes });

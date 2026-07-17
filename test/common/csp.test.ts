@@ -45,9 +45,11 @@ describe("the shipped Content-Security-Policy", () => {
 
   it("does not let the decoder's origin do anything but be framed", () => {
     // It is handed firmware. Framing is all it needs; a script-src or
-    // connect-src entry would be a different, much larger grant.
+    // connect-src entry for it would be a different, much larger grant. Assert
+    // the origin is absent from each rather than that the directive is bare, so
+    // tightening the CSP for unrelated reasons doesn't trip this.
     expect(directive("connect-src")).not.toContain(DECODER_ORIGIN);
-    expect(directive("script-src")).toBe("");
+    expect(directive("script-src")).not.toContain(DECODER_ORIGIN);
     expect(directive("default-src")).not.toContain(DECODER_ORIGIN);
   });
 });

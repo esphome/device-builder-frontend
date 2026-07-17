@@ -107,6 +107,11 @@ class HostedDecoder {
       const frame = document.createElement("iframe");
       frame.hidden = true;
       frame.setAttribute("aria-hidden", "true");
+      // Scripts, so the wasm runs; same-origin, so the page keeps its own
+      // origin and its `connect-src 'self'` still resolves the wasm. Nothing
+      // else: no top-level navigation, popups, forms, or downloads. Keeping its
+      // origin can't un-sandbox it here, because it is cross-origin from us.
+      frame.setAttribute("sandbox", "allow-scripts allow-same-origin");
       // A tab would need a user gesture and would interrupt the log the user is
       // reading; the decode needs neither a gesture nor a secure context.
       frame.src = `${DECODER_URL}#nonce=${encodeURIComponent(nonce)}&origin=${encodeURIComponent(
