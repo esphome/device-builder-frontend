@@ -148,6 +148,32 @@ describe("interleaveDecoded", () => {
     );
   });
 
+  it("keeps frames whose index falls outside the region", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const out = interleaveDecoded(["Guru: crash", "PC: 0x1"], {
+        decoded: [
+          { index: 1, text: "Decoded 0x1: loop()" },
+          { index: 9, text: "Decoded 0x2: setup()" },
+        ],
+        staleBuild: false,
+      });
+
+      // Host and child disagreeing about the lines that were sent is worth
+      // saying out loud, but the frames are still what the reader came for.
+      expect(out.map(stripAnsi)).toEqual([
+        "Guru: crash",
+        "PC: 0x1",
+        "WARNING Decoded 0x1: loop()",
+        "WARNING Decoded 0x2: setup()",
+      ]);
+      expect(warn).toHaveBeenCalledOnce();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("returns the region untouched when nothing decoded", () => {
     const raw = ["Guru Meditation Error: crash", "Rebooting..."];
 
@@ -255,6 +281,42 @@ describe("decodeCrashRegion", () => {
     const region = ["Guru: x", "PC: 0x400d1a2c"];
 
     expect(await decodeCrashRegion(api, "c.yaml", region, cache)).toBeNull();
+  });
+
+  it("does not re-ask for a region the backend already declined", async () => {
+    const decodeBacktrace = vi.fn(async () =>
+      reply({ decoded: [], unavailable_reason: "unsupported_platform" })
+    );
+    const api = fakeApi(decodeBacktrace);
+    const region = ["Guru: x", "PC: 0x400d1a2c", "Rebooting..."];
+
+    await decodeCrashRegion(api, "bk.yaml", region, cache);
+    await decodeCrashRegion(api, "bk.yaml", region, cache);
+    await decodeCrashRegion(api, "bk.yaml", region, cache);
+
+    // A platform it can't decode still costs it a child to find that out, so
+    // a crash loop on one must not pay per crash.
+    expect(decodeBacktrace).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again after a failure, which says nothing about the region", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const decodeBacktrace = vi
+      .fn<() => Promise<DecodeBacktraceResponse>>()
+      .mockRejectedValueOnce(new Error("timed out"))
+      .mockResolvedValue(reply());
+    const api = fakeApi(decodeBacktrace);
+    const region = ["Guru: x", "PC: 0x400d1a2c", "Rebooting..."];
+
+    try {
+      expect(await decodeCrashRegion(api, "e.yaml", region, cache)).toBeNull();
+      // Unlike a decline, a failure is about the backend, not the region: the
+      // next crash may land while it is healthy again.
+      expect(await decodeCrashRegion(api, "e.yaml", region, cache)).not.toBeNull();
+      expect(decodeBacktrace).toHaveBeenCalledTimes(2);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("returns null rather than throwing when the command fails", async () => {

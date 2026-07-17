@@ -42,8 +42,12 @@ const ANSI_RESET = "\u001b[0m";
 // see genuinely different crashes.
 const MAX_CACHE_ENTRIES = 16;
 
-/** Decodes already seen this log session, keyed on the region text. */
-export type CrashDecodeCache = Map<string, CrashDecode>;
+/**
+ * Decode outcomes already seen this log session, keyed on the region text.
+ *
+ * A null value is a region the backend declined, cached so it isn't re-asked.
+ */
+export type CrashDecodeCache = Map<string, CrashDecode | null>;
 
 // Shown where the reader is looking. The report gets the same verdict as a
 // typed value, so this line is presentation, not transport.
@@ -168,6 +172,7 @@ export function interleaveDecoded(raw: string[], decode: CrashDecode): string[] 
     out.push(line);
     const group = byIndex.get(i);
     if (!group) return;
+    byIndex.delete(i);
     if (stalePending) {
       // Say it where the reader is looking, above the frames it qualifies.
       out.push(asWarning(STALE_BUILD_LOG_LINE));
@@ -175,6 +180,15 @@ export function interleaveDecoded(raw: string[], decode: CrashDecode): string[] 
     }
     out.push(...group.map(asWarning));
   });
+  // An index past the region means the reply doesn't describe the lines that
+  // were sent. Show the frames rather than dropping them, and say so.
+  if (byIndex.size) {
+    console.warn("Backtrace decode addressed lines outside the region", [
+      ...byIndex.keys(),
+    ]);
+    if (stalePending) out.push(asWarning(STALE_BUILD_LOG_LINE));
+    for (const group of byIndex.values()) out.push(...group.map(asWarning));
+  }
   return out;
 }
 
@@ -200,15 +214,15 @@ export async function decodeCrashRegion(
   const lines = raw.map(normalizeLogLine);
   if (!needsDecode(lines)) return null;
   const key = `${configuration}\n${lines.join("\n")}`;
-  const hit = cache.get(key);
-  if (hit) return hit;
+  // A declined decode is cached as null, not skipped: a platform the backend
+  // can't decode still costs it a child to find that out, and a crash loop
+  // repeats the same region indefinitely.
+  if (cache.has(key)) return cache.get(key) ?? null;
   try {
     const result = await api.decodeBacktrace(configuration, lines);
-    if (result.decoded.length === 0) return null;
-    const decode: CrashDecode = {
-      decoded: result.decoded,
-      staleBuild: result.stale_build,
-    };
+    const decode: CrashDecode | null = result.decoded.length
+      ? { decoded: result.decoded, staleBuild: result.stale_build }
+      : null;
     if (cache.size >= MAX_CACHE_ENTRIES) {
       // Map iterates in insertion order, so this drops the oldest.
       cache.delete(cache.keys().next().value!);
@@ -216,6 +230,8 @@ export async function decodeCrashRegion(
     cache.set(key, decode);
     return decode;
   } catch (err) {
+    // Not cached: unlike a decline, a failure says nothing about the region,
+    // and the next crash may well land while the backend is healthy again.
     console.warn("Backtrace decoding failed", err);
     return null;
   }
