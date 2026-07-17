@@ -27,7 +27,8 @@ export class LineBatcher {
 
   enqueue(line: string): void {
     this._pending.push(line);
-    // Trim with headroom — one slice per maxLines pushes, not every push.
+    // Trim with headroom — for a positive maxLines that's one slice per
+    // maxLines pushes rather than every push; at 0 every push slices, to empty.
     // Counted from the front rather than as slice(-maxLines): a maxLines of 0
     // makes -maxLines a negative zero, which keeps the whole array, so nothing
     // would ever be dropped and a hidden tab would buffer without bound.

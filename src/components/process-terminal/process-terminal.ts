@@ -48,7 +48,7 @@ export type ProcessTerminalState = "running" | "success" | "error" | null;
 @customElement("esphome-process-terminal")
 export class ESPHomeProcessTerminal extends LitElement {
   /** Log lines for the built-in ansi-log (stream variant only). */
-  @property({ attribute: false }) lines: string[] = [];
+  @property({ attribute: false }) lines: readonly string[] = [];
 
   @property() placeholder = "";
 

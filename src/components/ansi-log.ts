@@ -217,7 +217,7 @@ export class ESPHomeAnsiLog extends LitElement {
 
   /** The log lines to render. */
   @property({ attribute: false })
-  lines: string[] = [];
+  lines: readonly string[] = [];
 
   /** Placeholder text when no lines. */
   @property({ type: String })
