@@ -1,5 +1,4 @@
 import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
-import type { RemoteBuildSubmitTarget } from "../../api/types/firmware-jobs.js";
 import {
   CLEANUP_TTL_MAX_SECONDS,
   CLEANUP_TTL_MIN_SECONDS,
@@ -301,26 +300,6 @@ export function onPairRequestSent(
   const next = new Map(host._buildOffloadPairings ?? []);
   next.set(summary.pin_sha256, summary);
   host._buildOffloadPairings = next;
-}
-
-export function onRemoteBuildJobSubmitted(
-  host: ESPHomeApp,
-  e: CustomEvent<{
-    job_id: string;
-    pin_sha256: string;
-    receiver_label: string;
-    configuration: string;
-    target: RemoteBuildSubmitTarget;
-  }>
-): void {
-  host.registerRemoteBuildJob(e.detail);
-}
-
-export function onRemoteBuildJobDismissed(
-  host: ESPHomeApp,
-  e: CustomEvent<{ job_id: string }>
-): void {
-  host.dismissRemoteBuildJob(e.detail.job_id);
 }
 
 export async function onSetLanguage(

@@ -78,6 +78,7 @@ describe("renderFacets", () => {
       _devices: [
         {
           update_available: true,
+          api_enabled: true,
           runtime_state: { state: "online", active_source: "mdns" },
         },
       ],

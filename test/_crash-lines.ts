@@ -15,6 +15,13 @@ export const CRASH_BLOCK = [
   "Rebooting...",
 ];
 
+// The same crash as captured over Web Serial: identical but for the inline
+// decode, which only `esphome logs` produces. This is what the backend
+// decoder exists to fill in.
+export const CRASH_BLOCK_UNDECODED = CRASH_BLOCK.filter(
+  (line) => !line.startsWith("WARNING Decoded ")
+);
+
 // A `devices/validate` stream (esphome config output): CLI log records
 // interleaved with the sanitized YAML, and the YAML it distills to.
 export const VALIDATE_OUTPUT = [

@@ -32,6 +32,7 @@ import {
   startDownload,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
 import { identityLocalize } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 
 const FACTORY: FirmwareBinary = { title: "Factory format", file: "firmware.factory.bin" };
 const OTA: FirmwareBinary = {
@@ -66,12 +67,7 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _statusMessage: "",
     _binaries: [] as FirmwareBinary[],
     _downloadedFilename: "",
-    _logLines: [] as string[],
-    // Synchronous stand-ins for the dialog's rAF-batched log sink.
-    _enqueueLogLine(line: string) {
-      this._logLines = [...this._logLines, line];
-    },
-    _flushLogLines() {},
+    _log: fakeLogBuffer(),
     _failedDuringCompile: false,
     _failedDuringValidate: false,
     _jobId: "",

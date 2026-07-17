@@ -33,7 +33,6 @@ export {
   remoteBuildEnabledContext,
   remoteComputeOnlyContext,
   serverVersionContext,
-  stubRemoteBuildJobState,
   versionContext,
   versionHistoryEnabledContext,
 } from "./contexts.js";

@@ -16,6 +16,7 @@ vi.mock("sonner-js", () => ({
 }));
 
 import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
+import { startOtaStream } from "../../src/components/logs-dialog/session.js";
 import {
   hasSerialPort,
   isStreaming,
@@ -236,8 +237,8 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
 
   it("never spawns a backend stream from a serial session", () => {
     startPassive();
-    // _startOtaStream only fires from a stopped OTA session.
-    call(el, "_startOtaStream");
+    // startOtaStream only fires from a stopped OTA session.
+    startOtaStream(el);
     expect(logs).not.toHaveBeenCalled();
   });
 
@@ -375,7 +376,7 @@ describe("logs-dialog passive Web Serial session (#526)", () => {
     expect(session(el).kind).toBe("reconnecting");
     el.abortSerialReconnect();
     expect(session(el).kind).toBe("dead");
-    expect((el as any)._lines).toEqual([]); // a cancel isn't a failure
+    expect((el as any)._log.lines).toEqual([]); // a cancel isn't a failure
     expect(toastError).not.toHaveBeenCalled();
   });
 

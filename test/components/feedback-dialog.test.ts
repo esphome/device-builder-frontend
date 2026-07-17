@@ -1,13 +1,18 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the version-prefill routing: Device Builder rows carry the server
+ * Pins the version-prefill routing (Device Builder rows carry the server
  * version, the ESPHome row carries the installed core version, and rows
- * without a source (or version) are left untouched.
+ * without a source or version are left untouched) and the write-in-English
+ * note that only the "Report a new issue" drill screen shows.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeFeedbackDialog } from "../../src/components/feedback-dialog.js";
+import { mount } from "../_dom.js";
 
 interface HrefLink {
   href?: string;
@@ -65,5 +70,35 @@ describe("feedback-dialog version prefill", () => {
 
   it("returns an empty string for a drill row with no href", () => {
     expect(dialog()._hrefFor({})).toBe("");
+  });
+});
+
+describe("feedback-dialog write-in-English note", () => {
+  const NOTE = "feedback.write_in_english";
+
+  it("shows the note on the new-issue screen only", async () => {
+    const el = await mount(new ESPHomeFeedbackDialog());
+    el.open();
+    await el.updateComplete;
+    const drill = (screen: string) =>
+      el.shadowRoot!.querySelector<HTMLButtonElement>(
+        `button.link[data-drill="${screen}"]`
+      );
+    const back = () => el.shadowRoot!.querySelector<HTMLButtonElement>(".back-button");
+
+    // Main screen: no note.
+    expect(el.shadowRoot!.textContent).not.toContain(NOTE);
+
+    // Drill into "Report a new issue" the way a user does: the note is there.
+    drill("bug")!.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain(NOTE);
+
+    // Back out and into the read-only browse screen: no note.
+    back()!.click();
+    await el.updateComplete;
+    drill("browse")!.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).not.toContain(NOTE);
   });
 });

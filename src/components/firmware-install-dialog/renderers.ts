@@ -245,15 +245,15 @@ export function renderStatusExtra(
 function downloadInstallLogs(host: ESPHomeFirmwareInstallDialog): void {
   // Land the pending rAF batch so a mid-stream download can't drop the
   // last frame of lines (mirrors command-dialog's _downloadOutput).
-  host._flushLogLines();
+  host._log.flush();
   const stem = configurationStem(host._device?.configuration, "install");
-  downloadAnsiText(host._logLines, `${stem}-install.txt`);
+  downloadAnsiText(host._log.lines, `${stem}-install.txt`);
 }
 
 export function renderLogs(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
-  if (host._logLines.length === 0) return nothing;
+  if (host._log.lines.length === 0) return nothing;
   return html`
     <div class="logs-header">
       <button
@@ -281,7 +281,7 @@ export function renderLogs(
       host._logsExpanded
         ? html`<div class="logs-container">
             <esphome-ansi-log
-              .lines=${host._logLines}
+              .lines=${host._log.lines}
               ?light=${!host._darkMode}
             ></esphome-ansi-log>
           </div>`

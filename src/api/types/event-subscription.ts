@@ -80,19 +80,12 @@ export enum DeviceEventType {
   OFFLOADER_PEER_LINK_CLOSED = "offloader_peer_link_closed",
   // Offloader-side remote-build job lifecycle. Fired by the
   // offloader's PeerLinkClient receive loop when an inbound
-  // job_state_changed / job_output frame lands from the
-  // paired receiver this dashboard submitted the job to. The
-  // offloader doesn't own a FirmwareJob row for these (the
-  // receiver runs the build); it just fans the wire frames
-  // onto its local bus so subscribe_events re-broadcasts to
-  // frontend tabs. Settings dialog's Send-builds section
-  // consumes both to render the live progress drawer per
-  // in-flight remote job: STATE_CHANGED drives the lifecycle
-  // pill (queued / running / completed / failed / cancelled),
-  // OUTPUT appends each per-line stdout / stderr chunk to the
-  // ansi-log buffer. Phase 5c-3 wired the backend.
+  // job_state_changed frame lands from the paired receiver
+  // running this dashboard's build. Feeds buildOffloadJobsContext;
+  // the one UI consumer is the command dialog's remote-queued
+  // indicator (a pool-routed compile parked behind another
+  // offloader's build).
   OFFLOADER_JOB_STATE_CHANGED = "offloader_job_state_changed",
-  OFFLOADER_JOB_OUTPUT = "offloader_job_output",
   // mDNS-discovered peer dashboards. Replaces the deleted
   // ``remote_build/list_hosts`` WS command — the controller fires
   // these events as its mDNS browser callback resolves /
@@ -213,19 +206,10 @@ export interface InitialStateEventData {
    *  RAM-only on the backend; populated as
    *  ``OFFLOADER_JOB_STATE_CHANGED`` events upsert rows by
    *  ``job_id`` and dropped when a terminal event (completed /
-   *  failed / cancelled) fires. Lets a tab subscribing AFTER
-   *  a ``running`` transition (page reload mid-build, second
-   *  tab opened after dispatch) repaint the live build
-   *  without waiting for the next event. Output buffer isn't
-   *  in the snapshot — the receiver doesn't replay; the next
-   *  ``OFFLOADER_JOB_OUTPUT`` line repopulates from the
-   *  point-of-subscribe forward. Display fields
-   *  (configuration / target / receiver_label) aren't carried
-   *  either — the receiver doesn't echo them, so reload-time
-   *  rows show empty strings until terminal (the dialog's
-   *  re-attach view tolerates them). Optional for the same
-   *  reason as ``pairings`` / ``peers`` — absent controller,
-   *  omitted field. */
+   *  failed / cancelled) fires. Re-seeds the command dialog's
+   *  remote-queued indicator after a reload mid-build.
+   *  Optional for the same reason as ``pairings`` / ``peers``
+   *  — absent controller, omitted field. */
   remote_jobs?: OffloaderRemoteJobSnapshotEntry[];
   /** Receiver-side settings scalars (RAM-canonical on the backend's
    *  ReceiverState). Seed the Build server panel's first paint;

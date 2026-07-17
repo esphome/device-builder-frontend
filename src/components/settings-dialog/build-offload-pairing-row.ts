@@ -2,7 +2,6 @@ import { html, nothing, type TemplateResult } from "lit";
 
 import type { PairingSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import type { RemoteBuildJobState } from "../../context/index.js";
 import { trimTrailingDot } from "../../util/hostname.js";
 import { pairingDisplayName } from "../../util/pairing-display-name.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
@@ -44,10 +43,7 @@ export function pillFor(pairing: PairingSummary, localize: LocalizeFunc): PillRe
 interface PairingRowContext {
   localize: LocalizeFunc;
   appVersion: string;
-  latestJob: RemoteBuildJobState | undefined;
   onToggleEnabled: (pairing: PairingSummary) => void;
-  onBuildRemote: (pairing: PairingSummary) => void;
-  onViewBuild: (jobId: string) => void;
   onEditEndpoint: (pairing: PairingSummary) => void;
   onResetBuildEnv: (pairing: PairingSummary) => void;
   onUnpair: (pairing: PairingSummary) => void;
@@ -60,10 +56,7 @@ export function renderPairingRow(
   const {
     localize,
     appVersion,
-    latestJob,
     onToggleEnabled,
-    onBuildRemote,
-    onViewBuild,
     onEditEndpoint,
     onResetBuildEnv,
     onUnpair,
@@ -112,38 +105,6 @@ export function renderPairingRow(
         ${renderPeerVersion(pairing, localize, appVersion)}
       </div>
       <div class="pairing-actions">
-        ${
-          pairing.status === "approved" && pairing.connected
-            ? html`
-                <button
-                  type="button"
-                  class="btn-build-remote"
-                  aria-label=${localize("settings.remote_build_submit_aria", {
-                    label: displayName,
-                  })}
-                  @click=${() => onBuildRemote(pairing)}
-                >
-                  ${localize("settings.remote_build_submit_action")}
-                </button>
-              `
-            : nothing
-        }
-        ${
-          latestJob !== undefined
-            ? html`
-                <button
-                  type="button"
-                  class="btn-view-remote-build"
-                  aria-label=${localize("settings.remote_build_view_aria", {
-                    label: displayName,
-                  })}
-                  @click=${() => onViewBuild(latestJob.job_id)}
-                >
-                  ${localize("settings.remote_build_view_action")}
-                </button>
-              `
-            : nothing
-        }
         ${
           canResetBuildEnv(pairing)
             ? html`
@@ -250,19 +211,4 @@ function renderPeerVersion(
       ${localize(key, { peer: pairing.esphome_version, local: appVersion })}
     </span>
   `;
-}
-
-export function latestJobForPin(
-  jobs: Map<string, RemoteBuildJobState> | null,
-  pin_sha256: string
-): RemoteBuildJobState | undefined {
-  if (jobs === null) return undefined;
-  let best: RemoteBuildJobState | undefined;
-  for (const job of jobs.values()) {
-    if (job.pin_sha256 !== pin_sha256) continue;
-    if (best === undefined || job.started_at > best.started_at) {
-      best = job;
-    }
-  }
-  return best;
 }

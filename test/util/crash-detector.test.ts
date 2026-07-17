@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectCrashKind, isCrashMarker } from "../../src/util/crash-detector.js";
+import { isCrashMarker } from "../../src/util/crash-detector.js";
 import { CRASH_BANNER_LINE } from "../_crash-lines.js";
 
 // Realistic crash lines, one per supported shape.
@@ -38,9 +38,6 @@ const NON_CRASH_LINES: ReadonlyArray<[string, string]> = [
   ["empty line", ""],
 ];
 
-// The dialog's real transport wrapping: timestamp prefix + ANSI color.
-const wrapEsc = (line: string) => `[12:34:56]\u001b[31m${line}\u001b[0m`;
-
 describe("isCrashMarker", () => {
   it.each(CRASH_LINES)("matches %s", (_name, line) => {
     expect(isCrashMarker(line)).toBe(true);
@@ -48,35 +45,5 @@ describe("isCrashMarker", () => {
 
   it.each(NON_CRASH_LINES)("does not match %s", (_name, line) => {
     expect(isCrashMarker(line)).toBe(false);
-  });
-});
-
-describe("detectCrashKind", () => {
-  it("spots a live crash line arriving wrapped in ANSI + timestamp", () => {
-    expect(detectCrashKind(["[12:00:00][I][app:029]: boot"])).toBeNull();
-    expect(
-      detectCrashKind([
-        "[12:00:00][I][app:029]: boot",
-        wrapEsc("Guru Meditation Error: Core 1 panic'ed (StoreProhibited)."),
-      ])
-    ).toBe("live");
-  });
-
-  it("classifies the crash handler's boot replay as previous-boot", () => {
-    expect(
-      detectCrashKind([
-        "[11:21:19.093][E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
-        "[11:21:19.167][E][esp32.crash:305]:   BT0: 0x4015482D  (backtrace)",
-      ])
-    ).toBe("previous-boot");
-  });
-
-  it("live wins when both kinds appear in one batch", () => {
-    expect(
-      detectCrashKind([
-        "[E][esp32.crash:332]: *** CRASH DETECTED ON PREVIOUS BOOT ***",
-        CRASH_BANNER_LINE,
-      ])
-    ).toBe("live");
   });
 });

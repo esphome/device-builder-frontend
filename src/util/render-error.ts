@@ -22,8 +22,7 @@ import { html, nothing } from "lit";
  *   submit-time / wire failures that don't bind to any single
  *   field. ``role="alert"`` so screen readers announce it
  *   even when focus is elsewhere. The dialogs that wrap a WS
- *   command (edit-pairing-endpoint-dialog,
- *   remote-build-job-dialog) use this shape.
+ *   command (edit-pairing-endpoint-dialog) use this shape.
  *
  * Both return ``nothing`` for falsy / empty messages so call
  * sites can write ``${renderInlineError(maybeMessage)}`` without

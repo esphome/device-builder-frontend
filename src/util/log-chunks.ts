@@ -19,7 +19,7 @@ export function cleanLine(line: string): string {
  * flag; without that, the next real tick pops a non-progress line
  * above the bar instead of starting fresh (#840).
  */
-export function chunksToVisualLines(chunks: string[]): string[] {
+export function chunksToVisualLines(chunks: readonly string[]): string[] {
   const visual: string[] = [];
   let prevEndedInCR = false;
   for (const chunk of chunks) {

@@ -23,15 +23,6 @@ export enum JobType {
   RENAME = "rename",
 }
 
-/** Output stream discriminator on a single line of build output. */
-export enum JobStream {
-  STDOUT = "stdout",
-  STDERR = "stderr",
-}
-
-/** Subset of {@link JobType} the remote-build submit_job WS arg accepts. */
-export type RemoteBuildSubmitTarget = JobType.COMPILE | JobType.UPLOAD;
-
 /** Where the bytes for a firmware build come from.
  *
  *  Mirrors the backend's ``JobSource`` StrEnum (7a-2a). ``LOCAL`` is

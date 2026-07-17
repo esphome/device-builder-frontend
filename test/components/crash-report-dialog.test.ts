@@ -116,6 +116,17 @@ describe("crash-report-dialog", () => {
     expect(button!.disabled).toBe(false);
   });
 
+  it("shows the write-in-English note whether or not a description is entered", async () => {
+    el.open("smallgarage.yaml", "Small Garage", CRASH_LINES);
+    finishValidate();
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain("crash_report.describe_english");
+
+    describe_("Pressed the crash button");
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain("crash_report.describe_english");
+  });
+
   it("always offers the manual issue link in the delivered state", async () => {
     // window.open with noopener returns null by spec even on success, so
     // the delivered state can't infer blocking; the link is always there.

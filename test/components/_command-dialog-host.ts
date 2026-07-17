@@ -3,6 +3,7 @@
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { JobStatus } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 
 export interface StreamCbs {
   onOutput: (line: string) => void;
@@ -39,7 +40,7 @@ export function makeCommandDialogHost(
     configuration: "kitchen.yaml",
     name: "kitchen",
     _port: "OTA",
-    _lines: [] as string[],
+    _log: fakeLogBuffer(),
     _showLogsAfterInstall: true,
     _userStopped: false,
     _failedDuringValidate: false,
@@ -48,9 +49,9 @@ export function makeCommandDialogHost(
     _flipToLogs: () => {
       flipped = true;
     },
-    _flushPendingLines: () => {},
-    _resetPendingLines: () => {},
-    _enqueueLine: () => {},
+    _enqueueLine(line: string) {
+      this._log.enqueue(line);
+    },
     ...overrides,
   };
   return {

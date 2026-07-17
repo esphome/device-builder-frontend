@@ -120,10 +120,14 @@ const BROWSE_LINKS: ReadonlyArray<FeedbackLink> = [
 
 const DRILL_SCREENS: Record<
   DrillScreen,
-  { titleKey: string; links: ReadonlyArray<FeedbackLink> }
+  { titleKey: string; noteKey?: string; links: ReadonlyArray<FeedbackLink> }
 > = {
   browse: { titleKey: "feedback.browse_issues", links: BROWSE_LINKS },
-  bug: { titleKey: "feedback.new_issue", links: BUG_LINKS },
+  bug: {
+    titleKey: "feedback.new_issue",
+    noteKey: "feedback.write_in_english",
+    links: BUG_LINKS,
+  },
 };
 
 const SECTIONS: ReadonlyArray<{
@@ -455,9 +459,16 @@ export class ESPHomeFeedbackDialog extends LitElement {
         }
         ${
           drill
-            ? html`<div class="links">
-                ${drill.links.map((link) => this._renderLink(link))}
-              </div>`
+            ? html`
+                ${
+                  drill.noteKey
+                    ? html`<p class="description">${this._localize(drill.noteKey)}</p>`
+                    : ""
+                }
+                <div class="links">
+                  ${drill.links.map((link) => this._renderLink(link))}
+                </div>
+              `
             : this._renderMainScreen()
         }
       </esphome-base-dialog>

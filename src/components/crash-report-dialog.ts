@@ -110,6 +110,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
 
   private _configuration = "";
   private _name = "";
+  // The log viewer's decode is what knows the build was stale; read only when
+  // the report is built on click, so it drives no render.
+  private _staleBuild = false;
   // The rendered report backing the delivered-state re-copy / download.
   private _reportText = "";
   private _issueUrl = "";
@@ -197,6 +200,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         background: var(--wa-color-surface-default);
         color: var(--wa-color-text-normal);
+        margin: 0 0 var(--wa-space-2xs);
+      }
+
+      .describe-note {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
         margin: 0 0 var(--wa-space-m);
       }
 
@@ -214,7 +223,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
   ];
 
   /** Open with a snapshot of the logs dialog's buffer. */
-  public open(configuration: string, name: string, lines: string[]): void {
+  public open(
+    configuration: string,
+    name: string,
+    lines: string[],
+    staleBuild = false
+  ): void {
     this._stopValidateStream();
     this._configuration = configuration;
     this._name = name;
@@ -226,6 +240,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._reportText = "";
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
+    this._staleBuild = staleBuild;
     this._dialog.open = true;
     this._captureConfig(this._session);
   }
@@ -284,6 +299,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
       scrape: this._scrape,
       configYaml: this._configYaml ?? "",
       userDescription: this._userDescription.trim(),
+      staleBuild: this._staleBuild,
       meta: {
         deviceName: this._name,
         configuration: this._configuration,
@@ -404,10 +420,14 @@ export class ESPHomeCrashReportDialog extends LitElement {
         id="crash-description"
         class="describe-input"
         rows="3"
+        aria-describedby="crash-description-note"
         placeholder=${this._localize("crash_report.describe_placeholder")}
         .value=${this._userDescription}
         @input=${this._onDescriptionInput}
       ></textarea>
+      <p id="crash-description-note" class="describe-note">
+        ${this._localize("crash_report.describe_english")}
+      </p>
       <ul class="summary">
         ${this._renderSummaryRow(
           this._localize(

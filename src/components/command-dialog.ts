@@ -37,7 +37,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
 import { LightDismissController } from "../util/light-dismiss-controller.js";
-import { LineBatcher } from "../util/line-batcher.js";
+import { LogBuffer } from "../util/log-buffer.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
@@ -143,14 +143,12 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() _open = false;
   @state() _commandType: CommandType = "validate";
   @state() _state: CommandState | null = null;
-  @state() _lines: string[] = [];
   @state() _statusMessage = "";
 
-  // rAF batch buffer for streamed output — coalesce per-line writes
-  // into one render per frame instead of one per line (#348).
-  private _lineBatch = new LineBatcher((batch) => {
-    this._lines = [...this._lines, ...batch];
-  });
+  // The streamed output, batched into one render per frame instead of one
+  // per line (#348). Uncapped: a compile log is finite and users scroll back
+  // through it.
+  _log = new LogBuffer(this);
 
   // Distinguishes user-stopped from backend-failed. Both flip _state to "error"
   // but only real failures get the reset-build-env hint.
@@ -294,8 +292,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._port = options?.port ?? "OTA";
     this._bootloader = options?.bootloader ?? false;
     this._state = null;
-    this._lines = [];
-    this._resetPendingLines();
+    this._log.reset();
     this._statusMessage = "";
     this._jobId = "";
     this._timerJobId = "";
@@ -354,7 +351,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._closeTimerDetail();
     // Cancel any prior follow before starting a new one — without this,
     // every reopen layered fresh streams while previous ones still pumped
-    // onOutput into _lines (lines duplicated per leaked subscription).
+    // onOutput into the buffer (lines duplicated per leaked subscription).
     void detachStream(this);
     this._open = true;
     this._resetAnsiLogScroll();
@@ -477,26 +474,13 @@ export class ESPHomeCommandDialog extends LitElement {
   // Buffer a streamed line; flushed on the next animation frame.
   _enqueueLine(line: string): void {
     this._timer.noteLine(line);
-    this._lineBatch.enqueue(line);
-  }
-
-  // Drain pending lines into ``_lines`` now. Called from terminal
-  // callbacks, detachStream, and _downloadOutput so consumers
-  // don't race the rAF.
-  _flushPendingLines(): void {
-    this._lineBatch.flush();
-  }
-
-  // Drop the pending batch and cancel any scheduled flush. Paired
-  // with every ``_lines = []`` reset.
-  _resetPendingLines(): void {
-    this._lineBatch.reset();
+    this._log.enqueue(line);
   }
 
   _downloadOutput = () => {
-    this._flushPendingLines();
+    this._log.flush();
     const stem = configurationStem(this.configuration, "output");
-    downloadAnsiText(this._lines, `${stem}-${this._commandType}.txt`);
+    downloadAnsiText(this._log.lines, `${stem}-${this._commandType}.txt`);
   };
 
   _start = () => startCommand(this);
@@ -525,7 +509,7 @@ export class ESPHomeCommandDialog extends LitElement {
         @after-hide=${this._onDialogHide}
       >
         <esphome-process-terminal
-          .lines=${this._lines}
+          .lines=${this._log.lines}
           ?light=${!this._darkMode}
           ?streaming=${this._state === "running" && !showRunTimer(this)}
           .state=${this._state}
