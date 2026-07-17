@@ -62,6 +62,8 @@ describe("device-card indicator tooltips", () => {
     const dot = el.shadowRoot!.querySelector("#ind-modified")!;
     expect(dot.hasAttribute("title")).toBe(false);
     expect(dot.getAttribute("tabindex")).toBe("0");
+    expect(dot.getAttribute("role")).toBe("img");
+    expect(dot.getAttribute("aria-label")).toBe("dashboard.status_modified");
     expect(tooltipFor(el, "ind-modified")!.textContent).toContain(
       "dashboard.status_modified"
     );
@@ -90,8 +92,20 @@ describe("device-card indicator tooltips", () => {
     });
     const icon = el.shadowRoot!.querySelector("#ind-encryption")!;
     expect(icon.hasAttribute("title")).toBe(false);
+    expect(icon.getAttribute("aria-label")).toBe(
+      "dashboard.table_status_encryption_pending_tooltip"
+    );
     expect(tooltipFor(el, "ind-encryption")!.textContent).toContain(
       "dashboard.table_status_encryption_pending_tooltip"
     );
+  });
+
+  it("gives every focusable indicator an accessible name", async () => {
+    const el = await mount({ showUpdate: true, queuedUpdate: true });
+    for (const id of ["ind-update", "ind-queued"]) {
+      const node = el.shadowRoot!.querySelector(`#${id}`)!;
+      expect(node.getAttribute("role")).toBe("img");
+      expect(node.getAttribute("aria-label")).toBeTruthy();
+    }
   });
 });

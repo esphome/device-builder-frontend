@@ -57,6 +57,8 @@ export function renderEncryptionIcon(
       library="mdi"
       name=${visual.iconName}
       tabindex="0"
+      role="img"
+      aria-label=${card._localize(visual.tooltipKey)}
     ></wa-icon>
     <wa-tooltip for="ind-encryption">${card._localize(visual.tooltipKey)}</wa-tooltip>`;
 }

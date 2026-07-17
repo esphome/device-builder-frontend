@@ -192,6 +192,8 @@ export class ESPHomeDeviceCard extends LitElement {
                         id="ind-modified"
                         class="indicator-dot indicator-dot--modified"
                         tabindex="0"
+                        role="img"
+                        aria-label=${this._localize("dashboard.status_modified")}
                       ></span>
                       <wa-tooltip for="ind-modified">
                         ${this._localize("dashboard.status_modified")}
@@ -204,6 +206,8 @@ export class ESPHomeDeviceCard extends LitElement {
                         id="ind-update"
                         class="indicator-dot indicator-dot--update"
                         tabindex="0"
+                        role="img"
+                        aria-label=${this._localize("dashboard.status_update_available")}
                       ></span>
                       <wa-tooltip for="ind-update">
                         ${this._localize("dashboard.status_update_available")}
@@ -218,6 +222,8 @@ export class ESPHomeDeviceCard extends LitElement {
                         library="mdi"
                         name="clock-outline"
                         tabindex="0"
+                        role="img"
+                        aria-label=${this._localize("dashboard.status_queued_update")}
                       ></wa-icon>
                       <wa-tooltip for="ind-queued">
                         ${this._localize("dashboard.status_queued_update")}
