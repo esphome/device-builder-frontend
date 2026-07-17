@@ -28,6 +28,7 @@ import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware
 import { startWebSerialInstall } from "../../src/components/firmware-install-dialog/install-flow.js";
 import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
 import { identityLocalize } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
 
 function makeHost() {
   const api = {
@@ -57,12 +58,7 @@ function makeHost() {
     _step: "connecting",
     _statusMessage: "",
     _flashPercent: 0,
-    _logLines: [] as string[],
-    // Synchronous stand-ins for the dialog's rAF-batched log sink.
-    _enqueueLogLine(line: string) {
-      this._logLines = [...this._logLines, line];
-    },
-    _flushLogLines() {},
+    _log: fakeLogBuffer(),
     _open: true,
     _showLogsAfterInstall: false,
     _detected: null as unknown,
@@ -131,8 +127,8 @@ describe("Web Serial install — HTTP byte download", () => {
 
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
-    expect(host._logLines).toContain("Detecting chip type... ESP32");
-    expect(host._logLines).toContain("Writing at 0x00010000...");
+    expect(host._log.lines).toContain("Detecting chip type... ESP32");
+    expect(host._log.lines).toContain("Writing at 0x00010000...");
   });
 
   it("releases the port when the post-flash reset throws", async () => {

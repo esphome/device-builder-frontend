@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the dialog-level batching wiring with a REAL LineBatcher (the flow
+ * Pins the dialog-level batching wiring with a REAL LogBuffer (the flow
  * harnesses stub the sink): lines buffer until a flush point, and _fail /
  * _detachStream land the pending batch synchronously.
  */
@@ -36,25 +36,25 @@ function makeDialog(): ESPHomeFirmwareInstallDialog {
 describe("install-dialog log batching wiring", () => {
   it("buffers lines until the frame, and _fail lands them synchronously", () => {
     const dialog = makeDialog();
-    dialog._enqueueLogLine("buffered line");
+    dialog._log.enqueue("buffered line");
     // Still pending — the rAF hasn't fired.
-    expect(dialog._logLines).toEqual([]);
+    expect(dialog._log.lines).toEqual([]);
     dialog._fail("boom");
     // The expanded error log must show every line, not race the rAF.
-    expect(dialog._logLines).toEqual(["buffered line"]);
+    expect(dialog._log.lines).toEqual(["buffered line"]);
   });
 
   it("_detachStream lands the pending batch before teardown", () => {
     const dialog = makeDialog();
-    dialog._enqueueLogLine("last line");
+    dialog._log.enqueue("last line");
     dialog._detachStream();
-    expect(dialog._logLines).toEqual(["last line"]);
+    expect(dialog._log.lines).toEqual(["last line"]);
   });
 
   it("a mid-stream log download flushes before reading", () => {
     const dialog = makeDialog();
-    Object.assign(dialog, { _logLines: ["landed line"] });
-    dialog._enqueueLogLine("buffered line");
+    dialog._log.append(["landed line"]);
+    dialog._log.enqueue("buffered line");
     const container = renderInto(renderLogs(dialog));
     // Second .logs-toggle is the download button (first is the expander).
     const buttons = container.querySelectorAll<HTMLElement>(".logs-toggle");
