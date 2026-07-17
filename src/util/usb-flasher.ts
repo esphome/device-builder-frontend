@@ -1,4 +1,5 @@
 import { FLASHER_ORIGIN, FLASHER_URL } from "../common/docs.js";
+import { randomNonce } from "./random-nonce.js";
 
 // Message types, mirroring flasher/src/protocol.ts in the device-builder repo.
 // The nonce travels one way only (dashboard -> flasher).
@@ -177,13 +178,4 @@ export function openFlasher(
   }, 1000);
   readyTimer = setTimeout(lost, READY_TIMEOUT_MS);
   return finish;
-}
-
-// crypto.randomUUID() is [SecureContext]-gated and undefined on plain-http
-// origins, which is exactly where this hand-off runs (the HA add-on). getRandom-
-// Values isn't gated; the nonce only needs to be unguessable, not a UUID.
-function randomNonce(): string {
-  const a = new Uint8Array(16);
-  crypto.getRandomValues(a);
-  return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
 }

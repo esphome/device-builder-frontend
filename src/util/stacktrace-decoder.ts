@@ -1,4 +1,5 @@
 import { DECODER_ORIGIN, DECODER_URL } from "../common/docs.js";
+import { randomNonce } from "./random-nonce.js";
 
 // Message types, mirroring esp-stacktrace-decoder/src/protocol.ts in the
 // device-builder repo. The nonce travels one way only (dashboard -> decoder).
@@ -25,12 +26,6 @@ export interface DecodedFrame {
   address: number;
   function_name: string;
   location: string;
-}
-
-function randomNonce(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**

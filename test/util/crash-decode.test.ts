@@ -18,14 +18,10 @@ const reply = (over: Partial<DecodeBacktraceResponse> = {}): DecodeBacktraceResp
   decoded: [{ index: 2, text: "Decoded 0x400d9150: setup() at application.cpp:59" }],
   stale_build: false,
   unavailable_reason: "",
+  local_build_hash: "build-1",
   ...over,
 });
 
-// `firmwareGetBinaries` is stubbed alongside the decoder because a backend
-// decline now falls through to the hosted decoder, and that path asks for the
-// ELF first. Empty means "never built here", which is the other half of what
-// `no_build` says, so the fallback declines without touching the network. A
-// test that wants the hosted path passes its own binaries.
 const fakeApi = (
   decodeBacktrace: (
     configuration: string,
@@ -35,7 +31,6 @@ const fakeApi = (
 ) =>
   ({
     decodeBacktrace,
-    firmwareGetBinaries: async () => [],
     ...over,
   }) as unknown as ESPHomeAPI;
 
@@ -306,59 +301,53 @@ describe("decodeCrashRegion", () => {
     // The remote-build shape: no CMake tree here, so the backend can't decode,
     // but the ELF was materialised locally and is all a decoder needs.
     const remoteBuilt = () =>
-      vi.fn(async () => reply({ decoded: [], unavailable_reason: "no_build" }));
-    const withElf = {
-      firmwareGetBinaries: async () => [{ title: "ELF", file: "firmware.elf" }],
-    };
+      vi.fn(async () => reply({ decoded: [], unavailable_reason: "no_local_toolchain" }));
     const region = ["Guru Meditation Error", "PC: 0x400d1a2c", "Rebooting..."];
+
+    /** Assert the reason never reaches the decoder: no frame, no download. */
+    const expectNoFallback = async (
+      unavailable_reason: string,
+      decoded: DecodeBacktraceResponse["decoded"] = []
+    ) => {
+      const firmwareDownloadBytes = vi.fn();
+      const available = vi.spyOn(hostedDecoder(), "available");
+      const api = fakeApi(async () => reply({ decoded, unavailable_reason }), {
+        firmwareDownloadBytes,
+      });
+
+      await decodeCrashRegion(api, "a.yaml", region, cache);
+
+      // `available()` frames the page; the download moves megabytes. Neither is
+      // worth spending on a reason the decoder can do nothing with.
+      expect(available).not.toHaveBeenCalled();
+      expect(firmwareDownloadBytes).not.toHaveBeenCalled();
+    };
 
     it("is not consulted when the backend decoded the region itself", async () => {
       // The whole point of trying the backend first: a locally built device
       // must not pay a page load and a multi-megabyte ELF transfer.
-      const firmwareGetBinaries = vi.fn(async () => []);
-      const api = fakeApi(async () => reply(), { firmwareGetBinaries });
-
-      expect(await decodeCrashRegion(api, "a.yaml", region, cache)).not.toBeNull();
-      expect(firmwareGetBinaries).not.toHaveBeenCalled();
+      await expectNoFallback("", reply().decoded);
     });
 
     it("is not consulted when there is nothing to decode", async () => {
-      const firmwareGetBinaries = vi.fn(async () => []);
-      const api = fakeApi(
-        async () => reply({ decoded: [], unavailable_reason: "no_backtrace" }),
-        { firmwareGetBinaries }
-      );
-
-      expect(await decodeCrashRegion(api, "a.yaml", region, cache)).toBeNull();
-      expect(firmwareGetBinaries).not.toHaveBeenCalled();
+      await expectNoFallback("no_backtrace");
     });
 
     it("is not consulted for a platform it could not decode either", async () => {
-      const firmwareGetBinaries = vi.fn(async () => []);
-      const api = fakeApi(
-        async () => reply({ decoded: [], unavailable_reason: "unsupported_platform" }),
-        { firmwareGetBinaries }
-      );
-
-      expect(await decodeCrashRegion(api, "a.yaml", region, cache)).toBeNull();
-      expect(firmwareGetBinaries).not.toHaveBeenCalled();
+      await expectNoFallback("unsupported_platform");
     });
 
-    it("does not fetch the ELF when the device was never built here", async () => {
-      // `no_build` covers both "built elsewhere" and "never built"; only the
-      // first has an ELF, and get_binaries is the cheap way to tell them apart.
-      const firmwareDownloadBytes = vi.fn();
-      const api = fakeApi(remoteBuilt(), { firmwareDownloadBytes });
-
-      expect(await decodeCrashRegion(api, "c.yaml", region, cache)).toBeNull();
-      expect(firmwareDownloadBytes).not.toHaveBeenCalled();
+    it("is not consulted when the device was never built here", async () => {
+      // `no_build` means the ELF isn't here either, so there is nothing to send.
+      // This is the reason that must never join the fallback set.
+      await expectNoFallback("no_build");
     });
 
     it("gives up quietly when the decoder can't be reached", async () => {
       // GitHub down, or an install with no internet. The raw dump has to stand;
       // a decode is an embellishment on a log, never a prerequisite for one.
       const firmwareDownloadBytes = vi.fn();
-      const api = fakeApi(remoteBuilt(), { ...withElf, firmwareDownloadBytes });
+      const api = fakeApi(remoteBuilt(), { firmwareDownloadBytes });
       vi.spyOn(hostedDecoder(), "available").mockResolvedValue(false);
 
       expect(await decodeCrashRegion(api, "c.yaml", region, cache)).toBeNull();
@@ -368,7 +357,6 @@ describe("decodeCrashRegion", () => {
 
     it("decodes through the hosted decoder when the backend can't", async () => {
       const api = fakeApi(remoteBuilt(), {
-        ...withElf,
         firmwareDownloadBytes: async () => new ArrayBuffer(8),
       });
       vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
@@ -392,8 +380,12 @@ describe("decodeCrashRegion", () => {
       // resolved against a build the device isn't running are confidently wrong.
       const api = fakeApi(
         async () =>
-          reply({ decoded: [], unavailable_reason: "no_build", stale_build: true }),
-        { ...withElf, firmwareDownloadBytes: async () => new ArrayBuffer(8) }
+          reply({
+            decoded: [],
+            unavailable_reason: "no_local_toolchain",
+            stale_build: true,
+          }),
+        { firmwareDownloadBytes: async () => new ArrayBuffer(8) }
       );
       vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
       vi.spyOn(hostedDecoder(), "decode").mockResolvedValue([
@@ -407,7 +399,6 @@ describe("decodeCrashRegion", () => {
 
     it("drops a frame whose address is in no line rather than guessing", async () => {
       const api = fakeApi(remoteBuilt(), {
-        ...withElf,
         firmwareDownloadBytes: async () => new ArrayBuffer(8),
       });
       vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
@@ -418,9 +409,38 @@ describe("decodeCrashRegion", () => {
       expect(await decodeCrashRegion(api, "c.yaml", region, cache)).toBeNull();
     });
 
+    it("refetches the ELF after a rebuild rather than decoding the old one", async () => {
+      // The scenario this feature lives in: the user is watching a crash loop,
+      // edits the config, rebuilds and installs, and it crashes again. The
+      // backend now reports stale_build false (the device matches the new local
+      // build), so nothing else would catch us serving the previous build's
+      // bytes, and the frames would name the wrong lines with no caveat.
+      const firmwareDownloadBytes = vi.fn(async () => new ArrayBuffer(8));
+      let hash = "build-1";
+      const api = fakeApi(
+        async () =>
+          reply({
+            decoded: [],
+            unavailable_reason: "no_local_toolchain",
+            local_build_hash: hash,
+          }),
+        { firmwareDownloadBytes }
+      );
+      vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
+      vi.spyOn(hostedDecoder(), "decode").mockResolvedValue([
+        { address: 0x400d1a2c, function_name: "setup()", location: "application.cpp:59" },
+      ]);
+
+      await decodeCrashRegion(api, "r.yaml", [...region, "boot 1"], cache);
+      hash = "build-2"; // the user rebuilt and installed
+      await decodeCrashRegion(api, "r.yaml", [...region, "boot 2"], cache);
+
+      expect(firmwareDownloadBytes).toHaveBeenCalledTimes(2);
+    });
+
     it("downloads the ELF once across a crash loop", async () => {
       const firmwareDownloadBytes = vi.fn(async () => new ArrayBuffer(8));
-      const api = fakeApi(remoteBuilt(), { ...withElf, firmwareDownloadBytes });
+      const api = fakeApi(remoteBuilt(), { firmwareDownloadBytes });
       vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
       vi.spyOn(hostedDecoder(), "decode").mockResolvedValue([
         { address: 0x400d1a2c, function_name: "setup()", location: "application.cpp:59" },

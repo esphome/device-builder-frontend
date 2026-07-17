@@ -1,5 +1,8 @@
 import type { ESPHomeAPI } from "../api/index.js";
-import type { DecodedBacktraceLine } from "../api/types/devices.js";
+import type {
+  DecodeBacktraceResponse,
+  DecodedBacktraceLine,
+} from "../api/types/devices.js";
 import {
   ADDRESS_RE,
   CRASH_END_RE,
@@ -7,6 +10,7 @@ import {
   MAX_LINES_AFTER_MARKER,
   isCrashMarker,
 } from "./crash-detector.js";
+import { KeyedPromiseCache } from "./keyed-promise-cache.js";
 import { normalizeLogLine } from "./log-line.js";
 import type { DecodedFrame } from "./stacktrace-decoder.js";
 import { hostedDecoder } from "./stacktrace-decoder.js";
@@ -50,15 +54,12 @@ const ELF_FILE = "firmware.elf";
 /**
  * ELF bytes per configuration, for the hosted-decoder path.
  *
- * Module-level and unbounded on purpose: an ELF is tens of megabytes and a
- * crash loop decodes region after region, so refetching per region is the cost
- * worth avoiding. The entry is the in-flight promise, so concurrent regions
- * share one download rather than racing. Bounded in practice by how many
- * distinct devices one tab streams logs from; the tab reload that ends the
- * session clears it, which is also what makes it safe to keep a build's bytes
- * after a reflash.
+ * Unbounded on purpose: an ELF runs to tens of megabytes and a crash loop
+ * decodes region after region, so refetching per region is the cost worth
+ * avoiding. A rejected download is evicted (the default), so one blip doesn't
+ * leave the device undecodable for the rest of the session.
  */
-const elfCache = new Map<string, Promise<ArrayBuffer | null>>();
+const elfCache = new KeyedPromiseCache<ArrayBuffer>();
 
 /** Drop the session's ELF bytes. Tests only; production keeps them for the tab. */
 export function resetElfCache(): void {
@@ -83,21 +84,16 @@ const BACKEND_FAULT_REASONS: ReadonlySet<string> = new Set([
   "helper_failed",
 ]);
 
-// Reasons worth a second opinion from the hosted decoder (mirroring
-// constants.DecodeUnavailable).
+// Reasons worth a second opinion from the hosted decoder.
 //
-// `no_build` is the one this exists for: a device built on a remote server has
-// no CMake build tree here, and native ESP-IDF resolves addr2line only through
-// that tree's cache, so the backend cannot decode a crash it has the ELF for.
-// The fault reasons are worth retrying for the same reason they are not cached.
-//
-// Deliberately absent: `no_backtrace`, where there is nothing to decode and the
-// hosted decoder would find nothing either, and `unsupported_platform`, where
-// the target is not an ESP the decoder handles.
+// `no_local_toolchain` is the one this exists for: the backend has the ELF but
+// not the build tree it was compiled in, so nothing there can resolve
+// addr2line. The fault reasons join it for the same reason they are not cached
+// above. `no_build` is absent and must stay absent: it means the ELF isn't here
+// either, so there is nothing to send.
 const HOSTED_FALLBACK_REASONS: ReadonlySet<string> = new Set([
-  "no_build",
-  "decode_failed",
-  "helper_failed",
+  ...BACKEND_FAULT_REASONS,
+  "no_local_toolchain",
 ]);
 
 // Shown where the reader is looking. The report gets the same verdict as a
@@ -288,12 +284,7 @@ export async function decodeCrashRegion(
     // and costs no ELF transfer. Only when it says it cannot is the hosted
     // decoder worth the round trip.
     if (decode === null && HOSTED_FALLBACK_REASONS.has(result.unavailable_reason)) {
-      decode = await decodeViaHostedDecoder(
-        api,
-        configuration,
-        lines,
-        result.stale_build
-      );
+      decode = await decodeViaHostedDecoder(api, configuration, result, lines);
     }
     if (decode !== null || !BACKEND_FAULT_REASONS.has(result.unavailable_reason)) {
       if (cache.size >= MAX_CACHE_ENTRIES) {
@@ -314,43 +305,34 @@ export async function decodeCrashRegion(
 /**
  * Decode *lines* in the browser, against the ELF the backend already serves.
  *
- * The path a remote-built device takes: the build tree it was compiled in lives
- * on the build server, so nothing here can resolve addr2line, but the ELF
- * itself was materialised locally and is all a decoder needs.
+ * The path a remote-built device takes; see the decoder page's README for why
+ * the ELF is the only local input left. Every step may decline, and declining
+ * leaves the raw dump standing.
  *
- * Every step is allowed to decline, and declining means the raw dump stands.
- * The gates run cheapest first so the common no-op costs the least: whether the
- * ELF exists at all is a local list, whether the decoder is reachable is one
- * page load, and only then is a multi-megabyte ELF worth fetching.
- *
- * *backendStaleBuild* rides through from the backend's reply, which knows both
- * the running firmware's config hash and the local build's whether or not it
- * could decode.
+ * The decoder is asked before the ELF is fetched, not alongside it: an
+ * unreachable decoder costs a page load to discover, and finding out after a
+ * multi-megabyte download would waste the download.
  */
 async function decodeViaHostedDecoder(
   api: ESPHomeAPI,
   configuration: string,
-  lines: string[],
-  backendStaleBuild: boolean
+  backend: DecodeBacktraceResponse,
+  lines: string[]
 ): Promise<CrashDecode | null> {
+  const decoder = hostedDecoder();
   try {
-    const binaries = await api.firmwareGetBinaries(configuration);
-    // Absent for a device that was never built here, which is the other half of
-    // what `no_build` means and the case that must not reach the network.
-    if (!binaries.some((b) => b.file === ELF_FILE)) return null;
-    if (!(await hostedDecoder().available())) return null;
-    const elf = await loadElf(api, configuration);
-    if (elf === null) return null;
+    if (!(await decoder.available())) return null;
+    const elf = await loadElf(api, configuration, backend.local_build_hash);
     // Hand over a copy: postMessage transfers it (detaching what it is given),
     // and the cached original has to survive for the next region of a crash loop.
-    const frames = await hostedDecoder().decode(elf.slice(0), lines.join("\n"));
+    const frames = await decoder.decode(elf.slice(0), lines.join("\n"));
     if (!frames?.length) return null;
     // Checked after mapping, not before: frames that resolve to no line leave
     // nothing to splice, and an empty decode would be cached and reported as a
     // success while rendering exactly like a failure.
     const decoded = framesToDecodedLines(frames, lines);
     if (!decoded.length) return null;
-    return { decoded, staleBuild: backendStaleBuild };
+    return { decoded, staleBuild: backend.stale_build };
   } catch (err) {
     console.warn("Hosted backtrace decoding failed", err);
     return null;
@@ -383,21 +365,22 @@ function framesToDecodedLines(
   return decoded;
 }
 
-/** The session's ELF bytes for *configuration*, fetched once. */
-async function loadElf(
+/**
+ * The session's ELF bytes for *configuration*'s *buildHash*, fetched once.
+ *
+ * Keyed on the build, not just the device: a rebuild mid-session replaces the
+ * ELF on disk, and serving the old bytes would decode the next crash against
+ * the wrong build and report it without a caveat (`stale_build` goes false the
+ * moment the device is reflashed to match). A new hash simply misses.
+ *
+ * Throws as the download does, which the caller turns into "no decode".
+ */
+function loadElf(
   api: ESPHomeAPI,
-  configuration: string
-): Promise<ArrayBuffer | null> {
-  const cached = elfCache.get(configuration);
-  if (cached !== undefined) return cached;
-  // Awaited by every region of a crash loop, so the fetch is shared rather than
-  // raced: an ELF runs to tens of megabytes.
-  const pending = api
-    .firmwareDownloadBytes(configuration, ELF_FILE)
-    .catch((err): null => {
-      console.warn("Could not download the ELF for decoding", err);
-      return null;
-    });
-  elfCache.set(configuration, pending);
-  return pending;
+  configuration: string,
+  buildHash: string
+): Promise<ArrayBuffer> {
+  return elfCache.fetch(`${configuration}\n${buildHash}`, () =>
+    api.firmwareDownloadBytes(configuration, ELF_FILE)
+  );
 }

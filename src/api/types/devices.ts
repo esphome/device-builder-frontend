@@ -340,9 +340,15 @@ export interface DecodeBacktraceResponse {
   /** The running firmware was built from a different config than the local
    *  build, so the symbols are confident but wrong. */
   stale_build: boolean;
+  /** The config hash the local build was compiled from, "" when there is none
+   *  to read. Identifies *which* build the on-disk ELF is, so a client caching
+   *  those bytes can tell a rebuild from a re-crash; `stale_build` can't answer
+   *  that, since it goes false the moment the device catches up with the local
+   *  build, which is exactly when cached bytes are stale. */
+  local_build_hash: string;
   /** Why nothing was decoded: "no_backtrace" | "no_build" |
-   *  "unsupported_platform" | "decode_failed" | "helper_failed"; "" on
-   *  success.
+   *  "no_local_toolchain" | "unsupported_platform" | "decode_failed" |
+   *  "helper_failed"; "" on success.
    *
    *  Never shown: the report states that the backtrace was not decoded without
    *  naming a cause, because most of these are indistinguishable to a reader
