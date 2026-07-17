@@ -55,7 +55,6 @@ import type {
   FirmwareBinary,
   FirmwareJob,
   FirmwareJobResult,
-  RemoteBuildSubmitTarget,
 } from "./types/firmware-jobs.js";
 import type {
   CommandMessage,
@@ -2153,87 +2152,6 @@ export class ESPHomeAPI {
     port: number;
   }): Promise<PairingSummary> {
     return this.sendCommand<PairingSummary>("remote_build/edit_pairing_endpoint", args);
-  }
-
-  /**
-   * Dispatch a build to a paired receiver behind pin_sha256.
-   *
-   * Bundles the YAML + every referenced file (includes,
-   * secrets, fonts, images) on the offloader, streams the
-   * tarball over the live peer-link Noise session, and
-   * returns the receiver's submit_job_ack. Live job
-   * lifecycle + per-line stdout / stderr arrive
-   * asynchronously through OFFLOADER_JOB_STATE_CHANGED /
-   * OFFLOADER_JOB_OUTPUT events on the subscribe_events
-   * stream tagged with the same job_id this returns.
-   *
-   * target is one of "compile" (build firmware artefacts on
-   * the receiver, no flash) or "upload" (build then OTA-
-   * upload to the device, like the local Install action).
-   *
-   * Errors from the WS layer:
-   * - INVALID_ARGS: pin / target / configuration shape
-   *   error, or bundle build failed (the receiver's
-   *   validator diagnostic is in the message verbatim).
-   * - NOT_FOUND: no pairing for this pin, or the YAML is
-   *   missing from config_dir.
-   * - PRECONDITION_FAILED: pairing isn't APPROVED, or the
-   *   peer-link session isn't currently live (orphaned,
-   *   unreachable, mid-reconnect).
-   * - UNAVAILABLE: ack timeout, or the session died
-   *   mid-flow.
-   *
-   * On accepted: false the receiver actively rejected the
-   * job (queue full, manifest unsupported, hash mismatch);
-   * reason carries the structured rejection code.
-   *
-   * Phase 5c-3 backend, 5c-4 frontend.
-   */
-  async submitRemoteBuildJob(args: {
-    pin_sha256: string;
-    configuration: string;
-    target: RemoteBuildSubmitTarget;
-  }): Promise<{ job_id: string; accepted: boolean; reason?: string }> {
-    return this.sendCommand<{
-      job_id: string;
-      accepted: boolean;
-      reason?: string;
-    }>("remote_build/submit_job", args);
-  }
-
-  /**
-   * Send a cooperative cancel for a remote build job (phase 5d).
-   *
-   * Routes through ``remote_build/cancel_job`` to the paired
-   * receiver behind *pin_sha256*; the receiver maps *job_id*
-   * (the offloader-local id ``submitRemoteBuildJob`` returned)
-   * back to its local ``FirmwareJob`` and dispatches the same
-   * cancel primitive an operator-driven cancel uses.
-   *
-   * Fire-and-forget on the wire — the resolved payload's
-   * ``sent`` flag reflects whether the cancel frame made it
-   * onto the peer-link wire (Noise encrypt + WS send
-   * succeeded), not whether the receiver acted on it. A
-   * ``sent: false`` resolve means a same-tick channel failure
-   * on the offloader side; the cancel never reached the
-   * receiver and the caller should treat it as an error.
-   * The actual cancel confirmation rides the existing
-   * ``OFFLOADER_JOB_STATE_CHANGED`` event stream as a
-   * ``status: "cancelled"`` transition, so callers should
-   * watch ``buildOffloadJobsContext`` for the terminal flip
-   * rather than treating ``sent: true`` as completion.
-   *
-   * Errors:
-   * - INVALID_ARGS: bad pin or empty job_id.
-   * - NOT_FOUND: no pairing for the given pin.
-   * - PRECONDITION_FAILED: pairing isn't APPROVED, or the
-   *   peer-link session isn't currently live.
-   */
-  async cancelRemoteBuildJob(args: {
-    pin_sha256: string;
-    job_id: string;
-  }): Promise<{ sent: boolean }> {
-    return this.sendCommand<{ sent: boolean }>("remote_build/cancel_job", args);
   }
 
   /**

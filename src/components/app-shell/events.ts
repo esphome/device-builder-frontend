@@ -11,7 +11,6 @@ import type {
 import { DeviceEventType } from "../../api/types/event-subscription.js";
 import type {
   OffloaderIncludeLocalChangedEventData,
-  OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
   OffloaderPairingAddedEventData,
@@ -427,17 +426,6 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         ...base,
         status: evt.status,
         error_message: evt.error_message,
-      });
-      break;
-    }
-    case DeviceEventType.OFFLOADER_JOB_OUTPUT: {
-      const evt = data as OffloaderJobOutputEventData;
-      const base =
-        host._buildOffloadJobs.get(evt.job_id) ??
-        stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
-      host._buildOffloadJobs = new Map(host._buildOffloadJobs).set(evt.job_id, {
-        ...base,
-        output: [...base.output, evt.line],
       });
       break;
     }
