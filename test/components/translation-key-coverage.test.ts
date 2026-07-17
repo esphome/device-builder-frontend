@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VersionMatchPolicy } from "../../src/api/types/event-subscription.js";
-import { JobType } from "../../src/api/types/firmware-jobs.js";
+import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { CommandType } from "../../src/components/command-dialog.js";
 import enMessages from "../../src/translations/en.json";
 
@@ -22,29 +22,12 @@ describe("firmware job type translation keys", () => {
   });
 });
 
-describe("remote build job status translation keys", () => {
-  // <esphome-remote-build-job-dialog> renders `settings.remote_build_status_${job.status}`.
+describe("firmware job status translation keys", () => {
+  // <esphome-firmware-jobs-dialog> renders `firmware_jobs.status_${job.status}`.
   it.each(Object.values(JobStatus))("defines a label for the %s job status", (status) => {
-    const key = `remote_build_status_${status}`;
-    expect(settings[key], `missing en.json key "settings.${key}"`).toBeTruthy();
+    const key = `status_${status}`;
+    expect(firmwareJobs[key], `missing en.json key "firmware_jobs.${key}"`).toBeTruthy();
   });
-});
-
-describe("remote build submit target translation keys", () => {
-  // <esphome-remote-build-job-dialog> renders `settings.remote_build_submit_target_${job.target}`.
-  // Record pin: tsc fails if RemoteBuildSubmitTarget gains/loses a member.
-  const SUBMIT_TARGETS: Record<RemoteBuildSubmitTarget, true> = {
-    [JobType.COMPILE]: true,
-    [JobType.UPLOAD]: true,
-  };
-
-  it.each(Object.keys(SUBMIT_TARGETS))(
-    "defines a label for the %s submit target",
-    (target) => {
-      const key = `remote_build_submit_target_${target}`;
-      expect(settings[key], `missing en.json key "settings.${key}"`).toBeTruthy();
-    }
-  );
 });
 
 describe("command dialog translation keys", () => {
