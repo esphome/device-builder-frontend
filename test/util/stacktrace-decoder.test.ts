@@ -54,8 +54,16 @@ beforeEach(() => {
   vi.useFakeTimers();
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.useRealTimers();
+  // Give the frame's navigation a moment to settle before the global afterEach
+  // wipes the body. happy-dom navigates on its own schedule and then reaches
+  // into a window the teardown has already dropped, which throws deep in its
+  // internals. Cosmetic only: the assertions pass either way, and the fake
+  // timers mean a test can retire a frame while its real navigation is still in
+  // flight, so this is best-effort noise suppression rather than a fix. If the
+  // stack traces come back on a loaded machine, that is all that has happened.
+  await new Promise((resolve) => setTimeout(resolve, 25));
   vi.restoreAllMocks();
 });
 
