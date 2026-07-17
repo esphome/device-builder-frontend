@@ -53,3 +53,22 @@ export type EsphomeWebHint = "logs" | "install" | "wizard";
 export function esphomeWebUrl(hint?: EsphomeWebHint): string {
   return hint ? `${FLASHER_URL}?dashboard_${hint}` : FLASHER_URL;
 }
+
+/**
+ * Hosted crash-backtrace decoder, framed and handed an ELF over postMessage.
+ *
+ * Exists because a remote-built device has no CMake build tree locally, and
+ * native ESP-IDF resolves addr2line only through that tree's cache, so the
+ * backend can't decode it. The page runs esp-stacktrace-decoder's wasm and is
+ * served with a CSP that permits no network egress, so the firmware stays in
+ * the browser.
+ *
+ * Optional by design: unreachable (offline, GitHub down) means no decode, never
+ * a broken log. If this URL moves, the old host has to keep serving until the
+ * dashboards that shipped with it baked in have aged out.
+ */
+export const DECODER_URL =
+  "https://esphome.github.io/device-builder/esp-stacktrace-decoder/";
+// Derived so the postMessage targetOrigin / inbound-frame check can't drift
+// from DECODER_URL.
+export const DECODER_ORIGIN = new URL(DECODER_URL).origin;

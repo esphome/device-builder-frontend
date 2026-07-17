@@ -110,6 +110,9 @@ export class ESPHomeCrashReportDialog extends LitElement {
 
   private _configuration = "";
   private _name = "";
+  // The log viewer's decode is what knows the build was stale; read only when
+  // the report is built on click, so it drives no render.
+  private _staleBuild = false;
   // The rendered report backing the delivered-state re-copy / download.
   private _reportText = "";
   private _issueUrl = "";
@@ -220,7 +223,12 @@ export class ESPHomeCrashReportDialog extends LitElement {
   ];
 
   /** Open with a snapshot of the logs dialog's buffer. */
-  public open(configuration: string, name: string, lines: string[]): void {
+  public open(
+    configuration: string,
+    name: string,
+    lines: string[],
+    staleBuild = false
+  ): void {
     this._stopValidateStream();
     this._configuration = configuration;
     this._name = name;
@@ -232,6 +240,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
     this._reportText = "";
     this._issueUrl = "";
     this._scrape = scrapeCrashData(lines);
+    this._staleBuild = staleBuild;
     this._dialog.open = true;
     this._captureConfig(this._session);
   }
@@ -290,6 +299,7 @@ export class ESPHomeCrashReportDialog extends LitElement {
       scrape: this._scrape,
       configYaml: this._configYaml ?? "",
       userDescription: this._userDescription.trim(),
+      staleBuild: this._staleBuild,
       meta: {
         deviceName: this._name,
         configuration: this._configuration,

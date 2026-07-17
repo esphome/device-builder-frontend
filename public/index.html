@@ -74,10 +74,24 @@
           all) leaves clickjacking unblocked; operators behind a
           reverse proxy can add their own frame-ancestors via
           response headers.
+        * frame-src names the crash-backtrace decoder, framed hidden
+          by util/stacktrace-decoder.ts when a device was built on a
+          remote server: the build tree never came with the firmware,
+          so nothing here can resolve addr2line, and the ELF is handed
+          to that page over postMessage instead. Named explicitly
+          because frame-src otherwise falls back through child-src to
+          default-src 'self', which blocks it. Scoped to the decoder's
+          path, not the origin, so the grant is the one page rather
+          than everything else published under esphome.github.io. It
+          is a decoder, not an upload: the page itself ships
+          connect-src 'self', so the firmware cannot leave the
+          browser. Failures gracefully degrade to no decode -
+          util/crash-decode.ts treats every error path as null and the
+          raw dump stays readable.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ws: wss: data: https://schema.esphome.io; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ws: wss: data: https://schema.esphome.io; frame-src https://esphome.github.io/device-builder/esp-stacktrace-decoder/; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>ESPHome Device Builder</title>
     <!-- Backend rewrites ``__ESPHOME_BASE_HREF__`` per-request to

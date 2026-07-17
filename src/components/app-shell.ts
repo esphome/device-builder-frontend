@@ -6,8 +6,7 @@ import { ESPHomeAPI } from "../api/index.js";
 import type { IntegrationDoc } from "../api/types/components.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
 import type { VersionMatchPolicy } from "../api/types/event-subscription.js";
-import type { FirmwareJob, RemoteBuildSubmitTarget } from "../api/types/firmware-jobs.js";
-import { JobStatus } from "../api/types/firmware-jobs.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { ServerInfoMessage } from "../api/types/protocol.js";
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
 import type {
@@ -86,8 +85,6 @@ import { createRouter } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
-  onRemoteBuildJobDismissed,
-  onRemoteBuildJobSubmitted,
   onSetExpertMode,
   onSetLanguage,
   onSetOffloaderIncludeLocal,
@@ -506,43 +503,6 @@ export class ESPHomeApp extends LitElement {
     this._onboardingDialog?.open();
   };
 
-  // Stamp display fields (configuration / target / receiver_label) on the
-  // in-flight remote-build job map after submit ack returns. Wire events
-  // don't carry these, so without this the progress dialog renders empty.
-  // Preserves any output / status a racing event already stamped.
-  registerRemoteBuildJob(seed: {
-    job_id: string;
-    pin_sha256: string;
-    receiver_label: string;
-    configuration: string;
-    target: RemoteBuildSubmitTarget;
-  }): void {
-    const next = new Map(this._buildOffloadJobs);
-    const existing = next.get(seed.job_id);
-    next.set(seed.job_id, {
-      job_id: seed.job_id,
-      pin_sha256: seed.pin_sha256,
-      receiver_label: seed.receiver_label,
-      configuration: seed.configuration,
-      target: seed.target,
-      status: existing?.status ?? JobStatus.QUEUED,
-      error_message: existing?.error_message ?? "",
-      output: existing?.output ?? [],
-      // || not ?? — stubRemoteBuildJobState seeds 0 as the "unset" sentinel;
-      // any existing>0 wins (entry stamped on a previous submit), 0 from a
-      // stub gets replaced so sorters reliably pick the newest.
-      started_at: existing?.started_at || Date.now(),
-    });
-    this._buildOffloadJobs = next;
-  }
-
-  dismissRemoteBuildJob(job_id: string): void {
-    if (!this._buildOffloadJobs.has(job_id)) return;
-    const next = new Map(this._buildOffloadJobs);
-    next.delete(job_id);
-    this._buildOffloadJobs = next;
-  }
-
   protected render() {
     if (this._authState === "connecting") {
       return html`
@@ -623,15 +583,6 @@ export class ESPHomeApp extends LitElement {
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @pair-request-sent=${(e: CustomEvent<{ summary: PairingSummary }>) =>
           onPairRequestSent(this, e)}
-        @remote-build-job-submitted=${(
-          e: CustomEvent<Parameters<typeof onRemoteBuildJobSubmitted>[1]["detail"]>
-        ) =>
-          onRemoteBuildJobSubmitted(
-            this,
-            e as Parameters<typeof onRemoteBuildJobSubmitted>[1]
-          )}
-        @remote-build-job-dismissed=${(e: CustomEvent<{ job_id: string }>) =>
-          onRemoteBuildJobDismissed(this, e)}
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${() => onFirmwareHistoryCleared(this)}

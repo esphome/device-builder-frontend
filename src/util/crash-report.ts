@@ -1,4 +1,18 @@
-import { isCrashMarker } from "./crash-detector.js";
+import { STALE_BUILD_LOG_LINE, STALE_BUILD_NOTE } from "./crash-decode.js";
+import {
+  ADDRESS_RE,
+  CRASH_END_RE,
+  DECODED_RE,
+  MAX_LINES_AFTER_MARKER,
+  isCrashMarker,
+} from "./crash-detector.js";
+import {
+  TRIM_MARKER,
+  encodedCost,
+  fitLines,
+  formEncodedLength,
+  takeLinesUnderBudget,
+} from "./crash-report-budget.js";
 import { normalizeLogLine, parseLogLine, tagged } from "./log-line.js";
 import { isCliLogLine } from "./validation-log.js";
 
@@ -9,13 +23,9 @@ import { isCliLogLine } from "./validation-log.js";
  * GitHub issue URL against esphome/esphome's bug-report form.
  */
 
-// Context kept ahead of the first crash marker, and the hard cap on how
-// far past it the excerpt extends when no explicit end marker arrives.
+// Context kept ahead of the first crash marker. How far past it the window
+// runs, and where it closes, are the shared crash grammar.
 const CONTEXT_LINES_BEFORE = 25;
-const MAX_LINES_AFTER_MARKER = 60;
-
-// Terminators of a crash dump — the excerpt window closes here.
-const CRASH_END_RE = /<<<stack<<<|^ELF file SHA256:|^Rebooting\.\.\./;
 
 // Total pre-filled URL budget. GitHub's server returns 414 past roughly
 // 8 KB of URL; 8000 keeps a small margin for their redirect/query
@@ -29,9 +39,7 @@ const MAX_PROBLEM_FRAMES = 40;
 const ISSUE_URL_BASE =
   "https://github.com/esphome/esphome/issues/new?template=bug_report.yml";
 
-// esphome logs' inline decoder emits `WARNING Decoded 0x...: func at
-// file:line`, with ` (inlined by) ...` continuation lines for inlined frames.
-const DECODED_RE = /^(?:WARNING )?Decoded (0x[0-9a-fA-F]{8}.*)$/;
+// ` (inlined by) ...` continuation lines follow a decoded frame.
 const DECODED_CONTINUATION_RE = /^\s*\(inlined by\)/;
 
 // Lines that merely echo the backtrace the `problem` field already
@@ -46,12 +54,18 @@ const DECODE_ECHO_RES = [
 ];
 
 const isDecodeEcho = (line: string): boolean =>
-  DECODE_ECHO_RES.some((re) => re.test(line));
+  // The stale-build caveat crash-decode injects next to the frames is
+  // compared whole: the report captions it in `problem`, and matching a
+  // substring of the prose would drop any log line that quoted it.
+  line === STALE_BUILD_LOG_LINE || DECODE_ECHO_RES.some((re) => re.test(line));
 
-// A line that carries crash payload past the marker: any 8-hex-digit
-// address (registers, stack dumps, backtrace continuations) or a
-// decoded frame.
-const CRASH_RELATED_RE = /(?:0x)?[0-9a-fA-F]{8}(?::|\b)|Decoded 0x/;
+// A line that carries crash payload past the marker: an address, a decoded
+// frame naming one, or a continuation of that frame. The continuation names
+// no address of its own, so without it a dump that ends before its terminator
+// loses the inlined frames off the end of the excerpt.
+const CRASH_RELATED_RE = new RegExp(
+  `${ADDRESS_RE.source}|Decoded 0x|${DECODED_CONTINUATION_RE.source}`
+);
 
 // `target_platform` → the bug form's platform dropdown values. ESP32 is a
 // prefix match (variants like ESP32S3 report as ESP32).
@@ -144,7 +158,13 @@ function extractCrashExcerpt(lines: string[]): { lines: string[]; crashIndex: nu
   return { lines: lines.slice(from, end + 1), crashIndex: start - from };
 }
 
-function extractDecodedFrames(excerpt: string[]): string[] {
+/** Pull `0x...: func at file:line` frames out of decoder output.
+ *
+ * Runs over inline decoder output scraped from the log buffer, and over
+ * the backend decoder's reply in crash-decode — both are the same text,
+ * so both fold inlined-frame continuations the same way.
+ */
+export function extractDecodedFrames(excerpt: string[]): string[] {
   const frames: string[] = [];
   let inFrame = false;
   for (const line of excerpt) {
@@ -211,6 +231,11 @@ export interface CrashReport {
   configYaml: string;
   /** The user's own account of what the device was doing when it crashed. */
   userDescription: string;
+  /** The frames were decoded against a build that no longer matches the
+   *  running firmware, so they name the wrong lines. The log viewer's decode
+   *  is what knows; scraping it back out of its own warning line would make
+   *  report copy load-bearing. */
+  staleBuild?: boolean;
 }
 
 // Every platform component that can appear in `loaded_integrations`;
@@ -265,11 +290,14 @@ export function buildFullReport(report: CrashReport): string {
   sections.push("## Decoded backtrace");
   if (scrape.decodedFrames.length > 0) {
     sections.push(fence(scrape.decodedFrames));
+    if (report.staleBuild) {
+      sections.push(STALE_BUILD_NOTE);
+    }
   } else if (scrape.crashFound) {
-    sections.push(
-      "The backtrace was not decoded in this log session (captured over " +
-        "Web Serial, or decoding was unavailable). Raw crash output is below."
-    );
+    // Deliberately states no cause: this branch covers a crash with no
+    // decodable addresses, a device with no local build, a platform with no
+    // decoder, and a decoder that failed, and the report can't tell which.
+    sections.push("The backtrace was not decoded. Raw crash output is below.");
   } else {
     sections.push(
       "The crash scrolled out of the log buffer before the report was created."
@@ -367,7 +395,9 @@ export function buildIssueUrl(report: CrashReport): IssueUrl {
   // `problem` is set first but still bounded: a long description and/or
   // many long decoded frames could blow the budget before logs/config
   // trim. Drop trailing frames (then hard-truncate) until it fits.
-  if (fitProblem(url, params, head, scrape.decodedFrames)) missing = true;
+  if (fitProblem(url, params, head, scrape.decodedFrames, report.staleBuild ?? false)) {
+    missing = true;
+  }
 
   // The crash logs get first claim on the budget: they're a one-time
   // capture, whereas the config can always be re-obtained from the YAML
@@ -461,12 +491,18 @@ function fitProblem(
   url: URL,
   params: URLSearchParams,
   head: string[],
-  frames: string[]
+  frames: string[],
+  staleBuild: boolean
 ): boolean {
   let used = Math.min(frames.length, MAX_PROBLEM_FRAMES);
   let dropped = frames.length > used;
+  // The prefilled issue is the channel a maintainer actually reads, so the
+  // stale-build caption has to ride with the frames here, not only in the
+  // downloadable report. Only meaningful when a frame is actually shown.
+  const caption = staleBuild && used > 0 ? [STALE_BUILD_NOTE] : [];
   for (;;) {
-    const body = used > 0 ? ["", "Decoded backtrace:", ...frames.slice(0, used)] : [];
+    const body =
+      used > 0 ? ["", "Decoded backtrace:", ...caption, ...frames.slice(0, used)] : [];
     const note =
       frames.length > used
         ? ["", `(+${frames.length - used} more frames in the report)`]
@@ -516,77 +552,4 @@ function excerptWithoutDecodeEchoes(
     lines.push(excerpt[i]);
   }
   return { lines, anchor: Math.min(anchor, Math.max(0, lines.length - 1)) };
-}
-
-const TRIM_MARKER = "[log excerpt trimmed; full logs in the attached report]";
-
-// Encoded length of *s* the way the prefilled URL actually serializes it:
-// URLSearchParams uses application/x-www-form-urlencoded, which differs
-// from encodeURIComponent for `! ~ ' ( )` (3 chars vs 1) — and ESPHome
-// backtraces are full of parens, so encodeURIComponent under-counts and
-// can produce a >8000-char URL (414). Measuring via URLSearchParams is
-// exact; the trailing "v=" (2 chars) is subtracted off.
-const formEncodedLength = (s: string): number =>
-  new URLSearchParams({ v: s }).toString().length - 2;
-
-const encodedCost = (line: string): number => formEncodedLength(`${line}\n`);
-
-/**
- * Greedily take the longest prefix of *lines* whose per-line
- * `encodedCost` fits `budget - spent`. Returns the kept prefix, the
- * running spend, and whether any line was dropped.
- */
-function takeLinesUnderBudget(
-  lines: string[],
-  budget: number,
-  spent: number
-): { kept: string[]; spent: number; truncated: boolean } {
-  const kept: string[] = [];
-  for (const line of lines) {
-    const cost = encodedCost(line);
-    if (spent + cost > budget) return { kept, spent, truncated: true };
-    kept.push(line);
-    spent += cost;
-  }
-  return { kept, spent, truncated: false };
-}
-
-/**
- * Join as much of *lines* as fits *budget* once URL-encoded: the block
- * from *anchor* to the end first (truncating its tail if even that
- * overflows), then context lines walking backwards from the anchor.
- *
- * Two passes: the first spends the whole budget on content; only when
- * that truncates does the second re-fit with the trim marker's cost
- * reserved, so the marker never pushes the result past the budget and
- * an untrimmed excerpt never sacrifices content to an unused reserve.
- */
-function fitLines(lines: string[], anchor: number, budget: number): string {
-  if (lines.length === 0 || budget <= 0) return "";
-  let fit = fitWithReserve(lines, anchor, budget, 0);
-  if (fit.truncated) {
-    fit = fitWithReserve(lines, anchor, budget, encodedCost(TRIM_MARKER));
-    fit.kept.push(TRIM_MARKER);
-  }
-  return fit.kept.length > (fit.truncated ? 1 : 0) ? fit.kept.join("\n") : "";
-}
-
-// Fit forward from *anchor* to the end, then walk backward over the
-// preceding context, sharing one budget and marker reserve.
-function fitWithReserve(
-  lines: string[],
-  anchor: number,
-  budget: number,
-  reserve: number
-): { kept: string[]; truncated: boolean } {
-  const forward = takeLinesUnderBudget(lines.slice(anchor), budget, reserve);
-  const back = takeLinesUnderBudget(
-    lines.slice(0, anchor).reverse(),
-    budget,
-    forward.spent
-  );
-  return {
-    kept: [...back.kept.reverse(), ...forward.kept],
-    truncated: forward.truncated || back.truncated,
-  };
 }

@@ -80,6 +80,17 @@ describe("LineBatcher", () => {
     expect(lines).toEqual(["a", "b", "c"]);
   });
 
+  it("buffers nothing at a maxLines of 0, rather than trimming by a negative zero", () => {
+    // slice(-0) is slice(0), which keeps everything: the trim would run on
+    // every push and drop nothing, so a hidden tab would buffer without bound.
+    withManualRaf();
+    const append = vi.fn();
+    const batcher = new LineBatcher(append, { maxLines: 0 });
+    for (let i = 0; i < 500; i++) batcher.enqueue(String(i));
+    batcher.flush();
+    expect(append).not.toHaveBeenCalled();
+  });
+
   it("maxLines bounds the pending buffer when frames never fire (hidden tab)", () => {
     const raf = withManualRaf();
     const append = vi.fn();

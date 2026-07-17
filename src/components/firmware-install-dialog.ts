@@ -29,7 +29,7 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
-import { LineBatcher } from "../util/line-batcher.js";
+import { LogBuffer } from "../util/log-buffer.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import type { DetectedChip } from "../util/web-serial.js";
@@ -140,7 +140,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _jobSourceLabel = "";
   @state() _jobSourcePin = "";
 
-  @state() _logLines: string[] = [];
   @state() _logsExpanded = false;
   @state() _flashPercent = 0;
   @state() _downloadedFilename = "";
@@ -161,11 +160,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _jobId = "";
   _streamId = "";
 
-  // rAF batch buffer for streamed output — coalesce per-line writes into
-  // one render per frame instead of one per line (#1203).
-  private _lineBatch = new LineBatcher((batch) => {
-    this._logLines = [...this._logLines, ...batch];
-  });
+  // The streamed output, batched into one render per frame instead of one
+  // per line (#1203). Uncapped: an install log is finite and the user reads
+  // back through it after a failure.
+  _log = new LogBuffer(this);
 
   // Build compile clocks — drives the compiling-step elapsed readout + the
   // offload hint. The step-based runEnded backstop freezes the span when the
@@ -265,7 +263,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     // Dispose any prior stream before resetting state. _init re-runs on every
     // installWebSerial including reopens after the user dismissed the previous
     // run (which only flips _open) — without this teardown, a still-attached
-    // followJob from the prior compile would push lines into _logLines.
+    // followJob from the prior compile would push lines into the buffer.
     this._detachStream();
     this._device = device;
     this._open = true;
@@ -275,8 +273,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     });
     this._statusMessage = "";
     this._errorMessage = "";
-    this._lineBatch.reset();
-    this._logLines = [];
+    this._log.reset();
     this._logsExpanded = false;
     this._flashPercent = 0;
     this._downloadedFilename = "";
@@ -302,7 +299,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // then the job is released to finish in the background queue.
   _detachStream({ cancelJob = true }: { cancelJob?: boolean } = {}) {
     // Land any buffered lines before teardown so nothing streamed is lost.
-    this._flushLogLines();
+    this._log.flush();
     // Tear down an in-flight USB-flasher hand-off (message listener + timers)
     // too, so closing or reusing the dialog can't leak it or let a stale
     // flasher tab mutate the next install's state. Pure teardown, no _fail.
@@ -353,22 +350,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // when empty so a single-string call doesn't paint the same text twice.
   _fail(title: string, detail = "") {
     // The expanded log must show every line up to the failure, not race the rAF.
-    this._flushLogLines();
+    this._log.flush();
     this._step = "error";
     this._statusMessage = title;
     this._errorMessage = detail;
     this._logsExpanded = true;
-  }
-
-  // Buffer a streamed line; flushed on the next animation frame.
-  _enqueueLogLine(line: string): void {
-    this._lineBatch.enqueue(line);
-  }
-
-  // Drain pending lines into ``_logLines`` now — terminal callbacks and
-  // teardown call this so consumers don't race the rAF.
-  _flushLogLines(): void {
-    this._lineBatch.flush();
   }
 
   // Close + navigate to /device/<configuration>. Same payload shape as
@@ -440,7 +426,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       this._errorMessage = "";
       // Drop the failed run's log and clocks so the wait streams only the
       // foreign build, not the old failure's lines or elapsed time.
-      this._logLines = [];
+      this._log.reset();
       this._timer.reset();
       this._statusMessage = this._localize("firmware.status_waiting_build");
       const settled = await waitForRunningJob(

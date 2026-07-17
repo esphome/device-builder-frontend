@@ -343,7 +343,7 @@ export function renderToolbar(host: ESPHomeCommandDialog): TemplateResult {
   return html`
     ${renderShowSecretsToggle(host)} ${renderShowLogsAfterInstallToggle(host)}
     ${
-      host._lines.length > 0
+      host._log.lines.length > 0
         ? renderTermButton({
             icon: "download",
             title: host._localize("command.download"),

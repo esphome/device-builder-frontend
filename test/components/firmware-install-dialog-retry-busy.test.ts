@@ -21,6 +21,14 @@ import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { identityLocalize } from "../_dom.js";
+import { fakeLogBuffer } from "../_fake-host.js";
+
+// The log as the failed run left it, so Retry has something to drop.
+const failedRunLog = () => {
+  const log = fakeLogBuffer();
+  log.append(["old failure line"]);
+  return log;
+};
 
 type FollowCbs = {
   onResult?: (d: unknown) => void;
@@ -39,7 +47,7 @@ function makeDialog(busy: boolean) {
     _device: { configuration: "device.yaml" } as ConfiguredDevice,
     _installer: "web-serial",
     _step: "error",
-    _logLines: ["old failure line"],
+    _log: failedRunLog(),
     _localize: identityLocalize,
     _activeJobs: busy ? new Map([["device.yaml", runningJob]]) : new Map(),
     _api: { firmwareFollowJob: followJob },
@@ -60,7 +68,7 @@ describe("install-dialog Retry while a foreign build runs", () => {
     // Never claims the foreign job: dismissal must not cancel it.
     expect(dialog._jobId).toBe("");
     // The failed run's log was dropped, not concatenated with the wait's.
-    expect(dialog._logLines).not.toContain("old failure line");
+    expect(dialog._log.lines).not.toContain("old failure line");
   });
 
   it("resets the compile clocks before streaming the foreign build", async () => {

@@ -69,7 +69,7 @@ export async function startWebSerialInstall(
   // install showed no esptool logs at all, unlike the OTA / server-serial
   // paths which stream the backend job output (#346).
   const onLog = (line: string) => {
-    host._enqueueLogLine(line);
+    host._log.enqueue(line);
   };
 
   // 1. Connect and detect chip
@@ -571,12 +571,12 @@ export function waitForRunningJob(
       onOutput: (line) => {
         if (host._step === "queued") host._step = "compiling";
         host._timer.noteLine(line);
-        host._enqueueLogLine(line);
+        host._log.enqueue(line);
       },
       onResult: () => {
         host._streamId = "";
         host._compileReject = null;
-        host._flushLogLines();
+        host._log.flush();
         resolve(true);
       },
       onError: () => {
@@ -614,14 +614,14 @@ export function compileAndWait(
             host._statusMessage = host._localize("firmware.status_compiling");
           }
           host._timer.noteLine(line);
-          host._enqueueLogLine(line);
+          host._log.enqueue(line);
           if (isValidationFailureLine(line)) host._failedDuringValidate = true;
         },
         onResult: (data) => {
           host._streamId = "";
           host._jobId = "";
           host._compileReject = null;
-          host._flushLogLines();
+          host._log.flush();
           const result = data as unknown as {
             status: string;
             error?: string | null;

@@ -4,7 +4,7 @@
  * Part of the src/api/types.ts barrel split.
  */
 import type { VersionMatchPolicy } from "./event-subscription.js";
-import { JobStatus, JobStream } from "./firmware-jobs.js";
+import { JobStatus } from "./firmware-jobs.js";
 import type {
   PairingSummary,
   PairingWindowState,
@@ -282,27 +282,6 @@ export interface OffloaderJobStateChangedEventData {
   job_id: string;
   status: JobStatus;
   error_message: string;
-}
-
-/**
- * Data payload for offloader_job_output.
- *
- * Fired per inbound job_output frame. line preserves its
- * trailing terminator (\n / \r / \r\n) so the existing
- * ansi-log renderer's carriage-return-overwrite contract
- * works byte-identical to local JOB_OUTPUT events.
- *
- * High-rate path during an active build (one frame per line
- * of compiler / linker output). Subscribers should batch
- * downstream rendering rather than re-render per event.
- */
-export interface OffloaderJobOutputEventData {
-  receiver_hostname: string;
-  receiver_port: number;
-  pin_sha256: string;
-  job_id: string;
-  stream: JobStream;
-  line: string;
 }
 
 /**

@@ -96,6 +96,19 @@ describe("scrapeCrashData", () => {
     ]);
   });
 
+  it("keeps inlined frames trailing a dump that never terminated", () => {
+    const scraped = scrapeCrashData([
+      "Guru Meditation Error: crash",
+      "Backtrace: 0x400d1a2c:0x3ffc3f40",
+      "WARNING Decoded 0x400d1a2c: loop() at main.cpp:42",
+      " (inlined by) tick() at main.cpp:11",
+    ]);
+
+    // A continuation names no address of its own, so nothing else holds the
+    // excerpt open past the frame above it when no Rebooting line arrives.
+    expect(scraped.decodedFrames[0]).toContain("(inlined by) tick() at main.cpp:11");
+  });
+
   it("reports a crash that scrolled out of the buffer", () => {
     const scrolled = scrapeCrashData(FILLER);
     expect(scrolled.crashFound).toBe(false);
@@ -156,6 +169,35 @@ describe("issuePlatform / inferComponentName", () => {
 });
 
 describe("buildFullReport", () => {
+  it("captions a backend decode made against a build that has since changed", () => {
+    // The frames look authoritative but name the wrong lines; a reader of the
+    // issue has no other way to tell.
+    const text = buildFullReport(report({ staleBuild: true }));
+
+    expect(text).toContain("no longer matches the firmware");
+  });
+
+  it("does not caption a decode made against the matching build", () => {
+    expect(buildFullReport(report())).not.toContain("no longer matches the firmware");
+  });
+
+  it("reports an undecoded backtrace without guessing why", () => {
+    // No frames covers "no addresses to decode", "never compiled here",
+    // "platform has no decoder" and "the decoder failed"; the report can't
+    // tell which, so it must not name one.
+    const undecoded = scrapeCrashData([
+      "Guru Meditation Error: crash",
+      "Backtrace: 0x400d9150:0x3ffb4f60",
+      "Rebooting...",
+    ]);
+    const text = buildFullReport(report({ scrape: undecoded }));
+
+    expect(undecoded.decodedFrames).toEqual([]);
+    expect(text).toContain("The backtrace was not decoded.");
+    expect(text).not.toContain("no local build");
+    expect(text).not.toContain("no decoder");
+  });
+
   it("leads with the user's context, then the decoded backtrace", () => {
     const text = buildFullReport(report());
     const order = [
@@ -228,6 +270,20 @@ describe("buildIssueUrl", () => {
 
   it("reports complete when everything fit", () => {
     expect(buildIssueUrl(report()).complete).toBe(true);
+  });
+
+  it("captions a stale build in problem, where the maintainer reads the frames", () => {
+    // The prefilled issue is the delivery channel; a warning only in the
+    // downloadable report would miss the frames a maintainer actually sees.
+    const p = params(report({ staleBuild: true }));
+    expect(p.get("problem")).toContain("Decoded backtrace:");
+    expect(p.get("problem")).toContain("no longer matches the firmware");
+  });
+
+  it("does not caption a fresh build", () => {
+    expect(params(report()).get("problem")).not.toContain(
+      "no longer matches the firmware"
+    );
   });
 
   it("fences the description in problem so a backtick run can't hide the trace", () => {
