@@ -45,7 +45,7 @@ describe("logs-dialog inline backtrace decode", () => {
   });
 
   const flush = async () => {
-    await (el as any)._decodeChain;
+    await (el as any)._crashDecode._chain;
     await el.updateComplete;
   };
 
@@ -168,6 +168,78 @@ describe("logs-dialog inline backtrace decode", () => {
     ).toHaveLength(2);
   });
 
+  it("splices correctly after the cap dropped lines off the front", async () => {
+    // Overflow the 5000-line cap while the decode is in flight, so the region
+    // sits at a lower index by the time the frames come back than it did when
+    // it was collected. A crash loop on a chatty device is exactly this.
+    let land: (v: unknown) => void = () => {};
+    let started: () => void = () => {};
+    const inFlight = new Promise<void>((resolve) => (started = resolve));
+    decodeBacktrace.mockImplementationOnce(async () => {
+      started();
+      await new Promise((resolve) => (land = resolve));
+      return {
+        decoded: [{ index: 2, text: "Decoded 0x400d1a2c: loop() at main.cpp:42" }],
+        stale_build: false,
+        unavailable_reason: "",
+      };
+    });
+
+    append(
+      el,
+      Array.from({ length: 4900 }, (_, i) => `[12:00:00]before ${i}`)
+    );
+    append(el, CRASH);
+    await inFlight;
+    // Enough to push the cap and drop lines from the front, but not so much
+    // that the crash itself scrolls out — it must still be there to decorate.
+    append(
+      el,
+      Array.from({ length: 200 }, (_, i) => `[12:00:03]after ${i}`)
+    );
+    land(null);
+    await flush();
+
+    const plain = lines(el).map(stripAnsi);
+    const at = plain.indexOf("WARNING Decoded 0x400d1a2c: loop() at main.cpp:42");
+    expect(at).toBeGreaterThan(-1);
+    // Still under the Backtrace line that produced it, not at the stale index.
+    expect(plain[at - 1]).toContain("Backtrace:");
+  });
+
+  it("refuses to decorate a region the index no longer points at", async () => {
+    // Fault injection: the index shift is correct in practice, so the only way
+    // to reach the verify is to corrupt it. A crash loop repeats one dump with
+    // the same marker and terminator, so the ends match at the wrong region
+    // too — only the middle proves the position is stale.
+    let land: (v: unknown) => void = () => {};
+    let started: () => void = () => {};
+    const inFlight = new Promise<void>((resolve) => (started = resolve));
+    decodeBacktrace.mockImplementationOnce(async () => {
+      started();
+      await new Promise((resolve) => (land = resolve));
+      return {
+        decoded: [{ index: 1, text: "Decoded 0x400d1111: first() at a.cpp:1" }],
+        stale_build: false,
+        unavailable_reason: "",
+      };
+    });
+
+    append(el, ["Guru Meditation Error: crash", "PC: 0x400d1111", "Rebooting..."]);
+    await inFlight;
+    append(el, ["Guru Meditation Error: crash", "PC: 0x400d2222", "Rebooting..."]);
+    // Point the first region's splice at the second one.
+    (el as any)._crashDecode._indexShift = 3;
+    land(null);
+    await flush();
+
+    // The frames name the first crash's addresses; landing them under the
+    // second would attribute one crash's decode to another.
+    expect(lines(el).map(stripAnsi)).not.toContain(
+      "WARNING Decoded 0x400d1111: first() at a.cpp:1"
+    );
+  });
+
   it("hands the stale-build verdict to the report as a value", async () => {
     decodeBacktrace.mockResolvedValue({
       decoded: [{ index: 2, text: "Decoded 0x400d1a2c: loop()" }],
@@ -184,6 +256,37 @@ describe("logs-dialog inline backtrace decode", () => {
     // Not re-read out of the warning line it injected: that would make report
     // copy load-bearing data.
     expect(open.mock.calls[0]![3]).toBe(true);
+  });
+
+  it("does not let a decode in flight at reset seed the next session", async () => {
+    let land: (v: unknown) => void = () => {};
+    let started: () => void = () => {};
+    const inFlight = new Promise<void>((resolve) => (started = resolve));
+    decodeBacktrace.mockImplementationOnce(async () => {
+      started();
+      await new Promise((resolve) => (land = resolve));
+      return {
+        decoded: [{ index: 2, text: "Decoded 0x400d1a2c: stale() at old.cpp:1" }],
+        stale_build: false,
+        unavailable_reason: "",
+      };
+    });
+
+    append(el, CRASH);
+    // Reset only once the decode is genuinely in flight, so it is holding the
+    // cache it was handed across the reset rather than racing to reach it.
+    await inFlight;
+    (el as any)._crashDecode.reset();
+    land(null);
+    await flush();
+
+    // The reset stands for a reflash: the same addresses now mean different
+    // lines, so the pre-reflash decode must not answer for the new firmware.
+    append(el, CRASH);
+    await flush();
+    expect(lines(el).map(stripAnsi)).not.toContain(
+      "WARNING Decoded 0x400d1a2c: stale() at old.cpp:1"
+    );
   });
 
   it("drops a decode that lands after the buffer was cleared", async () => {

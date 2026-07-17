@@ -75,17 +75,3 @@ export function classifyLine(normalized: string): CrashKind | null {
   }
   return kind;
 }
-
-/**
- * Classify a batch of raw (ANSI/timestamped) lines. "live" wins over
- * "previous-boot" when both appear; null when no marker matched.
- */
-export function detectCrashKind(lines: string[]): CrashKind | null {
-  let kind: CrashKind | null = null;
-  for (const line of lines) {
-    const lineKind = classifyLine(normalizeLogLine(line));
-    if (lineKind === "live") return "live";
-    if (lineKind) kind = lineKind;
-  }
-  return kind;
-}
