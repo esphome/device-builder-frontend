@@ -409,6 +409,46 @@ describe("decodeCrashRegion", () => {
       expect(await decodeCrashRegion(api, "c.yaml", region, cache)).toBeNull();
     });
 
+    it("attributes a frame by whole address token, not a hex substring", async () => {
+      // The address appears only inside a longer hex run (an ELF SHA line), never
+      // as a token. Matching by substring would misattribute the frame there; it
+      // must be dropped instead.
+      const api = fakeApi(remoteBuilt(), {
+        firmwareDownloadBytes: async () => new ArrayBuffer(8),
+      });
+      vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
+      vi.spyOn(hostedDecoder(), "decode").mockResolvedValue([
+        { address: 0x4201b6e0, function_name: "setup()", location: "a.cpp:1" },
+      ]);
+
+      const noToken = [
+        "Guru Meditation Error",
+        "ELF file SHA256: 0x4201b6e0abcdef1234567890",
+        "Rebooting...",
+      ];
+      expect(await decodeCrashRegion(api, "c.yaml", noToken, cache)).toBeNull();
+    });
+
+    it("attributes a frame to the line whose backtrace token carries its address", async () => {
+      const api = fakeApi(remoteBuilt(), {
+        firmwareDownloadBytes: async () => new ArrayBuffer(8),
+      });
+      vi.spyOn(hostedDecoder(), "available").mockResolvedValue(true);
+      vi.spyOn(hostedDecoder(), "decode").mockResolvedValue([
+        { address: 0x4201b6e0, function_name: "setup()", location: "a.cpp:1" },
+      ]);
+
+      const withToken = [
+        "Guru Meditation Error",
+        "Backtrace: 0x4201b6e0:0x3fca0000",
+        "Rebooting...",
+      ];
+      const decode = await decodeCrashRegion(api, "c.yaml", withToken, cache);
+      expect(decode?.decoded).toEqual([
+        { index: 1, text: "Decoded 0x4201b6e0: setup() at a.cpp:1" },
+      ]);
+    });
+
     it("refetches the ELF after a rebuild rather than decoding the old one", async () => {
       // The scenario this feature lives in: the user is watching a crash loop,
       // edits the config, rebuilds and installs, and it crashes again. The

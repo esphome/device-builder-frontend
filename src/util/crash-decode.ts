@@ -357,14 +357,22 @@ function framesToDecodedLines(
   frames: DecodedFrame[],
   lines: string[]
 ): DecodedBacktraceLine[] {
+  // The address values in each line, once. Compared by value, not substring:
+  // 4201b6e0 must not attach to a line where it only appears inside a longer
+  // hex run like 0x4201b6e0abcd. The lookbehind/lookahead pin it to a whole
+  // 8-digit token (optionally 0x-prefixed), the boundary ADDRESS_RE uses.
+  const addressesPerLine = lines.map((line) => {
+    const found = new Set<number>();
+    for (const m of line.matchAll(/(?<![0-9a-fx])(?:0x)?([0-9a-f]{8})(?![0-9a-f])/gi)) {
+      found.add(parseInt(m[1], 16));
+    }
+    return found;
+  });
   const decoded: DecodedBacktraceLine[] = [];
-  // Lowered once, not once per frame: the scan below is frames x lines.
-  const lower = lines.map((line) => line.toLowerCase());
   for (const frame of frames) {
-    // Addresses print as 8 hex digits, with or without the 0x, in either case.
-    const hex = frame.address.toString(16).padStart(8, "0");
-    const index = lower.findIndex((line) => line.includes(hex));
+    const index = addressesPerLine.findIndex((addrs) => addrs.has(frame.address));
     if (index === -1) continue;
+    const hex = frame.address.toString(16).padStart(8, "0");
     const location = frame.location ? ` at ${frame.location}` : "";
     // The wording esphome's own decoders log, so a Web Serial decode reads like
     // the OTA one the device's logger would have printed.
