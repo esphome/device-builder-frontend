@@ -7,6 +7,8 @@ const MSG_READY = "esphome-stacktrace-decode:ready";
 const MSG_REQUEST = "esphome-stacktrace-decode:request";
 const MSG_RESULT = "esphome-stacktrace-decode:result";
 const MSG_ERROR = "esphome-stacktrace-decode:error";
+// The page announcing, before any request, that it will never answer.
+const MSG_UNAVAILABLE = "esphome-stacktrace-decode:unavailable";
 
 // The wire protocol version this dashboard speaks. Bumped only for a breaking
 // change; additive fields/messages don't need it. Sent in the request frame and
@@ -119,7 +121,18 @@ class HostedDecoder {
       };
       const onReady = (ev: MessageEvent) => {
         if (ev.origin !== DECODER_ORIGIN || ev.source !== frame.contentWindow) return;
-        const data = ev.data as { type?: string; version?: number };
+        const data = ev.data as { type?: string; version?: number; reason?: string };
+        if (data?.type === MSG_UNAVAILABLE) {
+          // It loaded and told us it won't answer, so there is nothing to wait
+          // for. Logged because this is a wiring mistake on our side, not an
+          // outage, and the page's own console is inside a hidden frame.
+          console.warn(
+            "Stack trace decoder is unavailable:",
+            data.reason ?? "no reason given"
+          );
+          settle(false);
+          return;
+        }
         if (data?.type !== MSG_READY) return;
         // Forward-compat: a decoder advertising a newer protocol still gets our
         // v1 frame (additive fields are ignored); just note the mismatch. When a

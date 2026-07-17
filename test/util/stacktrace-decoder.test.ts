@@ -22,6 +22,7 @@ const READY = "esphome-stacktrace-decode:ready";
 const REQUEST = "esphome-stacktrace-decode:request";
 const RESULT = "esphome-stacktrace-decode:result";
 const ERROR = "esphome-stacktrace-decode:error";
+const UNAVAILABLE = "esphome-stacktrace-decode:unavailable";
 
 /** The one iframe the decoder framed. */
 const frame = () => document.querySelector("iframe");
@@ -89,6 +90,19 @@ describe("hostedDecoder", () => {
 
     expect(await available).toBe(false);
     // ...and the dead frame is cleaned up rather than left in the document.
+    expect(frame()).toBeNull();
+  });
+
+  it("gives up at once when the page says it cannot answer", async () => {
+    // A wiring mistake (no nonce in the hash) is not an outage, and the page's
+    // own console is inside a hidden frame where nobody reads it. Told
+    // directly, we stop rather than sit out the full timeout.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    queueMicrotask(() => reply({ type: UNAVAILABLE, reason: "framed without a nonce" }));
+
+    // No timer advance: the point is that it does not wait.
+    expect(await hostedDecoder().available()).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.any(String), "framed without a nonce");
     expect(frame()).toBeNull();
   });
 
