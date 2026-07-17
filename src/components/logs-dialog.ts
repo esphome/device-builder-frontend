@@ -28,6 +28,17 @@ import { LogBuffer } from "../util/log-buffer.js";
 import { notifyError } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { CrashDecodeController } from "./crash-decode-controller.js";
+import {
+  abortSerialReconnect,
+  onStart,
+  onStop,
+  openOta,
+  openPassive,
+  setSerialOpenFailed,
+  setSerialStream,
+  teardownSession,
+  toggleShowStates,
+} from "./logs-dialog/session.js";
 import type { ESPHomeCrashReportDialog } from "./crash-report-dialog.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
@@ -74,14 +85,14 @@ const MAX_LOG_LINES = 5000;
 export class ESPHomeLogsDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
-  private _localize: LocalizeFunc = (key) => key;
+  _localize: LocalizeFunc = (key) => key;
 
   @consume({ context: darkModeContext, subscribe: true })
   @state()
   private _darkMode = initialDarkMode();
 
   @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
+  _api!: ESPHomeAPI;
 
   @property()
   configuration = "";
@@ -92,13 +103,13 @@ export class ESPHomeLogsDialog extends LitElement {
   // The active log source + its lifecycle. Single source of truth; the toolbar
   // (streaming dot, Stop/Start, Reset enablement, source chip) all derive from
   // it. See logs-session.ts for the states and why they're a union.
-  @state() private _session: LogsSession = { kind: "idle" };
+  @state() _session: LogsSession = { kind: "idle" };
 
   @state()
-  private _expanded = false;
+  _expanded = false;
 
   @state()
-  private _showStates = true;
+  _showStates = true;
 
   /**
    * Set when this session was launched as the post-install logs
@@ -111,12 +122,12 @@ export class ESPHomeLogsDialog extends LitElement {
    * the run that asked for it.
    */
   @state()
-  private _backToInstall = false;
-  private _backToInstallHandler: (() => void) | null = null;
+  _backToInstall = false;
+  _backToInstallHandler: (() => void) | null = null;
 
   // Reconnect hook for a Web Serial session whose reader is gone (a reopen
   // failed -> `dead`); the "click Start to reconnect" recovery (#636).
-  private _reconnect: (() => Promise<void>) | null = null;
+  _reconnect: (() => Promise<void>) | null = null;
 
   // The visible log, its cap, and the stream-position map inline decoding
   // needs. Owns every line the dialog shows; the dialog holds no counters.
@@ -144,7 +155,7 @@ export class ESPHomeLogsDialog extends LitElement {
   private _crashReportDialog!: ESPHomeCrashReportDialog;
 
   @state()
-  private _open = false;
+  _open = false;
 
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
@@ -177,45 +188,39 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   public open(port = OTA_PORT, options: { onBackToInstall?: () => void } = {}) {
-    this._beginSession(options.onBackToInstall);
-    this._reconnect = null;
-    this._session = { kind: "ota", port, streamId: null };
-    this._open = true;
-    this._resetAnsiLogScroll();
-    // Not awaiting the teardown in _beginSession (unlike _toggleShowStates):
-    // open() is only reached after a close, so any prior session is already
-    // idle and the teardown is a no-op — there's no live stream to overlap.
-    this._startOtaStream();
+    openOta(this, port, options);
   }
 
   public openPassive(options: {
-    // Required so the `dead` state (a reopen failure) always has a recovery
-    // path — Start re-runs it; otherwise the Start button would be a dead end.
     onReconnect: () => Promise<void>;
     onBackToInstall?: () => void;
   }) {
-    this._beginSession(options.onBackToInstall);
-    this._reconnect = options.onReconnect;
-    // The attach (`attachSerialLogStream` -> `setSerialStream`) follows
-    // immediately; show it as connecting/streaming until the reader lands.
-    this._session = { kind: "reconnecting", paused: false };
-    this._open = true;
-    this._resetAnsiLogScroll();
+    openPassive(this, options);
   }
 
-  /** Shared open/openPassive prologue: tear down any prior session and reset
-   *  the per-session view state. ``_showStates`` resets each open so the dialog
-   *  behaves the same way every time unless the user flips it this session. */
-  private _beginSession(onBackToInstall?: () => void) {
-    void this._teardownSession();
-    this._clearLogs();
-    this._expanded = false;
-    this._showStates = true;
-    this._backToInstallHandler = onBackToInstall ?? null;
-    this._backToInstall = this._backToInstallHandler !== null;
+  /** Register the Web Serial reader (its loop-cancel) + port. Called by
+   *  `attachSerialLogStream` once a port is open and streaming. */
+  public setSerialStream(port: SerialPort, cancel: () => void) {
+    setSerialStream(this, port, cancel);
   }
 
-  private _resetAnsiLogScroll() {
+  /** Surface a failure to reopen the Web Serial port for post-install logs.
+   *  The caller pairs this with a ``toast.error``. */
+  public setSerialOpenFailed(message: string) {
+    setSerialOpenFailed(this, message);
+  }
+
+  /** Return an in-flight reconnect to ``dead`` without surfacing an error. */
+  public abortSerialReconnect() {
+    abortSerialReconnect(this);
+  }
+
+  public close() {
+    void teardownSession(this);
+    this._open = false;
+  }
+
+  _resetAnsiLogScroll() {
     /* The ansi-log instance is reused across opens. If the user
        scrolled up in a previous session its ``_isUserScrolled`` flag
        is still true, which suppresses auto-scroll for the new
@@ -224,90 +229,6 @@ export class ESPHomeLogsDialog extends LitElement {
        flag and forces a scroll. updateComplete makes sure the @query
        has resolved on first open. */
     this.updateComplete.then(() => this._terminal?.scrollToBottom());
-  }
-
-  /** Register the Web Serial reader (its loop-cancel) + port. Called by
-   *  `attachSerialLogStream` once a port is open and streaming. */
-  public setSerialStream(port: SerialPort, cancel: () => void) {
-    // The attach is async (the reopen path retries for up to 5s). If the dialog
-    // closed or switched to a non-passive session while it was in flight, don't
-    // register — tear it down (cancel stops the reader and closes the port) so
-    // the handle isn't leaked, leaving the next open() to fail "already open".
-    if (!this._open || !isPassive(this._session)) {
-      cancel();
-      return;
-    }
-    // Honor a Stop pressed during the in-flight attach; replace any prior
-    // reader (defensive — `reconnecting` holds none).
-    const paused = this._session.kind === "reconnecting" ? this._session.paused : false;
-    if (this._session.kind === "serial") this._session.cancel();
-    this._session = { kind: "serial", port, cancel, paused };
-  }
-
-  /**
-   * Surface a failure to reopen the Web Serial port for post-install logs.
-   * Appends the message into the log pane (so a user who looked away during the
-   * install still sees the cause) and drops to ``dead`` so the toolbar shows
-   * "Start" — clicking it re-runs the reconnect hook. The caller pairs this
-   * with a ``toast.error``.
-   */
-  public setSerialOpenFailed(message: string) {
-    // Same guard as setSerialStream: the reopen retries across the re-enum
-    // window, so a late failure can land after the dialog closed or switched to
-    // an OTA session — don't tear that unrelated session down or flip it dead.
-    if (!this._open || !isPassive(this._session)) return;
-    void this._teardownSession();
-    this._log.dropPending();
-    this._log.append([message]);
-    this._session = { kind: "dead" };
-  }
-
-  /**
-   * Return an in-flight reconnect to ``dead`` without surfacing an error — for
-   * when the user dismisses the Web Serial port picker. The ``Start`` button
-   * stays available; no log line or toast (a cancel isn't a failure). Only acts
-   * while ``reconnecting`` — never on a live ``serial`` session, which holds an
-   * open reader/port that flipping to ``dead`` would leak.
-   */
-  public abortSerialReconnect() {
-    if (this._session.kind !== "reconnecting") return;
-    this._session = { kind: "dead" };
-  }
-
-  /** Stop whatever the session is running (Web Serial reader -> closes the
-   *  port; backend WS -> kills the subprocess) and return to ``idle``. The
-   *  cancel from `streamSerialToDialog` releases the reader lock before closing
-   *  so the next open() isn't blocked by a still-open port. A Stop *pause*
-   *  doesn't call this — it keeps the reader + port alive (#526). */
-  private _teardownSession(): Promise<void> {
-    // Drain any batched lines into the visible buffer before the session ends
-    // so a stop/close doesn't drop what was buffered for the next frame.
-    this._log.flush();
-    const s = this._session;
-    this._session = { kind: "idle" };
-    if (s.kind === "serial") {
-      s.cancel();
-      return Promise.resolve();
-    }
-    if (s.kind === "ota" && s.streamId !== null) {
-      return this._stopBackendStream(s.streamId);
-    }
-    return Promise.resolve();
-  }
-
-  private _stopBackendStream(streamId: string): Promise<void> {
-    // Swallow errors: if the WS is already gone there's nothing to cancel
-    // server-side. Returns a promise so callers that immediately respawn (the
-    // states toggle) can await the cancel landing first.
-    return this._api
-      .stopStream(streamId)
-      .catch(() => undefined)
-      .then(() => undefined);
-  }
-
-  public close() {
-    void this._teardownSession();
-    this._open = false;
   }
 
   protected render() {
@@ -458,93 +379,12 @@ export class ESPHomeLogsDialog extends LitElement {
     );
   };
 
-  // Start button (only shown while not streaming; the leading guard also
-  // absorbs a double-click in the same microtask). Per state:
-  //  - ota (stopped): respawn the backend stream.
-  //  - serial / reconnecting: just un-pause display — no port reopen (no
-  //    DTR/RTS pulse / reset) and no second reconnect while one's in flight.
-  //  - dead: run the reconnect hook (#636).
   private _onStart() {
-    const s = this._session;
-    if (isStreaming(s)) return;
-    switch (s.kind) {
-      case "ota":
-        this._startOtaStream();
-        break;
-      case "serial":
-      case "reconnecting":
-        this._session = { ...s, paused: false };
-        break;
-      case "dead":
-        this._reconnectSerial();
-        break;
-    }
+    onStart(this);
   }
 
-  // Stop button. OTA kills the subprocess (Start respawns it); a Web Serial
-  // session only pauses display — the port + reader stay open so Start resumes
-  // without a close/reopen that reboots the device (#526).
   private _onStop() {
-    const s = this._session;
-    switch (s.kind) {
-      case "ota":
-        if (s.streamId !== null) {
-          this._session = { kind: "ota", port: s.port, streamId: null };
-          void this._stopBackendStream(s.streamId);
-        }
-        break;
-      case "serial":
-      case "reconnecting":
-        this._session = { ...s, paused: true };
-        break;
-    }
-  }
-
-  private _startOtaStream() {
-    const s = this._session;
-    // Don't respawn onto a closed dialog (a close during the states-toggle
-    // cancel await would otherwise orphan a stream); only spawn from a stopped
-    // OTA session.
-    if (!this._open || s.kind !== "ota" || s.streamId !== null) return;
-    // Tag the stop callbacks with this stream's id so a late onResult/onError
-    // from a torn-down stream can't stop the one that replaced it. (The API
-    // also drops a stopped stream's handler synchronously, so this is belt +
-    // braces — it keeps correctness local instead of relying on that.)
-    let streamId = "";
-    streamId = this._api.logs(
-      this.configuration,
-      s.port,
-      {
-        onOutput: (line: string) => {
-          this._enqueueLine(line);
-        },
-        onResult: () => this._markOtaStopped(streamId),
-        onError: () => this._markOtaStopped(streamId),
-      },
-      { noStates: !this._showStates }
-    );
-    this._session = { kind: "ota", port: s.port, streamId };
-  }
-
-  private _markOtaStopped(streamId: string) {
-    const s = this._session;
-    if (s.kind === "ota" && s.streamId === streamId) {
-      this._session = { kind: "ota", port: s.port, streamId: null };
-    }
-  }
-
-  private _reconnectSerial() {
-    if (!this._reconnect) return;
-    this._session = { kind: "reconnecting", paused: false };
-    this._reconnect().catch(() => {
-      // The reopen-retry failure path handles itself (setSerialOpenFailed ->
-      // `dead`, with its own toast). Only surface genuinely-unhandled
-      // rejections — still `reconnecting` means attach didn't handle it — so we
-      // don't double-toast.
-      if (this._session.kind !== "reconnecting") return;
-      this._session = { kind: "dead" };
-      notifyError(this._localize("dashboard.logs_web_serial_open_failed"));
-    });
+    onStop(this);
   }
 
   private _downloadLogs() {
@@ -557,24 +397,14 @@ export class ESPHomeLogsDialog extends LitElement {
     this._expanded = !this._expanded;
   }
 
-  private async _toggleShowStates() {
-    this._showStates = !this._showStates;
-    /* The --no-states flag is baked into the esphome subprocess at spawn time,
-       so flipping the toggle tears the stream down and respawns it. Await the
-       cancel so the backend has killed the old subprocess before the new one
-       spawns (a fast double-toggle would otherwise leave two readers on the
-       device API). Only while actively streaming — if the user already hit
-       Stop, leave the buffer and let them Start themselves. */
-    const s = this._session;
-    if (s.kind !== "ota" || s.streamId === null) return;
-    this._session = { kind: "ota", port: s.port, streamId: null };
-    await this._stopBackendStream(s.streamId);
-    this._startOtaStream();
+  // Returns the restart so a caller can await the respawn landing.
+  private _toggleShowStates() {
+    return toggleShowStates(this);
   }
 
   // Reset the log and everything derived from it. The single place that
   // pairing lives, so a new caller can't reset the lines and forget the rest.
-  private _clearLogs() {
+  _clearLogs() {
     this._log.reset();
     this._crashDecode.reset();
     this._crashKind = null;
@@ -644,7 +474,7 @@ export class ESPHomeLogsDialog extends LitElement {
 
   private _onDialogHide() {
     this._open = false;
-    void this._teardownSession();
+    void teardownSession(this);
   }
 
   /**
@@ -655,7 +485,7 @@ export class ESPHomeLogsDialog extends LitElement {
    * subscriptions briefly running), then re-shows the source install dialog.
    */
   private _onBackToInstall = async () => {
-    await this._teardownSession();
+    await teardownSession(this);
     const handler = this._backToInstallHandler;
     this._backToInstall = false;
     this._backToInstallHandler = null;
