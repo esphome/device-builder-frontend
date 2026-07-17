@@ -1,4 +1,4 @@
-import { STALE_BUILD_LOG_LINE } from "./crash-decode.js";
+import { STALE_BUILD_LOG_LINE, STALE_BUILD_NOTE } from "./crash-decode.js";
 import {
   ADDRESS_RE,
   CRASH_END_RE,
@@ -36,14 +36,6 @@ const MAX_ISSUE_URL_LENGTH = 8000;
 // list always rides in the downloadable report.
 const MAX_PROBLEM_FRAMES = 40;
 
-// One wording for the stale-build caption, shared by the downloadable report,
-// the prefilled issue, and the log line crash-decode injects, so they can't
-// drift. The injected line is how the flag reaches here: staleness is a
-// backend verdict, and the log buffer carries it in like everything else.
-export const STALE_BUILD_NOTE =
-  "Decoded against a local build that no longer matches the firmware running " +
-  "on the device, so these frames may name the wrong lines.";
-
 const ISSUE_URL_BASE =
   "https://github.com/esphome/esphome/issues/new?template=bug_report.yml";
 
@@ -67,9 +59,13 @@ const isDecodeEcho = (line: string): boolean =>
   // substring of the prose would drop any log line that quoted it.
   line === STALE_BUILD_LOG_LINE || DECODE_ECHO_RES.some((re) => re.test(line));
 
-// A line that carries crash payload past the marker: an address, or a
-// decoded frame naming one.
-const CRASH_RELATED_RE = new RegExp(`${ADDRESS_RE.source}|Decoded 0x`);
+// A line that carries crash payload past the marker: an address, a decoded
+// frame naming one, or a continuation of that frame. The continuation names
+// no address of its own, so without it a dump that ends before its terminator
+// loses the inlined frames off the end of the excerpt.
+const CRASH_RELATED_RE = new RegExp(
+  `${ADDRESS_RE.source}|Decoded 0x|${DECODED_CONTINUATION_RE.source}`
+);
 
 // `target_platform` → the bug form's platform dropdown values. ESP32 is a
 // prefix match (variants like ESP32S3 report as ESP32).

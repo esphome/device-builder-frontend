@@ -51,9 +51,19 @@ export type CrashDecodeCache = Map<string, CrashDecode | null>;
 
 // Shown where the reader is looking. The report gets the same verdict as a
 // typed value, so this line is presentation, not transport.
-export const STALE_BUILD_LOG_LINE =
-  "WARNING Decoded against a local build that no longer matches the firmware " +
-  "running on the device; these frames may name the wrong lines.";
+/**
+ * One wording for the stale-build caveat, in one place.
+ *
+ * The log line below, the downloadable report, and the prefilled issue all say
+ * it, and a reader comparing them should not have to wonder whether a
+ * difference in wording means a difference in fact.
+ */
+export const STALE_BUILD_NOTE =
+  "Decoded against a local build that no longer matches the firmware running " +
+  "on the device, so these frames may name the wrong lines.";
+
+/** The caveat as it lands in the log, where every record carries a level. */
+export const STALE_BUILD_LOG_LINE = `WARNING ${STALE_BUILD_NOTE}`;
 
 export interface CrashDecode {
   /** Decoder output, each tagged with its line's offset into the region. */

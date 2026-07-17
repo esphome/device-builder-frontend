@@ -96,6 +96,19 @@ describe("scrapeCrashData", () => {
     ]);
   });
 
+  it("keeps inlined frames trailing a dump that never terminated", () => {
+    const scraped = scrapeCrashData([
+      "Guru Meditation Error: crash",
+      "Backtrace: 0x400d1a2c:0x3ffc3f40",
+      "WARNING Decoded 0x400d1a2c: loop() at main.cpp:42",
+      " (inlined by) tick() at main.cpp:11",
+    ]);
+
+    // A continuation names no address of its own, so nothing else holds the
+    // excerpt open past the frame above it when no Rebooting line arrives.
+    expect(scraped.decodedFrames[0]).toContain("(inlined by) tick() at main.cpp:11");
+  });
+
   it("reports a crash that scrolled out of the buffer", () => {
     const scrolled = scrapeCrashData(FILLER);
     expect(scrolled.crashFound).toBe(false);
