@@ -11,10 +11,11 @@ import { computeUpdateFacet, normalizeUpdateBuckets } from "../../src/util/facet
 import { identityLocalize } from "../_dom.js";
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 
-// computeUpdateFacet reads update_available / has_pending_changes, gated on
-// active_source via showUpdateAvailable / showPendingChanges. The shared
-// fixture defaults to a live mDNS source so update/modified buckets surface;
-// mDNS-dark cases pass runtime_state.active_source explicitly.
+// computeUpdateFacet reads update_available / has_pending_changes, gated
+// through showUpdateAvailable / showPendingChanges. The shared fixture
+// defaults to a trusted identity (live mDNS source AND
+// deployed_identity_live) so update/modified buckets surface; mDNS-dark
+// cases must override BOTH — either alone keeps the identity trusted.
 const device = makeConfiguredDevice;
 
 // Echo the key so assertions key off the i18n id, not display copy.

@@ -13,10 +13,14 @@ const mdnsOnline = (d: ConfiguredDevice): boolean =>
 // api: can also hold active_source === "mdns", but off a bare A-record
 // resolve that vouches for reachability only, never identity.
 // Everywhere mdns can't vouch, the backend ships its own first-party
-// evidence as runtime_state.deployed_identity_live (session-only; the
-// backend clears it when mDNS takes ownership of an api: device, so a
-// powered-down device still blanks through the announce lifecycle).
-// Full semantics: backend docs/API.md, Device.runtime_state.
+// evidence as runtime_state.deployed_identity_live (session-only). Where
+// mDNS can reach the device, the backend clears the flag when mDNS takes
+// ownership, so a powered-down device blanks through the announce
+// lifecycle. In an mDNS-dark deployment the flag deliberately never
+// expires — no evidence of staleness can arrive, so the last-confirmed
+// identity stays up and reachability is signalled separately by the
+// state indicator. Full semantics: backend docs/API.md,
+// Device.runtime_state.
 export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
   (d.api_enabled && mdnsOnline(d)) || d.runtime_state.deployed_identity_live;
 

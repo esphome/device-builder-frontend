@@ -21,8 +21,9 @@ import {
 } from "../_make-configured-device.js";
 
 function device(over: ConfiguredDeviceOverrides = {}): ConfiguredDevice {
-  // Online + live mDNS by default so update/modified filters match; mDNS-dark
-  // cases override active_source.
+  // Online with a trusted identity by default (live mDNS source AND
+  // deployed_identity_live) so update/modified filters match; mDNS-dark
+  // cases must override BOTH — either alone keeps the identity trusted.
   return makeConfiguredDevice({
     friendly_name: "Kitchen Lamp",
     ...over,
