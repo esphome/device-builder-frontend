@@ -1,18 +1,17 @@
-import { notifyError } from "../../util/notify.js";
-import type { ESPHomeLogsDialog } from "../logs-dialog.js";
-import { OTA_PORT, isPassive, isStreaming } from "../logs-session.js";
-
 /**
  * The logs dialog's log source and its lifecycle.
  *
  * Every transition of ``host._session`` lives here; the element renders it and
  * owns nothing about how a stream is started, paused, or torn down.
  */
+import { notifyError } from "../../util/notify.js";
+import type { ESPHomeLogsDialog } from "../logs-dialog.js";
+import { isPassive, isStreaming } from "../logs-session.js";
 
 /** Open on a backend OTA / server-serial stream for *port*. */
 export function openOta(
   host: ESPHomeLogsDialog,
-  port = OTA_PORT,
+  port: string,
   options: { onBackToInstall?: () => void } = {}
 ): void {
   beginSession(host, options.onBackToInstall);
