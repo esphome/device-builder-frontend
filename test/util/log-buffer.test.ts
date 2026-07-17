@@ -230,6 +230,24 @@ describe("LogBuffer", () => {
       expect(buf.indexOf(2, ["c"])).toBe(3);
     });
 
+    it("costs every position up to the one it rewrote, which is why only the newest may be", () => {
+      // The documented precondition, demonstrated. The single shift is only
+      // true of the positions after the rewrite, so an out-of-order one leaves
+      // the earlier positions resolving nowhere rather than resolving wrong.
+      const buf = new LogBuffer(new FakeHost());
+      buf.append(["a", "b", "c", "d"]);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        buf.replace(2, ["c"], ["c1", "c2", "c3"]); // not the newest; changes length
+        expect(buf.lines).toEqual(["a", "b", "c1", "c2", "c3", "d"]);
+        expect(buf.indexOf(0, ["a"])).toBeNull(); // before it: lost
+        expect(buf.indexOf(2, ["c1"])).toBeNull(); // itself: lost
+        expect(buf.indexOf(3, ["d"])).toBe(5); // after it: still right
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it("leaves the buffer alone when the run isn't there", () => {
       const buf = new LogBuffer(new FakeHost());
       buf.append(["a", "b"]);

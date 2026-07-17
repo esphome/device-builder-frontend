@@ -5,7 +5,7 @@ export interface LogBufferOptions {
   /** Retain only the newest *maxLines*. Unbounded when omitted. */
   maxLines?: number;
   /** Called after each append with the batch and the stream position of its first line. */
-  onAppend?: (lines: string[], start: number) => void;
+  onAppend?: (lines: readonly string[], start: number) => void;
 }
 
 /**
@@ -28,7 +28,7 @@ export class LogBuffer {
   private _streamCount = 0;
   private _epoch = 0;
   private readonly _maxLines?: number;
-  private readonly _onAppend?: (lines: string[], start: number) => void;
+  private readonly _onAppend?: (lines: readonly string[], start: number) => void;
 
   constructor(
     private readonly _host: ReactiveControllerHost,
@@ -41,8 +41,10 @@ export class LogBuffer {
     });
   }
 
-  /** A fresh array per mutation, so a Lit ``.lines=`` binding sees the change. */
-  get lines(): string[] {
+  /** A fresh array per mutation, so a Lit ``.lines=`` binding sees the change.
+   *  Readonly: the shift and the cap are only right if every write comes
+   *  through this class. */
+  get lines(): readonly string[] {
     return this._lines;
   }
 
@@ -57,7 +59,7 @@ export class LogBuffer {
   }
 
   /** Append *lines* now; returns the stream position of ``lines[0]``. */
-  append(lines: string[]): number {
+  append(lines: readonly string[]): number {
     const start = this._streamCount;
     this._streamCount += lines.length;
     this._setLines([...this._lines, ...lines]);
@@ -94,7 +96,7 @@ export class LogBuffer {
    * share a first and last line, so an ends-only check would accept a
    * mispositioned write in exactly the case that produces two runs to confuse.
    */
-  indexOf(streamPosition: number, expected: string[]): number | null {
+  indexOf(streamPosition: number, expected: readonly string[]): number | null {
     const at = streamPosition + this._shift;
     // Out of bounds is ordinary: the cap drops from the front, so a run either
     // survives whole or loses its head to a flood.
@@ -103,7 +105,7 @@ export class LogBuffer {
       // In bounds but not there. The cap moves every line by the same amount,
       // so the only way here is a shift that has drifted from the buffer, which
       // would otherwise read as the caller quietly ceasing to work.
-      console.warn("Log run is not at its tracked position; not replacing it", at);
+      console.warn("Log run is not at its tracked position; refusing to resolve it", at);
       return null;
     }
     return at;
@@ -112,14 +114,19 @@ export class LogBuffer {
   /**
    * Swap the run at *streamPosition* for *replacement*.
    *
-   * Only the newest tracked run may be replaced: the position map is a single
-   * shift, so rewriting an earlier run would silently move every position that
-   * precedes it.
+   * Only the newest tracked run may be replaced. The position map is a single
+   * shift, and a length-changing rewrite adds the delta to all of it, which is
+   * only true of the positions after *streamPosition*: everything up to and
+   * including it stops resolving from then on.
    *
    * False when the run has churned out from under the caller and was left alone
    * rather than written in the wrong place.
    */
-  replace(streamPosition: number, expected: string[], replacement: string[]): boolean {
+  replace(
+    streamPosition: number,
+    expected: readonly string[],
+    replacement: readonly string[]
+  ): boolean {
     const at = this.indexOf(streamPosition, expected);
     if (at === null) return false;
     const next = [...this._lines];

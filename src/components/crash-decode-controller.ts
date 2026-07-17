@@ -94,21 +94,24 @@ export class CrashDecodeController {
   // region's position is computed. Fire-and-forget: the log keeps streaming
   // while the backend's child works, and a failure leaves the dump untouched.
   private _queueDecode(region: CrashRegion): void {
-    const epoch = this.host.buffer().epoch;
+    const buffer = this.host.buffer();
+    const epoch = buffer.epoch;
     this._chain = this._chain
       .then(async () => {
-        if (epoch !== this.host.buffer().epoch) return;
+        if (epoch !== buffer.epoch) return;
         const decode = await decodeCrashRegion(
           this.host.api(),
           this.host.configuration(),
           region.raw,
           this._cache
         );
-        if (decode === null || epoch !== this.host.buffer().epoch) return;
+        if (decode === null || epoch !== buffer.epoch) return;
         if (decode.staleBuild) this._staleBuild = true;
-        this.host
-          .buffer()
-          .replace(region.startIndex, region.raw, interleaveDecoded(region.raw, decode));
+        buffer.replace(
+          region.startIndex,
+          region.raw,
+          interleaveDecoded(region.raw, decode)
+        );
       })
       .catch((err) => console.warn("Inline backtrace decode failed", err));
   }

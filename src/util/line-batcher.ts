@@ -11,7 +11,7 @@
  * ``maxLines`` bounds only the PENDING buffer — rAF doesn't fire while
  * the tab is hidden, so a flood can pile up unflushed. Capping the
  * merged visible buffer is the append callback's job (it owns that
- * array; see ``LogBuffer._setLines``).
+ * array; see ``LogBuffer``).
  */
 export class LineBatcher {
   private _pending: string[] = [];

@@ -81,7 +81,7 @@ export function configurationStem(
  * — and tests — can assert on what would be saved without having to
  * re-parse the Blob.
  */
-export function downloadAnsiText(lines: string[], filename: string): string {
+export function downloadAnsiText(lines: readonly string[], filename: string): string {
   /* Some streams (notably the firmware-job follow path) deliver
      each line *with* its trailing ``\n`` / ``\r\n`` baked into the
      payload, and a few — esptool / PlatformIO progress lines that

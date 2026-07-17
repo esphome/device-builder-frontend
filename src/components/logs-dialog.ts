@@ -587,7 +587,7 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   // Every line the buffer takes on, batched or direct, passes through here.
-  private _onLinesAppended(lines: string[], start: number): void {
+  private _onLinesAppended(lines: readonly string[], start: number): void {
     // One normalization per line, shared by the crash classifier and the
     // decode controller: this runs for every line of a stream that can push
     // thousands a second.
