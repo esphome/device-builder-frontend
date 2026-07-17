@@ -7,7 +7,6 @@ import type { IntegrationDoc } from "../api/types/components.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
 import type { VersionMatchPolicy } from "../api/types/event-subscription.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
-import { JobStatus } from "../api/types/firmware-jobs.js";
 import type { ServerInfoMessage } from "../api/types/protocol.js";
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
 import type {
