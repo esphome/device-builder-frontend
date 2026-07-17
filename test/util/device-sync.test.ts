@@ -8,30 +8,55 @@ import {
 import { makeConfiguredDevice } from "../_make-configured-device.js";
 
 describe("device-sync mDNS gating", () => {
-  it("trusts the deployed identity per api_enabled, live source, and http identity", () => {
-    // An api device needs a live mDNS; a no-api device's identity arrives
-    // over _http._tcp, which never claims reachability, so active_source
-    // can't vouch for it — the backend's http_identity_live does.
+  it("trusts the deployed identity per api_enabled, live source, and identity evidence", () => {
+    // An api device is trusted under mdns ownership OR the backend's
+    // first-party evidence flag (a direct Native API connection where
+    // mDNS is dark). A no-api device is trusted on the flag alone: its
+    // mdns ownership is a bare A-record resolve — reachability only —
+    // so that disjunct is deliberately api-scoped.
     for (const s of ["mdns", "ping", "mqtt", "unknown"] as const) {
       for (const api_enabled of [true, false]) {
-        for (const http_identity_live of [true, false]) {
+        for (const deployed_identity_live of [true, false]) {
           expect(
             deployedIdentityTrusted(
               makeConfiguredDevice({
                 api_enabled,
-                runtime_state: { active_source: s, http_identity_live },
+                runtime_state: { active_source: s, deployed_identity_live },
               })
             )
-          ).toBe(api_enabled ? s === "mdns" : http_identity_live);
+          ).toBe((api_enabled && s === "mdns") || deployed_identity_live);
         }
       }
     }
   });
 
+  it("shows an api device's signals off Native-API evidence while mDNS is dark", () => {
+    const probed = makeConfiguredDevice({
+      api_enabled: true,
+      runtime_state: { active_source: "ping", deployed_identity_live: true },
+      has_pending_changes: true,
+      pending_changes_via_hash: true,
+      update_available: true,
+    });
+    expect(deployedIdentityTrusted(probed)).toBe(true);
+    expect(showPendingChanges(probed)).toBe(true);
+    expect(showUpdateAvailable(probed)).toBe(true);
+  });
+
+  it("never trusts a no-api device off mdns ownership alone", () => {
+    // A no-api mdns claim comes from the active A-record resolve; it
+    // says the host answers, not that any identity broadcast is fresh.
+    const resolvedOnly = makeConfiguredDevice({
+      api_enabled: false,
+      runtime_state: { active_source: "mdns", deployed_identity_live: false },
+    });
+    expect(deployedIdentityTrusted(resolvedOnly)).toBe(false);
+  });
+
   it("hides an api device's hash-driven modified / update signals while mDNS is dark", () => {
     const dark = makeConfiguredDevice({
       api_enabled: true,
-      runtime_state: { active_source: "ping" },
+      runtime_state: { active_source: "ping", deployed_identity_live: false },
       has_pending_changes: true,
       pending_changes_via_hash: true,
       update_available: true,
@@ -46,7 +71,7 @@ describe("device-sync mDNS gating", () => {
     // mDNS-sourced, so it stays hidden.
     const dark = makeConfiguredDevice({
       api_enabled: true,
-      runtime_state: { active_source: "ping" },
+      runtime_state: { active_source: "ping", deployed_identity_live: false },
       has_pending_changes: true,
       update_available: true,
     });
@@ -68,7 +93,7 @@ describe("device-sync mDNS gating", () => {
   it("shows a no-api device's hash-driven modified / update signals without mDNS reachability", () => {
     const mqttOnly = makeConfiguredDevice({
       api_enabled: false,
-      runtime_state: { active_source: "mqtt", http_identity_live: true },
+      runtime_state: { active_source: "mqtt", deployed_identity_live: true },
       has_pending_changes: true,
       pending_changes_via_hash: true,
       update_available: true,
@@ -80,7 +105,7 @@ describe("device-sync mDNS gating", () => {
   it("hides a no-api device's hash-driven signals when the identity TXT went dark", () => {
     const dark = makeConfiguredDevice({
       api_enabled: false,
-      runtime_state: { active_source: "mqtt", http_identity_live: false },
+      runtime_state: { active_source: "mqtt", deployed_identity_live: false },
       has_pending_changes: true,
       pending_changes_via_hash: true,
       update_available: true,

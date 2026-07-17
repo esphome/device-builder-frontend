@@ -2,27 +2,29 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 
 // Whether mDNS is the channel currently driving the device's online state.
 // Deliberately unexported: for gating the deployed identity (version /
-// config hash) use deployedIdentityTrusted below, never this directly —
-// this predicate can never be true for a device without api:.
+// config hash) use deployedIdentityTrusted below, never this directly.
 const mdnsOnline = (d: ConfiguredDevice): boolean =>
   d.runtime_state.active_source === "mdns";
 
-// Whether the mDNS-sourced deployed identity (version / config hash) is
-// trustworthy. An api: device broadcasts it on _esphomelib._tcp, the same
-// service that claims active_source === "mdns", so that source doubles as the
-// freshness signal: when mDNS is dark (a ping/MQTT-only "odd setup", e.g. a
-// Docker-bridge dashboard) the values go stale, so blanking them avoids a
-// false "out of sync". A device without api: broadcasts the same identity
-// trio on _http._tcp (ESPHome 2026.7.0+), which by backend design never
-// claims reachability, so active_source can't vouch for it — the backend
-// tracks that broadcast's freshness itself and ships it as
-// runtime_state.http_identity_live (session-only; false on backend cold
-// start until the broadcast is heard). A powered-down device blanks
-// rather than showing its last-heard identity: an arbitrarily old
-// broadcast is not evidence, matching how an api: device blanks when
-// mDNS goes dark.
+// Whether the deployed identity (version / config hash) is trustworthy.
+// Two evidence channels, one per disjunct. An api: device broadcasts the
+// identity on _esphomelib._tcp, the same service that claims
+// active_source === "mdns", so mdns ownership doubles as the freshness
+// signal — and the api_enabled guard on that disjunct is load-bearing:
+// a device without api: can also hold active_source === "mdns", but off
+// a bare A-record resolve that vouches for reachability only, never
+// identity. Everywhere mdns ownership can't vouch, the backend tracks
+// its own first-party evidence and ships it as
+// runtime_state.deployed_identity_live: the _http._tcp identity TXT for
+// devices without api: (ESPHome 2026.7.0+), a direct Native API
+// device_info connection for api: devices mDNS can't reach (the
+// Docker-bridge dashboard), and the dashboard's own flash. Session-only,
+// false on backend cold start until evidence arrives; the backend
+// clears it when mDNS takes ownership of an api: device, so a
+// powered-down device still blanks through the announce lifecycle
+// rather than showing its last-heard identity.
 export const deployedIdentityTrusted = (d: ConfiguredDevice): boolean =>
-  d.api_enabled ? mdnsOnline(d) : d.runtime_state.http_identity_live;
+  (d.api_enabled && mdnsOnline(d)) || d.runtime_state.deployed_identity_live;
 
 // Whether to SHOW the "modified" (needs-install) and "update available"
 // indicators, gated so a stale mDNS-dark value can't flag a false "out of

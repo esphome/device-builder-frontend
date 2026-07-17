@@ -169,8 +169,8 @@ describe("renderVersionSection deployed row", () => {
   });
 
   it("shows the deployed version for a no-api device reachable over MQTT", () => {
-    // Delivered via the _http._tcp identity TXT; active_source never claims
-    // mDNS for these devices, so the gate is http_identity_live instead.
+    // Delivered via the _http._tcp identity TXT; a no-api mdns claim is a
+    // bare A-record resolve, so the gate is deployed_identity_live instead.
     const result = renderVersionSection(
       _device({
         current_version: "2026.7.1",
@@ -178,7 +178,7 @@ describe("renderVersionSection deployed row", () => {
         runtime_state: {
           active_source: "mqtt",
           deployed_version: "2026.7.0",
-          http_identity_live: true,
+          deployed_identity_live: true,
         },
       }),
       _localize
@@ -196,7 +196,7 @@ describe("renderVersionSection deployed row", () => {
         runtime_state: {
           active_source: "mqtt",
           deployed_version: "2026.7.0",
-          http_identity_live: false,
+          deployed_identity_live: false,
         },
       }),
       _localize
@@ -211,13 +211,36 @@ describe("renderVersionSection deployed row", () => {
       _device({
         current_version: "2026.7.1",
         api_enabled: true,
-        runtime_state: { active_source: "ping", deployed_version: "2026.7.0" },
+        runtime_state: {
+          active_source: "ping",
+          deployed_version: "2026.7.0",
+          deployed_identity_live: false,
+        },
       }),
       _localize
     );
     const texts = valueTexts(result);
     expect(texts).not.toContain("2026.7.0");
     expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
+  });
+
+  it("shows an api device's deployed version off Native-API evidence while mDNS is dark", () => {
+    // The backend read the version over a direct device_info connection
+    // (Docker-bridge mDNS-dark) and vouches with deployed_identity_live.
+    const result = renderVersionSection(
+      _device({
+        current_version: "2026.7.1",
+        api_enabled: true,
+        runtime_state: {
+          active_source: "ping",
+          deployed_version: "2026.7.0",
+          deployed_identity_live: true,
+        },
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).toContain("2026.7.0");
   });
 });
 
@@ -258,7 +281,7 @@ describe("renderConfigHashSection deployed row", () => {
         runtime_state: {
           active_source: "mqtt",
           deployed_config_hash: "22e8e223",
-          http_identity_live: true,
+          deployed_identity_live: true,
         },
       }),
       _localize
@@ -276,7 +299,7 @@ describe("renderConfigHashSection deployed row", () => {
         runtime_state: {
           active_source: "mqtt",
           deployed_config_hash: "22e8e223",
-          http_identity_live: false,
+          deployed_identity_live: false,
         },
       }),
       _localize
@@ -291,12 +314,33 @@ describe("renderConfigHashSection deployed row", () => {
       _device({
         expected_config_hash: "abc123",
         api_enabled: true,
-        runtime_state: { active_source: "ping", deployed_config_hash: "22e8e223" },
+        runtime_state: {
+          active_source: "ping",
+          deployed_config_hash: "22e8e223",
+          deployed_identity_live: false,
+        },
       }),
       _localize
     );
     const texts = valueTexts(result);
     expect(texts).not.toContain("22e8e223");
     expect(texts).toContain("dashboard.drawer_waiting_for_mdns");
+  });
+
+  it("shows an api device's deployed hash under identity evidence while mDNS is dark", () => {
+    const result = renderConfigHashSection(
+      _device({
+        expected_config_hash: "abc123",
+        api_enabled: true,
+        runtime_state: {
+          active_source: "ping",
+          deployed_config_hash: "22e8e223",
+          deployed_identity_live: true,
+        },
+      }),
+      _localize
+    );
+    const texts = valueTexts(result);
+    expect(texts).toContain("22e8e223");
   });
 });

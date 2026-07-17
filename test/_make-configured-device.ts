@@ -39,18 +39,19 @@ const _BASE = {
   runtime_state: {
     state: DeviceState.UNKNOWN,
     // Live mDNS source so an api-enabled test device shows its out-of-sync /
-    // update indicators (the fixture defaults to no-api, whose gate is
-    // http_identity_live below); tests covering the mDNS-dark "hide
-    // indicators" behaviour override this to "ping" / "unknown".
+    // update indicators without leaning on deployed_identity_live below;
+    // tests covering the mDNS-dark "hide indicators" behaviour must
+    // override BOTH (either alone keeps an api device trusted).
     active_source: "mdns",
     ip_addresses: [],
     deployed_version: "",
     deployed_config_hash: "",
     queued_update: false,
     api_encryption_active: null,
-    // Same happy-path default for the no-api gate; tests covering the
-    // identity-went-dark behaviour override this to false.
-    http_identity_live: true,
+    // Happy-path default for the first-party evidence gate (both device
+    // kinds); tests covering the identity-went-dark behaviour override
+    // this to false.
+    deployed_identity_live: true,
   },
   expected_config_hash: "",
   has_pending_changes: false,

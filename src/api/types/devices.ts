@@ -62,13 +62,15 @@ export interface DeviceRuntimeState {
    * mismatch / plaintext.
    */
   api_encryption_active: string | null;
-  /** Whether an unexpired ``_http._tcp`` identity TXT currently backs
-   *  the deployed identity of a device without api:. Session-only —
-   *  false on backend cold start until the broadcast is heard.
-   *  ``deployedIdentityTrusted`` gates the non-api deployed identity
-   *  on it, mirroring the ``active_source === "mdns"`` gate api
-   *  devices use. */
-  http_identity_live: boolean;
+  /** Whether fresh first-party evidence backs the deployed identity:
+   *  an unexpired ``_http._tcp`` identity TXT (devices without api:),
+   *  a live Native API device_info connection the backend made (api
+   *  devices mDNS doesn't own, e.g. Docker-bridge), or a flash this
+   *  dashboard performed. Session-only — false on backend cold start
+   *  until evidence arrives. mDNS taking ownership of an api device
+   *  clears it; the announce lifecycle vouches from there, which is
+   *  the other half of ``deployedIdentityTrusted``'s gate. */
+  deployed_identity_live: boolean;
 }
 
 /** A configured ESPHome device. */
