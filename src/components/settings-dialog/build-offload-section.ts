@@ -11,12 +11,10 @@ import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
 import type { OffloaderAlertSnapshotEntry } from "../../api/types/remote-build-events.js";
 import type { PairingSummary, RemoteBuildPeer } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import type { RemoteBuildJobState } from "../../context/index.js";
 import {
   apiContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
-  buildOffloadJobsContext,
   buildOffloadPairingsContext,
   desktopVersionContext,
   localizeContext,
@@ -109,10 +107,6 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   @consume({ context: buildOffloadAlertsContext, subscribe: true })
   @state()
   private _alerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
-
-  @consume({ context: buildOffloadJobsContext, subscribe: true })
-  @state()
-  private _jobs: Map<string, RemoteBuildJobState> | null = null;
 
   @state()
   private _pendingUnpair: {
