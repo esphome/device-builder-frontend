@@ -137,7 +137,11 @@ export function renderResetSuggestion(
   if (host._commandType === "validate" || host._failedDuringValidate) {
     return renderValidationFailureSuggestion(host);
   }
-  if (host._commandType !== "install" && host._commandType !== "compile") {
+  if (
+    host._commandType !== "install" &&
+    host._commandType !== "compile" &&
+    host._commandType !== "offline_compile"
+  ) {
     return nothing;
   }
   return renderBuildFailureSuggestion(host, remotePeerLabel(host), remoteResetPin(host));
@@ -180,6 +184,7 @@ export function showRunTimer(host: ESPHomeCommandDialog): boolean {
   if (
     host._commandType !== "install" &&
     host._commandType !== "compile" &&
+    host._commandType !== "offline_compile" &&
     host._commandType !== "rename"
   ) {
     return false;
