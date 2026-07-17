@@ -38,8 +38,6 @@ const NON_CRASH_LINES: ReadonlyArray<[string, string]> = [
   ["empty line", ""],
 ];
 
-// The dialog's real transport wrapping: timestamp prefix + ANSI color.
-
 describe("isCrashMarker", () => {
   it.each(CRASH_LINES)("matches %s", (_name, line) => {
     expect(isCrashMarker(line)).toBe(true);

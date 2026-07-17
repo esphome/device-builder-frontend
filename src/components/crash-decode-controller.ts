@@ -144,8 +144,17 @@ export class CrashDecodeController {
     const { raw, startIndex } = region;
     const lines = this.host.getLines();
     const at = startIndex + this._indexShift;
+    // Out of bounds is ordinary: the cap drops from the front, so a region
+    // either survives whole or loses its head, and a flood can take one
+    // between its marker and its terminator.
     if (at < 0 || at + raw.length > lines.length) return null;
-    if (raw.some((line, i) => lines[at + i] !== line)) return null;
+    if (raw.some((line, i) => lines[at + i] !== line)) {
+      // In bounds but not there. The cap moves every line by the same amount,
+      // so the only way here is a shift that has drifted from the buffer —
+      // which would otherwise read as decoding quietly ceasing to work.
+      console.warn("Crash region is not at its tracked position; not decorating it", at);
+      return null;
+    }
     return at;
   }
 

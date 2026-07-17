@@ -225,19 +225,31 @@ describe("logs-dialog inline backtrace decode", () => {
       };
     });
 
-    append(el, ["Guru Meditation Error: crash", "PC: 0x400d1111", "Rebooting..."]);
-    await inFlight;
-    append(el, ["Guru Meditation Error: crash", "PC: 0x400d2222", "Rebooting..."]);
-    // Point the first region's splice at the second one.
-    (el as any)._crashDecode._indexShift = 3;
-    land(null);
-    await flush();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    // The frames name the first crash's addresses; landing them under the
-    // second would attribute one crash's decode to another.
-    expect(lines(el).map(stripAnsi)).not.toContain(
-      "WARNING Decoded 0x400d1111: first() at a.cpp:1"
-    );
+    try {
+      append(el, ["Guru Meditation Error: crash", "PC: 0x400d1111", "Rebooting..."]);
+      await inFlight;
+      append(el, ["Guru Meditation Error: crash", "PC: 0x400d2222", "Rebooting..."]);
+      // Point the first region's splice at the second one.
+      (el as any)._crashDecode._indexShift = 3;
+      land(null);
+      await flush();
+
+      // The frames name the first crash's addresses; landing them under the
+      // second would attribute one crash's decode to another.
+      expect(lines(el).map(stripAnsi)).not.toContain(
+        "WARNING Decoded 0x400d1111: first() at a.cpp:1"
+      );
+      // And it says so: in bounds but not there is a drifted shift, which
+      // would otherwise read as decoding quietly ceasing to work.
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("not at its tracked position"),
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("does not decode a region the cap dropped before it terminated", async () => {
