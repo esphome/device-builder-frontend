@@ -11,12 +11,15 @@
  */
 export function installWaTooltipTouchSuppression(): void {
   if (typeof document === "undefined") return;
-  document.addEventListener("wa-show", (e: Event) => {
-    // "wa-show" is shared by dialogs/dropdowns — only ever cancel tooltips.
-    // composedPath, not target: crossing the shadow boundary retargets
-    // the event to the host component.
-    if ((e.composedPath()[0] as Element | undefined)?.localName !== "wa-tooltip") return;
-    if (typeof window.matchMedia !== "function") return;
-    if (window.matchMedia("(hover: none)").matches) e.preventDefault();
-  });
+  // Named handler so addEventListener dedupes a repeated install.
+  document.addEventListener("wa-show", suppressTooltipShowOnTouch);
+}
+
+function suppressTooltipShowOnTouch(e: Event): void {
+  // "wa-show" is shared by dialogs/dropdowns — only ever cancel tooltips.
+  // composedPath, not target: crossing the shadow boundary retargets
+  // the event to the host component.
+  if ((e.composedPath()[0] as Element | undefined)?.localName !== "wa-tooltip") return;
+  if (typeof window.matchMedia !== "function") return;
+  if (window.matchMedia("(hover: none)").matches) e.preventDefault();
 }

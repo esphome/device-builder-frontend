@@ -48,6 +48,14 @@ describe("installWaTooltipTouchSuppression", () => {
     expect(dispatchWaShow("wa-dialog").defaultPrevented).toBe(false);
   });
 
+  it("registers a single listener even when installed repeatedly", () => {
+    installWaTooltipTouchSuppression();
+    installWaTooltipTouchSuppression();
+    mockHoverNone(true);
+    expect(dispatchWaShow("wa-tooltip").defaultPrevented).toBe(true);
+    expect(window.matchMedia).toHaveBeenCalledTimes(1);
+  });
+
   it("lets the show through when matchMedia is unavailable", () => {
     vi.stubGlobal("matchMedia", undefined);
     expect(dispatchWaShow("wa-tooltip").defaultPrevented).toBe(false);
