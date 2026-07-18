@@ -22,6 +22,9 @@ interface PageView {
   _suppressBoardPrompt: boolean;
   _api: ESPHomeAPI;
   _doSaveYaml(): Promise<boolean>;
+  _saveYaml(): Promise<boolean>;
+  _showActiveJobProgress(): boolean;
+  _installAfterSave(run: () => void): Promise<void>;
 }
 
 const S3_BOARD = {
@@ -93,6 +96,54 @@ describe("post-save board reselect prompt", () => {
       } as unknown as ESPHomeAPI,
     });
     await page._doSaveYaml();
+    expect(openReselect).not.toHaveBeenCalled();
+  });
+});
+
+describe("install hard block on board disagreement", () => {
+  function makeInstallPage(overrides: Partial<PageView> = {}) {
+    const made = makePage({
+      _showActiveJobProgress: () => false,
+      _saveYaml: async () => true,
+      ...overrides,
+    });
+    return { ...made, run: vi.fn() };
+  }
+
+  it("blocks install and opens the picker while the YAML disagrees", async () => {
+    const { page, openReselect, run } = makeInstallPage();
+    await page._installAfterSave(run);
+    expect(run).not.toHaveBeenCalled();
+    expect(openReselect).toHaveBeenCalledWith({
+      configuration: "dev.yaml",
+      yaml: C3_YAML,
+    });
+  });
+
+  it("re-prompts on every blocked install click", async () => {
+    // Unlike the post-save prompt, the block has no dismissed-state memo.
+    const { page, openReselect, run } = makeInstallPage();
+    await page._installAfterSave(run);
+    await page._installAfterSave(run);
+    expect(run).not.toHaveBeenCalled();
+    expect(openReselect).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs the install once the YAML agrees", async () => {
+    const { page, openReselect, run } = makeInstallPage({
+      _yaml: "esp32:\n  board: esp32-s3-devkitc-1\n",
+    });
+    await page._installAfterSave(run);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(openReselect).not.toHaveBeenCalled();
+  });
+
+  it("does not block when the save was refused", async () => {
+    const { page, openReselect, run } = makeInstallPage({
+      _saveYaml: async () => false,
+    });
+    await page._installAfterSave(run);
+    expect(run).not.toHaveBeenCalled();
     expect(openReselect).not.toHaveBeenCalled();
   });
 });

@@ -917,13 +917,21 @@ export class ESPHomePageDevice extends LitElement {
     return saved;
   };
 
+  /** The parsed YAML platform block when it names a different chip than
+   *  the selected board, else null. */
+  private _boardDisagreement() {
+    if (!this._board) return null;
+    const parsed = readPlatformBoard(this._yaml);
+    return parsed && boardDisagreesWithYaml(parsed, this._board) ? parsed : null;
+  }
+
   /** Offer to reselect the stored board when the saved YAML names a
    *  different chip — the stale `board_id` would dead-end the Web
    *  Serial chip check. */
   private _maybePromptBoardReselect() {
-    if (this._suppressBoardPrompt || !this._board) return;
-    const parsed = readPlatformBoard(this._yaml);
-    if (!parsed || !boardDisagreesWithYaml(parsed, this._board)) return;
+    if (this._suppressBoardPrompt) return;
+    const parsed = this._boardDisagreement();
+    if (!parsed) return;
     const key = `${this.id}|${parsed.platform}|${parsed.board}|${parsed.variant}`;
     if (this._boardPromptShownFor === key) return;
     this._boardPromptShownFor = key;
@@ -1019,7 +1027,16 @@ export class ESPHomePageDevice extends LitElement {
     } finally {
       this._suppressBoardPrompt = false;
     }
-    if (saved) run();
+    if (!saved) return;
+    // Hard block: an unresolved YAML/board disagreement dead-ends the
+    // install chip check, so force the fix before offering install
+    // methods. Dismissing the picker keeps install blocked; the next
+    // click re-prompts.
+    if (this._boardDisagreement()) {
+      void this._boardReselectDialog?.open({ configuration: this.id, yaml: this._yaml });
+      return;
+    }
+    run();
   };
   private _saveThenInstall = () => this._installAfterSave(this._installCtrl.onInstall);
   private _saveThenUpdate = () => this._installAfterSave(this._installCtrl.onUpdate);

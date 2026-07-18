@@ -97,15 +97,17 @@ export class ESPHomeBoardReselectDialog extends LitElement {
       const board = parsed.board.toLowerCase();
       const { boards } = await this._api.getBoards({
         query: parsed.board,
-        limit: PAGE_SIZE,
+        limit: 100,
       });
-      const exact = boards.filter(
+      const match = boards.find(
         (b) =>
           b.esphome.board.toLowerCase() === board &&
           b.esphome.platform === parsed.platform
       );
-      if (exact.length > 0) {
-        this._exactBoards = exact;
+      if (match) {
+        // The compatible-boards command returns the complete same-target
+        // set in one page — the query search alone would cap the list.
+        this._exactBoards = await this._api.getCompatibleBoards(match.id);
         return true;
       }
     }

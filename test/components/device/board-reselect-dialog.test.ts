@@ -56,17 +56,24 @@ describe("board-reselect-dialog", () => {
     vi.clearAllMocks();
   });
 
-  it("lists only boards exact-matching the YAML board string", async () => {
+  it("lists the full compatible set for an exact YAML board match", async () => {
     const getBoards = vi.fn().mockResolvedValue({
       boards: [C3_CURATED, C3_GENERIC, S3_NOISE],
     });
-    const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
+    // The complete same-target set comes from get_compatible_boards, not
+    // the capped query search.
+    const getCompatibleBoards = vi.fn().mockResolvedValue([C3_CURATED, C3_GENERIC]);
+    const { el, inner } = await makeDialog({
+      getBoards,
+      getCompatibleBoards,
+    } as unknown as ESPHomeAPI);
     await el.open({
       configuration: "dev.yaml",
       yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
     });
     await el.updateComplete;
-    expect(getBoards).toHaveBeenCalledWith({ query: "esp32-c3-devkitm-1", limit: 50 });
+    expect(getBoards).toHaveBeenCalledWith({ query: "esp32-c3-devkitm-1", limit: 100 });
+    expect(getCompatibleBoards).toHaveBeenCalledWith("c3-curated");
     expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]);
     expect((inner() as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
       true
@@ -151,6 +158,7 @@ describe("board-reselect-dialog", () => {
   it("applies the pick via devices/update and emits board-changed", async () => {
     const api = {
       getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
+      getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
       updateDevice: vi.fn().mockResolvedValue({}),
     };
     const { el, inner } = await makeDialog(api as unknown as ESPHomeAPI);
@@ -183,6 +191,7 @@ describe("board-reselect-dialog", () => {
   it("toasts an error and emits nothing when the update fails", async () => {
     const api = {
       getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
+      getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
       updateDevice: vi.fn().mockRejectedValue(new Error("boom")),
     };
     const { el, inner } = await makeDialog(api as unknown as ESPHomeAPI);
@@ -207,13 +216,14 @@ describe("board-reselect-dialog", () => {
     const api = {
       getConfig: vi.fn().mockResolvedValue("esp32:\n  board: esp32-c3-devkitm-1\n"),
       getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
+      getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED]),
     };
     const { el } = await makeDialog(api as unknown as ESPHomeAPI);
     await el.open({ configuration: "dev.yaml" });
     expect(api.getConfig).toHaveBeenCalledWith("dev.yaml");
     expect(api.getBoards).toHaveBeenCalledWith({
       query: "esp32-c3-devkitm-1",
-      limit: 50,
+      limit: 100,
     });
   });
 });
