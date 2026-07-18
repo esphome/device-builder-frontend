@@ -692,6 +692,7 @@
     "board_reselect_title": "Select matching board",
     "board_reselect_desc": "Your configuration sets \"{board}\", which does not match the device's selected board. Pick the board that matches your configuration.",
     "board_reselect_none": "No boards in the catalog match \"{board}\".",
+    "board_reselect_no_platform": "No board or variant found in the configuration.",
     "welcome_banner_title": "Congratulations, you just configured your {name}!",
     "welcome_banner_body": "A minimal default configuration has been applied. From here you can refine the core settings, add components like sensors or lights, and set up automations. Use the Device navigator on the left or the panels below to get started.",
     "welcome_banner_dismiss": "Dismiss welcome message",

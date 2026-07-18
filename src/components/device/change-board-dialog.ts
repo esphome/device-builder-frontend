@@ -127,6 +127,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
                 type="search"
                 autofocus
                 placeholder=${this._localize("wizard.search_boards_placeholder")}
+                aria-label=${this._localize("wizard.search_boards_placeholder")}
                 @input=${this._onSearchInput}
               />`
             : nothing

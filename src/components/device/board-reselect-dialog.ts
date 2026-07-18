@@ -8,6 +8,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { applyBoardChange } from "../../util/board-change.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
+import { canonicalComponentKey } from "../../util/component-presence.js";
 import { debounce } from "../../util/debounce.js";
 import { notifyError } from "../../util/notify.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
@@ -76,7 +77,11 @@ export class ESPHomeBoardReselectDialog extends LitElement {
       this._search = "";
       this._pendingSearch = "";
       if (!(await this._loadCandidates(parsed))) {
-        notifyError(this._localize("device.board_reselect_none", { board: label }));
+        notifyError(
+          label
+            ? this._localize("device.board_reselect_none", { board: label })
+            : this._localize("device.board_reselect_no_platform")
+        );
         return false;
       }
       this._configuration = opts.configuration;
@@ -140,7 +145,7 @@ export class ESPHomeBoardReselectDialog extends LitElement {
       const match = boards.find(
         (b) =>
           b.esphome.board.toLowerCase() === board &&
-          b.esphome.platform === parsed.platform
+          canonicalComponentKey(b.esphome.platform) === parsed.platform
       );
       if (match) {
         // The compatible-boards command returns the complete same-target
