@@ -25,7 +25,7 @@ function footerHost(step: string) {
     _retry: vi.fn(),
     _showLogsAgain: vi.fn(),
     _detected: null,
-    _failureKind: null as InstallFailureKind | null,
+    _failureKind: null as InstallFailureKind,
     _tryChangeBoard: vi.fn(),
     _showLogsAfterInstall: false,
     _toggleShowLogsAfterInstall: vi.fn(),

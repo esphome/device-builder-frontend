@@ -86,7 +86,7 @@ export type InstallStep =
 
 export type Installer = "web-serial" | "binary-download" | "web-flash" | null;
 
-export type InstallFailureKind = "compile" | "validate" | "chip-mismatch";
+export type InstallFailureKind = "compile" | "validate" | "chip-mismatch" | null;
 
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {
@@ -129,7 +129,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // "open in editor" (YAML help), "chip-mismatch" swaps the footer's Retry
   // (which would loop on the same stale board) for a change-board hand-off.
   // null: no failure, or an unclassified one (e.g. Web Serial connection).
-  @state() _failureKind: InstallFailureKind | null = null;
+  @state() _failureKind: InstallFailureKind = null;
 
   // Source of the most recent compile job. REMOTE means the toolchain lives
   // on a paired receiver, so the local "reset build environment" link can't

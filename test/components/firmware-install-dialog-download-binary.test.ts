@@ -26,10 +26,7 @@ import {
   JobSource,
   JobStatus,
 } from "../../src/api/types/firmware-jobs.js";
-import type {
-  ESPHomeFirmwareInstallDialog,
-  InstallFailureKind,
-} from "../../src/components/firmware-install-dialog.js";
+import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import {
   downloadSelectedBinary,
   startDownload,
@@ -71,7 +68,7 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _binaries: [] as FirmwareBinary[],
     _downloadedFilename: "",
     _log: fakeLogBuffer(),
-    _failureKind: null as InstallFailureKind | null,
+    _failureKind: null,
     _jobId: "",
     _streamId: "",
     _jobSource: JobSource.LOCAL,

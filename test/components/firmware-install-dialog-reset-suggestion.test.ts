@@ -27,7 +27,7 @@ interface Host {
   _step: string;
   _statusMessage: string;
   _errorMessage: string;
-  _failureKind: InstallFailureKind | null;
+  _failureKind: InstallFailureKind;
   _jobSource: JobSource;
   _jobSourceLabel: string;
   _tryCleanBuild: () => void;

@@ -67,8 +67,8 @@ function isPeerLinkSessionLostError(message: string): boolean {
 export function renderResetSuggestion(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
-  if (host._failureKind !== "compile" && host._failureKind !== "validate") return nothing;
   if (host._failureKind === "validate") return renderValidationFailureSuggestion(host);
+  if (host._failureKind !== "compile") return nothing;
   if (isPeerLinkSessionLostError(host._errorMessage)) return nothing;
   const remoteLabel =
     host._jobSource === JobSource.REMOTE && host._jobSourceLabel

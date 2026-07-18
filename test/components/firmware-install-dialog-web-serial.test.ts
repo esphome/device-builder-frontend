@@ -24,10 +24,7 @@ vi.mock("../../src/util/post-install-logs.js", () => ({
 }));
 
 import { JobSource, JobStatus } from "../../src/api/types/firmware-jobs.js";
-import type {
-  ESPHomeFirmwareInstallDialog,
-  InstallFailureKind,
-} from "../../src/components/firmware-install-dialog.js";
+import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { startWebSerialInstall } from "../../src/components/firmware-install-dialog/install-flow.js";
 import { _clearBoardBodyCache } from "../../src/util/board-body-cache.js";
 import { identityLocalize } from "../_dom.js";
@@ -65,7 +62,7 @@ function makeHost() {
     _open: true,
     _showLogsAfterInstall: false,
     _detected: null as unknown,
-    _failureKind: null as InstallFailureKind | null,
+    _failureKind: null,
     _jobId: "",
     _streamId: "",
     _jobSource: JobSource.LOCAL,
