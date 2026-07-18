@@ -1,6 +1,7 @@
 import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
 import { EscapeController } from "../util/escape-controller.js";
+import { fireEvent } from "../util/fire-event.js";
 
 /**
  * Base for self-triggering kebab / toggle popover menus: owns the open
@@ -49,6 +50,6 @@ export abstract class OverflowMenuElement extends LitElement {
   };
 
   protected _emit(type: string, detail?: unknown) {
-    this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
+    fireEvent(this, type, detail);
   }
 }

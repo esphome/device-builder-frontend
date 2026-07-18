@@ -27,6 +27,7 @@ import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { fireEvent } from "../util/fire-event.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { busyActionLabel, updateActionTitle } from "../util/update-tooltip.js";
@@ -243,7 +244,7 @@ export class ESPHomeDeviceCard extends LitElement {
                 <div class="device-actions" @click=${(e: Event) => e.stopPropagation()}>
                   <button
                     class="action-btn action-btn--primary"
-                    @click=${() => this._emit("edit-device")}
+                    @click=${() => fireEvent(this, "edit-device")}
                   >
                     <wa-icon library="mdi" name="pencil"></wa-icon>
                     ${this._localize("dashboard.edit")}
@@ -252,7 +253,7 @@ export class ESPHomeDeviceCard extends LitElement {
                   <button
                     id="btn-logs"
                     class="action-btn action-btn--ghost action-btn--tile"
-                    @click=${() => this._emit("open-logs")}
+                    @click=${() => fireEvent(this, "open-logs")}
                     aria-label=${this._localize("dashboard.drawer_logs")}
                   >
                     <wa-icon library="mdi" name="text-box-outline"></wa-icon>
@@ -296,7 +297,7 @@ export class ESPHomeDeviceCard extends LitElement {
       return html`<button
           id="btn-accent"
           class="action-btn action-btn--accent action-btn--tile"
-          @click=${() => this._emit(this.busy ? "show-progress" : "update-device")}
+          @click=${() => fireEvent(this, this.busy ? "show-progress" : "update-device")}
           aria-label=${busyActionLabel(this._localize, this.busy, "dashboard.update")}
         >
           <wa-icon library="mdi" name="upload"></wa-icon>
@@ -316,7 +317,7 @@ export class ESPHomeDeviceCard extends LitElement {
       return html`<button
           id="btn-accent"
           class="action-btn action-btn--accent action-btn--tile"
-          @click=${() => this._emit(this.busy ? "show-progress" : "install-device")}
+          @click=${() => fireEvent(this, this.busy ? "show-progress" : "install-device")}
           aria-label=${label}
         >
           <wa-icon library="mdi" name="upload"></wa-icon>
@@ -335,7 +336,7 @@ export class ESPHomeDeviceCard extends LitElement {
       // Native buttons activate Enter on keydown — match for instant feedback.
       if (e.repeat) return;
       e.preventDefault();
-      this._emit(this.selectMode ? "toggle-select" : "card-click");
+      fireEvent(this, this.selectMode ? "toggle-select" : "card-click");
       return;
     }
 
@@ -367,11 +368,11 @@ export class ESPHomeDeviceCard extends LitElement {
     if (!this._spaceArmed) return;
     this._spaceArmed = false;
     e.preventDefault();
-    this._emit(this.selectMode ? "toggle-select" : "card-click");
+    fireEvent(this, this.selectMode ? "toggle-select" : "card-click");
   };
 
   private _onClick = () => {
-    this._emit(this.selectMode ? "toggle-select" : "card-click");
+    fireEvent(this, this.selectMode ? "toggle-select" : "card-click");
   };
 
   private _onHostContextMenu = (e: MouseEvent) => onHostContextMenu(this, e);
@@ -380,17 +381,7 @@ export class ESPHomeDeviceCard extends LitElement {
     e.stopPropagation();
     const btn = e.currentTarget as HTMLElement;
     const rect = btn.getBoundingClientRect();
-    this.dispatchEvent(
-      new CustomEvent("card-context-menu", {
-        detail: { x: rect.right, y: rect.bottom },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  _emit(name: string) {
-    this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true }));
+    fireEvent(this, "card-context-menu", { x: rect.right, y: rect.bottom });
   }
 }
 

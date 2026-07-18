@@ -6,6 +6,7 @@ import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
 import { safeWebUiUrl } from "../util/web-ui-url.js";
@@ -288,7 +289,10 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
             this.device.ignored
               ? nothing
               : html`
-                  <button class="btn btn--primary" @click=${() => this._emit("adopt")}>
+                  <button
+                    class="btn btn--primary"
+                    @click=${() => fireEvent(this, "adopt", this.device)}
+                  >
                     <wa-icon library="mdi" name="download"></wa-icon>
                     ${this._localize("dashboard.action_take_control")}
                   </button>
@@ -309,7 +313,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
                 ? "dashboard.action_unignore"
                 : "dashboard.action_ignore"
             )}
-            @click=${() => this._emit("toggle-ignore")}
+            @click=${() => fireEvent(this, "toggle-ignore", this.device)}
           >
             <wa-icon
               library="mdi"
@@ -324,16 +328,6 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
         </div>
       </div>
     `;
-  }
-
-  private _emit(name: string) {
-    this.dispatchEvent(
-      new CustomEvent(name, {
-        detail: this.device,
-        bubbles: true,
-        composed: true,
-      })
-    );
   }
 }
 
