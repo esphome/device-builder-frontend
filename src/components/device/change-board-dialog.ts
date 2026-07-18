@@ -12,6 +12,7 @@ import {
   dialogChromeStyles,
   quietCloseButtonStyles,
 } from "../../styles/dialog-chrome.js";
+import { inputStyles } from "../../styles/inputs.js";
 import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
@@ -68,8 +69,8 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   @property({ type: Boolean })
   searchable = false;
 
-  @state()
-  private _searchValue = "";
+  @query(".board-search")
+  private _searchInput?: HTMLInputElement | null;
 
   @query(".sentinel")
   private _sentinel?: HTMLElement | null;
@@ -89,12 +90,14 @@ export class ESPHomeChangeBoardDialog extends LitElement {
     quietCloseButtonStyles,
     dialogActionsRowStyles,
     dialogActionButtonStyles,
+    inputStyles,
     changeBoardDialogStyles,
     loadMoreFooterStyles,
   ];
 
   open() {
-    this._searchValue = "";
+    // Uncontrolled input — a stale query from the last open is cleared here.
+    if (this._searchInput) this._searchInput.value = "";
     this._dialog.open = true;
   }
 
@@ -123,7 +126,6 @@ export class ESPHomeChangeBoardDialog extends LitElement {
                 class="board-search"
                 type="search"
                 autofocus
-                .value=${this._searchValue}
                 placeholder=${this._localize("wizard.search_boards_placeholder")}
                 @input=${this._onSearchInput}
               />`
@@ -199,10 +201,9 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   };
 
   private _onSearchInput = (e: Event) => {
-    this._searchValue = (e.target as HTMLInputElement).value;
     this.dispatchEvent(
       new CustomEvent<{ value: string }>("search-changed", {
-        detail: { value: this._searchValue },
+        detail: { value: (e.target as HTMLInputElement).value },
       })
     );
   };

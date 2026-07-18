@@ -1,12 +1,14 @@
 import { consume } from "@lit/context";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { applyBoardChange } from "../../util/board-change.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
+import { debounce } from "../../util/debounce.js";
 import { notifyError } from "../../util/notify.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { readPlatformBoard } from "../../util/yaml-board.js";
@@ -61,7 +63,8 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   /** Variant of the paged listing; the search re-query needs it. */
   private _variant: string | null = null;
 
-  private _searchTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Latest raw input value, committed to `_search` by the debounce. */
+  private _pendingSearch = "";
 
   async open(opts: BoardReselectOpenOptions): Promise<void> {
     try {
@@ -69,6 +72,7 @@ export class ESPHomeBoardReselectDialog extends LitElement {
       const parsed = readPlatformBoard(yaml);
       const label = parsed?.board ?? parsed?.variant ?? parsed?.platform ?? "";
       this._search = "";
+      this._pendingSearch = "";
       if (!(await this._loadCandidates(parsed))) {
         notifyError(this._localize("device.board_reselect_none", { board: label }));
         return;
@@ -102,17 +106,21 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   }
 
   /** Exact matches filter client-side (the set is complete); the paged
-   *  listing re-queries the server instead. */
-  private _filteredBoards(): SlimBoard[] {
-    if (this._exactBoards === null) return this._list.items;
-    const search = this._search.trim().toLowerCase();
-    if (!search) return this._exactBoards;
-    return this._exactBoards.filter(
+   *  listing re-queries the server instead. Memoized so the `.boards`
+   *  binding keeps a stable identity across unrelated renders. */
+  private _filterExact = memoizeOne((boards: SlimBoard[], search: string) => {
+    if (!search) return boards;
+    return boards.filter(
       (b) =>
         b.name.toLowerCase().includes(search) ||
         b.manufacturer.toLowerCase().includes(search) ||
         b.id.toLowerCase().includes(search)
     );
+  });
+
+  private _filteredBoards(): SlimBoard[] {
+    if (this._exactBoards === null) return this._list.items;
+    return this._filterExact(this._exactBoards, this._search.toLowerCase());
   }
 
   /** Resolve candidates; true when any exist (state is then populated). */
@@ -157,11 +165,10 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   }
 
   private _fetchVariantPage = async (offset: number, limit: number) => {
-    const search = this._search.trim();
     const page = await this._api.getBoards({
       platform: "esp32",
       variant: this._variant ?? undefined,
-      ...(search ? { query: search } : {}),
+      ...(this._search ? { query: this._search } : {}),
       offset,
       limit,
     });
@@ -172,15 +179,17 @@ export class ESPHomeBoardReselectDialog extends LitElement {
     this._list.loadMore();
   };
 
+  private _applySearch = debounce(() => {
+    const value = this._pendingSearch.trim();
+    if (value === this._search) return;
+    this._search = value;
+    // Exact mode filters in render; the paged listing re-queries.
+    if (this._exactBoards === null) this._list.reset(this._fetchVariantPage);
+  }, 300);
+
   private _onSearchChanged = (e: CustomEvent<{ value: string }>) => {
-    clearTimeout(this._searchTimer);
-    const value = e.detail.value;
-    this._searchTimer = setTimeout(() => {
-      if (value === this._search) return;
-      this._search = value;
-      // Exact mode filters in render; the paged listing re-queries.
-      if (this._exactBoards === null) this._list.reset(this._fetchVariantPage);
-    }, 250);
+    this._pendingSearch = e.detail.value;
+    this._applySearch();
   };
 
   private _onSelectBoard = async (e: CustomEvent<{ boardId: string }>) => {

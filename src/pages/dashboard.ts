@@ -969,8 +969,12 @@ export class ESPHomePageDashboard extends LitElement {
     void this._guardBoardThen(device, () => openInstallMethod(this, device));
   };
 
-  /** Hard block: force the board fix before any install path opens. */
+  /** Hard block: force the board fix before a single-device install
+   *  opens. Re-attaching to a running job starts no install, so it
+   *  skips the guard's fetches; bulk update stays ungated (OTA only,
+   *  N pickers can't stack). */
   _guardBoardThen = async (device: ConfiguredDevice, proceed: () => void) => {
+    if (showJobProgress(this, device)) return;
     if (await findBoardDisagreement(this._api, device)) {
       void this._boardReselectDialog?.open({ configuration: device.configuration });
       return;

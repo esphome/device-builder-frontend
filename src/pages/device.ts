@@ -601,23 +601,20 @@ export class ESPHomePageDevice extends LitElement {
 
   /**
    * Swap the device's board to the picked alternate. `devices/update`
-   * writes only the sidecar `board_id` (the YAML keeps its `board:`);
-   * the header refreshes itself via the `DEVICE_UPDATED` event.
+   * writes only the sidecar `board_id` (the YAML keeps its `board:`),
+   * so no reload is needed — the header refreshes itself via the
+   * `DEVICE_UPDATED` event.
    */
   private _onChangeBoard = async (e: CustomEvent<{ boardId: string }>) => {
     const boardId = e.detail?.boardId;
     const device = this._device;
     if (!boardId || !device || boardId === device.board_id) return;
-    // Reloading YAML after the swap would discard unsaved edits.
+    // An unsaved buffer may disagree with the board being applied.
     if (this._isDirty) {
       notifyError(this._localize("device.change_board_unsaved"));
       return;
     }
-    if (
-      await applyBoardChange(this._api, this._localize, device.configuration, boardId)
-    ) {
-      await this._loadYaml();
-    }
+    await applyBoardChange(this._api, this._localize, device.configuration, boardId);
   };
 
   private _readStoredLayout(): DeviceLayoutMode | null {
