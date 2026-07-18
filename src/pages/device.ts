@@ -1115,6 +1115,7 @@ export class ESPHomePageDevice extends LitElement {
             )}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
+            @request-install=${this._installCtrl.onInstall}
             @goto-line=${this._onEditorGoToLine}
             @change-board=${this._onChangeBoard}
             @open-logs=${this._onEditorOpenLogs}
@@ -1183,6 +1184,7 @@ export class ESPHomePageDevice extends LitElement {
           .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
           .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
           .canFlashBootloader=${this._installCtrl.canFlashBootloader}
+          .neverFlashed=${this._installCtrl.neverFlashed}
           .mode=${this._installCtrl.methodMode}
           @close=${this._installCtrl.onInstallMethodClose}
           @select-method=${this._installCtrl.onInstallMethodSelect}

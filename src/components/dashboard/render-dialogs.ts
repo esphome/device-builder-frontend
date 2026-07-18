@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
 import { computeLabelUsage } from "../../util/label-usage.js";
+import { isNeverFlashed } from "../../util/never-flashed.js";
 import { performRename } from "./actions-ui.js";
 import {
   archiveBulkDevices,
@@ -248,6 +249,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
         host._installMethodDevice?.ip || host._installMethodDevice?.address || ""
       }
       .canFlashBootloader=${canFlashBootloader(host._installMethodDevice)}
+      .neverFlashed=${isNeverFlashed(host._installMethodDevice)}
       .mode=${host._installMethodMode}
       @close=${() => {
         host._installMethodOpen = false;

@@ -2,6 +2,7 @@ import { APIError } from "../../api/api-error.js";
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { isNeverFlashed } from "../../util/never-flashed.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
@@ -220,7 +221,15 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       // upload is already cancelled.
       if (result.queued_update_armed) {
         host._state = "success";
-        host._statusMessage = host._localize("dashboard.queued_successfully");
+        // A never-flashed device can't come online by itself, so
+        // "installs when it comes back online" would be a dead promise
+        // — point at the USB first-install instead.
+        const device = host._devices.find((d) => d.configuration === host.configuration);
+        host._statusMessage = host._localize(
+          isNeverFlashed(device)
+            ? "dashboard.queued_first_install"
+            : "dashboard.queued_successfully"
+        );
         host._jobId = "";
         return;
       }

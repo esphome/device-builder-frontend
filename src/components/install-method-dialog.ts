@@ -33,6 +33,14 @@ import {
   webSerialAvailability,
   type WebSerialAvailability,
 } from "../util/web-serial.js";
+import {
+  renderBootloaderOption,
+  renderInstallNotice,
+  renderManualDownloadOption,
+  renderOtaOption,
+  renderServerSerialOption,
+  type MethodRowContext,
+} from "./install-method-dialog-rows.js";
 import { installMethodDialogStyles } from "./install-method-dialog.styles.js";
 import { renderDisclosure } from "./shared/disclosure.js";
 import {
@@ -40,6 +48,7 @@ import {
   renderSerialPortReplugHint,
 } from "./shared/serial-port-hints.js";
 
+import "@home-assistant/webawesome/dist/components/callout/callout.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "./base-dialog.js";
@@ -97,6 +106,14 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    */
   @property({ type: Boolean, attribute: "can-flash-bootloader" })
   canFlashBootloader = false;
+
+  /**
+   * Device has never run ESPHome firmware (``isNeverFlashed``). Leads
+   * with the USB rows and swaps in first-install copy — a queued OTA
+   * can never reach a board that has never been online.
+   */
+  @property({ type: Boolean, attribute: "never-flashed" })
+  neverFlashed = false;
 
   @state() private _view: DialogView = "method";
 
@@ -180,7 +197,6 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   }
 
   private _renderMethodList() {
-    const isOnline = this.deviceState === DeviceState.ONLINE;
     const availability = this._webSerialAvailability;
     const hasWebSerial = availability === "available";
     const env = this._environment;
@@ -202,57 +218,35 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // actionable solely via in-app Web Serial, so show it only when that's
     // available; otherwise logs go through server-serial / OTA.
     const showUsbRow = isEsptool && (isLogs ? hasWebSerial : !dropDisabledUsb);
-    const serverSerialKeys = this._serverSerialCopyKeys(env);
+
+    const ctx = this._rowContext();
+    const otaRow = renderOtaOption(ctx);
+    const usbRow = showUsbRow ? this._renderUsbOption(availability) : nothing;
+    const serverRow = showServerSerialRow
+      ? renderServerSerialOption(ctx, env, () => this._onServerSerial())
+      : nothing;
+    // A never-flashed device can't receive an OTA by itself — lead with
+    // the USB rows so the first install goes over a cable. At least one
+    // of the two renders in install mode (their hide conditions are
+    // mutually exclusive).
+    const usbFirst = !isLogs && this.neverFlashed;
+    const rows = usbFirst ? [usbRow, serverRow, otaRow] : [otaRow, usbRow, serverRow];
 
     return html`
-      <div class="list">
-        ${this._renderOtaOption(isOnline)}
-        ${showUsbRow ? this._renderUsbOption(availability) : nothing}
-        ${
-          showServerSerialRow
-            ? html`<div class="option" @click=${this._onServerSerial}>
-                <wa-icon library="mdi" name="serial-port"></wa-icon>
-                <div class="info">
-                  <span class="title">${this._localize(serverSerialKeys.title)}</span>
-                  <span class="desc">${this._localize(serverSerialKeys.desc)}</span>
-                </div>
-              </div>`
-            : nothing
-        }
-      </div>
+      ${renderInstallNotice(ctx)}
+      <div class="list">${rows}</div>
       ${this._renderAdvancedSection()}
     `;
   }
 
-  /**
-   * Pick the title/desc localisation keys for the server-serial row
-   * based on where the backend is running. On HA the user is
-   * plugging into their HA server; on a local backend without
-   * WebSerial they're plugging into their own machine; remote
-   * setups use the generic phrasing.
-   */
-  private _serverSerialCopyKeys(env: DeploymentEnvironment): {
-    title: string;
-    desc: string;
-  } {
-    switch (env) {
-      case "ha-addon":
-        return {
-          title: "dashboard.install_method_usb_server_ha",
-          desc: "dashboard.install_method_usb_server_ha_desc",
-        };
-      case "localhost":
-        return {
-          title: "dashboard.install_method_usb_server_localhost",
-          desc: "dashboard.install_method_usb_server_localhost_desc",
-        };
-      case "remote":
-      default:
-        return {
-          title: "dashboard.install_method_usb_server",
-          desc: "dashboard.install_method_usb_server_desc",
-        };
-    }
+  private _rowContext(): MethodRowContext {
+    return {
+      localize: this._localize,
+      mode: this.mode,
+      deviceState: this.deviceState,
+      neverFlashed: this.neverFlashed,
+      onSelect: (method) => this._selectMethod(method),
+    };
   }
 
   /**
@@ -336,29 +330,6 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       >${after}`;
   }
 
-  /**
-   * Manual binary download — always offered in install mode. Compiles
-   * here, hands the user the resulting binary, and leaves flashing to
-   * whatever tool they prefer (esptool.py, picotool, copy-to-MSC for
-   * UF2 platforms, etc). Distinct from the USB row, which flashes for the
-   * user (in-app or via the external flasher) and is gated to ESP32 / ESP8266.
-   */
-  private _renderManualDownloadOption() {
-    return html`
-      <div class="option" @click=${() => this._selectMethod("binary-download")}>
-        <wa-icon library="mdi" name="download"></wa-icon>
-        <div class="info">
-          <span class="title"
-            >${this._localize("dashboard.install_method_manual_download")}</span
-          >
-          <span class="desc"
-            >${this._localize("dashboard.install_method_manual_download_desc")}</span
-          >
-        </div>
-      </div>
-    `;
-  }
-
   private _renderPortList() {
     if (this._portsPoll.loading) {
       return html`
@@ -411,38 +382,6 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     `;
   }
 
-  private _renderOtaOption(isOnline: boolean) {
-    // Install mode keeps the row clickable when not online; the
-    // compile runs even if the upload fails. Logs mode has no
-    // compile-equivalent so it stays gated on isOnline.
-    const enabled = isOnline || this.mode === "install";
-    const isOffline = this.deviceState === DeviceState.OFFLINE;
-    const titleKey =
-      this.mode === "logs"
-        ? "dashboard.logs_method_wireless"
-        : "dashboard.install_method_network";
-    let descKey: string;
-    if (this.mode === "logs") {
-      descKey = "dashboard.logs_method_wireless_desc";
-    } else if (isOffline) {
-      descKey = "dashboard.install_method_network_desc_offline";
-    } else {
-      descKey = "dashboard.install_method_network_desc";
-    }
-    return html`
-      <div
-        class="option ${!enabled ? "option--disabled" : ""}"
-        @click=${enabled ? () => this._selectMethod("ota") : undefined}
-      >
-        <wa-icon library="mdi" name="wifi"></wa-icon>
-        <div class="info">
-          <span class="title">${this._localize(titleKey)}</span>
-          <span class="desc">${this._localize(descKey)}</span>
-        </div>
-      </div>
-    `;
-  }
-
   /**
    * "Advanced options" disclosure at the bottom of the method
    * list. Holds the OTA address-override card (target a specific
@@ -466,35 +405,17 @@ export class ESPHomeInstallMethodDialog extends LitElement {
             this.mode === "install" &&
             this.canFlashBootloader &&
             this.deviceState === DeviceState.ONLINE
-              ? this._renderBootloaderOption()
+              ? renderBootloaderOption(this._rowContext())
               : nothing
           }
-          ${this.mode === "install" ? this._renderManualDownloadOption() : nothing}
+          ${
+            this.mode === "install"
+              ? renderManualDownloadOption(this._rowContext())
+              : nothing
+          }
         </div>
       `,
     });
-  }
-
-  /**
-   * OTA bootloader update — flashes the second-stage bootloader instead
-   * of the app (the "Bootloader too old for OTA rollback" warning's fix
-   * without a USB cable). Rendered only when the host says the device
-   * can accept it and it's online for the flash to land.
-   */
-  private _renderBootloaderOption() {
-    return html`
-      <div class="option" @click=${() => this._selectMethod("bootloader")}>
-        <wa-icon library="mdi" name="chip"></wa-icon>
-        <div class="info">
-          <span class="title"
-            >${this._localize("dashboard.install_method_bootloader")}</span
-          >
-          <span class="desc"
-            >${this._localize("dashboard.install_method_bootloader_desc")}</span
-          >
-        </div>
-      </div>
-    `;
   }
 
   /**

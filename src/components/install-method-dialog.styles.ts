@@ -28,6 +28,11 @@ export const installMethodDialogStyles = css`
     display: none;
   }
 
+  .method-notice {
+    margin-bottom: var(--wa-space-m);
+    font-size: var(--wa-font-size-s);
+  }
+
   .list {
     display: flex;
     flex-direction: column;

@@ -3,6 +3,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
+import { isNeverFlashed } from "../../util/never-flashed.js";
 import {
   launchLogs,
   launchLogsWithMethod,
@@ -58,6 +59,10 @@ export class DeviceInstallController implements ReactiveController {
 
   get canFlashBootloader(): boolean {
     return canFlashBootloader(this._host.device);
+  }
+
+  get neverFlashed(): boolean {
+    return isNeverFlashed(this._host.device);
   }
 
   /** "Install" entry point — opens the install-method picker. */

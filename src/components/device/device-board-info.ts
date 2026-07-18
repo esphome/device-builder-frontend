@@ -5,6 +5,7 @@ import {
   mdiOpenInNew,
   mdiPartyPopper,
   mdiPlusCircleOutline,
+  mdiUsb,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -52,6 +53,7 @@ registerMdiIcons({
   close: mdiClose,
   "party-popper": mdiPartyPopper,
   "plus-circle-outline": mdiPlusCircleOutline,
+  usb: mdiUsb,
 });
 
 /** The three top-level section groups the navigator can expand. */
@@ -511,6 +513,17 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
           })}
         </p>
         <p class="welcome-banner-text">${this._localize("device.welcome_banner_body")}</p>
+        <p class="welcome-banner-text">
+          ${this._localize("device.welcome_banner_first_install")}
+        </p>
+        <button
+          type="button"
+          class="welcome-banner-install"
+          @click=${this._onWelcomeInstall}
+        >
+          <wa-icon library="mdi" name="usb"></wa-icon>
+          ${this._localize("device.welcome_banner_install_button")}
+        </button>
         <button
           type="button"
           class="welcome-banner-close"
@@ -526,6 +539,15 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   private _onDismissWelcome() {
     this.dispatchEvent(
       new CustomEvent("just-created-dismiss", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onWelcomeInstall() {
+    this.dispatchEvent(
+      new CustomEvent("request-install", {
         bubbles: true,
         composed: true,
       })
