@@ -12,8 +12,9 @@ import { canonicalComponentKey } from "../../util/component-presence.js";
 import { debounce } from "../../util/debounce.js";
 import { notifyError } from "../../util/notify.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
-import { readPlatformBoard } from "../../util/yaml-board.js";
+import { readPlatformBoard, type YamlPlatformBoard } from "../../util/yaml-board.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
+import { navItemMatches } from "./navigator-search-match.js";
 
 import "./change-board-dialog.js";
 
@@ -106,8 +107,7 @@ export class ESPHomeBoardReselectDialog extends LitElement {
         searchable
         ?hasMore=${paged && this._list.hasMore}
         ?loadingMore=${paged && (this._list.loading || this._list.loadingMore)}
-        ?loadError=${paged && this._list.hasError && this._list.items.length > 0}
-        ?loadFailed=${paged && this._list.hasError && this._list.items.length === 0}
+        ?loadError=${paged && this._list.hasError}
         @load-more=${this._onLoadMore}
         @search-changed=${this._onSearchChanged}
         @select-board=${this._onSelectBoard}
@@ -120,23 +120,16 @@ export class ESPHomeBoardReselectDialog extends LitElement {
    *  binding keeps a stable identity across unrelated renders. */
   private _filterExact = memoizeOne((boards: SlimBoard[], search: string) => {
     if (!search) return boards;
-    return boards.filter(
-      (b) =>
-        b.name.toLowerCase().includes(search) ||
-        b.manufacturer.toLowerCase().includes(search) ||
-        b.id.toLowerCase().includes(search)
-    );
+    return boards.filter((b) => navItemMatches(search, b.name, b.manufacturer, b.id));
   });
 
   private _filteredBoards(): SlimBoard[] {
     if (this._exactBoards === null) return this._list.items;
-    return this._filterExact(this._exactBoards, this._search.toLowerCase());
+    return this._filterExact(this._exactBoards, this._search);
   }
 
   /** Resolve candidates; true when any exist (state is then populated). */
-  private async _loadCandidates(
-    parsed: ReturnType<typeof readPlatformBoard>
-  ): Promise<boolean> {
+  private async _loadCandidates(parsed: YamlPlatformBoard | null): Promise<boolean> {
     if (parsed?.board) {
       const board = parsed.board.toLowerCase();
       const { boards } = await this._api.getBoards({

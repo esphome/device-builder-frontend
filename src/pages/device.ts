@@ -42,7 +42,7 @@ import {
 } from "../util/backend-field-errors.js";
 import { withBase } from "../util/base-path.js";
 import { fetchBoard } from "../util/board-body-cache.js";
-import { applyBoardChange } from "../util/board-change.js";
+import { applyBoardChange, openBoardReselect } from "../util/board-change.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
@@ -905,7 +905,7 @@ export class ESPHomePageDevice extends LitElement {
     const message = saved ? "device.yaml_saved" : "device.yaml_save_error";
     const variant = saved ? notifySuccess : notifyError;
     variant(this._localize(message));
-    if (saved) this._maybePromptBoardReselect();
+    if (saved) void this._maybePromptBoardReselect();
     return saved;
   };
 
@@ -918,19 +918,16 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _openBoardReselect(): Promise<boolean> {
-    const dialog = this._boardReselectDialog;
-    if (!dialog) {
-      // A missing dialog is a bug, not "nothing to offer".
-      console.error("Board reselect dialog missing");
-      return Promise.resolve(false);
-    }
-    return dialog.open({ configuration: this.id, yaml: this._yaml });
+    return openBoardReselect(this._boardReselectDialog, {
+      configuration: this.id,
+      yaml: this._yaml,
+    });
   }
 
   /** Offer to reselect the stored board when the saved YAML names a
    *  different chip — the stale `board_id` would dead-end the Web
    *  Serial chip check. */
-  private _maybePromptBoardReselect() {
+  private async _maybePromptBoardReselect(): Promise<void> {
     if (this._suppressBoardPrompt) return;
     const parsed = this._boardDisagreement();
     if (!parsed) return;
@@ -940,27 +937,18 @@ export class ESPHomePageDevice extends LitElement {
     // un-record when nothing opened (transient fetch failure) so the
     // next save re-offers the prompt.
     this._boardPromptShownFor = key;
-    void this._openBoardReselect()
-      .then((opened) => {
-        if (!opened && this._boardPromptShownFor === key) {
-          this._boardPromptShownFor = null;
-        }
-      })
-      .catch((err) => {
-        console.error("Board reselect prompt failed:", err);
-        if (this._boardPromptShownFor === key) this._boardPromptShownFor = null;
-      });
+    const opened = await this._openBoardReselect().catch((err) => {
+      console.error("Board reselect prompt failed:", err);
+      return false;
+    });
+    if (!opened && this._boardPromptShownFor === key) {
+      this._boardPromptShownFor = null;
+    }
   }
 
   /** Chip-mismatch recovery hand-off from the install dialog. */
   private _onRequestChangeBoard = (e: CustomEvent<{ configuration: string }>) => {
-    const dialog = this._boardReselectDialog;
-    if (!dialog) {
-      // A missing dialog is a bug, not "nothing to offer".
-      console.error("Board reselect dialog missing");
-      return;
-    }
-    void dialog.open({
+    void openBoardReselect(this._boardReselectDialog, {
       configuration: e.detail.configuration,
       yaml: e.detail.configuration === this.id ? this._yaml : undefined,
     });

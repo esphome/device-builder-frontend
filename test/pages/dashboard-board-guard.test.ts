@@ -32,6 +32,11 @@ vi.mock("../../src/components/wizard/create-config-dialog.js", () => ({}));
 vi.mock("../../src/util/board-change.js", () => ({
   findBoardDisagreement: vi.fn(),
   applyBoardChange: vi.fn(),
+  // Real pass-through shape so the stubbed dialog's open() drives the tests.
+  openBoardReselect: (
+    dialog: { open: (opts: unknown) => Promise<boolean> } | undefined,
+    opts: unknown
+  ) => dialog?.open(opts) ?? Promise.resolve(false),
 }));
 
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";

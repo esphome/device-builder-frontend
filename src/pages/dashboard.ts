@@ -149,7 +149,7 @@ import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
 import "../components/device/board-reselect-dialog.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
-import { findBoardDisagreement } from "../util/board-change.js";
+import { findBoardDisagreement, openBoardReselect } from "../util/board-change.js";
 import "../components/discovered-device-card.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
@@ -976,24 +976,22 @@ export class ESPHomePageDashboard extends LitElement {
    *  through — the chip check downstream stays the guard, and
    *  blocking would strand the install with only a toast. */
   _guardBoardThen = async (device: ConfiguredDevice, proceed: () => void) => {
+    if (showJobProgress(this, device)) return;
+    const yaml = await findBoardDisagreement(this._api, this._localize, device);
+    if (
+      yaml &&
+      (await openBoardReselect(this._boardReselectDialog, {
+        configuration: device.configuration,
+        yaml,
+      }))
+    ) {
+      return;
+    }
     try {
-      if (showJobProgress(this, device)) return;
-      const yaml = await findBoardDisagreement(this._api, this._localize, device);
-      if (yaml) {
-        const dialog = this._boardReselectDialog;
-        if (!dialog) {
-          // A missing dialog is a bug, not "nothing to offer" — log it
-          // loudly and fail open.
-          console.error("Board reselect dialog missing; skipping install guard");
-        } else if (await dialog.open({ configuration: device.configuration, yaml })) {
-          return;
-        }
-      }
       proceed();
     } catch (err) {
-      // The awaited helpers catch internally, so this only sees a throw
-      // out of proceed() — log instead of losing it as an unhandled
-      // rejection behind the void call sites.
+      // Logged rather than lost as an unhandled rejection behind the
+      // void call sites.
       console.error("Install entry failed:", err);
     }
   };
@@ -1010,13 +1008,9 @@ export class ESPHomePageDashboard extends LitElement {
 
   /** Chip-mismatch recovery hand-off from the install dialog. */
   _onRequestChangeBoard = (e: CustomEvent<{ configuration: string }>) => {
-    const dialog = this._boardReselectDialog;
-    if (!dialog) {
-      // A missing dialog is a bug, not "nothing to offer".
-      console.error("Board reselect dialog missing");
-      return;
-    }
-    void dialog.open({ configuration: e.detail.configuration });
+    void openBoardReselect(this._boardReselectDialog, {
+      configuration: e.detail.configuration,
+    });
   };
 
   _toggleDevice(configuration: string) {

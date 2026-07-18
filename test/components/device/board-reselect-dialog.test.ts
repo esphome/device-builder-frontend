@@ -192,7 +192,7 @@ describe("board-reselect-dialog", () => {
     inner().dispatchEvent(
       new CustomEvent("search-changed", { detail: { value: "ghost" } })
     );
-    await vi.waitFor(() => expect(inner().loadFailed).toBe(true));
+    await vi.waitFor(() => expect(inner().loadError).toBe(true));
     expect(inner().boards).toEqual([]);
   });
 

@@ -61,14 +61,10 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   @property({ type: Boolean })
   loadingMore = false;
 
-  /** The last append failed; renders the retry affordance. */
+  /** A page load failed. With rows shown this renders the retry
+   *  affordance; with none, the empty state reads as an error. */
   @property({ type: Boolean })
   loadError = false;
-
-  /** The first page failed; the empty state reads as an error, not
-   *  "no boards found". */
-  @property({ type: Boolean })
-  loadFailed = false;
 
   /** Renders a filter input; emits `search-changed` with `{ value }`. */
   @property({ type: Boolean })
@@ -142,9 +138,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
             this.boards.length === 0 && this.searchable && !this.loadingMore
               ? html`<p class="load-more-loading">
                   ${this._localize(
-                    this.loadFailed
-                      ? "wizard.boards_load_error"
-                      : "wizard.no_boards_found"
+                    this.loadError ? "wizard.boards_load_error" : "wizard.no_boards_found"
                   )}
                 </p>`
               : nothing
@@ -152,7 +146,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
           ${this.boards.map((board) => this._renderBoard(board))}
           ${renderLoadMoreFooter({
             loadingMore: this.loadingMore,
-            error: this.loadError,
+            error: this.loadError && this.boards.length > 0,
             hasMore: this.hasMore,
             localize: this._localize,
             loadingLabelKey: "wizard.loading_boards",
