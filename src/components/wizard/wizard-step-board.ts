@@ -9,7 +9,6 @@ import { ESPHOME_DOCS_BASE } from "../../common/docs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { textStyles } from "../../styles/text.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
@@ -139,13 +138,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     );
   }
 
-  static styles = [
-    espHomeStyles,
-    inputStyles,
-    linkButtonStyles,
-    textStyles,
-    wizardStepBoardStyles,
-  ];
+  static styles = [espHomeStyles, inputStyles, linkButtonStyles, wizardStepBoardStyles];
 
   protected render() {
     if (this._view === "select-port") {

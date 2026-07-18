@@ -210,9 +210,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
           </button>
         </div>
 
-        <p
-          class="board-description ${expanded ? "" : "board-description--clamp line-clamp-2"}"
-        >
+        <p class="board-description ${expanded ? "" : "line-clamp-2"}">
           ${renderMarkdown(board.description)}
         </p>
 
