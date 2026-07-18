@@ -948,9 +948,12 @@ export class ESPHomePageDevice extends LitElement {
 
   /** Chip-mismatch recovery hand-off from the install dialog. */
   private _onRequestChangeBoard = (e: CustomEvent<{ configuration: string }>) => {
+    // Hand over the buffer only when it matches the saved config; a
+    // dirty buffer would resolve candidates the backend doesn't hold.
+    const cleanBuffer = e.detail.configuration === this.id && !this._isDirty;
     void openBoardReselect(this._boardReselectDialog, {
       configuration: e.detail.configuration,
-      yaml: e.detail.configuration === this.id ? this._yaml : undefined,
+      yaml: cleanBuffer ? this._yaml : undefined,
     });
   };
 
