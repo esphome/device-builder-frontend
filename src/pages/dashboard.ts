@@ -149,6 +149,7 @@ import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
 import "../components/device/board-reselect-dialog.js";
 import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
+import { findBoardDisagreement } from "../util/board-change.js";
 import "../components/discovered-device-card.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
@@ -956,10 +957,26 @@ export class ESPHomePageDashboard extends LitElement {
     this._drawerOpen = true;
   }
 
-  _openCommand = (device: ConfiguredDevice, type: CommandType, port?: string) =>
+  _openCommand = (device: ConfiguredDevice, type: CommandType, port?: string) => {
+    if (type === "install") {
+      void this._guardBoardThen(device, () => openCommand(this, device, type, port));
+      return;
+    }
     openCommand(this, device, type, port);
+  };
   _showJobProgress = (device: ConfiguredDevice) => showJobProgress(this, device);
-  _openInstallMethod = (device: ConfiguredDevice) => openInstallMethod(this, device);
+  _openInstallMethod = (device: ConfiguredDevice) => {
+    void this._guardBoardThen(device, () => openInstallMethod(this, device));
+  };
+
+  /** Hard block: force the board fix before any install path opens. */
+  _guardBoardThen = async (device: ConfiguredDevice, proceed: () => void) => {
+    if (await findBoardDisagreement(this._api, device)) {
+      void this._boardReselectDialog?.open({ configuration: device.configuration });
+      return;
+    }
+    proceed();
+  };
   _onInstallMethodSelect = (e: CustomEvent<{ method: string; port?: string }>) =>
     onInstallMethodSelect(this, e);
   _openLogs = (device: ConfiguredDevice) => openLogs(this, device);

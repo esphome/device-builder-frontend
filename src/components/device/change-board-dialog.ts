@@ -64,8 +64,18 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   @property({ type: Boolean })
   loadError = false;
 
+  /** Renders a filter input; emits `search-changed` with `{ value }`. */
+  @property({ type: Boolean })
+  searchable = false;
+
+  @state()
+  private _searchValue = "";
+
   @query(".sentinel")
   private _sentinel?: HTMLElement | null;
+
+  @query(".board-list")
+  private _scrollBox?: HTMLElement | null;
 
   private readonly _dialog = new DialogOpenController(this);
 
@@ -84,6 +94,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   ];
 
   open() {
+    this._searchValue = "";
     this._dialog.open = true;
   }
 
@@ -106,7 +117,26 @@ export class ESPHomeChangeBoardDialog extends LitElement {
             })
           }
         </p>
+        ${
+          this.searchable
+            ? html`<input
+                class="board-search"
+                type="search"
+                autofocus
+                .value=${this._searchValue}
+                placeholder=${this._localize("wizard.search_boards_placeholder")}
+                @input=${this._onSearchInput}
+              />`
+            : nothing
+        }
         <div class="board-list">
+          ${
+            this.boards.length === 0 && this.searchable && !this.loadingMore
+              ? html`<p class="load-more-loading">
+                  ${this._localize("wizard.no_boards_found")}
+                </p>`
+              : nothing
+          }
           ${this.boards.map((board) => this._renderBoard(board))}
           ${renderLoadMoreFooter({
             loadingMore: this.loadingMore,
@@ -158,14 +188,23 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   }
 
   protected updated() {
-    // Null root: the dialog body is the scroll container, but clipping by
-    // ancestor scroll boxes still applies (same reasoning as the wizard's
-    // board list). The margin prefetches before the sentinel is visible.
-    this._intersection.observeIfPresent(this._sentinel, null, "200px");
+    // The board list is always its own scroll box, so observe against it
+    // directly — an explicit root also makes the prefetch margin apply to
+    // the box the user actually scrolls, unlike the null-root form.
+    this._intersection.observeIfPresent(this._sentinel, this._scrollBox ?? null, "200px");
   }
 
   private _requestLoadMore = () => {
     this.dispatchEvent(new CustomEvent("load-more"));
+  };
+
+  private _onSearchInput = (e: Event) => {
+    this._searchValue = (e.target as HTMLInputElement).value;
+    this.dispatchEvent(
+      new CustomEvent<{ value: string }>("search-changed", {
+        detail: { value: this._searchValue },
+      })
+    );
   };
 
   private _select(board: SlimBoard) {

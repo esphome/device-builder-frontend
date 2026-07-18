@@ -8,6 +8,7 @@ export function makeSlimBoard(
   return {
     id,
     name: id,
+    manufacturer: "",
     images: [],
     esphome: { platform: "esp32", board: id, variant: null, ...esphome },
   } as unknown as SlimBoard;

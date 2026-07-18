@@ -83,4 +83,22 @@ export const changeBoardDialogStyles = css`
     color: var(--wa-color-text-quiet);
     padding: var(--wa-space-m);
   }
+
+  .board-search {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: var(--wa-space-s);
+    padding: var(--wa-space-s) var(--wa-space-m);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-lowered);
+    color: var(--wa-color-text-normal);
+    font-family: inherit;
+    font-size: var(--wa-font-size-s);
+  }
+
+  .board-search:focus-visible {
+    outline: var(--wa-border-width-m) solid var(--esphome-primary);
+    outline-offset: 2px;
+  }
 `;

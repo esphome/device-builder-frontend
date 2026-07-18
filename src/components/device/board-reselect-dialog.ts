@@ -48,6 +48,9 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   @state()
   private _description = "";
 
+  @state()
+  private _search = "";
+
   @query("esphome-change-board-dialog")
   private _dialog!: ESPHomeChangeBoardDialog;
 
@@ -55,11 +58,17 @@ export class ESPHomeBoardReselectDialog extends LitElement {
 
   private _configuration = "";
 
+  /** Variant of the paged listing; the search re-query needs it. */
+  private _variant: string | null = null;
+
+  private _searchTimer: ReturnType<typeof setTimeout> | undefined;
+
   async open(opts: BoardReselectOpenOptions): Promise<void> {
     try {
       const yaml = opts.yaml ?? (await this._api.getConfig(opts.configuration));
       const parsed = readPlatformBoard(yaml);
       const label = parsed?.board ?? parsed?.variant ?? parsed?.platform ?? "";
+      this._search = "";
       if (!(await this._loadCandidates(parsed))) {
         notifyError(this._localize("device.board_reselect_none", { board: label }));
         return;
@@ -78,16 +87,32 @@ export class ESPHomeBoardReselectDialog extends LitElement {
     const paged = this._exactBoards === null;
     return html`
       <esphome-change-board-dialog
-        .boards=${this._exactBoards ?? this._list.items}
+        .boards=${this._filteredBoards()}
         .heading=${this._localize("device.board_reselect_title")}
         .description=${this._description}
+        searchable
         ?hasMore=${paged && this._list.hasMore}
         ?loadingMore=${paged && this._list.loadingMore}
         ?loadError=${paged && this._list.hasError && this._list.items.length > 0}
         @load-more=${this._onLoadMore}
+        @search-changed=${this._onSearchChanged}
         @select-board=${this._onSelectBoard}
       ></esphome-change-board-dialog>
     `;
+  }
+
+  /** Exact matches filter client-side (the set is complete); the paged
+   *  listing re-queries the server instead. */
+  private _filteredBoards(): SlimBoard[] {
+    if (this._exactBoards === null) return this._list.items;
+    const search = this._search.trim().toLowerCase();
+    if (!search) return this._exactBoards;
+    return this._exactBoards.filter(
+      (b) =>
+        b.name.toLowerCase().includes(search) ||
+        b.manufacturer.toLowerCase().includes(search) ||
+        b.id.toLowerCase().includes(search)
+    );
   }
 
   /** Resolve candidates; true when any exist (state is then populated). */
@@ -116,32 +141,46 @@ export class ESPHomeBoardReselectDialog extends LitElement {
     // string the catalog doesn't carry) still pins the chip — every board
     // of that variant is compatible. Anything broader is not offered.
     if (parsed?.platform === "esp32" && parsed.variant) {
-      const variant = chipNameToVariant(parsed.variant);
-      const fetchPage = async (offset: number, limit: number) => {
-        const page = await this._api.getBoards({
-          platform: "esp32",
-          variant,
-          offset,
-          limit,
-        });
-        return { items: page.boards, total: page.total };
-      };
+      this._variant = chipNameToVariant(parsed.variant);
       // Probe page 0 up front so the none-found case toasts instead of
       // opening an empty dialog; the reset serves it without a refetch
       // (offset 0 is only ever the reset's own first fetch).
-      const probe = await fetchPage(0, PAGE_SIZE);
+      const probe = await this._fetchVariantPage(0, PAGE_SIZE);
       if (probe.items.length === 0) return false;
       this._exactBoards = null;
       this._list.reset((offset, limit) =>
-        offset === 0 ? Promise.resolve(probe) : fetchPage(offset, limit)
+        offset === 0 ? Promise.resolve(probe) : this._fetchVariantPage(offset, limit)
       );
       return true;
     }
     return false;
   }
 
+  private _fetchVariantPage = async (offset: number, limit: number) => {
+    const search = this._search.trim();
+    const page = await this._api.getBoards({
+      platform: "esp32",
+      variant: this._variant ?? undefined,
+      ...(search ? { query: search } : {}),
+      offset,
+      limit,
+    });
+    return { items: page.boards, total: page.total };
+  };
+
   private _onLoadMore = () => {
     this._list.loadMore();
+  };
+
+  private _onSearchChanged = (e: CustomEvent<{ value: string }>) => {
+    clearTimeout(this._searchTimer);
+    const value = e.detail.value;
+    this._searchTimer = setTimeout(() => {
+      if (value === this._search) return;
+      this._search = value;
+      // Exact mode filters in render; the paged listing re-queries.
+      if (this._exactBoards === null) this._list.reset(this._fetchVariantPage);
+    }, 250);
   };
 
   private _onSelectBoard = async (e: CustomEvent<{ boardId: string }>) => {

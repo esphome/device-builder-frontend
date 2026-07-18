@@ -133,6 +133,51 @@ describe("board-reselect-dialog", () => {
     expect(inner().hasMore).toBe(false);
   });
 
+  it("filters the exact-match set client-side on search", async () => {
+    const heltec = makeSlimBoard("heltec-wifi-kit", {
+      board: "esp32-c3-devkitm-1",
+      variant: "esp32c3",
+    });
+    const api = {
+      getBoards: vi.fn().mockResolvedValue({ boards: [C3_CURATED] }),
+      getCompatibleBoards: vi.fn().mockResolvedValue([C3_CURATED, heltec]),
+    };
+    const { el, inner } = await makeDialog(api as unknown as ESPHomeAPI);
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
+    });
+    inner().dispatchEvent(
+      new CustomEvent("search-changed", { detail: { value: "heltec" } })
+    );
+    await vi.waitFor(() => expect(inner().boards).toEqual([heltec]));
+    // No server round-trip for the complete exact set.
+    expect(api.getBoards).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-queries the paged variant listing on search", async () => {
+    const getBoards = vi
+      .fn()
+      .mockResolvedValue({ boards: [C3_CURATED, C3_GENERIC], total: 2 });
+    const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  variant: ESP32C3\n",
+    });
+    inner().dispatchEvent(
+      new CustomEvent("search-changed", { detail: { value: "devkit" } })
+    );
+    await vi.waitFor(() =>
+      expect(getBoards).toHaveBeenLastCalledWith({
+        platform: "esp32",
+        variant: "esp32c3",
+        query: "devkit",
+        offset: 0,
+        limit: 50,
+      })
+    );
+  });
+
   it("toasts and stays closed when the YAML pins neither board nor variant", async () => {
     // Nothing to derive a compatible set from — never offer a loose list.
     const getBoards = vi.fn().mockResolvedValue({ boards: [C3_CURATED] });

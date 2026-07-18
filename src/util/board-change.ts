@@ -1,6 +1,34 @@
 import type { ESPHomeAPI } from "../api/index.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { fetchBoard } from "./board-body-cache.js";
 import { notifyError, notifySuccess } from "./notify.js";
+import { boardDisagreesWithYaml, readPlatformBoard } from "./yaml-board.js";
+
+/**
+ * Whether the device's YAML names a different chip than its stored board.
+ *
+ * Fetches both sides; a fetch hiccup fails open so install is never
+ * blocked on a transient error.
+ */
+export async function findBoardDisagreement(
+  api: ESPHomeAPI,
+  device: Pick<ConfiguredDevice, "configuration" | "board_id">
+): Promise<boolean> {
+  if (!device.board_id) return false;
+  try {
+    const [board, yaml] = await Promise.all([
+      fetchBoard(api, device.board_id),
+      api.getConfig(device.configuration),
+    ]);
+    if (!board) return false;
+    const parsed = readPlatformBoard(yaml);
+    return parsed !== null && boardDisagreesWithYaml(parsed, board);
+  } catch (err) {
+    console.warn("Board disagreement check failed:", err);
+    return false;
+  }
+}
 
 /** Write a device's sidecar `board_id` and toast the outcome; true on success. */
 export async function applyBoardChange(
