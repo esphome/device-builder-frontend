@@ -1010,7 +1010,13 @@ export class ESPHomePageDashboard extends LitElement {
 
   /** Chip-mismatch recovery hand-off from the install dialog. */
   _onRequestChangeBoard = (e: CustomEvent<{ configuration: string }>) => {
-    void this._boardReselectDialog?.open({ configuration: e.detail.configuration });
+    const dialog = this._boardReselectDialog;
+    if (!dialog) {
+      // A missing dialog is a bug, not "nothing to offer".
+      console.error("Board reselect dialog missing");
+      return;
+    }
+    void dialog.open({ configuration: e.detail.configuration });
   };
 
   _toggleDevice(configuration: string) {
