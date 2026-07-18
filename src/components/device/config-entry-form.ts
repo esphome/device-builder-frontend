@@ -42,6 +42,7 @@ import { isEntryVisible, type ValidationError } from "../../util/config-validati
 import { resolveDeviceName } from "../../util/device-name.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { fetchAllComponents } from "../../util/fetch-all-components.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   fetchPinRegistryModes,
@@ -608,13 +609,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   }
 
   private _emitAdvancedToggle(show: boolean) {
-    this.dispatchEvent(
-      new CustomEvent("advanced-toggle", {
-        detail: { show },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "advanced-toggle", { show });
   }
 
   /** Fallback banner for *unsatisfied* constraint groups that aren't visually
@@ -1163,13 +1158,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * it at a higher level and opens the dialog from scratch.
    */
   private _requestAddComponent(domain: string) {
-    this.dispatchEvent(
-      new CustomEvent("request-add-component", {
-        detail: { domain },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "request-add-component", { domain });
   }
 
   /**

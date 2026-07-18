@@ -37,6 +37,7 @@ import { linkButtonStyles } from "../styles/link-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
+import { fireEvent } from "../util/fire-event.js";
 import { LightDismissController } from "../util/light-dismiss-controller.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
@@ -370,13 +371,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // faster machine. The build keeps running in the background queue.
   _tryOpenBuildOffloadSettings = () => {
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("open-settings", {
-        detail: { section: "build_offload" },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-settings", { section: "build_offload" });
   };
 
   // Reopen without clearing line buffer / status. Used by logs-dialog's
@@ -425,9 +420,7 @@ export class ESPHomeCommandDialog extends LitElement {
     // Closing frees the user to interact with the firmware-tasks list;
     // follow_job will reattach if they click back into this device's job.
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("open-firmware-jobs", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "open-firmware-jobs");
   };
 
   // Close + navigate to /device/<config>. Device page just closes (user
@@ -436,13 +429,7 @@ export class ESPHomeCommandDialog extends LitElement {
     const configuration = this.configuration;
     this.close();
     if (!configuration) return;
-    this.dispatchEvent(
-      new CustomEvent("request-open-editor", {
-        detail: { configuration },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "request-open-editor", { configuration });
   };
 
   // Per-device clean: same dialog instance, same configuration. Non-
@@ -451,9 +438,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   _tryResetBuildEnv = () => {
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "open-reset-build-env");
   };
 
   _tryResetRemoteBuildEnv = (pin: string) => {

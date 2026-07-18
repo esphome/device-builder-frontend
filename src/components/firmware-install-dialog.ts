@@ -29,6 +29,7 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
+import { fireEvent } from "../util/fire-event.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
@@ -337,13 +338,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _tryOpenBuildOffloadSettings = () => {
     this._detachStream({ cancelJob: false });
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-settings", {
-        detail: { section: "build_offload" },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-settings", { section: "build_offload" });
   };
 
   // Drop into red error state. detail is optional — render skips it entirely
@@ -363,13 +358,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     const device = this._device;
     this._close();
     if (!device) return;
-    this.dispatchEvent(
-      new CustomEvent("request-open-editor", {
-        detail: { configuration: device.configuration },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "request-open-editor", { configuration: device.configuration });
   };
 
   // Chip-mismatch recovery: close and hand off to the host page's board
@@ -379,13 +368,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     const device = this._device;
     this._close();
     if (!device) return;
-    this.dispatchEvent(
-      new CustomEvent("request-change-board", {
-        detail: { configuration: device.configuration },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "request-change-board", { configuration: device.configuration });
   };
 
   // Per-device clean: dashboard routes through command-dialog's clean flow.
@@ -393,20 +376,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     const device = this._device;
     this._close();
     if (!device) return;
-    this.dispatchEvent(
-      new CustomEvent("clean-build", {
-        detail: device,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "clean-build", device);
   };
 
   _tryResetBuildEnv = () => {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "open-reset-build-env");
   };
 
   _tryResetRemoteBuildEnv = (pin: string) => {
@@ -473,7 +448,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     // _detachStream already clears _jobId (and cancels the backend job +
     // settles any pending compile promise) — no need to clear it here.
     this._detachStream();
-    this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
+    fireEvent(this, "close");
   };
 
   // Flip _open the moment a close is requested (X / Escape / outside-click) so

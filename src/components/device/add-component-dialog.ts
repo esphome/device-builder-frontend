@@ -14,6 +14,7 @@ import type { BusPrefill } from "../../util/bus-constraint-prefill.js";
 import { collectExistingIds } from "../../util/default-component-id.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { buildFeaturedId, isFeaturedId } from "../../util/featured-id.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -669,9 +670,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   /** Surface the merged YAML as an unsaved editor draft (host saves explicitly). */
   private _dispatchDraft(yaml: string) {
-    this.dispatchEvent(
-      new CustomEvent("yaml-draft", { detail: { yaml }, bubbles: true, composed: true })
-    );
+    fireEvent(this, "yaml-draft", { yaml });
   }
 
   /**
@@ -856,13 +855,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
           typeof newId === "string" ? newId : undefined
         );
         if (target) {
-          this.dispatchEvent(
-            new CustomEvent("section-select", {
-              detail: target,
-              bubbles: true,
-              composed: true,
-            })
-          );
+          fireEvent(this, "section-select", target);
         }
         this._dialog.open = false;
         this._selected = null;

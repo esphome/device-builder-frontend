@@ -28,6 +28,7 @@ import { serialPortHintStyles } from "../styles/serial-port-hints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
 import { isEsptoolPlatform } from "../util/esptool-platform.js";
+import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { SerialPortsPollController } from "../util/serial-ports-poll-controller.js";
 import {
@@ -499,27 +500,15 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   }
 
   private _selectMethod(method: string, port?: string) {
-    this.dispatchEvent(
-      new CustomEvent("select-method", {
-        detail: port ? { method, port } : { method },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "select-method", port ? { method, port } : { method });
   }
 
   private _selectPort(port: string) {
-    this.dispatchEvent(
-      new CustomEvent("select-method", {
-        detail: { method: "server-serial", port },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "select-method", { method: "server-serial", port });
   }
 
   private _onClose() {
-    this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
+    fireEvent(this, "close");
   }
 }
 

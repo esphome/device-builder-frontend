@@ -20,6 +20,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
@@ -257,13 +258,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   /** Re-emit the picker's selection as a page-level `change-board`. */
   private _onSelectBoard = (e: CustomEvent<{ boardId: string }>) => {
     e.stopPropagation();
-    this.dispatchEvent(
-      new CustomEvent("change-board", {
-        detail: e.detail,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "change-board", e.detail);
   };
 
   static styles = [espHomeStyles, deviceBoardInfoStyles];
@@ -487,13 +482,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    * page's state shape from in here.
    */
   private _onShowNavSection(section: NavSectionName) {
-    this.dispatchEvent(
-      new CustomEvent("nav-section-show", {
-        detail: { section },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "nav-section-show", { section });
   }
 
   /**
@@ -537,21 +526,11 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   }
 
   private _onDismissWelcome() {
-    this.dispatchEvent(
-      new CustomEvent("just-created-dismiss", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "just-created-dismiss");
   }
 
   private _onWelcomeInstall() {
-    this.dispatchEvent(
-      new CustomEvent("request-install", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "request-install");
   }
 }
 
