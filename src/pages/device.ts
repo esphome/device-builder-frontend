@@ -1039,7 +1039,7 @@ export class ESPHomePageDevice extends LitElement {
     // methods. Dismissing the picker keeps install blocked; the next
     // click re-prompts.
     if (this._boardDisagreement()) {
-      this._openBoardReselect();
+      void this._openBoardReselect();
       return;
     }
     run();
