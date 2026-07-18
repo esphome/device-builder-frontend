@@ -18,6 +18,7 @@ import type { ESPHomeAPI } from "../api/index.js";
 import { DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { backButtonStyles } from "../styles/back-button.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { disclosureStyles } from "../styles/disclosure.js";
 import { emptyStateStyles } from "../styles/empty-state.js";
@@ -175,6 +176,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     newItemHighlightStyles,
     serialPortHintStyles,
     emptyStateStyles,
+    backButtonStyles,
     installMethodDialogStyles,
   ];
 

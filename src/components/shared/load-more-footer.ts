@@ -37,7 +37,7 @@ export function renderLoadMoreFooter(
   if (o.error) {
     return html`<div class="load-more-error" role="alert">
       <span>${o.localize(o.errorLabelKey)}</span>
-      <button class="retry-link" type="button" @click=${o.onRetry}>
+      <button class="retry-link link-button" type="button" @click=${o.onRetry}>
         ${o.localize("command.retry")}
       </button>
     </div>`;

@@ -232,22 +232,7 @@ export const installMethodDialogStyles = css`
   }
 
   .back-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0;
     margin-bottom: var(--wa-space-s);
-    background: none;
-    border: none;
-    font-family: inherit;
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--esphome-primary);
-    cursor: pointer;
-  }
-
-  .back-btn wa-icon {
-    font-size: 16px;
   }
 
   .loading {

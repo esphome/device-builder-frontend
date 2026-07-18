@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
@@ -11,9 +11,13 @@ import { dialogChromeStyles, quietCloseButtonStyles } from "../styles/dialog-chr
 import { dialogFieldStyles } from "../styles/dialog-fields.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
+import { validateDeviceName } from "../util/config-validation.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
-import { renderInlineError } from "../util/render-error.js";
+import {
+  deviceNameValidity,
+  renderDeviceNameField,
+  type DeviceNameValidity,
+} from "./shared/device-name-field.js";
 
 import "./base-dialog.js";
 
@@ -97,14 +101,11 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     // the backend rejects ``new_name == source`` anyway, but
     // catching it client-side keeps the submit button disabled
     // instead of letting the user fire and see an error toast.
-    const err =
+    const validity: DeviceNameValidity =
       sameAsSource && showsValidation
-        ? { code: "dashboard.action_clone_same_name", params: undefined }
-        : showsValidation
-          ? validateDeviceName(trimmedName)
-          : null;
-    const warning = showsValidation && !err ? getDeviceNameWarning(trimmedName) : null;
-    const canSubmit = trimmedName.length > 0 && !err;
+        ? { err: { code: "dashboard.action_clone_same_name" }, warning: null }
+        : deviceNameValidity(trimmedName, showsValidation);
+    const canSubmit = trimmedName.length > 0 && !validity.err;
 
     return html`
       <esphome-base-dialog
@@ -115,31 +116,17 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
         .confirmOnEnter=${this._confirm}
         @request-close=${this._dialog.onRequestClose}
       >
-        <div class="field">
-          <label for="clone-new-name"
-            >${this._localize("dashboard.action_clone_name_label")}</label
-          >
-          <input
-            id="clone-new-name"
-            type="text"
-            autofocus
-            class=${err ? "invalid" : ""}
-            .value=${this._name}
-            placeholder=${this.sourceName}
-            @input=${(e: Event) => {
-              this._name = (e.target as HTMLInputElement).value;
-            }}
-          />
-          ${
-            err
-              ? renderInlineError(this._localize(err.code, err.params))
-              : warning
-                ? html`<span class="field-warning"
-                    >${this._localize(warning.code, warning.params)}</span
-                  >`
-                : nothing
-          }
-        </div>
+        ${renderDeviceNameField({
+          localize: this._localize,
+          labelKey: "dashboard.action_clone_name_label",
+          value: this._name,
+          validity,
+          onInput: (value) => {
+            this._name = value;
+          },
+          id: "clone-new-name",
+          placeholder: this.sourceName,
+        })}
         <div class="field">
           <label for="clone-friendly-name"
             >${this._localize("dashboard.action_clone_friendly_name_label")}</label
