@@ -6,7 +6,7 @@ import {
 } from "../../util/config-validation.js";
 import { renderInlineError } from "../../util/render-error.js";
 
-/** Localizable message: ``ValidationError`` minus the field key. */
+/** The localizable (code, params) subset of ``ValidationError``. */
 export interface DeviceNameMessage {
   code: string;
   params?: Record<string, string | number>;
@@ -23,11 +23,11 @@ export interface DeviceNameValidity {
  * error-free.
  */
 export function deviceNameValidity(
-  trimmed: string,
+  name: string,
   showsValidation: boolean
 ): DeviceNameValidity {
-  const err = showsValidation ? validateDeviceName(trimmed) : null;
-  const warning = showsValidation && !err ? getDeviceNameWarning(trimmed) : null;
+  const err = showsValidation ? validateDeviceName(name) : null;
+  const warning = showsValidation && !err ? getDeviceNameWarning(name) : null;
   return { err, warning };
 }
 

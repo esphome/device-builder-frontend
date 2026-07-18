@@ -91,6 +91,7 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
           onInput: (value) => {
             this._value = value;
           },
+          id: "rename-device-name",
         })}
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>
