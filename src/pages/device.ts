@@ -1037,9 +1037,11 @@ export class ESPHomePageDevice extends LitElement {
     // Hard block: an unresolved YAML/board disagreement dead-ends the
     // install chip check, so force the fix before offering install
     // methods. Dismissing the picker keeps install blocked; the next
-    // click re-prompts.
-    if (this._boardDisagreement()) {
-      void this._openBoardReselect();
+    // click re-prompts. When the picker has nothing to offer (no
+    // catalog candidates, or a transient failure) fall through — the
+    // chip check downstream stays the guard, and blocking here would
+    // strand the install with only a toast.
+    if (this._boardDisagreement() && (await this._openBoardReselect())) {
       return;
     }
     run();

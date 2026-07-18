@@ -42,7 +42,7 @@ const DEVICE = makeConfiguredDevice({ configuration: "stale.yaml" });
 
 function makePage() {
   const page = new ESPHomePageDashboard();
-  const openReselect = vi.fn().mockResolvedValue(undefined);
+  const openReselect = vi.fn().mockResolvedValue(true);
   Object.defineProperty(page, "_boardReselectDialog", {
     value: { open: openReselect },
   });
@@ -69,6 +69,17 @@ describe("dashboard install hard block", () => {
     page._openCommand(DEVICE, "install");
     await vi.waitFor(() => expect(openReselect).toHaveBeenCalledTimes(1));
     expect(page._commandDialog.openForDevice).not.toHaveBeenCalled();
+  });
+
+  it("falls through when the picker has nothing to offer", async () => {
+    // Blocking with only a toast would strand the install; the chip
+    // check downstream stays the guard.
+    vi.mocked(findBoardDisagreement).mockResolvedValue(true);
+    const { page, openReselect } = makePage();
+    openReselect.mockResolvedValue(false);
+    page._openInstallMethod(DEVICE);
+    await vi.waitFor(() => expect(page._installMethodOpen).toBe(true));
+    expect(openReselect).toHaveBeenCalledTimes(1);
   });
 
   it("proceeds when the YAML and board agree", async () => {

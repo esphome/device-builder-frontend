@@ -139,6 +139,14 @@ describe("install hard block on board disagreement", () => {
     expect(openReselect).toHaveBeenCalledTimes(2);
   });
 
+  it("falls through to the install when the picker has nothing to offer", async () => {
+    const { page, openReselect, run } = makeInstallPage();
+    openReselect.mockResolvedValue(false);
+    await page._installAfterSave(run);
+    expect(openReselect).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it("runs the install once the YAML agrees", async () => {
     const { page, openReselect, run } = makeInstallPage({
       _yaml: "esp32:\n  board: esp32-s3-devkitc-1\n",

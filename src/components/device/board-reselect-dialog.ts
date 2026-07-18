@@ -105,7 +105,7 @@ export class ESPHomeBoardReselectDialog extends LitElement {
         .description=${this._description}
         searchable
         ?hasMore=${paged && this._list.hasMore}
-        ?loadingMore=${paged && this._list.loadingMore}
+        ?loadingMore=${paged && (this._list.loading || this._list.loadingMore)}
         ?loadError=${paged && this._list.hasError && this._list.items.length > 0}
         @load-more=${this._onLoadMore}
         @search-changed=${this._onSearchChanged}
