@@ -31,10 +31,12 @@ const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
 if (favicon) favicon.href = withBase("/assets/logo/esphome-favicon.svg");
 
 import { installWaComboboxLeakFix } from "./util/wa-combobox-leak-fix.js";
+import { installWaTooltipTouchSuppression } from "./util/wa-tooltip-touch-suppression.js";
 
 // Register the wa-combobox stub before any wa-select / wa-option renders
 // so webawesome's never-resolving whenDefined promise can't leak (#1031).
 installWaComboboxLeakFix();
+installWaTooltipTouchSuppression();
 
 import "./components/app-shell.js";
 import "./styles/apply-theme.js";
