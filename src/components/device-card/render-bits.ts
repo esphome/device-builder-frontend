@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
 
@@ -75,7 +76,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       class="device-status busy"
       @click=${(e: Event) => {
         e.stopPropagation();
-        card._emit("show-progress");
+        fireEvent(card, "show-progress");
       }}
     >
       <wa-spinner></wa-spinner>

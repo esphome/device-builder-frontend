@@ -16,6 +16,7 @@ import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { dropdownMenuStyles } from "../styles/dropdown-menu.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
+import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -364,7 +365,7 @@ export class ESPHomeSelectBar extends LitElement {
         <div class="left">
           <button
             class="toggle"
-            @click=${() => this._emit(allSelected ? "deselect-all" : "select-all")}
+            @click=${() => fireEvent(this, allSelected ? "deselect-all" : "select-all")}
           >
             ${
               allSelected
@@ -380,7 +381,7 @@ export class ESPHomeSelectBar extends LitElement {
           <button
             class="btn btn--cancel"
             aria-label=${cancelLabel}
-            @click=${() => this._emit("cancel")}
+            @click=${() => fireEvent(this, "cancel")}
           >
             <wa-icon library="mdi" name="close"></wa-icon>
             <span class="btn-label">${cancelLabel}</span>
@@ -389,7 +390,7 @@ export class ESPHomeSelectBar extends LitElement {
             class="btn btn--secondary"
             aria-label=${labelsAriaLabel}
             ?disabled=${count === 0}
-            @click=${() => this._emit("labels-selected")}
+            @click=${() => fireEvent(this, "labels-selected")}
           >
             <wa-icon library="mdi" name="tag-multiple"></wa-icon>
             <span class="btn-label">${labelsLabel}</span>
@@ -398,7 +399,7 @@ export class ESPHomeSelectBar extends LitElement {
             class="btn btn--secondary"
             aria-label=${archiveAriaLabel}
             ?disabled=${count === 0}
-            @click=${() => this._emit("archive-selected")}
+            @click=${() => fireEvent(this, "archive-selected")}
           >
             <wa-icon library="mdi" name="archive-outline"></wa-icon>
             <span class="btn-label">${archiveLabel}</span>
@@ -407,7 +408,7 @@ export class ESPHomeSelectBar extends LitElement {
             class="btn btn--danger"
             aria-label=${deleteAriaLabel}
             ?disabled=${count === 0}
-            @click=${() => this._emit("delete-selected")}
+            @click=${() => fireEvent(this, "delete-selected")}
           >
             <wa-icon library="mdi" name="delete"></wa-icon>
             <span class="btn-label">${deleteLabel}</span>
@@ -417,7 +418,7 @@ export class ESPHomeSelectBar extends LitElement {
               class="btn btn--primary update-split__main"
               aria-label=${updateAriaLabel}
               ?disabled=${count === 0}
-              @click=${() => this._emit("update-selected")}
+              @click=${() => fireEvent(this, "update-selected")}
             >
               <wa-icon library="mdi" name="update"></wa-icon>
               <span class="btn-label">${updateLabel}</span>
@@ -478,7 +479,7 @@ export class ESPHomeSelectBar extends LitElement {
 
   private _onCompile() {
     this._menuOpen = false;
-    this._emit("compile-selected");
+    fireEvent(this, "compile-selected");
   }
 
   /* role + tabindex make the menu row focusable; this maps Enter /
@@ -490,10 +491,6 @@ export class ESPHomeSelectBar extends LitElement {
       (e.currentTarget as HTMLElement).click();
     }
   };
-
-  private _emit(name: string) {
-    this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true }));
-  }
 }
 
 declare global {
