@@ -975,23 +975,26 @@ export class ESPHomePageDashboard extends LitElement {
    *  N pickers can't stack). A picker with nothing to offer falls
    *  through — the chip check downstream stays the guard, and
    *  blocking would strand the install with only a toast. */
-  _guardBoardThen = async (device: ConfiguredDevice, proceed: () => void) => {
-    if (showJobProgress(this, device)) return;
-    const yaml = await findBoardDisagreement(this._api, this._localize, device);
-    if (
-      yaml &&
-      (await openBoardReselect(this._boardReselectDialog, {
-        configuration: device.configuration,
-        yaml,
-      }))
-    ) {
-      return;
-    }
+  _guardBoardThen = async (
+    device: ConfiguredDevice,
+    proceed: () => void | Promise<void>
+  ) => {
+    // Whole body guarded: the void call sites would otherwise turn any
+    // throw into a silent unhandled rejection.
     try {
-      proceed();
+      if (showJobProgress(this, device)) return;
+      const yaml = await findBoardDisagreement(this._api, this._localize, device);
+      if (
+        yaml &&
+        (await openBoardReselect(this._boardReselectDialog, {
+          configuration: device.configuration,
+          yaml,
+        }))
+      ) {
+        return;
+      }
+      await proceed();
     } catch (err) {
-      // Surfaced rather than lost as an unhandled rejection behind the
-      // void call sites.
       console.error("Install entry failed:", err);
       notifyError(this._localize("device.install_start_failed"));
     }

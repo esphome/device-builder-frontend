@@ -1023,7 +1023,7 @@ export class ESPHomePageDevice extends LitElement {
   // on-disk file, so an unsaved edit would flash the previous version. A
   // click while a job already runs re-attaches to it instead: no save (the
   // edit stays in the buffer), no second job.
-  private _installAfterSave = async (run: () => void): Promise<void> => {
+  private _installAfterSave = async (run: () => void | Promise<void>): Promise<void> => {
     if (this._showActiveJobProgress()) return;
     let saved: boolean;
     this._suppressBoardPrompt = true;
@@ -1050,7 +1050,7 @@ export class ESPHomePageDevice extends LitElement {
       return;
     }
     try {
-      run();
+      await run();
     } catch (err) {
       // Surfaced rather than lost as an unhandled rejection.
       console.error("Install entry failed:", err);
