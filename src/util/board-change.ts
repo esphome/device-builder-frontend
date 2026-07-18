@@ -6,30 +6,32 @@ import { notifyError, notifySuccess, notifyWarning } from "./notify.js";
 import { boardDisagreesWithYaml, readPlatformBoard } from "./yaml-board.js";
 
 /**
- * Whether the device's YAML names a different chip than its stored board.
+ * The device's YAML when it names a different chip than its stored
+ * board, else null — callers hand the fetched YAML to the reselect
+ * picker to spare a refetch.
  *
- * Fetches both sides; a fetch failure fails open so install is never
- * blocked on it — but toasts a warning so a persistent failure is
- * distinguishable from a genuine "agrees".
+ * A fetch failure fails open (null) so install is never blocked on it,
+ * but toasts a warning so a persistent failure is distinguishable from
+ * a genuine "agrees".
  */
 export async function findBoardDisagreement(
   api: ESPHomeAPI,
   localize: LocalizeFunc,
   device: Pick<ConfiguredDevice, "configuration" | "board_id">
-): Promise<boolean> {
-  if (!device.board_id) return false;
+): Promise<string | null> {
+  if (!device.board_id) return null;
   try {
     const [board, yaml] = await Promise.all([
       fetchBoard(api, device.board_id),
       api.getConfig(device.configuration),
     ]);
-    if (!board) return false;
+    if (!board) return null;
     const parsed = readPlatformBoard(yaml);
-    return parsed !== null && boardDisagreesWithYaml(parsed, board);
+    return parsed !== null && boardDisagreesWithYaml(parsed, board) ? yaml : null;
   } catch (err) {
     console.warn("Board disagreement check failed:", err);
     notifyWarning(localize("device.board_check_failed"));
-    return false;
+    return null;
   }
 }
 

@@ -55,16 +55,19 @@ function makePage() {
 
 describe("dashboard install hard block", () => {
   it("blocks the install-method picker and opens the reselect dialog", async () => {
-    vi.mocked(findBoardDisagreement).mockResolvedValue(true);
+    vi.mocked(findBoardDisagreement).mockResolvedValue("esp32:\n  variant: esp32s3\n");
     const { page, openReselect } = makePage();
     page._openInstallMethod(DEVICE);
     await vi.waitFor(() => expect(openReselect).toHaveBeenCalledTimes(1));
-    expect(openReselect).toHaveBeenCalledWith({ configuration: "stale.yaml" });
+    expect(openReselect).toHaveBeenCalledWith({
+      configuration: "stale.yaml",
+      yaml: "esp32:\n  variant: esp32s3\n",
+    });
     expect(page._installMethodOpen).toBe(false);
   });
 
   it("blocks the direct update install the same way", async () => {
-    vi.mocked(findBoardDisagreement).mockResolvedValue(true);
+    vi.mocked(findBoardDisagreement).mockResolvedValue("esp32:\n  variant: esp32s3\n");
     const { page, openReselect } = makePage();
     page._openCommand(DEVICE, "install");
     await vi.waitFor(() => expect(openReselect).toHaveBeenCalledTimes(1));
@@ -74,7 +77,7 @@ describe("dashboard install hard block", () => {
   it("falls through when the picker has nothing to offer", async () => {
     // Blocking with only a toast would strand the install; the chip
     // check downstream stays the guard.
-    vi.mocked(findBoardDisagreement).mockResolvedValue(true);
+    vi.mocked(findBoardDisagreement).mockResolvedValue("esp32:\n  variant: esp32s3\n");
     const { page, openReselect } = makePage();
     openReselect.mockResolvedValue(false);
     page._openInstallMethod(DEVICE);
@@ -83,7 +86,7 @@ describe("dashboard install hard block", () => {
   });
 
   it("proceeds when the YAML and board agree", async () => {
-    vi.mocked(findBoardDisagreement).mockResolvedValue(false);
+    vi.mocked(findBoardDisagreement).mockResolvedValue(null);
     const { page, openReselect } = makePage();
     page._openInstallMethod(DEVICE);
     await vi.waitFor(() => expect(page._installMethodOpen).toBe(true));
@@ -91,7 +94,7 @@ describe("dashboard install hard block", () => {
   });
 
   it("leaves non-install commands ungated", () => {
-    vi.mocked(findBoardDisagreement).mockResolvedValue(true);
+    vi.mocked(findBoardDisagreement).mockResolvedValue("esp32:\n  variant: esp32s3\n");
     const { page, openReselect } = makePage();
     page._openCommand(DEVICE, "clean");
     expect(page._commandDialog.openForDevice).toHaveBeenCalledTimes(1);

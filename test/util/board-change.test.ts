@@ -32,24 +32,27 @@ describe("findBoardDisagreement", () => {
         configuration: "dev.yaml",
         board_id: "",
       })
-    ).toBe(false);
+    ).toBeNull();
     expect(api.getConfig).not.toHaveBeenCalled();
   });
 
-  it("flags a YAML naming a different chip", async () => {
+  it("returns the fetched YAML when it names a different chip", async () => {
+    // Callers hand this to the reselect picker to spare a refetch.
     vi.mocked(fetchBoard).mockResolvedValue(S3_BOARD);
     const api = {
       getConfig: vi.fn().mockResolvedValue("esp32:\n  variant: esp32c3\n"),
     } as unknown as ESPHomeAPI;
-    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBe(true);
+    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBe(
+      "esp32:\n  variant: esp32c3\n"
+    );
   });
 
-  it("is false when the YAML agrees", async () => {
+  it("is null when the YAML agrees", async () => {
     vi.mocked(fetchBoard).mockResolvedValue(S3_BOARD);
     const api = {
       getConfig: vi.fn().mockResolvedValue("esp32:\n  board: esp32-s3-devkitc-1\n"),
     } as unknown as ESPHomeAPI;
-    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBe(false);
+    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBeNull();
   });
 
   it("fails open with a warning toast on a fetch failure", async () => {
@@ -59,7 +62,7 @@ describe("findBoardDisagreement", () => {
     const api = {
       getConfig: vi.fn().mockRejectedValue(new Error("boom")),
     } as unknown as ESPHomeAPI;
-    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBe(false);
+    expect(await findBoardDisagreement(api, identityLocalize, DEVICE)).toBeNull();
     expect(toast.warning).toHaveBeenCalled();
   });
 });

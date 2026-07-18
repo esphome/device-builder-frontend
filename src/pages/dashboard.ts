@@ -977,9 +977,11 @@ export class ESPHomePageDashboard extends LitElement {
    *  blocking would strand the install with only a toast. */
   _guardBoardThen = async (device: ConfiguredDevice, proceed: () => void) => {
     if (showJobProgress(this, device)) return;
-    if (await findBoardDisagreement(this._api, this._localize, device)) {
+    const yaml = await findBoardDisagreement(this._api, this._localize, device);
+    if (yaml) {
       const opened = await (this._boardReselectDialog?.open({
         configuration: device.configuration,
+        yaml,
       }) ?? Promise.resolve(false));
       if (opened) return;
     }
