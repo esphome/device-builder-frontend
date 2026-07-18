@@ -142,6 +142,12 @@ export interface BoardCatalogEntry extends SlimBoard {
    * the create wizard's "set up with everything" default. Body-only.
    */
   full_config?: boolean;
+  /**
+   * Remote-package board: devices/create writes a thin packages: reference
+   * to this upstream config instead of expanding components; the wizard
+   * shows the ready-made note in place of the full-setup checkbox. Body-only.
+   */
+  package_import_url?: string;
   /** Components recommended for this board. */
   featured_components: FeaturedComponent[];
   /** Logical groups of featured components added together. */

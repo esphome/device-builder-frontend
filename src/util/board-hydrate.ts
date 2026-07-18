@@ -46,6 +46,7 @@ export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
   return {
     ...hydrateSlimBoard(entry),
     full_config: entry.full_config ?? false,
+    package_import_url: entry.package_import_url ?? "",
     featured_components: (entry.featured_components ?? []).map(_hydrateFeaturedComponent),
     featured_bundles: (entry.featured_bundles ?? []).map(_hydrateFeaturedBundle),
     requires_wifi: entry.requires_wifi ?? false,

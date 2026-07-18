@@ -423,7 +423,13 @@ export class ESPHomeWizardStepSetup extends LitElement {
                   ${this._localize("wizard.full_setup_desc")}
                 </p>
               </div>`
-            : null
+            : this.board?.package_import_url
+              ? html`<div class="full-setup">
+                  <p class="section-subtitle">
+                    ${this._localize("wizard.package_config_desc")}
+                  </p>
+                </div>`
+              : null
         }
       </section>
     `;
