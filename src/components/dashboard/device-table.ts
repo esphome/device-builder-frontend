@@ -39,7 +39,11 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { matchesDeviceRow } from "../../util/device-search.js";
-import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
+import {
+  deployedIdentityTrusted,
+  showPendingChanges,
+  showUpdateAvailable,
+} from "../../util/device-sync.js";
 import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { TourActivityController } from "../guided-tour/tour-activity-controller.js";
@@ -289,7 +293,7 @@ export class ESPHomeDeviceTable extends LitElement {
           // interface derived values are diagnostic detail that
           // belongs in the per-device drawer.
           platform: d.target_platform || "",
-          version: rt.deployed_version,
+          version: deployedIdentityTrusted(d) ? rt.deployed_version : "",
           build_size_bytes: d.build_size_bytes || 0,
           comment: d.comment || "",
           area: d.area || "",
