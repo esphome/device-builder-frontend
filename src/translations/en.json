@@ -690,7 +690,7 @@
     "change_board_error": "Failed to change board",
     "change_board_unsaved": "Save or discard your changes before changing the board",
     "board_reselect_title": "Select matching board",
-    "board_reselect_desc": "Your configuration sets \"{board}\", which does not match the device's selected board. Pick the board that matches your configuration.",
+    "board_reselect_desc": "Your configuration targets \"{board}\", which does not match the device's selected board. Pick the board that matches your configuration.",
     "board_reselect_none": "No boards in the catalog match \"{board}\".",
     "board_reselect_no_platform": "No board or variant found in the configuration.",
     "board_check_failed": "Could not verify the board selection, continuing anyway.",
