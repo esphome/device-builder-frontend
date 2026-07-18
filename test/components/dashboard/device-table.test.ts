@@ -144,7 +144,10 @@ describe("device-table Version column identity gating", () => {
   it.each<[string, ConfiguredDeviceOverrides, string]>([
     [
       "api device with mdns ownership shows the deployed version",
-      { api_enabled: true },
+      {
+        api_enabled: true,
+        runtime_state: { active_source: "mdns", deployed_identity_live: false },
+      },
       "2026.6.0",
     ],
     [
@@ -157,7 +160,7 @@ describe("device-table Version column identity gating", () => {
     ],
     [
       "no-api device with a live identity TXT shows the deployed version",
-      { api_enabled: false },
+      { api_enabled: false, runtime_state: { deployed_identity_live: true } },
       "2026.6.0",
     ],
     [
