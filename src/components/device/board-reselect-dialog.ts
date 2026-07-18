@@ -74,7 +74,9 @@ export class ESPHomeBoardReselectDialog extends LitElement {
     try {
       const yaml = opts.yaml ?? (await this._api.getConfig(opts.configuration));
       const parsed = readPlatformBoard(yaml);
-      const label = parsed?.board ?? parsed?.variant ?? parsed?.platform ?? "";
+      // Only a board or variant is matchable; a bare platform block gets
+      // the no-platform toast below.
+      const label = parsed?.board ?? parsed?.variant ?? "";
       this._search = "";
       this._pendingSearch = "";
       if (!(await this._loadCandidates(parsed))) {

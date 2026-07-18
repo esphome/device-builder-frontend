@@ -212,6 +212,17 @@ describe("board-reselect-dialog", () => {
     );
   });
 
+  it("uses the no-platform toast for a bare platform block", async () => {
+    // A platform label isn't matchable; "match \"esp32\"" would mislead.
+    const getBoards = vi.fn().mockResolvedValue({ boards: [C3_CURATED] });
+    const { el } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
+    expect(await el.open({ configuration: "dev.yaml", yaml: "esp32:\n" })).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(
+      "device.board_reselect_no_platform",
+      expect.anything()
+    );
+  });
+
   it("falls through to the variant listing on an empty compatible set", async () => {
     // An anomalous empty response must not open an empty picker.
     const getBoards = vi
