@@ -4,6 +4,7 @@ import { customElement, property } from "lit/decorators.js";
 
 import { emptyStateStyles } from "../../styles/empty-state.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { deviceSectionAutomationListStyles } from "./device-section-automation-list.styles.js";
 
@@ -39,7 +40,12 @@ export interface AutomationListRow {
  */
 @customElement("esphome-section-automation-list")
 export class ESPHomeSectionAutomationList extends LitElement {
-  static styles = [espHomeStyles, emptyStateStyles, deviceSectionAutomationListStyles];
+  static styles = [
+    espHomeStyles,
+    emptyStateStyles,
+    textStyles,
+    deviceSectionAutomationListStyles,
+  ];
 
   @property()
   heading = "";
@@ -91,7 +97,7 @@ export class ESPHomeSectionAutomationList extends LitElement {
               ${this.rows.map(
                 (row) =>
                   html`<li class="row">
-                    <span class="name">${row.label}</span>
+                    <span class="name truncate">${row.label}</span>
                     <div class="row-buttons">
                       <button
                         type="button"

@@ -16,6 +16,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import {
   NO_INSTANCE_ERRORS,
   type InstanceBackendErrors,
@@ -270,7 +271,7 @@ export class ESPHomeDeviceEditor extends LitElement {
   @query("esphome-confirm-dialog.auto-fix-confirm")
   private _autoFixConfirmDialog?: ESPHomeConfirmDialog;
 
-  static styles = [espHomeStyles, deviceEditorStyles];
+  static styles = [espHomeStyles, textStyles, deviceEditorStyles];
 
   protected render() {
     // On mobile we collapse the split view down to a single pane to
@@ -307,10 +308,12 @@ export class ESPHomeDeviceEditor extends LitElement {
           <slot name="header-start"></slot>
           <div class="editor-header-main">
             <div class="editor-header-titlerow">
-              <h2 class="editor-header-title">${title}</h2>
+              <h2 class="editor-header-title truncate">${title}</h2>
               ${
                 this.configuration && !compactHeader
-                  ? html`<span class="editor-header-file">${this.configuration}</span>`
+                  ? html`<span class="editor-header-file truncate"
+                      >${this.configuration}</span
+                    >`
                   : nothing
               }
             </div>

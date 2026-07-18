@@ -252,7 +252,9 @@ export class ESPHomeAutomationActionNode extends LitElement {
             title=${this._localize("device.automation_action_pick")}
             @click=${this._openPicker}
           >
-            <span class="ae-row-picker-name"> ${def?.name ?? this.value.action_id} </span>
+            <span class="ae-row-picker-name truncate">
+              ${def?.name ?? this.value.action_id}
+            </span>
             <wa-icon library="mdi" name="pencil-outline"></wa-icon>
           </button>
           <div class="ae-row-controls">

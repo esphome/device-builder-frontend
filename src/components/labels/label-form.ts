@@ -30,6 +30,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { labelChipStyles } from "../../util/label-chip-template.js";
 import {
   LABEL_COLOR_SWATCHES,
@@ -245,7 +246,13 @@ export class ESPHomeLabelForm extends LitElement {
       .filter((s) => s && !taken.has(s.toLowerCase()));
   }
 
-  static styles = [espHomeStyles, inputStyles, labelChipStyles, labelFormStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    textStyles,
+    labelChipStyles,
+    labelFormStyles,
+  ];
 
   /** Open the form programmatically. Hosts that drive the open
    *  state externally (e.g. seeding from a filter input) can call

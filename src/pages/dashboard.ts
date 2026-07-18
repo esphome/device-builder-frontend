@@ -105,6 +105,7 @@ import {
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { textStyles } from "../styles/text.js";
 import { runBulkCompile, runBulkUpdate } from "../util/bulk-update.js";
 import {
   loadDashboardFilters,
@@ -340,6 +341,7 @@ export class ESPHomePageDashboard extends LitElement {
     dashboardStyles,
     stackBarStyles,
     dashboardStacksStyles,
+    textStyles,
     deviceGridStyles,
     yamlModeStyles,
     skeletonStyles,

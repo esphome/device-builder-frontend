@@ -13,6 +13,7 @@ import { mdiClose, mdiMagnify, mdiPalette } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { inputStyles } from "../styles/inputs.js";
+import { textStyles } from "../styles/text.js";
 import { LightDismissController } from "../util/light-dismiss-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { mdiIconPickerStyles } from "./mdi-icon-picker.styles.js";
@@ -117,7 +118,7 @@ export class ESPHomeMdiIconPicker extends LitElement {
 
   @query(".search-input") private _searchInput?: HTMLInputElement;
 
-  static styles = [inputStyles, mdiIconPickerStyles];
+  static styles = [inputStyles, textStyles, mdiIconPickerStyles];
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._dismiss.set(this._open);
@@ -314,7 +315,9 @@ export class ESPHomeMdiIconPicker extends LitElement {
         @click=${this._toggle}
       >
         ${this._renderTriggerIcon()}
-        <span class=${name ? "trigger-label" : "trigger-label placeholder"}>
+        <span
+          class=${name ? "trigger-label truncate" : "trigger-label placeholder truncate"}
+        >
           ${name ? `mdi:${name}` : this.placeholder}
         </span>
         ${

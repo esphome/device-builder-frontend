@@ -32,6 +32,7 @@ import {
 } from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { textStyles } from "../styles/text.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { getErrorMessage } from "../util/error-message.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
@@ -160,6 +161,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   static styles = [
     espHomeStyles,
     primaryDialogHeaderStyles,
+    textStyles,
     firmwareJobsListStyles,
     firmwareJobsDialogStyles,
   ];

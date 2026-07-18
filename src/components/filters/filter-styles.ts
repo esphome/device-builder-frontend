@@ -191,9 +191,6 @@ export const filterStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .facet-row-count {

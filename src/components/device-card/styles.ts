@@ -1,6 +1,9 @@
 import { css } from "lit";
 
+import { textStyles } from "../../styles/text.js";
+
 export const deviceCardStyles = [
+  textStyles,
   css`
     /* Only rendered when the device carries labels; an untagged device
        gets no chip row and the card collapses naturally. Padding leans
@@ -112,9 +115,6 @@ export const deviceCardStyles = [
       font-size: var(--wa-font-size-m);
       font-weight: var(--wa-font-weight-bold);
       color: var(--wa-color-text-normal);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .indicator-dot {
@@ -159,9 +159,6 @@ export const deviceCardStyles = [
       margin: 0;
       font-size: var(--wa-font-size-xs);
       color: var(--wa-color-text-quiet);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .device-status {

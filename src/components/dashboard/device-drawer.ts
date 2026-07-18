@@ -15,6 +15,7 @@ import { DeviceState } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -50,6 +51,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
 
   static styles = [
     espHomeStyles,
+    textStyles,
     css`
       :host {
         display: block;
@@ -119,9 +121,6 @@ export class ESPHomeDeviceDrawer extends LitElement {
         font-size: var(--wa-font-size-l);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .subtitle {
@@ -326,7 +325,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
       <div class="drawer">
         <div class="header">
           <div class="header-left">
-            <h2 class="title">${device.friendly_name || device.name}</h2>
+            <h2 class="title truncate">${device.friendly_name || device.name}</h2>
             <p class="subtitle">${device.configuration}</p>
           </div>
           <button

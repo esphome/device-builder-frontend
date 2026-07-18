@@ -6,6 +6,7 @@ import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { textStyles } from "../styles/text.js";
 import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
@@ -37,6 +38,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
 
   static styles = [
     espHomeStyles,
+    textStyles,
     css`
       :host {
         display: block;
@@ -105,9 +107,6 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .subtitle {
@@ -270,7 +269,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
           }
         </span>
         <div class="header">
-          <h3 class="title">${title}</h3>
+          <h3 class="title truncate">${title}</h3>
           <div class="subtitle">
             ${
               showHostname

@@ -102,9 +102,6 @@ export const deviceSectionAutomationListStyles = css`
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-normal);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .row-buttons {

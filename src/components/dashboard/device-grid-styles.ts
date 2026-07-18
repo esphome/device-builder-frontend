@@ -309,9 +309,6 @@ export const deviceGridStyles = css`
   }
 
   .table-create-btn .label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     /* Flex item must allow shrinking below its intrinsic width or the
        ellipsis never triggers when the mobile row gets tight. */
     min-width: 0;

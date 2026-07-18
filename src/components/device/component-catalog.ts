@@ -18,6 +18,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { debounce } from "../../util/debounce.js";
 import { isFeaturedId } from "../../util/featured-id.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
@@ -240,6 +241,7 @@ export class ESPHomeComponentCatalog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    textStyles,
     componentCatalogStyles,
     loadMoreFooterStyles,
   ];

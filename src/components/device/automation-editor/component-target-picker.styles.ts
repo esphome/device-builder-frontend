@@ -96,9 +96,6 @@ export const componentTargetPickerStyles = css`
   .component-choice-name {
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-normal);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .component-domain {
     flex: 0 0 auto;

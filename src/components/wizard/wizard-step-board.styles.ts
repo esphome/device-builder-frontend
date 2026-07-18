@@ -218,13 +218,6 @@ export const wizardStepBoardStyles = css`
     overflow-wrap: anywhere;
   }
 
-  .board-description--clamp {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
   .tags {
     display: flex;
     flex-wrap: wrap;

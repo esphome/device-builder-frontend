@@ -23,6 +23,7 @@ import {
   localizeContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { textStyles } from "../styles/text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { yamlEmptyMessageKey } from "../util/yaml-search-helpers.js";
 import type { CommandAction } from "./command-palette-actions.js";
@@ -101,7 +102,7 @@ export class ESPHomeCommandPalette extends LitElement {
   @query(".search-input")
   private _searchInput?: HTMLInputElement;
 
-  static styles = [espHomeStyles, commandPaletteStyles];
+  static styles = [espHomeStyles, textStyles, commandPaletteStyles];
 
   /* Cmd+K is always-on (it opens the palette), so it stays on a
      dedicated keydown listener. Esc is wa-dialog's job: its
@@ -414,7 +415,7 @@ export class ESPHomeCommandPalette extends LitElement {
               ? html`<wa-icon library="mdi" name=${item.icon}></wa-icon>`
               : nothing
         }
-        <span class="item-label">${item.label}</span>
+        <span class="item-label truncate">${item.label}</span>
       </div>
     `;
   }

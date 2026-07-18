@@ -101,9 +101,6 @@ export const firmwareJobsListStyles = css`
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .job-meta {

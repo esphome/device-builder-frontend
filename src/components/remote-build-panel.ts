@@ -34,6 +34,7 @@ import { pairingAddressStyles } from "../styles/pairing-address.js";
 import { pairingWindowStyles } from "../styles/pairing-window.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { textStyles } from "../styles/text.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { notify } from "../util/notify.js";
@@ -164,6 +165,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
     pairingAddressStyles,
     pairingWindowStyles,
     peerRowStyles,
+    textStyles,
     firmwareJobsListStyles,
     stackBarStyles,
     remoteBuildPanelStyles,

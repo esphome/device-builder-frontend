@@ -6,6 +6,7 @@ import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { boardImageUrl } from "../../util/board-image.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -79,7 +80,12 @@ export class ESPHomeWizardStepBoardList extends LitElement {
     regular: boards.filter((b) => !b.featured),
   }));
 
-  static styles = [espHomeStyles, wizardStepBoardStyles, loadMoreFooterStyles];
+  static styles = [
+    espHomeStyles,
+    textStyles,
+    wizardStepBoardStyles,
+    loadMoreFooterStyles,
+  ];
 
   protected render() {
     const { featured, regular } = this._splitBoards(this.boards);
@@ -204,7 +210,9 @@ export class ESPHomeWizardStepBoardList extends LitElement {
           </button>
         </div>
 
-        <p class="board-description ${expanded ? "" : "board-description--clamp"}">
+        <p
+          class="board-description ${expanded ? "" : "board-description--clamp line-clamp-2"}"
+        >
           ${renderMarkdown(board.description)}
         </p>
 

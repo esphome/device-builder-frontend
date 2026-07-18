@@ -13,6 +13,7 @@ import { mdiCheck, mdiChevronDown, mdiMagnify } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import type { FacetOption } from "../../util/facets.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { toggleSelection } from "../../util/toggle-selection.js";
@@ -65,7 +66,7 @@ export class ESPHomeFilterSection extends LitElement {
 
   @query(".facet-search-input") private _searchInputEl?: HTMLInputElement;
 
-  static styles = [espHomeStyles, filterStyles, filterSectionStyles];
+  static styles = [espHomeStyles, textStyles, filterStyles, filterSectionStyles];
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("expanded") && !this.expanded) this._query = "";
@@ -85,7 +86,7 @@ export class ESPHomeFilterSection extends LitElement {
         aria-expanded=${this.expanded ? "true" : "false"}
         @click=${this._onHeaderClick}
       >
-        <span class="section-name">${this.name}</span>
+        <span class="section-name truncate">${this.name}</span>
         ${
           this.selected.length > 0
             ? html`<span class="section-count" aria-hidden="true"
@@ -154,7 +155,7 @@ export class ESPHomeFilterSection extends LitElement {
                           : nothing
                       }
                     </span>
-                    <span class="facet-row-name">${option.name}</span>
+                    <span class="facet-row-name truncate">${option.name}</span>
                     ${
                       option.count >= 0
                         ? html`<span class="facet-row-count" aria-hidden="true"

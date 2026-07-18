@@ -201,7 +201,9 @@ export class ESPHomeAutomationConditionTree extends LitElement {
             ?disabled=${this.disabled}
             @click=${() => this._openPickerForChange(idx)}
           >
-            <span class="ae-row-picker-name"> ${def?.name ?? node.condition_id} </span>
+            <span class="ae-row-picker-name truncate">
+              ${def?.name ?? node.condition_id}
+            </span>
             <wa-icon library="mdi" name="pencil-outline"></wa-icon>
           </button>
           <div class="ae-row-controls">

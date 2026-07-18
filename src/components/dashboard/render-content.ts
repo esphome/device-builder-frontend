@@ -240,7 +240,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         @click=${() => host._createDialog.open()}
       >
         <wa-icon library="mdi" name="plus"></wa-icon>
-        <span class="label">${host._localize("dashboard.create_device")}</span>
+        <span class="label truncate">${host._localize("dashboard.create_device")}</span>
       </button>
       <div slot="no-results-extra" class="yaml-preview-banner">
         ${renderNoResultsExtras(host)}

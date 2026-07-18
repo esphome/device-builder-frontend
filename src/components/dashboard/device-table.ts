@@ -38,6 +38,7 @@ import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { matchesDeviceRow } from "../../util/device-search.js";
 import {
   deployedIdentityTrusted,
@@ -318,7 +319,13 @@ export class ESPHomeDeviceTable extends LitElement {
     }
   }
 
-  static styles = [espHomeStyles, tableCellStyles, tableLayoutStyles, labelChipStyles];
+  static styles = [
+    espHomeStyles,
+    tableCellStyles,
+    tableLayoutStyles,
+    textStyles,
+    labelChipStyles,
+  ];
 
   protected render() {
     const effectivePageSize = effectiveTablePageSize(this._pageSize, this._rows.length);

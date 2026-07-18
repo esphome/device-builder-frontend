@@ -116,7 +116,7 @@ function renderJob(host: FirmwareJobsListHost, job: FirmwareJob): TemplateResult
         <wa-icon library="mdi" name=${typeIcon}></wa-icon>
       </div>
       <div class="job-content">
-        <div class="job-name">${name}</div>
+        <div class="job-name truncate">${name}</div>
         <div class="job-meta">
           <span>${typeLabel}</span>
           <span>•</span>

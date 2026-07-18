@@ -6,6 +6,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { centeredMobileDialog } from "../styles/dialog-mobile.js";
+import { textStyles } from "../styles/text.js";
 import { EnterController } from "../util/enter-controller.js";
 
 /** Wrappers currently open, maintained by the class below. Backs
@@ -324,7 +325,8 @@ export class ESPHomeBaseDialog extends LitElement {
         @wa-after-hide=${this._onWaAfterHide}
       >
         <header slot="label" part="label-row">
-          <slot name="header-prefix"></slot><span part="title-text">${this.label}</span
+          <slot name="header-prefix"></slot
+          ><span class="truncate" part="title-text">${this.label}</span
           ><slot name="header-suffix"></slot>
         </header>
         <slot></slot>
@@ -338,6 +340,7 @@ export class ESPHomeBaseDialog extends LitElement {
     // Mobile default: centered, dvh-capped. Heavy dialogs override with
     // fullscreenMobileDialog (their outer-tree ::part rule wins).
     centeredMobileDialog("wa-dialog"),
+    textStyles,
     css`
       :host {
         display: contents;
@@ -402,9 +405,6 @@ export class ESPHomeBaseDialog extends LitElement {
       }
       [part="title-text"] {
         min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }
     `,
   ];

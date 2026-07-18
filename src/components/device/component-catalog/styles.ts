@@ -274,9 +274,6 @@ export const componentCatalogStyles = css`
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
     line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   /* Category chip disambiguates same-name catalog entries (sensor.debug
@@ -319,13 +316,6 @@ export const componentCatalogStyles = css`
     font-size: var(--wa-font-size-2xs);
     color: var(--wa-color-text-quiet);
     line-height: 1.4;
-  }
-
-  .component-description--clamp {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
 
   .card-footer {

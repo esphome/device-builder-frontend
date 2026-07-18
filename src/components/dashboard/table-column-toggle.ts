@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { OverflowMenuElement } from "../overflow-menu-element.js";
 
@@ -31,6 +32,7 @@ export class ESPHomeTableColumnToggle extends OverflowMenuElement {
   static styles = [
     espHomeStyles,
     dropdownMenuStyles,
+    textStyles,
     css`
       :host {
         display: block;
@@ -77,9 +79,6 @@ export class ESPHomeTableColumnToggle extends OverflowMenuElement {
          rather than wrapping the row when space is tight (e.g. a long
          translated "Columns" string); the icon stays put. */
       .toggle-btn .label {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
         /* Flex item must allow shrinking below its intrinsic width or
            the ellipsis never triggers on a tight toolbar row. */
         min-width: 0;
@@ -208,7 +207,7 @@ export class ESPHomeTableColumnToggle extends OverflowMenuElement {
         @click=${this._toggle}
       >
         <wa-icon library="mdi" name="cog-outline"></wa-icon>
-        <span class="label">${this._localize("dashboard.table_columns")}</span>
+        <span class="label truncate">${this._localize("dashboard.table_columns")}</span>
       </button>
       ${
         this._open

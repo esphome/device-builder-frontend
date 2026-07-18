@@ -24,6 +24,7 @@ import type { Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { labelChipStyles } from "../../util/label-chip-template.js";
 import { labelChipStyleString } from "../../util/label-style.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -75,6 +76,7 @@ export class ESPHomeLabelsFilterSection extends LitElement {
 
   static styles = [
     espHomeStyles,
+    textStyles,
     filterStyles,
     filterSectionStyles,
     labelChipStyles,
@@ -89,7 +91,9 @@ export class ESPHomeLabelsFilterSection extends LitElement {
         aria-expanded=${this.expanded ? "true" : "false"}
         @click=${this._onHeaderClick}
       >
-        <span class="section-name">${this._localize("dashboard.filter_labels")}</span>
+        <span class="section-name truncate"
+          >${this._localize("dashboard.filter_labels")}</span
+        >
         ${
           this.selected.length > 0
             ? html`<span class="section-count" aria-hidden="true"
@@ -155,8 +159,8 @@ export class ESPHomeLabelsFilterSection extends LitElement {
         <span class="facet-row-check" aria-hidden="true">
           ${checked ? html`<wa-icon library="mdi" name="check"></wa-icon>` : nothing}
         </span>
-        <span class="facet-row-name">
-          <span class="label-chip" style=${labelChipStyleString(label.color)}
+        <span class="facet-row-name truncate">
+          <span class="label-chip truncate" style=${labelChipStyleString(label.color)}
             >${label.name}</span
           >
         </span>

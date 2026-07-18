@@ -74,9 +74,6 @@ export const mdiIconPickerStyles = css`
   .trigger-label {
     flex: 1;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     font-family: var(--wa-font-family-code, monospace);
     font-size: var(--wa-font-size-s);
   }

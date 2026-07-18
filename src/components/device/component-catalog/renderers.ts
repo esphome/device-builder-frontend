@@ -88,7 +88,7 @@ export function renderBundleCard(
               </div>`
         }
         <div class="component-card-header-text">
-          <h3 class="component-title">${bundle.name}</h3>
+          <h3 class="component-title truncate">${bundle.name}</h3>
           ${renderRecommendedChip(
             `recommended-chip-bundle-${bundle.id}`,
             recommendedTooltip
@@ -104,7 +104,7 @@ export function renderBundleCard(
         bundle.description
           ? html`<p
               class="component-description ${
-                expanded ? "" : "component-description--clamp"
+                expanded ? "" : "component-description--clamp line-clamp-2"
               }"
               data-component-id=${expandKey}
             >
@@ -182,7 +182,7 @@ export function renderCard(
               </div>`
         }
         <div class="component-card-header-text">
-          <h3 class="component-title">${component.name}</h3>
+          <h3 class="component-title truncate">${component.name}</h3>
           ${
             featured
               ? renderRecommendedChip(
@@ -205,7 +205,7 @@ export function renderCard(
         ${expandable ? renderExpandButton(host, component.id) : nothing}
       </div>
       <p
-        class="component-description ${expanded ? "" : "component-description--clamp"}"
+        class="component-description ${expanded ? "" : "component-description--clamp line-clamp-2"}"
         data-component-id=${component.id}
       >
         ${renderMarkdown(component.description)}

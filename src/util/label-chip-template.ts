@@ -33,10 +33,7 @@ export const labelChipStyles: CSSResult = css`
     font-weight: var(--wa-font-weight-bold);
     line-height: 1.4;
     border: var(--wa-border-width-s) solid transparent;
-    white-space: nowrap;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   /* Overflow chip ("+N") — uses the neutral palette regardless of
@@ -72,7 +69,7 @@ export function renderLabelChip(
   options: { suppressTitle?: boolean } = {}
 ): TemplateResult {
   return html`<span
-    class="label-chip"
+    class="label-chip truncate"
     style=${labelChipStyleString(label.color)}
     title=${options.suppressTitle ? nothing : label.name}
     >${label.name}</span
@@ -102,7 +99,7 @@ export function renderLabelChips(
   const overflowTitle = hidden.map((l) => l.name).join(", ");
   return html`<span class="label-chips">
     ${visible.map((l) => renderLabelChip(l))}
-    <span class="label-chip label-chip--overflow" title=${overflowTitle}
+    <span class="label-chip label-chip--overflow truncate" title=${overflowTitle}
       >+${hidden.length}</span
     >
   </span>`;

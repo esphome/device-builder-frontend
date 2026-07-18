@@ -8,6 +8,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { textStyles } from "../styles/text.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { getErrorMessage } from "../util/error-message.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -65,6 +66,7 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
     espHomeStyles,
     // Shared .btn / .btn--cancel chrome for the footer Close button.
     dialogActionButtonStyles,
+    textStyles,
     css`
       esphome-base-dialog {
         --width: 560px;
@@ -139,27 +141,18 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
         color: var(--wa-color-text-normal);
         font-weight: var(--wa-font-weight-bold);
         font-size: var(--wa-font-size-m);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .row-config {
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-2xs);
         font-family: var(--wa-font-family-code);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .row-comment {
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-xs);
         font-style: italic;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .row-actions {
@@ -288,11 +281,11 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
         (device) => html`
           <div class="row">
             <div class="row-info">
-              <div class="row-name">${device.friendly_name || device.name}</div>
-              <div class="row-config">${device.configuration}</div>
+              <div class="row-name truncate">${device.friendly_name || device.name}</div>
+              <div class="row-config truncate">${device.configuration}</div>
               ${
                 device.comment
-                  ? html`<div class="row-comment">${device.comment}</div>`
+                  ? html`<div class="row-comment truncate">${device.comment}</div>`
                   : nothing
               }
             </div>
