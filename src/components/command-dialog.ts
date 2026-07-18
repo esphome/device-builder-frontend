@@ -33,6 +33,7 @@ import {
   versionContext,
 } from "../context/index.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
+import { linkButtonStyles } from "../styles/link-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { configurationStem, downloadAnsiText } from "../util/download-text.js";
@@ -250,6 +251,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    linkButtonStyles,
     termTokens,
     termButtonStyles,
     commandDialogStyles,

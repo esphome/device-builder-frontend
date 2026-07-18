@@ -14,6 +14,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { linkButtonStyles } from "../../styles/link-button.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
   NO_INSTANCE_ERRORS,
@@ -266,7 +267,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     );
   };
 
-  static styles = [espHomeStyles, deviceBoardInfoStyles];
+  static styles = [espHomeStyles, linkButtonStyles, deviceBoardInfoStyles];
 
   protected render() {
     const board = this.board;
@@ -295,7 +296,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
                       this._alternateBoards.length > 0
                         ? html`<button
                             type="button"
-                            class="board-change-link"
+                            class="board-change-link link-button"
                             @click=${this._openChangeBoard}
                           >
                             ${this._localize("device.change_board_link")}

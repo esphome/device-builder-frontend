@@ -76,13 +76,6 @@ export const deviceBoardInfoStyles = css`
     align-items: center;
     gap: var(--wa-space-2xs);
     font-size: var(--wa-font-size-xs);
-    font-family: inherit;
-    color: var(--esphome-primary);
-    text-decoration: underline;
-    padding: 0;
-    border: none;
-    background: none;
-    cursor: pointer;
   }
 
   .board-change-link:hover {

@@ -27,16 +27,6 @@ export const wizardStepBoardStyles = css`
     margin-top: calc(-1 * var(--wa-space-2xs));
   }
 
-  .helper-link {
-    border: none;
-    padding: 0;
-    background: none;
-    color: var(--esphome-primary);
-    cursor: pointer;
-    text-decoration: underline;
-    font: inherit;
-  }
-
   .helper-link:hover {
     text-decoration: none;
   }

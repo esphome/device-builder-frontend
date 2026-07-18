@@ -28,6 +28,7 @@ import {
 } from "./wizard-step-board-platforms.js";
 
 import { inputStyles } from "../../styles/inputs.js";
+import { linkButtonStyles } from "../../styles/link-button.js";
 import { wizardStepBoardStyles } from "./wizard-step-board.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -137,7 +138,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     );
   }
 
-  static styles = [espHomeStyles, inputStyles, wizardStepBoardStyles];
+  static styles = [espHomeStyles, inputStyles, linkButtonStyles, wizardStepBoardStyles];
 
   protected render() {
     if (this._view === "select-port") {
@@ -178,7 +179,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
                   })}
                 </span>
                 <button
-                  class="helper-link"
+                  class="helper-link link-button"
                   type="button"
                   @click=${this._exitDetectionMode}
                 >
@@ -211,7 +212,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
                   ${this._localize("wizard.connect_your_board")}
                 </button>
                 <a
-                  class="helper-link"
+                  class="helper-link link-button"
                   href=${UNDERSTANDING_BOARDS_DOCS_URL}
                   target="_blank"
                   rel="noopener noreferrer"

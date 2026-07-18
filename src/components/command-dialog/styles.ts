@@ -105,13 +105,6 @@ export const commandDialogStyles = css`
   /* "Build locally instead" override link. Inline text link rather than
      button — the row is informational chrome, not a primary action. */
   .force-local-link {
-    background: none;
-    border: none;
-    padding: 0;
-    font: inherit;
-    color: var(--esphome-primary, #1e88e5);
-    cursor: pointer;
-    text-decoration: underline;
     text-underline-offset: 2px;
   }
   .force-local-link:hover:not(:disabled),

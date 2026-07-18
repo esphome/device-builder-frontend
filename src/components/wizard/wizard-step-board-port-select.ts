@@ -6,6 +6,7 @@ import { classMap } from "lit/directives/class-map.js";
 import type { SerialPort } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { backButtonStyles } from "../../styles/back-button.js";
 import { emptyStateStyles } from "../../styles/empty-state.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { newItemHighlightStyles } from "../../styles/new-item-highlight.js";
@@ -64,6 +65,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
     newItemHighlightStyles,
     serialPortHintStyles,
     emptyStateStyles,
+    backButtonStyles,
     css`
       :host {
         display: flex;
@@ -80,22 +82,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       }
 
       .back-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 0;
-        background: none;
-        border: none;
-        font-family: inherit;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--esphome-primary);
-        cursor: pointer;
         align-self: flex-start;
-      }
-
-      .back-btn wa-icon {
-        font-size: 16px;
       }
 
       .list {

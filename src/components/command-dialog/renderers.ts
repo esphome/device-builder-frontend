@@ -72,7 +72,7 @@ export function renderRemoteBuilderSubLine(
           ? html`
               <span class="spacer"></span>
               <button
-                class="force-local-link"
+                class="force-local-link link-button"
                 ?disabled=${host._switchingToLocal}
                 @click=${host._onForceLocalClick}
               >
