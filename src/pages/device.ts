@@ -1115,7 +1115,7 @@ export class ESPHomePageDevice extends LitElement {
             )}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
-            @request-install=${this._installCtrl.onInstall}
+            @request-install=${this._saveThenInstall}
             @goto-line=${this._onEditorGoToLine}
             @change-board=${this._onChangeBoard}
             @open-logs=${this._onEditorOpenLogs}

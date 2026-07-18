@@ -518,7 +518,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         </p>
         <button
           type="button"
-          class="welcome-banner-install"
+          class="action-item welcome-banner-install"
           @click=${this._onWelcomeInstall}
         >
           <wa-icon library="mdi" name="usb"></wa-icon>

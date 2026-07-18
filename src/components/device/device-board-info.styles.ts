@@ -123,24 +123,13 @@ export const deviceBoardInfoStyles = css`
     line-height: 1.5;
   }
 
-  .welcome-banner-install {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--wa-space-2xs);
+  /* Compact variant of .action-item (defined below; compound selector
+     outweighs its base rules regardless of source order). */
+  .action-item.welcome-banner-install {
+    width: auto;
     margin-top: var(--wa-space-xs);
-    padding: var(--wa-space-2xs) var(--wa-space-s);
-    border: var(--wa-border-width-s) solid var(--esphome-primary);
-    border-radius: var(--wa-border-radius-m);
-    background: transparent;
-    color: var(--esphome-primary);
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-semibold);
-    cursor: pointer;
-    transition: background 0.12s;
-  }
-
-  .welcome-banner-install:hover {
-    background: var(--esphome-tint-strong);
   }
 
   .welcome-banner-close {

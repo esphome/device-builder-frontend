@@ -37,6 +37,7 @@ import {
   renderBootloaderOption,
   renderInstallNotice,
   renderManualDownloadOption,
+  renderMethodRow,
   renderOtaOption,
   renderServerSerialOption,
   type MethodRowContext,
@@ -223,7 +224,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const otaRow = renderOtaOption(ctx);
     const usbRow = showUsbRow ? this._renderUsbOption(availability) : nothing;
     const serverRow = showServerSerialRow
-      ? renderServerSerialOption(ctx, env, () => this._onServerSerial())
+      ? renderServerSerialOption(this._localize, env, () => this._onServerSerial())
       : nothing;
     // A never-flashed device can't receive an OTA by itself — lead with
     // the USB rows so the first install goes over a cable. At least one
@@ -235,7 +236,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     return html`
       ${renderInstallNotice(ctx)}
       <div class="list">${rows}</div>
-      ${this._renderAdvancedSection()}
+      ${this._renderAdvancedSection(ctx)}
     `;
   }
 
@@ -269,39 +270,23 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * row, and the flasher tab itself surfaces the "no Web Serial" error.
    */
   private _renderUsbOption(availability: WebSerialAvailability) {
+    const title = this._localize("dashboard.install_method_usb_local");
     if (availability === "unsupported") {
-      return html`
-        <div class="option option--disabled">
-          <wa-icon library="mdi" name="usb"></wa-icon>
-          <div class="info">
-            <span class="title"
-              >${this._localize("dashboard.install_method_usb_local")}</span
-            >
-            <span class="desc"
-              >${this._localize("dashboard.install_method_usb_local_unsupported")}</span
-            >
-          </div>
-        </div>
-      `;
+      return renderMethodRow({
+        icon: "usb",
+        title,
+        desc: this._localize("dashboard.install_method_usb_local_unsupported"),
+      });
     }
     const inApp = availability === "available";
-    const desc = inApp
-      ? this._localize("dashboard.install_method_usb_local_desc")
-      : this._renderUsbRemoteDesc();
-    return html`
-      <div
-        class="option"
-        @click=${() => this._selectMethod(inApp ? "web-serial" : "web-flash")}
-      >
-        <wa-icon library="mdi" name="usb"></wa-icon>
-        <div class="info">
-          <span class="title"
-            >${this._localize("dashboard.install_method_usb_local")}</span
-          >
-          <span class="desc">${desc}</span>
-        </div>
-      </div>
-    `;
+    return renderMethodRow({
+      icon: "usb",
+      title,
+      desc: inApp
+        ? this._localize("dashboard.install_method_usb_local_desc")
+        : this._renderUsbRemoteDesc(),
+      onClick: () => this._selectMethod(inApp ? "web-serial" : "web-flash"),
+    });
   }
 
   /**
@@ -390,7 +375,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * address) and, in install mode, the manual binary-download
    * option (compile here, flash with an external tool).
    */
-  private _renderAdvancedSection() {
+  private _renderAdvancedSection(ctx: MethodRowContext) {
     return renderDisclosure({
       open: this._advancedExpanded,
       onToggle: () => this._onToggleAdvanced(),
@@ -405,14 +390,10 @@ export class ESPHomeInstallMethodDialog extends LitElement {
             this.mode === "install" &&
             this.canFlashBootloader &&
             this.deviceState === DeviceState.ONLINE
-              ? renderBootloaderOption(this._rowContext())
+              ? renderBootloaderOption(ctx)
               : nothing
           }
-          ${
-            this.mode === "install"
-              ? renderManualDownloadOption(this._rowContext())
-              : nothing
-          }
+          ${this.mode === "install" ? renderManualDownloadOption(ctx) : nothing}
         </div>
       `,
     });

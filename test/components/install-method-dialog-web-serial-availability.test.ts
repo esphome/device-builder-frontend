@@ -16,29 +16,12 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
+import {
+  restoreWebSerialEnv,
+  setWebSerialEnv as setEnv,
+} from "./_install-method-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const origSerial = Object.getOwnPropertyDescriptor(navigator, "serial");
-const origSecure = Object.getOwnPropertyDescriptor(window, "isSecureContext");
-const origLocation = Object.getOwnPropertyDescriptor(window, "location");
-
-function setEnv(opts: { serial: boolean; secure: boolean; href: string }) {
-  if (opts.serial) {
-    Object.defineProperty(navigator, "serial", { configurable: true, value: {} });
-  } else if ("serial" in navigator) {
-    delete (navigator as any).serial;
-  }
-  Object.defineProperty(window, "isSecureContext", {
-    configurable: true,
-    value: opts.secure,
-  });
-  const u = new URL(opts.href);
-  Object.defineProperty(window, "location", {
-    configurable: true,
-    value: { hostname: u.hostname, href: u.href },
-  });
-}
-
 async function mount(
   mode: "install" | "logs" = "install"
 ): Promise<ESPHomeInstallMethodDialog> {
@@ -81,10 +64,7 @@ function methodOnClick(d: ESPHomeInstallMethodDialog, el: Element): string | nul
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 afterEach(() => {
-  if (origSerial) Object.defineProperty(navigator, "serial", origSerial);
-  else if ("serial" in navigator) delete (navigator as any).serial;
-  if (origSecure) Object.defineProperty(window, "isSecureContext", origSecure);
-  if (origLocation) Object.defineProperty(window, "location", origLocation);
+  restoreWebSerialEnv();
   vi.restoreAllMocks();
 });
 

@@ -16,6 +16,24 @@ export interface MethodRowContext {
   onSelect: (method: string) => void;
 }
 
+/** Shared option-row template; a row without ``onClick`` renders disabled. */
+export function renderMethodRow(opts: {
+  icon: string;
+  title: unknown;
+  desc: unknown;
+  onClick?: () => void;
+}): TemplateResult {
+  return html`
+    <div class="option ${!opts.onClick ? "option--disabled" : ""}" @click=${opts.onClick}>
+      <wa-icon library="mdi" name=${opts.icon}></wa-icon>
+      <div class="info">
+        <span class="title">${opts.title}</span>
+        <span class="desc">${opts.desc}</span>
+      </div>
+    </div>
+  `;
+}
+
 /**
  * Dialog-top callout ahead of the method list, install mode only: a
  * first-install USB notice for a never-flashed device (it can't receive
@@ -67,18 +85,12 @@ export function renderOtaOption(ctx: MethodRowContext): TemplateResult {
   } else {
     descKey = "dashboard.install_method_network_desc";
   }
-  return html`
-    <div
-      class="option ${!enabled ? "option--disabled" : ""}"
-      @click=${enabled ? () => ctx.onSelect("ota") : undefined}
-    >
-      <wa-icon library="mdi" name="wifi"></wa-icon>
-      <div class="info">
-        <span class="title">${ctx.localize(titleKey)}</span>
-        <span class="desc">${ctx.localize(descKey)}</span>
-      </div>
-    </div>
-  `;
+  return renderMethodRow({
+    icon: "wifi",
+    title: ctx.localize(titleKey),
+    desc: ctx.localize(descKey),
+    onClick: enabled ? () => ctx.onSelect("ota") : undefined,
+  });
 }
 
 /**
@@ -88,20 +100,17 @@ export function renderOtaOption(ctx: MethodRowContext): TemplateResult {
  * the generic phrasing.
  */
 export function renderServerSerialOption(
-  ctx: MethodRowContext,
+  localize: LocalizeFunc,
   env: DeploymentEnvironment,
   onClick: () => void
 ): TemplateResult {
   const keys = serverSerialCopyKeys(env);
-  return html`
-    <div class="option" @click=${onClick}>
-      <wa-icon library="mdi" name="serial-port"></wa-icon>
-      <div class="info">
-        <span class="title">${ctx.localize(keys.title)}</span>
-        <span class="desc">${ctx.localize(keys.desc)}</span>
-      </div>
-    </div>
-  `;
+  return renderMethodRow({
+    icon: "serial-port",
+    title: localize(keys.title),
+    desc: localize(keys.desc),
+    onClick,
+  });
 }
 
 /**
@@ -112,19 +121,12 @@ export function renderServerSerialOption(
  * user (in-app or via the external flasher) and is gated to ESP32 / ESP8266.
  */
 export function renderManualDownloadOption(ctx: MethodRowContext): TemplateResult {
-  return html`
-    <div class="option" @click=${() => ctx.onSelect("binary-download")}>
-      <wa-icon library="mdi" name="download"></wa-icon>
-      <div class="info">
-        <span class="title"
-          >${ctx.localize("dashboard.install_method_manual_download")}</span
-        >
-        <span class="desc"
-          >${ctx.localize("dashboard.install_method_manual_download_desc")}</span
-        >
-      </div>
-    </div>
-  `;
+  return renderMethodRow({
+    icon: "download",
+    title: ctx.localize("dashboard.install_method_manual_download"),
+    desc: ctx.localize("dashboard.install_method_manual_download_desc"),
+    onClick: () => ctx.onSelect("binary-download"),
+  });
 }
 
 /**
@@ -134,17 +136,12 @@ export function renderManualDownloadOption(ctx: MethodRowContext): TemplateResul
  * can accept it and it's online for the flash to land.
  */
 export function renderBootloaderOption(ctx: MethodRowContext): TemplateResult {
-  return html`
-    <div class="option" @click=${() => ctx.onSelect("bootloader")}>
-      <wa-icon library="mdi" name="chip"></wa-icon>
-      <div class="info">
-        <span class="title">${ctx.localize("dashboard.install_method_bootloader")}</span>
-        <span class="desc"
-          >${ctx.localize("dashboard.install_method_bootloader_desc")}</span
-        >
-      </div>
-    </div>
-  `;
+  return renderMethodRow({
+    icon: "chip",
+    title: ctx.localize("dashboard.install_method_bootloader"),
+    desc: ctx.localize("dashboard.install_method_bootloader_desc"),
+    onClick: () => ctx.onSelect("bootloader"),
+  });
 }
 
 function serverSerialCopyKeys(env: DeploymentEnvironment): {
