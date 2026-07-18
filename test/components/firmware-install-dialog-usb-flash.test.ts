@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
-import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import type {
+  ESPHomeFirmwareInstallDialog,
+  InstallFailureKind,
+} from "../../src/components/firmware-install-dialog.js";
 import {
   pickFactoryBinary,
   showOtaLogs,
@@ -48,8 +51,7 @@ function makeHost(opts: { compileOk: boolean; binaries?: FirmwareBinary[] }) {
     _compileReject: null,
     _jobSource: 0,
     _jobSourceLabel: "",
-    _failedDuringCompile: false,
-    _failedDuringValidate: false,
+    _failureKind: null as InstallFailureKind | null,
     _binaries: [] as FirmwareBinary[],
     _usbFirmware: null as ArrayBuffer | null,
     _usbFirmwareName: "",

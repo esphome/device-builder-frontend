@@ -86,6 +86,8 @@ export type InstallStep =
 
 export type Installer = "web-serial" | "binary-download" | "web-flash" | null;
 
+export type InstallFailureKind = "compile" | "validate" | "chip-mismatch";
+
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -122,18 +124,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _statusMessage = "";
   @state() _errorMessage = "";
 
-  // Drives the reset-build-env hint — only build failures benefit; chip
-  // mismatch / Web Serial connection errors don't.
-  @state() _failedDuringCompile = false;
-
-  // Flips when output contains an ESPHome validation marker, swapping the
-  // hint from clean/reset (C++ help) to "open in editor" (YAML help).
-  @state() _failedDuringValidate = false;
-
-  // Pre-flash chip mismatch against the stored board_id. Swaps the footer's
-  // Retry (which would loop on the same stale board) for a change-board
-  // hand-off.
-  @state() _failedChipMismatch = false;
+  // What made the install fail, when a specific kind was recognised.
+  // "compile" drives the reset-build-env hint, "validate" swaps that hint to
+  // "open in editor" (YAML help), "chip-mismatch" swaps the footer's Retry
+  // (which would loop on the same stale board) for a change-board hand-off.
+  // null: no failure, or an unclassified one (e.g. Web Serial connection).
+  @state() _failureKind: InstallFailureKind | null = null;
 
   // Source of the most recent compile job. REMOTE means the toolchain lives
   // on a paired receiver, so the local "reset build environment" link can't
@@ -285,9 +281,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._binaries = [];
     this._showLogsAfterInstall = true;
     this._installer = null;
-    this._failedDuringCompile = false;
-    this._failedDuringValidate = false;
-    this._failedChipMismatch = false;
+    this._failureKind = null;
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
     this._jobSourcePin = "";

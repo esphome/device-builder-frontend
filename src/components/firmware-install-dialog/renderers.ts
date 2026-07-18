@@ -67,8 +67,8 @@ function isPeerLinkSessionLostError(message: string): boolean {
 export function renderResetSuggestion(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
-  if (!host._failedDuringCompile) return nothing;
-  if (host._failedDuringValidate) return renderValidationFailureSuggestion(host);
+  if (host._failureKind !== "compile" && host._failureKind !== "validate") return nothing;
+  if (host._failureKind === "validate") return renderValidationFailureSuggestion(host);
   if (isPeerLinkSessionLostError(host._errorMessage)) return nothing;
   const remoteLabel =
     host._jobSource === JobSource.REMOTE && host._jobSourceLabel
@@ -353,7 +353,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   }
   // A chip mismatch against the stored board can't be retried into success —
   // offer the board-reselect hand-off instead.
-  if (host._step === "error" && host._failedChipMismatch) {
+  if (host._step === "error" && host._failureKind === "chip-mismatch") {
     return html`
       <div class="footer">
         <button class="btn btn--ghost" @click=${host._close}>
@@ -372,9 +372,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   const canRetry =
     host._step === "error" &&
     (host._installer === "web-serial" || host._installer === "web-flash") &&
-    !host._failedDuringCompile &&
-    !host._failedDuringValidate &&
-    !host._failedChipMismatch;
+    host._failureKind === null;
   if (canRetry) {
     return html`
       <div class="footer">

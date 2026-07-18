@@ -127,7 +127,7 @@ export async function startWebSerialInstall(
     !(expectedIsCoarseEsp32 && detectedVariant.startsWith("esp32"))
   ) {
     await releaseSerial(detected);
-    host._failedChipMismatch = true;
+    host._failureKind = "chip-mismatch";
     host._fail(
       host._localize("firmware.chip_mismatch", {
         detected: detected.chipName,
@@ -269,7 +269,8 @@ async function compileOrFail(
     await compileAndWait(host, configuration);
     return true;
   } catch (err) {
-    host._failedDuringCompile = true;
+    // ??= so a "validate" already recorded off the output stream survives.
+    host._failureKind ??= "compile";
     host._fail(host._localize("firmware.compile_failed"), compileFailureDetail(err));
     return false;
   }
@@ -616,7 +617,7 @@ export function compileAndWait(
           }
           host._timer.noteLine(line);
           host._log.enqueue(line);
-          if (isValidationFailureLine(line)) host._failedDuringValidate = true;
+          if (isValidationFailureLine(line)) host._failureKind = "validate";
         },
         onResult: (data) => {
           host._streamId = "";
