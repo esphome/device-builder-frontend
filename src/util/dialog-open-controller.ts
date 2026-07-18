@@ -17,8 +17,9 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
  * (Escape / X / outside-click), before wa-dialog finishes hiding, so a host
  * re-render can't re-assert ``?open`` and cancel the in-progress hide —
  * ``esphome-base-dialog`` never mutates its own ``open`` on a user-driven
- * close, the host owns the flag (see the wrapper's class docs). Teardown
- * stays in the host's ``@after-hide`` handler.
+ * close, the host owns the flag (see the wrapper's class docs). Hosts that
+ * sync on the wrapper's ``@after-hide`` re-emit instead bind
+ * ``onAfterHide``.
  *
  * Dialogs with a real veto (busy guard, unsaved-changes prompt) keep their
  * own ``@request-close`` handler instead; the trivial flip here never
@@ -49,6 +50,12 @@ export class DialogOpenController implements ReactiveController {
 
   /** The trivial ``@request-close`` handler: flip the flag, veto nothing. */
   readonly onRequestClose = (): void => {
+    this.open = false;
+  };
+
+  /** The trivial ``@after-hide`` handler — the wrapper re-emits it for every
+   *  dismissal path (Esc / outside-click / X / reactive ``?open`` flip). */
+  readonly onAfterHide = (): void => {
     this.open = false;
   };
 }

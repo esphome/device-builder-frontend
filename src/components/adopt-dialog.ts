@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
@@ -13,6 +13,7 @@ import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { markJustCreated } from "../util/just-created.js";
@@ -45,7 +46,6 @@ export class ESPHomeAdoptDialog extends LitElement {
   @state() private _encryption = true;
   @state() private _busy = false;
   @state() private _error: string | null = null;
-  @state() private _open = false;
   @state() private _ssid = "";
   @state() private _password = "";
   // undefined until config/get_secrets resolves; only fetched for a
@@ -207,11 +207,15 @@ export class ESPHomeAdoptDialog extends LitElement {
     `,
   ];
 
+  private readonly _dialog = new DialogOpenController(this);
+
   // Enter submits; _submit self-guards on name validity and re-entry.
   private _enter = new EnterController(this, () => this._submit());
 
-  protected willUpdate(changed: PropertyValues): void {
-    if (changed.has("_open")) this._enter.set(this._open);
+  protected willUpdate(): void {
+    // Re-sync every update (set() no-ops on same value) — the open flag
+    // lives on the controller, so it never appears in `changed`.
+    this._enter.set(this._dialog.open);
   }
 
   open(device: AdoptableDevice) {
@@ -230,7 +234,7 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._ssid = "";
     this._password = "";
     this._hasWifiSecrets = undefined;
-    this._open = true;
+    this._dialog.open = true;
     // A Wi-Fi device whose install has no shared wifi_ssid/wifi_password
     // would import a config referencing an undefined !secret and fail to
     // validate (esphome/device-builder#1742). Probe the shared secrets so
@@ -276,15 +280,7 @@ export class ESPHomeAdoptDialog extends LitElement {
        Lit hands the listener to ``addEventListener`` which calls it
        with ``this === undefined`` (strict mode) and the property
        access below would blow up. */
-    this._open = false;
-  };
-
-  private _onAfterHide = (): void => {
-    // <esphome-base-dialog> re-emits after-hide for every
-    // dismissal path (Esc / outside-click / X / reactive
-    // ?open flip). Flip our local open flag so the next
-    // render's ?open binding matches.
-    this._open = false;
+    this._dialog.open = false;
   };
 
   protected render() {
@@ -305,10 +301,10 @@ export class ESPHomeAdoptDialog extends LitElement {
 
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         ?busy=${this._busy}
         .label=${this._localize("dashboard.adopt_title")}
-        @after-hide=${this._onAfterHide}
+        @after-hide=${this._dialog.onAfterHide}
       >
         ${
           device

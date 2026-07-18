@@ -12,6 +12,7 @@ import {
 } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 
 import "./base-dialog.js";
@@ -34,11 +35,12 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
   @state()
   private _api!: ESPHomeAPI;
 
-  @state() private _open = false;
   @state() private _loading = false;
   @state() private _check: DesktopUpdateCheck | null = null;
   @state() private _error = "";
   @state() private _updating = false;
+
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
@@ -79,18 +81,14 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
   ];
 
   async open() {
-    this._open = true;
+    this._dialog.open = true;
     this._updating = false;
     await this._runCheck();
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  private _onAfterHide = (): void => {
-    this._open = false;
-  };
 
   private _runCheck = async (): Promise<void> => {
     this._loading = true;
@@ -149,12 +147,12 @@ export class ESPHomeDesktopUpdateDialog extends LitElement {
   protected render() {
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         ?busy=${this._updating}
         .label=${this._localize("desktop_update_dialog.title")}
-        @after-hide=${this._onAfterHide}
+        @after-hide=${this._dialog.onAfterHide}
       >
-        ${this._open ? this._renderBody() : nothing}
+        ${this._dialog.open ? this._renderBody() : nothing}
       </esphome-base-dialog>
     `;
   }

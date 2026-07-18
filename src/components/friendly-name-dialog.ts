@@ -11,6 +11,7 @@ import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { dialogFieldStyles } from "../styles/dialog-fields.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
@@ -54,8 +55,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
   @state()
   private _install = true;
 
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
@@ -97,20 +97,12 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
     // want a YAML-only edit (offline device, batch later) can
     // toggle off — but the common case is "rename and apply."
     this._install = true;
-    this._open = true;
+    this._dialog.open = true;
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  private _onAfterHide = (): void => {
-    // <esphome-base-dialog> re-emits after-hide for every
-    // dismissal path (Esc / outside-click / X / reactive
-    // ?open flip). Flip our local open flag so the next
-    // render's ?open binding matches.
-    this._open = false;
-  };
 
   protected render() {
     const trimmed = this._value.trim();
@@ -121,12 +113,12 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
 
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("dashboard.action_friendly_name_title", {
           name: this.deviceName,
         })}
         .confirmOnEnter=${this._confirm}
-        @after-hide=${this._onAfterHide}
+        @after-hide=${this._dialog.onAfterHide}
       >
         <div class="field">
           <label for="friendly-name-input"

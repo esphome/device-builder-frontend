@@ -54,4 +54,25 @@ describe("DialogOpenController", () => {
     ctrl.open = true;
     expect(ctrl.onRequestClose).toBe(first);
   });
+
+  it("onAfterHide flips the flag false", () => {
+    const host = new FakeHost();
+    const ctrl = new DialogOpenController(host);
+    ctrl.open = true;
+
+    ctrl.onAfterHide();
+    expect(ctrl.open).toBe(false);
+    expect(host.updates).toBe(2);
+  });
+
+  it("onAfterHide after a request-close flip is a no-op", () => {
+    const host = new FakeHost();
+    const ctrl = new DialogOpenController(host);
+    ctrl.open = true;
+
+    ctrl.onRequestClose();
+    ctrl.onAfterHide();
+    expect(ctrl.open).toBe(false);
+    expect(host.updates).toBe(2);
+  });
 });

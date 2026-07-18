@@ -8,6 +8,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { getErrorMessage } from "../util/error-message.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
@@ -57,7 +58,8 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
   @state() private _devices: ArchivedDevice[] = [];
   @state() private _loading = false;
   @state() private _error: string | null = null;
-  @state() private _open = false;
+
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
@@ -221,21 +223,13 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
 
   /** Open the dialog and (re)fetch the archive list. */
   async open() {
-    this._open = true;
+    this._dialog.open = true;
     await this.refresh();
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  private _onAfterHide = (): void => {
-    // <esphome-base-dialog> re-emits after-hide for every
-    // dismissal path (Esc / outside-click / X / reactive
-    // ?open flip). Flip our local open flag so the next
-    // render's ?open binding matches.
-    this._open = false;
-  };
 
   /** Re-pull the list. Caller invokes after unarchive / delete to
    *  reflect the new state without closing the dialog. */
@@ -257,9 +251,9 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
   protected render() {
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("dashboard.archived_dialog_title")}
-        @after-hide=${this._onAfterHide}
+        @after-hide=${this._dialog.onAfterHide}
       >
         <div class="body">
           <p class="desc">${this._localize("dashboard.archived_dialog_desc")}</p>
