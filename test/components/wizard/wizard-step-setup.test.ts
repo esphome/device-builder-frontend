@@ -329,6 +329,13 @@ describe("wizard-step-setup", () => {
     );
     expect(el.shadowRoot!.querySelector("wa-checkbox")).toBeNull();
     expect(el.shadowRoot!.querySelector(".full-setup .section-subtitle")).not.toBeNull();
+    // The emitted flag must stay off too — a stale true would make the
+    // create dialog vendor components next to the package reference.
+    await setName(el, "kitchen");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.fullSetup).toBe(false);
   });
 
   it("omits the full-setup option for an optional-component board", async () => {
