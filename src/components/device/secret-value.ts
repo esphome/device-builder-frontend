@@ -262,7 +262,7 @@ export class ESPHomeSecretValue extends LitElement {
       <span class="msg" role="alert">
         <wa-icon library="mdi" name="alert"></wa-icon>
         ${this._localize("device.secret_picker_reveal_error")}
-        <button class="link-button" type="button" @click=${this._retry}>
+        <button class="retry link-button" type="button" @click=${this._retry}>
           ${this._localize("device.secret_picker_retry")}
         </button>
       </span>
