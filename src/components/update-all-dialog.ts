@@ -180,8 +180,8 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   protected render() {
     // Keep one <esphome-base-dialog> so a close flips ?open reactively and
     // wa-dialog's exit animation plays on every path. Gate only the body +
-    // the facet/match compute on _open — this is a persistent child on the
-    // hot `devices` context, so nothing should recompute while closed.
+    // the facet/match compute on the open flag — this is a persistent child
+    // on the hot `devices` context, so nothing should recompute while closed.
     const matched = this._dialog.open ? this._matched() : [];
     return html`
       <esphome-base-dialog
