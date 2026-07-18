@@ -59,6 +59,9 @@ export const labelChipStyles: CSSResult = css`
 
 /** Render a label chip.
  *
+ *  Hosts must compose ``textStyles`` alongside ``labelChipStyles``
+ *  (the chip's overflow handling is the shared ``.truncate`` class).
+ *
  *  ``options.suppressTitle`` lets a parent that owns its own
  *  row-level ``title`` attribute opt out of the chip's native
  *  tooltip; otherwise two tooltips fight for the same row (one
