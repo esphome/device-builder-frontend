@@ -74,26 +74,30 @@ describe("board-reselect-dialog", () => {
   });
 
   it("lists same-variant boards for a variant-only YAML", async () => {
-    const getBoards = vi.fn().mockResolvedValue({ boards: [C3_CURATED, C3_GENERIC] });
+    const getBoards = vi
+      .fn()
+      .mockResolvedValue({ boards: [C3_CURATED, C3_GENERIC], total: 2 });
     const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
     await el.open({
       configuration: "dev.yaml",
       yaml: "esp32:\n  variant: ESP32C3\n",
     });
+    // The probe seeds the paged list's first page — no duplicate fetch.
     expect(getBoards).toHaveBeenCalledTimes(1);
     expect(getBoards).toHaveBeenCalledWith({
       platform: "esp32",
       variant: "esp32c3",
       limit: 50,
     });
-    expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]);
+    await vi.waitFor(() => expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]));
+    expect(inner().hasMore).toBe(false);
   });
 
   it("falls back to same-variant boards when the catalog lacks the board string", async () => {
     const getBoards = vi
       .fn()
       .mockResolvedValueOnce({ boards: [S3_NOISE] })
-      .mockResolvedValueOnce({ boards: [C3_CURATED, C3_GENERIC] });
+      .mockResolvedValueOnce({ boards: [C3_CURATED, C3_GENERIC], total: 2 });
     const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
     await el.open({
       configuration: "dev.yaml",
@@ -104,7 +108,29 @@ describe("board-reselect-dialog", () => {
       variant: "esp32c3",
       limit: 50,
     });
-    expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]);
+    await vi.waitFor(() => expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]));
+  });
+
+  it("pages the variant listing on load-more", async () => {
+    const getBoards = vi
+      .fn()
+      .mockResolvedValueOnce({ boards: [C3_CURATED], total: 2 })
+      .mockResolvedValueOnce({ boards: [C3_GENERIC], total: 2 });
+    const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  variant: ESP32C3\n",
+    });
+    await vi.waitFor(() => expect(inner().hasMore).toBe(true));
+    inner().dispatchEvent(new CustomEvent("load-more"));
+    await vi.waitFor(() => expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]));
+    expect(getBoards).toHaveBeenLastCalledWith({
+      platform: "esp32",
+      variant: "esp32c3",
+      offset: 1,
+      limit: 50,
+    });
+    expect(inner().hasMore).toBe(false);
   });
 
   it("toasts and stays closed when the YAML pins neither board nor variant", async () => {

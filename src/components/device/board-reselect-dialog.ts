@@ -2,15 +2,18 @@ import { consume } from "@lit/context";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { SlimBoard } from "../../api/types/boards.js";
+import type { PagedBoardsResponse, SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
+import { PagedListController } from "../../util/paged-list-controller.js";
 import { readPlatformBoard } from "../../util/yaml-board.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
 
 import "./change-board-dialog.js";
+
+const PAGE_SIZE = 50;
 
 export interface BoardReselectOpenOptions {
   configuration: string;
@@ -23,9 +26,10 @@ export interface BoardReselectOpenOptions {
  *
  * Candidates are limited to compatible boards: exact matches on the
  * YAML's `board:` PlatformIO string, or — when the YAML sets only an
- * `esp32.variant:` — boards of that same variant. The pick updates only
- * the sidecar `board_id` via `devices/update` — the YAML is already the
- * source of truth. Emits `board-changed` on success.
+ * `esp32.variant:` — boards of that same variant, server-paged with
+ * infinite scroll. The pick updates only the sidecar `board_id` via
+ * `devices/update` — the YAML is already the source of truth. Emits
+ * `board-changed` on success.
  */
 @customElement("esphome-board-reselect-dialog")
 export class ESPHomeBoardReselectDialog extends LitElement {
@@ -36,8 +40,9 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
+  /** Exact `board:`-string matches; null means the paged variant listing. */
   @state()
-  private _boards: SlimBoard[] = [];
+  private _exactBoards: SlimBoard[] | null = null;
 
   @state()
   private _description = "";
@@ -45,20 +50,20 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   @query("esphome-change-board-dialog")
   private _dialog!: ESPHomeChangeBoardDialog;
 
+  private readonly _list = new PagedListController<SlimBoard>(this, PAGE_SIZE);
+
   private _configuration = "";
 
   async open(opts: BoardReselectOpenOptions): Promise<void> {
     try {
       const yaml = opts.yaml ?? (await this._api.getConfig(opts.configuration));
       const parsed = readPlatformBoard(yaml);
-      const boards = await this._findCandidates(parsed);
       const label = parsed?.board ?? parsed?.variant ?? parsed?.platform ?? "";
-      if (boards.length === 0) {
+      if (!(await this._loadCandidates(parsed))) {
         notifyError(this._localize("device.board_reselect_none", { board: label }));
         return;
       }
       this._configuration = opts.configuration;
-      this._boards = boards;
       this._description = this._localize("device.board_reselect_desc", { board: label });
       await this.updateComplete;
       this._dialog.open();
@@ -69,42 +74,81 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   }
 
   protected render() {
+    const paged = this._exactBoards === null;
     return html`
       <esphome-change-board-dialog
-        .boards=${this._boards}
+        .boards=${this._exactBoards ?? this._list.items}
         .heading=${this._localize("device.board_reselect_title")}
         .description=${this._description}
+        ?hasMore=${paged && this._list.hasMore}
+        ?loadingMore=${paged && this._list.loadingMore}
+        ?loadError=${paged && this._list.hasError && this._list.items.length > 0}
+        @load-more=${this._onLoadMore}
         @select-board=${this._onSelectBoard}
       ></esphome-change-board-dialog>
     `;
   }
 
-  private async _findCandidates(
+  /** Resolve candidates; true when any exist (state is then populated). */
+  private async _loadCandidates(
     parsed: ReturnType<typeof readPlatformBoard>
-  ): Promise<SlimBoard[]> {
+  ): Promise<boolean> {
     if (parsed?.board) {
       const board = parsed.board.toLowerCase();
-      const { boards } = await this._api.getBoards({ query: parsed.board, limit: 50 });
+      const { boards } = await this._api.getBoards({
+        query: parsed.board,
+        limit: PAGE_SIZE,
+      });
       const exact = boards.filter(
         (b) =>
           b.esphome.board.toLowerCase() === board &&
           b.esphome.platform === parsed.platform
       );
-      if (exact.length > 0) return exact;
+      if (exact.length > 0) {
+        this._exactBoards = exact;
+        return true;
+      }
     }
     // A variant-only YAML (`esp32.variant:` with no `board:`, or a board
     // string the catalog doesn't carry) still pins the chip — every board
     // of that variant is compatible. Anything broader is not offered.
     if (parsed?.platform === "esp32" && parsed.variant) {
-      const { boards } = await this._api.getBoards({
+      const variant = chipNameToVariant(parsed.variant);
+      const fetchPage = async (offset: number, limit: number) => {
+        const page = await this._api.getBoards({
+          platform: "esp32",
+          variant,
+          offset,
+          limit,
+        });
+        return { items: page.boards, total: page.total };
+      };
+      // Probe page 0 up front so the none-found case toasts instead of
+      // opening an empty dialog; the reset serves it without a refetch.
+      const probe = await this._api.getBoards({
         platform: "esp32",
-        variant: chipNameToVariant(parsed.variant),
-        limit: 50,
+        variant,
+        limit: PAGE_SIZE,
       });
-      return boards;
+      if (probe.boards.length === 0) return false;
+      let seeded: PagedBoardsResponse | null = probe;
+      this._exactBoards = null;
+      this._list.reset(async (offset, limit) => {
+        if (offset === 0 && seeded) {
+          const first = seeded;
+          seeded = null;
+          return { items: first.boards, total: first.total };
+        }
+        return fetchPage(offset, limit);
+      });
+      return true;
     }
-    return [];
+    return false;
   }
+
+  private _onLoadMore = () => {
+    this._list.loadMore();
+  };
 
   private _onSelectBoard = async (e: CustomEvent<{ boardId: string }>) => {
     // Keep the pick out of the page-level `change-board` machinery —

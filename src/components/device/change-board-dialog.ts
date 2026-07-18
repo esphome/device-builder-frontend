@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
-import { LitElement, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { LitElement, css, html, nothing } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
@@ -12,9 +12,12 @@ import {
   dialogChromeStyles,
   quietCloseButtonStyles,
 } from "../../styles/dialog-chrome.js";
+import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
+import { IntersectionController } from "../../util/intersection-controller.js";
+import { renderLoadMoreFooter } from "../shared/load-more-footer.js";
 import { changeBoardDialogStyles } from "./change-board-dialog.styles.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
@@ -23,7 +26,9 @@ import "../base-dialog.js";
 /**
  * Picker for swapping a device's board to an interchangeable one. Bind
  * `.currentBoard` and `.boards`, open via `open()`; emits a bubbling
- * `select-board` with `{ boardId }` on selection.
+ * `select-board` with `{ boardId }` on selection. A server-paged owner
+ * additionally binds `hasMore` / `loadingMore` / `loadError` and appends
+ * pages on the `load-more` event.
  */
 @customElement("esphome-change-board-dialog")
 export class ESPHomeChangeBoardDialog extends LitElement {
@@ -47,7 +52,26 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   @property()
   description = "";
 
+  /** More pages remain; renders the infinite-scroll sentinel. */
+  @property({ type: Boolean })
+  hasMore = false;
+
+  /** A page append is in flight. */
+  @property({ type: Boolean })
+  loadingMore = false;
+
+  /** The last append failed; renders the retry affordance. */
+  @property({ type: Boolean })
+  loadError = false;
+
+  @query(".sentinel")
+  private _sentinel?: HTMLElement | null;
+
   private readonly _dialog = new DialogOpenController(this);
+
+  private readonly _intersection = new IntersectionController(this, () =>
+    this._requestLoadMore()
+  );
 
   static styles = [
     espHomeStyles,
@@ -56,6 +80,14 @@ export class ESPHomeChangeBoardDialog extends LitElement {
     dialogActionsRowStyles,
     dialogActionButtonStyles,
     changeBoardDialogStyles,
+    loadMoreFooterStyles,
+    css`
+      .load-more-loading {
+        text-align: center;
+        color: var(--wa-color-text-quiet);
+        padding: var(--wa-space-m);
+      }
+    `,
   ];
 
   open() {
@@ -83,6 +115,16 @@ export class ESPHomeChangeBoardDialog extends LitElement {
         </p>
         <div class="board-list">
           ${this.boards.map((board) => this._renderBoard(board))}
+          ${renderLoadMoreFooter({
+            loadingMore: this.loadingMore,
+            error: this.loadError,
+            hasMore: this.hasMore,
+            localize: this._localize,
+            loadingLabelKey: "wizard.loading_boards",
+            errorLabelKey: "wizard.boards_load_more_error",
+            onRetry: this._requestLoadMore,
+            loadingClass: "load-more-loading",
+          })}
         </div>
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>
@@ -121,6 +163,17 @@ export class ESPHomeChangeBoardDialog extends LitElement {
       </button>
     `;
   }
+
+  protected updated() {
+    // Null root: the dialog body is the scroll container, but clipping by
+    // ancestor scroll boxes still applies (same reasoning as the wizard's
+    // board list). The margin prefetches before the sentinel is visible.
+    this._intersection.observeIfPresent(this._sentinel, null, "200px");
+  }
+
+  private _requestLoadMore = () => {
+    this.dispatchEvent(new CustomEvent("load-more"));
+  };
 
   private _select(board: SlimBoard) {
     this.close();
