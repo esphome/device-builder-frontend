@@ -554,7 +554,7 @@
     "section_name_device_desc": "Naming your project will show up in the ESPHome dashboard. Choose a recognisable, descriptive and memorable name. You can use component names or relevant words. You can edit this after you finish this project.",
     "full_setup": "Set up with all recommended components",
     "full_setup_desc": "Adds this device's onboard components (relays, sensors, and more) so it's ready to use. You can change them afterwards in the editor.",
-    "package_config_desc": "This device uses the official ready-made configuration and automatically stays up to date with it. You can add more components afterwards in the editor.",
+    "package_config_desc": "This device uses a ready-made configuration and automatically stays up to date with it. You can add more components afterwards in the editor.",
     "full_setup_partial": "{count, plural, one {Couldn't add recommended component {names}} other {Couldn't add recommended components {names}{extra, plural, =0 {} other { and # more}}}}; finish in the editor.",
     "wifi_configuration": "Wi-Fi Configuration",
     "wifi_required_desc": "This board connects over Wi-Fi. Enter your network once and Device Builder will securely reuse it for future Wi-Fi devices.",
