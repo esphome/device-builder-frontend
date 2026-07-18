@@ -381,10 +381,6 @@ export const componentCatalogStyles = css`
     grid-column: 1 / -1;
   }
 
-  .load-more-loading {
-    grid-column: 1 / -1;
-  }
-
   .loading {
     flex: 1;
     display: flex;

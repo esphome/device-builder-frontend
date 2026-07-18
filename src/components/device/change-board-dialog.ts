@@ -135,7 +135,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
         <div class="board-list">
           ${
             this.boards.length === 0 && this.searchable && !this.loadingMore
-              ? html`<p class="load-more-loading">
+              ? html`<p class="load-more-loading-compact">
                   ${this._localize(
                     this.loadError ? "wizard.boards_load_error" : "wizard.no_boards_found"
                   )}
