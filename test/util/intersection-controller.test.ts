@@ -5,34 +5,7 @@ import {
   type IntersectionControllerOptions,
 } from "../../src/util/intersection-controller.js";
 import { FakeHost } from "../_fake-host.js";
-
-class MockObserver {
-  static instances: MockObserver[] = [];
-  observed: Element[] = [];
-  disconnected = false;
-  constructor(
-    public cb: IntersectionObserverCallback,
-    public options?: IntersectionObserverInit
-  ) {
-    MockObserver.instances.push(this);
-  }
-  observe(el: Element) {
-    this.observed.push(el);
-  }
-  unobserve() {}
-  disconnect() {
-    this.disconnected = true;
-  }
-  takeRecords() {
-    return [];
-  }
-  trigger(isIntersecting: boolean) {
-    this.cb(
-      [{ isIntersecting, target: this.observed[0] } as IntersectionObserverEntry],
-      this as unknown as IntersectionObserver
-    );
-  }
-}
+import { MockObserver } from "../_intersection-observer.js";
 
 class SentinelHost extends FakeHost {
   renderRoot = document.createElement("div");

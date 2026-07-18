@@ -10,37 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/badge/badge.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
-class MockObserver {
-  static instances: MockObserver[] = [];
-  observed: Element[] = [];
-  disconnected = false;
-  constructor(
-    public cb: IntersectionObserverCallback,
-    public options?: IntersectionObserverInit
-  ) {
-    MockObserver.instances.push(this);
-  }
-  observe(el: Element) {
-    this.observed.push(el);
-  }
-  unobserve() {}
-  disconnect() {
-    this.disconnected = true;
-  }
-  takeRecords() {
-    return [];
-  }
-  trigger(isIntersecting: boolean) {
-    this.cb(
-      [{ isIntersecting, target: this.observed[0] } as IntersectionObserverEntry],
-      this as unknown as IntersectionObserver
-    );
-  }
-}
-
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import { ESPHomeWizardStepBoardList } from "../../src/components/wizard/wizard-step-board-list.js";
 import { identityLocalize } from "../_dom.js";
+import { MockObserver } from "../_intersection-observer.js";
 
 const board = (i: number): BoardCatalogEntry =>
   ({

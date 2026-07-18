@@ -15,9 +15,10 @@ import {
   findReferencePath,
   seedDefaults,
 } from "../../../src/components/device/add-component-form-seed.js";
+import { identityLocalize } from "../../_dom.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
-const localize = (key: string): string => key;
+const localize = identityLocalize;
 
 function makeComponent(over: Partial<ComponentCatalogEntry> = {}): ComponentCatalogEntry {
   return {
