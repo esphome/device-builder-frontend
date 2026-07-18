@@ -13,6 +13,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
+import { fireEvent } from "../util/fire-event.js";
 import { deviceNameValidity, renderDeviceNameField } from "./shared/device-name-field.js";
 
 import "./base-dialog.js";
@@ -118,13 +119,7 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
     if (validateDeviceName(newName)) return;
     this._resolved = true;
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("rename-confirm", {
-        detail: newName,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "rename-confirm", newName);
   };
 }
 

@@ -17,6 +17,7 @@ import {
   quietCloseButtonStyles,
 } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 import "../base-dialog.js";
 import "./label-form.js";
 
@@ -90,13 +91,11 @@ export class ESPHomeLabelDialog extends LitElement {
   }
 
   private _requestClose = () => {
-    this.dispatchEvent(
-      new CustomEvent("request-close", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "request-close");
   };
 
   private _onAfterHide = () => {
-    this.dispatchEvent(new CustomEvent("after-hide", { bubbles: true, composed: true }));
+    fireEvent(this, "after-hide");
   };
 }
 

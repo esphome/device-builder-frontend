@@ -24,6 +24,7 @@ import {
 } from "../../context/index.js";
 import { peerRowStyles } from "../../styles/peer-rows.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -374,34 +375,19 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     if (!_VERSION_MATCH_POLICIES.includes(raw as VersionMatchPolicy)) return;
     const policy = raw as VersionMatchPolicy;
     if (policy === this._versionMatchPolicy) return;
-    this.dispatchEvent(
-      new CustomEvent("set-offloader-version-match-policy", {
-        detail: policy,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-offloader-version-match-policy", policy);
   };
 
   private _onToggleRemoteBuilds = () => {
     if (this._remoteBuildsEnabled === null) return;
-    this.dispatchEvent(
-      new CustomEvent("set-offloader-remote-builds-enabled", {
-        detail: !this._remoteBuildsEnabled,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-offloader-remote-builds-enabled", !this._remoteBuildsEnabled);
   };
 
   private _onTogglePairingEnabled = (pairing: PairingSummary) => {
-    this.dispatchEvent(
-      new CustomEvent("set-offloader-pairing-enabled", {
-        detail: { pin_sha256: pairing.pin_sha256, enabled: !pairing.enabled },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-offloader-pairing-enabled", {
+      pin_sha256: pairing.pin_sha256,
+      enabled: !pairing.enabled,
+    });
   };
 
   private _onPairClick = (): void => {

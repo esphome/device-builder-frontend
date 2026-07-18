@@ -8,6 +8,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { fireEvent } from "../util/fire-event.js";
 import { formatPinSha256 } from "../util/pin-format.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./confirm-dialog.js";
@@ -241,24 +242,12 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
 
   private _onAccept() {
     if (this.peer === null) return;
-    this.dispatchEvent(
-      new CustomEvent("confirm", {
-        detail: { dashboardId: this.peer.dashboard_id },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "confirm", { dashboardId: this.peer.dashboard_id });
   }
 
   private _onReject() {
     if (this.peer === null) return;
-    this.dispatchEvent(
-      new CustomEvent("reject", {
-        detail: { dashboardId: this.peer.dashboard_id },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "reject", { dashboardId: this.peer.dashboard_id });
   }
 }
 

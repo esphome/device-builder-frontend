@@ -7,6 +7,7 @@ import { localizeContext } from "../context/index.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
+import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -189,25 +190,19 @@ export class ESPHomeYamlValidationDialog extends LitElement {
     if (this._resolvedExit !== null) return; // a repeated Enter must not dispatch twice
     this._resolvedExit = "goto";
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("goto", {
-        detail: { line: this.firstErrorLine, col: this.firstErrorCol },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "goto", { line: this.firstErrorLine, col: this.firstErrorCol });
   }
 
   private _saveAnyway() {
     this._resolvedExit = "save-anyway";
     this.close();
-    this.dispatchEvent(new CustomEvent("save-anyway", { bubbles: true, composed: true }));
+    fireEvent(this, "save-anyway");
   }
 
   private _onAfterHide() {
     this._dialog.open = false;
     if (this._resolvedExit === null) {
-      this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
+      fireEvent(this, "cancel");
     }
   }
 }

@@ -27,6 +27,7 @@ import { peerRowStyles } from "../../styles/peer-rows.js";
 import { pinHexStyles } from "../../styles/pin-hex.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { pairingAddress } from "../../util/pairing-address.js";
 import { renderPairingAddress } from "../shared/pairing-address.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
@@ -391,13 +392,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   }
 
   private _onToggleEnabled() {
-    this.dispatchEvent(
-      new CustomEvent("set-remote-build-enabled", {
-        detail: !this._remoteBuildEnabled,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-remote-build-enabled", !this._remoteBuildEnabled);
     return nothing;
   }
 

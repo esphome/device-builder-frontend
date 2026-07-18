@@ -5,6 +5,7 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { isTypingTarget } from "../../util/typing-target.js";
 import { guidedTourStyles } from "./esphome-guided-tour.styles.js";
@@ -494,7 +495,7 @@ export class ESPHomeGuidedTour extends LitElement {
 
   private _pause = (): void => {
     this._deactivate();
-    this.dispatchEvent(new CustomEvent("tour-paused", { bubbles: true, composed: true }));
+    fireEvent(this, "tour-paused");
   };
 
   private _deactivate(): void {
@@ -515,9 +516,7 @@ export class ESPHomeGuidedTour extends LitElement {
     clearTourConfiguration();
     clearTourPending();
     this._deactivate();
-    this.dispatchEvent(
-      new CustomEvent("tour-finished", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "tour-finished");
   }
 
   private _scheduleMeasure(): void {

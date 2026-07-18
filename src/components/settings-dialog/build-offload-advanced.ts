@@ -8,6 +8,7 @@ import {
   offloaderIncludeLocalInPoolContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { renderToggleRow } from "./settings-rows.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
@@ -44,13 +45,7 @@ export class ESPHomeSettingsBuildOffloadAdvanced extends LitElement {
 
   private _onToggleIncludeLocal = () => {
     if (this._includeLocalInPool === null) return;
-    this.dispatchEvent(
-      new CustomEvent("set-offloader-include-local", {
-        detail: !this._includeLocalInPool,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-offloader-include-local", !this._includeLocalInPool);
   };
 }
 

@@ -1,6 +1,7 @@
 import { css, html, type TemplateResult } from "lit";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { fireEvent } from "../util/fire-event.js";
 import { splitTemplate } from "../util/template-split.js";
 
 /**
@@ -18,13 +19,7 @@ export function canResetBuildEnv(pairing: PairingSummary): boolean {
 
 /** Route *pin*'s confirm-then-follow remote reset to the firmware-jobs dialog. */
 export function requestResetPeerBuildEnv(el: HTMLElement, pin: string): void {
-  el.dispatchEvent(
-    new CustomEvent("open-reset-peer-build-env", {
-      detail: { pin_sha256: pin },
-      bubbles: true,
-      composed: true,
-    })
-  );
+  fireEvent(el, "open-reset-peer-build-env", { pin_sha256: pin });
 }
 
 // Visual boundary around the user-controlled receiver label inlined in the

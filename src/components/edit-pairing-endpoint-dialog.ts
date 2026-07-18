@@ -12,6 +12,7 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
+import { fireEvent } from "../util/fire-event.js";
 import {
   normalizeHostnameForCompare,
   parsePortInput,
@@ -149,17 +150,11 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
       // event so this dialog doesn't have to write the
       // returned PairingSummary into state itself. Just
       // close.
-      this.dispatchEvent(
-        new CustomEvent("pairing-endpoint-edited", {
-          bubbles: true,
-          composed: true,
-          detail: {
-            pin_sha256: this._pinSha256,
-            hostname,
-            port,
-          },
-        })
-      );
+      fireEvent(this, "pairing-endpoint-edited", {
+        pin_sha256: this._pinSha256,
+        hostname,
+        port,
+      });
       this._open = false;
     } catch (err) {
       // Pass the values that actually went on the wire (trimmed

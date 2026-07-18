@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
+import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -204,20 +205,20 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   private _onDiscard() {
     this._resolved = true;
     this.close();
-    this.dispatchEvent(new CustomEvent("discard", { bubbles: true, composed: true }));
+    fireEvent(this, "discard");
   }
 
   private _onSave() {
     if (this._resolved) return; // a repeated Enter must not dispatch twice
     this._resolved = true;
     this.close();
-    this.dispatchEvent(new CustomEvent("save", { bubbles: true, composed: true }));
+    fireEvent(this, "save");
   }
 
   private _onAfterHide() {
     this._dialog.open = false;
     if (!this._resolved) {
-      this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
+      fireEvent(this, "cancel");
     }
   }
 }
