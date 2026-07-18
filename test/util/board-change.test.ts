@@ -10,8 +10,11 @@ import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
 import { fetchBoard } from "../../src/util/board-body-cache.js";
 import { findBoardDisagreement } from "../../src/util/board-change.js";
-import { identityLocalize } from "../_dom.js";
 import { makeSlimBoard } from "../_make-slim-board.js";
+
+// Inline stub: this suite runs in node, and test/_dom.ts drags in Lit's
+// DOM helpers.
+const identityLocalize = (key: string) => key;
 
 const S3_BOARD = makeSlimBoard("generic-esp32s3", {
   board: "esp32-s3-devkitc-1",
