@@ -3,20 +3,11 @@ import {
   consumePendingHighlight,
   markPendingHighlight,
 } from "../../src/util/pending-highlight.js";
+import { stubStorage } from "../_storage.js";
 
 describe("pending-highlight", () => {
-  // The vitest config runs in the ``node`` environment which has no
-  // ``sessionStorage``. The helper just calls ``getItem`` /
-  // ``setItem`` / ``removeItem`` so a tiny in-memory Map stand-in is
-  // enough — we don't need to pull in jsdom for two methods.
   beforeEach(() => {
-    const store = new Map<string, string>();
-    vi.stubGlobal("sessionStorage", {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => store.set(k, v),
-      removeItem: (k: string) => store.delete(k),
-      clear: () => store.clear(),
-    });
+    stubStorage("sessionStorage");
   });
 
   afterEach(() => {

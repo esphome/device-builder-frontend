@@ -4,20 +4,11 @@ import {
   consumeJustCreated,
   markJustCreated,
 } from "../../src/util/just-created.js";
+import { stubStorage, stubThrowingStorage } from "../_storage.js";
 
 describe("just-created", () => {
-  // The vitest config runs in the ``node`` environment which has no
-  // ``sessionStorage``. Stub it with a tiny in-memory Map per-test so
-  // we don't need to pull in jsdom for two methods. Same shape as
-  // ``pending-highlight.test.ts``.
   beforeEach(() => {
-    const store = new Map<string, string>();
-    vi.stubGlobal("sessionStorage", {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => store.set(k, v),
-      removeItem: (k: string) => store.delete(k),
-      clear: () => store.clear(),
-    });
+    stubStorage("sessionStorage");
   });
 
   afterEach(() => {
@@ -70,20 +61,7 @@ describe("just-created", () => {
     // every ``sessionStorage`` access. The helpers swallow these
     // — the welcome banner is decoration, not worth blowing up
     // the wizard / rename / device-mount over.
-    vi.stubGlobal("sessionStorage", {
-      getItem: () => {
-        throw new Error("blocked");
-      },
-      setItem: () => {
-        throw new Error("blocked");
-      },
-      removeItem: () => {
-        throw new Error("blocked");
-      },
-      clear: () => {
-        throw new Error("blocked");
-      },
-    });
+    stubThrowingStorage("sessionStorage");
     expect(() => markJustCreated("kitchen.yaml")).not.toThrow();
     expect(consumeJustCreated("kitchen.yaml")).toBe(false);
     expect(() => clearJustCreated()).not.toThrow();

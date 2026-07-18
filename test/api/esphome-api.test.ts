@@ -7,6 +7,7 @@ import {
   installMockWebSocket,
   uninstallMockWebSocket,
 } from "./mock-websocket.js";
+import { stubStorage } from "../_storage.js";
 
 const serverInfo = {
   server_version: "1.0.0",
@@ -21,16 +22,8 @@ const serverInfoAuthRequired = {
   requires_auth: true,
 };
 
-function stubLocalStorage(initial?: Record<string, string>): Map<string, string> {
-  const store = new Map<string, string>(Object.entries(initial ?? {}));
-  vi.stubGlobal("localStorage", {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => store.set(k, v),
-    removeItem: (k: string) => store.delete(k),
-    clear: () => store.clear(),
-  });
-  return store;
-}
+const stubLocalStorage = (initial?: Record<string, string>) =>
+  stubStorage("localStorage", initial);
 
 async function connect(api: ESPHomeAPI): Promise<MockWebSocket> {
   const pending = api.connect();
