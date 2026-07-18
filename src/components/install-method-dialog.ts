@@ -20,6 +20,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { disclosureStyles } from "../styles/disclosure.js";
+import { emptyStateStyles } from "../styles/empty-state.js";
 import { inputStyles } from "../styles/inputs.js";
 import { newItemHighlightStyles } from "../styles/new-item-highlight.js";
 import { serialPortHintStyles } from "../styles/serial-port-hints.js";
@@ -173,6 +174,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     inputStyles,
     newItemHighlightStyles,
     serialPortHintStyles,
+    emptyStateStyles,
     installMethodDialogStyles,
   ];
 
@@ -337,7 +339,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       </button>
       ${
         this._portsPoll.ports.length === 0
-          ? html`<div class="empty">
+          ? html`<div class="empty-message">
               ${this._localize("dashboard.install_method_no_ports")}
             </div>`
           : html`

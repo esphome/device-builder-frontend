@@ -259,12 +259,4 @@ export const installMethodDialogStyles = css`
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-s);
   }
-
-  .empty {
-    text-align: center;
-    padding: var(--wa-space-l) 0;
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-s);
-    line-height: 1.5;
-  }
 `;

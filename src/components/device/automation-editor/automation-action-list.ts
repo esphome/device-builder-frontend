@@ -108,7 +108,7 @@ export class ESPHomeAutomationActionList extends LitElement {
         }
         ${
           this.actions.length === 0
-            ? html`<p class="ae-empty-block" role="status">
+            ? html`<p class="empty-message--dashed" role="status">
                 ${this._localize("device.automation_actions_empty")}
               </p>`
             : this.actions.map((node, idx) =>

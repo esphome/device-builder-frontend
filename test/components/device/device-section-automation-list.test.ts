@@ -35,7 +35,9 @@ describe("esphome-section-automation-list", () => {
       deleteLabel: "Delete",
     });
     expect(el.shadowRoot?.querySelector(".add")).not.toBeNull();
-    expect(el.shadowRoot?.querySelector(".empty")?.textContent).toContain("Nothing yet");
+    expect(el.shadowRoot?.querySelector(".empty-message--dashed")?.textContent).toContain(
+      "Nothing yet"
+    );
   });
 
   it("omits the empty placeholder when addable but emptyText is absent", async () => {
@@ -47,7 +49,7 @@ describe("esphome-section-automation-list", () => {
     });
     // Header + Add still render, but no blank dashed box / ARIA status.
     expect(el.shadowRoot?.querySelector(".add")).not.toBeNull();
-    expect(el.shadowRoot?.querySelector(".empty")).toBeNull();
+    expect(el.shadowRoot?.querySelector(".empty-message--dashed")).toBeNull();
   });
 
   it("emits edit / delete with the row key", async () => {

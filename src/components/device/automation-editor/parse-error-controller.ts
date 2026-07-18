@@ -73,11 +73,11 @@ export class ParseErrorController implements ReactiveController {
     // A known action with no structured form is not an error — show the
     // neutral "edit in YAML" hint, no alert styling.
     if (this._unsupported) {
-      return html`<div class="ae-empty-block" role="note">
+      return html`<div class="empty-message--dashed" role="note">
         <p>${localize("device.yaml_only_section")}</p>
       </div>`;
     }
-    return html`<div class="ae-empty-block" role="alert">
+    return html`<div class="empty-message--dashed" role="alert">
       <p class="ae-error">${localize("device.automation_parse_error")}</p>
       ${this._message ? html`<p>${this._message}</p>` : nothing}
     </div>`;

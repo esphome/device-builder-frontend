@@ -2,6 +2,7 @@ import { mdiDelete, mdiPencil, mdiPlus } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
+import { emptyStateStyles } from "../../styles/empty-state.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { deviceSectionAutomationListStyles } from "./device-section-automation-list.styles.js";
@@ -38,7 +39,7 @@ export interface AutomationListRow {
  */
 @customElement("esphome-section-automation-list")
 export class ESPHomeSectionAutomationList extends LitElement {
-  static styles = [espHomeStyles, deviceSectionAutomationListStyles];
+  static styles = [espHomeStyles, emptyStateStyles, deviceSectionAutomationListStyles];
 
   @property()
   heading = "";
@@ -84,7 +85,7 @@ export class ESPHomeSectionAutomationList extends LitElement {
           ? // Only paint the placeholder when there's copy for it — a blank
             // dashed box + empty ARIA status would just be noise otherwise.
             this.emptyText !== undefined
-            ? html`<p class="empty" role="status">${this.emptyText}</p>`
+            ? html`<p class="empty-message--dashed" role="status">${this.emptyText}</p>`
             : nothing
           : html`<ul class="rows">
               ${this.rows.map(

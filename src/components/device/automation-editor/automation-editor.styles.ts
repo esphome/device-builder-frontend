@@ -1,5 +1,6 @@
 import { css } from "lit";
 
+import { emptyStateStyles } from "../../../styles/empty-state.js";
 import { substitutionNoteStyles } from "../substitution-note.styles.js";
 import { automationEditorActionStyles } from "./automation-editor-actions.styles.js";
 import { automationEditorRowStyles } from "./automation-editor-rows.styles.js";
@@ -216,5 +217,6 @@ export const automationEditorStyles = [
   automationEditorScriptParamStyles,
   automationEditorRowStyles,
   automationEditorActionStyles,
+  emptyStateStyles,
   substitutionNoteStyles,
 ];

@@ -6,6 +6,7 @@ import { classMap } from "lit/directives/class-map.js";
 import type { SerialPort } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { emptyStateStyles } from "../../styles/empty-state.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { newItemHighlightStyles } from "../../styles/new-item-highlight.js";
 import { serialPortHintStyles } from "../../styles/serial-port-hints.js";
@@ -62,6 +63,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
     inputStyles,
     newItemHighlightStyles,
     serialPortHintStyles,
+    emptyStateStyles,
     css`
       :host {
         display: flex;
@@ -164,22 +166,6 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-s);
       }
-
-      .empty {
-        text-align: center;
-        padding: var(--wa-space-l) 0;
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
-        line-height: 1.5;
-      }
-
-      .error {
-        text-align: center;
-        padding: var(--wa-space-l) 0;
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
-        line-height: 1.5;
-      }
     `,
   ];
 
@@ -212,11 +198,13 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       `;
     }
     if (this.errorMessage) {
-      return html`<div class="error">${this.errorMessage}</div>`;
+      return html`<div class="empty-message">${this.errorMessage}</div>`;
     }
     if (this.ports.length === 0) {
       return html`
-        <div class="empty">${this._localize("wizard.connect_your_board_no_ports")}</div>
+        <div class="empty-message">
+          ${this._localize("wizard.connect_your_board_no_ports")}
+        </div>
       `;
     }
     return html`
