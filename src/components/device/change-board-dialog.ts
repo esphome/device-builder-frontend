@@ -39,6 +39,14 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   @property({ attribute: false })
   boards: SlimBoard[] = [];
 
+  /** Title override; empty falls back to the change-board copy. */
+  @property()
+  heading = "";
+
+  /** Intro override; empty falls back to the change-board copy. */
+  @property()
+  description = "";
+
   private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
@@ -62,13 +70,16 @@ export class ESPHomeChangeBoardDialog extends LitElement {
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
-        .label=${this._localize("device.change_board_title")}
+        .label=${this.heading || this._localize("device.change_board_title")}
         @request-close=${this._dialog.onRequestClose}
       >
         <p class="intro">
-          ${this._localize("device.change_board_desc", {
-            name: this.currentBoard?.name ?? "",
-          })}
+          ${
+            this.description ||
+            this._localize("device.change_board_desc", {
+              name: this.currentBoard?.name ?? "",
+            })
+          }
         </p>
         <div class="board-list">
           ${this.boards.map((board) => this._renderBoard(board))}

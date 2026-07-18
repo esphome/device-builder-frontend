@@ -147,6 +147,8 @@ import "../components/dashboard/device-drawer.js";
 import "../components/dashboard/device-table.js";
 import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
+import "../components/device/board-reselect-dialog.js";
+import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
 import "../components/discovered-device-card.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
@@ -326,6 +328,8 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-command-dialog") _commandDialog!: ESPHomeCommandDialog;
   @query("esphome-firmware-install-dialog")
   _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+  @query("esphome-board-reselect-dialog")
+  _boardReselectDialog!: ESPHomeBoardReselectDialog;
   @query("esphome-logs-dialog") _logsDialog!: ESPHomeLogsDialog;
   @query(".search-input") _searchInputEl?: HTMLElement & { focus: () => void };
 
@@ -965,6 +969,11 @@ export class ESPHomePageDashboard extends LitElement {
   );
   _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+  };
+
+  /** Chip-mismatch recovery hand-off from the install dialog. */
+  _onRequestChangeBoard = (e: CustomEvent<{ configuration: string }>) => {
+    void this._boardReselectDialog?.open({ configuration: e.detail.configuration });
   };
 
   _toggleDevice(configuration: string) {

@@ -127,6 +127,7 @@ export async function startWebSerialInstall(
     !(expectedIsCoarseEsp32 && detectedVariant.startsWith("esp32"))
   ) {
     await releaseSerial(detected);
+    host._failedChipMismatch = true;
     host._fail(
       host._localize("firmware.chip_mismatch", {
         detected: detected.chipName,

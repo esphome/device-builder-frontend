@@ -1,0 +1,98 @@
+// @vitest-environment happy-dom
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+
+import type { ESPHomeAPI } from "../../src/api/index.js";
+import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
+import { ESPHomePageDevice } from "../../src/pages/device.js";
+
+/**
+ * Pin the post-save board-reselect prompt: fires once per disagreement,
+ * suppressed during install-triggered saves, silent on a failed save.
+ */
+
+interface PageView {
+  id: string;
+  _yaml: string;
+  _savedYaml: string;
+  _board: BoardCatalogEntry | null;
+  _suppressBoardPrompt: boolean;
+  _api: ESPHomeAPI;
+  _doSaveYaml(): Promise<boolean>;
+}
+
+const S3_BOARD = {
+  esphome: { platform: "esp32", board: "esp32-s3-devkitc-1", variant: "esp32s3" },
+} as BoardCatalogEntry;
+
+const C3_YAML = "esp32:\n  board: esp32-c3-devkitm-1\n";
+
+function makePage(overrides: Partial<PageView> = {}) {
+  const page = new ESPHomePageDevice() as unknown as PageView;
+  const openReselect = vi.fn().mockResolvedValue(undefined);
+  Object.assign(page, {
+    id: "dev.yaml",
+    _yaml: C3_YAML,
+    _savedYaml: "",
+    _board: S3_BOARD,
+    _api: { updateConfig: vi.fn().mockResolvedValue(undefined) },
+    ...overrides,
+  });
+  // Shadow the @query accessor with the stub dialog.
+  Object.defineProperty(page, "_boardReselectDialog", {
+    value: { open: openReselect },
+  });
+  return { page, openReselect };
+}
+
+describe("post-save board reselect prompt", () => {
+  it("opens the reselect dialog when the saved YAML disagrees with the board", async () => {
+    const { page, openReselect } = makePage();
+    await page._doSaveYaml();
+    expect(openReselect).toHaveBeenCalledTimes(1);
+    expect(openReselect).toHaveBeenCalledWith({
+      configuration: "dev.yaml",
+      yaml: C3_YAML,
+    });
+  });
+
+  it("prompts once for the same dismissed disagreement", async () => {
+    const { page, openReselect } = makePage();
+    await page._doSaveYaml();
+    await page._doSaveYaml();
+    expect(openReselect).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays quiet while an install-triggered save runs", async () => {
+    const { page, openReselect } = makePage({ _suppressBoardPrompt: true });
+    await page._doSaveYaml();
+    expect(openReselect).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when the YAML agrees with the board", async () => {
+    const { page, openReselect } = makePage({
+      _yaml: "esp32:\n  board: esp32-s3-devkitc-1\n",
+    });
+    await page._doSaveYaml();
+    expect(openReselect).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet with no loaded board", async () => {
+    const { page, openReselect } = makePage({ _board: null });
+    await page._doSaveYaml();
+    expect(openReselect).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when the save fails", async () => {
+    const { page, openReselect } = makePage({
+      _api: {
+        updateConfig: vi.fn().mockRejectedValue(new Error("boom")),
+      } as unknown as ESPHomeAPI,
+    });
+    await page._doSaveYaml();
+    expect(openReselect).not.toHaveBeenCalled();
+  });
+});

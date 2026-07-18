@@ -24,6 +24,8 @@ function footerHost(step: string) {
     _detected: null,
     _failedDuringCompile: false,
     _failedDuringValidate: false,
+    _failedChipMismatch: false,
+    _tryChangeBoard: vi.fn(),
     _showLogsAfterInstall: false,
     _toggleShowLogsAfterInstall: vi.fn(),
   };
@@ -73,6 +75,18 @@ describe("firmware-install-dialog footer", () => {
   it("does not offer Retry on a non-Web-Serial error", () => {
     const host = footerHost("error"); // binary-download
     const values = footerValues(host);
+    expect(values).not.toContain(host._retry);
+  });
+
+  it("offers Change board and not Retry on a chip mismatch", () => {
+    // Retry would loop on the same stale board_id; the reselect hand-off
+    // is the only way out.
+    const host = footerHost("error");
+    host._installer = "web-serial";
+    host._failedChipMismatch = true;
+    const values = footerValues(host);
+    expect(values).toContain(host._tryChangeBoard);
+    expect(values).toContain(host._close);
     expect(values).not.toContain(host._retry);
   });
 });

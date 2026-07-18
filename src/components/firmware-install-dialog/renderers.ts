@@ -351,6 +351,20 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
+  // A chip mismatch against the stored board can't be retried into success —
+  // offer the board-reselect hand-off instead.
+  if (host._step === "error" && host._failedChipMismatch) {
+    return html`
+      <div class="footer">
+        <button class="btn btn--ghost" @click=${host._close}>
+          ${host._localize("command.close")}
+        </button>
+        <button class="btn btn--primary" @click=${host._tryChangeBoard}>
+          ${host._localize("firmware.change_board_action")}
+        </button>
+      </div>
+    `;
+  }
   // A failed Web Serial or USB (web-flash) flash can be retried in place: re-run
   // the install (web-flash re-opens the external flasher). Excludes compile /
   // validate failures, which surface the reset-build hint (renderResetSuggestion)
@@ -359,7 +373,8 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
     host._step === "error" &&
     (host._installer === "web-serial" || host._installer === "web-flash") &&
     !host._failedDuringCompile &&
-    !host._failedDuringValidate;
+    !host._failedDuringValidate &&
+    !host._failedChipMismatch;
   if (canRetry) {
     return html`
       <div class="footer">

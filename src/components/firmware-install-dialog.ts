@@ -130,6 +130,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // hint from clean/reset (C++ help) to "open in editor" (YAML help).
   @state() _failedDuringValidate = false;
 
+  // Pre-flash chip mismatch against the stored board_id. Swaps the footer's
+  // Retry (which would loop on the same stale board) for a change-board
+  // hand-off.
+  @state() _failedChipMismatch = false;
+
   // Source of the most recent compile job. REMOTE means the toolchain lives
   // on a paired receiver, so the local "reset build environment" link can't
   // help — the build-failure hint swaps to a plain-text "ask the operator
@@ -282,6 +287,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._installer = null;
     this._failedDuringCompile = false;
     this._failedDuringValidate = false;
+    this._failedChipMismatch = false;
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
     this._jobSourcePin = "";
@@ -365,6 +371,22 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (!device) return;
     this.dispatchEvent(
       new CustomEvent("request-open-editor", {
+        detail: { configuration: device.configuration },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
+  // Chip-mismatch recovery: close and hand off to the host page's board
+  // reselect flow. Closing first is deliberate — the dialog's _device
+  // snapshot is stale after a board change; a fresh install re-reads state.
+  _tryChangeBoard = () => {
+    const device = this._device;
+    this._close();
+    if (!device) return;
+    this.dispatchEvent(
+      new CustomEvent("request-change-board", {
         detail: { configuration: device.configuration },
         bubbles: true,
         composed: true,

@@ -239,7 +239,9 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
       @request-open-editor=${host._onRequestOpenEditor}
+      @request-change-board=${host._onRequestChangeBoard}
     ></esphome-firmware-install-dialog>
+    <esphome-board-reselect-dialog></esphome-board-reselect-dialog>
     <esphome-logs-dialog></esphome-logs-dialog>
     <esphome-install-method-dialog
       ?open=${host._installMethodOpen}

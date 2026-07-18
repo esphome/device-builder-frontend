@@ -24,6 +24,7 @@ vi.mock("../../src/components/dashboard/device-drawer.js", () => ({}));
 vi.mock("../../src/components/dashboard/device-table.js", () => ({}));
 vi.mock("../../src/components/dashboard/table-row-menu.js", () => ({}));
 vi.mock("../../src/components/device-card.js", () => ({}));
+vi.mock("../../src/components/device/board-reselect-dialog.js", () => ({}));
 vi.mock("../../src/components/discovered-device-card.js", () => ({}));
 vi.mock("../../src/components/firmware-install-dialog.js", () => ({}));
 vi.mock("../../src/components/friendly-name-dialog.js", () => ({}));
