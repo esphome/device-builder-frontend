@@ -126,7 +126,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       }
 
       .option:focus-visible {
-        outline: 2px solid var(--esphome-primary);
+        outline: var(--esphome-focus-outline);
         outline-offset: 2px;
       }
 

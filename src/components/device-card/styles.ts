@@ -42,7 +42,7 @@ export const deviceCardStyles = [
 
     /* Focus ring on the inner card so it follows rounded corners. */
     :host(:focus-visible) .device-card {
-      outline: 2px solid var(--esphome-primary);
+      outline: var(--esphome-focus-outline);
       outline-offset: 2px;
     }
 

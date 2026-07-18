@@ -217,7 +217,7 @@ export const componentCatalogStyles = css`
   }
 
   .expand-button:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 1px;
   }
 
@@ -369,7 +369,7 @@ export const componentCatalogStyles = css`
   }
 
   .select-component:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 3px;
   }
 

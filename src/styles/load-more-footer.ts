@@ -46,7 +46,7 @@ export const loadMoreFooterStyles = css`
   }
 
   .retry-link:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 2px;
   }
 `;
