@@ -1046,7 +1046,13 @@ export class ESPHomePageDevice extends LitElement {
     if (this._boardDisagreement() && (await this._openBoardReselect())) {
       return;
     }
-    run();
+    try {
+      run();
+    } catch (err) {
+      // Surfaced rather than lost as an unhandled rejection.
+      console.error("Install entry failed:", err);
+      notifyError(this._localize("device.install_start_failed"));
+    }
   };
   private _saveThenInstall = () => this._installAfterSave(this._installCtrl.onInstall);
   private _saveThenUpdate = () => this._installAfterSave(this._installCtrl.onUpdate);

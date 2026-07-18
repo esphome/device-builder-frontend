@@ -124,7 +124,7 @@ import { sortDevices } from "../util/device-sort.js";
 import { normalizeUpdateBuckets } from "../util/facets.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
-import { notifyInfo } from "../util/notify.js";
+import { notifyError, notifyInfo } from "../util/notify.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { consumePendingSerialSetup } from "../util/pending-serial-setup.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -990,9 +990,10 @@ export class ESPHomePageDashboard extends LitElement {
     try {
       proceed();
     } catch (err) {
-      // Logged rather than lost as an unhandled rejection behind the
+      // Surfaced rather than lost as an unhandled rejection behind the
       // void call sites.
       console.error("Install entry failed:", err);
+      notifyError(this._localize("device.install_start_failed"));
     }
   };
   _onInstallMethodSelect = (e: CustomEvent<{ method: string; port?: string }>) =>
