@@ -1,4 +1,4 @@
-import { RP2_ALIAS_KEY, RP2_CANONICAL_KEY } from "./component-presence.js";
+import { TARGET_PLATFORM_KEYS } from "./component-presence.js";
 import { parseYamlAutomations } from "./yaml-automations.js";
 import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 import {
@@ -49,16 +49,8 @@ export interface CategorizedSections {
 // block is the exception, not the rule. It's a regular platform
 // component and lives under "Components" in the navigator.
 export const CORE_KEYS = new Set([
-  // Target platforms
-  "esp32",
-  "esp8266",
-  RP2_CANONICAL_KEY,
-  // esphome#17145 renames the rp2040 platform key to rp2; keep both
-  RP2_ALIAS_KEY,
-  "bk72xx",
-  "rtl87xx",
-  "ln882x",
-  "nrf52",
+  // Target platforms (both RP2 spellings ride along in the shared set)
+  ...TARGET_PLATFORM_KEYS,
   "host",
   // ESPHome infrastructure
   "esphome",

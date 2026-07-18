@@ -2,11 +2,12 @@ import { consume } from "@lit/context";
 import { html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { PagedBoardsResponse, SlimBoard } from "../../api/types/boards.js";
+import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { applyBoardChange } from "../../util/board-change.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
-import { notifyError, notifySuccess } from "../../util/notify.js";
+import { notifyError } from "../../util/notify.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { readPlatformBoard } from "../../util/yaml-board.js";
 import type { ESPHomeChangeBoardDialog } from "./change-board-dialog.js";
@@ -126,23 +127,14 @@ export class ESPHomeBoardReselectDialog extends LitElement {
         return { items: page.boards, total: page.total };
       };
       // Probe page 0 up front so the none-found case toasts instead of
-      // opening an empty dialog; the reset serves it without a refetch.
-      const probe = await this._api.getBoards({
-        platform: "esp32",
-        variant,
-        limit: PAGE_SIZE,
-      });
-      if (probe.boards.length === 0) return false;
-      let seeded: PagedBoardsResponse | null = probe;
+      // opening an empty dialog; the reset serves it without a refetch
+      // (offset 0 is only ever the reset's own first fetch).
+      const probe = await fetchPage(0, PAGE_SIZE);
+      if (probe.items.length === 0) return false;
       this._exactBoards = null;
-      this._list.reset(async (offset, limit) => {
-        if (offset === 0 && seeded) {
-          const first = seeded;
-          seeded = null;
-          return { items: first.boards, total: first.total };
-        }
-        return fetchPage(offset, limit);
-      });
+      this._list.reset((offset, limit) =>
+        offset === 0 ? Promise.resolve(probe) : fetchPage(offset, limit)
+      );
       return true;
     }
     return false;
@@ -158,9 +150,9 @@ export class ESPHomeBoardReselectDialog extends LitElement {
     e.stopPropagation();
     const configuration = this._configuration;
     if (!configuration) return;
-    try {
-      await this._api.updateDevice({ configuration, board_id: e.detail.boardId });
-      notifySuccess(this._localize("device.change_board_success"));
+    if (
+      await applyBoardChange(this._api, this._localize, configuration, e.detail.boardId)
+    ) {
       this.dispatchEvent(
         new CustomEvent<{ configuration: string; boardId: string }>("board-changed", {
           detail: { configuration, boardId: e.detail.boardId },
@@ -168,9 +160,6 @@ export class ESPHomeBoardReselectDialog extends LitElement {
           composed: true,
         })
       );
-    } catch (err) {
-      console.error("Failed to change board:", err);
-      notifyError(this._localize("device.change_board_error"));
     }
   };
 }

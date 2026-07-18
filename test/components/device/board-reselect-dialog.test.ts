@@ -14,29 +14,20 @@ vi.mock("sonner-js", () => ({
 
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-import type { SlimBoard } from "../../../src/api/types/boards.js";
 import { ESPHomeBoardReselectDialog } from "../../../src/components/device/board-reselect-dialog.js";
 import type { ESPHomeChangeBoardDialog } from "../../../src/components/device/change-board-dialog.js";
 import { mount } from "../../_dom.js";
+import { makeSlimBoard } from "../../_make-slim-board.js";
 
-function slimBoard(id: string, esphome: Partial<SlimBoard["esphome"]>): SlimBoard {
-  return {
-    id,
-    name: id,
-    images: [],
-    esphome: { platform: "esp32", board: id, variant: null, ...esphome },
-  } as unknown as SlimBoard;
-}
-
-const C3_CURATED = slimBoard("c3-curated", {
+const C3_CURATED = makeSlimBoard("c3-curated", {
   board: "esp32-c3-devkitm-1",
   variant: "esp32c3",
 });
-const C3_GENERIC = slimBoard("esp32-c3-devkitm-1", {
+const C3_GENERIC = makeSlimBoard("esp32-c3-devkitm-1", {
   board: "esp32-c3-devkitm-1",
   variant: "esp32c3",
 });
-const S3_NOISE = slimBoard("s3-board", {
+const S3_NOISE = makeSlimBoard("s3-board", {
   board: "esp32-s3-devkitc-1",
   variant: "esp32s3",
 });
@@ -94,6 +85,7 @@ describe("board-reselect-dialog", () => {
     expect(getBoards).toHaveBeenCalledWith({
       platform: "esp32",
       variant: "esp32c3",
+      offset: 0,
       limit: 50,
     });
     await vi.waitFor(() => expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]));
@@ -113,6 +105,7 @@ describe("board-reselect-dialog", () => {
     expect(getBoards).toHaveBeenLastCalledWith({
       platform: "esp32",
       variant: "esp32c3",
+      offset: 0,
       limit: 50,
     });
     await vi.waitFor(() => expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]));
@@ -175,13 +168,12 @@ describe("board-reselect-dialog", () => {
         composed: true,
       })
     );
-    await vi.waitFor(() => expect(api.updateDevice).toHaveBeenCalled());
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     expect(api.updateDevice).toHaveBeenCalledWith({
       configuration: "dev.yaml",
       board_id: "c3-curated",
     });
     expect(toast.success).toHaveBeenCalled();
-    expect(onChanged).toHaveBeenCalledTimes(1);
     expect((onChanged.mock.calls[0][0] as CustomEvent).detail).toEqual({
       configuration: "dev.yaml",
       boardId: "c3-curated",

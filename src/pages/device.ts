@@ -42,6 +42,7 @@ import {
 } from "../util/backend-field-errors.js";
 import { withBase } from "../util/base-path.js";
 import { fetchBoard } from "../util/board-body-cache.js";
+import { applyBoardChange } from "../util/board-change.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
@@ -612,16 +613,10 @@ export class ESPHomePageDevice extends LitElement {
       notifyError(this._localize("device.change_board_unsaved"));
       return;
     }
-    try {
-      await this._api.updateDevice({
-        configuration: device.configuration,
-        board_id: boardId,
-      });
+    if (
+      await applyBoardChange(this._api, this._localize, device.configuration, boardId)
+    ) {
       await this._loadYaml();
-      notifySuccess(this._localize("device.change_board_success"));
-    } catch (err) {
-      console.error("Failed to change board:", err);
-      notifyError(this._localize("device.change_board_error"));
     }
   };
 
@@ -925,6 +920,10 @@ export class ESPHomePageDevice extends LitElement {
     return parsed && boardDisagreesWithYaml(parsed, this._board) ? parsed : null;
   }
 
+  private _openBoardReselect() {
+    void this._boardReselectDialog?.open({ configuration: this.id, yaml: this._yaml });
+  }
+
   /** Offer to reselect the stored board when the saved YAML names a
    *  different chip — the stale `board_id` would dead-end the Web
    *  Serial chip check. */
@@ -935,7 +934,7 @@ export class ESPHomePageDevice extends LitElement {
     const key = `${this.id}|${parsed.platform}|${parsed.board}|${parsed.variant}`;
     if (this._boardPromptShownFor === key) return;
     this._boardPromptShownFor = key;
-    void this._boardReselectDialog?.open({ configuration: this.id, yaml: this._yaml });
+    this._openBoardReselect();
   }
 
   /** Chip-mismatch recovery hand-off from the install dialog. */
@@ -1033,7 +1032,7 @@ export class ESPHomePageDevice extends LitElement {
     // methods. Dismissing the picker keeps install blocked; the next
     // click re-prompts.
     if (this._boardDisagreement()) {
-      void this._boardReselectDialog?.open({ configuration: this.id, yaml: this._yaml });
+      this._openBoardReselect();
       return;
     }
     run();

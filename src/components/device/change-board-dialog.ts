@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -81,13 +81,6 @@ export class ESPHomeChangeBoardDialog extends LitElement {
     dialogActionButtonStyles,
     changeBoardDialogStyles,
     loadMoreFooterStyles,
-    css`
-      .load-more-loading {
-        text-align: center;
-        color: var(--wa-color-text-quiet);
-        padding: var(--wa-space-m);
-      }
-    `,
   ];
 
   open() {

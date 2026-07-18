@@ -1,27 +1,11 @@
 import type { SlimBoard } from "../api/types/boards.js";
 import { chipNameToVariant } from "./chip-variant.js";
-import {
-  canonicalComponentKey,
-  RP2_ALIAS_KEY,
-  RP2_CANONICAL_KEY,
-} from "./component-presence.js";
+import { canonicalComponentKey, TARGET_PLATFORM_KEYS } from "./component-presence.js";
 import {
   lineIndent,
   parseYamlTopLevelSections,
   readInstanceScalar,
 } from "./yaml-sections-core.js";
-
-/** Target-platform section keys that can carry a `board:` scalar. */
-const PLATFORM_KEYS = new Set([
-  "esp32",
-  "esp8266",
-  RP2_CANONICAL_KEY,
-  RP2_ALIAS_KEY,
-  "bk72xx",
-  "rtl87xx",
-  "ln882x",
-  "nrf52",
-]);
 
 export interface YamlPlatformBoard {
   /** Canonical platform key (`rp2` folded to `rp2040`). */
@@ -38,7 +22,9 @@ export interface YamlPlatformBoard {
  * `null` when no platform section exists (packages-based configs).
  */
 export function readPlatformBoard(yaml: string): YamlPlatformBoard | null {
-  const section = parseYamlTopLevelSections(yaml).find((s) => PLATFORM_KEYS.has(s.key));
+  const section = parseYamlTopLevelSections(yaml).find((s) =>
+    TARGET_PLATFORM_KEYS.has(s.key)
+  );
   if (!section) return null;
   const lines = yaml.split("\n");
   let board: string | null = null;

@@ -3,6 +3,18 @@
 export const RP2_CANONICAL_KEY = "rp2040";
 export const RP2_ALIAS_KEY = "rp2";
 
+/** ESPHome target-platform section keys that carry board config (no `host`). */
+export const TARGET_PLATFORM_KEYS: ReadonlySet<string> = new Set([
+  "esp32",
+  "esp8266",
+  RP2_CANONICAL_KEY,
+  RP2_ALIAS_KEY,
+  "bk72xx",
+  "rtl87xx",
+  "ln882x",
+  "nrf52",
+]);
+
 const PLATFORM_KEY_ALIAS: Readonly<Record<string, string>> = {
   [RP2_ALIAS_KEY]: RP2_CANONICAL_KEY,
   [RP2_CANONICAL_KEY]: RP2_ALIAS_KEY,

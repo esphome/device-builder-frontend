@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SlimBoard } from "../../src/api/types/boards.js";
 import { boardDisagreesWithYaml, readPlatformBoard } from "../../src/util/yaml-board.js";
+import { makeSlimBoard } from "../_make-slim-board.js";
 
-function slimBoard(esphome: Partial<SlimBoard["esphome"]>): SlimBoard {
-  return {
-    esphome: { platform: "esp32", board: "esp32dev", variant: null, ...esphome },
-  } as SlimBoard;
-}
+const slimBoard = (esphome: Partial<SlimBoard["esphome"]>): SlimBoard =>
+  makeSlimBoard("esp32dev", esphome);
 
 describe("readPlatformBoard", () => {
   it("reads board and variant from an esp32 section", () => {
