@@ -65,6 +65,11 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   @property({ type: Boolean })
   loadError = false;
 
+  /** The first page failed; the empty state reads as an error, not
+   *  "no boards found". */
+  @property({ type: Boolean })
+  loadFailed = false;
+
   /** Renders a filter input; emits `search-changed` with `{ value }`. */
   @property({ type: Boolean })
   searchable = false;
@@ -136,7 +141,11 @@ export class ESPHomeChangeBoardDialog extends LitElement {
           ${
             this.boards.length === 0 && this.searchable && !this.loadingMore
               ? html`<p class="load-more-loading">
-                  ${this._localize("wizard.no_boards_found")}
+                  ${this._localize(
+                    this.loadFailed
+                      ? "wizard.boards_load_error"
+                      : "wizard.no_boards_found"
+                  )}
                 </p>`
               : nothing
           }

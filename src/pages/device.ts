@@ -918,10 +918,13 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _openBoardReselect(): Promise<boolean> {
-    return (
-      this._boardReselectDialog?.open({ configuration: this.id, yaml: this._yaml }) ??
-      Promise.resolve(false)
-    );
+    const dialog = this._boardReselectDialog;
+    if (!dialog) {
+      // A missing dialog is a bug, not "nothing to offer".
+      console.error("Board reselect dialog missing");
+      return Promise.resolve(false);
+    }
+    return dialog.open({ configuration: this.id, yaml: this._yaml });
   }
 
   /** Offer to reselect the stored board when the saved YAML names a
@@ -937,11 +940,16 @@ export class ESPHomePageDevice extends LitElement {
     // un-record when nothing opened (transient fetch failure) so the
     // next save re-offers the prompt.
     this._boardPromptShownFor = key;
-    void this._openBoardReselect().then((opened) => {
-      if (!opened && this._boardPromptShownFor === key) {
-        this._boardPromptShownFor = null;
-      }
-    });
+    void this._openBoardReselect()
+      .then((opened) => {
+        if (!opened && this._boardPromptShownFor === key) {
+          this._boardPromptShownFor = null;
+        }
+      })
+      .catch((err) => {
+        console.error("Board reselect prompt failed:", err);
+        if (this._boardPromptShownFor === key) this._boardPromptShownFor = null;
+      });
   }
 
   /** Chip-mismatch recovery hand-off from the install dialog. */

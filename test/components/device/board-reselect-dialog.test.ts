@@ -179,6 +179,23 @@ describe("board-reselect-dialog", () => {
     );
   });
 
+  it("marks a failed search re-query as an error, not an empty catalog", async () => {
+    const getBoards = vi
+      .fn()
+      .mockResolvedValueOnce({ boards: [C3_CURATED], total: 1 })
+      .mockRejectedValueOnce(new Error("boom"));
+    const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
+    await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  variant: ESP32C3\n",
+    });
+    inner().dispatchEvent(
+      new CustomEvent("search-changed", { detail: { value: "ghost" } })
+    );
+    await vi.waitFor(() => expect(inner().loadFailed).toBe(true));
+    expect(inner().boards).toEqual([]);
+  });
+
   it("toasts and stays closed when the YAML pins neither board nor variant", async () => {
     // Nothing to derive a compatible set from — never offer a loose list.
     const getBoards = vi.fn().mockResolvedValue({ boards: [C3_CURATED] });
