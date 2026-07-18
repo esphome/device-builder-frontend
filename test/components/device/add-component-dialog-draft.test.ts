@@ -7,9 +7,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+import "../../_mock-webawesome.js";
+
 vi.mock("../../../src/components/device/add-component-form.js", () => ({}));
 vi.mock("../../../src/components/device/component-catalog.js", () => ({}));
 

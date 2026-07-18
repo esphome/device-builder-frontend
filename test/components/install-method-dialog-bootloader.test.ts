@@ -7,10 +7,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import "../_mock-webawesome.js";
+
 vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
