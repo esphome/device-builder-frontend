@@ -58,11 +58,12 @@ describe("board-reselect-dialog", () => {
       getBoards,
       getCompatibleBoards,
     } as unknown as ESPHomeAPI);
-    await el.open({
+    const opened = await el.open({
       configuration: "dev.yaml",
       yaml: "esp32:\n  board: esp32-c3-devkitm-1\n",
     });
     await el.updateComplete;
+    expect(opened).toBe(true);
     expect(getBoards).toHaveBeenCalledWith({ query: "esp32-c3-devkitm-1", limit: 100 });
     expect(getCompatibleBoards).toHaveBeenCalledWith("c3-curated");
     expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]);
@@ -182,15 +183,41 @@ describe("board-reselect-dialog", () => {
     // Nothing to derive a compatible set from — never offer a loose list.
     const getBoards = vi.fn().mockResolvedValue({ boards: [C3_CURATED] });
     const { el, inner } = await makeDialog({ getBoards } as unknown as ESPHomeAPI);
-    await el.open({
+    const opened = await el.open({
       configuration: "dev.yaml",
       yaml: "packages:\n  base: !include base.yaml\n",
     });
+    expect(opened).toBe(false);
     expect(getBoards).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalled();
     expect((inner() as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(
       false
     );
+  });
+
+  it("falls through to the variant listing on an empty compatible set", async () => {
+    // An anomalous empty response must not open an empty picker.
+    const getBoards = vi
+      .fn()
+      .mockResolvedValueOnce({ boards: [C3_CURATED] })
+      .mockResolvedValueOnce({ boards: [C3_CURATED, C3_GENERIC], total: 2 });
+    const getCompatibleBoards = vi.fn().mockResolvedValue([]);
+    const { el, inner } = await makeDialog({
+      getBoards,
+      getCompatibleBoards,
+    } as unknown as ESPHomeAPI);
+    const opened = await el.open({
+      configuration: "dev.yaml",
+      yaml: "esp32:\n  board: esp32-c3-devkitm-1\n  variant: ESP32C3\n",
+    });
+    expect(opened).toBe(true);
+    expect(getBoards).toHaveBeenLastCalledWith({
+      platform: "esp32",
+      variant: "esp32c3",
+      offset: 0,
+      limit: 50,
+    });
+    await vi.waitFor(() => expect(inner().boards).toEqual([C3_CURATED, C3_GENERIC]));
   });
 
   it("applies the pick via devices/update and emits board-changed", async () => {

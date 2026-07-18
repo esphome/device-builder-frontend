@@ -917,8 +917,11 @@ export class ESPHomePageDevice extends LitElement {
     return parsed && boardDisagreesWithYaml(parsed, this._board) ? parsed : null;
   }
 
-  private _openBoardReselect() {
-    void this._boardReselectDialog?.open({ configuration: this.id, yaml: this._yaml });
+  private _openBoardReselect(): Promise<boolean> {
+    return (
+      this._boardReselectDialog?.open({ configuration: this.id, yaml: this._yaml }) ??
+      Promise.resolve(false)
+    );
   }
 
   /** Offer to reselect the stored board when the saved YAML names a
@@ -930,8 +933,15 @@ export class ESPHomePageDevice extends LitElement {
     if (!parsed) return;
     const key = `${this.id}|${parsed.platform}|${parsed.board}|${parsed.variant}`;
     if (this._boardPromptShownFor === key) return;
+    // Record up front so a save during the open can't double-fire, but
+    // un-record when nothing opened (transient fetch failure) so the
+    // next save re-offers the prompt.
     this._boardPromptShownFor = key;
-    this._openBoardReselect();
+    void this._openBoardReselect().then((opened) => {
+      if (!opened && this._boardPromptShownFor === key) {
+        this._boardPromptShownFor = null;
+      }
+    });
   }
 
   /** Chip-mismatch recovery hand-off from the install dialog. */

@@ -35,7 +35,7 @@ const C3_YAML = "esp32:\n  board: esp32-c3-devkitm-1\n";
 
 function makePage(overrides: Partial<PageView> = {}) {
   const page = new ESPHomePageDevice() as unknown as PageView;
-  const openReselect = vi.fn().mockResolvedValue(undefined);
+  const openReselect = vi.fn().mockResolvedValue(true);
   Object.assign(page, {
     id: "dev.yaml",
     _yaml: C3_YAML,
@@ -67,6 +67,16 @@ describe("post-save board reselect prompt", () => {
     await page._doSaveYaml();
     await page._doSaveYaml();
     expect(openReselect).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-offers the prompt when the picker failed to open", async () => {
+    // A transient fetch failure must not permanently suppress the prompt.
+    const { page, openReselect } = makePage();
+    openReselect.mockResolvedValueOnce(false);
+    await page._doSaveYaml();
+    await vi.waitFor(() => expect(openReselect).toHaveBeenCalledTimes(1));
+    await page._doSaveYaml();
+    await vi.waitFor(() => expect(openReselect).toHaveBeenCalledTimes(2));
   });
 
   it("stays quiet while an install-triggered save runs", async () => {

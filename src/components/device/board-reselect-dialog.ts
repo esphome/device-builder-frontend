@@ -66,7 +66,9 @@ export class ESPHomeBoardReselectDialog extends LitElement {
   /** Latest raw input value, committed to `_search` by the debounce. */
   private _pendingSearch = "";
 
-  async open(opts: BoardReselectOpenOptions): Promise<void> {
+  /** Resolve candidates and show the picker; false when nothing opened
+   *  (no candidates, or a fetch failed) so callers can retry later. */
+  async open(opts: BoardReselectOpenOptions): Promise<boolean> {
     try {
       const yaml = opts.yaml ?? (await this._api.getConfig(opts.configuration));
       const parsed = readPlatformBoard(yaml);
@@ -75,15 +77,17 @@ export class ESPHomeBoardReselectDialog extends LitElement {
       this._pendingSearch = "";
       if (!(await this._loadCandidates(parsed))) {
         notifyError(this._localize("device.board_reselect_none", { board: label }));
-        return;
+        return false;
       }
       this._configuration = opts.configuration;
       this._description = this._localize("device.board_reselect_desc", { board: label });
       await this.updateComplete;
       this._dialog.open();
+      return true;
     } catch (err) {
       console.error("Failed to open board reselect:", err);
       notifyError(this._localize("device.change_board_error"));
+      return false;
     }
   }
 
@@ -140,9 +144,13 @@ export class ESPHomeBoardReselectDialog extends LitElement {
       );
       if (match) {
         // The compatible-boards command returns the complete same-target
-        // set in one page — the query search alone would cap the list.
-        this._exactBoards = await this._api.getCompatibleBoards(match.id);
-        return true;
+        // set in one page — the query search alone would cap the list. An
+        // anomalous empty set falls through to the variant listing.
+        const compatible = await this._api.getCompatibleBoards(match.id);
+        if (compatible.length > 0) {
+          this._exactBoards = compatible;
+          return true;
+        }
       }
     }
     // A variant-only YAML (`esp32.variant:` with no `board:`, or a board
