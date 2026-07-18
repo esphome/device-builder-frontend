@@ -1,6 +1,6 @@
 import { mdiArrowCollapseAll, mdiArrowExpandAll, mdiOpenInNew, mdiPlus } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { SlimBoard } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -55,9 +55,18 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   @state()
   private _expandedBoardId: string | null = null;
 
-  @query(".sentinel")
-  private _sentinel?: HTMLElement | null;
-
+  // Observes against the viewport (no rootSelector), not the inner scroll box:
+  // on mobile the board list isn't its own scroll container (the dialog body
+  // scrolls as one), so a fixed root would never see the sentinel cross and
+  // paging would stall after one page. IntersectionObserver still clips the
+  // sentinel by the desktop scroll box, so this works in both layouts.
+  //
+  // Re-paging relies on each appended page overflowing the scroll container
+  // so the sentinel leaves the viewport and re-crosses on the next scroll.
+  // That always holds: a full page is far taller than the container, and the
+  // only short page is the last one, which lands hasMore=false and removes
+  // the sentinel. A short non-final page (which would keep the sentinel in
+  // view and not re-fire) never occurs.
   private _intersection = new IntersectionController(this, () =>
     this.dispatchEvent(new CustomEvent("load-more"))
   );
@@ -121,29 +130,11 @@ export class ESPHomeWizardStepBoardList extends LitElement {
                     loadingLabelKey: "wizard.loading_boards",
                     errorLabelKey: "wizard.boards_load_more_error",
                     onRetry: this._onRetry,
-                    loadingClass: "loading",
                   })}
                 `
         }
       </div>
     `;
-  }
-
-  protected updated() {
-    // Observe against the viewport (null root), not the inner scroll box: on
-    // mobile the board list isn't its own scroll container (the dialog body
-    // scrolls as one), so a fixed root would never see the sentinel cross and
-    // paging would stall after one page. IntersectionObserver still clips the
-    // sentinel by the desktop scroll box, so this works in both layouts. The
-    // 200px margin prefetches the next page before the sentinel is in view.
-    //
-    // Re-paging relies on each appended page overflowing the scroll container
-    // so the sentinel leaves the viewport and re-crosses on the next scroll.
-    // That always holds: a full page is far taller than the container, and the
-    // only short page is the last one, which lands hasMore=false and removes
-    // the sentinel. A short non-final page (which would keep the sentinel in
-    // view and not re-fire) never occurs.
-    this._intersection.observeIfPresent(this._sentinel, null, "200px");
   }
 
   private _renderFeatured(board: SlimBoard) {

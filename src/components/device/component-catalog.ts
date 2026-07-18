@@ -8,7 +8,7 @@ import {
   mdiPlus,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, queryAll, state } from "lit/decorators.js";
+import { customElement, property, queryAll, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
@@ -118,13 +118,21 @@ export class ESPHomeComponentCatalog extends LitElement {
   })
   _overflowingDescriptions: ReadonlySet<string> = new Set();
 
-  @query(".sentinel") private _sentinel?: HTMLElement | null;
-
   @queryAll(".component-description--clamp[data-component-id]")
   private _clampedDescriptions!: NodeListOf<HTMLElement>;
 
   private _resize = new ResizeController(this, () => this._measureDescriptionOverflow());
 
+  // Observes against the viewport (no rootSelector) so paging works whether
+  // the grid scrolls itself or the surrounding dialog does; the sentinel is
+  // still clipped by the scroll container, and only exists while more pages
+  // remain (see render), so a missing one tears the observer down.
+  //
+  // Re-paging relies on each appended page overflowing the scroll container
+  // so the sentinel re-crosses on the next scroll. That holds because a full
+  // page far exceeds the container height and the only short page is the
+  // last (hasMore=false, sentinel removed); a short non-final page never
+  // occurs.
   private _intersection = new IntersectionController(this, () => this._list.loadMore());
 
   private _debouncedSearch = debounce(() => this._fetchComponents(), 300);
@@ -266,18 +274,6 @@ export class ESPHomeComponentCatalog extends LitElement {
       this._category = "all";
       this._fetchComponents();
     }
-
-    // Observe against the viewport (null root) so paging works whether the
-    // grid scrolls itself or the surrounding dialog does; the sentinel is
-    // still clipped by the scroll container, and only exists while more pages
-    // remain (see render), so a missing one tears the observer down.
-    //
-    // Re-paging relies on each appended page overflowing the scroll container
-    // so the sentinel re-crosses on the next scroll. That holds because a full
-    // page far exceeds the container height and the only short page is the
-    // last (hasMore=false, sentinel removed); a short non-final page never
-    // occurs.
-    this._intersection.observeIfPresent(this._sentinel, null, "200px");
   }
 
   protected render() {
@@ -387,7 +383,6 @@ export class ESPHomeComponentCatalog extends LitElement {
             loadingLabelKey: "device.loading_components",
             errorLabelKey: "device.components_load_more_error",
             onRetry: () => this._list.loadMore(),
-            loadingClass: "empty",
           })}
         </div>
       </div>

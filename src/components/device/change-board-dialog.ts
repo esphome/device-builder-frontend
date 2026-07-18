@@ -73,16 +73,15 @@ export class ESPHomeChangeBoardDialog extends LitElement {
   @query(".board-search")
   private _searchInput?: HTMLInputElement | null;
 
-  @query(".sentinel")
-  private _sentinel?: HTMLElement | null;
-
-  @query(".board-list")
-  private _scrollBox?: HTMLElement | null;
-
   private readonly _dialog = new DialogOpenController(this);
 
-  private readonly _intersection = new IntersectionController(this, () =>
-    this._requestLoadMore()
+  // The board list is always its own scroll box, so observe against it
+  // directly — an explicit root also makes the prefetch margin apply to
+  // the box the user actually scrolls, unlike the viewport-root form.
+  private readonly _intersection = new IntersectionController(
+    this,
+    () => this._requestLoadMore(),
+    { rootSelector: ".board-list" }
   );
 
   static styles = [
@@ -152,7 +151,7 @@ export class ESPHomeChangeBoardDialog extends LitElement {
             loadingLabelKey: "wizard.loading_boards",
             errorLabelKey: "wizard.boards_load_more_error",
             onRetry: this._requestLoadMore,
-            loadingClass: "load-more-loading",
+            loadingClass: "load-more-loading-compact",
           })}
         </div>
         <div class="actions">
@@ -191,13 +190,6 @@ export class ESPHomeChangeBoardDialog extends LitElement {
         }
       </button>
     `;
-  }
-
-  protected updated() {
-    // The board list is always its own scroll box, so observe against it
-    // directly — an explicit root also makes the prefetch margin apply to
-    // the box the user actually scrolls, unlike the null-root form.
-    this._intersection.observeIfPresent(this._sentinel, this._scrollBox ?? null, "200px");
   }
 
   private _requestLoadMore = () => {

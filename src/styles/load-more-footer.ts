@@ -1,17 +1,23 @@
 import { css } from "lit";
 
 /**
- * Shared styles for the infinite-scroll footer (sentinel + retry) used by the
- * board picker and the component catalog. Pairs with ``renderLoadMoreFooter``
- * in ``components/shared/load-more-footer.ts``; the spinner line uses each
- * host's own ``.loading`` / ``.empty`` class, so only the sentinel and the
- * retry affordance live here.
+ * Shared styles for the infinite-scroll footer (sentinel + spinner + retry).
+ * Pairs with ``renderLoadMoreFooter`` in ``components/shared/load-more-footer.ts``;
+ * the spinner line defaults to ``.load-more-loading``, overridable per host
+ * via ``loadingClass``.
  */
 export const loadMoreFooterStyles = css`
   /* Infinite-scroll trigger: a zero-content marker the IntersectionObserver
      watches; given a sliver of height so it reliably crosses the root. */
   .sentinel {
     height: 1px;
+  }
+
+  .load-more-loading {
+    text-align: center;
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    padding: var(--wa-space-xl);
   }
 
   .load-more-error {

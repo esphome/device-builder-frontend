@@ -78,7 +78,9 @@ export const changeBoardDialogStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  .load-more-loading {
+  /* Compact override of the shared .load-more-loading default: dialog
+     spacing, no font-size bump. */
+  .load-more-loading-compact {
     text-align: center;
     color: var(--wa-color-text-quiet);
     padding: var(--wa-space-m);
