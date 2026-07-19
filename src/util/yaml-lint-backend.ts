@@ -404,7 +404,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // key), name that cause, and carry its repair when it has one.
         const squiggleLineNum = doc.lineAt(from).number;
         const cause =
-          describeValueTypeCause(readLine, squiggleLineNum, opts.localize) ??
+          describeValueTypeCause(readLine, squiggleLineNum, opts.localize, message) ??
           (await describeInvalidOptionFix({
             api: opts.api,
             state: view.state,

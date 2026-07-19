@@ -225,6 +225,49 @@ describe("summarizeValidation", () => {
     expect(summary.first?.message).toContain("yaml_editor.error_missing_colon_hint");
   });
 
+  // The reproduced wire payload for an `advanced:` whose only child is
+  // commented out (esphome strips the config path upstream, so the hint
+  // is the only thing naming the line and key).
+  it("adds the commented-out-block hint to a bare 'expected a dictionary.'", () => {
+    const content = [
+      "esphome:",
+      "  name: dict-error-repro",
+      "",
+      "esp32:",
+      "  board: esp32dev",
+      "  framework:",
+      "    type: arduino",
+      "    advanced:",
+      '#      minimum_chip_revision: "3.1"',
+      "",
+      "logger:",
+      "",
+    ].join("\n");
+    const summary = summarize(
+      res(
+        [],
+        [
+          {
+            message: "expected a dictionary.",
+            range: {
+              document: "<file>",
+              start_line: 7,
+              start_col: 4,
+              end_line: 7,
+              end_col: 12,
+            },
+          },
+        ]
+      ),
+      content
+    );
+    expect(summary.first?.line).toBe(8);
+    expect(summary.first?.message).toBe(
+      "expected a dictionary. " +
+        'yaml_editor.error_commented_block_hint:{"line":8,"key":"advanced"}'
+    );
+  });
+
   it("skips the cause hint when the error lives in an included file", () => {
     const content = "logger:\n  le\n";
     const summary = summarize(

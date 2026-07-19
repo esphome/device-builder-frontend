@@ -148,6 +148,52 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
     }
   });
 
+  // A key whose only child is commented out parses as null; the inline
+  // diagnostic must name the commented-out block, not just echo the bare
+  // "expected a dictionary." the validator sends.
+  it("squiggles the commented-out-block hint onto 'expected a dictionary.'", async () => {
+    const doc = [
+      "esphome:", // 1
+      "  name: x", // 2
+      "esp32:", // 3
+      "  board: esp32dev", // 4
+      "  framework:", // 5
+      "    type: arduino", // 6
+      "    advanced:", // 7
+      '#      minimum_chip_revision: "3.1"', // 8
+      "logger:", // 9
+      "",
+    ].join("\n");
+    const validateYaml = vi.fn(async () => ({
+      yaml_errors: [],
+      validation_errors: [
+        {
+          message: "expected a dictionary.",
+          range: {
+            document: "x.yaml",
+            start_line: 6,
+            start_col: 4,
+            end_line: 6,
+            end_col: 12,
+          },
+        },
+      ],
+    })) as unknown as ESPHomeAPI["validateYaml"];
+
+    const view = mountView(validateYaml, () => {}, undefined, doc);
+    try {
+      forceLinting(view);
+      await flush();
+      const messages: string[] = [];
+      forEachDiagnostic(view.state, (d) => messages.push(d.message));
+      expect(messages).toEqual([
+        "expected a dictionary. yaml_editor.error_commented_block_hint:7",
+      ]);
+    } finally {
+      view.destroy();
+    }
+  });
+
   it("banners a locatable validation error with its line and nested-list hint", async () => {
     const doc = [
       "light:", // 1

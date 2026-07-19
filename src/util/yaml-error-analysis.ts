@@ -577,16 +577,18 @@ function dashSpaceCause(
 /**
  * Add the misindent / half-typed-key cause to a wrong-value-type
  * validation message ("expected a dictionary.") anchored at *line*: a
- * value-less `- key:` whose items landed one level deeper, a bare word
- * with no ':' (a lone "le" under "logger:" parses as its string value),
- * or a dash stuck to its key (`-platform:` parses as a mapping key, so
- * the section fails schema validation instead of the YAML parse).
+ * value-less `- key:` whose items landed one level deeper, a dash stuck
+ * to its key (`-platform:` parses as a mapping key, so the section fails
+ * schema validation instead of the YAML parse), a value-less `key:` with
+ * nothing (or only comments) under it, or a bare word with no ':' (a
+ * lone "le" under "logger:" parses as its string value).
  * Null when the anchored line is none of these shapes.
  */
 export function describeValueTypeCause(
   readLine: ReadLine,
   line: number,
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  message = ""
 ): ValueTypeCause | null {
   const nested = describeNestedListValue(readLine, line, localize);
   if (nested) return { text: nested };
@@ -595,6 +597,13 @@ export function describeValueTypeCause(
   const dashKey = botchedDashKey(text);
   if (dashKey !== null) {
     return dashSpaceCause(line, dashKey, indentOf(text), localize);
+  }
+  // Gated on the message: a value-less `key:` with no children is legal
+  // YAML (`logger:`), so an error anchored there for another reason
+  // ("'board' is a required option") must not pick up a remove-the-line hint.
+  if (EXPECTED_DICT_RE.test(message)) {
+    const emptyBlock = describeEmptyBlock(readLine, line, localize);
+    if (emptyBlock) return { text: emptyBlock };
   }
   const token = text.trim();
   if (token && !token.includes(":") && !token.startsWith("#") && !token.startsWith("-")) {
@@ -606,6 +615,60 @@ export function describeValueTypeCause(
     };
   }
   return null;
+}
+
+/** The wrong-value-type message the empty-block cause explains. */
+const EXPECTED_DICT_RE = /expected a dictionary/i;
+
+/**
+ * Whether a comment line reads as a commented-out *child* of a key at
+ * *keyIndent*: the `#` itself sits deeper, or the commented text is a
+ * `key:` / `- ` line whose own indent sits deeper (a `#` jammed at column
+ * 0 in front of a still-indented option — the hand-commented shape).
+ */
+function isCommentedChild(text: string, keyIndent: number): boolean {
+  if (indentOf(text) > keyIndent) return true;
+  const content = text.trimStart().replace(/^#+/, "");
+  if (indentOf(content) <= keyIndent) return false;
+  return parseListItemMarker(content) !== null || lineKeyToken(content) !== null;
+}
+
+/**
+ * The empty-block cause behind "expected a dictionary." anchored on a
+ * value-less plain `key:`: nothing is indented under it, so its value is
+ * null. Distinguishes children that are all commented out (the classic
+ * "commented the option, left the key" repair — uncomment or comment the
+ * key too) from a key with nothing under it at all. Null when the key has
+ * any real child, or the line isn't a value-less plain key.
+ */
+function describeEmptyBlock(
+  readLine: ReadLine,
+  line: number,
+  localize: LocalizeFunc
+): string | null {
+  const text = readLine(line);
+  if (text === undefined || parseListItemMarker(text)) return null;
+  const key = valuelessKeyOf(stripComment(text));
+  if (key === null) return null;
+  const keyIndent = indentOf(text);
+  let sawComment = false;
+  for (let n = line + 1; n <= line + WALK_BOUND; n++) {
+    const next = readLine(n);
+    if (next === undefined) break;
+    if (!next.trim()) continue;
+    if (next.trimStart().startsWith("#")) {
+      sawComment ||= isCommentedChild(next, keyIndent);
+      continue;
+    }
+    if (indentOf(next) > keyIndent) return null;
+    break;
+  }
+  return localize(
+    sawComment
+      ? "yaml_editor.error_commented_block_hint"
+      : "yaml_editor.error_empty_block_hint",
+    { line, key }
+  );
 }
 
 /** Matches `[X] is an invalid option for [Y].` with any trailing hint

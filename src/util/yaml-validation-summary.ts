@@ -102,7 +102,7 @@ export function summarizeValidation(
   // when the two diverge the shape check fails and the hint is simply
   // omitted, never wrong.
   if (hasRange && (!file || file === "<file>")) {
-    const cause = describeValueTypeCause(readLine, line, localize);
+    const cause = describeValueTypeCause(readLine, line, localize, message);
     if (cause) message = `${message} ${cause.text}`;
   }
   return { count, first: { line, col, message, file } };
