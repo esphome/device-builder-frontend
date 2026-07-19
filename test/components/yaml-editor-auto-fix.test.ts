@@ -354,9 +354,12 @@ describe("yaml-editor applyAutoFix (#1884)", () => {
     expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
   });
 
-  it("no-ops a stale remove-line fix whose line now holds a different key", async () => {
+  // Deleting or commenting the wrong line often still validates clean, so
+  // the destructive kinds must refuse structurally once the diagnosed
+  // value-less key has gained a value.
+  it("no-ops a stale destructive fix once the key has gained a value", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
-    const doc = "esp32:\n  framework:\n    type: arduino\n";
+    const doc = "esp32:\n  framework:\n    advanced: true\n";
     const el = await mountEditor(validateYaml, doc);
 
     expect(
@@ -368,6 +371,7 @@ describe("yaml-editor applyAutoFix (#1884)", () => {
         kind: "remove-line",
       })
     ).toBe("stale");
+    expect(viewOf(el).state.doc.toString()).toBe(doc);
     expect(validateYaml).not.toHaveBeenCalled();
   });
 });

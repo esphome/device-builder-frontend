@@ -49,6 +49,18 @@ function mountView(
   });
 }
 
+/** All hover-tooltip actions across the current diagnostics. */
+function collectActions(
+  view: EditorView
+): { name: string; apply: (v: EditorView, a: number, b: number) => void }[] {
+  const actions: {
+    name: string;
+    apply: (v: EditorView, a: number, b: number) => void;
+  }[] = [];
+  forEachDiagnostic(view.state, (d) => actions.push(...(d.actions ?? [])));
+  return actions;
+}
+
 describe("backend linter humanizes + banners a locatable parse error", () => {
   it("pinpoints the fix in both the banner (with auto-fix) and an inline diagnostic", async () => {
     let banner: BannerError[] = [];
@@ -111,11 +123,7 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
       forceLinting(view);
       await flush();
 
-      const actions: {
-        name: string;
-        apply: (v: EditorView, a: number, b: number) => void;
-      }[] = [];
-      forEachDiagnostic(view.state, (d) => actions.push(...(d.actions ?? [])));
+      const actions = collectActions(view);
       expect(actions.map((a) => a.name)).toEqual(["yaml_editor.error_auto_fix"]);
 
       actions[0].apply(view, 0, 0);
@@ -140,9 +148,7 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
     try {
       forceLinting(view);
       await flush();
-      const actions: unknown[] = [];
-      forEachDiagnostic(view.state, (d) => actions.push(...(d.actions ?? [])));
-      expect(actions).toEqual([]);
+      expect(collectActions(view)).toEqual([]);
     } finally {
       view.destroy();
     }
@@ -191,19 +197,13 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
       forceLinting(view);
       await flush();
       const messages: string[] = [];
-      const actions: {
-        name: string;
-        apply: (v: EditorView, a: number, b: number) => void;
-      }[] = [];
-      forEachDiagnostic(view.state, (d) => {
-        messages.push(d.message);
-        actions.push(...(d.actions ?? []));
-      });
+      forEachDiagnostic(view.state, (d) => messages.push(d.message));
       expect(messages).toEqual([
         "expected a dictionary. yaml_editor.error_commented_block_hint:7",
       ]);
 
       // The hint carries the comment-out repair as the tooltip action.
+      const actions = collectActions(view);
       expect(actions.map((a) => a.name)).toEqual(["yaml_editor.error_auto_fix"]);
       actions[0].apply(view, 0, 0);
       expect(fixes).toEqual([

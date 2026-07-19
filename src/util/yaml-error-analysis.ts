@@ -190,7 +190,7 @@ function lineHasValue(text: string): boolean {
 
 /** The line's key when it is a value-less `key:` opener, else null.
  *  Callers pre-filter `- ` marker lines. */
-function valuelessKeyOf(text: string): string | null {
+export function valuelessKeyOf(text: string): string | null {
   return lineHasValue(text) ? null : lineKeyToken(text);
 }
 
