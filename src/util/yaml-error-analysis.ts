@@ -630,7 +630,7 @@ function isCommentedChild(text: string, keyIndent: number): boolean {
   if (indentOf(text) > keyIndent) return true;
   const content = text.trimStart().replace(/^#+/, "");
   if (indentOf(content) <= keyIndent) return false;
-  return parseListItemMarker(content) !== null || lineKeyToken(content) !== null;
+  return lineKeyToken(content) !== null;
 }
 
 /**
