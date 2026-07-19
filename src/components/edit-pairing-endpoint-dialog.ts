@@ -13,6 +13,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
 import { fireEvent } from "../util/fire-event.js";
+import { formatApiError } from "../util/format-api-error.js";
 import {
   normalizeHostnameForCompare,
   parsePortInput,
@@ -197,10 +198,14 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
             detail: err.details,
           });
         default:
-          return this._localize("settings.edit_pairing_endpoint_generic_error");
+          break;
       }
     }
-    return this._localize("settings.edit_pairing_endpoint_generic_error");
+    return formatApiError(
+      err,
+      this._localize,
+      "settings.edit_pairing_endpoint_generic_error"
+    );
   }
 
   private _onRequestClose = (e: Event): void => {

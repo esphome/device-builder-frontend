@@ -1,6 +1,7 @@
 import { APIError } from "../../api/api-error.js";
 import { ErrorCode } from "../../api/types/protocol.js";
 import type { PairingSummary } from "../../api/types/remote-build.js";
+import { formatApiError } from "../../util/format-api-error.js";
 import { parsePortInput } from "../../util/hostname.js";
 import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.js";
 
@@ -21,7 +22,7 @@ export function previewErrorMessage(
       });
     }
   }
-  return host._localize("settings.pair_build_server_preview_failed");
+  return formatApiError(err, host._localize, "settings.pair_build_server_preview_failed");
 }
 
 export function requestErrorMessage(
@@ -47,7 +48,7 @@ export function requestErrorMessage(
       });
     }
   }
-  return host._localize("settings.pair_build_server_request_failed");
+  return formatApiError(err, host._localize, "settings.pair_build_server_request_failed");
 }
 
 export async function onPreviewSubmit(host: ESPHomePairBuildServerDialog): Promise<void> {
