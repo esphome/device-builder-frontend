@@ -31,6 +31,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { labelChipStyles } from "../../util/label-chip-template.js";
 import {
   LABEL_COLOR_SWATCHES,
@@ -471,7 +472,7 @@ export class ESPHomeLabelForm extends LitElement {
     }
     // Edit mode and the standalone create dialog let the host own
     // "close".
-    this.dispatchEvent(new CustomEvent("form-cancel", { bubbles: true, composed: true }));
+    fireEvent(this, "form-cancel");
   }
 
   private async _submit() {
@@ -492,7 +493,7 @@ export class ESPHomeLabelForm extends LitElement {
     // user still on the same device?" check) can snapshot before
     // the await. The event has no detail; the host already knows
     // its own context.
-    this.dispatchEvent(new CustomEvent("submitting", { bubbles: true, composed: true }));
+    fireEvent(this, "submitting");
     this._saving = true;
     const editing = this.editing;
     try {

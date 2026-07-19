@@ -30,6 +30,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
@@ -178,13 +179,7 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
 
   private _onTriggerChange = (e: Event) => {
     const id = (e.target as HTMLSelectElement).value;
-    this.dispatchEvent(
-      new CustomEvent("trigger-change", {
-        detail: { triggerId: id, params: {} },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "trigger-change", { triggerId: id, params: {} });
   };
 
   private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
@@ -194,13 +189,7 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
   private _onParamChange = (e: CustomEvent<ConfigEntryValueChange>) => {
     e.stopPropagation();
     const next = applyParamChange(this.triggerParams, e.detail.path, e.detail.value);
-    this.dispatchEvent(
-      new CustomEvent("trigger-params-change", {
-        detail: { params: next },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "trigger-params-change", { params: next });
   };
 }
 

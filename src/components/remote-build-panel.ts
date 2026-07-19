@@ -35,6 +35,7 @@ import { pairingWindowStyles } from "../styles/pairing-window.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
+import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { notify } from "../util/notify.js";
@@ -231,13 +232,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   }
 
   _openBuildServerSettings = () => {
-    this.dispatchEvent(
-      new CustomEvent("open-settings", {
-        detail: { section: "build_server" },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-settings", { section: "build_server" });
   };
 
   _jobDisplayName(job: FirmwareJob): string {
@@ -308,9 +303,7 @@ export class ESPHomeRemoteBuildPanel extends LitElement {
   }
 
   private _onToggleCollapsed = () => {
-    this.dispatchEvent(
-      new CustomEvent("toggle-collapsed", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "toggle-collapsed");
   };
 
   private _renderBody() {

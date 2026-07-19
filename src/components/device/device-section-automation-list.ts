@@ -5,6 +5,7 @@ import { customElement, property } from "lit/decorators.js";
 import { emptyStateStyles } from "../../styles/empty-state.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { deviceSectionAutomationListStyles } from "./device-section-automation-list.styles.js";
 
@@ -128,13 +129,11 @@ export class ESPHomeSectionAutomationList extends LitElement {
   }
 
   private _onAdd = () => {
-    this.dispatchEvent(new CustomEvent("add", { bubbles: true, composed: true }));
+    fireEvent(this, "add");
   };
 
   private _emit(type: "edit" | "delete", key: string) {
-    this.dispatchEvent(
-      new CustomEvent(type, { detail: { key }, bubbles: true, composed: true })
-    );
+    fireEvent(this, type, { key });
   }
 }
 

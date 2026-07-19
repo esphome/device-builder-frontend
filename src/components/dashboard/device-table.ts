@@ -45,6 +45,7 @@ import {
   showPendingChanges,
   showUpdateAvailable,
 } from "../../util/device-sync.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { TourActivityController } from "../guided-tour/tour-activity-controller.js";
@@ -190,13 +191,7 @@ export class ESPHomeDeviceTable extends LitElement {
     updater: SortingState | ((old: SortingState) => SortingState)
   ) => {
     this._sorting = typeof updater === "function" ? updater(this._sorting) : updater;
-    this.dispatchEvent(
-      new CustomEvent("table-sort-change", {
-        detail: this._sorting,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "table-sort-change", this._sorting);
   };
 
   private _handleVisibilityChange = (
@@ -204,13 +199,7 @@ export class ESPHomeDeviceTable extends LitElement {
   ) => {
     this._columnVisibility =
       typeof updater === "function" ? updater(this._columnVisibility) : updater;
-    this.dispatchEvent(
-      new CustomEvent("table-visibility-change", {
-        detail: this._columnVisibility,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "table-visibility-change", this._columnVisibility);
   };
 
   private _handlePaginationChange = (
@@ -222,13 +211,7 @@ export class ESPHomeDeviceTable extends LitElement {
     this._pageSize = next.pageSize;
     this._pageIndex = next.pageIndex;
     if (pageSizeChanged) {
-      this.dispatchEvent(
-        new CustomEvent("table-page-size-change", {
-          detail: this._pageSize,
-          bubbles: true,
-          composed: true,
-        })
-      );
+      fireEvent(this, "table-page-size-change", this._pageSize);
     }
   };
 
@@ -412,13 +395,7 @@ export class ESPHomeDeviceTable extends LitElement {
             // The state we feed on the next render drives the slice.
             this._pageSize = e.detail;
             this._pageIndex = 0;
-            this.dispatchEvent(
-              new CustomEvent("table-page-size-change", {
-                detail: e.detail,
-                bubbles: true,
-                composed: true,
-              })
-            );
+            fireEvent(this, "table-page-size-change", e.detail);
             this._scrollToTop();
           }}
         ></esphome-table-pagination>
@@ -526,18 +503,14 @@ export class ESPHomeDeviceTable extends LitElement {
   }
 
   private _onToggleSelect(config: string) {
-    this.dispatchEvent(
-      new CustomEvent("toggle-select", { detail: config, bubbles: true, composed: true })
-    );
+    fireEvent(this, "toggle-select", config);
   }
 
   private _onToggleAll() {
-    this.dispatchEvent(
-      new CustomEvent(this._allSelected ? "deselect-all" : "select-all", {
-        detail: this._visibleConfigs.slice(),
-        bubbles: true,
-        composed: true,
-      })
+    fireEvent(
+      this,
+      this._allSelected ? "deselect-all" : "select-all",
+      this._visibleConfigs.slice()
     );
   }
 
@@ -582,17 +555,11 @@ export class ESPHomeDeviceTable extends LitElement {
   }
 
   private _forwardEvent(name: string, detail: unknown) {
-    this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+    fireEvent(this, name, detail);
   }
 
   private _enterSelectMode(device: ConfiguredDevice) {
-    this.dispatchEvent(
-      new CustomEvent("enter-select-mode", {
-        detail: device.configuration,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "enter-select-mode", device.configuration);
   }
 
   private _scrollToTop() {
@@ -600,9 +567,7 @@ export class ESPHomeDeviceTable extends LitElement {
   }
 
   private _onRowClick(device: ConfiguredDevice) {
-    this.dispatchEvent(
-      new CustomEvent("row-click", { detail: device, bubbles: true, composed: true })
-    );
+    fireEvent(this, "row-click", device);
   }
 }
 

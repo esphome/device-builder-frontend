@@ -22,6 +22,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import { effectiveDeviceLayout } from "../../util/editor-layout.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { notifyError, notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SaveShortcutController } from "../../util/save-shortcut-controller.js";
@@ -142,13 +143,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     const { id } = (event as CustomEvent<TourRevealEventDetail>).detail;
     const next = layoutRevealingAnchor(id, this.layout, this._isMobile);
     if (next) {
-      this.dispatchEvent(
-        new CustomEvent(TOUR_LAYOUT_CHANGE_EVENT, {
-          detail: next,
-          bubbles: true,
-          composed: true,
-        })
-      );
+      fireEvent(this, TOUR_LAYOUT_CHANGE_EVENT, next);
     }
   };
 
@@ -458,21 +453,11 @@ export class ESPHomeDeviceEditor extends LitElement {
   }
 
   private _onSave() {
-    this.dispatchEvent(
-      new CustomEvent("save-yaml", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "save-yaml");
   }
 
   private _onValidate() {
-    this.dispatchEvent(
-      new CustomEvent("validate-device", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "validate-device");
   }
 
   private _toggleDiff() {
@@ -497,21 +482,11 @@ export class ESPHomeDeviceEditor extends LitElement {
   }
 
   private _onInstall() {
-    this.dispatchEvent(
-      new CustomEvent("install-device", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "install-device");
   }
 
   private _onUpdate() {
-    this.dispatchEvent(
-      new CustomEvent("update-device", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "update-device");
   }
 
   willUpdate(changed: Map<string, unknown>) {
@@ -666,23 +641,11 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   /** Ask the page to highlight and scroll to a banner error's line. */
   private _gotoErrorLine(line: number) {
-    this.dispatchEvent(
-      new CustomEvent("goto-line", {
-        detail: { line },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "goto-line", { line });
   }
 
   private _setLayout(layout: DeviceLayoutMode) {
-    this.dispatchEvent(
-      new CustomEvent("layout-change", {
-        detail: layout,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "layout-change", layout);
   }
 
   private _onDividerPointerDown = (e: PointerEvent) => {
@@ -748,13 +711,7 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   private _onYamlChange(e: CustomEvent) {
     this._lastEditAt = performance.now();
-    this.dispatchEvent(
-      new CustomEvent("yaml-change", {
-        detail: e.detail,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "yaml-change", e.detail);
   }
 }
 

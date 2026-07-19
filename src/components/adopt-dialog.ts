@@ -15,6 +15,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
+import { fireEvent } from "../util/fire-event.js";
 import { formatApiError } from "../util/format-api-error.js";
 import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
@@ -501,13 +502,7 @@ export class ESPHomeAdoptDialog extends LitElement {
       // so the welcome banner would just be noise.
       markJustCreated(`${name}.yaml`);
       this.close();
-      this.dispatchEvent(
-        new CustomEvent("adopted", {
-          detail: { name, friendlyName },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      fireEvent(this, "adopted", { name, friendlyName });
     } catch (err) {
       this._error = formatApiError(err, this._localize, "dashboard.adopt_error_generic");
     } finally {

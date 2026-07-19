@@ -16,6 +16,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
 import { validateEntries, type ValidationError } from "../../util/config-validation.js";
 import { resolveFeaturedComponentId } from "../../util/featured-id.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -393,13 +394,7 @@ export class ESPHomeAddComponentForm extends LitElement {
    * catalog view, filtered to the requested dependency domain.
    */
   private _onAddDep(domain: string) {
-    this.dispatchEvent(
-      new CustomEvent("navigate-to-dep", {
-        detail: { domain },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "navigate-to-dep", { domain });
   }
 
   /** True if any error in the map has the `validation.required` code. */
@@ -490,7 +485,7 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   private _onCancel() {
-    this.dispatchEvent(new CustomEvent("form-cancel", { bubbles: true, composed: true }));
+    fireEvent(this, "form-cancel");
   }
 
   private _onSubmit() {
@@ -554,13 +549,7 @@ export class ESPHomeAddComponentForm extends LitElement {
 
     const fields = coerceFields(this._entries, this._values);
 
-    this.dispatchEvent(
-      new CustomEvent("form-submit", {
-        detail: { fields },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "form-submit", { fields });
   }
 }
 

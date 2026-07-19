@@ -24,6 +24,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
+import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { yamlEmptyMessageKey } from "../util/yaml-search-helpers.js";
 import type { CommandAction } from "./command-palette-actions.js";
@@ -499,39 +500,19 @@ export class ESPHomeCommandPalette extends LitElement {
   }
 
   private _setTheme(theme: string) {
-    this.dispatchEvent(
-      new CustomEvent("set-theme", {
-        detail: theme,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-theme", theme);
   }
 
   private _setLanguage(lang: LanguageChoice) {
-    this.dispatchEvent(
-      new CustomEvent("set-language", {
-        detail: lang,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-language", lang);
   }
 
   private _toggleExpertMode() {
-    this.dispatchEvent(
-      new CustomEvent("set-expert-mode", {
-        detail: !this._expertMode,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-expert-mode", !this._expertMode);
   }
 
   private _openUpdateAll() {
-    this.dispatchEvent(
-      new CustomEvent("open-update-all", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "open-update-all");
   }
 }
 

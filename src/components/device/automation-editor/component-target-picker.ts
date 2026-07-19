@@ -12,6 +12,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { textStyles } from "../../../styles/text.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { componentTargetPickerStyles } from "./component-target-picker.styles.js";
 import { instanceName } from "./component-targets.js";
 
@@ -153,13 +154,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
 
   private _select(id: string) {
     if (this.disabled) return;
-    this.dispatchEvent(
-      new CustomEvent("component-change", {
-        detail: { componentId: id },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "component-change", { componentId: id });
   }
 }
 

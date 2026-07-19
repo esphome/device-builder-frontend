@@ -16,6 +16,7 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { LightDismissController } from "../../util/light-dismiss-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { filterStyles } from "./filter-styles.js";
@@ -182,9 +183,7 @@ export class ESPHomeFiltersPopover extends LitElement {
   }
 
   private _onClearAll = () => {
-    this.dispatchEvent(
-      new CustomEvent("clear-filters", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "clear-filters");
     this._close();
   };
 }

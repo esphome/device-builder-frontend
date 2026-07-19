@@ -25,6 +25,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { labelChipStyles } from "../../util/label-chip-template.js";
 import { labelChipStyleString } from "../../util/label-style.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -194,9 +195,7 @@ export class ESPHomeLabelsFilterSection extends LitElement {
   }
 
   private _onHeaderClick = () => {
-    this.dispatchEvent(
-      new CustomEvent("filter-section-toggle", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "filter-section-toggle");
   };
 
   private _onEditClick(e: Event, label: Label) {
@@ -225,15 +224,11 @@ export class ESPHomeLabelsFilterSection extends LitElement {
 
   private _onCreateClick = () => {
     this._requestPopoverClose();
-    this.dispatchEvent(
-      new CustomEvent("request-create-label", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "request-create-label");
   };
 
   private _requestPopoverClose() {
-    this.dispatchEvent(
-      new CustomEvent("request-popover-close", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "request-popover-close");
   }
 
   private _toggleLabel(labelId: string, select: boolean) {

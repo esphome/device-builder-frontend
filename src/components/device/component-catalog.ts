@@ -21,6 +21,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
 import { debounce } from "../../util/debounce.js";
 import { isFeaturedId } from "../../util/featured-id.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { isVisible } from "../../util/is-visible.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
@@ -431,23 +432,11 @@ export class ESPHomeComponentCatalog extends LitElement {
   };
 
   _onAdd(component: ComponentCatalogEntry) {
-    this.dispatchEvent(
-      new CustomEvent("add-component", {
-        detail: { component },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "add-component", { component });
   }
 
   _onAddBundle(bundle: FeaturedBundle) {
-    this.dispatchEvent(
-      new CustomEvent("add-bundle", {
-        detail: { bundle, boardId: this.boardId },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "add-bundle", { bundle, boardId: this.boardId });
   }
 }
 

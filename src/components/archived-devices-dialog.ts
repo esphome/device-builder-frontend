@@ -11,6 +11,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { getErrorMessage } from "../util/error-message.js";
+import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 
@@ -314,23 +315,11 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
   }
 
   private _unarchive(device: ArchivedDevice) {
-    this.dispatchEvent(
-      new CustomEvent("unarchive", {
-        detail: device,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "unarchive", device);
   }
 
   private _deletePermanently(device: ArchivedDevice) {
-    this.dispatchEvent(
-      new CustomEvent("delete-archived", {
-        detail: device,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "delete-archived", device);
   }
 }
 

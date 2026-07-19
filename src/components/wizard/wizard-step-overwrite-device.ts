@@ -5,6 +5,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 
 /** Asks before replacing an existing device's config on a YAML upload.
  *  Overwriting keeps the device's labels / comment / board; deleting it
@@ -61,19 +62,11 @@ export class ESPHomeWizardStepOverwriteDevice extends LitElement {
   }
 
   private _cancel() {
-    this.dispatchEvent(
-      new CustomEvent("next-step", {
-        detail: "method",
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "next-step", "method");
   }
 
   private _confirm() {
-    this.dispatchEvent(
-      new CustomEvent("overwrite-device", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "overwrite-device");
   }
 }
 

@@ -6,6 +6,7 @@ import type {
   AutomationTree,
 } from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { notifyError } from "../../../util/notify.js";
 import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
@@ -92,26 +93,14 @@ export class AutoApplyController implements ReactiveController {
    *  ``flushPending()`` before its global save. Mirrors
    *  device-section-config's section-mount event. */
   hostConnected(): void {
-    this._host.dispatchEvent(
-      new CustomEvent("section-mount", {
-        detail: { node: this._host },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this._host, "section-mount", { node: this._host });
   }
 
   hostDisconnected(): void {
     // Cancel the pending debounced upsert — a write scheduled by a
     // section that's no longer on screen must not fire.
     this._clearTimer();
-    this._host.dispatchEvent(
-      new CustomEvent("section-unmount", {
-        detail: { node: this._host },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this._host, "section-unmount", { node: this._host });
   }
 
   /** Brief-window dirty flag covering the debounce gap so the global
@@ -149,13 +138,7 @@ export class AutoApplyController implements ReactiveController {
       ...patch,
     };
     this._host.value = value;
-    this._host.dispatchEvent(
-      new CustomEvent("automation-change", {
-        detail: { value, location: this._host.location },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this._host, "automation-change", { value, location: this._host.location });
     this.scheduleAutoApply();
   }
 
@@ -332,13 +315,7 @@ export class AutoApplyController implements ReactiveController {
     if (this._dirty === value) return;
     this._dirty = value;
     this._host.requestUpdate();
-    this._host.dispatchEvent(
-      new CustomEvent("dirty-change", {
-        detail: { dirty: value },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this._host, "dirty-change", { dirty: value });
   }
 
   private _setDeleting(value: boolean): void {

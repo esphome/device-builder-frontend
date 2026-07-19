@@ -8,6 +8,7 @@ import {
   getEncryptionVisual,
   type EncryptionState,
 } from "../../../util/encryption-state.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { formatFileSize } from "../../../util/format-file-size.js";
 import { splitIntegrations } from "../../../util/integration-split.js";
 import { buildWebUiUrlForHost } from "../../../util/web-ui-url.js";
@@ -437,13 +438,7 @@ function emitCleanBuild(
   host: ESPHomeDeviceDrawerContent,
   device: ConfiguredDevice
 ): void {
-  host.dispatchEvent(
-    new CustomEvent("clean-build", {
-      detail: device,
-      bubbles: true,
-      composed: true,
-    })
-  );
+  fireEvent(host, "clean-build", device);
 }
 
 // Build-size row with inline "Clean" button. Hidden on never-compiled devices

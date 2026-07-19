@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import { ALL_PAGE_SIZE } from "./pagination.js";
@@ -260,23 +261,11 @@ export class ESPHomeTablePagination extends LitElement {
   }
 
   private _onPageSizeChange(e: Event) {
-    this.dispatchEvent(
-      new CustomEvent("page-size-change", {
-        detail: Number((e.target as HTMLSelectElement).value),
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "page-size-change", Number((e.target as HTMLSelectElement).value));
   }
 
   private _emitPageChange(pageIndex: number) {
-    this.dispatchEvent(
-      new CustomEvent("page-change", {
-        detail: pageIndex,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "page-change", pageIndex);
   }
 }
 

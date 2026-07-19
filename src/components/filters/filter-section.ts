@@ -15,6 +15,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
 import type { FacetOption } from "../../util/facets.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { toggleSelection } from "../../util/toggle-selection.js";
 import { filterSectionStyles } from "./filter-section.styles.js";
@@ -172,9 +173,7 @@ export class ESPHomeFilterSection extends LitElement {
   }
 
   private _onHeaderClick = () => {
-    this.dispatchEvent(
-      new CustomEvent("filter-section-toggle", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "filter-section-toggle");
   };
 
   private _toggleOption(id: string, select: boolean) {

@@ -12,6 +12,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
@@ -266,13 +267,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
   }
 
   private _onAdd(board: SlimBoard) {
-    this.dispatchEvent(
-      new CustomEvent("next-step", {
-        detail: { step: "setup", board },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "next-step", { step: "setup", board });
   }
 
   private get _environment(): DeploymentEnvironment {

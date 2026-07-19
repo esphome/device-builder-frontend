@@ -30,6 +30,7 @@ import { darkModeContext, localizeContext } from "../../../context/index.js";
 import { editorHeightTheme, selectEditorTheme } from "../../../util/codemirror-theme.js";
 import { initialDarkMode } from "../../../util/dark-mode.js";
 import { editorSearchPhrases } from "../../../util/editor-search-phrases.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { CodeMirrorEditorElement } from "../../codemirror-editor-element.js";
 
 /** Marks the doc change that syncs the external ``value`` prop into the
@@ -147,13 +148,7 @@ export class ESPHomeLambdaEditor extends CodeMirrorEditorElement {
           !update.transactions.some((tr) => tr.annotation(externalSync) !== undefined)
         ) {
           const value = update.state.doc.toString();
-          this.dispatchEvent(
-            new CustomEvent("lambda-change", {
-              detail: { value },
-              bubbles: true,
-              composed: true,
-            })
-          );
+          fireEvent(this, "lambda-change", { value });
         }
       }),
     ]);

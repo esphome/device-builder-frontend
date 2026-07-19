@@ -13,6 +13,7 @@ import { newItemHighlightStyles } from "../../styles/new-item-highlight.js";
 import { serialPortHintStyles } from "../../styles/serial-port-hints.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { DeploymentEnvironment } from "../../util/environment.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   renderSerialPortBadges,
@@ -230,17 +231,11 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
   }
 
   private _onSelect(port: string) {
-    this.dispatchEvent(
-      new CustomEvent("select-port", {
-        detail: { port },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "select-port", { port });
   }
 
   private _onBack = () => {
-    this.dispatchEvent(new CustomEvent("back", { bubbles: true, composed: true }));
+    fireEvent(this, "back");
   };
 }
 

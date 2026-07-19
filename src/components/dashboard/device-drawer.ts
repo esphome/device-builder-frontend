@@ -18,6 +18,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { EscapeController } from "../../util/escape-controller.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
 
@@ -402,9 +403,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
 
   private _close() {
     this.open = false;
-    this.dispatchEvent(
-      new CustomEvent("drawer-close", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "drawer-close");
   }
 
   private _escape = new EscapeController(this, (e) => {
@@ -417,13 +416,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
   }
 
   private _emitAction(name: string) {
-    this.dispatchEvent(
-      new CustomEvent(name, {
-        detail: this.device,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, name, this.device);
   }
 }
 

@@ -38,6 +38,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
@@ -580,32 +581,15 @@ export class ESPHomeAutomationActionNode extends LitElement {
   }
 
   private _reorder(delta: number) {
-    this.dispatchEvent(
-      new CustomEvent("action-reorder", {
-        detail: { delta },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "action-reorder", { delta });
   }
 
   private _onDelete = () => {
-    this.dispatchEvent(
-      new CustomEvent("action-delete", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "action-delete");
   };
 
   private _emit(value: ActionNode) {
-    this.dispatchEvent(
-      new CustomEvent("action-change", {
-        detail: { value },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "action-change", { value });
   }
 }
 

@@ -9,6 +9,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl } from "../../util/board-image.js";
 import { EnterController } from "../../util/enter-controller.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { boardOffersFullSetup } from "../../util/full-setup.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../../util/secrets-cache.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
@@ -494,13 +495,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
       this._stage = "name";
       return;
     }
-    this.dispatchEvent(
-      new CustomEvent("next-step", {
-        detail: "board",
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "next-step", "board");
   }
 
   private _onNext() {
@@ -534,19 +529,13 @@ export class ESPHomeWizardStepSetup extends LitElement {
   };
 
   private _finish(wifiSsid: string, wifiPassword: string) {
-    this.dispatchEvent(
-      new CustomEvent("finish-setup", {
-        detail: {
-          board: this.board,
-          name: this._deviceName,
-          wifiSsid,
-          wifiPassword,
-          fullSetup: this._offersFullSetup && this._fullSetup,
-        },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "finish-setup", {
+      board: this.board,
+      name: this._deviceName,
+      wifiSsid,
+      wifiPassword,
+      fullSetup: this._offersFullSetup && this._fullSetup,
+    });
   }
 }
 

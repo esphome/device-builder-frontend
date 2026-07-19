@@ -8,6 +8,7 @@ import { loadMoreFooterStyles } from "../../styles/load-more-footer.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
 import { boardImageUrl } from "../../util/board-image.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { IntersectionController } from "../../util/intersection-controller.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -262,13 +263,7 @@ export class ESPHomeWizardStepBoardList extends LitElement {
   }
 
   private _onAdd(board: SlimBoard) {
-    this.dispatchEvent(
-      new CustomEvent("add-board", {
-        detail: { board },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "add-board", { board });
   }
 }
 
