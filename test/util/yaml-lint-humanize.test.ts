@@ -180,14 +180,34 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
       ],
     })) as unknown as ESPHomeAPI["validateYaml"];
 
-    const view = mountView(validateYaml, () => {}, undefined, doc);
+    const fixes: YamlAutoFix[] = [];
+    const view = mountView(
+      validateYaml,
+      () => {},
+      (fix) => fixes.push(fix),
+      doc
+    );
     try {
       forceLinting(view);
       await flush();
       const messages: string[] = [];
-      forEachDiagnostic(view.state, (d) => messages.push(d.message));
+      const actions: {
+        name: string;
+        apply: (v: EditorView, a: number, b: number) => void;
+      }[] = [];
+      forEachDiagnostic(view.state, (d) => {
+        messages.push(d.message);
+        actions.push(...(d.actions ?? []));
+      });
       expect(messages).toEqual([
         "expected a dictionary. yaml_editor.error_commented_block_hint:7",
+      ]);
+
+      // The hint carries the comment-out repair as the tooltip action.
+      expect(actions.map((a) => a.name)).toEqual(["yaml_editor.error_auto_fix"]);
+      actions[0].apply(view, 0, 0);
+      expect(fixes).toEqual([
+        { line: 7, indent: 0, key: "advanced", fromIndent: 4, kind: "comment-out" },
       ]);
     } finally {
       view.destroy();

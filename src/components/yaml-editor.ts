@@ -608,7 +608,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     confirm?: () => Promise<boolean>
   ): Promise<AutoFixOutcome> {
     const view = this._view;
-    if (!view || !this._api || (fix.kind !== "dash-space" && fix.indent === 0)) {
+    if (!view || !this._api || (fix.kind === undefined && fix.indent === 0)) {
       return "unavailable";
     }
     // Resolve the target only when the line the fix wants to edit is still
@@ -634,14 +634,23 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     if (from === null) return "stale";
 
     const doc = view.state.doc;
-    // The dash-space repair inserts after the stuck dash; indent repairs
-    // insert or remove leading spaces at the line start.
-    const changeAt = (at: number): { from: number; to?: number; insert?: string } =>
-      fix.kind === "dash-space"
-        ? { from: at + fix.fromIndent + 1, insert: " " }
-        : fix.indent > 0
-          ? { from: at, insert: " ".repeat(fix.indent) }
-          : { from: at, to: at - fix.indent };
+    // The dash-space repair inserts after the stuck dash; comment-out
+    // inserts `# ` at the line's indent; remove-line deletes the whole
+    // line (extent read from the live doc — changeAt runs against the
+    // pre-await doc for the proposal and the settled doc for dispatch);
+    // indent repairs insert or remove leading spaces at the line start.
+    const changeAt = (at: number): { from: number; to?: number; insert?: string } => {
+      if (fix.kind === "dash-space")
+        return { from: at + fix.fromIndent + 1, insert: " " };
+      if (fix.kind === "comment-out") return { from: at + fix.fromIndent, insert: "# " };
+      if (fix.kind === "remove-line") {
+        const target = view.state.doc.lineAt(at);
+        return { from: target.from, to: Math.min(target.to + 1, view.state.doc.length) };
+      }
+      return fix.indent > 0
+        ? { from: at, insert: " ".repeat(fix.indent) }
+        : { from: at, to: at - fix.indent };
+    };
     const change = changeAt(from);
     const proposed =
       doc.sliceString(0, change.from) +

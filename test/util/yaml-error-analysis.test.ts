@@ -136,6 +136,7 @@ describe("describeValueTypeCause", () => {
       ];
     expect(describeValueTypeCause(doc, 1, localize, "expected a dictionary.")).toEqual({
       text: 'yaml_editor.error_commented_block_hint:{"line":1,"key":"advanced"}',
+      fix: { line: 1, indent: 0, key: "advanced", fromIndent: 4, kind: "comment-out" },
     });
   });
 
@@ -148,6 +149,7 @@ describe("describeValueTypeCause", () => {
       ];
     expect(describeValueTypeCause(doc, 1, localize, "expected a dictionary.")).toEqual({
       text: 'yaml_editor.error_commented_block_hint:{"line":1,"key":"advanced"}',
+      fix: { line: 1, indent: 0, key: "advanced", fromIndent: 4, kind: "comment-out" },
     });
   });
 
@@ -160,10 +162,12 @@ describe("describeValueTypeCause", () => {
       describeValueTypeCause(beforeSibling, 1, localize, "expected a dictionary.")
     ).toEqual({
       text: 'yaml_editor.error_empty_block_hint:{"line":1,"key":"framework"}',
+      fix: { line: 1, indent: 0, key: "framework", fromIndent: 2, kind: "remove-line" },
     });
     const atEof = (n: number): string | undefined => ["  advanced:"][n - 1];
     expect(describeValueTypeCause(atEof, 1, localize, "expected a dictionary.")).toEqual({
       text: 'yaml_editor.error_empty_block_hint:{"line":1,"key":"advanced"}',
+      fix: { line: 1, indent: 0, key: "advanced", fromIndent: 2, kind: "remove-line" },
     });
   });
 
@@ -203,6 +207,7 @@ describe("describeValueTypeCause", () => {
       ["web_server:", "#api:", "logger:"][n - 1];
     expect(describeValueTypeCause(doc, 1, localize, "expected a dictionary.")).toEqual({
       text: 'yaml_editor.error_empty_block_hint:{"line":1,"key":"web_server"}',
+      fix: { line: 1, indent: 0, key: "web_server", fromIndent: 0, kind: "remove-line" },
     });
   });
 });
