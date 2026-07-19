@@ -588,7 +588,7 @@ export function describeValueTypeCause(
   readLine: ReadLine,
   line: number,
   localize: LocalizeFunc,
-  message = ""
+  message: string
 ): ValueTypeCause | null {
   const nested = describeNestedListValue(readLine, line, localize);
   if (nested) return { text: nested };

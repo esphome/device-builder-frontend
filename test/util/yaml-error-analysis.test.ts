@@ -104,11 +104,11 @@ describe("describeValueTypeCause", () => {
     const { describeValueTypeCause } =
       await import("../../src/util/yaml-error-analysis.js");
     const doc = (n: number): string | undefined => ["logger:", "  le"][n - 1];
-    expect(describeValueTypeCause(doc, 2, localize)).toEqual({
+    expect(describeValueTypeCause(doc, 2, localize, "")).toEqual({
       text: 'yaml_editor.error_missing_colon_hint:{"line":2,"key":"le"}',
     });
     const keyed = (n: number): string | undefined => ["logger:", "  level: DEBUG"][n - 1];
-    expect(describeValueTypeCause(keyed, 2, localize)).toBeNull();
+    expect(describeValueTypeCause(keyed, 2, localize, "")).toBeNull();
   });
 
   // The valid-YAML variant of the stuck dash: `-platform:` with no deeper
@@ -119,7 +119,7 @@ describe("describeValueTypeCause", () => {
       await import("../../src/util/yaml-error-analysis.js");
     const doc = (n: number): string | undefined =>
       ["ota:", "  -platform: esphome"][n - 1];
-    expect(describeValueTypeCause(doc, 2, localize)).toEqual({
+    expect(describeValueTypeCause(doc, 2, localize, "")).toEqual({
       text: 'yaml_editor.error_dash_space_fix:{"line":2,"key":"platform"}',
       fix: { line: 2, indent: 0, key: "-platform", fromIndent: 2, kind: "dash-space" },
     });
@@ -131,18 +131,11 @@ describe("describeValueTypeCause", () => {
     const { describeValueTypeCause } =
       await import("../../src/util/yaml-error-analysis.js");
     const doc = (n: number): string | undefined =>
-      [
-        "esp32:",
-        "  board: esp32dev",
-        "  framework:",
-        "    type: arduino",
-        "    advanced:",
-        '#      minimum_chip_revision: "3.1"',
-        "",
-        "logger:",
-      ][n - 1];
-    expect(describeValueTypeCause(doc, 5, localize, "expected a dictionary.")).toEqual({
-      text: 'yaml_editor.error_commented_block_hint:{"line":5,"key":"advanced"}',
+      ["    advanced:", '#      minimum_chip_revision: "3.1"', "  board: esp32dev"][
+        n - 1
+      ];
+    expect(describeValueTypeCause(doc, 1, localize, "expected a dictionary.")).toEqual({
+      text: 'yaml_editor.error_commented_block_hint:{"line":1,"key":"advanced"}',
     });
   });
 
@@ -186,7 +179,7 @@ describe("describeValueTypeCause", () => {
         "'board' is a required option for [esp32]."
       )
     ).toBeNull();
-    expect(describeValueTypeCause(doc, 1, localize)).toBeNull();
+    expect(describeValueTypeCause(doc, 1, localize, "")).toBeNull();
   });
 
   it("stays silent when the key has a real child or a value", async () => {
