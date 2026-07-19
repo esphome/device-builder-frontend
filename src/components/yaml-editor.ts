@@ -33,12 +33,12 @@ import { idleCompletion } from "../util/idle-completion.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { cursorKeyPathAt, indexedKeyPathAt } from "../util/yaml-cursor-paths.js";
 import {
+  emptyBlockFixKind,
   lineKeyToken,
-  valuelessKeyOf,
   type YamlAutoFix,
 } from "../util/yaml-error-analysis.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
-import { indentOf, stripComment } from "../util/yaml-line-walker.js";
+import { indentOf } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
@@ -606,9 +606,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    * the proposed document is what actually catches fixing the wrong item or
    * double-fixing one already repaired. The destructive kinds lean harder on
    * the structural check — deleting or commenting the wrong line often still
-   * validates clean — so they additionally require the line to still be a
-   * value-less key. A validation failure rejects (the caller surfaces it)
-   * rather than silently applying.
+   * validates clean — so they additionally require the line to still hold
+   * the exact empty/commented shape the fix was diagnosed for. A validation
+   * failure rejects (the caller surfaces it) rather than silently applying.
    */
   async applyAutoFix(
     fix: YamlAutoFix,
@@ -636,9 +636,15 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       }
       // A dedent must have the spaces it wants to remove.
       if (fix.indent < 0 && fix.fromIndent + fix.indent < 0) return null;
-      // A destructive fix was diagnosed on a value-less key; a line that has
-      // since gained a value must not be commented out or deleted.
-      if (destructive && valuelessKeyOf(stripComment(t.text)) === null) return null;
+      // A destructive fix's target IS its diagnosed line, so unlike the
+      // general anchored-elsewhere case above, re-running the shape check is
+      // valid — and required: a key that has since gained a value or a real
+      // child must not be commented out or deleted.
+      if (destructive) {
+        const readLine = (n: number): string | undefined =>
+          n >= 1 && n <= doc.lines ? doc.line(n).text : undefined;
+        if (emptyBlockFixKind(readLine, fix.line) !== fix.kind) return null;
+      }
       return t;
     };
     const line = targetLine();

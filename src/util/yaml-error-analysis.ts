@@ -190,7 +190,7 @@ function lineHasValue(text: string): boolean {
 
 /** The line's key when it is a value-less `key:` opener, else null.
  *  Callers pre-filter `- ` marker lines. */
-export function valuelessKeyOf(text: string): string | null {
+function valuelessKeyOf(text: string): string | null {
   return lineHasValue(text) ? null : lineKeyToken(text);
 }
 
@@ -634,23 +634,20 @@ function isCommentedChild(text: string, keyIndent: number): boolean {
 }
 
 /**
- * The empty-block cause behind "expected a dictionary." anchored on a
- * value-less plain `key:`: nothing is indented under it, so its value is
- * null. Distinguishes children that are all commented out (the classic
- * "commented the option, left the key" repair — the fix comments out the
- * key too) from a key with nothing under it at all (the fix removes the
- * line). Null when the key has any real child, or the line isn't a
- * value-less plain key.
+ * Classify the empty-block shape at *line*: a value-less plain `key:`
+ * whose children are all commented out ("comment-out") or absent
+ * entirely ("remove-line"); null when the key has any real child, or
+ * the line isn't a value-less plain key. Also the apply site's stale
+ * check for the destructive fixes — the diagnosed line must still hold
+ * the exact shape the fix was built for.
  */
-function describeEmptyBlock(
+export function emptyBlockFixKind(
   readLine: ReadLine,
-  line: number,
-  localize: LocalizeFunc
-): ValueTypeCause | null {
+  line: number
+): "comment-out" | "remove-line" | null {
   const text = readLine(line);
   if (text === undefined || parseListItemMarker(text)) return null;
-  const key = valuelessKeyOf(stripComment(text));
-  if (key === null) return null;
+  if (valuelessKeyOf(stripComment(text)) === null) return null;
   const keyIndent = indentOf(text);
   let sawComment = false;
   for (let n = line + 1; n <= line + WALK_BOUND; n++) {
@@ -664,20 +661,32 @@ function describeEmptyBlock(
     if (indentOf(next) > keyIndent) return null;
     break;
   }
+  return sawComment ? "comment-out" : "remove-line";
+}
+
+/**
+ * The empty-block cause behind "expected a dictionary.": the hint names
+ * the commented-out or empty shape and carries the matching repair
+ * (comment the key out too, or remove the line).
+ */
+function describeEmptyBlock(
+  readLine: ReadLine,
+  line: number,
+  localize: LocalizeFunc
+): ValueTypeCause | null {
+  const kind = emptyBlockFixKind(readLine, line);
+  if (kind === null) return null;
+  const text = readLine(line);
+  const key = valuelessKeyOf(stripComment(text ?? ""));
+  if (key === null) return null;
   return {
     text: localize(
-      sawComment
+      kind === "comment-out"
         ? "yaml_editor.error_commented_block_hint"
         : "yaml_editor.error_empty_block_hint",
       { line, key }
     ),
-    fix: {
-      line,
-      indent: 0,
-      key,
-      fromIndent: keyIndent,
-      kind: sawComment ? "comment-out" : "remove-line",
-    },
+    fix: { line, indent: 0, key, fromIndent: indentOf(text ?? ""), kind },
   };
 }
 

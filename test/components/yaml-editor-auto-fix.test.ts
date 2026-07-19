@@ -356,10 +356,51 @@ describe("yaml-editor applyAutoFix (#1884)", () => {
 
   // Deleting or commenting the wrong line often still validates clean, so
   // the destructive kinds must refuse structurally once the diagnosed
-  // value-less key has gained a value.
+  // shape is gone: the key gained a value, gained a real child (which the
+  // fix would orphan), or flipped to the other empty-block shape.
   it("no-ops a stale destructive fix once the key has gained a value", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
     const doc = "esp32:\n  framework:\n    advanced: true\n";
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(
+      await el.applyAutoFix({
+        line: 3,
+        indent: 0,
+        key: "advanced",
+        fromIndent: 4,
+        kind: "remove-line",
+      })
+    ).toBe("stale");
+    expect(viewOf(el).state.doc.toString()).toBe(doc);
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
+
+  it("no-ops a stale destructive fix once the key has gained a real child", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const doc =
+      'esp32:\n  framework:\n    advanced:\n      minimum_chip_revision: "3.1"\n';
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(
+      await el.applyAutoFix({
+        line: 3,
+        indent: 0,
+        key: "advanced",
+        fromIndent: 4,
+        kind: "remove-line",
+      })
+    ).toBe("stale");
+    expect(viewOf(el).state.doc.toString()).toBe(doc);
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
+
+  it("no-ops a destructive fix whose empty-block shape has flipped", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    // Diagnosed remove-line (nothing under the key); a commented child has
+    // since appeared, so the right repair is now comment-out, not deletion.
+    const doc =
+      'esp32:\n  framework:\n    advanced:\n#      minimum_chip_revision: "3.1"\n';
     const el = await mountEditor(validateYaml, doc);
 
     expect(
