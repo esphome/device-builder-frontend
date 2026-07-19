@@ -8,9 +8,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+import "../../_mock-webawesome.js";
 
 import { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 import { identityLocalize } from "../../_dom.js";

@@ -36,6 +36,7 @@ import {
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { labelChipStyles, renderLabelChip } from "../../util/label-chip-template.js";
 import { notifyError, notifyInfo, notifySuccess } from "../../util/notify.js";
 import { setsEqual } from "../../util/set-equal.js";
@@ -275,6 +276,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    textStyles,
     labelChipStyles,
     labelsListStyles,
     dialogActionButtonStyles,

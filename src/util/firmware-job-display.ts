@@ -4,14 +4,23 @@ import { JobType } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /**
- * The job type a job presents as: a deferred install is a lone COMPILE
- * carrying the whole install intent, so it surfaces as an Install.
+ * Resolve the human-readable label for a job's *type* (as opposed to
+ * ``firmwareJobDisplayName``, which names the job itself).
  *
- * Deliberately NOT used by the device card's busy badge — "Compiling"
- * during a deferred install matches a normal chain's compile phase.
+ * A deferred install's underlying job is a plain COMPILE — the device
+ * is offline, so nothing installs yet — but "Compile" alone loses the
+ * context that an install is queued behind it. This surfaces it as
+ * "Offline compile" instead of letting it read as an outright Install.
+ *
+ * COMPILE-gated: a failed OTA upload the backend converts offline also
+ * carries ``is_deferred_install``, but what ran there was a flash of a
+ * finished build — it keeps its honest Upload label.
  */
-export function effectiveJobType(job: FirmwareJob): JobType {
-  return job.is_deferred_install ? JobType.INSTALL : job.job_type;
+export function firmwareJobTypeLabel(job: FirmwareJob, localize: LocalizeFunc): string {
+  if (job.is_deferred_install && job.job_type === JobType.COMPILE) {
+    return localize("firmware_jobs.type_offline_compile");
+  }
+  return localize(`firmware_jobs.type_${job.job_type}`);
 }
 
 /**

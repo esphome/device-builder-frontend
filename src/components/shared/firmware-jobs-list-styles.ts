@@ -65,7 +65,7 @@ export const firmwareJobsListStyles = css`
   /* Negative offset keeps the ring inside the scroll container; a real
      outline lets forced-colors mode substitute the system highlight. */
   .job:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: -2px;
   }
 
@@ -101,9 +101,6 @@ export const firmwareJobsListStyles = css`
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .job-meta {

@@ -25,6 +25,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { EnterController } from "../../util/enter-controller.js";
 import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyWarning } from "../../util/notify.js";
 import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
@@ -486,15 +487,11 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._open = false;
     if (!this._startTourAfterClose) return;
     this._startTourAfterClose = false;
-    this.dispatchEvent(
-      new CustomEvent("open-guided-tour", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "open-guided-tour");
   }
 
   private _emitAcknowledged() {
-    this.dispatchEvent(
-      new CustomEvent("onboarding-acknowledged", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "onboarding-acknowledged");
   }
 
   private _consumeResetParam(): void {

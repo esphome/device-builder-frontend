@@ -22,6 +22,7 @@ import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { storedTheme } from "../../util/dark-mode.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 import {
@@ -225,53 +226,23 @@ export class ESPHomeSettingsAppearance extends LitElement {
   private _onChange(e: Event) {
     const theme = (e.target as HTMLSelectElement).value;
     this._theme = theme;
-    this.dispatchEvent(
-      new CustomEvent("set-theme", {
-        detail: theme,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-theme", theme);
   }
 
   private _onToggleExpertMode() {
-    this.dispatchEvent(
-      new CustomEvent("set-expert-mode", {
-        detail: !this._expertMode,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-expert-mode", !this._expertMode);
   }
 
   private _onToggleRemoteCompute() {
-    this.dispatchEvent(
-      new CustomEvent("set-remote-compute-only", {
-        detail: !this._remoteComputeOnly,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-remote-compute-only", !this._remoteComputeOnly);
   }
 
   private _onToggleHideDeviceBuilder() {
-    this.dispatchEvent(
-      new CustomEvent("set-hide-device-builder", {
-        detail: !this._hideDeviceBuilder,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-hide-device-builder", !this._hideDeviceBuilder);
   }
 
   private _onToggleVersionHistory() {
-    this.dispatchEvent(
-      new CustomEvent("set-version-history-enabled", {
-        detail: !this._versionHistoryEnabled,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "set-version-history-enabled", !this._versionHistoryEnabled);
   }
 }
 

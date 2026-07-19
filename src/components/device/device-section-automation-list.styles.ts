@@ -67,18 +67,6 @@ export const deviceSectionAutomationListStyles = css`
     font-size: 14px;
   }
 
-  .empty {
-    margin: 0;
-    padding: var(--wa-space-m) var(--wa-space-s);
-    text-align: center;
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-s);
-    font-style: italic;
-    border: 1px dashed var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-m);
-    background: var(--wa-color-surface-lowered, transparent);
-  }
-
   .rows {
     list-style: none;
     margin: 0;
@@ -114,9 +102,6 @@ export const deviceSectionAutomationListStyles = css`
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-normal);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .row-buttons {

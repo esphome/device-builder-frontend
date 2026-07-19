@@ -32,6 +32,7 @@ import {
 } from "../context/index.js";
 import { dropdownMenuStyles } from "../styles/dropdown-menu.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { fireEvent } from "../util/fire-event.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-actions.js";
@@ -394,42 +395,22 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
    *  hand-editing ``secrets.yaml``. */
   private _openOnboarding() {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-onboarding-wifi", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-onboarding-wifi");
   }
 
   private _openFirmwareJobs() {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-firmware-jobs", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-firmware-jobs");
   }
 
   private _openResetBuildEnv() {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-reset-build-env", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-reset-build-env");
   }
 
   private _openSettings() {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-settings", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-settings");
   }
 
   private _openSearch() {
@@ -439,12 +420,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
 
   private _openGuidedTour() {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-guided-tour", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-guided-tour");
   }
 
   private _offloaderAlertsCount(): number {
@@ -453,22 +429,12 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
 
   private _openFeedback() {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-feedback", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-feedback");
   }
 
   private _openCheckForUpdates() {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-check-updates", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-check-updates");
   }
 }
 

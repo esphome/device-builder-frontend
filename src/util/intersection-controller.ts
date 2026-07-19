@@ -1,63 +1,49 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
+export interface IntersectionControllerOptions {
+  /** Selector for the scroll container to use as the observer root; omit to
+   *  observe against the viewport. */
+  rootSelector?: string;
+  rootMargin?: string;
+}
+
 /**
  * Reactive controller wrapping an ``IntersectionObserver`` over a single
- * sentinel element.
-
- * The host calls ``observe(target, root)`` once the sentinel and its scroll
- * container are in the DOM (e.g. from ``updated``); ``onIntersect`` fires each
- * time the sentinel scrolls into view, driving infinite-scroll page fetches.
- * Re-observing the same target is a no-op; a new target replaces the old
- * subscription. The observer is torn down on host disconnect.
+ * ``.sentinel`` element (what ``renderLoadMoreFooter`` emits).
+ *
+ * Discovers the sentinel (and optional root) in the host's render root after
+ * every update, so hosts supply only the ``onIntersect`` callback, which fires
+ * each time the sentinel scrolls into view, driving infinite-scroll page
+ * fetches. A sentinel that leaves the DOM (no more pages) tears the observer
+ * down; a re-rendered one re-subscribes. Torn down on host disconnect.
  */
 export class IntersectionController implements ReactiveController {
   private _observer: IntersectionObserver | null = null;
   private _target: Element | null = null;
   private _root: Element | null = null;
-  private _rootMargin = "";
+  private readonly _rootSelector: string | null;
+  private readonly _rootMargin: string;
 
   constructor(
-    host: ReactiveControllerHost,
-    private readonly _onIntersect: () => void
+    private readonly _host: ReactiveControllerHost & { renderRoot: ParentNode },
+    private readonly _onIntersect: () => void,
+    options: IntersectionControllerOptions = {}
   ) {
-    host.addController(this);
+    this._rootSelector = options.rootSelector ?? null;
+    this._rootMargin = options.rootMargin ?? "200px";
+    _host.addController(this);
   }
 
-  /** Observe ``target`` when present, else tear down. ``root`` may be null
-   *  (the viewport). Hosts call this from ``updated`` with their (possibly
-   *  missing) sentinel. */
-  observeIfPresent(
-    target: Element | null | undefined,
-    root: Element | null,
-    rootMargin?: string
-  ): void {
-    if (target) this.observe(target, root, rootMargin);
-    else this.disconnect();
-  }
-
-  observe(target: Element, root: Element | null, rootMargin = "0px"): void {
-    // Re-observe only when the target or an observer option actually changes,
-    // so a same-config call from ``updated`` is a cheap no-op but a new
-    // ``root`` / ``rootMargin`` rebuilds the observer.
-    if (
-      this._observer !== null &&
-      this._target === target &&
-      this._root === root &&
-      this._rootMargin === rootMargin
-    ) {
+  hostUpdated(): void {
+    const target = this._host.renderRoot.querySelector(".sentinel");
+    if (!target) {
+      this.disconnect();
       return;
     }
-    this.disconnect();
-    this._target = target;
-    this._root = root;
-    this._rootMargin = rootMargin;
-    this._observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) this._onIntersect();
-      },
-      { root, rootMargin }
-    );
-    this._observer.observe(target);
+    const root = this._rootSelector
+      ? this._host.renderRoot.querySelector(this._rootSelector)
+      : null;
+    this._observe(target, root);
   }
 
   hostDisconnected(): void {
@@ -69,6 +55,24 @@ export class IntersectionController implements ReactiveController {
     this._observer = null;
     this._target = null;
     this._root = null;
-    this._rootMargin = "";
+  }
+
+  private _observe(target: Element, root: Element | null): void {
+    // Re-observe only when the target or root actually changes, so a
+    // same-config call from ``hostUpdated`` is a cheap no-op but a
+    // re-rendered node rebuilds the observer.
+    if (this._observer !== null && this._target === target && this._root === root) {
+      return;
+    }
+    this.disconnect();
+    this._target = target;
+    this._root = root;
+    this._observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) this._onIntersect();
+      },
+      { root, rootMargin: this._rootMargin }
+    );
+    this._observer.observe(target);
   }
 }

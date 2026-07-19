@@ -197,6 +197,7 @@ describe("hydrateBoard", () => {
       featured: true,
       is_generic: false,
       full_config: false,
+      package_import_url: "",
       featured_components: [],
       featured_bundles: [],
       requires_wifi: false,
@@ -239,6 +240,7 @@ describe("hydratePagedBoardsResponse", () => {
     expect(board).not.toHaveProperty("featured_bundles");
     expect(board).not.toHaveProperty("requires_wifi");
     expect(board).not.toHaveProperty("full_config");
+    expect(board).not.toHaveProperty("package_import_url");
   });
 
   it("re-defaults a wholly-stripped wrapper (forward-compat against omit_default on PagedResponse)", () => {

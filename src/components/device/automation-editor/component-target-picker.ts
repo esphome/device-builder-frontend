@@ -11,6 +11,8 @@ import type { AvailableComponentInstance } from "../../../api/types/automations.
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { textStyles } from "../../../styles/text.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { componentTargetPickerStyles } from "./component-target-picker.styles.js";
 import { instanceName } from "./component-targets.js";
 
@@ -34,7 +36,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
   @property() value = "";
   @property({ type: Boolean }) disabled = false;
 
-  static styles = [espHomeStyles, componentTargetPickerStyles];
+  static styles = [espHomeStyles, textStyles, componentTargetPickerStyles];
 
   protected render() {
     const { plan, order } = this._plan();
@@ -116,7 +118,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
       tabindex=${tabbable ? "0" : "-1"}
       @click=${() => this._select(d.id)}
     >
-      <span class="component-choice-name">${instanceName(d)}</span>
+      <span class="component-choice-name truncate">${instanceName(d)}</span>
       <span class="component-domain">${d.component_id}</span>
     </div>`;
   }
@@ -152,13 +154,7 @@ export class ESPHomeComponentTargetPicker extends LitElement {
 
   private _select(id: string) {
     if (this.disabled) return;
-    this.dispatchEvent(
-      new CustomEvent("component-change", {
-        detail: { componentId: id },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "component-change", { componentId: id });
   }
 }
 

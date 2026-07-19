@@ -1,3 +1,4 @@
+import { fireEvent } from "../../util/fire-event.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
 
 // Pick the card on the next row whose horizontal centre is closest to ours.
@@ -63,11 +64,5 @@ export function onHostContextMenu(card: ESPHomeDeviceCard, e: MouseEvent): void 
   if (originatesOnControl(card, e)) return;
   e.preventDefault();
   e.stopPropagation();
-  card.dispatchEvent(
-    new CustomEvent("card-context-menu", {
-      detail: { x: e.clientX, y: e.clientY },
-      bubbles: true,
-      composed: true,
-    })
-  );
+  fireEvent(card, "card-context-menu", { x: e.clientX, y: e.clientY });
 }

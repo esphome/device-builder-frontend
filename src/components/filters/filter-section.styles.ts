@@ -54,9 +54,6 @@ export const filterSectionStyles = css`
   .section-name {
     flex: 1;
     min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   /* Per-dimension active-selection count. Carries the signal the

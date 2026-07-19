@@ -25,6 +25,7 @@ import {
 import { defaultBoardImageUrl, onBoardImageError } from "../../util/board-image.js";
 import { pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { notifyError } from "../../util/notify.js";
@@ -342,13 +343,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // Announce so the page-level navigation guard (device.ts) can hold a
     // direct ref. The tree is page → device-editor → device-board-info → us;
     // a property passthrough chain would cost three edits per API change.
-    this.dispatchEvent(
-      new CustomEvent("section-mount", {
-        detail: { node: this },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "section-mount", { node: this });
   }
 
   disconnectedCallback() {
@@ -357,13 +352,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       clearTimeout(this._draftTimer);
       this._draftTimer = null;
     }
-    this.dispatchEvent(
-      new CustomEvent("section-unmount", {
-        detail: { node: this },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "section-unmount", { node: this });
   }
 
   // Flush pending draft sync now. The page calls this before save / section
@@ -397,13 +386,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   _setDirty(value: boolean): void {
     if (this._dirty === value) return;
     this._dirty = value;
-    this.dispatchEvent(
-      new CustomEvent("dirty-change", {
-        detail: { dirty: value },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "dirty-change", { dirty: value });
   }
 
   _scheduleDraftFlush() {
@@ -415,9 +398,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   private _onShowYamlEditor() {
-    this.dispatchEvent(
-      new CustomEvent("show-yaml-editor", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "show-yaml-editor");
   }
 
   private _onValueChange = (e: CustomEvent<ConfigEntryValueChange>) =>

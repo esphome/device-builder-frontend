@@ -15,9 +15,9 @@ export interface LoadMoreFooterOptions {
   errorLabelKey: string;
   /** Re-runs the failed page fetch. */
   onRetry: () => void;
-  /** Class for the spinner line; the host owns its centered-text style
-   *  (``"loading"`` for the board picker, ``"empty"`` for the catalog). */
-  loadingClass: string;
+  /** Class for the spinner line; defaults to the shared centered-quiet
+   *  ``load-more-loading`` in ``loadMoreFooterStyles``. */
+  loadingClass?: string;
 }
 
 /**
@@ -31,12 +31,13 @@ export function renderLoadMoreFooter(
   o: LoadMoreFooterOptions
 ): TemplateResult | typeof nothing {
   if (o.loadingMore) {
-    return html`<p class=${o.loadingClass}>${o.localize(o.loadingLabelKey)}</p>`;
+    const cls = o.loadingClass ?? "load-more-loading";
+    return html`<p class=${cls}>${o.localize(o.loadingLabelKey)}</p>`;
   }
   if (o.error) {
     return html`<div class="load-more-error" role="alert">
       <span>${o.localize(o.errorLabelKey)}</span>
-      <button class="retry-link" type="button" @click=${o.onRetry}>
+      <button class="retry-link link-button" type="button" @click=${o.onRetry}>
         ${o.localize("command.retry")}
       </button>
     </div>`;

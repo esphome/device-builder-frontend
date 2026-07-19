@@ -4,18 +4,11 @@ import {
   getStoredToken,
   setStoredToken,
 } from "../../src/util/auth-token.js";
+import { stubStorage, stubThrowingStorage } from "../_storage.js";
 
 describe("auth-token", () => {
-  // Mirrors the just-created.test.ts pattern: vitest runs in node, so
-  // localStorage has to be stubbed per-test.
   beforeEach(() => {
-    const store = new Map<string, string>();
-    vi.stubGlobal("localStorage", {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => store.set(k, v),
-      removeItem: (k: string) => store.delete(k),
-      clear: () => store.clear(),
-    });
+    stubStorage("localStorage");
   });
 
   afterEach(() => {
@@ -61,20 +54,7 @@ describe("auth-token", () => {
     // Private-mode browsers and sandboxed iframes can throw on every
     // localStorage access. The helpers swallow these — auth still
     // works (in-memory token on the API client carries the session).
-    vi.stubGlobal("localStorage", {
-      getItem: () => {
-        throw new Error("blocked");
-      },
-      setItem: () => {
-        throw new Error("blocked");
-      },
-      removeItem: () => {
-        throw new Error("blocked");
-      },
-      clear: () => {
-        throw new Error("blocked");
-      },
-    });
+    stubThrowingStorage("localStorage");
     expect(() => setStoredToken("abc", 1)).not.toThrow();
     expect(getStoredToken()).toBeNull();
     expect(() => clearStoredToken()).not.toThrow();

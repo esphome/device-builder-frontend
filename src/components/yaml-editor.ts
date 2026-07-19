@@ -28,6 +28,7 @@ import {
 import { initialDarkMode } from "../util/dark-mode.js";
 import { editorSearchPhrases } from "../util/editor-search-phrases.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { fireEvent } from "../util/fire-event.js";
 import { idleCompletion } from "../util/idle-completion.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { cursorKeyPathAt, indexedKeyPathAt } from "../util/yaml-cursor-paths.js";
@@ -430,13 +431,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         const completionOpen = completionStatus(update.state) === "active";
         if (completionOpen !== this._lastCompletionOpen) {
           this._lastCompletionOpen = completionOpen;
-          this.dispatchEvent(
-            new CustomEvent("yaml-completion-open", {
-              detail: { open: completionOpen },
-              bubbles: true,
-              composed: true,
-            })
-          );
+          fireEvent(this, "yaml-completion-open", { open: completionOpen });
         }
         // LOAD-BEARING ORDER: `yaml-change` MUST be dispatched
         // before `yaml-cursor-line` within a single update.
@@ -452,13 +447,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         // `pages/device.ts:_onYamlCursorLine` for the
         // matching mention of this invariant.)
         if (update.docChanged) {
-          this.dispatchEvent(
-            new CustomEvent("yaml-change", {
-              detail: { value: update.state.doc.toString() },
-              bubbles: true,
-              composed: true,
-            })
-          );
+          fireEvent(this, "yaml-change", { value: update.state.doc.toString() });
           // A hand edit invalidates a block highlight: the stored
           // range is a static line snapshot and the mark decoration
           // only position-maps, so lines typed inside the section
@@ -475,9 +464,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
               (tr) => tr.docChanged && tr.annotation(Transaction.userEvent) !== undefined
             )
           ) {
-            this.dispatchEvent(
-              new CustomEvent("yaml-user-edit", { bubbles: true, composed: true })
-            );
+            fireEvent(this, "yaml-user-edit");
           }
         }
         // Cursor moved (click, arrow keys, find-jump) or a user edit
@@ -509,20 +496,14 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
           ) {
             this._lastReportedCursorLine = line;
             this._lastReportedPathKey = pathKey;
-            this.dispatchEvent(
-              new CustomEvent("yaml-cursor-line", {
-                detail: {
-                  line,
-                  path,
-                  // AST-only sibling of ``path`` carrying block-sequence
-                  // list indices — what the automation editor needs to
-                  // resolve a node inside a handler body.
-                  indexedPath: indexedKeyPathAt(update.state, head),
-                },
-                bubbles: true,
-                composed: true,
-              })
-            );
+            fireEvent(this, "yaml-cursor-line", {
+              line,
+              path,
+              // AST-only sibling of ``path`` carrying block-sequence
+              // list indices — what the automation editor needs to
+              // resolve a node inside a handler body.
+              indexedPath: indexedKeyPathAt(update.state, head),
+            });
           }
         }
       }),
@@ -723,13 +704,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     // or the host would hold the invalid banner forever.
     if (this._lastCompletionOpen) {
       this._lastCompletionOpen = false;
-      this.dispatchEvent(
-        new CustomEvent("yaml-completion-open", {
-          detail: { open: false },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      fireEvent(this, "yaml-completion-open", { open: false });
     }
     this._mountEditor();
   }

@@ -9,6 +9,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
+import type { ESPHomeBoardReselectDialog } from "../components/device/board-reselect-dialog.js";
 import type { NavSectionName } from "../components/device/device-board-info.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
 import { notifyError, notifySuccess } from "../util/notify.js";
@@ -41,6 +42,7 @@ import {
 } from "../util/backend-field-errors.js";
 import { withBase } from "../util/base-path.js";
 import { fetchBoard } from "../util/board-body-cache.js";
+import { applyBoardChange, openBoardReselect } from "../util/board-change.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
@@ -55,6 +57,7 @@ import {
   resolveUrlLineFocus,
 } from "../util/url-line-resolver.js";
 import { buildWebUiUrl } from "../util/web-ui-url.js";
+import { boardDisagreesWithYaml, readPlatformBoard } from "../util/yaml-board.js";
 import {
   getLastValidatedResult,
   type YamlDiagnosticsDetail,
@@ -81,6 +84,7 @@ import {
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/command-dialog.js";
+import "../components/device/board-reselect-dialog.js";
 import "../components/device/device-editor.js";
 import "../components/device/device-navigator.js";
 import "../components/firmware-install-dialog.js";
@@ -307,6 +311,17 @@ export class ESPHomePageDevice extends LitElement {
 
   @query("esphome-yaml-validation-dialog")
   private _yamlValidationDialog!: ESPHomeYamlValidationDialog;
+
+  @query("esphome-board-reselect-dialog")
+  private _boardReselectDialog!: ESPHomeBoardReselectDialog;
+
+  /** Holds the post-save board prompt while an install-triggered save
+   *  runs, so it can't stack under the install-method dialog. */
+  private _suppressBoardPrompt = false;
+
+  /** Disagreement key the prompt already fired for; blocks a re-prompt
+   *  on every save of the same dismissed state. */
+  private _boardPromptShownFor: string | null = null;
 
   /** First-error / count snapshot driving the save-time validation
    *  prompt. Reset before opening the dialog and read by it via
@@ -585,30 +600,21 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   /**
-   * Swap the device's board to the picked alternate, then reload the YAML
-   * pane (`devices/update` rewrote `board:`). The header refreshes itself
-   * via the `DEVICE_UPDATED` event.
+   * Swap the device's board to the picked alternate. `devices/update`
+   * writes only the sidecar `board_id` (the YAML keeps its `board:`),
+   * so no reload is needed — the header refreshes itself via the
+   * `DEVICE_UPDATED` event.
    */
   private _onChangeBoard = async (e: CustomEvent<{ boardId: string }>) => {
     const boardId = e.detail?.boardId;
     const device = this._device;
     if (!boardId || !device || boardId === device.board_id) return;
-    // Reloading YAML after the swap would discard unsaved edits.
+    // An unsaved buffer may disagree with the board being applied.
     if (this._isDirty) {
       notifyError(this._localize("device.change_board_unsaved"));
       return;
     }
-    try {
-      await this._api.updateDevice({
-        configuration: device.configuration,
-        board_id: boardId,
-      });
-      await this._loadYaml();
-      notifySuccess(this._localize("device.change_board_success"));
-    } catch (err) {
-      console.error("Failed to change board:", err);
-      notifyError(this._localize("device.change_board_error"));
-    }
+    await applyBoardChange(this._api, this._localize, device.configuration, boardId);
   };
 
   private _readStoredLayout(): DeviceLayoutMode | null {
@@ -899,7 +905,56 @@ export class ESPHomePageDevice extends LitElement {
     const message = saved ? "device.yaml_saved" : "device.yaml_save_error";
     const variant = saved ? notifySuccess : notifyError;
     variant(this._localize(message));
+    if (saved) void this._maybePromptBoardReselect();
     return saved;
+  };
+
+  /** The parsed YAML platform block when it names a different chip than
+   *  the selected board, else null. */
+  private _boardDisagreement() {
+    if (!this._board) return null;
+    const parsed = readPlatformBoard(this._yaml);
+    return parsed && boardDisagreesWithYaml(parsed, this._board) ? parsed : null;
+  }
+
+  private _openBoardReselect(): Promise<boolean> {
+    return openBoardReselect(this._boardReselectDialog, {
+      configuration: this.id,
+      yaml: this._yaml,
+    });
+  }
+
+  /** Offer to reselect the stored board when the saved YAML names a
+   *  different chip — the stale `board_id` would dead-end the Web
+   *  Serial chip check. */
+  private async _maybePromptBoardReselect(): Promise<void> {
+    if (this._suppressBoardPrompt) return;
+    const parsed = this._boardDisagreement();
+    if (!parsed) return;
+    const key = `${this.id}|${parsed.platform}|${parsed.board}|${parsed.variant}`;
+    if (this._boardPromptShownFor === key) return;
+    // Record up front so a save during the open can't double-fire, but
+    // un-record when nothing opened (transient fetch failure) so the
+    // next save re-offers the prompt.
+    this._boardPromptShownFor = key;
+    const opened = await this._openBoardReselect().catch((err) => {
+      console.error("Board reselect prompt failed:", err);
+      return false;
+    });
+    if (!opened && this._boardPromptShownFor === key) {
+      this._boardPromptShownFor = null;
+    }
+  }
+
+  /** Chip-mismatch recovery hand-off from the install dialog. */
+  private _onRequestChangeBoard = (e: CustomEvent<{ configuration: string }>) => {
+    // Hand over the buffer only when it matches the saved config; a
+    // dirty buffer would resolve candidates the backend doesn't hold.
+    const cleanBuffer = e.detail.configuration === this.id && !this._isDirty;
+    void openBoardReselect(this._boardReselectDialog, {
+      configuration: e.detail.configuration,
+      yaml: cleanBuffer ? this._yaml : undefined,
+    });
   };
 
   private _onValidationSaveAnyway = async () => {
@@ -968,9 +1023,10 @@ export class ESPHomePageDevice extends LitElement {
   // on-disk file, so an unsaved edit would flash the previous version. A
   // click while a job already runs re-attaches to it instead: no save (the
   // edit stays in the buffer), no second job.
-  private _installAfterSave = async (run: () => void): Promise<void> => {
+  private _installAfterSave = async (run: () => void | Promise<void>): Promise<void> => {
     if (this._showActiveJobProgress()) return;
     let saved: boolean;
+    this._suppressBoardPrompt = true;
     try {
       saved = await this._saveYaml();
     } catch (e) {
@@ -979,8 +1035,27 @@ export class ESPHomePageDevice extends LitElement {
       console.error("Failed to save before install:", e);
       notifyError(this._localize("device.yaml_save_error"));
       return;
+    } finally {
+      this._suppressBoardPrompt = false;
     }
-    if (saved) run();
+    if (!saved) return;
+    // Hard block: an unresolved YAML/board disagreement dead-ends the
+    // install chip check, so force the fix before offering install
+    // methods. Dismissing the picker keeps install blocked; the next
+    // click re-prompts. When the picker has nothing to offer (no
+    // catalog candidates, or a transient failure) fall through — the
+    // chip check downstream stays the guard, and blocking here would
+    // strand the install with only a toast.
+    if (this._boardDisagreement() && (await this._openBoardReselect())) {
+      return;
+    }
+    try {
+      await run();
+    } catch (err) {
+      // Surfaced rather than lost as an unhandled rejection.
+      console.error("Install entry failed:", err);
+      notifyError(this._localize("device.install_start_failed"));
+    }
   };
   private _saveThenInstall = () => this._installAfterSave(this._installCtrl.onInstall);
   private _saveThenUpdate = () => this._installAfterSave(this._installCtrl.onUpdate);
@@ -1115,6 +1190,7 @@ export class ESPHomePageDevice extends LitElement {
             )}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
+            @request-install=${this._saveThenInstall}
             @goto-line=${this._onEditorGoToLine}
             @change-board=${this._onChangeBoard}
             @open-logs=${this._onEditorOpenLogs}
@@ -1175,6 +1251,7 @@ export class ESPHomePageDevice extends LitElement {
           @request-show-logs-after-install=${this._onPostInstallShowLogs}
           @clean-build=${this._onCleanBuild}
           @request-open-editor=${this._onRequestOpenEditor}
+          @request-change-board=${this._onRequestChangeBoard}
         ></esphome-firmware-install-dialog>
         <esphome-logs-dialog></esphome-logs-dialog>
         <esphome-install-method-dialog
@@ -1183,6 +1260,7 @@ export class ESPHomePageDevice extends LitElement {
           .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
           .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
           .canFlashBootloader=${this._installCtrl.canFlashBootloader}
+          .neverFlashed=${this._installCtrl.neverFlashed}
           .mode=${this._installCtrl.methodMode}
           @close=${this._installCtrl.onInstallMethodClose}
           @select-method=${this._installCtrl.onInstallMethodSelect}
@@ -1197,6 +1275,7 @@ export class ESPHomePageDevice extends LitElement {
           @goto=${this._onValidationGoTo}
           @cancel=${this._onValidationCancel}
         ></esphome-yaml-validation-dialog>
+        <esphome-board-reselect-dialog></esphome-board-reselect-dialog>
       </div>
     `;
   }

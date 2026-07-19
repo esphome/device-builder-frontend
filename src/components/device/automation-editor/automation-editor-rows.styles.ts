@@ -91,9 +91,6 @@ export const automationEditorRowStyles = css`
   .ae-row-picker-name {
     font-size: var(--wa-font-size-m);
     font-weight: var(--wa-font-weight-bold);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .ae-row-picker wa-icon {

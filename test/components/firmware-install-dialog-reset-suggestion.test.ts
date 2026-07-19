@@ -9,7 +9,10 @@
  */
 import { describe, it } from "vitest";
 import { JobSource } from "../../src/api/types/firmware-jobs.js";
-import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import type {
+  ESPHomeFirmwareInstallDialog,
+  InstallFailureKind,
+} from "../../src/components/firmware-install-dialog.js";
 import { renderResetSuggestion } from "../../src/components/firmware-install-dialog/renderers.js";
 import {
   expectFallbackToLocal,
@@ -24,8 +27,7 @@ interface Host {
   _step: string;
   _statusMessage: string;
   _errorMessage: string;
-  _failedDuringCompile: boolean;
-  _failedDuringValidate: boolean;
+  _failureKind: InstallFailureKind;
   _jobSource: JobSource;
   _jobSourceLabel: string;
   _tryCleanBuild: () => void;
@@ -39,8 +41,7 @@ function baseHost(overrides: Partial<Host> = {}): Host {
     _step: "error",
     _statusMessage: "Install failed.",
     _errorMessage: "Boom",
-    _failedDuringCompile: true,
-    _failedDuringValidate: false,
+    _failureKind: "compile",
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
     _tryCleanBuild: () => {},

@@ -3,9 +3,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+import "../_mock-webawesome.js";
+
 vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }));

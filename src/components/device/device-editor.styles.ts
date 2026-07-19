@@ -72,9 +72,6 @@ export const deviceEditorStyles = css`
     margin: 0;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     min-width: 0;
   }
 
@@ -82,9 +79,6 @@ export const deviceEditorStyles = css`
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-normal);
     color: var(--esphome-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     min-width: 0;
     /* Yield before the device name when the header is tight; the
        filename is the secondary half of the title row. */

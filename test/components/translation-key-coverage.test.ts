@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VersionMatchPolicy } from "../../src/api/types/event-subscription.js";
-import { JobType } from "../../src/api/types/firmware-jobs.js";
+import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { CommandType } from "../../src/components/command-dialog.js";
 import enMessages from "../../src/translations/en.json";
 
@@ -22,11 +22,21 @@ describe("firmware job type translation keys", () => {
   });
 });
 
-describe("command dialog title translation keys", () => {
-  // <esphome-command-dialog> renders `command.${this._commandType}_title`.
+describe("firmware job status translation keys", () => {
+  // <esphome-firmware-jobs-dialog> renders `firmware_jobs.status_${job.status}`.
+  it.each(Object.values(JobStatus))("defines a label for the %s job status", (status) => {
+    const key = `status_${status}`;
+    expect(firmwareJobs[key], `missing en.json key "firmware_jobs.${key}"`).toBeTruthy();
+  });
+});
+
+describe("command dialog translation keys", () => {
+  // <esphome-command-dialog> renders `command.${this._commandType}_title`,
+  // as well as the dynamic `_success` and `_failed` banner states.
   const COMMAND_TYPES: Record<CommandType, true> = {
     install: true,
     compile: true,
+    offline_compile: true,
     validate: true,
     clean: true,
     reset: true,
@@ -34,10 +44,25 @@ describe("command dialog title translation keys", () => {
   };
 
   it.each(Object.keys(COMMAND_TYPES))(
-    "defines a title for the %s command",
+    "defines title, success, and failed keys for the %s command",
     (commandType) => {
-      const key = `${commandType}_title`;
-      expect(command[key], `missing en.json key "command.${key}"`).toBeTruthy();
+      const titleKey = `${commandType}_title`;
+      const failedKey = `${commandType}_failed`;
+
+      expect(command[titleKey], `missing en.json key "command.${titleKey}"`).toBeTruthy();
+      expect(
+        command[failedKey],
+        `missing en.json key "command.${failedKey}"`
+      ).toBeTruthy();
+
+      // The rename command does not use a standard _success translation key
+      if (commandType !== "rename") {
+        const successKey = `${commandType}_success`;
+        expect(
+          command[successKey],
+          `missing en.json key "command.${successKey}"`
+        ).toBeTruthy();
+      }
     }
   );
 });

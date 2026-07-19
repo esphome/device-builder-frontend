@@ -8,18 +8,11 @@ import {
   nextSplitRatioForKey,
   saveSplitRatio,
 } from "../../src/util/split-ratio.js";
+import { stubStorage, stubThrowingStorage } from "../_storage.js";
 
 describe("split-ratio", () => {
-  // Mirrors the auth-token.test.ts pattern: vitest runs in node, so
-  // localStorage has to be stubbed per-test.
   beforeEach(() => {
-    const store = new Map<string, string>();
-    vi.stubGlobal("localStorage", {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => store.set(k, v),
-      removeItem: (k: string) => store.delete(k),
-      clear: () => store.clear(),
-    });
+    stubStorage("localStorage");
   });
 
   afterEach(() => {
@@ -71,20 +64,7 @@ describe("split-ratio", () => {
 
   it("tolerates localStorage throwing on read and write", () => {
     // Private mode / sandboxed iframes can throw on every access.
-    vi.stubGlobal("localStorage", {
-      getItem: () => {
-        throw new Error("blocked");
-      },
-      setItem: () => {
-        throw new Error("blocked");
-      },
-      removeItem: () => {
-        throw new Error("blocked");
-      },
-      clear: () => {
-        throw new Error("blocked");
-      },
-    });
+    stubThrowingStorage("localStorage");
     expect(() => saveSplitRatio(0.6)).not.toThrow();
     expect(loadSplitRatio()).toBe(DEFAULT_SPLIT_RATIO);
   });

@@ -6,6 +6,7 @@ import { localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
+import { fireEvent } from "../../util/fire-event.js";
 
 /** Terminal result of a bundle import that left some existing files in
  *  place, so a partial import reads as partial rather than a silent
@@ -81,7 +82,7 @@ export class ESPHomeWizardStepImportPartial extends LitElement {
   }
 
   private _open() {
-    this.dispatchEvent(new CustomEvent("open-device", { bubbles: true, composed: true }));
+    fireEvent(this, "open-device");
   }
 }
 

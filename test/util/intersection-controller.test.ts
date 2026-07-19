@@ -1,36 +1,31 @@
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { IntersectionController } from "../../src/util/intersection-controller.js";
+import {
+  IntersectionController,
+  type IntersectionControllerOptions,
+} from "../../src/util/intersection-controller.js";
 import { FakeHost } from "../_fake-host.js";
+import { MockObserver } from "../_intersection-observer.js";
 
-class MockObserver {
-  static instances: MockObserver[] = [];
-  observed: Element[] = [];
-  disconnected = false;
-  constructor(
-    public cb: IntersectionObserverCallback,
-    public options?: IntersectionObserverInit
-  ) {
-    MockObserver.instances.push(this);
+class SentinelHost extends FakeHost {
+  renderRoot = document.createElement("div");
+  addSentinel(): HTMLElement {
+    const sentinel = document.createElement("div");
+    sentinel.className = "sentinel";
+    this.renderRoot.appendChild(sentinel);
+    return sentinel;
   }
-  observe(el: Element) {
-    this.observed.push(el);
-  }
-  unobserve() {}
-  disconnect() {
-    this.disconnected = true;
-  }
-  takeRecords() {
-    return [];
-  }
-  trigger(isIntersecting: boolean) {
-    this.cb(
-      [{ isIntersecting, target: this.observed[0] } as IntersectionObserverEntry],
-      this as unknown as IntersectionObserver
-    );
+  removeSentinel() {
+    this.renderRoot.querySelector(".sentinel")?.remove();
   }
 }
 
-const el = (id: string) => ({ id }) as unknown as Element;
+function setup(options?: IntersectionControllerOptions) {
+  const host = new SentinelHost();
+  const onIntersect = vi.fn();
+  const ctrl = new IntersectionController(host, onIntersect, options);
+  return { host, ctrl, onIntersect };
+}
 
 beforeEach(() => {
   MockObserver.instances = [];
@@ -42,64 +37,89 @@ afterEach(() => {
 });
 
 describe("IntersectionController", () => {
-  it("invokes the callback only when the sentinel is intersecting", () => {
-    const onIntersect = vi.fn();
-    const ctrl = new IntersectionController(new FakeHost(), onIntersect);
-    const target = el("sentinel");
-    ctrl.observe(target, null, "200px");
+  it("observes the sentinel against the viewport with the 200px default margin", () => {
+    const { host, ctrl } = setup();
+    const sentinel = host.addSentinel();
+    ctrl.hostUpdated();
 
     const obs = MockObserver.instances[0];
-    expect(obs.observed).toEqual([target]);
+    expect(obs.observed).toEqual([sentinel]);
     expect(obs.options).toMatchObject({ root: null, rootMargin: "200px" });
+  });
 
+  it("invokes the callback only when the sentinel is intersecting", () => {
+    const { host, ctrl, onIntersect } = setup();
+    host.addSentinel();
+    ctrl.hostUpdated();
+
+    const obs = MockObserver.instances[0];
     obs.trigger(false);
     expect(onIntersect).not.toHaveBeenCalled();
     obs.trigger(true);
     expect(onIntersect).toHaveBeenCalledTimes(1);
   });
 
-  it("re-observing the same target is a no-op; a new target replaces the observer", () => {
-    const ctrl = new IntersectionController(new FakeHost(), vi.fn());
-    const a = el("a");
-    ctrl.observe(a, null);
-    ctrl.observe(a, null);
+  it("resolves rootSelector to the scroll container", () => {
+    const { host, ctrl } = setup({ rootSelector: ".board-list" });
+    const scrollBox = document.createElement("div");
+    scrollBox.className = "board-list";
+    host.renderRoot.appendChild(scrollBox);
+    host.addSentinel();
+    ctrl.hostUpdated();
+
+    expect(MockObserver.instances[0].options).toMatchObject({ root: scrollBox });
+  });
+
+  it("honours a rootMargin override", () => {
+    const { host, ctrl } = setup({ rootMargin: "50px" });
+    host.addSentinel();
+    ctrl.hostUpdated();
+
+    expect(MockObserver.instances[0].options).toMatchObject({ rootMargin: "50px" });
+  });
+
+  it("creates no observer while the sentinel is absent", () => {
+    const { ctrl } = setup();
+    ctrl.hostUpdated();
+    expect(MockObserver.instances).toHaveLength(0);
+  });
+
+  it("repeat updates with the same sentinel are a no-op", () => {
+    const { host, ctrl } = setup();
+    host.addSentinel();
+    ctrl.hostUpdated();
+    ctrl.hostUpdated();
     expect(MockObserver.instances).toHaveLength(1);
+  });
 
-    const b = el("b");
-    ctrl.observe(b, null);
+  it("a re-rendered sentinel node replaces the observer", () => {
+    const { host, ctrl } = setup();
+    host.addSentinel();
+    ctrl.hostUpdated();
+
+    host.removeSentinel();
+    const next = host.addSentinel();
+    ctrl.hostUpdated();
+
     expect(MockObserver.instances).toHaveLength(2);
     expect(MockObserver.instances[0].disconnected).toBe(true);
-    expect(MockObserver.instances[1].observed).toEqual([b]);
+    expect(MockObserver.instances[1].observed).toEqual([next]);
   });
 
-  it("re-observes the same target when root or rootMargin changes", () => {
-    const ctrl = new IntersectionController(new FakeHost(), vi.fn());
-    const a = el("a");
-    ctrl.observe(a, null, "0px");
-    ctrl.observe(a, null, "200px");
-    expect(MockObserver.instances).toHaveLength(2);
+  it("tears down when the sentinel leaves the DOM", () => {
+    const { host, ctrl } = setup();
+    host.addSentinel();
+    ctrl.hostUpdated();
+
+    host.removeSentinel();
+    ctrl.hostUpdated();
     expect(MockObserver.instances[0].disconnected).toBe(true);
-    expect(MockObserver.instances[1].options).toMatchObject({ rootMargin: "200px" });
-  });
-
-  it("observeIfPresent tears down when the target is missing", () => {
-    const ctrl = new IntersectionController(new FakeHost(), vi.fn());
-    ctrl.observe(el("a"), null);
-    ctrl.observeIfPresent(null, null);
-    expect(MockObserver.instances[0].disconnected).toBe(true);
-  });
-
-  it("observeIfPresent observes against a null (viewport) root", () => {
-    const ctrl = new IntersectionController(new FakeHost(), vi.fn());
-    const target = el("sentinel");
-    ctrl.observeIfPresent(target, null, "200px");
-    expect(MockObserver.instances[0].observed).toEqual([target]);
-    expect(MockObserver.instances[0].options).toMatchObject({ root: null });
   });
 
   it("disconnects the observer on host disconnect", () => {
-    const ctrl = new IntersectionController(new FakeHost(), vi.fn());
-    ctrl.observe(el("a"), null);
+    const { host, ctrl } = setup();
+    host.addSentinel();
+    ctrl.hostUpdated();
     ctrl.hostDisconnected();
     expect(MockObserver.instances[0].disconnected).toBe(true);
   });

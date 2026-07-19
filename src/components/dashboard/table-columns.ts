@@ -7,6 +7,7 @@ import { JobStatus } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
 import { busyActionLabel, updateActionTitle } from "../../util/update-tooltip.js";
@@ -73,9 +74,7 @@ const RECENT_LABEL_KEY: Record<JobStatus, string> = {
 
 const dispatchRowEvent = (e: Event, name: string, device: ConfiguredDevice) => {
   e.stopPropagation();
-  (e.currentTarget as HTMLElement).dispatchEvent(
-    new CustomEvent(name, { detail: device, bubbles: true, composed: true })
-  );
+  fireEvent(e.currentTarget as HTMLElement, name, device);
 };
 
 // One "no data" placeholder for every column. Rendered in the muted

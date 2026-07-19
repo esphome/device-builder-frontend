@@ -5,6 +5,7 @@ import {
   mdiOpenInNew,
   mdiPartyPopper,
   mdiPlusCircleOutline,
+  mdiUsb,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -19,6 +20,7 @@ import {
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
 import { boardImageUrl, onBoardImageError } from "../../util/board-image.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
@@ -52,6 +54,7 @@ registerMdiIcons({
   close: mdiClose,
   "party-popper": mdiPartyPopper,
   "plus-circle-outline": mdiPlusCircleOutline,
+  usb: mdiUsb,
 });
 
 /** The three top-level section groups the navigator can expand. */
@@ -255,13 +258,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   /** Re-emit the picker's selection as a page-level `change-board`. */
   private _onSelectBoard = (e: CustomEvent<{ boardId: string }>) => {
     e.stopPropagation();
-    this.dispatchEvent(
-      new CustomEvent("change-board", {
-        detail: e.detail,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "change-board", e.detail);
   };
 
   static styles = [espHomeStyles, deviceBoardInfoStyles];
@@ -485,13 +482,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    * page's state shape from in here.
    */
   private _onShowNavSection(section: NavSectionName) {
-    this.dispatchEvent(
-      new CustomEvent("nav-section-show", {
-        detail: { section },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "nav-section-show", { section });
   }
 
   /**
@@ -511,6 +502,17 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
           })}
         </p>
         <p class="welcome-banner-text">${this._localize("device.welcome_banner_body")}</p>
+        <p class="welcome-banner-text">
+          ${this._localize("device.welcome_banner_first_install")}
+        </p>
+        <button
+          type="button"
+          class="action-item welcome-banner-install"
+          @click=${this._onWelcomeInstall}
+        >
+          <wa-icon library="mdi" name="usb"></wa-icon>
+          ${this._localize("device.welcome_banner_install_button")}
+        </button>
         <button
           type="button"
           class="welcome-banner-close"
@@ -524,12 +526,11 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   }
 
   private _onDismissWelcome() {
-    this.dispatchEvent(
-      new CustomEvent("just-created-dismiss", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "just-created-dismiss");
+  }
+
+  private _onWelcomeInstall() {
+    fireEvent(this, "request-install");
   }
 }
 

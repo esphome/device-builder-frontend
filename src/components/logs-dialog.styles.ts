@@ -44,8 +44,6 @@ export const logsDialogStyles = css`
        (full value stays on the title tooltip). */
     flex-shrink: 0;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
     padding: 1px 8px;
     border-radius: 999px;
     font-family: var(--term-mono-font);
@@ -54,7 +52,6 @@ export const logsDialogStyles = css`
     color: var(--esphome-on-primary);
     background: color-mix(in srgb, var(--esphome-on-primary) 16%, transparent);
     border: 1px solid color-mix(in srgb, var(--esphome-on-primary) 32%, transparent);
-    white-space: nowrap;
   }
   esphome-base-dialog::part(footer) {
     display: none;

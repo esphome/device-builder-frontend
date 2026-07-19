@@ -45,9 +45,6 @@ export const deviceNavigatorStyles = css`
        line-height 1 clipped the descender 'g' (#827) and left this header about
        0.4px shorter than the editor's, offsetting the divider by a pixel. */
     line-height: var(--wa-line-height-normal);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     min-width: 0;
   }
 
@@ -285,9 +282,6 @@ export const deviceNavigatorStyles = css`
     margin: 0;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-semibold);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .nav-item-subtitle {
@@ -296,9 +290,6 @@ export const deviceNavigatorStyles = css`
     font-weight: normal;
     margin: 0;
     line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   /* Error-count pill on a row (or a collapsed subgroup header) whose

@@ -36,6 +36,7 @@ import {
   quietCloseButtonStyles,
 } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import {
   labelChipStyles,
@@ -116,6 +117,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
   static styles = [
     espHomeStyles,
+    textStyles,
     labelChipStyles,
     labelsListStyles,
     // Neutral header + title + quiet close button (shared) — dialog-chrome.ts.
@@ -277,7 +279,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         ${assigned.map(
           (label) =>
             html`<span
-              class="label-chip assigned-chip"
+              class="label-chip assigned-chip truncate"
               style=${labelChipStyleString(label.color)}
               title=${label.name}
               >${label.name}<button

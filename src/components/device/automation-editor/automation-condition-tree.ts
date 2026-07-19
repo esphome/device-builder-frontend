@@ -33,6 +33,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
@@ -201,7 +202,9 @@ export class ESPHomeAutomationConditionTree extends LitElement {
             ?disabled=${this.disabled}
             @click=${() => this._openPickerForChange(idx)}
           >
-            <span class="ae-row-picker-name"> ${def?.name ?? node.condition_id} </span>
+            <span class="ae-row-picker-name truncate">
+              ${def?.name ?? node.condition_id}
+            </span>
             <wa-icon library="mdi" name="pencil-outline"></wa-icon>
           </button>
           <div class="ae-row-controls">
@@ -386,13 +389,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   }
 
   private _emit(conditions: ConditionNode[]) {
-    this.dispatchEvent(
-      new CustomEvent("conditions-change", {
-        detail: { conditions },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "conditions-change", { conditions });
   }
 }
 

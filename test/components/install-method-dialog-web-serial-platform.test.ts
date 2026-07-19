@@ -9,30 +9,19 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+import "../_mock-webawesome.js";
+
+vi.mock("@home-assistant/webawesome/dist/components/callout/callout.js", () => ({}));
 
 import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
+import {
+  restoreWebSerialEnv,
+  setLocalhostWithWebSerial,
+} from "./_install-method-dialog-env.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const origSerial = Object.getOwnPropertyDescriptor(navigator, "serial");
-const origSecure = Object.getOwnPropertyDescriptor(window, "isSecureContext");
-const origLocation = Object.getOwnPropertyDescriptor(window, "location");
-
-// Localhost, secure, Web Serial available — the case where server-serial is
-// normally dropped in favour of Web Serial.
-function setLocalhostWithWebSerial() {
-  Object.defineProperty(navigator, "serial", { configurable: true, value: {} });
-  Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
-  Object.defineProperty(window, "location", {
-    configurable: true,
-    value: { hostname: "localhost", href: "http://localhost:6052/" },
-  });
-}
-
 async function mount(platform: string): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
   (dialog as any)._localize = defaultLocalize;
@@ -57,11 +46,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (origSerial) Object.defineProperty(navigator, "serial", origSerial);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  else if ("serial" in navigator) delete (navigator as any).serial;
-  if (origSecure) Object.defineProperty(window, "isSecureContext", origSecure);
-  if (origLocation) Object.defineProperty(window, "location", origLocation);
+  restoreWebSerialEnv();
   vi.restoreAllMocks();
 });
 

@@ -23,6 +23,7 @@ import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { runBulkUpdate } from "../util/bulk-update.js";
 import { applyFacetFilters, type FacetSelection } from "../util/device-filter.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { renderFacetSections } from "./filters/facet-sections.js";
 
@@ -77,10 +78,9 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   private _activeJobs: Map<string, FirmwareJob> = new Map();
 
   @state()
-  private _open = false;
-
-  @state()
   private _selection: FacetSelection = defaultSelection();
+
+  private readonly _dialog = new DialogOpenController(this);
 
   // Memoized like the dashboard's facet pipeline so a re-render (or the
   // confirm read) over a large fleet doesn't refilter / re-tally on every
@@ -125,7 +125,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
 
   async open() {
     this._selection = defaultSelection();
-    this._open = true;
+    this._dialog.open = true;
     // Sections only exist after the open render; default-expand the two
     // facets carrying pre-checks. The helper doesn't bind `expanded`, so
     // these toggles are imperative and survive re-renders (as the popover
@@ -137,7 +137,7 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
 
   private _sectionEls(): (HTMLElement & { expanded: boolean })[] {
@@ -147,10 +147,6 @@ export class ESPHomeUpdateAllDialog extends LitElement {
       ) ?? []
     );
   }
-
-  private _onAfterHide = (): void => {
-    this._open = false;
-  };
 
   private _onSectionToggle = (e: Event): void => {
     const target = e.target;
@@ -184,17 +180,17 @@ export class ESPHomeUpdateAllDialog extends LitElement {
   protected render() {
     // Keep one <esphome-base-dialog> so a close flips ?open reactively and
     // wa-dialog's exit animation plays on every path. Gate only the body +
-    // the facet/match compute on _open — this is a persistent child on the
-    // hot `devices` context, so nothing should recompute while closed.
-    const matched = this._open ? this._matched() : [];
+    // the facet/match compute on the open flag — this is a persistent child
+    // on the hot `devices` context, so nothing should recompute while closed.
+    const matched = this._dialog.open ? this._matched() : [];
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("update_all_dialog.title")}
-        @after-hide=${this._onAfterHide}
+        @after-hide=${this._dialog.onAfterHide}
       >
         ${
-          this._open
+          this._dialog.open
             ? html`
                 <div class="sections" @filter-section-toggle=${this._onSectionToggle}>
                   ${renderFacetSections({

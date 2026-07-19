@@ -2,7 +2,10 @@ import { mdiDelete, mdiPencil, mdiPlus } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
+import { emptyStateStyles } from "../../styles/empty-state.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { deviceSectionAutomationListStyles } from "./device-section-automation-list.styles.js";
 
@@ -38,7 +41,12 @@ export interface AutomationListRow {
  */
 @customElement("esphome-section-automation-list")
 export class ESPHomeSectionAutomationList extends LitElement {
-  static styles = [espHomeStyles, deviceSectionAutomationListStyles];
+  static styles = [
+    espHomeStyles,
+    emptyStateStyles,
+    textStyles,
+    deviceSectionAutomationListStyles,
+  ];
 
   @property()
   heading = "";
@@ -84,13 +92,13 @@ export class ESPHomeSectionAutomationList extends LitElement {
           ? // Only paint the placeholder when there's copy for it — a blank
             // dashed box + empty ARIA status would just be noise otherwise.
             this.emptyText !== undefined
-            ? html`<p class="empty" role="status">${this.emptyText}</p>`
+            ? html`<p class="empty-message--dashed" role="status">${this.emptyText}</p>`
             : nothing
           : html`<ul class="rows">
               ${this.rows.map(
                 (row) =>
                   html`<li class="row">
-                    <span class="name">${row.label}</span>
+                    <span class="name truncate">${row.label}</span>
                     <div class="row-buttons">
                       <button
                         type="button"
@@ -121,13 +129,11 @@ export class ESPHomeSectionAutomationList extends LitElement {
   }
 
   private _onAdd = () => {
-    this.dispatchEvent(new CustomEvent("add", { bubbles: true, composed: true }));
+    fireEvent(this, "add");
   };
 
   private _emit(type: "edit" | "delete", key: string) {
-    this.dispatchEvent(
-      new CustomEvent(type, { detail: { key }, bubbles: true, composed: true })
-    );
+    fireEvent(this, type, { key });
   }
 }
 

@@ -29,6 +29,11 @@ export const espHomeStyles = css`
     --esphome-focus-ring-tight: 0 0 0 2px
       color-mix(in srgb, var(--esphome-primary), transparent 70%);
 
+    /* Outline sibling of the rings, for :focus-visible on plain
+       controls. Used as the full outline value; outline-offset stays
+       per site. */
+    --esphome-focus-outline: 2px solid var(--esphome-primary);
+
     /* Hover affordance for clickable rows / cards / option tiles: a primary
        ring plus the focus-ring glow, matching a focused input. Bundled into
        one box-shadow (inset ring + outer glow) so a :hover only sets

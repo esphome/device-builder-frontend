@@ -29,6 +29,7 @@ import {
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
+import { fireEvent } from "../util/fire-event.js";
 import { LogBuffer } from "../util/log-buffer.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
@@ -86,6 +87,8 @@ export type InstallStep =
 
 export type Installer = "web-serial" | "binary-download" | "web-flash" | null;
 
+export type InstallFailureKind = "compile" | "validate" | "chip-mismatch" | null;
+
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -122,13 +125,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _statusMessage = "";
   @state() _errorMessage = "";
 
-  // Drives the reset-build-env hint — only build failures benefit; chip
-  // mismatch / Web Serial connection errors don't.
-  @state() _failedDuringCompile = false;
-
-  // Flips when output contains an ESPHome validation marker, swapping the
-  // hint from clean/reset (C++ help) to "open in editor" (YAML help).
-  @state() _failedDuringValidate = false;
+  // What made the install fail, when a specific kind was recognised.
+  // "compile" drives the reset-build-env hint, "validate" swaps that hint to
+  // "open in editor" (YAML help), "chip-mismatch" swaps the footer's Retry
+  // (which would loop on the same stale board) for a change-board hand-off.
+  // null: no failure, or an unclassified one (e.g. Web Serial connection).
+  @state() _failureKind: InstallFailureKind = null;
 
   // Source of the most recent compile job. REMOTE means the toolchain lives
   // on a paired receiver, so the local "reset build environment" link can't
@@ -280,8 +282,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._binaries = [];
     this._showLogsAfterInstall = true;
     this._installer = null;
-    this._failedDuringCompile = false;
-    this._failedDuringValidate = false;
+    this._failureKind = null;
     this._jobSource = JobSource.LOCAL;
     this._jobSourceLabel = "";
     this._jobSourcePin = "";
@@ -337,13 +338,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _tryOpenBuildOffloadSettings = () => {
     this._detachStream({ cancelJob: false });
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-settings", {
-        detail: { section: "build_offload" },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "open-settings", { section: "build_offload" });
   };
 
   // Drop into red error state. detail is optional — render skips it entirely
@@ -363,13 +358,17 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     const device = this._device;
     this._close();
     if (!device) return;
-    this.dispatchEvent(
-      new CustomEvent("request-open-editor", {
-        detail: { configuration: device.configuration },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "request-open-editor", { configuration: device.configuration });
+  };
+
+  // Chip-mismatch recovery: close and hand off to the host page's board
+  // reselect flow. Closing first is deliberate — the dialog's _device
+  // snapshot is stale after a board change; a fresh install re-reads state.
+  _tryChangeBoard = () => {
+    const device = this._device;
+    this._close();
+    if (!device) return;
+    fireEvent(this, "request-change-board", { configuration: device.configuration });
   };
 
   // Per-device clean: dashboard routes through command-dialog's clean flow.
@@ -377,20 +376,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     const device = this._device;
     this._close();
     if (!device) return;
-    this.dispatchEvent(
-      new CustomEvent("clean-build", {
-        detail: device,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "clean-build", device);
   };
 
   _tryResetBuildEnv = () => {
     this._close();
-    this.dispatchEvent(
-      new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
-    );
+    fireEvent(this, "open-reset-build-env");
   };
 
   _tryResetRemoteBuildEnv = (pin: string) => {
@@ -457,7 +448,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     // _detachStream already clears _jobId (and cancels the backend job +
     // settles any pending compile promise) — no need to clear it here.
     this._detachStream();
-    this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
+    fireEvent(this, "close");
   };
 
   // Flip _open the moment a close is requested (X / Escape / outside-click) so

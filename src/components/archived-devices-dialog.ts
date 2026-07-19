@@ -8,7 +8,10 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { textStyles } from "../styles/text.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { getErrorMessage } from "../util/error-message.js";
+import { fireEvent } from "../util/fire-event.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 
@@ -57,12 +60,14 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
   @state() private _devices: ArchivedDevice[] = [];
   @state() private _loading = false;
   @state() private _error: string | null = null;
-  @state() private _open = false;
+
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
     // Shared .btn / .btn--cancel chrome for the footer Close button.
     dialogActionButtonStyles,
+    textStyles,
     css`
       esphome-base-dialog {
         --width: 560px;
@@ -137,27 +142,18 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
         color: var(--wa-color-text-normal);
         font-weight: var(--wa-font-weight-bold);
         font-size: var(--wa-font-size-m);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .row-config {
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-2xs);
         font-family: var(--wa-font-family-code);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .row-comment {
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-xs);
         font-style: italic;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .row-actions {
@@ -221,21 +217,13 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
 
   /** Open the dialog and (re)fetch the archive list. */
   async open() {
-    this._open = true;
+    this._dialog.open = true;
     await this.refresh();
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  private _onAfterHide = (): void => {
-    // <esphome-base-dialog> re-emits after-hide for every
-    // dismissal path (Esc / outside-click / X / reactive
-    // ?open flip). Flip our local open flag so the next
-    // render's ?open binding matches.
-    this._open = false;
-  };
 
   /** Re-pull the list. Caller invokes after unarchive / delete to
    *  reflect the new state without closing the dialog. */
@@ -257,9 +245,9 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
   protected render() {
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("dashboard.archived_dialog_title")}
-        @after-hide=${this._onAfterHide}
+        @after-hide=${this._dialog.onAfterHide}
       >
         <div class="body">
           <p class="desc">${this._localize("dashboard.archived_dialog_desc")}</p>
@@ -294,11 +282,11 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
         (device) => html`
           <div class="row">
             <div class="row-info">
-              <div class="row-name">${device.friendly_name || device.name}</div>
-              <div class="row-config">${device.configuration}</div>
+              <div class="row-name truncate">${device.friendly_name || device.name}</div>
+              <div class="row-config truncate">${device.configuration}</div>
               ${
                 device.comment
-                  ? html`<div class="row-comment">${device.comment}</div>`
+                  ? html`<div class="row-comment truncate">${device.comment}</div>`
                   : nothing
               }
             </div>
@@ -327,23 +315,11 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
   }
 
   private _unarchive(device: ArchivedDevice) {
-    this.dispatchEvent(
-      new CustomEvent("unarchive", {
-        detail: device,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "unarchive", device);
   }
 
   private _deletePermanently(device: ArchivedDevice) {
-    this.dispatchEvent(
-      new CustomEvent("delete-archived", {
-        detail: device,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "delete-archived", device);
   }
 }
 

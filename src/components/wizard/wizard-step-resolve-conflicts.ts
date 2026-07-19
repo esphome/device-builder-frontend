@@ -5,6 +5,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 
 /** Lets the user choose which bundle files overwrite the ones already on
  *  disk. Unchecked files are kept; secrets.yaml is always merged and is
@@ -169,23 +170,11 @@ export class ESPHomeWizardStepResolveConflicts extends LitElement {
   }
 
   private _cancel() {
-    this.dispatchEvent(
-      new CustomEvent("next-step", {
-        detail: "method",
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "next-step", "method");
   }
 
   private _confirm() {
-    this.dispatchEvent(
-      new CustomEvent("resolve-conflicts", {
-        detail: { overwrite: [...this._overwrite] },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "resolve-conflicts", { overwrite: [...this._overwrite] });
   }
 }
 

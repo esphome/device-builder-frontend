@@ -120,7 +120,7 @@ export const deviceGridStyles = css`
     opacity: 1;
   }
   .discovered-section-toggle:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 2px;
     opacity: 1;
   }
@@ -309,9 +309,6 @@ export const deviceGridStyles = css`
   }
 
   .table-create-btn .label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     /* Flex item must allow shrinking below its intrinsic width or the
        ellipsis never triggers when the mobile row gets tight. */
     min-width: 0;

@@ -20,6 +20,7 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { textStyles } from "../styles/text.js";
 import { type CrashKind, classifyLine } from "../util/crash-detector.js";
 import { normalizeLogLine } from "../util/log-line.js";
 import { initialDarkMode } from "../util/dark-mode.js";
@@ -172,6 +173,7 @@ export class ESPHomeLogsDialog extends LitElement {
     primaryDialogHeaderStyles,
     termTokens,
     termButtonStyles,
+    textStyles,
     logsDialogStyles,
     // Full-screen on mobile, terminal fills it.
     fullscreenMobileDialog("esphome-base-dialog"),
@@ -257,7 +259,9 @@ export class ESPHomeLogsDialog extends LitElement {
         @request-close=${this._onDialogRequestClose}
         @after-hide=${this._onDialogHide}
       >
-        <span slot="header-suffix" class="source-chip" title=${source}>${source}</span>
+        <span slot="header-suffix" class="source-chip truncate" title=${source}
+          >${source}</span
+        >
         <esphome-process-terminal
           .lines=${this._log.lines}
           placeholder=${this._localize("dashboard.logs_placeholder")}

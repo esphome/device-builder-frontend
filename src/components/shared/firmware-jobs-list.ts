@@ -7,7 +7,7 @@ import {
 } from "../../api/types/firmware-jobs.js";
 import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
-import { effectiveJobType } from "../../util/firmware-job-display.js";
+import { firmwareJobTypeLabel } from "../../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
 import {
@@ -103,9 +103,9 @@ export function renderGroups(
 
 function renderJob(host: FirmwareJobsListHost, job: FirmwareJob): TemplateResult {
   const name = host._jobDisplayName(job);
-  const effectiveType = effectiveJobType(job);
-  const typeIcon = TYPE_ICONS[effectiveType] ?? "hammer-wrench";
-  const typeLabel = host._localize(`firmware_jobs.type_${effectiveType}`);
+  const typeIcon = TYPE_ICONS[job.job_type] ?? "hammer-wrench";
+  const typeLabel = firmwareJobTypeLabel(job, host._localize);
+
   const showProgress =
     job.status === JobStatus.RUNNING && typeof job.progress === "number";
   const terminal = isTerminal(job);
@@ -116,7 +116,7 @@ function renderJob(host: FirmwareJobsListHost, job: FirmwareJob): TemplateResult
         <wa-icon library="mdi" name=${typeIcon}></wa-icon>
       </div>
       <div class="job-content">
-        <div class="job-name">${name}</div>
+        <div class="job-name truncate">${name}</div>
         <div class="job-meta">
           <span>${typeLabel}</span>
           <span>•</span>

@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import { followJob } from "../../src/components/command-dialog/commands.js";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { makeCommandDialogHost as makeHost } from "./_command-dialog-host.js";
 
@@ -80,6 +81,38 @@ describe("command-dialog deferred install follow", () => {
     });
 
     expect(host._state).toBe("success");
+    expect(host._statusMessage).toBe("dashboard.queued_successfully");
+  });
+
+  it("tells a never-flashed device's owner to plug in via USB", () => {
+    const { host, follows } = lonelyCompileHost();
+    // makeConfiguredDevice defaults are UNKNOWN + no deploy evidence.
+    host._devices = [makeConfiguredDevice()];
+    host._jobId = "c1";
+    followJob(host, "c1");
+    follows.c1.onResult({
+      status: JobStatus.COMPLETED,
+      exit_code: 0,
+      queued_update_armed: true,
+    });
+
+    expect(host._state).toBe("success");
+    expect(host._statusMessage).toBe("dashboard.queued_first_install");
+  });
+
+  it("keeps the generic queued copy once the device has deploy evidence", () => {
+    const { host, follows } = lonelyCompileHost();
+    host._devices = [
+      makeConfiguredDevice({ runtime_state: { deployed_version: "2026.6.0" } }),
+    ];
+    host._jobId = "c1";
+    followJob(host, "c1");
+    follows.c1.onResult({
+      status: JobStatus.COMPLETED,
+      exit_code: 0,
+      queued_update_armed: true,
+    });
+
     expect(host._statusMessage).toBe("dashboard.queued_successfully");
   });
 

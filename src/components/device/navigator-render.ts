@@ -91,8 +91,12 @@ function renderNavRow(row: NavRow, v: NavSectionView, showIcon: boolean): Templa
     >
       ${showIcon ? renderRowGlyph(domain) : nothing}
       <div class="nav-item-content">
-        <p>${primary}</p>
-        ${secondary ? html`<span class="nav-item-subtitle">${secondary}</span>` : nothing}
+        <p class="truncate">${primary}</p>
+        ${
+          secondary
+            ? html`<span class="nav-item-subtitle truncate">${secondary}</span>`
+            : nothing
+        }
       </div>
       ${errors > 0 ? renderErrorBadge(errors, v) : nothing}
       <wa-icon class="nav-item-chevron" library="mdi" name="chevron-right"></wa-icon>

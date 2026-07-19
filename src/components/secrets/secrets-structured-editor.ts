@@ -15,6 +15,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { modalDialogStyles } from "../../styles/modal-dialog.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { navigate } from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -395,9 +396,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     // misattribute to whatever row now sits at that line; clear it.
     this._keyError = null;
     this.value = value;
-    this.dispatchEvent(
-      new CustomEvent("yaml-change", { detail: { value }, bubbles: true, composed: true })
-    );
+    fireEvent(this, "yaml-change", { value });
   }
 }
 

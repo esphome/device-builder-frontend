@@ -2,16 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
-import type { ReactiveControllerHost } from "lit";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type { AvailableAutomations } from "../../../../src/api/types/automations.js";
 import { CatalogLoadController } from "../../../../src/components/device/automation-editor/catalog-load-controller.js";
 import { _clearAutomationBodyCache } from "../../../../src/util/automation-body-cache.js";
 import { identityLocalize } from "../../../_dom.js";
+import { fakeHost } from "../../../_fake-host.js";
 
 const localize = identityLocalize as never;
-const stubHost = () => ({ addController: vi.fn() }) as unknown as ReactiveControllerHost;
+const stubHost = fakeHost;
 
 const emptySlim = (): AvailableAutomations =>
   ({

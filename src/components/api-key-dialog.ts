@@ -7,6 +7,7 @@ import { localizeContext } from "../context/index.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
+import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -31,8 +32,7 @@ export class ESPHomeApiKeyDialog extends LitElement {
   @state()
   private _visible = false;
 
-  @state()
-  private _open = false;
+  private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
     espHomeStyles,
@@ -108,27 +108,19 @@ export class ESPHomeApiKeyDialog extends LitElement {
   open(key: string) {
     this.apiKey = key;
     this._visible = false;
-    this._open = true;
+    this._dialog.open = true;
   }
 
   close() {
-    this._open = false;
+    this._dialog.open = false;
   }
-
-  private _onAfterHide = (): void => {
-    // <esphome-base-dialog> re-emits after-hide for every
-    // dismissal path (Esc / outside-click / X / reactive
-    // ?open flip). Flip our local open flag so the next
-    // render's ?open binding matches.
-    this._open = false;
-  };
 
   protected render() {
     return html`
       <esphome-base-dialog
-        ?open=${this._open}
+        ?open=${this._dialog.open}
         .label=${this._localize("dashboard.action_api_key_title")}
-        @after-hide=${this._onAfterHide}
+        @after-hide=${this._dialog.onAfterHide}
       >
         <div class="content">
           ${this.apiKey ? this._renderKey() : this._renderNoKey()}

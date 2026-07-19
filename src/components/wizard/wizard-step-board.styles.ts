@@ -27,16 +27,6 @@ export const wizardStepBoardStyles = css`
     margin-top: calc(-1 * var(--wa-space-2xs));
   }
 
-  .helper-link {
-    border: none;
-    padding: 0;
-    background: none;
-    color: var(--esphome-primary);
-    cursor: pointer;
-    text-decoration: underline;
-    font: inherit;
-  }
-
   .helper-link:hover {
     text-decoration: none;
   }
@@ -228,13 +218,6 @@ export const wizardStepBoardStyles = css`
     overflow-wrap: anywhere;
   }
 
-  .board-description--clamp {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
   .tags {
     display: flex;
     flex-wrap: wrap;
@@ -282,7 +265,7 @@ export const wizardStepBoardStyles = css`
   }
 
   .select-board:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 3px;
   }
 

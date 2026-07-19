@@ -47,6 +47,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { textStyles } from "../../../styles/text.js";
 import { DialogOpenController } from "../../../util/dialog-open-controller.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
@@ -118,6 +119,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    textStyles,
     css`
       esphome-base-dialog {
         --width: 640px;
@@ -247,12 +249,6 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         font-size: var(--wa-font-size-2xs);
         color: var(--wa-color-text-quiet);
         line-height: 1.4;
-        /* Clamp to two lines — descriptions can be long but the
-           picker shouldn't grow each row past a manageable height. */
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
       }
 
       .picker-row-add {
@@ -505,7 +501,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         <span class="picker-row-title">${item.name}</span>
         ${
           item.description
-            ? html`<span class="picker-row-desc">
+            ? html`<span class="picker-row-desc line-clamp-2">
                 ${renderMarkdown(item.description)}
               </span>`
             : nothing

@@ -77,4 +77,17 @@ export const changeBoardDialogStyles = css`
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
   }
+
+  /* Compact override of the shared .load-more-loading default: dialog
+     spacing, no font-size bump. */
+  .load-more-loading-compact {
+    text-align: center;
+    color: var(--wa-color-text-quiet);
+    padding: var(--wa-space-m);
+  }
+
+  /* Chrome comes from the shared inputStyles sheet; only layout here. */
+  .board-search {
+    margin-bottom: var(--wa-space-s);
+  }
 `;

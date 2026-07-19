@@ -4,20 +4,12 @@ import {
   saveDashboardFilters,
   STORAGE_KEY,
 } from "../../src/util/dashboard-filters-session.js";
+import { stubStorage, stubThrowingStorage } from "../_storage.js";
 
 describe("dashboard-filters-session", () => {
-  // The vitest config runs in the ``node`` environment which has no
-  // ``sessionStorage``; a tiny in-memory Map stand-in covers the three
-  // methods the helper uses.
   let store: Map<string, string>;
   beforeEach(() => {
-    store = new Map<string, string>();
-    vi.stubGlobal("sessionStorage", {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => store.set(k, v),
-      removeItem: (k: string) => store.delete(k),
-      clear: () => store.clear(),
-    });
+    store = stubStorage("sessionStorage");
   });
 
   afterEach(() => {
@@ -72,14 +64,7 @@ describe("dashboard-filters-session", () => {
   });
 
   it("does not throw when storage is unavailable", () => {
-    vi.stubGlobal("sessionStorage", {
-      getItem: () => {
-        throw new Error("denied");
-      },
-      setItem: () => {
-        throw new Error("denied");
-      },
-    });
+    stubThrowingStorage("sessionStorage");
     expect(() =>
       saveDashboardFilters({
         labels: [],

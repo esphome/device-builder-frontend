@@ -217,7 +217,7 @@ export const componentCatalogStyles = css`
   }
 
   .expand-button:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 1px;
   }
 
@@ -274,9 +274,6 @@ export const componentCatalogStyles = css`
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
     line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   /* Category chip disambiguates same-name catalog entries (sensor.debug
@@ -321,13 +318,6 @@ export const componentCatalogStyles = css`
     line-height: 1.4;
   }
 
-  .component-description--clamp {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
   .card-footer {
     display: flex;
     align-items: center;
@@ -369,7 +359,7 @@ export const componentCatalogStyles = css`
   }
 
   .select-component:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 3px;
   }
 

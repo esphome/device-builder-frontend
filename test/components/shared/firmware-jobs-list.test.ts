@@ -56,20 +56,40 @@ function groupsHost() {
 }
 
 describe("renderJob type label", () => {
-  it("labels a deferred-install compile as the Install its dialog claims to be", () => {
+  it("labels a deferred-install compile as an offline compile", () => {
     const job = makeFirmwareJob({
       job_type: JobType.COMPILE,
       is_deferred_install: true,
     });
     const el = renderInto(renderGroups(groupsHost() as never, [job], []));
-    expect(el.textContent).toContain("firmware_jobs.type_install");
+
+    expect(el.textContent).toContain("firmware_jobs.type_offline_compile");
+
     expect(el.textContent).not.toContain("firmware_jobs.type_compile");
+    expect(el.textContent).not.toContain("firmware_jobs.type_install");
   });
 
   it("keeps a plain compile labeled Compile", () => {
     const job = makeFirmwareJob({ job_type: JobType.COMPILE });
     const el = renderInto(renderGroups(groupsHost() as never, [job], []));
     expect(el.textContent).toContain("firmware_jobs.type_compile");
+  });
+
+  it("labels a standard install as Install", () => {
+    const job = makeFirmwareJob({ job_type: JobType.INSTALL });
+    const el = renderInto(renderGroups(groupsHost() as never, [job], []));
+    expect(el.textContent).toContain("firmware_jobs.type_install");
+  });
+
+  it("keeps Upload on a failed upload converted offline", () => {
+    const job = makeFirmwareJob({
+      job_type: JobType.UPLOAD,
+      status: JobStatus.FAILED,
+      is_deferred_install: true,
+    });
+    const el = renderInto(renderGroups(groupsHost() as never, [job], []));
+    expect(el.textContent).toContain("firmware_jobs.type_upload");
+    expect(el.textContent).not.toContain("firmware_jobs.type_offline_compile");
   });
 });
 

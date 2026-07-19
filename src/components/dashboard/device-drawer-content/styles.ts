@@ -125,7 +125,7 @@ export const deviceDrawerContentStyles = css`
     color: var(--esphome-primary);
   }
   .address-visit-link:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 2px;
     color: var(--esphome-primary);
   }
@@ -203,7 +203,7 @@ export const deviceDrawerContentStyles = css`
   }
 
   .tag--link:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: 2px;
   }
 

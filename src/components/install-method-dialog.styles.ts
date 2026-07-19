@@ -28,6 +28,11 @@ export const installMethodDialogStyles = css`
     display: none;
   }
 
+  .method-notice {
+    margin-bottom: var(--wa-space-m);
+    font-size: var(--wa-font-size-s);
+  }
+
   .list {
     display: flex;
     flex-direction: column;
@@ -139,7 +144,7 @@ export const installMethodDialogStyles = css`
   }
 
   .option-collapsible__header:focus-visible {
-    outline: 2px solid var(--esphome-primary);
+    outline: var(--esphome-focus-outline);
     outline-offset: -2px;
   }
 
@@ -227,22 +232,7 @@ export const installMethodDialogStyles = css`
   }
 
   .back-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0;
     margin-bottom: var(--wa-space-s);
-    background: none;
-    border: none;
-    font-family: inherit;
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--esphome-primary);
-    cursor: pointer;
-  }
-
-  .back-btn wa-icon {
-    font-size: 16px;
   }
 
   .loading {
@@ -253,13 +243,5 @@ export const installMethodDialogStyles = css`
     padding: var(--wa-space-xl) 0;
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-s);
-  }
-
-  .empty {
-    text-align: center;
-    padding: var(--wa-space-l) 0;
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-s);
-    line-height: 1.5;
   }
 `;

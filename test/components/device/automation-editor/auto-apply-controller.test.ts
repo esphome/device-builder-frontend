@@ -27,7 +27,7 @@ import {
   type AutoApplyHost,
   type AutoApplyOptions,
 } from "../../../../src/components/device/automation-editor/auto-apply-controller.js";
-import { flushTimers } from "../../../_dom.js";
+import { flushTimers, identityLocalize } from "../../../_dom.js";
 
 const SCRIPT: AutomationLocation = {
   kind: "script",
@@ -55,7 +55,7 @@ class Host extends EventTarget implements AutoApplyHost {
   updateComplete = Promise.resolve(true);
 }
 
-const localize: LocalizeFunc = (key) => key;
+const localize: LocalizeFunc = identityLocalize as LocalizeFunc;
 
 function setup(over: Partial<AutoApplyOptions> = {}) {
   const host = new Host();

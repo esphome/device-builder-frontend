@@ -13,6 +13,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { linkButtonStyles } from "../../styles/link-button.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
 import {
   ensureSecretWithToast,
@@ -106,106 +107,99 @@ export class ESPHomeSecretValue extends LitElement {
     }
   }
 
-  static styles = css`
-    :host {
-      display: block;
-    }
+  static styles = [
+    linkButtonStyles,
+    css`
+      :host {
+        display: block;
+      }
 
-    .fix {
-      display: flex;
-      flex-direction: column;
-      gap: var(--wa-space-2xs);
-      padding-left: var(--wa-space-2xs);
-    }
+      .fix {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-2xs);
+        padding-left: var(--wa-space-2xs);
+      }
 
-    .msg {
-      display: flex;
-      align-items: center;
-      gap: var(--wa-space-2xs);
-      font-size: var(--wa-font-size-xs);
-      color: var(--wa-color-danger-border, var(--wa-color-danger-60));
-    }
+      .msg {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-2xs);
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-danger-border, var(--wa-color-danger-60));
+      }
 
-    .row {
-      display: flex;
-      align-items: center;
-      gap: var(--wa-space-xs);
-    }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+      }
 
-    /* esphome-password-input is display:block; flex so it shares the row. */
-    esphome-password-input {
-      flex: 1;
-      min-width: 0;
-    }
+      /* esphome-password-input is display:block; flex so it shares the row. */
+      esphome-password-input {
+        flex: 1;
+        min-width: 0;
+      }
 
-    .copy {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      flex-shrink: 0;
-      padding: 0;
-      border: none;
-      border-radius: var(--wa-border-radius-m);
-      background: transparent;
-      color: var(--wa-color-text-quiet);
-      cursor: pointer;
-      transition:
-        background 0.12s,
-        color 0.12s;
-    }
+      .copy {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        flex-shrink: 0;
+        padding: 0;
+        border: none;
+        border-radius: var(--wa-border-radius-m);
+        background: transparent;
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+        transition:
+          background 0.12s,
+          color 0.12s;
+      }
 
-    .copy:hover:not(:disabled) {
-      background: var(--wa-color-surface-border);
-      color: var(--wa-color-text-normal);
-    }
+      .copy:hover:not(:disabled) {
+        background: var(--wa-color-surface-border);
+        color: var(--wa-color-text-normal);
+      }
 
-    .copy:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+      .copy:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
 
-    .copy wa-icon {
-      font-size: 15px;
-    }
+      .copy wa-icon {
+        font-size: 15px;
+      }
 
-    .retry {
-      padding: 0;
-      border: none;
-      background: transparent;
-      color: var(--esphome-primary);
-      font: inherit;
-      cursor: pointer;
-      text-decoration: underline;
-    }
+      .save {
+        padding: 0 14px;
+        min-height: var(--wa-form-control-height);
+        box-sizing: border-box;
+        flex-shrink: 0;
+        border: var(--wa-border-width-s) solid var(--esphome-primary);
+        border-radius: var(--wa-border-radius-m);
+        background: var(--esphome-primary);
+        color: var(--wa-color-surface-default);
+        font-family: inherit;
+        font-size: var(--wa-font-size-s);
+        cursor: pointer;
+        transition:
+          opacity 0.12s,
+          background 0.12s;
+      }
 
-    .save {
-      padding: 0 14px;
-      min-height: var(--wa-form-control-height);
-      box-sizing: border-box;
-      flex-shrink: 0;
-      border: var(--wa-border-width-s) solid var(--esphome-primary);
-      border-radius: var(--wa-border-radius-m);
-      background: var(--esphome-primary);
-      color: var(--wa-color-surface-default);
-      font-family: inherit;
-      font-size: var(--wa-font-size-s);
-      cursor: pointer;
-      transition:
-        opacity 0.12s,
-        background 0.12s;
-    }
+      .save:hover:not(:disabled) {
+        opacity: 0.9;
+      }
 
-    .save:hover:not(:disabled) {
-      opacity: 0.9;
-    }
-
-    .save:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  `;
+      .save:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    `,
+  ];
 
   protected render() {
     return this.present ? this._renderEdit() : this._renderCreate();
@@ -268,7 +262,7 @@ export class ESPHomeSecretValue extends LitElement {
       <span class="msg" role="alert">
         <wa-icon library="mdi" name="alert"></wa-icon>
         ${this._localize("device.secret_picker_reveal_error")}
-        <button class="retry" type="button" @click=${this._retry}>
+        <button class="retry link-button" type="button" @click=${this._retry}>
           ${this._localize("device.secret_picker_retry")}
         </button>
       </span>

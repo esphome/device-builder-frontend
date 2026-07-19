@@ -14,6 +14,7 @@ import { mdiChevronDown } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { inputStyles } from "../styles/inputs.js";
+import { textStyles } from "../styles/text.js";
 import { renderOptionStack } from "../util/option-stack.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { buildOptionsComboboxChangeEvent } from "./options-combobox-event.js";
@@ -87,7 +88,7 @@ export class ESPHomeOptionsCombobox extends LitElement {
   @query(".option--active")
   private _activeOption?: HTMLElement;
 
-  static styles = [inputStyles, optionsComboboxStyles];
+  static styles = [inputStyles, textStyles, optionsComboboxStyles];
 
   protected render() {
     const filtered = this._filtered;
@@ -148,7 +149,7 @@ export class ESPHomeOptionsCombobox extends LitElement {
                   (opt, i) =>
                     html`<div
                       id="option-${i}"
-                      class="option ${i === this._active ? "option--active" : ""}"
+                      class="option truncate ${i === this._active ? "option--active" : ""}"
                       role="option"
                       aria-selected=${opt.value === this.value ? "true" : "false"}
                       @mousedown=${this._preventBlur}

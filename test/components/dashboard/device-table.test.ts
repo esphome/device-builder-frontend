@@ -23,7 +23,10 @@ import {
   ALL_PAGE_SIZE,
   effectiveTablePageSize,
 } from "../../../src/components/dashboard/pagination.js";
-import { makeConfiguredDevice } from "../../_make-configured-device.js";
+import {
+  makeConfiguredDevice,
+  type ConfiguredDeviceOverrides,
+} from "../../_make-configured-device.js";
 
 afterEach(() => {
   setTourActive(false);
@@ -116,6 +119,64 @@ describe("device-table All rendering", () => {
     expect(
       el.shadowRoot!.querySelector('tbody tr[data-configuration="demo-0.yaml"]')
     ).not.toBeNull();
+  });
+});
+
+describe("device-table Version column identity gating", () => {
+  async function mountWithVersionColumn(
+    device: ConfiguredDevice
+  ): Promise<ESPHomeDeviceTable> {
+    const el = new ESPHomeDeviceTable();
+    el.devices = [device];
+    el.initialColumnVisibility = { version: true };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await el.updateComplete;
+    return el;
+  }
+
+  function versionCellText(el: ESPHomeDeviceTable): string {
+    const cell = el.shadowRoot!.querySelector("tbody td.col-version");
+    expect(cell).not.toBeNull();
+    return cell!.querySelector(".cell-mono, .cell-muted")!.textContent!.trim();
+  }
+
+  it.each<[string, ConfiguredDeviceOverrides, string]>([
+    [
+      "api device with mdns ownership shows the deployed version",
+      {
+        api_enabled: true,
+        runtime_state: { active_source: "mdns", deployed_identity_live: false },
+      },
+      "2026.6.0",
+    ],
+    [
+      "api device with a dark identity blanks",
+      {
+        api_enabled: true,
+        runtime_state: { active_source: "ping", deployed_identity_live: false },
+      },
+      "—",
+    ],
+    [
+      "no-api device with a live identity TXT shows the deployed version",
+      { api_enabled: false, runtime_state: { deployed_identity_live: true } },
+      "2026.6.0",
+    ],
+    [
+      "no-api device with a dark identity blanks",
+      { api_enabled: false, runtime_state: { deployed_identity_live: false } },
+      "—",
+    ],
+  ])("%s", async (_name, overrides, expected) => {
+    const { runtime_state, ...flat } = overrides;
+    const el = await mountWithVersionColumn(
+      makeConfiguredDevice({
+        ...flat,
+        runtime_state: { deployed_version: "2026.6.0", ...runtime_state },
+      })
+    );
+    expect(versionCellText(el)).toBe(expected);
   });
 });
 

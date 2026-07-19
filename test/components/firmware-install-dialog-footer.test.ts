@@ -7,7 +7,10 @@
  * Stop button mid-download.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import type {
+  ESPHomeFirmwareInstallDialog,
+  InstallFailureKind,
+} from "../../src/components/firmware-install-dialog.js";
 import { renderFooter } from "../../src/components/firmware-install-dialog/renderers.js";
 import { identityLocalize } from "../_dom.js";
 import { findTemplatesByAnchor } from "../_lit-template-walker.js";
@@ -22,8 +25,8 @@ function footerHost(step: string) {
     _retry: vi.fn(),
     _showLogsAgain: vi.fn(),
     _detected: null,
-    _failedDuringCompile: false,
-    _failedDuringValidate: false,
+    _failureKind: null as InstallFailureKind,
+    _tryChangeBoard: vi.fn(),
     _showLogsAfterInstall: false,
     _toggleShowLogsAfterInstall: vi.fn(),
   };
@@ -65,7 +68,7 @@ describe("firmware-install-dialog footer", () => {
     // wouldn't address them, so it falls through to the plain Close footer.
     const host = footerHost("error");
     host._installer = "web-serial";
-    host._failedDuringCompile = true;
+    host._failureKind = "compile";
     const values = footerValues(host);
     expect(values).not.toContain(host._retry);
   });
@@ -73,6 +76,18 @@ describe("firmware-install-dialog footer", () => {
   it("does not offer Retry on a non-Web-Serial error", () => {
     const host = footerHost("error"); // binary-download
     const values = footerValues(host);
+    expect(values).not.toContain(host._retry);
+  });
+
+  it("offers Change board and not Retry on a chip mismatch", () => {
+    // Retry would loop on the same stale board_id; the reselect hand-off
+    // is the only way out.
+    const host = footerHost("error");
+    host._installer = "web-serial";
+    host._failureKind = "chip-mismatch";
+    const values = footerValues(host);
+    expect(values).toContain(host._tryChangeBoard);
+    expect(values).toContain(host._close);
     expect(values).not.toContain(host._retry);
   });
 });

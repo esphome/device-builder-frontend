@@ -5,6 +5,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { navigatorSearchStyles } from "./device-navigator-search.styles.js";
 
@@ -100,13 +101,7 @@ export class ESPHomeNavigatorSearch extends LitElement {
   };
 
   private _emit(value: string) {
-    this.dispatchEvent(
-      new CustomEvent("navigator-search", {
-        detail: { value },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "navigator-search", { value });
   }
 }
 

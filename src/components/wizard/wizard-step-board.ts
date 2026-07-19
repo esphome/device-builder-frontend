@@ -12,6 +12,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
@@ -28,6 +29,7 @@ import {
 } from "./wizard-step-board-platforms.js";
 
 import { inputStyles } from "../../styles/inputs.js";
+import { linkButtonStyles } from "../../styles/link-button.js";
 import { wizardStepBoardStyles } from "./wizard-step-board.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -137,7 +139,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     );
   }
 
-  static styles = [espHomeStyles, inputStyles, wizardStepBoardStyles];
+  static styles = [espHomeStyles, inputStyles, linkButtonStyles, wizardStepBoardStyles];
 
   protected render() {
     if (this._view === "select-port") {
@@ -178,7 +180,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
                   })}
                 </span>
                 <button
-                  class="helper-link"
+                  class="helper-link link-button"
                   type="button"
                   @click=${this._exitDetectionMode}
                 >
@@ -211,7 +213,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
                   ${this._localize("wizard.connect_your_board")}
                 </button>
                 <a
-                  class="helper-link"
+                  class="helper-link link-button"
                   href=${UNDERSTANDING_BOARDS_DOCS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -265,13 +267,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
   }
 
   private _onAdd(board: SlimBoard) {
-    this.dispatchEvent(
-      new CustomEvent("next-step", {
-        detail: { step: "setup", board },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "next-step", { step: "setup", board });
   }
 
   private get _environment(): DeploymentEnvironment {

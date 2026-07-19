@@ -17,6 +17,7 @@ import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, expertModeContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { textStyles } from "../../styles/text.js";
 import { subscribeAutomationCatalogCache } from "../../util/automation-catalog-cache.js";
 import { instanceKey } from "../../util/backend-field-errors.js";
 import {
@@ -24,6 +25,7 @@ import {
   getCachedComponent,
   subscribeComponentCache,
 } from "../../util/component-name-cache.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   type YamlSection,
@@ -228,7 +230,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _collapsedGroups = new Set<string>();
 
-  static styles = [espHomeStyles, deviceNavigatorStyles];
+  static styles = [espHomeStyles, textStyles, deviceNavigatorStyles];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
     // Fire on the edge that satisfies the gate — typically just
@@ -418,7 +420,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
           @automation-added=${this._onAutomationAdded}
         ></esphome-add-script-dialog>
         <header class="card-header">
-          <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
+          <h2 class="card-title truncate">${this._localize("device.navigator_title")}</h2>
           <div class="header-actions">
             ${
               showSearchToggle
@@ -527,13 +529,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   };
 
   private _toggleSection(index: number) {
-    this.dispatchEvent(
-      new CustomEvent("section-toggle", {
-        detail: { index },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "section-toggle", { index });
   }
 
   /** Collapse/expand one domain subgroup (new Set so @state reacts). */
@@ -547,12 +543,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
    *  desktop (set ``_navCollapsed`` + persist) and mobile (close the
    *  drawer) — we just say "I'd like to disappear". */
   private _onCollapseClick = () => {
-    this.dispatchEvent(
-      new CustomEvent("nav-collapse", {
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "nav-collapse");
   };
 
   /**
@@ -615,23 +606,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   private _emitHighlight(range: HighlightRange | null, scroll: boolean) {
-    this.dispatchEvent(
-      new CustomEvent("yaml-highlight", {
-        detail: { range, scroll },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "yaml-highlight", { range, scroll });
   }
 
   private _emitSectionSelect(sectionKey: string | null, fromLine: number | undefined) {
-    this.dispatchEvent(
-      new CustomEvent("section-select", {
-        detail: { sectionKey, fromLine },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "section-select", { sectionKey, fromLine });
   }
 
   /**

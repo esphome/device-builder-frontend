@@ -4,11 +4,11 @@
  * Pins EnterController: fires on a plain Enter, stays out of the way for
  * modifiers, IME, already-handled events, and self-handling focus targets.
  */
-import type { ReactiveControllerHost } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import { EnterController } from "../../src/util/enter-controller.js";
+import { FakeHost } from "../_fake-host.js";
 
-const stubHost = { addController() {} } as unknown as ReactiveControllerHost;
+const stubHost = new FakeHost();
 
 let target: HTMLElement;
 

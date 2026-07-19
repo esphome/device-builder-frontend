@@ -124,18 +124,6 @@ export const automationEditorActionStyles = css`
     font-size: 14px;
   }
 
-  .ae-empty-block {
-    margin: 0;
-    padding: var(--wa-space-m) var(--wa-space-s);
-    text-align: center;
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-s);
-    font-style: italic;
-    border: 1px dashed var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-m);
-    background: var(--wa-color-surface-lowered, transparent);
-  }
-
   /* Bottom-of-editor save / delete buttons. */
   .ae-actions {
     display: flex;

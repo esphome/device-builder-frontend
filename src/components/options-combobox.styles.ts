@@ -58,9 +58,6 @@ export const optionsComboboxStyles = css`
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-normal);
     cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .option--active {

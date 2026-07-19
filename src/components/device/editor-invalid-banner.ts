@@ -24,6 +24,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
+import { linkButtonStyles } from "../../styles/link-button.js";
 import { renderTextLinks } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { YamlAutoFix } from "../../util/yaml-error-analysis.js";
@@ -94,6 +95,7 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
 
   static styles = [
     dangerBannerStyles,
+    linkButtonStyles,
     css`
       :host {
         display: contents;
@@ -103,17 +105,13 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
         flex: 0 0 auto;
       }
 
+      /* Deltas over .link-button: banner-colored (not primary), bolder,
+         and kept on one line inside the wrapping error text. */
       .invalid-banner-goto {
         appearance: none;
         margin-left: 0.35em;
-        padding: 0;
-        border: none;
-        background: none;
         color: inherit;
-        font: inherit;
         font-weight: var(--wa-font-weight-semibold);
-        text-decoration: underline;
-        cursor: pointer;
         white-space: nowrap;
       }
 
@@ -157,7 +155,7 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
                   ? html`
                       <button
                         type="button"
-                        class="invalid-banner-goto"
+                        class="invalid-banner-goto link-button"
                         title=${this._localize("yaml_editor.error_auto_fix_hint")}
                         @click=${() => this._onAutoFix(err.fix!)}
                       >
@@ -170,7 +168,7 @@ export class ESPHomeEditorInvalidBanner extends LitElement {
                   ? html`
                       <button
                         type="button"
-                        class="invalid-banner-goto"
+                        class="invalid-banner-goto link-button"
                         @click=${() => this._onGotoLine(err.line!)}
                       >
                         ${this._localize("yaml_editor.error_go_to_line", {

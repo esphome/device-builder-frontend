@@ -1,4 +1,5 @@
 import { validateEntries } from "../../../util/config-validation.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
 import { notifySuccess } from "../../../util/notify.js";
@@ -57,13 +58,7 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
   if (newYaml === host.yaml) return;
 
   host._lastSelfWrittenYaml = newYaml;
-  host.dispatchEvent(
-    new CustomEvent("yaml-draft", {
-      detail: { yaml: newYaml },
-      bubbles: true,
-      composed: true,
-    })
-  );
+  fireEvent(host, "yaml-draft", { yaml: newYaml });
 }
 
 export function onValueChange(
@@ -124,20 +119,8 @@ export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promi
     }
     await host._api.updateConfig(host.configuration, newYaml);
     host._setDirty(false);
-    host.dispatchEvent(
-      new CustomEvent("yaml-updated", {
-        detail: { yaml: newYaml },
-        bubbles: true,
-        composed: true,
-      })
-    );
-    host.dispatchEvent(
-      new CustomEvent("section-select", {
-        detail: { sectionKey: null },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(host, "yaml-updated", { yaml: newYaml });
+    fireEvent(host, "section-select", { sectionKey: null });
     notifySuccess(host._localize("device.section_deleted", { name: title }));
   } catch (e) {
     host._error = formatApiError(e, host._localize, "device.section_delete_error");

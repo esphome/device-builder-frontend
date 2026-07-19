@@ -67,8 +67,8 @@ function isPeerLinkSessionLostError(message: string): boolean {
 export function renderResetSuggestion(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
-  if (!host._failedDuringCompile) return nothing;
-  if (host._failedDuringValidate) return renderValidationFailureSuggestion(host);
+  if (host._failureKind === "validate") return renderValidationFailureSuggestion(host);
+  if (host._failureKind !== "compile") return nothing;
   if (isPeerLinkSessionLostError(host._errorMessage)) return nothing;
   const remoteLabel =
     host._jobSource === JobSource.REMOTE && host._jobSourceLabel
@@ -351,6 +351,20 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
+  // A chip mismatch against the stored board can't be retried into success —
+  // offer the board-reselect hand-off instead.
+  if (host._step === "error" && host._failureKind === "chip-mismatch") {
+    return html`
+      <div class="footer">
+        <button class="btn btn--ghost" @click=${host._close}>
+          ${host._localize("command.close")}
+        </button>
+        <button class="btn btn--primary" @click=${host._tryChangeBoard}>
+          ${host._localize("firmware.change_board_action")}
+        </button>
+      </div>
+    `;
+  }
   // A failed Web Serial or USB (web-flash) flash can be retried in place: re-run
   // the install (web-flash re-opens the external flasher). Excludes compile /
   // validate failures, which surface the reset-build hint (renderResetSuggestion)
@@ -358,8 +372,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   const canRetry =
     host._step === "error" &&
     (host._installer === "web-serial" || host._installer === "web-flash") &&
-    !host._failedDuringCompile &&
-    !host._failedDuringValidate;
+    host._failureKind === null;
   if (canRetry) {
     return html`
       <div class="footer">

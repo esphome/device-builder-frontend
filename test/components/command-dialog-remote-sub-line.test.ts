@@ -38,7 +38,11 @@ function makePairing(auto: boolean): PairingSummary {
   };
 }
 
-function makeHost(opts: { auto: boolean; localVersion?: string }): ESPHomeCommandDialog {
+function makeHost(opts: {
+  auto: boolean;
+  localVersion?: string;
+  commandType?: string;
+}): ESPHomeCommandDialog {
   return {
     _localize: (key: string, values?: Record<string, unknown>) =>
       values ? `${key}:${JSON.stringify(values)}` : key,
@@ -52,7 +56,7 @@ function makeHost(opts: { auto: boolean; localVersion?: string }): ESPHomeComman
     },
     _pairings: new Map([[PIN, makePairing(opts.auto)]]),
     _appVersion: opts.localVersion ?? "2026.7.0b2",
-    _commandType: "compile",
+    _commandType: opts.commandType ?? "compile",
     _switchingToLocal: false,
   } as unknown as ESPHomeCommandDialog;
 }
@@ -73,6 +77,20 @@ describe("renderRemoteBuilderSubLine version", () => {
       renderRemoteBuilderSubLine(makeHost({ auto: true, localVersion: "2026.8.0-dev" }))
     );
     expect(el.textContent).toContain("builder (2026.6.5)");
+  });
+
+  it("offers Build locally for a reopened remote deferred install", () => {
+    const el = renderInto(
+      renderRemoteBuilderSubLine(
+        makeHost({ auto: false, commandType: "offline_compile" })
+      )
+    );
+    expect(el.querySelector(".force-local-link")).not.toBeNull();
+  });
+
+  it("keeps the override hidden for a plain compile", () => {
+    const el = renderInto(renderRemoteBuilderSubLine(makeHost({ auto: false })));
+    expect(el.querySelector(".force-local-link")).toBeNull();
   });
 
   it("prefers the pairing's friendly name over the auto-derived snapshot label", () => {

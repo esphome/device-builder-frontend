@@ -1,9 +1,12 @@
 import { css } from "lit";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 
+import { textStyles } from "../../styles/text.js";
+
 export const deviceCardStyles = [
   // Shared .action-btn language (also used by ESPHome Web's cards).
   actionBtnStyles,
+  textStyles,
   css`
     /* Only rendered when the device carries labels; an untagged device
        gets no chip row and the card collapses naturally. Padding leans
@@ -45,7 +48,7 @@ export const deviceCardStyles = [
 
     /* Focus ring on the inner card so it follows rounded corners. */
     :host(:focus-visible) .device-card {
-      outline: 2px solid var(--esphome-primary);
+      outline: var(--esphome-focus-outline);
       outline-offset: 2px;
     }
 
@@ -115,9 +118,6 @@ export const deviceCardStyles = [
       font-size: var(--wa-font-size-m);
       font-weight: var(--wa-font-weight-bold);
       color: var(--wa-color-text-normal);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .indicator-dot {
@@ -162,9 +162,6 @@ export const deviceCardStyles = [
       margin: 0;
       font-size: var(--wa-font-size-xs);
       color: var(--wa-color-text-quiet);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .device-status {

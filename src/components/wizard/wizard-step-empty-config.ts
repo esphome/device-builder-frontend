@@ -6,6 +6,7 @@ import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EnterController } from "../../util/enter-controller.js";
+import { fireEvent } from "../../util/fire-event.js";
 
 @customElement("esphome-wizard-step-empty-config")
 export class ESPHomeWizardStepEmptyConfig extends LitElement {
@@ -128,19 +129,11 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   }
 
   private _cancel() {
-    this.dispatchEvent(
-      new CustomEvent("next-step", { detail: "method", bubbles: true, composed: true })
-    );
+    fireEvent(this, "next-step", "method");
   }
 
   private _next() {
-    this.dispatchEvent(
-      new CustomEvent("create-empty-config", {
-        detail: { name: this._name },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "create-empty-config", { name: this._name });
   }
 }
 

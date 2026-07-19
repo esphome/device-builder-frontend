@@ -2,6 +2,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
 
@@ -52,11 +53,15 @@ export function renderEncryptionIcon(
   });
   if (!visual) return nothing;
   return html`<wa-icon
-    class="encryption-icon ${visual.cssClass}"
-    library="mdi"
-    name=${visual.iconName}
-    title=${card._localize(visual.tooltipKey)}
-  ></wa-icon>`;
+      id="ind-encryption"
+      class="encryption-icon ${visual.cssClass}"
+      library="mdi"
+      name=${visual.iconName}
+      tabindex="0"
+      role="img"
+      aria-label=${card._localize(visual.tooltipKey)}
+    ></wa-icon>
+    <wa-tooltip for="ind-encryption">${card._localize(visual.tooltipKey)}</wa-tooltip>`;
 }
 
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
@@ -71,7 +76,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       class="device-status busy"
       @click=${(e: Event) => {
         e.stopPropagation();
-        card._emit("show-progress");
+        fireEvent(card, "show-progress");
       }}
     >
       <wa-spinner></wa-spinner>
@@ -82,10 +87,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
     const status = card.recentJob.status;
     const icon = RECENT_JOB_ICON[status];
     if (icon) {
-      return html`<div
-        class="device-status ${RECENT_JOB_VARIANT[status]}"
-        title=${card._localize(RECENT_JOB_LABEL[status])}
-      >
+      return html`<div class="device-status ${RECENT_JOB_VARIANT[status]}">
         <wa-icon library="mdi" name=${icon}></wa-icon>
         ${card._localize(RECENT_JOB_LABEL[status])}
       </div>`;

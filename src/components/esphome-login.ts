@@ -13,6 +13,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { fireEvent } from "../util/fire-event.js";
 
 @customElement("esphome-login")
 export class ESPHomeLogin extends LitElement {
@@ -244,13 +245,10 @@ export class ESPHomeLogin extends LitElement {
     if (this.submitting) return;
     if (this.disconnected) return;
     if (this.rateLimitedUntil > Date.now()) return;
-    this.dispatchEvent(
-      new CustomEvent("submit-credentials", {
-        detail: { username: this._username, password: this._password },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "submit-credentials", {
+      username: this._username,
+      password: this._password,
+    });
   };
 }
 

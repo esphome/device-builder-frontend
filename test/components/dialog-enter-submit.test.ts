@@ -11,9 +11,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+import "../_mock-webawesome.js";
 
 import type { LitElement } from "lit";
 import { ESPHomeBulkLabelsDialog } from "../../src/components/labels/bulk-labels-dialog.js";

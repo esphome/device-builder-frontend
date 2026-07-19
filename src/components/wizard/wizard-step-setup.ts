@@ -9,6 +9,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { boardImageUrl } from "../../util/board-image.js";
 import { EnterController } from "../../util/enter-controller.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { boardOffersFullSetup } from "../../util/full-setup.js";
 import { fetchSecretKeys, hasSharedWifiSecret } from "../../util/secrets-cache.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
@@ -66,6 +67,16 @@ export class ESPHomeWizardStepSetup extends LitElement {
   // assembled component by component. Only shown for full-config boards.
   @state()
   private _fullSetup = true;
+
+  /**
+   * Full setup never applies to a remote-package board — the package
+   * reference is the whole config, so both the checkbox and the emitted
+   * finish-setup flag must stay off even if the body also carries
+   * full_config and bundles.
+   */
+  private get _offersFullSetup(): boolean {
+    return !this.board?.package_import_url && boardOffersFullSetup(this.board);
+  }
 
   @state()
   private _wifiSsid = "";
@@ -408,22 +419,28 @@ export class ESPHomeWizardStepSetup extends LitElement {
         </div>
 
         ${
-          boardOffersFullSetup(this.board)
+          this.board?.package_import_url
             ? html`<div class="full-setup">
-                <wa-checkbox
-                  .checked=${this._fullSetup}
-                  @change=${(e: Event) => {
-                    this._fullSetup = (
-                      e.currentTarget as HTMLElement & { checked: boolean }
-                    ).checked;
-                  }}
-                  >${this._localize("wizard.full_setup")}</wa-checkbox
-                >
                 <p class="section-subtitle">
-                  ${this._localize("wizard.full_setup_desc")}
+                  ${this._localize("wizard.package_config_desc")}
                 </p>
               </div>`
-            : null
+            : this._offersFullSetup
+              ? html`<div class="full-setup">
+                  <wa-checkbox
+                    .checked=${this._fullSetup}
+                    @change=${(e: Event) => {
+                      this._fullSetup = (
+                        e.currentTarget as HTMLElement & { checked: boolean }
+                      ).checked;
+                    }}
+                    >${this._localize("wizard.full_setup")}</wa-checkbox
+                  >
+                  <p class="section-subtitle">
+                    ${this._localize("wizard.full_setup_desc")}
+                  </p>
+                </div>`
+              : null
         }
       </section>
     `;
@@ -478,13 +495,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
       this._stage = "name";
       return;
     }
-    this.dispatchEvent(
-      new CustomEvent("next-step", {
-        detail: "board",
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "next-step", "board");
   }
 
   private _onNext() {
@@ -518,19 +529,13 @@ export class ESPHomeWizardStepSetup extends LitElement {
   };
 
   private _finish(wifiSsid: string, wifiPassword: string) {
-    this.dispatchEvent(
-      new CustomEvent("finish-setup", {
-        detail: {
-          board: this.board,
-          name: this._deviceName,
-          wifiSsid,
-          wifiPassword,
-          fullSetup: boardOffersFullSetup(this.board) && this._fullSetup,
-        },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "finish-setup", {
+      board: this.board,
+      name: this._deviceName,
+      wifiSsid,
+      wifiPassword,
+      fullSetup: this._offersFullSetup && this._fullSetup,
+    });
   }
 }
 

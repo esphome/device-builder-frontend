@@ -198,7 +198,7 @@ describe("adopt-dialog wifi step (#1742)", () => {
     expect(importDevice).not.toHaveBeenCalled();
     expect(priv._error).toBe("disk full");
     expect(priv._busy).toBe(false);
-    expect(priv._open).toBe(true);
+    expect(priv._dialog.open).toBe(true);
   });
 
   it("does not collect wifi when the device advertised no network", async () => {

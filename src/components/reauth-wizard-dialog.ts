@@ -14,6 +14,7 @@ import {
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { fireEvent } from "../util/fire-event.js";
 import { friendlyHostname, trimTrailingDot } from "../util/hostname.js";
 import { pairingDisplayNameForPin } from "../util/pairing-display-name.js";
 import { formatPinSha256 } from "../util/pin-format.js";
@@ -285,13 +286,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     outcome: "success" | "pin_changed",
     receiverLabel: string
   ): void {
-    this.dispatchEvent(
-      new CustomEvent("reauth-result", {
-        bubbles: true,
-        composed: true,
-        detail: { outcome, receiver_label: receiverLabel },
-      })
-    );
+    fireEvent(this, "reauth-result", { outcome, receiver_label: receiverLabel });
   }
 
   private _renderStep1(alert: OffloaderPinMismatchAlert) {

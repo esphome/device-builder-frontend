@@ -299,6 +299,45 @@ describe("wizard-step-setup", () => {
     expect((onFinish.mock.calls[0][0] as CustomEvent).detail.fullSetup).toBe(true);
   });
 
+  // A remote-package board: the ready-made note replaces the checkbox — the
+  // package reference is the whole config, nothing to opt out of.
+  const packageBoard = () =>
+    board({
+      requires_wifi: false,
+      package_import_url:
+        "github://esphome/bluetooth-proxies/olimex/olimex-esp32-poe-iso.yaml@main",
+    });
+
+  it("shows the ready-made note instead of a checkbox for a package board", async () => {
+    const el = await mount(packageBoard());
+    expect(el.shadowRoot!.querySelector("wa-checkbox")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".full-setup .section-subtitle")).not.toBeNull();
+  });
+
+  it("prefers the ready-made note when a package board also claims full-config", async () => {
+    const el = await mount(
+      board({
+        requires_wifi: false,
+        package_import_url:
+          "github://esphome/bluetooth-proxies/olimex/olimex-esp32-poe-iso.yaml@main",
+        full_config: true,
+        featured_components: [{ id: "relay_1" }] as never,
+        featured_bundles: [
+          { id: "all_recommended", name: "x", component_ids: ["relay_1"] },
+        ] as never,
+      })
+    );
+    expect(el.shadowRoot!.querySelector("wa-checkbox")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".full-setup .section-subtitle")).not.toBeNull();
+    // The emitted flag must stay off too — a stale true would make the
+    // create dialog vendor components next to the package reference.
+    await setName(el, "kitchen");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.fullSetup).toBe(false);
+  });
+
   it("omits the full-setup option for an optional-component board", async () => {
     const el = await mount(noWifiBoard());
     expect(el.shadowRoot!.querySelector("wa-checkbox")).toBeNull();

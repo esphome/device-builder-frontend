@@ -25,6 +25,7 @@ import { localizeContext } from "../../context/index.js";
 import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EscapeController } from "../../util/escape-controller.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { busyActionLabel } from "../../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../../util/visit-web-ui-link.js";
@@ -338,7 +339,7 @@ export class ESPHomeTableRowMenu extends LitElement {
   private _close() {
     this.device = null;
     this.position = null;
-    this.dispatchEvent(new CustomEvent("menu-close", { bubbles: true, composed: true }));
+    fireEvent(this, "menu-close");
   }
 
   private _preventAndClose(e: Event) {
@@ -347,13 +348,7 @@ export class ESPHomeTableRowMenu extends LitElement {
   }
 
   private _emit(name: string) {
-    this.dispatchEvent(
-      new CustomEvent(name, {
-        detail: this.device,
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, name, this.device);
     this._close();
   }
 

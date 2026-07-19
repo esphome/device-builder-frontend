@@ -6,11 +6,14 @@ import { classMap } from "lit/directives/class-map.js";
 import type { SerialPort } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { backButtonStyles } from "../../styles/back-button.js";
+import { emptyStateStyles } from "../../styles/empty-state.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { newItemHighlightStyles } from "../../styles/new-item-highlight.js";
 import { serialPortHintStyles } from "../../styles/serial-port-hints.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import type { DeploymentEnvironment } from "../../util/environment.js";
+import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   renderSerialPortBadges,
@@ -62,6 +65,8 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
     inputStyles,
     newItemHighlightStyles,
     serialPortHintStyles,
+    emptyStateStyles,
+    backButtonStyles,
     css`
       :host {
         display: flex;
@@ -78,22 +83,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       }
 
       .back-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 0;
-        background: none;
-        border: none;
-        font-family: inherit;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--esphome-primary);
-        cursor: pointer;
         align-self: flex-start;
-      }
-
-      .back-btn wa-icon {
-        font-size: 16px;
       }
 
       .list {
@@ -126,7 +116,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       }
 
       .option:focus-visible {
-        outline: 2px solid var(--esphome-primary);
+        outline: var(--esphome-focus-outline);
         outline-offset: 2px;
       }
 
@@ -164,22 +154,6 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-s);
       }
-
-      .empty {
-        text-align: center;
-        padding: var(--wa-space-l) 0;
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
-        line-height: 1.5;
-      }
-
-      .error {
-        text-align: center;
-        padding: var(--wa-space-l) 0;
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
-        line-height: 1.5;
-      }
     `,
   ];
 
@@ -212,11 +186,13 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       `;
     }
     if (this.errorMessage) {
-      return html`<div class="error">${this.errorMessage}</div>`;
+      return html`<div class="empty-message">${this.errorMessage}</div>`;
     }
     if (this.ports.length === 0) {
       return html`
-        <div class="empty">${this._localize("wizard.connect_your_board_no_ports")}</div>
+        <div class="empty-message">
+          ${this._localize("wizard.connect_your_board_no_ports")}
+        </div>
       `;
     }
     return html`
@@ -255,17 +231,11 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
   }
 
   private _onSelect(port: string) {
-    this.dispatchEvent(
-      new CustomEvent("select-port", {
-        detail: { port },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "select-port", { port });
   }
 
   private _onBack = () => {
-    this.dispatchEvent(new CustomEvent("back", { bubbles: true, composed: true }));
+    fireEvent(this, "back");
   };
 }
 

@@ -27,6 +27,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { fireEvent } from "../../../util/fire-event.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "./automation-action-node.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -108,7 +109,7 @@ export class ESPHomeAutomationActionList extends LitElement {
         }
         ${
           this.actions.length === 0
-            ? html`<p class="ae-empty-block" role="status">
+            ? html`<p class="empty-message--dashed" role="status">
                 ${this._localize("device.automation_actions_empty")}
               </p>`
             : this.actions.map((node, idx) =>
@@ -190,13 +191,7 @@ export class ESPHomeAutomationActionList extends LitElement {
   }
 
   private _emit(actions: ActionNode[]) {
-    this.dispatchEvent(
-      new CustomEvent("actions-change", {
-        detail: { actions },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "actions-change", { actions });
   }
 }
 

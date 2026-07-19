@@ -11,11 +11,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+import "../../_mock-webawesome.js";
+
 vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";

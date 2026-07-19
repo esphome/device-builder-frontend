@@ -54,9 +54,11 @@ export function renderRemoteBuilderSubLine(
   // wins over the job's creation-time source_label snapshot.
   const name = pairingDisplayNameForPin(host._pairings, pin, label);
   const display = version ? `${name} (${version})` : name;
-  // Only allow override for in-flight install — switching mid-upload or
-  // mid-compile is a power-user shape without a UI today.
-  const canOverride = host._commandType === "install";
+  // Only allow override for an in-flight install chain — a deferred install
+  // (offline_compile) is the same chain head and keeps the link it had when
+  // it derived "install". Switching a plain compile has no UI today.
+  const canOverride =
+    host._commandType === "install" || host._commandType === "offline_compile";
   return html`
     <div class="remote-builder-sub-line" role="status" slot="sub-line">
       <wa-icon library="mdi" name="server-network"></wa-icon>
@@ -70,7 +72,7 @@ export function renderRemoteBuilderSubLine(
           ? html`
               <span class="spacer"></span>
               <button
-                class="force-local-link"
+                class="force-local-link link-button"
                 ?disabled=${host._switchingToLocal}
                 @click=${host._onForceLocalClick}
               >
@@ -137,7 +139,11 @@ export function renderResetSuggestion(
   if (host._commandType === "validate" || host._failedDuringValidate) {
     return renderValidationFailureSuggestion(host);
   }
-  if (host._commandType !== "install" && host._commandType !== "compile") {
+  if (
+    host._commandType !== "install" &&
+    host._commandType !== "compile" &&
+    host._commandType !== "offline_compile"
+  ) {
     return nothing;
   }
   return renderBuildFailureSuggestion(host, remotePeerLabel(host), remoteResetPin(host));
@@ -180,6 +186,7 @@ export function showRunTimer(host: ESPHomeCommandDialog): boolean {
   if (
     host._commandType !== "install" &&
     host._commandType !== "compile" &&
+    host._commandType !== "offline_compile" &&
     host._commandType !== "rename"
   ) {
     return false;

@@ -75,7 +75,7 @@ function makeHost(getBinariesResults: FirmwareBinary[][]) {
     _binaries: [] as FirmwareBinary[],
     _downloadedFilename: "",
     _log: fakeLogBuffer(),
-    _failedDuringCompile: false,
+    _failureKind: null,
     _jobId: "",
     _streamId: "",
     _jobSource: JobSource.LOCAL,
