@@ -87,7 +87,7 @@ describe("catalog-picker-dialog filtering contract", () => {
     // YAML id — writing it into a reference param produces a dangling id.
     const src = await readSource();
     const body = methodBody(src, "_preFillFor");
-    expect(body).toMatch(/has_explicit_id !== true.*return undefined/);
+    expect(body).toMatch(/!device\.has_explicit_id\) return undefined/);
   });
 });
 

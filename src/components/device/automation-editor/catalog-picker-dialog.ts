@@ -527,7 +527,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
     item: CatalogItem,
     device: AvailableComponentInstance
   ): Record<string, unknown> | undefined {
-    if (device.has_explicit_id !== true) return undefined;
+    if (!device.has_explicit_id) return undefined;
     const domain = componentDomain(device.component_id);
     const idEntry = item.config_entries.find((e) => e.references_component === domain);
     if (!idEntry) return undefined;
