@@ -152,7 +152,7 @@ function componentToCompletion(c: ComponentCatalogEntry): Completion {
  *  hypothetical session resets) gets garbage-collected with its
  *  memo. */
 const topLevelMemo = new WeakMap<CatalogIndex, Completion[]>();
-const domainsMemo = new WeakMap<CatalogIndex, Set<string>>();
+const domainsMemo = new WeakMap<CatalogIndex, ReadonlySet<string>>();
 
 /**
  * Platform-domain umbrellas (``switch``, ``sensor``, …), from two
@@ -162,7 +162,7 @@ const domainsMemo = new WeakMap<CatalogIndex, Set<string>>();
  * ``update``) carry no standalone catalog entry, only platform variants;
  * the id prefix catches a category enum lagging a new platform domain.
  */
-export function platformDomains(catalog: CatalogIndex): Set<string> {
+export function platformDomains(catalog: CatalogIndex): ReadonlySet<string> {
   const cached = domainsMemo.get(catalog);
   if (cached) return cached;
   const domains = new Set<string>();
