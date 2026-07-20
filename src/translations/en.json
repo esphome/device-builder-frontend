@@ -940,7 +940,6 @@
     "external_component_title": "External component",
     "platform_section_title": "Platform section",
     "platform_domain_section": "Each entry under \"{key}\" is a platform component (like \"- platform: gpio\"). Add one to configure it.",
-    "platform_domain_add": "Add {key}",
     "load_config_error": "Failed to load section config",
     "yaml_only_section": "This section doesn't have a structured editor — edit it directly in the YAML pane on the right.",
     "security_generate": "Generate",

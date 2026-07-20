@@ -7,7 +7,7 @@ import {
   mdiPencil,
   mdiPlusCircleOutline,
 } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
@@ -453,19 +453,20 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
 
+    // A catalog miss (external component or bare platform domain) swaps the
+    // title and drops the subtitle-less image header.
+    const catalogMiss = this._isUnknown || this._isPlatformDomain;
+    const headerTitle = this._isUnknown
+      ? this._localize("device.external_component_title")
+      : this._isPlatformDomain
+        ? this._localize("device.platform_section_title")
+        : this._config.title;
+
     return html`
       <div class="section-header">
         <div class="section-header-info">
           <div class="section-header-title-row">
-            <h3 class="section-title">
-              ${
-                this._isUnknown
-                  ? this._localize("device.external_component_title")
-                  : this._isPlatformDomain
-                    ? this._localize("device.platform_section_title")
-                    : this._config.title
-              }
-            </h3>
+            <h3 class="section-title">${headerTitle}</h3>
             ${
               this._config.docs_url
                 ? html`<a
@@ -481,7 +482,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             }
           </div>
           ${
-            this._isUnknown || this._isPlatformDomain
+            catalogMiss
               ? html`<p class="section-subtitle">${this.sectionKey}</p>`
               : nothing
           }
@@ -494,7 +495,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           }
         </div>
         ${
-          this._isUnknown || this._isPlatformDomain
+          catalogMiss
             ? nothing
             : html`<div class="section-image">
                 <img
@@ -518,46 +519,40 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       }
       ${
         this._isPlatformDomain
-          ? html`<div class="yaml-only-notice" role="note">
-                <wa-icon library="mdi" name="information-outline"></wa-icon>
-                <div class="yaml-only-notice-body">
-                  <p>
-                    ${this._localize("device.platform_domain_section", {
-                      key: this.sectionKey,
-                    })}
-                  </p>
-                  <button
-                    type="button"
-                    class="yaml-only-notice-cta"
-                    @click=${this._onAddPlatform}
-                  >
-                    ${this._localize("device.platform_domain_add", {
-                      key: this.sectionKey,
-                    })}
-                  </button>
-                </div>
-              </div>
-              ${this._renderActionsRow(canDelete)}`
+          ? html`${this._renderNotice(html`
+              <p>
+                ${this._localize("device.platform_domain_section", {
+                  key: this.sectionKey,
+                })}
+              </p>
+              <button
+                type="button"
+                class="yaml-only-notice-cta"
+                @click=${this._onAddPlatform}
+              >
+                ${this._localize("device.id_reference_add", {
+                  domain: this.sectionKey,
+                })}
+              </button>
+            `)}
+            ${this._renderActionsRow(canDelete)}`
           : yamlOnly
-            ? html`<div class="yaml-only-notice" role="note">
-                  <wa-icon library="mdi" name="information-outline"></wa-icon>
-                  <div class="yaml-only-notice-body">
-                    <p>${this._localize("device.yaml_only_section")}</p>
-                    ${
-                      this.yamlPaneVisible
-                        ? nothing
-                        : html`<button
-                            type="button"
-                            class="yaml-only-notice-cta"
-                            @click=${this._onShowYamlEditor}
-                          >
-                            ${this._localize("device.show_yaml_editor")}
-                          </button>`
-                    }
-                  </div>
-                </div>
-                ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
-                ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
+            ? html`${this._renderNotice(html`
+                <p>${this._localize("device.yaml_only_section")}</p>
+                ${
+                  this.yamlPaneVisible
+                    ? nothing
+                    : html`<button
+                        type="button"
+                        class="yaml-only-notice-cta"
+                        @click=${this._onShowYamlEditor}
+                      >
+                        ${this._localize("device.show_yaml_editor")}
+                      </button>`
+                }
+              `)}
+              ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
+              ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
             : html`
                 ${
                   isSecuritySection(this.sectionKey)
@@ -663,6 +658,15 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _renderActionsRow(canDelete: boolean) {
     if (!canDelete) return nothing;
     return html`<div class="actions">${this._renderDeleteButton()}</div>`;
+  }
+
+  /** The info-notice shell shared by the YAML-only and platform-domain
+   *  states; *body* supplies the message and its CTA. */
+  private _renderNotice(body: TemplateResult) {
+    return html`<div class="yaml-only-notice" role="note">
+      <wa-icon library="mdi" name="information-outline"></wa-icon>
+      <div class="yaml-only-notice-body">${body}</div>
+    </div>`;
   }
 
   private _renderApiActionDialog() {

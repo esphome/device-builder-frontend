@@ -180,7 +180,6 @@ export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
   const out: Completion[] = [];
   const seen = new Set<string>();
   for (const domain of platformDomains(catalog)) {
-    if (seen.has(domain)) continue;
     seen.add(domain);
     out.push({
       label: domain,

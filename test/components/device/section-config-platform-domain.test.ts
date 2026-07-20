@@ -24,19 +24,13 @@ import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 const SLIMS: ComponentCatalogEntry[] = [
   makeComponentEntry("switch.gpio", { category: ComponentCategory.SWITCH }),
-  makeComponentEntry("logger", { category: ComponentCategory.CORE }),
 ];
 
 // One catalog shape for the whole file — loadCatalog memoizes its promise
 // for the module's lifetime, so per-test catalogs would collide.
 const api = {
   getComponents: async () => ({ components: SLIMS }),
-  getComponentBodies: async (ids: string[]) =>
-    Object.fromEntries(
-      ids
-        .filter((id) => id === "logger")
-        .map((id) => [id, { ...SLIMS[1], config_entries: [] }])
-    ),
+  getComponentBodies: async () => ({}),
 } as unknown as ESPHomeAPI;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
