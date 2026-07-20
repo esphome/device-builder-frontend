@@ -164,6 +164,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         this._componentId =
           this._available.devices.find((d) => d.parent_id === container.id)?.id ?? "";
       }
+      this._preselectUniqueTrigger();
     } catch (err) {
       this._error = getErrorMessage(err);
     } finally {
@@ -443,11 +444,21 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     } else {
       this._componentId = "";
     }
+    this._preselectUniqueTrigger();
   }
 
   private _onComponentChange(id: string) {
     this._componentId = id;
     this._triggerId = null;
+    this._preselectUniqueTrigger();
+  }
+
+  /** When exactly one trigger is offerable for the current target,
+   *  select it so Continue is a single click; the select stays
+   *  editable and the multi-trigger case is unchanged. */
+  private _preselectUniqueTrigger() {
+    const triggers = this._filteredTriggers();
+    if (triggers.length === 1) this._triggerId = triggers[0].id;
   }
 
   private _canContinue(): boolean {
