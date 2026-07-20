@@ -10,9 +10,10 @@ body:
         Thanks for reporting! 🙏 A couple of checks before filing:
 
 
-        - **Web Serial only works in Chromium browsers** (Chrome, Edge,
-        Opera). Firefox and Safari cannot connect to serial devices by
-        browser design — that's a browser limitation, not a bug we can fix.
+        - **Your browser must support Web Serial** — Chromium browsers
+        (Chrome, Edge, Opera) and recent Firefox work; Safari cannot
+        connect to serial devices — that's a browser limitation, not a
+        bug we can fix.
 
         - **Firmware / compile / component problems** belong in the
         [esphome repo](https://github.com/esphome/esphome/issues/new/choose)
