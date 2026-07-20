@@ -23,6 +23,7 @@ import type {
 } from "./esphome-schema.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import type { CatalogIndex } from "./yaml-completion-catalog.js";
+import { AUTOMATION_KEYS, CORE_KEYS } from "./yaml-sections.js";
 
 // Leading-whitespace counter — used when computing indents and
 // list-item lead text for the trigger / action apply snippets.
@@ -189,6 +190,24 @@ export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
   }
   topLevelMemo.set(catalog, out);
   return out;
+}
+
+const knownKeysMemo = new WeakMap<CatalogIndex, Set<string>>();
+
+/**
+ * Every valid top-level key: catalog domains and standalone ids plus the
+ * core and automation sections. ``null`` for an empty catalog —
+ * ``loadCatalog``'s failure path resolves an empty index, and callers must
+ * fail toward "known" rather than classify every component as unknown.
+ */
+export function knownTopLevelKeys(catalog: CatalogIndex): Set<string> | null {
+  if (catalog.components.length === 0) return null;
+  const cached = knownKeysMemo.get(catalog);
+  if (cached) return cached;
+  const keys = new Set<string>([...CORE_KEYS, ...AUTOMATION_KEYS]);
+  for (const item of buildTopLevelCompletions(catalog)) keys.add(item.label);
+  knownKeysMemo.set(catalog, keys);
+  return keys;
 }
 
 export function platformValueCompletion(c: ComponentCatalogEntry): Completion {

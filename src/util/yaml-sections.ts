@@ -87,7 +87,7 @@ export const CORE_KEYS = new Set([
 // In ESPHome, automations are inline on_* handlers within components.
 // `script` and `interval` are the standalone automation-adjacent
 // top-level keys.
-const AUTOMATION_KEYS = new Set(["script", "interval"]);
+export const AUTOMATION_KEYS = new Set(["script", "interval"]);
 
 export function categorizeSections(sections: YamlSection[]): CategorizedSections {
   const core: YamlSection[] = [];
