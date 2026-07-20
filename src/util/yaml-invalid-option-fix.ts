@@ -11,9 +11,6 @@
  * offered — the gate fails closed, so packages / `!extend` / unknown
  * components simply get no fix rather than a wrong one.
  */
-import type { EditorState } from "@codemirror/state";
-import type { ESPHomeAPI } from "../api/esphome-api.js";
-import type { LocalizeFunc } from "../common/localize.js";
 import { getKeyPath, getPlatformValue } from "./yaml-ast.js";
 import { loadCatalog, resolveAvailableEntries } from "./yaml-completion-catalog.js";
 import {
@@ -24,22 +21,13 @@ import {
   type ReadLine,
   type ValueTypeCause,
 } from "./yaml-error-analysis.js";
+import type { YamlFixContext } from "./yaml-fix-context.js";
 import { indentOf } from "./yaml-line-walker.js";
-
-export interface InvalidOptionFixContext {
-  api: ESPHomeAPI;
-  state: EditorState;
-  /** The sanitized validation-error message. */
-  message: string;
-  /** 1-indexed line the squiggle anchors on. */
-  blamedLine: number;
-  localize: LocalizeFunc;
-}
 
 /** Cause + one-click re-indent for a misnested option, or null when the
  *  buffer shape or the schema doesn't confirm it. Never throws. */
 export async function describeInvalidOptionFix(
-  ctx: InvalidOptionFixContext
+  ctx: YamlFixContext
 ): Promise<ValueTypeCause | null> {
   try {
     return await resolveFix(ctx);
@@ -48,7 +36,7 @@ export async function describeInvalidOptionFix(
   }
 }
 
-async function resolveFix(ctx: InvalidOptionFixContext): Promise<ValueTypeCause | null> {
+async function resolveFix(ctx: YamlFixContext): Promise<ValueTypeCause | null> {
   const parsed = parseInvalidOptionMessage(ctx.message);
   if (!parsed) return null;
   const doc = ctx.state.doc;
@@ -70,7 +58,7 @@ async function resolveFix(ctx: InvalidOptionFixContext): Promise<ValueTypeCause 
  * become the grandparent's child.
  */
 async function gateCandidate(
-  ctx: InvalidOptionFixContext,
+  ctx: YamlFixContext,
   parsed: { key: string; parent: string },
   cand: DedentedOptionCandidate,
   nest: boolean

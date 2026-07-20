@@ -27,7 +27,7 @@ const QUOTED_PATH_RE = /"([^"]*[/\\])([^"/\\]+)"/g;
 const PAIR_RE = /^\s*([^\s:#][^:]*?)\s*:(?:\s+(.*))?$/;
 
 /** Analysis walks never scan further than this many lines. */
-const WALK_BOUND = 50;
+export const WALK_BOUND = 50;
 
 /** Canonical child-indent step. A literal two: this module stays free of
  *  esphome-yaml-lang's CodeMirror import graph, where ESPHOME_YAML_INDENT

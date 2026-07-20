@@ -29,9 +29,7 @@ const BODIES: Record<string, ComponentCatalogEntry> = {
   sensor: { ...SLIMS[1], config_entries: [makeConfigEntry({ key: "id" })] },
 };
 
-const fakeApi = (
-  bodies: (ids: string[]) => Record<string, ComponentCatalogEntry> | never
-) =>
+const fakeApi = (bodies: (ids: string[]) => Record<string, ComponentCatalogEntry>) =>
   ({
     getComponents: async () => ({ components: SLIMS }),
     getComponentBodies: async (ids: string[]) => bodies(ids),

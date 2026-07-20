@@ -12,20 +12,25 @@ import { getKeyPath } from "./yaml-ast.js";
 import { loadCatalog, resolveAvailableEntries } from "./yaml-completion-catalog.js";
 import {
   lineKeyToken,
+  WALK_BOUND,
   YAML_INDENT_STEP,
   type ValueTypeCause,
 } from "./yaml-error-analysis.js";
-import type { InvalidOptionFixContext } from "./yaml-invalid-option-fix.js";
-import { indentOf, stripComment } from "./yaml-line-walker.js";
+import type { YamlFixContext } from "./yaml-fix-context.js";
+import {
+  indentOf,
+  RE_LIST_ITEM,
+  RE_TOP_LEVEL_KEY,
+  stripComment,
+} from "./yaml-line-walker.js";
 
 const COMPONENT_NOT_FOUND_RE = /^Component not found: ([A-Za-z0-9_]+)\.?$/;
-const SECTION_OPENER_RE = /^([A-Za-z0-9_]+)\s*:$/;
 
 /** Cause + one-click indent for a stray top-level key the section above
  *  accepts, or null when the buffer shape or the schema doesn't confirm
  *  it. Never throws. */
 export async function describeComponentNotFoundFix(
-  ctx: InvalidOptionFixContext
+  ctx: YamlFixContext
 ): Promise<ValueTypeCause | null> {
   try {
     return await resolveFix(ctx);
@@ -34,12 +39,11 @@ export async function describeComponentNotFoundFix(
   }
 }
 
-async function resolveFix(ctx: InvalidOptionFixContext): Promise<ValueTypeCause | null> {
+async function resolveFix(ctx: YamlFixContext): Promise<ValueTypeCause | null> {
   const parsed = ctx.message.match(COMPONENT_NOT_FOUND_RE);
   if (!parsed) return null;
   const key = parsed[1];
   const doc = ctx.state.doc;
-  if (ctx.blamedLine < 1 || ctx.blamedLine > doc.lines) return null;
   const blamedText = stripComment(doc.line(ctx.blamedLine).text);
   if (indentOf(blamedText) !== 0 || lineKeyToken(blamedText) !== key) return null;
 
@@ -80,17 +84,19 @@ async function resolveFix(ctx: InvalidOptionFixContext): Promise<ValueTypeCause 
 
 /** Nearest column-0 line above *line* when it is a valueless
  *  ``section:`` opener; null when it's anything else (a complete
- *  ``key: value`` pair owns no block for the stray key to join). */
+ *  ``key: value`` pair owns no block for the stray key to join).
+ *  Not ``findTopLevelBlock``: that walk skips non-key column-0 lines
+ *  and drops the line number this one needs. */
 function sectionOpenerAbove(
   doc: Text,
   line: number
 ): { key: string; line: number } | null {
-  for (let n = line - 1; n >= 1; n--) {
+  for (let n = line - 1; n >= Math.max(1, line - WALK_BOUND); n--) {
     const stripped = stripComment(doc.line(n).text);
     if (!stripped.trim()) continue;
     if (indentOf(stripped) !== 0) continue;
-    const m = stripped.match(SECTION_OPENER_RE);
-    return m ? { key: m[1], line: n } : null;
+    const m = stripped.match(RE_TOP_LEVEL_KEY);
+    return m && stripped.slice(m[0].length).trim() === "" ? { key: m[1], line: n } : null;
   }
   return null;
 }
@@ -102,7 +108,7 @@ function childIndent(doc: Text, openerLine: number, strayLine: number): number |
   for (let n = openerLine + 1; n < strayLine; n++) {
     const stripped = stripComment(doc.line(n).text);
     if (!stripped.trim()) continue;
-    if (/^\s*-(\s|$)/.test(stripped)) return null;
+    if (RE_LIST_ITEM.test(stripped)) return null;
     return indentOf(stripped);
   }
   return YAML_INDENT_STEP;
