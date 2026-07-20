@@ -1,0 +1,86 @@
+name: 🌐 web.esphome.io bug report
+description: Report a problem with the web.esphome.io site (flashing, Wi-Fi provisioning, logs).
+title: "[web.esphome.io] "
+type: "Bug"
+labels: ["web.esphome.io"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for reporting! 🙏 A couple of checks before filing:
+
+
+        - **Web Serial only works in Chromium browsers** (Chrome, Edge,
+        Opera). Firefox and Safari cannot connect to serial devices by
+        browser design — that's a browser limitation, not a bug we can fix.
+
+        - **Firmware / compile / component problems** belong in the
+        [esphome repo](https://github.com/esphome/esphome/issues/new/choose)
+        — web.esphome.io only delivers the firmware to the device.
+
+        - **Device Builder dashboard problems** (the ESPHome dashboard you
+        run yourself) go on the
+        [device-builder tracker](https://github.com/esphome/device-builder/issues/new?template=bug_report.yml).
+
+        - **Quick questions** land faster in the
+        [Discord channel](https://discord.gg/Rf2jWGVjaK).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: |
+        A clear description of the problem. Include reproduction steps
+        — "I clicked X, expected Y, got Z" is ideal.
+      placeholder: |
+        1. Open web.esphome.io and click "Connect"
+        2. Pick the USB serial port
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: action
+    attributes:
+      label: What were you trying to do?
+      multiple: false
+      options:
+        - Connect to the device / select the serial port
+        - Install / flash firmware
+        - Provision Wi-Fi (Improv)
+        - View logs
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and operating system
+      description: Browser with its version, and the OS it runs on.
+      placeholder: "e.g. Chrome 138 on macOS 15"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device / board
+      description: The board or chip you were connecting to.
+      placeholder: "e.g. ESP32-S3-DevKitC-1"
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console / log output
+      description: |
+        Open the browser devtools console (F12), reproduce the problem, and
+        paste any errors here. For log-viewing problems, include the
+        on-screen device log too.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots or anything else that might help us reproduce.

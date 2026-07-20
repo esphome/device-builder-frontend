@@ -1,7 +1,7 @@
-# With `blank_issues_enabled: false` and no issue templates defined,
-# the new-issue chooser shows nothing but these contact links — users
-# are funnelled straight to the right channel. Maintainers can still
-# open issues directly via the /issues/new URL when needed.
+# web.esphome.io bugs are filed here (this repo deploys the site);
+# dashboard bugs are funnelled to the backend tracker so triage stays
+# in one place. `blank_issues_enabled: false` removes the blank-issue
+# escape hatch.
 blank_issues_enabled: false
 contact_links:
   - name: 📋 Check the backlog first
@@ -11,11 +11,19 @@ contact_links:
       filing — saves duplicates and gives you a feel for the
       direction the project is heading.
 
-  - name: 🐛 Report a bug
+  - name: 🐛 Report a Device Builder dashboard bug
     url: https://github.com/esphome/device-builder/issues/new?template=bug_report.yml
     about: |
-      All bug reports — UI included — go on the backend tracker
-      so we can triage in one place.
+      Dashboard bug reports — UI included — go on the backend
+      tracker so we can triage in one place. Only web.esphome.io
+      reports are filed here.
+
+  - name: 🐛 ESPHome compilation / firmware / component issues
+    url: https://github.com/esphome/esphome/issues/new/choose
+    about: |
+      Compile errors, runtime problems on the device, and component
+      behaviour live in the esphome core repo — web.esphome.io only
+      delivers the firmware to the device.
 
   - name: 💡 Request / discuss a feature
     url: https://github.com/orgs/esphome/discussions
