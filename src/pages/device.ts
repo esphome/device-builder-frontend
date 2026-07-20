@@ -233,14 +233,23 @@ export class ESPHomePageDevice extends LitElement {
   // section editor keys its per-edit error suppression on the prop
   // changing, and a fresh object every render would wipe it immediately.
   private _instanceBackendErrors = memoizeOne(backendErrorsForInstance);
-  private _navErrorCounts = memoizeOne(
-    (errors: readonly BackendFieldError[], held: string | null) => {
-      const counts = backendErrorCounts(errors);
-      // Freshly built each memo miss, so deleting the held entry is safe.
-      if (held !== null) counts.delete(held);
-      return counts;
-    }
-  );
+  private _baseErrorCounts = memoizeOne(backendErrorCounts);
+
+  /** Navigator error counts minus the held instance's chip. The held key
+   *  changes on every keystroke of a half-typed section name, so the base
+   *  map is memoized on the errors alone and returned as-is (stable
+   *  identity, no navigator churn) unless it actually contains the held
+   *  entry. */
+  private _navErrorCounts(
+    errors: readonly BackendFieldError[],
+    held: string | null
+  ): Map<string, number> {
+    const base = this._baseErrorCounts(errors);
+    if (held === null || !base.has(held)) return base;
+    const counts = new Map(base);
+    counts.delete(held);
+    return counts;
+  }
 
   /** Form-relative path of the last focused field, and whether its YAML
    *  line wasn't found yet (a just-added value whose debounced write is
@@ -1753,14 +1762,16 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   /** Resolve the known-top-level-key set off the session-cached catalog.
-   *  ``loadCatalog`` never rejects (a failed fetch resolves an empty index
-   *  and resets its cache), so re-kicking on the next held-candidate event
-   *  retries for free. */
+   *  ``loadCatalog`` never rejects — a failed fetch resolves an empty index
+   *  (null set) and resets its cache — so clearing the kicked flag only on
+   *  that outcome allows a later retry without a per-keystroke refetch
+   *  storm against an already-unhealthy backend. */
   private _kickKnownKeys(): void {
-    if (this._catalogKicked && this._knownTopLevelKeys !== null) return;
+    if (this._catalogKicked) return;
     this._catalogKicked = true;
     void loadCatalog(this._api).then((catalog) => {
       this._knownTopLevelKeys = knownTopLevelKeys(catalog);
+      if (this._knownTopLevelKeys === null) this._catalogKicked = false;
     });
   }
 
