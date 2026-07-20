@@ -971,6 +971,7 @@
     "missing_dependencies_body": "Configure these first, then come back to add this one:",
     "missing_dependencies_add": "Add {domain}",
     "id_reference_empty": "No {domain} configured yet",
+    "id_reference_auto_configured": "Auto (uses the configured {domain})",
     "id_reference_add": "Add {domain}",
     "id_reference_auto": "Auto",
     "id_reference_auto_detail": "Let ESPHome pick the {domain}",

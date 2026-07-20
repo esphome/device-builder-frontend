@@ -8,6 +8,7 @@ import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
+  ADD_NEW_SENTINEL,
   AUTO_SENTINEL,
   renderIdReferenceField,
 } from "../../../src/components/device/config-entry-id-reference-renderer.js";
@@ -246,6 +247,64 @@ describe("renderIdReferenceField — inline error for an unknown id", () => {
   });
 });
 
+describe("renderIdReferenceField — id-less configured domain (device-builder#2212)", () => {
+  const IDLESS_LOGGER_YAML = "esphome:\n  name: d\nlogger:\n  baud_rate: 115200\n";
+
+  function renderLoggerRef(yaml: string) {
+    const entry = makeEntry(ConfigEntryType.STRING, { references_component: "logger" });
+    return renderIdReferenceField(
+      entry,
+      ["logger_id"],
+      makeRenderCtx({ logger_id: "" }, { overrides: { yaml } })
+    );
+  }
+
+  const placeholderOf = (tmpl: unknown): unknown =>
+    findElementBindings(tmpl, "wa-select")[0]?.placeholder;
+
+  // The class attribute mixes static text with a binding, so read the solo
+  // marker off the template values rather than the extracted bindings.
+  const hasSoloAdd = (tmpl: unknown): boolean =>
+    findTemplatesByAnchor(tmpl, "<wa-option").some((t) =>
+      (t.values as unknown[]).some((v) => v === "id-option-add--solo")
+    );
+
+  it("offers Auto instead of claiming no logger is configured", () => {
+    const tmpl = renderLoggerRef(IDLESS_LOGGER_YAML);
+    expect(placeholderOf(tmpl)).toBe("device.id_reference_auto_configured");
+    const values = findElementBindings(tmpl, "wa-option").map((o) => o.value);
+    expect(values).toContain(AUTO_SENTINEL);
+    expect(values).toContain(ADD_NEW_SENTINEL);
+  });
+
+  it("demotes the Add CTA out of its solo styling", () => {
+    expect(hasSoloAdd(renderLoggerRef(IDLESS_LOGGER_YAML))).toBe(false);
+  });
+
+  it("keeps the empty-state copy and solo Add CTA when the domain is absent", () => {
+    const tmpl = renderLoggerRef("esphome:\n  name: d\n");
+    expect(placeholderOf(tmpl)).toBe("device.id_reference_empty");
+    expect(findElementBindings(tmpl, "wa-option").map((o) => o.value)).not.toContain(
+      AUTO_SENTINEL
+    );
+    expect(hasSoloAdd(tmpl)).toBe(true);
+  });
+
+  it("selecting Auto emits the empty value (key omitted on save)", () => {
+    const ctx = makeRenderCtx(
+      { logger_id: "" },
+      { overrides: { yaml: IDLESS_LOGGER_YAML } }
+    );
+    const entry = makeEntry(ConfigEntryType.STRING, { references_component: "logger" });
+    const tmpl = renderIdReferenceField(entry, ["logger_id"], ctx);
+    const onChange = findElementBindings(tmpl, "wa-select")[0]["@change"] as (
+      e: Event
+    ) => void;
+    onChange({ target: { value: AUTO_SENTINEL } } as unknown as Event);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["logger_id"], "");
+  });
+});
+
 describe("renderIdReferenceField — revert-to-auto option (#2208)", () => {
   const LOGGER_YAML = "logger:\n  baud_rate: 115200\n";
 
@@ -284,7 +343,13 @@ describe("renderIdReferenceField — revert-to-auto option (#2208)", () => {
   });
 
   it("hides Auto while the field is empty (auto is already the default)", () => {
-    expect(optionValues(renderRef(""))).not.toContain(AUTO_SENTINEL);
+    // An id'd candidate keeps this on the sole-candidate-placeholder path;
+    // the id-less empty state now offers Auto explicitly (device-builder#2212).
+    const ctx = makeRenderCtx(
+      { logger_id: "" },
+      { overrides: { yaml: "logger:\n  id: my_logger\n" } }
+    );
+    expect(optionValues(renderRef("", {}, ctx))).not.toContain(AUTO_SENTINEL);
   });
 
   it("hides Auto on a required reference", () => {

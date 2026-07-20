@@ -14,6 +14,7 @@ import {
 } from "../../util/config-entry-yaml-scan.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { resolveSubstitutions } from "../../util/substitutions.js";
+import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -82,6 +83,12 @@ export function renderIdReferenceField(
     : nothing;
   // Solo "Add new" CTA only when there's genuinely nothing to show.
   const empty = candidates.length === 0 && !hasOrphanValue;
+  // An id-less singleton (plain logger:, wifi:, ...) yields no candidates
+  // even though the domain is configured; ESPHome auto-resolves the
+  // reference, so say that instead of claiming nothing is configured.
+  // Scanned from the YAML rather than ctx.presentComponents, which not
+  // every form host wires up (the automation action form doesn't).
+  const emptyButConfigured = empty && parseTopLevelComponents(ctx.yaml).has(domain);
 
   const onChange = (e: Event) => {
     const select = e.target as HTMLSelectElement;
@@ -118,7 +125,7 @@ export function renderIdReferenceField(
   // only option (empty state) the dropdown is a single CTA.
   const addOption = html`
     <wa-option
-      class="id-option id-option-add ${empty ? "id-option-add--solo" : ""}"
+      class="id-option id-option-add ${empty && !emptyButConfigured ? "id-option-add--solo" : ""}"
       value=${ADD_NEW_SENTINEL}
     >
       <span class="id-option-stack">
@@ -137,9 +144,23 @@ export function renderIdReferenceField(
         <wa-select
           class=${fieldError ? "invalid" : ""}
           ?disabled=${effectiveDisabled(entry, ctx)}
-          placeholder=${ctx.localize("device.id_reference_empty", { domain })}
+          placeholder=${ctx.localize(
+            emptyButConfigured
+              ? "device.id_reference_auto_configured"
+              : "device.id_reference_empty",
+            { domain }
+          )}
           @change=${onChange}
         >
+          ${
+            emptyButConfigured
+              ? idOption(
+                  AUTO_SENTINEL,
+                  ctx.localize("device.id_reference_auto"),
+                  ctx.localize("device.id_reference_auto_detail", { domain })
+                )
+              : nothing
+          }
           ${addOption}
         </wa-select>
         ${renderFieldError(path, ctx)}
