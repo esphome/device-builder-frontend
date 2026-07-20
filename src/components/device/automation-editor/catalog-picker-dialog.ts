@@ -517,12 +517,17 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * Find the action's id-shaped ConfigEntry that references the
    * picked device's domain and pre-fill it with the device's id.
    * Returns ``undefined`` when no such field exists (e.g. core
-   * actions, conditions that don't take an id).
+   * actions, conditions that don't take an id) or when the device's
+   * id is synthesized rather than declared in YAML — writing a
+   * synthetic id (``logger`` / ``uart_0``) into a reference param
+   * produces a dangling id ESPHome rejects (#2208); left empty,
+   * ESPHome auto-resolves the instance.
    */
   private _preFillFor(
     item: CatalogItem,
     device: AvailableComponentInstance
   ): Record<string, unknown> | undefined {
+    if (device.has_explicit_id !== true) return undefined;
     const domain = componentDomain(device.component_id);
     const idEntry = item.config_entries.find((e) => e.references_component === domain);
     if (!idEntry) return undefined;

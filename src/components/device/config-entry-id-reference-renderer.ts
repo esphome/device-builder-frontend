@@ -24,6 +24,7 @@ import {
 } from "./config-entry-renderers-shared.js";
 
 export const ADD_NEW_SENTINEL = "__esphome_add_new__";
+export const AUTO_SENTINEL = "__esphome_auto__";
 
 export function renderIdReferenceField(
   entry: ConfigEntry,
@@ -93,8 +94,24 @@ export function renderIdReferenceField(
       ctx.requestAddComponent(domain);
       return;
     }
-    ctx.emitChange(path, next);
+    // Empty string clears the key on serialization in every form host,
+    // reverting the field to ESPHome's auto-resolved instance.
+    ctx.emitChange(path, next === AUTO_SENTINEL ? "" : next);
   };
+
+  // Revert-to-auto for an optional reference with a committed value — the
+  // only visual-editor way out of a dangling id (e.g. the synthetic
+  // ``logger_id: logger`` older builds pre-filled, #2208). An empty field
+  // already reads as auto via the default-candidate placeholder, so the
+  // option only appears once a value is set.
+  const autoOption =
+    !entry.required && value !== ""
+      ? idOption(
+          AUTO_SENTINEL,
+          ctx.localize("device.id_reference_auto"),
+          ctx.localize("device.id_reference_auto_detail", { domain })
+        )
+      : nothing;
 
   // The "Add new <domain>" option lives at the bottom — same
   // affordance as Home Assistant's entity pickers. When it's the
@@ -144,7 +161,7 @@ export function renderIdReferenceField(
         }
         @change=${onChange}
       >
-        ${orphanOption}
+        ${autoOption} ${orphanOption}
         ${candidates.map((c) => {
           const secondary = c.name ? `${c.id} · ${domain}` : domain;
           // The label is display-only; the stored value stays c.id. Resolve

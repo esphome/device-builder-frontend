@@ -287,7 +287,8 @@ export interface AvailableComponentInstance {
   /** Catalog component id (``switch.gpio``, ``light.binary``). A
    *  sub-entity carries the bare sub-domain (``sensor``) instead. */
   component_id: string;
-  /** The configured ``id:`` value from YAML. */
+  /** The declared ``id:``, or a synthesized round-trip identity (the domain
+   *  for an id-less singleton, ``<domain>_<idx>`` positional) when none. */
   id: string;
   /** The configured ``name:`` value, if any (purely for display). */
   name?: string;
@@ -298,4 +299,7 @@ export interface AvailableComponentInstance {
   is_entity_container?: boolean;
   /** A sub-entity's owning container id, for grouping it under that container. */
   parent_id?: string;
+  /** True only when the YAML declares ``id:``. A synthesized ``id`` must
+   *  never be written into an action's reference param (#2208). */
+  has_explicit_id?: boolean;
 }

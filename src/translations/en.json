@@ -970,6 +970,8 @@
     "missing_dependencies_add": "Add {domain}",
     "id_reference_empty": "No {domain} configured yet",
     "id_reference_add": "Add {domain}",
+    "id_reference_auto": "Auto",
+    "id_reference_auto_detail": "Let ESPHome pick the {domain}",
     "id_reference_unresolved": "{domain} not defined in this file",
     "id_reference_unknown_error": "ID \"{id}\" is not defined in this configuration.",
     "return_to_after_dep_prefix": "Adding a dependency. We'll bring you back to",

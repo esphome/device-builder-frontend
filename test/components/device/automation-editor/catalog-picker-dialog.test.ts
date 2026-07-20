@@ -81,6 +81,14 @@ describe("catalog-picker-dialog filtering contract", () => {
     expect(body).toMatch(/references_component === domain/);
     expect(body).toMatch(/\[idEntry\.key\]: device\.id/);
   });
+
+  it("By-target never pre-fills a synthesized instance id (#2208)", async () => {
+    // A synthetic id (`logger`, `uart_0`) is a round-trip identity, not a
+    // YAML id — writing it into a reference param produces a dangling id.
+    const src = await readSource();
+    const body = methodBody(src, "_preFillFor");
+    expect(body).toMatch(/has_explicit_id !== true.*return undefined/);
+  });
 });
 
 describe("catalog-picker-dialog tab strip", () => {

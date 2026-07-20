@@ -7,7 +7,10 @@
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
-import { renderIdReferenceField } from "../../../src/components/device/config-entry-id-reference-renderer.js";
+import {
+  AUTO_SENTINEL,
+  renderIdReferenceField,
+} from "../../../src/components/device/config-entry-id-reference-renderer.js";
 import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
@@ -240,5 +243,53 @@ describe("renderIdReferenceField — inline error for an unknown id", () => {
     const texts = errorTexts(tmpl);
     expect(texts).toHaveLength(1);
     expect(texts[0]).not.toBe("device.id_reference_unknown_error");
+  });
+});
+
+describe("renderIdReferenceField — revert-to-auto option (#2208)", () => {
+  const LOGGER_YAML = "logger:\n  baud_rate: 115200\n";
+
+  function renderRef(
+    value: string,
+    entryOverrides: Partial<Parameters<typeof makeEntry>[1]> = {},
+    ctx = makeRenderCtx({ logger_id: value }, { overrides: { yaml: LOGGER_YAML } })
+  ) {
+    const entry = makeEntry(ConfigEntryType.STRING, {
+      references_component: "logger",
+      ...entryOverrides,
+    });
+    return renderIdReferenceField(entry, ["logger_id"], ctx);
+  }
+
+  const optionValues = (tmpl: unknown): unknown[] =>
+    findElementBindings(tmpl, "wa-option").map((o) => o.value);
+
+  it("offers Auto on an optional reference with a committed value", () => {
+    // The dangling `logger_id: logger` older builds pre-filled has no other
+    // visual-editor way out.
+    expect(optionValues(renderRef("logger"))).toContain(AUTO_SENTINEL);
+  });
+
+  it("selecting Auto clears the value (key removed on serialization)", () => {
+    const ctx = makeRenderCtx(
+      { logger_id: "logger" },
+      { overrides: { yaml: LOGGER_YAML } }
+    );
+    const tmpl = renderRef("logger", {}, ctx);
+    const onChange = findElementBindings(tmpl, "wa-select")[0]["@change"] as (
+      e: Event
+    ) => void;
+    onChange({ target: { value: AUTO_SENTINEL } } as unknown as Event);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["logger_id"], "");
+  });
+
+  it("hides Auto while the field is empty (auto is already the default)", () => {
+    expect(optionValues(renderRef(""))).not.toContain(AUTO_SENTINEL);
+  });
+
+  it("hides Auto on a required reference", () => {
+    expect(optionValues(renderRef("logger", { required: true }))).not.toContain(
+      AUTO_SENTINEL
+    );
   });
 });
