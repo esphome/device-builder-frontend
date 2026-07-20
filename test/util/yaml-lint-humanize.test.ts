@@ -18,7 +18,10 @@ import {
   type BannerError,
   type MappedValidationError,
 } from "../../src/util/yaml-lint-backend.js";
+import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import { flush } from "../_dom.js";
+import { makeComponentEntry } from "./_make-component-entry.js";
+import { makeConfigEntry } from "./_make-config-entry.js";
 
 // Echo the key + line so a humanized hit is distinguishable from raw text.
 const localize = (key: string, values?: Record<string, string | number>): string =>
@@ -308,6 +311,79 @@ describe("backend linter humanizes + banners a locatable parse error", () => {
         fromIndent: 2,
         kind: "dash-space",
       });
+    } finally {
+      view.destroy();
+    }
+  });
+
+  it("squiggles + banners the stray-top-level-key hint with the indent fix", async () => {
+    const doc = "logger:\n  baud_rate: 115200\nid: mylogger\n";
+    // The catalog gate needs a logger body carrying `id`; mountView's api
+    // is validate-only, so this test wires the full surface itself.
+    const api = {
+      validateYaml: vi.fn(async () => ({
+        yaml_errors: [],
+        validation_errors: [
+          {
+            message: "Component not found: id.",
+            range: {
+              document: "x.yaml",
+              start_line: 2,
+              start_col: 0,
+              end_line: 2,
+              end_col: 2,
+            },
+          },
+        ],
+      })),
+      getComponents: async () => ({ components: [makeComponentEntry("logger")] }),
+      getComponentBodies: async () => ({
+        logger: {
+          ...makeComponentEntry("logger"),
+          config_entries: [makeConfigEntry({ key: "id" })],
+        },
+      }),
+    } as unknown as ESPHomeAPI;
+
+    let banner: BannerError[] = [];
+    const fixes: YamlAutoFix[] = [];
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        extensions: [
+          // The analyzer's AST agreement check needs the YAML parse tree
+          // the production editor always carries.
+          esphomeYaml(),
+          createBackendYamlLinter({
+            api,
+            getConfiguration: () => "x.yaml",
+            localize,
+            onResult: (errors) => {
+              banner = errors;
+            },
+            onAutoFix: (fix) => fixes.push(fix),
+          }),
+        ],
+      }),
+      parent: document.body,
+    });
+    try {
+      forceLinting(view);
+      await flush();
+      const messages: string[] = [];
+      forEachDiagnostic(view.state, (d) => messages.push(d.message));
+      expect(messages).toEqual([
+        "Component not found: id. yaml_editor.error_indent_under_section_fix:3",
+      ]);
+
+      const expectedFix = { line: 3, indent: 2, key: "id", fromIndent: 0 };
+      const actions = collectActions(view);
+      expect(actions.map((a) => a.name)).toEqual(["yaml_editor.error_auto_fix"]);
+      actions[0].apply(view, 0, 0);
+      expect(fixes).toEqual([expectedFix]);
+
+      expect(banner).toHaveLength(1);
+      expect(banner[0].fix).toEqual(expectedFix);
     } finally {
       view.destroy();
     }

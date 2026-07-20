@@ -32,7 +32,7 @@ const WALK_BOUND = 50;
 /** Canonical child-indent step. A literal two: this module stays free of
  *  esphome-yaml-lang's CodeMirror import graph, where ESPHOME_YAML_INDENT
  *  is the same two spaces. */
-const YAML_INDENT_STEP = 2;
+export const YAML_INDENT_STEP = 2;
 
 /**
  * Strip absolute directory paths out of a backend error message.

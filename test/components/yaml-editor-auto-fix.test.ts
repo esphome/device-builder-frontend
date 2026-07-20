@@ -268,6 +268,33 @@ describe("yaml-editor applyAutoFix (#1884)", () => {
     expect(validateYaml).not.toHaveBeenCalled();
   });
 
+  it("applies the stray-top-level-key indent (component-not-found fix)", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const broken = "logger:\n  baud_rate: 115200\nid: mylogger\n";
+    const fixed = "logger:\n  baud_rate: 115200\n  id: mylogger\n";
+    const el = await mountEditor(validateYaml, broken);
+    const view = viewOf(el);
+
+    expect(await el.applyAutoFix({ line: 3, indent: 2, key: "id", fromIndent: 0 })).toBe(
+      "applied"
+    );
+
+    expect(view.state.doc.toString()).toBe(fixed);
+    undo(view);
+    expect(view.state.doc.toString()).toBe(broken);
+  });
+
+  it("no-ops a stale stray-key fix whose line was already indented", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const doc = "logger:\n  baud_rate: 115200\n  id: mylogger\n";
+    const el = await mountEditor(validateYaml, doc);
+
+    expect(await el.applyAutoFix({ line: 3, indent: 2, key: "id", fromIndent: 0 })).toBe(
+      "stale"
+    );
+    expect(validateYaml).not.toHaveBeenCalled();
+  });
+
   it("applies a comment-out fix at the key's indent", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
     const broken =

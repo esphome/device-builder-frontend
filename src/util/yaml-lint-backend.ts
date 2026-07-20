@@ -36,6 +36,7 @@ import {
   type ReadLine,
   type YamlAutoFix,
 } from "./yaml-error-analysis.js";
+import { describeComponentNotFoundFix } from "./yaml-component-not-found-fix.js";
 import { describeInvalidOptionFix } from "./yaml-invalid-option-fix.js";
 import { indentOf } from "./yaml-line-walker.js";
 import { isOpenConfigFile } from "./yaml-validation-summary.js";
@@ -403,15 +404,17 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // list items, a half-typed key with no ':', a dash stuck to its
         // key), name that cause, and carry its repair when it has one.
         const squiggleLineNum = doc.lineAt(from).number;
+        const fixCtx = {
+          api: opts.api,
+          state: view.state,
+          message,
+          blamedLine: squiggleLineNum,
+          localize: opts.localize,
+        };
         const cause =
           describeValueTypeCause(readLine, squiggleLineNum, opts.localize, message) ??
-          (await describeInvalidOptionFix({
-            api: opts.api,
-            state: view.state,
-            message,
-            blamedLine: squiggleLineNum,
-            localize: opts.localize,
-          }));
+          (await describeInvalidOptionFix(fixCtx)) ??
+          (await describeComponentNotFoundFix(fixCtx));
         if (cause) message = `${message} ${cause.text}`;
         diagnostics.push({
           from,
