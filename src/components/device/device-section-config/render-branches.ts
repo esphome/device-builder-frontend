@@ -66,8 +66,9 @@ export function renderStructuredFormBranch(
   config: SectionConfigResponse,
   canDelete: boolean
 ) {
-  // Memoized on its inputs, so this repeat of render()'s call returns the
-  // same reference and the form's .entries identity stays stable.
+  // Repeats render()'s call. Cheap: the resolver returns a constant or the
+  // catalog's own array for map/default sections; only list sections
+  // allocate fresh, as every render already did.
   const renderEntries = resolveSectionEntries(host.sectionKey, config.entries);
   return html`
     ${
