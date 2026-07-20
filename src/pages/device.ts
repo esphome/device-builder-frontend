@@ -1562,7 +1562,8 @@ export class ESPHomePageDevice extends LitElement {
     // throttle means clicking the held line itself emits no event; the
     // navigator entry (kept visible) is the release path there.
     if (e.detail.viaEdit === true) {
-      if (this._knownTopLevelKeys === null) this._kickKnownKeys();
+      // An unresolved key set (catalog still loading, or failed — retried
+      // on the next device load, never from this hot path) means no holds.
       if (this._knownTopLevelKeys !== null && !this._knownTopLevelKeys.has(match.key)) {
         this._heldUnknownInstance = instanceKey(sectionKey, match.fromLine);
         return;
