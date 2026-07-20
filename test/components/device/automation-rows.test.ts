@@ -1,10 +1,11 @@
 /**
  * Unit-pins the pure ``automation-rows`` module lifted out of
- * ``device-section-config``'s ``_renderTriggersTable`` /
- * ``_renderActionFieldsTable``: filter + label of inline trigger and
- * action-field rows. The catalog/i18n labels are injected so these run with
- * no DOM, controller, or live API — the component methods are now thin
- * wrappers that feed in ``parseYamlAutomations(yaml)`` and the label callback.
+ * ``device-section-config``'s ``renderTriggersTable`` /
+ * ``renderActionFieldsTable`` (render-tables.ts): filter + label of inline
+ * trigger and action-field rows. The catalog/i18n labels are injected so
+ * these run with no DOM, controller, or live API — the table renderers are
+ * thin wrappers that feed in ``parseYamlAutomations(yaml)`` and the label
+ * callback.
  */
 import { describe, expect, it } from "vitest";
 

@@ -54,8 +54,8 @@ export interface YamlSection {
   /**
    * Component action-list field name (``open_action``) for a
    * ``component_action`` automation row. Kept distinct from
-   * ``eventKey`` (a trigger key) so the trigger table and
-   * ``_triggerLabel`` don't sweep these in — these have no trigger.
+   * ``eventKey`` (a trigger key) so the trigger table and its
+   * trigger-label resolver don't sweep these in — these have no trigger.
    */
   actionField?: string;
   /**

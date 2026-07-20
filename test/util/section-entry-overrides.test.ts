@@ -178,7 +178,7 @@ describe("device-section-config wiring", () => {
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
       here,
-      "../../src/components/device/device-section-config.ts"
+      "../../src/components/device/device-section-config/render-branches.ts"
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
 

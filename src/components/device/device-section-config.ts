@@ -7,7 +7,7 @@ import {
   mdiPencil,
   mdiPlusCircleOutline,
 } from "@mdi/js";
-import { html, LitElement, nothing, type TemplateResult } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
@@ -17,21 +17,16 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { dangerBannerStyles } from "../../styles/banners.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { actionFieldLabel } from "../../util/action-field-label.js";
 import {
   NO_INSTANCE_ERRORS,
   type InstanceBackendErrors,
 } from "../../util/backend-field-errors.js";
-import { defaultBoardImageUrl, onBoardImageError } from "../../util/board-image.js";
-import { pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
-import { renderMarkdown } from "../../util/markdown.js";
 import { notifyError } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
-import { parseYamlAutomations, type YamlSection } from "../../util/yaml-sections.js";
 import {
   applyYamlDiff,
   locationFromSectionKey,
@@ -40,25 +35,14 @@ import {
 import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
 
-import { scrollFlashRow } from "./field-highlight.js";
 import { fieldHighlightStyles } from "./field-highlight.styles.js";
 
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "../confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
-import "./add-api-action-dialog.js";
 import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
-import "./add-automation-dialog.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
-import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
-import "./device-section-automation-list.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
-import {
-  selectActionFieldRows,
-  selectTriggerRows,
-} from "./device-section-config/automation-rows.js";
 import {
   applySectionValues,
   flushDraft,
@@ -70,16 +54,28 @@ import {
   type SectionConfigResponse,
 } from "./device-section-config/loading.js";
 import {
+  maybeFlashApiActionsList,
+  revealAdvancedForErrors,
+  revealAdvancedForFocus,
+} from "./device-section-config/reveal.js";
+import {
+  renderPlatformDomainBranch,
+  renderStructuredFormBranch,
+  renderYamlOnlyBranch,
+  type StructuredFormOpts,
+} from "./device-section-config/render-branches.js";
+import {
+  renderAddAutomationDialog,
+  renderApiActionDialog,
+  renderDeleteConfirmDialog,
+} from "./device-section-config/render-dialogs.js";
+import { renderSectionHeader } from "./device-section-config/render-header.js";
+import {
   resolveComponentId,
   resolveShortcutTarget,
   type ShortcutTarget,
 } from "./device-section-config/shortcut-target.js";
-// The value imports (isSecuritySection / isDeprecationSection) already execute
-// the modules, registering the notice elements — no separate side-effect
-// imports needed.
-import { isDeprecationSection } from "./deprecation-notice.js";
 import type { ApplySectionValuesDetail } from "./notice-banner.js";
-import { isSecuritySection } from "./security-notice.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
@@ -175,7 +171,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   // Sections whose advanced fields we've auto-revealed for caret-follow once.
   // Not reactive — bookkeeping so a later deliberate collapse isn't reopened.
-  private readonly _autoRevealedSections = new Set<string>();
+  readonly _autoRevealedSections = new Set<string>();
 
   // Section's resolved fromLine against the *current* yaml. Forwarded to the
   // form so its conflict-detection stays aligned with read/write paths.
@@ -199,7 +195,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   // Resolves the automations-list rows' pretty trigger names; shared
   // with the device navigator.
-  private readonly _triggerCatalog = new TriggerCatalogController(this, () => ({
+  readonly _triggerCatalog = new TriggerCatalogController(this, () => ({
     api: this._api,
     platform: this.board?.esphome.platform || undefined,
     boardId: this.board?.id,
@@ -213,7 +209,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    *  keystroke while the backend map lags a lint round-trip, so on a path
    *  collision the client's message wins. Memoised so per-keystroke renders
    *  keep the form's errors prop identity stable. */
-  private _mergeErrors = memoizeOne(
+  _mergeErrors = memoizeOne(
     (
       backend: Map<string, ValidationError>,
       cleared: Set<string>,
@@ -230,18 +226,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
   );
 
-  private get _showAdvanced(): boolean {
+  get _showAdvanced(): boolean {
     return this._advancedShownSections.has(this.sectionKey);
   }
 
-  private _setShowAdvanced(show: boolean) {
+  _setShowAdvanced(show: boolean) {
     const next = new Set(this._advancedShownSections);
     if (show) next.add(this.sectionKey);
     else next.delete(this.sectionKey);
     this._advancedShownSections = next;
   }
 
-  private _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
+  _onAdvancedToggle = (e: CustomEvent<{ show: boolean }>) => {
     this._setShowAdvanced(e.detail.show);
   };
 
@@ -275,73 +271,21 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     this._revealAdvancedForErrors(changedProperties);
   }
 
-  /**
-   * When a backend error lands on an advanced field that's currently
-   * hidden, reveal the advanced fields so the inline message is visible.
-   */
   private _revealAdvancedForErrors(changedProperties: Map<string, unknown>): void {
-    if (!changedProperties.has("backendErrors") && !changedProperties.has("_config")) {
-      return;
-    }
-    if (!this.backendErrors.fields.size) return;
-    this._autoRevealAdvanced(
-      [...this.backendErrors.fields.keys()].map((path) => path.split("."))
-    );
+    revealAdvancedForErrors(this, changedProperties);
   }
 
-  /**
-   * When the caret follows to an advanced field that's currently hidden (Show
-   * advanced off and the field has no value yet, so it isn't rendered), reveal
-   * the section's advanced fields here in willUpdate so the field renders this
-   * pass and the form's scroll-to-field can reach it.
-   */
   private _revealAdvancedForFocus(changedProperties: Map<string, unknown>): void {
-    if (!changedProperties.has("focusFieldPath") && !changedProperties.has("_config")) {
-      return;
-    }
-    if (this.focusFieldPath?.length) this._autoRevealAdvanced([this.focusFieldPath]);
-  }
-
-  /**
-   * Reveal the section's hidden advanced fields when any of *paths* is
-   * advanced. At most once per section so a later deliberate collapse
-   * sticks (mirrors config-entry-form's seed-once nested-disclosure
-   * behaviour — auto-reveal shouldn't fight the user's choice).
-   */
-  private _autoRevealAdvanced(paths: readonly string[][]): void {
-    if (this._showAdvanced || !this._config) return;
-    if (this._autoRevealedSections.has(this.sectionKey)) return;
-    const entries = resolveSectionEntries(this.sectionKey, this._config.entries);
-    if (!paths.some((path) => pathIsAdvanced(entries, path))) return;
-    this._autoRevealedSections.add(this.sectionKey);
-    this._setShowAdvanced(true);
+    revealAdvancedForFocus(this, changedProperties);
   }
 
   updated() {
     this._triggerCatalog.ensure();
-    this._maybeFlashApiActionsList();
+    maybeFlashApiActionsList(this);
   }
 
   /** ``focusFieldPath`` key already flashed — one-shot per target. */
-  private _apiListFlashKey?: string;
-
-  /** ``api.actions`` / ``services`` are hidden from the form — the
-   *  manage-list below it owns them, so a caret on those keys lands
-   *  there instead of on a field that no longer renders. */
-  private _maybeFlashApiActionsList(): void {
-    if (this.sectionKey !== "api") return;
-    const head = this.focusFieldPath?.[0];
-    if (head !== "actions" && head !== "services") return;
-    const key = JSON.stringify(this.focusFieldPath);
-    if (key === this._apiListFlashKey) return;
-    const list = this.shadowRoot?.querySelector<HTMLElement>(
-      "esphome-section-automation-list"
-    );
-    // The list renders once the section config loads — hold the shot.
-    if (!list) return;
-    this._apiListFlashKey = key;
-    scrollFlashRow(list);
-  }
+  _apiListFlashKey?: string;
 
   connectedCallback() {
     super.connectedCallback();
@@ -402,23 +346,22 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
   }
 
-  private _onShowYamlEditor() {
+  _onShowYamlEditor() {
     fireEvent(this, "show-yaml-editor");
   }
 
-  private _onAddPlatform() {
+  _onAddPlatform() {
     // Same deep-link the id-reference "+ Add new <domain>" pickers use:
     // board-info catches it and opens the add-component dialog filtered
     // to this domain.
     fireEvent(this, "request-add-component", { domain: this.sectionKey });
   }
 
-  private _onValueChange = (e: CustomEvent<ConfigEntryValueChange>) =>
-    onValueChange(this, e);
+  _onValueChange = (e: CustomEvent<ConfigEntryValueChange>) => onValueChange(this, e);
 
-  private _onDeleteConfirmed = () => onDeleteConfirmed(this);
+  _onDeleteConfirmed = () => onDeleteConfirmed(this);
 
-  private _onApplySectionValues = (e: CustomEvent<ApplySectionValuesDetail>) =>
+  _onApplySectionValues = (e: CustomEvent<ApplySectionValuesDetail>) =>
     applySectionValues(this, e.detail.changes);
 
   protected render() {
@@ -431,11 +374,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
 
     if (!this._config) return nothing;
+    const config = this._config;
 
     const showAdvanced = this._showAdvanced;
     // Handles overrides for sections whose backend schema doesn't match the
     // actual user-keyed shape (currently just substitutions).
-    const renderEntries = resolveSectionEntries(this.sectionKey, this._config.entries);
+    const renderEntries = resolveSectionEntries(this.sectionKey, config.entries);
     // Free-form / structural sections: show "edit via YAML" instead of the
     // form. external_components and packages are always-YAML (discriminated
     // unions don't fit the catalog — see #361 for the packages data-loss
@@ -460,234 +404,47 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       ? this._localize("device.external_component_title")
       : this._isPlatformDomain
         ? this._localize("device.platform_section_title")
-        : this._config.title;
+        : config.title;
 
     return html`
-      <div class="section-header">
-        <div class="section-header-info">
-          <div class="section-header-title-row">
-            <h3 class="section-title">${headerTitle}</h3>
-            ${
-              this._config.docs_url
-                ? html`<a
-                    class="docs-link"
-                    href=${this._config.docs_url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    ${this._localize("device.docs")}
-                    <wa-icon library="mdi" name="open-in-new"></wa-icon>
-                  </a>`
-                : nothing
-            }
-          </div>
-          ${
-            catalogMiss
-              ? html`<p class="section-subtitle">${this.sectionKey}</p>`
-              : nothing
-          }
-          ${
-            this._config.description
-              ? html`<p class="section-desc">
-                  ${renderMarkdown(this._config.description)}
-                </p>`
-              : nothing
-          }
-        </div>
-        ${
-          catalogMiss
-            ? nothing
-            : html`<div class="section-image">
-                <img
-                  src=${this._config.image_url || defaultBoardImageUrl()}
-                  alt=${this._config.title}
-                  referrerpolicy="no-referrer"
-                  @error=${onBoardImageError}
-                />
-              </div>`
-        }
-      </div>
-      ${
-        sectionAlerts.length > 0
-          ? html`<div class="danger-banner section-error-banner" role="alert">
-              <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
-              <div class="danger-banner-text">
-                ${sectionAlerts.map((msg) => html`<p>${msg}</p>`)}
-              </div>
-            </div>`
-          : nothing
-      }
+      ${renderSectionHeader(this, { config, catalogMiss, headerTitle, sectionAlerts })}
       ${
         this._isPlatformDomain
-          ? html`${this._renderNotice(html`
-              <p>
-                ${this._localize("device.platform_domain_section", {
-                  key: this.sectionKey,
-                })}
-              </p>
-              <button
-                type="button"
-                class="yaml-only-notice-cta"
-                @click=${this._onAddPlatform}
-              >
-                ${this._localize("device.id_reference_add", {
-                  domain: this.sectionKey,
-                })}
-              </button>
-            `)}
-            ${this._renderActionsRow(canDelete)}`
+          ? this._renderPlatformDomainBranch(canDelete)
           : yamlOnly
-            ? html`${this._renderNotice(html`
-                <p>${this._localize("device.yaml_only_section")}</p>
-                ${
-                  this.yamlPaneVisible
-                    ? nothing
-                    : html`<button
-                        type="button"
-                        class="yaml-only-notice-cta"
-                        @click=${this._onShowYamlEditor}
-                      >
-                        ${this._localize("device.show_yaml_editor")}
-                      </button>`
-                }
-              `)}
-              ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
-              ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
-            : html`
-                ${
-                  isSecuritySection(this.sectionKey)
-                    ? html`<esphome-security-notice
-                        .sectionKey=${this.sectionKey}
-                        .yaml=${this.yaml}
-                        .configuration=${this.configuration}
-                        .fromLine=${this._resolvedFromLine}
-                        @apply-section-values=${this._onApplySectionValues}
-                      ></esphome-security-notice>`
-                    : nothing
-                }
-                ${
-                  isDeprecationSection(this.sectionKey)
-                    ? html`<esphome-deprecation-notice
-                        .sectionKey=${this.sectionKey}
-                        .values=${this._values}
-                        .entries=${renderEntries}
-                        @apply-section-values=${this._onApplySectionValues}
-                      ></esphome-deprecation-notice>`
-                    : nothing
-                }
-                <esphome-config-entry-form
-                  .entries=${renderEntries}
-                  .requiredGroups=${this._config.required_groups}
-                  .values=${this._values}
-                  .errors=${this._mergeErrors(
-                    this.backendErrors.fields,
-                    this._clearedBackendPaths,
-                    this._fieldErrors
-                  )}
-                  .board=${this.board}
-                  .yaml=${this.yaml}
-                  .fromLine=${this._resolvedFromLine}
-                  .sectionKey=${this.sectionKey}
-                  .configuration=${this.configuration}
-                  .focusFieldPath=${this.focusFieldPath}
-                  .presentComponents=${this._presentComponents}
-                  advanced-section
-                  gate-advanced
-                  ?show-advanced=${showAdvanced}
-                  @value-change=${this._onValueChange}
-                  @advanced-toggle=${this._onAdvancedToggle}
-                  @edit-action-field=${this._onEditActionField}
-                ></esphome-config-entry-form>
-                ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
-                ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
-                ${this._renderActionsRow(canDelete)}
-              `
+            ? this._renderYamlOnlyBranch(canDelete)
+            : this._renderStructuredFormBranch({
+                config,
+                renderEntries,
+                showAdvanced,
+                canDelete,
+              })
       }
-      ${this._renderApiActionDialog()} ${this._renderAddAutomationDialog()}
-      ${
-        canDelete
-          ? html`<esphome-confirm-dialog
-              heading=${this._localize("device.delete_section")}
-              confirm-label=${this._localize("device.delete_section")}
-              message=${this._localize("device.confirm_delete_section", {
-                name: this._config.title,
-              })}
-              destructive
-              @confirm=${this._onDeleteConfirmed}
-            ></esphome-confirm-dialog>`
-          : nothing
-      }
+      ${renderApiActionDialog(this)} ${renderAddAutomationDialog(this)}
+      ${renderDeleteConfirmDialog(this, canDelete, config)}
     `;
   }
 
-  private _renderDeleteButton() {
-    return html`<button
-      class="delete-button"
-      ?disabled=${this._deleting}
-      @click=${() => this._confirmDialog?.open()}
-    >
-      <wa-icon library="mdi" name="delete"></wa-icon>
-      ${this._localize("device.delete_section")}
-    </button>`;
+  private _renderPlatformDomainBranch(canDelete: boolean) {
+    return renderPlatformDomainBranch(this, canDelete);
   }
 
-  /**
-   * Inline manage-list of api_action entries. Rendered only for the
-   * api section, through the shared automation-list component (one
-   * surface for api actions, triggers, and component action fields).
-   */
-  private _renderApiActionsTable() {
-    if (this.sectionKey !== "api") return nothing;
-    const rows = parseYamlAutomations(this.yaml)
-      .filter((s) => s.key.startsWith("automation:api_action:"))
-      .map((s) => ({ key: s.key, label: s.id ?? "" }));
-    return html`<esphome-section-automation-list
-      .heading=${this._localize("device.api_actions_list_title")}
-      .rows=${rows}
-      add-label=${this._localize("device.add_api_action")}
-      empty-text=${this._localize("device.api_actions_list_empty")}
-      edit-label=${this._localize("device.api_actions_list_edit")}
-      delete-label=${this._localize("device.api_actions_list_delete")}
-      busy-key=${this._deletingRow}
-      @add=${this._onOpenAddApiAction}
-      @edit=${this._onEditRow}
-      @delete=${this._onDeleteRow}
-    ></esphome-section-automation-list>`;
+  private _renderYamlOnlyBranch(canDelete: boolean) {
+    return renderYamlOnlyBranch(this, canDelete);
   }
 
-  private _renderActionsRow(canDelete: boolean) {
-    if (!canDelete) return nothing;
-    return html`<div class="actions">${this._renderDeleteButton()}</div>`;
+  private _renderStructuredFormBranch(opts: StructuredFormOpts) {
+    return renderStructuredFormBranch(this, opts);
   }
 
-  /** The info-notice shell shared by the YAML-only and platform-domain
-   *  states; *body* supplies the message and its CTA. */
-  private _renderNotice(body: TemplateResult) {
-    return html`<div class="yaml-only-notice" role="note">
-      <wa-icon library="mdi" name="information-outline"></wa-icon>
-      <div class="yaml-only-notice-body">${body}</div>
-    </div>`;
-  }
-
-  private _renderApiActionDialog() {
-    if (this.sectionKey !== "api") return nothing;
-    return html`<esphome-add-api-action-dialog
-      .boardName=${this.boardName}
-      .configuration=${this.configuration}
-      .board=${this.board}
-      .yaml=${this.yaml}
-      @automation-added=${this._onApiActionAdded}
-    ></esphome-add-api-action-dialog>`;
-  }
-
-  private _onOpenAddApiAction = () => {
+  _onOpenAddApiAction = () => {
     this._addApiActionDialog?.open();
   };
 
   /** Backend confirmed the new api_action landed. Route the
    *  navigator (and the right pane) to its editor so the user can
    *  fill in variables + actions immediately. */
-  private _onApiActionAdded = (e: CustomEvent<{ sectionKey: string }>) => {
+  _onApiActionAdded = (e: CustomEvent<{ sectionKey: string }>) => {
     e.stopPropagation();
     this.dispatchEvent(
       new CustomEvent<{ sectionKey: string }>("section-select", {
@@ -701,7 +458,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   /** Edit any manage-list row: route the navigator to its stable
    *  section key. Shared by api actions, triggers, and action fields —
    *  every row carries its ``automation:…`` key. */
-  private _onEditRow = (e: CustomEvent<{ key: string }>) => {
+  _onEditRow = (e: CustomEvent<{ key: string }>) => {
     e.stopPropagation();
     this.dispatchEvent(
       new CustomEvent<{ sectionKey: string }>("section-select", {
@@ -720,7 +477,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * (``deleteAutomation`` → apply diff → ``updateConfig``) for all three.
    * One delete at a time; ``_deletingRow`` locks the lists meanwhile.
    */
-  private _onDeleteRow = async (e: CustomEvent<{ key: string }>) => {
+  _onDeleteRow = async (e: CustomEvent<{ key: string }>) => {
     e.stopPropagation();
     const key = e.detail.key;
     const location = locationFromSectionKey(key);
@@ -756,7 +513,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * shortcut. Thin wrapper over the pure ``resolveShortcutTarget``,
    * injecting this section's catalog gate.
    */
-  private _shortcutTarget(): ShortcutTarget {
+  _shortcutTarget(): ShortcutTarget {
     return resolveShortcutTarget(
       this.yaml,
       this.sectionKey,
@@ -766,92 +523,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   /** Addressable id of the component instance this section edits, or null. */
-  private _resolveComponentId(): string | null {
+  _resolveComponentId(): string | null {
     return resolveComponentId(this.yaml, this.sectionKey, this._resolvedFromLine);
   }
 
-  /**
-   * Inline manage-list of inline trigger automations for the current
-   * section — ``component_on`` triggers on a component instance
-   * (filtered by ``id``) or ``device_on`` triggers under ``esphome:``.
-   * Rendered through the shared automation-list component.
-   */
-  private _renderTriggersTable() {
-    const target = this._shortcutTarget();
-    if (target === null) return nothing;
-    const rows = selectTriggerRows(parseYamlAutomations(this.yaml), target, (s) =>
-      this._triggerLabel(s)
-    );
-    const heading =
-      target.kind === "device_on"
-        ? this._localize("device.automations_list_title_device")
-        : this._localize("device.automations_list_title");
-    return html`<esphome-section-automation-list
-      .heading=${heading}
-      .rows=${rows}
-      add-label=${this._localize("device.add_automation")}
-      empty-text=${this._localize("device.automations_list_empty")}
-      edit-label=${this._localize("device.automations_list_edit")}
-      delete-label=${this._localize("device.automations_list_delete")}
-      busy-key=${this._deletingRow}
-      @add=${this._onOpenAddAutomation}
-      @edit=${this._onEditRow}
-      @delete=${this._onDeleteRow}
-    ></esphome-section-automation-list>`;
-  }
-
-  /**
-   * Inline manage-list of component action-list config fields (cover
-   * ``open_action`` / ``close_action`` / …) for the current instance.
-   * No add affordance — the fields are fixed by the platform — so the
-   * shared list renders nothing when the instance declares none.
-   */
-  private _renderActionFieldsTable() {
-    const componentId = this._resolveComponentId();
-    if (componentId === null) return nothing;
-    const rows = selectActionFieldRows(
-      parseYamlAutomations(this.yaml),
-      componentId,
-      (field) => actionFieldLabel(field, this._localize)
-    );
-    return html`<esphome-section-automation-list
-      .heading=${this._localize("device.action_fields_list_title")}
-      .rows=${rows}
-      edit-label=${this._localize("device.action_fields_list_edit")}
-      delete-label=${this._localize("device.action_fields_list_delete")}
-      busy-key=${this._deletingRow}
-      @edit=${this._onEditRow}
-      @delete=${this._onDeleteRow}
-    ></esphome-section-automation-list>`;
-  }
-
-  /** Pretty trigger label for an automations-list row, resolved from
-   *  the trigger catalog ("Binary Sensor → On State"). Falls back to
-   *  ``displayLabel`` / the raw event key until the catalog loads. */
-  private _triggerLabel(item: YamlSection): string {
-    const fallback = item.displayLabel || item.eventKey || "";
-    if (!item.eventKey) return fallback;
-    return this._triggerCatalog.resolveName(
-      item.parentKey ?? "esphome",
-      item.eventKey,
-      fallback
-    );
-  }
-
-  private _renderAddAutomationDialog() {
-    if (this._shortcutTarget() === null) {
-      return nothing;
-    }
-    return html`<esphome-add-automation-dialog
-      .boardName=${this.boardName}
-      .configuration=${this.configuration}
-      .board=${this.board}
-      .yaml=${this.yaml}
-      @automation-added=${this._onAutomationAdded}
-    ></esphome-add-automation-dialog>`;
-  }
-
-  private _onOpenAddAutomation = () => {
+  _onOpenAddAutomation = () => {
     const target = this._shortcutTarget();
     if (target === null) return;
     if (target.kind === "device_on") {
@@ -864,7 +540,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
   };
 
-  private _onAutomationAdded = (e: CustomEvent<{ sectionKey: string }>) => {
+  _onAutomationAdded = (e: CustomEvent<{ sectionKey: string }>) => {
     e.stopPropagation();
     this.dispatchEvent(
       new CustomEvent<{ sectionKey: string }>("section-select", {
@@ -881,7 +557,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * form knows only the field key; resolve this instance's component id
    * and build the ``component_action`` section key here.
    */
-  private _onEditActionField = (e: CustomEvent<{ field: string }>) => {
+  _onEditActionField = (e: CustomEvent<{ field: string }>) => {
     e.stopPropagation();
     const componentId = this._resolveComponentId();
     if (componentId === null) return;
