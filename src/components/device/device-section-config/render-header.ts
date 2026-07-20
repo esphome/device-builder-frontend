@@ -4,35 +4,37 @@
  */
 import { html, nothing } from "lit";
 import { defaultBoardImageUrl, onBoardImageError } from "../../../util/board-image.js";
-import { renderMarkdown } from "../../../util/markdown.js";
+import { isSafeLinkHref, renderMarkdown } from "../../../util/markdown.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
 import type { SectionConfigResponse } from "./loading.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
-export interface SectionHeaderOpts {
-  config: SectionConfigResponse;
-  catalogMiss: boolean;
-  headerTitle: string;
-  sectionAlerts: string[];
-}
-
 export function renderSectionHeader(
   host: ESPHomeDeviceSectionConfig,
-  { config, catalogMiss, headerTitle, sectionAlerts }: SectionHeaderOpts
+  config: SectionConfigResponse,
+  sectionAlerts: string[]
 ) {
+  // A catalog miss (external component or bare platform domain) swaps the
+  // title and drops the subtitle-less image header.
+  const catalogMiss = host._isUnknown || host._isPlatformDomain;
+  const headerTitle = host._isUnknown
+    ? host._localize("device.external_component_title")
+    : host._isPlatformDomain
+      ? host._localize("device.platform_section_title")
+      : config.title;
   return html`
     <div class="section-header">
       <div class="section-header-info">
         <div class="section-header-title-row">
           <h3 class="section-title">${headerTitle}</h3>
           ${
-            config.docs_url
+            isSafeLinkHref(config.docs_url)
               ? html`<a
                   class="docs-link"
                   href=${config.docs_url}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                 >
                   ${host._localize("device.docs")}
                   <wa-icon library="mdi" name="open-in-new"></wa-icon>

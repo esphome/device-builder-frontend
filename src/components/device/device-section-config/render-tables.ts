@@ -1,29 +1,17 @@
 /**
- * Inline manage-lists (api actions, triggers, component action fields)
- * plus the shared notice shell and the delete actions row.
+ * Inline manage-lists: api actions, triggers, component action fields.
  */
-import { html, nothing, type TemplateResult } from "lit";
+import { html, nothing } from "lit";
 import { actionFieldLabel } from "../../../util/action-field-label.js";
 import { parseYamlAutomations, type YamlSection } from "../../../util/yaml-sections.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
-import { selectActionFieldRows, selectTriggerRows } from "./automation-rows.js";
+import {
+  selectActionFieldRows,
+  selectApiActionRows,
+  selectTriggerRows,
+} from "./automation-rows.js";
 
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../device-section-automation-list.js";
-
-/** The info-notice shell shared by the YAML-only and platform-domain
- *  states; *body* supplies the message and its CTA. */
-export function renderNotice(body: TemplateResult) {
-  return html`<div class="yaml-only-notice" role="note">
-    <wa-icon library="mdi" name="information-outline"></wa-icon>
-    <div class="yaml-only-notice-body">${body}</div>
-  </div>`;
-}
-
-export function renderActionsRow(host: ESPHomeDeviceSectionConfig, canDelete: boolean) {
-  if (!canDelete) return nothing;
-  return html`<div class="actions">${renderDeleteButton(host)}</div>`;
-}
 
 /**
  * Inline manage-list of api_action entries. Rendered only for the
@@ -32,9 +20,7 @@ export function renderActionsRow(host: ESPHomeDeviceSectionConfig, canDelete: bo
  */
 export function renderApiActionsTable(host: ESPHomeDeviceSectionConfig) {
   if (host.sectionKey !== "api") return nothing;
-  const rows = parseYamlAutomations(host.yaml)
-    .filter((s) => s.key.startsWith("automation:api_action:"))
-    .map((s) => ({ key: s.key, label: s.id ?? "" }));
+  const rows = selectApiActionRows(parseYamlAutomations(host.yaml));
   return html`<esphome-section-automation-list
     .heading=${host._localize("device.api_actions_list_title")}
     .rows=${rows}
@@ -102,17 +88,6 @@ export function renderActionFieldsTable(host: ESPHomeDeviceSectionConfig) {
     @edit=${host._onEditRow}
     @delete=${host._onDeleteRow}
   ></esphome-section-automation-list>`;
-}
-
-function renderDeleteButton(host: ESPHomeDeviceSectionConfig) {
-  return html`<button
-    class="delete-button"
-    ?disabled=${host._deleting}
-    @click=${() => host._confirmDialog?.open()}
-  >
-    <wa-icon library="mdi" name="delete"></wa-icon>
-    ${host._localize("device.delete_section")}
-  </button>`;
 }
 
 /** Pretty trigger label for an automations-list row, resolved from

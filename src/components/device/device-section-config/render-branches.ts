@@ -2,8 +2,8 @@
  * The render body's three branches: bare platform-domain catalog miss,
  * YAML-only section, and the structured config-entry form.
  */
-import { html, nothing } from "lit";
-import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { html, nothing, type TemplateResult } from "lit";
+import { resolveSectionEntries } from "../../../util/section-entry-overrides.js";
 // The value imports (isSecuritySection / isDeprecationSection) already execute
 // the modules, registering the notice elements — no separate side-effect
 // imports needed.
@@ -13,20 +13,12 @@ import { isSecuritySection } from "../security-notice.js";
 import type { SectionConfigResponse } from "./loading.js";
 import {
   renderActionFieldsTable,
-  renderActionsRow,
   renderApiActionsTable,
-  renderNotice,
   renderTriggersTable,
 } from "./render-tables.js";
 
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../config-entry-form.js";
-
-export interface StructuredFormOpts {
-  config: SectionConfigResponse;
-  renderEntries: ConfigEntry[];
-  showAdvanced: boolean;
-  canDelete: boolean;
-}
 
 export function renderPlatformDomainBranch(
   host: ESPHomeDeviceSectionConfig,
@@ -71,8 +63,12 @@ export function renderYamlOnlyBranch(
 
 export function renderStructuredFormBranch(
   host: ESPHomeDeviceSectionConfig,
-  { config, renderEntries, showAdvanced, canDelete }: StructuredFormOpts
+  config: SectionConfigResponse,
+  canDelete: boolean
 ) {
+  // Memoized on its inputs, so this repeat of render()'s call returns the
+  // same reference and the form's .entries identity stays stable.
+  const renderEntries = resolveSectionEntries(host.sectionKey, config.entries);
   return html`
     ${
       isSecuritySection(host.sectionKey)
@@ -113,7 +109,7 @@ export function renderStructuredFormBranch(
       .presentComponents=${host._presentComponents}
       advanced-section
       gate-advanced
-      ?show-advanced=${showAdvanced}
+      ?show-advanced=${host._showAdvanced}
       @value-change=${host._onValueChange}
       @advanced-toggle=${host._onAdvancedToggle}
       @edit-action-field=${host._onEditActionField}
@@ -122,4 +118,27 @@ export function renderStructuredFormBranch(
     ${renderApiActionsTable(host)} ${renderTriggersTable(host)}
     ${renderActionsRow(host, canDelete)}
   `;
+}
+
+/** The info-notice shell shared by the YAML-only and platform-domain
+ *  states; *body* supplies the message and its CTA. */
+function renderNotice(body: TemplateResult) {
+  return html`<div class="yaml-only-notice" role="note">
+    <wa-icon library="mdi" name="information-outline"></wa-icon>
+    <div class="yaml-only-notice-body">${body}</div>
+  </div>`;
+}
+
+function renderActionsRow(host: ESPHomeDeviceSectionConfig, canDelete: boolean) {
+  if (!canDelete) return nothing;
+  return html`<div class="actions">
+    <button
+      class="delete-button"
+      ?disabled=${host._deleting}
+      @click=${() => host._confirmDialog?.open()}
+    >
+      <wa-icon library="mdi" name="delete"></wa-icon>
+      ${host._localize("device.delete_section")}
+    </button>
+  </div>`;
 }

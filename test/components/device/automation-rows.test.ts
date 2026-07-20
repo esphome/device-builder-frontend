@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   selectActionFieldRows,
+  selectApiActionRows,
   selectTriggerRows,
 } from "../../../src/components/device/device-section-config/automation-rows.js";
 import type { YamlSection } from "../../../src/util/yaml-sections.js";
@@ -116,5 +117,19 @@ describe("selectActionFieldRows", () => {
   it("returns an empty list when the instance declares no action fields", () => {
     const sections = [section({ key: "trigger", eventKey: "on_press", id: "c1" })];
     expect(selectActionFieldRows(sections, "c1", labelField)).toEqual([]);
+  });
+});
+
+describe("selectApiActionRows", () => {
+  it("keeps only api_action rows, labelled by id", () => {
+    const sections = [
+      section({ key: "automation:api_action:greet", id: "greet" }),
+      section({ key: "automation:trigger:esphome:on_boot", eventKey: "on_boot" }),
+      section({ key: "automation:api_action:anon" }), // no id -> empty label
+    ];
+    expect(selectApiActionRows(sections)).toEqual([
+      { key: "automation:api_action:greet", label: "greet" },
+      { key: "automation:api_action:anon", label: "" },
+    ]);
   });
 });

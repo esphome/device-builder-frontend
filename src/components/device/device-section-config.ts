@@ -62,7 +62,6 @@ import {
   renderPlatformDomainBranch,
   renderStructuredFormBranch,
   renderYamlOnlyBranch,
-  type StructuredFormOpts,
 } from "./device-section-config/render-branches.js";
 import {
   renderAddAutomationDialog,
@@ -188,6 +187,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   _loadId = 0;
   _draftTimer: ReturnType<typeof setTimeout> | null = null;
+  /** ``focusFieldPath`` key already flashed — one-shot per target. */
+  _apiListFlashKey?: string;
   // Parent loops yaml-draft events back through our yaml prop, which would
   // trigger reload() and lose focus mid-edit. reload() short-circuits when
   // the live yaml matches this snapshot.
@@ -284,9 +285,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     maybeFlashApiActionsList(this);
   }
 
-  /** ``focusFieldPath`` key already flashed — one-shot per target. */
-  _apiListFlashKey?: string;
-
   connectedCallback() {
     super.connectedCallback();
     // Announce so the page-level navigation guard (device.ts) can hold a
@@ -376,7 +374,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     if (!this._config) return nothing;
     const config = this._config;
 
-    const showAdvanced = this._showAdvanced;
     // Handles overrides for sections whose backend schema doesn't match the
     // actual user-keyed shape (currently just substitutions).
     const renderEntries = resolveSectionEntries(this.sectionKey, config.entries);
@@ -397,44 +394,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
 
-    // A catalog miss (external component or bare platform domain) swaps the
-    // title and drops the subtitle-less image header.
-    const catalogMiss = this._isUnknown || this._isPlatformDomain;
-    const headerTitle = this._isUnknown
-      ? this._localize("device.external_component_title")
-      : this._isPlatformDomain
-        ? this._localize("device.platform_section_title")
-        : config.title;
-
     return html`
-      ${renderSectionHeader(this, { config, catalogMiss, headerTitle, sectionAlerts })}
+      ${renderSectionHeader(this, config, sectionAlerts)}
       ${
         this._isPlatformDomain
-          ? this._renderPlatformDomainBranch(canDelete)
+          ? renderPlatformDomainBranch(this, canDelete)
           : yamlOnly
-            ? this._renderYamlOnlyBranch(canDelete)
-            : this._renderStructuredFormBranch({
-                config,
-                renderEntries,
-                showAdvanced,
-                canDelete,
-              })
+            ? renderYamlOnlyBranch(this, canDelete)
+            : renderStructuredFormBranch(this, config, canDelete)
       }
       ${renderApiActionDialog(this)} ${renderAddAutomationDialog(this)}
       ${renderDeleteConfirmDialog(this, canDelete, config)}
     `;
-  }
-
-  private _renderPlatformDomainBranch(canDelete: boolean) {
-    return renderPlatformDomainBranch(this, canDelete);
-  }
-
-  private _renderYamlOnlyBranch(canDelete: boolean) {
-    return renderYamlOnlyBranch(this, canDelete);
-  }
-
-  private _renderStructuredFormBranch(opts: StructuredFormOpts) {
-    return renderStructuredFormBranch(this, opts);
   }
 
   _onOpenAddApiAction = () => {
@@ -446,13 +417,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    *  fill in variables + actions immediately. */
   _onApiActionAdded = (e: CustomEvent<{ sectionKey: string }>) => {
     e.stopPropagation();
-    this.dispatchEvent(
-      new CustomEvent<{ sectionKey: string }>("section-select", {
-        detail: { sectionKey: e.detail.sectionKey },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "section-select", { sectionKey: e.detail.sectionKey });
   };
 
   /** Edit any manage-list row: route the navigator to its stable
@@ -460,13 +425,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    *  every row carries its ``automation:…`` key. */
   _onEditRow = (e: CustomEvent<{ key: string }>) => {
     e.stopPropagation();
-    this.dispatchEvent(
-      new CustomEvent<{ sectionKey: string }>("section-select", {
-        detail: { sectionKey: e.detail.key },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "section-select", { sectionKey: e.detail.key });
   };
 
   /**
@@ -491,13 +450,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);
-      this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-updated", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      fireEvent(this, "yaml-updated", { yaml: newYaml });
     } catch (err) {
       const msg = formatApiError(err, this._localize, "device.automation_save_error");
       notifyError(this._localize("device.automation_save_error"), {
@@ -542,13 +495,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   _onAutomationAdded = (e: CustomEvent<{ sectionKey: string }>) => {
     e.stopPropagation();
-    this.dispatchEvent(
-      new CustomEvent<{ sectionKey: string }>("section-select", {
-        detail: { sectionKey: e.detail.sectionKey },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "section-select", { sectionKey: e.detail.sectionKey });
   };
 
   /**
@@ -566,13 +513,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       component_id: componentId,
       field: e.detail.field,
     });
-    this.dispatchEvent(
-      new CustomEvent<{ sectionKey: string }>("section-select", {
-        detail: { sectionKey },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    fireEvent(this, "section-select", { sectionKey });
   };
 }
 

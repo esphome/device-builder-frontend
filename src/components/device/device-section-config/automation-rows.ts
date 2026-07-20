@@ -59,3 +59,10 @@ export function selectActionFieldRows(
       label: fieldLabel(s.actionField),
     }));
 }
+
+/** Rows for the api section's ``api_action`` manage-list. */
+export function selectApiActionRows(sections: readonly YamlSection[]): AutomationRow[] {
+  return sections
+    .filter((s) => s.key.startsWith("automation:api_action:"))
+    .map((s) => ({ key: s.key, label: s.id ?? "" }));
+}
