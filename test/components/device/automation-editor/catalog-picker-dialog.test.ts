@@ -75,19 +75,12 @@ describe("catalog-picker-dialog filtering contract", () => {
     expect(body).toMatch(/componentDomain\(item\.domain\)/);
   });
 
-  it("By-target pre-fills the action's id-shaped param with the picked device's id", async () => {
+  it("By-target routes each pick through the shared pre-fill helper", async () => {
+    // The pre-fill behavior itself (declared-id-only, #2208) is pinned by
+    // the pure-function tests in component-targets.test.ts.
     const src = await readSource();
-    const body = methodBody(src, "_preFillFor");
-    expect(body).toMatch(/references_component === domain/);
-    expect(body).toMatch(/\[idEntry\.key\]: device\.id/);
-  });
-
-  it("By-target never pre-fills a synthesized instance id (#2208)", async () => {
-    // A synthetic id (`logger`, `uart_0`) is a round-trip identity, not a
-    // YAML id — writing it into a reference param produces a dangling id.
-    const src = await readSource();
-    const body = methodBody(src, "_preFillFor");
-    expect(body).toMatch(/!device\.has_explicit_id\) return undefined/);
+    const body = methodBody(src, "_renderByTarget");
+    expect(body).toMatch(/preFillIdParam\(item, device\)/);
   });
 });
 

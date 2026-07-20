@@ -10,6 +10,7 @@ import {
   instanceContext,
   instanceName,
   isSelectableTarget,
+  preFillIdParam,
   selectableTargets,
   triggersForComponent,
 } from "../../../../src/components/device/automation-editor/component-targets.js";
@@ -115,5 +116,46 @@ describe("instance label helpers", () => {
         devices
       )
     ).toBe("sensor");
+  });
+});
+
+describe("preFillIdParam", () => {
+  const logAction = {
+    config_entries: [
+      { key: "format", type: "string", required: true },
+      { key: "logger_id", type: "id", references_component: "logger" },
+    ] as never,
+  };
+
+  it("pre-fills the id-shaped entry from a device with a declared id", () => {
+    const device = inst({
+      id: "mylogger",
+      component_id: "logger",
+      has_explicit_id: true,
+    });
+    expect(preFillIdParam(logAction, device)).toEqual({ logger_id: "mylogger" });
+  });
+
+  it("never pre-fills a synthesized id (#2208)", () => {
+    // `logger` here is the backend's round-trip identity for an id-less
+    // singleton, not a YAML id — pre-filling it dangles.
+    expect(
+      preFillIdParam(logAction, inst({ id: "logger", component_id: "logger" }))
+    ).toBeUndefined();
+    expect(
+      preFillIdParam(
+        logAction,
+        inst({ id: "logger", component_id: "logger", has_explicit_id: false })
+      )
+    ).toBeUndefined();
+  });
+
+  it("returns undefined when the item has no entry referencing the domain", () => {
+    const device = inst({
+      id: "relay",
+      component_id: "switch.gpio",
+      has_explicit_id: true,
+    });
+    expect(preFillIdParam(logAction, device)).toBeUndefined();
   });
 });

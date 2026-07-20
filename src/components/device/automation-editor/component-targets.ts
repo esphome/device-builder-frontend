@@ -6,6 +6,7 @@ import type {
   AutomationTrigger,
   AvailableComponentInstance,
 } from "../../../api/types/automations.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { stripRedundantComponentSuffix } from "../../../util/component-title.js";
 import { parseCatalogId } from "../../../util/config-entry-yaml-scan.js";
 import { CORE_KEYS } from "../../../util/yaml-sections.js";
@@ -70,6 +71,25 @@ export function scopeToContainer(
 ): AvailableComponentInstance[] {
   if (!container) return devices;
   return devices.filter((d) => d.id === container.id || d.parent_id === container.id);
+}
+
+/**
+ * Pre-fill for a picked item's id-shaped ConfigEntry referencing *device*'s
+ * domain: ``{key: device.id}``, or ``undefined`` when the item has no such
+ * field or the device's id is synthesized rather than declared in YAML —
+ * writing a synthetic id (``logger`` / ``uart_0``) into a reference param
+ * produces a dangling id ESPHome rejects (#2208); left empty, ESPHome
+ * auto-resolves the instance.
+ */
+export function preFillIdParam(
+  item: { config_entries: ConfigEntry[] },
+  device: AvailableComponentInstance
+): Record<string, unknown> | undefined {
+  if (!device.has_explicit_id) return undefined;
+  const domain = componentDomain(device.component_id);
+  const idEntry = item.config_entries.find((e) => e.references_component === domain);
+  if (!idEntry) return undefined;
+  return { [idEntry.key]: device.id };
 }
 
 /** Component-level triggers valid for *device*, matched on its bare or
