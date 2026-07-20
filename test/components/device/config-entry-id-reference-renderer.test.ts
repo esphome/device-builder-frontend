@@ -290,6 +290,23 @@ describe("renderIdReferenceField — id-less configured domain (device-builder#2
     expect(hasSoloAdd(tmpl)).toBe(true);
   });
 
+  it("keeps the Add CTA for a required reference (no Auto way out)", () => {
+    const entry = makeEntry(ConfigEntryType.STRING, {
+      references_component: "logger",
+      required: true,
+    });
+    const tmpl = renderIdReferenceField(
+      entry,
+      ["logger_id"],
+      makeRenderCtx({ logger_id: "" }, { overrides: { yaml: IDLESS_LOGGER_YAML } })
+    );
+    expect(placeholderOf(tmpl)).toBe("device.id_reference_empty");
+    expect(findElementBindings(tmpl, "wa-option").map((o) => o.value)).not.toContain(
+      AUTO_SENTINEL
+    );
+    expect(hasSoloAdd(tmpl)).toBe(true);
+  });
+
   it("selecting Auto emits the empty value (key omitted on save)", () => {
     const ctx = makeRenderCtx(
       { logger_id: "" },

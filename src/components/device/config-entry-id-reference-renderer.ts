@@ -86,9 +86,13 @@ export function renderIdReferenceField(
   // An id-less singleton (plain logger:, wifi:, ...) yields no candidates
   // even though the domain is configured; ESPHome auto-resolves the
   // reference, so say that instead of claiming nothing is configured.
-  // Scanned from the YAML rather than ctx.presentComponents, which not
-  // every form host wires up (the automation action form doesn't).
-  const emptyButConfigured = empty && parseTopLevelComponents(ctx.yaml).has(domain);
+  // Only for an optional reference (same gate as the revert-to-auto
+  // option below): a required one needs an explicit id, so the Add CTA
+  // is the honest empty state. Scanned from the YAML rather than
+  // ctx.presentComponents, which not every form host wires up (the
+  // automation action form doesn't).
+  const emptyButConfigured =
+    empty && !entry.required && parseTopLevelComponents(ctx.yaml).has(domain);
 
   const onChange = (e: Event) => {
     const select = e.target as HTMLSelectElement;
