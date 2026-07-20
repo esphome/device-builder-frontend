@@ -17,6 +17,7 @@ import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
 interface CursorLineDetail {
   line: number;
   path: string[];
+  viaEdit?: boolean;
   indexedPath?: (string | number)[];
 }
 
@@ -56,11 +57,13 @@ describe("yaml-editor cursor-line emission (#946)", () => {
     const events = record(el);
 
     // Caret rests on the blank top-level line 3 → first emit, no section.
+    // A pure caret move is not an edit.
     caretToLineEnd(view, 3);
     parseAll(view);
     expect(events).toHaveLength(1);
     expect(events[0].line).toBe(3);
     expect(events[0].path[0]).toBeUndefined();
+    expect(events[0].viaEdit).toBe(false);
 
     // Type the block header on the same line in one transaction — a real
     // keystroke carries both the edit and the caret move. The same-line
@@ -71,10 +74,12 @@ describe("yaml-editor cursor-line emission (#946)", () => {
       selection: EditorSelection.single(at + "http_request:".length),
     });
 
-    // One more emit, still line 3, now attributed to http_request.
+    // One more emit, still line 3, now attributed to http_request and
+    // flagged as edit-driven so the page can hold unknown keys (#2211).
     expect(events).toHaveLength(2);
     expect(events[1].line).toBe(3);
     expect(events[1].path[0]).toBe("http_request");
+    expect(events[1].viaEdit).toBe(true);
   });
 
   it("does not re-emit while typing within the same section", async () => {

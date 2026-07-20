@@ -37,6 +37,7 @@ import {
   backendErrorCounts,
   backendErrorsForInstance,
   formRelativePath,
+  instanceKey,
   resolveBackendErrors,
   type BackendFieldError,
 } from "../util/backend-field-errors.js";
@@ -58,6 +59,8 @@ import {
 } from "../util/url-line-resolver.js";
 import { buildWebUiUrl } from "../util/web-ui-url.js";
 import { boardDisagreesWithYaml, readPlatformBoard } from "../util/yaml-board.js";
+import { loadCatalog } from "../util/yaml-completion-catalog.js";
+import { knownTopLevelKeys } from "../util/yaml-completion-items.js";
 import {
   getLastValidatedResult,
   type YamlDiagnosticsDetail,
@@ -213,11 +216,40 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _backendErrors: BackendFieldError[] = [];
 
+  /** instanceKey of the half-typed unknown section whose selection switch
+   *  and navigator error chip are held while the user is still typing its
+   *  key; null when nothing is held. */
+  @state()
+  private _heldUnknownInstance: string | null = null;
+
+  /** Valid top-level keys (core + automation + catalog domains/ids); null
+   *  until the catalog resolves — treated as "everything is known" so a
+   *  failed catalog fetch degrades to no holds, never to holding all
+   *  typed section switches. */
+  private _knownTopLevelKeys: Set<string> | null = null;
+  private _catalogKicked = false;
+
   // Memoised so idle re-renders keep the prop identities stable — the
   // section editor keys its per-edit error suppression on the prop
   // changing, and a fresh object every render would wipe it immediately.
   private _instanceBackendErrors = memoizeOne(backendErrorsForInstance);
-  private _navErrorCounts = memoizeOne(backendErrorCounts);
+  private _baseErrorCounts = memoizeOne(backendErrorCounts);
+
+  /** Navigator error counts minus the held instance's chip. The held key
+   *  changes on every keystroke of a half-typed section name, so the base
+   *  map is memoized on the errors alone and returned as-is (stable
+   *  identity, no navigator churn) unless it actually contains the held
+   *  entry. */
+  private _navErrorCounts(
+    errors: readonly BackendFieldError[],
+    held: string | null
+  ): Map<string, number> {
+    const base = this._baseErrorCounts(errors);
+    if (held === null || !base.has(held)) return base;
+    const counts = new Map(base);
+    counts.delete(held);
+    return counts;
+  }
 
   /** Form-relative path of the last focused field, and whether its YAML
    *  line wasn't found yet (a just-added value whose debounced write is
@@ -561,6 +593,8 @@ export class ESPHomePageDevice extends LitElement {
       // handler ignores results for other configurations, so these
       // would linger until the new device's first lint pass.
       if (this._backendErrors.length) this._backendErrors = [];
+      this._heldUnknownInstance = null;
+      this._kickKnownKeys();
       this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board
@@ -1285,6 +1319,7 @@ export class ESPHomePageDevice extends LitElement {
    *  the device entirely is the app-shell's top-left back button —
    *  not this one. */
   private _onBack = () => {
+    this._heldUnknownInstance = null;
     this._guardSectionSwitch(() => {
       const prev = this._sectionHistory.length
         ? this._sectionHistory[this._sectionHistory.length - 1]
@@ -1423,7 +1458,7 @@ export class ESPHomePageDevice extends LitElement {
       .platformReady=${this._platformReady}
       .selectedKey=${this._selectedSection}
       .selectedFromLine=${this._selectedFromLine}
-      .errorCounts=${this._navErrorCounts(this._backendErrors)}
+      .errorCounts=${this._navErrorCounts(this._backendErrors, this._heldUnknownInstance)}
     ></esphome-device-navigator>`;
   }
 
@@ -1491,6 +1526,7 @@ export class ESPHomePageDevice extends LitElement {
     e: CustomEvent<{
       line: number;
       path?: string[];
+      viaEdit?: boolean;
       indexedPath?: (string | number)[];
     }>
   ) {
@@ -1517,6 +1553,23 @@ export class ESPHomePageDevice extends LitElement {
       this._focusYamlPath = e.detail.indexedPath;
       return;
     }
+    // A doc edit that resolves an unknown top-level key is a key still
+    // being typed (`sendx:` on its way to `sensor:`) — hold the switch so
+    // the pane doesn't flip to the unknown-component error surface on
+    // every keystroke (#2211). Clicks and caret moves (viaEdit false)
+    // always switch, so a settled external component still opens its
+    // pane deliberately. One quirk to know: the editor's same-line
+    // throttle means clicking the held line itself emits no event; the
+    // navigator entry (kept visible) is the release path there.
+    if (e.detail.viaEdit === true) {
+      // An unresolved key set (catalog still loading, or failed — retried
+      // on the next device load, never from this hot path) means no holds.
+      if (this._knownTopLevelKeys !== null && !this._knownTopLevelKeys.has(match.key)) {
+        this._heldUnknownInstance = instanceKey(sectionKey, match.fromLine);
+        return;
+      }
+    }
+    this._heldUnknownInstance = null;
     // Cross-section: set the field path only when the switch actually
     // applies, so a guard veto (unsaved edits) can't point the old
     // section's form at a path meant for the new one.
@@ -1660,6 +1713,7 @@ export class ESPHomePageDevice extends LitElement {
     e: CustomEvent<{ sectionKey: string | null; fromLine?: number }>
   ) {
     const { sectionKey, fromLine } = e.detail;
+    this._heldUnknownInstance = null;
     if (sectionKey === this._selectedSection && fromLine === this._selectedFromLine) {
       this._drawerOpen = false;
       return;
@@ -1706,6 +1760,20 @@ export class ESPHomePageDevice extends LitElement {
   private _guardSectionSwitch(action: () => void): void {
     this._activeSection?.flushPending();
     action();
+  }
+
+  /** Resolve the known-top-level-key set off the session-cached catalog.
+   *  ``loadCatalog`` never rejects — a failed fetch resolves an empty index
+   *  (null set) and resets its cache — so clearing the kicked flag only on
+   *  that outcome allows a later retry without a per-keystroke refetch
+   *  storm against an already-unhealthy backend. */
+  private _kickKnownKeys(): void {
+    if (this._catalogKicked) return;
+    this._catalogKicked = true;
+    void loadCatalog(this._api).then((catalog) => {
+      this._knownTopLevelKeys = knownTopLevelKeys(catalog);
+      if (this._knownTopLevelKeys === null) this._catalogKicked = false;
+    });
   }
 
   private _onSectionMount = (e: Event) => {

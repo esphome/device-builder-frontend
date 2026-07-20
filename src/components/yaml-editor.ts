@@ -503,6 +503,10 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
             fireEvent(this, "yaml-cursor-line", {
               line,
               path,
+              // True when a doc edit (typing, paste, undo) moved the
+              // caret here — the page holds section switches onto a
+              // half-typed unknown key only for edit-driven moves.
+              viaEdit: update.docChanged,
               // AST-only sibling of ``path`` carrying block-sequence
               // list indices — what the automation editor needs to
               // resolve a node inside a handler body.
