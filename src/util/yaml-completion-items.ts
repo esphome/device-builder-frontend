@@ -151,27 +151,35 @@ function componentToCompletion(c: ComponentCatalogEntry): Completion {
  *  hypothetical session resets) gets garbage-collected with its
  *  memo. */
 const topLevelMemo = new WeakMap<CatalogIndex, Completion[]>();
+const domainsMemo = new WeakMap<CatalogIndex, Set<string>>();
 
-export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
-  const cached = topLevelMemo.get(catalog);
+/**
+ * Platform-domain umbrellas (``switch``, ``sensor``, …), from two
+ * sources deduped by the Set — both the entry's ``category`` AND the
+ * dotted-id prefix (``ota.esphome`` → ``ota``). Belt and braces:
+ * ``category`` is the canonical signal but some umbrellas (e.g. ``ota``,
+ * ``update``) carry no standalone catalog entry, only platform variants;
+ * the id prefix catches a category enum lagging a new platform domain.
+ */
+export function platformDomains(catalog: CatalogIndex): Set<string> {
+  const cached = domainsMemo.get(catalog);
   if (cached) return cached;
-  const out: Completion[] = [];
-  const seen = new Set<string>();
-  // Collect domain umbrellas from two sources, then dedupe via
-  // ``seen`` — both the entry's ``category`` AND the dotted-id
-  // prefix (``ota.esphome`` → ``ota``). Belt and braces:
-  //   - ``category`` is the canonical signal but some umbrellas
-  //     (e.g. ``ota``, ``update``) carry no standalone catalog
-  //     entry, only platform variants.
-  //   - The id prefix catches cases where the category enum
-  //     hasn't been updated to mirror a new platform domain.
   const domains = new Set<string>();
   for (const c of catalog.components) {
     if (!c.id.includes(".")) continue;
     domains.add(c.category);
     domains.add(c.id.slice(0, c.id.indexOf(".")));
   }
-  for (const domain of domains) {
+  domainsMemo.set(catalog, domains);
+  return domains;
+}
+
+export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
+  const cached = topLevelMemo.get(catalog);
+  if (cached) return cached;
+  const out: Completion[] = [];
+  const seen = new Set<string>();
+  for (const domain of platformDomains(catalog)) {
     if (seen.has(domain)) continue;
     seen.add(domain);
     out.push({

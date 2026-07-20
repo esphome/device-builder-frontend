@@ -35,6 +35,22 @@ function catalog(entries: ComponentCatalogEntry[]): CatalogIndex {
   return { components: entries, byId, byCategory };
 }
 
+describe("platformDomains", () => {
+  it("derives domains from categories and dotted-id prefixes only", async () => {
+    const { platformDomains } = await import("../../src/util/yaml-completion-items.js");
+    const c = catalog([
+      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
+      entry("ota.esphome", ComponentCategory.OTA),
+      entry("logger", ComponentCategory.CORE),
+    ]);
+    const domains = platformDomains(c);
+    expect(domains.has("binary_sensor")).toBe(true);
+    expect(domains.has("ota")).toBe(true);
+    // Standalone ids are components, not domains.
+    expect(domains.has("logger")).toBe(false);
+  });
+});
+
 describe("buildTopLevelCompletions", () => {
   it("includes platform-domain umbrellas extracted from categories", () => {
     // The catalog only carries dotted ids for platform implementations

@@ -1,6 +1,8 @@
 import type { ConfigEntry, RequiredGroup } from "../../../api/types/config-entries.js";
 import { fetchComponent } from "../../../util/component-name-cache.js";
 import { normalizeHexValues } from "../../../util/hex-int.js";
+import { loadCatalog } from "../../../util/yaml-completion-catalog.js";
+import { platformDomains } from "../../../util/yaml-completion-items.js";
 import { parseYamlSectionValues } from "../../../util/yaml-section-reader.js";
 import { resolveCurrentFromLine } from "../../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../../util/yaml-serialize.js";
@@ -24,6 +26,7 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
   host._error = "";
   host._config = null;
   host._isUnknown = false;
+  host._isPlatformDomain = false;
   host._setDirty(false);
   if (host._draftTimer) {
     clearTimeout(host._draftTimer);
@@ -47,10 +50,15 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
     const yaml = host.yaml;
 
     if (!component) {
-      // External component — synthesise a config with no entries
-      // so the YAML-only notice fires. Store sectionKey as title (not a
-      // localised "External component" label) so the delete confirm + toast
-      // read distinctly when a device has multiple unknown sections.
+      // The catalog only carries dotted ids for platform domains, so a
+      // bare ``switch:`` misses too — that is an empty platform section
+      // awaiting its first item, not an external component.
+      const domain = platformDomains(await loadCatalog(host._api)).has(host.sectionKey);
+      if (id !== host._loadId) return;
+      // Synthesise a config with no entries so the YAML-only notice
+      // fires. Store sectionKey as title (not a localised "External
+      // component" label) so the delete confirm + toast read distinctly
+      // when a device has multiple unknown sections.
       host._config = {
         section_key: host.sectionKey,
         section_type: "core",
@@ -62,7 +70,8 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
         entries: [],
         required_groups: [],
       };
-      host._isUnknown = true;
+      host._isPlatformDomain = domain;
+      host._isUnknown = !domain;
     } else {
       host._config = {
         section_key: host.sectionKey,

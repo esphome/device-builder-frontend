@@ -157,6 +157,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   // shows the domain.platform so the user can see which key it applies to.
   @state() _isUnknown = false;
 
+  // A bare platform-domain section (`switch:` with no items yet) — the
+  // catalog only carries dotted ids, so it misses like an unknown key but
+  // gets an add-a-platform affordance instead of the external treatment.
+  @state() _isPlatformDomain = false;
+
   @state() _fieldErrors: Map<string, ValidationError> = new Map();
 
   // Backend-error paths the user has edited since the last lint pass —
@@ -401,6 +406,13 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     fireEvent(this, "show-yaml-editor");
   }
 
+  private _onAddPlatform() {
+    // Same deep-link the id-reference "+ Add new <domain>" pickers use:
+    // board-info catches it and opens the add-component dialog filtered
+    // to this domain.
+    fireEvent(this, "request-add-component", { domain: this.sectionKey });
+  }
+
   private _onValueChange = (e: CustomEvent<ConfigEntryValueChange>) =>
     onValueChange(this, e);
 
@@ -449,7 +461,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               ${
                 this._isUnknown
                   ? this._localize("device.external_component_title")
-                  : this._config.title
+                  : this._isPlatformDomain
+                    ? this._localize("device.platform_section_title")
+                    : this._config.title
               }
             </h3>
             ${
@@ -467,7 +481,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             }
           </div>
           ${
-            this._isUnknown
+            this._isUnknown || this._isPlatformDomain
               ? html`<p class="section-subtitle">${this.sectionKey}</p>`
               : nothing
           }
@@ -480,7 +494,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           }
         </div>
         ${
-          this._isUnknown
+          this._isUnknown || this._isPlatformDomain
             ? nothing
             : html`<div class="section-image">
                 <img
@@ -503,75 +517,96 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           : nothing
       }
       ${
-        yamlOnly
+        this._isPlatformDomain
           ? html`<div class="yaml-only-notice" role="note">
                 <wa-icon library="mdi" name="information-outline"></wa-icon>
                 <div class="yaml-only-notice-body">
-                  <p>${this._localize("device.yaml_only_section")}</p>
-                  ${
-                    this.yamlPaneVisible
-                      ? nothing
-                      : html`<button
-                          type="button"
-                          class="yaml-only-notice-cta"
-                          @click=${this._onShowYamlEditor}
-                        >
-                          ${this._localize("device.show_yaml_editor")}
-                        </button>`
-                  }
+                  <p>
+                    ${this._localize("device.platform_domain_section", {
+                      key: this.sectionKey,
+                    })}
+                  </p>
+                  <button
+                    type="button"
+                    class="yaml-only-notice-cta"
+                    @click=${this._onAddPlatform}
+                  >
+                    ${this._localize("device.platform_domain_add", {
+                      key: this.sectionKey,
+                    })}
+                  </button>
                 </div>
               </div>
-              ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
-              ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
-          : html`
-              ${
-                isSecuritySection(this.sectionKey)
-                  ? html`<esphome-security-notice
-                      .sectionKey=${this.sectionKey}
-                      .yaml=${this.yaml}
-                      .configuration=${this.configuration}
-                      .fromLine=${this._resolvedFromLine}
-                      @apply-section-values=${this._onApplySectionValues}
-                    ></esphome-security-notice>`
-                  : nothing
-              }
-              ${
-                isDeprecationSection(this.sectionKey)
-                  ? html`<esphome-deprecation-notice
-                      .sectionKey=${this.sectionKey}
-                      .values=${this._values}
-                      .entries=${renderEntries}
-                      @apply-section-values=${this._onApplySectionValues}
-                    ></esphome-deprecation-notice>`
-                  : nothing
-              }
-              <esphome-config-entry-form
-                .entries=${renderEntries}
-                .requiredGroups=${this._config.required_groups}
-                .values=${this._values}
-                .errors=${this._mergeErrors(
-                  this.backendErrors.fields,
-                  this._clearedBackendPaths,
-                  this._fieldErrors
-                )}
-                .board=${this.board}
-                .yaml=${this.yaml}
-                .fromLine=${this._resolvedFromLine}
-                .sectionKey=${this.sectionKey}
-                .configuration=${this.configuration}
-                .focusFieldPath=${this.focusFieldPath}
-                .presentComponents=${this._presentComponents}
-                advanced-section
-                gate-advanced
-                ?show-advanced=${showAdvanced}
-                @value-change=${this._onValueChange}
-                @advanced-toggle=${this._onAdvancedToggle}
-                @edit-action-field=${this._onEditActionField}
-              ></esphome-config-entry-form>
-              ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
-              ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
-              ${this._renderActionsRow(canDelete)}
-            `
+              ${this._renderActionsRow(canDelete)}`
+          : yamlOnly
+            ? html`<div class="yaml-only-notice" role="note">
+                  <wa-icon library="mdi" name="information-outline"></wa-icon>
+                  <div class="yaml-only-notice-body">
+                    <p>${this._localize("device.yaml_only_section")}</p>
+                    ${
+                      this.yamlPaneVisible
+                        ? nothing
+                        : html`<button
+                            type="button"
+                            class="yaml-only-notice-cta"
+                            @click=${this._onShowYamlEditor}
+                          >
+                            ${this._localize("device.show_yaml_editor")}
+                          </button>`
+                    }
+                  </div>
+                </div>
+                ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
+                ${this._renderActionFieldsTable()} ${this._renderActionsRow(canDelete)}`
+            : html`
+                ${
+                  isSecuritySection(this.sectionKey)
+                    ? html`<esphome-security-notice
+                        .sectionKey=${this.sectionKey}
+                        .yaml=${this.yaml}
+                        .configuration=${this.configuration}
+                        .fromLine=${this._resolvedFromLine}
+                        @apply-section-values=${this._onApplySectionValues}
+                      ></esphome-security-notice>`
+                    : nothing
+                }
+                ${
+                  isDeprecationSection(this.sectionKey)
+                    ? html`<esphome-deprecation-notice
+                        .sectionKey=${this.sectionKey}
+                        .values=${this._values}
+                        .entries=${renderEntries}
+                        @apply-section-values=${this._onApplySectionValues}
+                      ></esphome-deprecation-notice>`
+                    : nothing
+                }
+                <esphome-config-entry-form
+                  .entries=${renderEntries}
+                  .requiredGroups=${this._config.required_groups}
+                  .values=${this._values}
+                  .errors=${this._mergeErrors(
+                    this.backendErrors.fields,
+                    this._clearedBackendPaths,
+                    this._fieldErrors
+                  )}
+                  .board=${this.board}
+                  .yaml=${this.yaml}
+                  .fromLine=${this._resolvedFromLine}
+                  .sectionKey=${this.sectionKey}
+                  .configuration=${this.configuration}
+                  .focusFieldPath=${this.focusFieldPath}
+                  .presentComponents=${this._presentComponents}
+                  advanced-section
+                  gate-advanced
+                  ?show-advanced=${showAdvanced}
+                  @value-change=${this._onValueChange}
+                  @advanced-toggle=${this._onAdvancedToggle}
+                  @edit-action-field=${this._onEditActionField}
+                ></esphome-config-entry-form>
+                ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
+                ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
+                ${this._renderActionsRow(canDelete)}
+              `
       }
       ${this._renderApiActionDialog()} ${this._renderAddAutomationDialog()}
       ${
