@@ -53,15 +53,6 @@ export function renderTourBubble(p: TourBubbleProps): TemplateResult {
       aria-label=${p.localize(p.step.titleKey)}
       style=${styleMap(bubbleStyle)}
     >
-      <button
-        type="button"
-        class="btn btn-step-close btn-pause ${p.pauseHover ? "hovered" : ""}"
-        aria-label=${p.localize("tour.pause")}
-        title=${p.localize("tour.pause")}
-        @click=${p.onPause}
-      >
-        <wa-icon library="mdi" name="close" aria-hidden="true"></wa-icon>
-      </button>
       ${
         p.frame.dock
           ? nothing
@@ -80,6 +71,15 @@ export function renderTourBubble(p: TourBubbleProps): TemplateResult {
             total: p.totalSteps,
           })}
         </span>
+        <button
+          type="button"
+          class="btn btn-step-close btn-pause ${p.pauseHover ? "hovered" : ""}"
+          aria-label=${p.localize("tour.pause")}
+          title=${p.localize("tour.pause")}
+          @click=${p.onPause}
+        >
+          <wa-icon library="mdi" name="close" aria-hidden="true"></wa-icon>
+        </button>
       </div>
       <div class="bubble-scroll">
         <h2>${p.localize(p.step.titleKey)}</h2>

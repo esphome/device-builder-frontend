@@ -70,14 +70,12 @@ export const guidedTourStyles = css`
   }
 
   .btn-step-close {
-    position: absolute;
-    top: var(--wa-space-s);
-    right: var(--wa-space-s);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 28px;
     height: 28px;
+    margin: -6px -5px -6px 0;
     padding: 0;
     color: var(--wa-color-text-quiet);
   }
@@ -96,7 +94,7 @@ export const guidedTourStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding: 0 var(--wa-space-xl) var(--wa-space-s) 0;
+    padding: 0 0 var(--wa-space-s);
     border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
   }
 
