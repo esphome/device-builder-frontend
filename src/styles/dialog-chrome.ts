@@ -84,6 +84,14 @@ export const primaryHeaderDialogStyles = css`
     font-weight: var(--wa-font-weight-bold);
   }
 
+  /* The band height is fixed, so a wrapped title would clip against it;
+     keep these titles single-line (base-dialog wraps by default). */
+  esphome-base-dialog::part(title-text) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   esphome-base-dialog::part(close-button__base) {
     background: transparent;
     border: none;

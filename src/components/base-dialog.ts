@@ -6,7 +6,6 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { centeredMobileDialog } from "../styles/dialog-mobile.js";
-import { textStyles } from "../styles/text.js";
 import { EnterController } from "../util/enter-controller.js";
 
 /** Wrappers currently open, maintained by the class below. Backs
@@ -325,8 +324,7 @@ export class ESPHomeBaseDialog extends LitElement {
         @wa-after-hide=${this._onWaAfterHide}
       >
         <header slot="label" part="label-row">
-          <slot name="header-prefix"></slot
-          ><span class="truncate" part="title-text">${this.label}</span
+          <slot name="header-prefix"></slot><span part="title-text">${this.label}</span
           ><slot name="header-suffix"></slot>
         </header>
         <slot></slot>
@@ -340,7 +338,6 @@ export class ESPHomeBaseDialog extends LitElement {
     // Mobile default: centered, dvh-capped. Heavy dialogs override with
     // fullscreenMobileDialog (their outer-tree ::part rule wins).
     centeredMobileDialog("wa-dialog"),
-    textStyles,
     css`
       :host {
         display: contents;
@@ -391,10 +388,14 @@ export class ESPHomeBaseDialog extends LitElement {
          flex-shrink: 0)] but gives .title no min-width, so its default
          min-width:auto (= min-content) lets a long unbroken title grow
          the header past the dialog's right edge and shove the close
-         button off-screen (worst on a narrow / mobile viewport). Letting
-         the title column shrink to 0 and ellipsize fixes it for every
-         dialog built on this wrapper. The header-suffix (e.g. a status
-         chip) stays beside the truncated title via the label-row flex. */
+         button off-screen (worst on a narrow / mobile viewport). The
+         min-width: 0 chain lets the title column shrink instead, and
+         overflow-wrap breaks even an unbroken token so long / localized
+         titles wrap to extra lines rather than ellipsize away (#1331).
+         Fixed-height header bars (dialog-header.ts / dialog-chrome.ts)
+         opt back into single-line ellipsis on ::part(title-text). The
+         header-suffix (e.g. a status chip) stays beside the title via
+         the label-row flex. */
       wa-dialog::part(title) {
         min-width: 0;
       }
@@ -405,6 +406,7 @@ export class ESPHomeBaseDialog extends LitElement {
       }
       [part="title-text"] {
         min-width: 0;
+        overflow-wrap: anywhere;
       }
     `,
   ];
