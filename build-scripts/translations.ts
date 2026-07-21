@@ -5,7 +5,7 @@
 //   ppnpm run translations:download --source release
 //                                                pull locales from the latest GitHub release
 //   pnpm run translations:orphans                 export keys on Lokalise but not in en.json
-//   ppnpm run translations:orphans:delete [--yes]
+//   pnpm run translations:orphans:delete [--yes]
 //                                                delete the reviewed orphan keys from Lokalise
 //
 // `orphans` is a reviewable alternative to `upload --cleanup`: instead of
