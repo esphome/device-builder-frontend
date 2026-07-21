@@ -53,6 +53,30 @@ export const onboardingWizardStyles = css`
     margin-top: var(--wa-space-xs);
   }
 
+  /* Caution note on the usage screen when the user picks a standalone
+     setup while another Device Builder was discovered on the network. */
+  .usage-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wa-space-s);
+    margin-top: var(--wa-space-s);
+    padding: var(--wa-space-s) var(--wa-space-m);
+    background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 90%);
+    border: 1px solid color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 65%);
+    border-radius: var(--wa-border-radius-m);
+    font-size: var(--wa-font-size-s);
+    line-height: 1.5;
+    color: var(--wa-color-text-normal);
+    text-align: left;
+  }
+
+  .usage-warning wa-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 18px;
+    color: var(--esphome-warning, #f59e0b);
+  }
+
   .welcome-logo {
     width: 88px;
     height: 88px;

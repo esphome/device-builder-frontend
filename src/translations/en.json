@@ -1046,6 +1046,16 @@
         "title": "Welcome to ESPHome Device Builder",
         "intro": "We’ll help you tailor your ESPHome experience in a few quick steps."
       },
+      "usage": {
+        "title": "How do you want to use this installation?",
+        "intro": "You can change this any time in Settings.",
+        "standalone_title": "Standalone installation",
+        "standalone_desc": "A full ESPHome Device Builder on this machine — recommended if you don't already have an ESPHome installation.",
+        "remote_title": "Use as remote builder",
+        "remote_desc": "Pair with your existing ESPHome Device Builder and lend this machine's compute power to build device firmware.",
+        "existing_warning": "We found an existing installation on your network: {name}. A standalone setup here creates a second, separate Device Builder — continue only if that's what you want.",
+        "existing_warning_unnamed": "We found an existing installation on your network. A standalone setup here creates a second, separate Device Builder — continue only if that's what you want."
+      },
       "existing_server": {
         "title": "You already have ESPHome Device Builder",
         "found": "Found on your network: {name}",

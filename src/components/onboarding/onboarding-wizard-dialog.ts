@@ -1,9 +1,11 @@
 import { consume } from "@lit/context";
 import {
+  mdiAlertOutline,
   mdiCodeBraces,
   mdiCompassOutline,
   mdiHandshake,
   mdiMemory,
+  mdiMonitorDashboard,
   mdiServerNetwork,
   mdiSprout,
 } from "@mdi/js";
@@ -16,6 +18,7 @@ import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
   buildOffloadDiscoveredHostsContext,
+  desktopVersionContext,
   isHaAddonContext,
   localizeContext,
 } from "../../context/index.js";
@@ -37,7 +40,7 @@ import { REMOTE_COMPUTE_FEATURES, renderFeatureList } from "../shared/feature-li
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { onChoiceGroupKeydown, renderChoiceCard, rovingTabbable } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
-import { wizardScreens, type WizardScreen } from "./wizard-screens.js";
+import { wizardScreens, type UsageChoice, type WizardScreen } from "./wizard-screens.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
@@ -52,9 +55,11 @@ function viewportSupportsTour(): boolean {
 }
 
 registerMdiIcons({
+  "alert-outline": mdiAlertOutline,
   "code-braces": mdiCodeBraces,
   "compass-outline": mdiCompassOutline,
   handshake: mdiHandshake,
+  "monitor-dashboard": mdiMonitorDashboard,
   "server-network": mdiServerNetwork,
   sprout: mdiSprout,
   memory: mdiMemory,
@@ -71,6 +76,13 @@ registerMdiIcons({
  * choices closes the wizard straight onto the dashboard. Wi-Fi is
  * intentionally absent: the first Wi-Fi device that needs shared credentials
  * collects them.
+ *
+ * Under the desktop app a usage question follows Welcome: "standalone"
+ * continues the flow above (minus the orientation step, which the question
+ * subsumes), while "use as remote builder" persists remote_compute_only +
+ * hide_device_builder and ends the wizard on the spot — the dashboard
+ * reacts to the preference flip and lands on the remote-build pairing
+ * onboarding instead of the device builder.
  *
  * ``?resetOnboarding=1`` reopens a clean default run for frontend development.
  * It does not reset data before opening; completing the choices writes them
@@ -93,6 +105,12 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   @state()
   private _isHaAddon = false;
 
+  /** Desktop wrapper version from the handshake; non-empty ⇒ running under
+   *  the ESPHome Desktop app (the repo-wide "is desktop" signal). */
+  @consume({ context: desktopVersionContext, subscribe: true })
+  @state()
+  private _desktopVersion = "";
+
   @state() private _open = false;
   @state() private _saving = false;
   @state() private _error: string | null = null;
@@ -104,6 +122,14 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   // insert/remove the existing-server screen under the user.
   @state() private _existingServerPinned = false;
   @state() private _showTour = viewportSupportsTour();
+  // Frozen at open() like _showTour, so a reconnect can't add or remove the
+  // usage screen mid-flow.
+  @state() private _showUsage = false;
+  @state() private _usage: UsageChoice | null = null;
+  // The detection-based default, pinned when the usage screen is first
+  // entered so a host discovered mid-screen can't flip the badge and the
+  // preselection under the user. The warning banner stays live on purpose.
+  @state() private _usageRecommended: UsageChoice | null = null;
 
   private _startTourAfterClose = false;
   private _enter = new EnterController(this, () => {
@@ -131,6 +157,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._experience = ExperienceLevel.BEGINNER;
     this._existingServerPinned = false;
     this._showTour = viewportSupportsTour();
+    this._showUsage = Boolean(this._desktopVersion);
+    this._usage = null;
+    this._usageRecommended = null;
     this._startTourAfterClose = false;
     this._enter.set(true);
   }
@@ -151,7 +180,12 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     // once they advance past experience so a late host can't shift the flow.
     const showExistingServer =
       this._index <= 1 ? this._computeShowExistingServer() : this._existingServerPinned;
-    return wizardScreens({ showExistingServer, showTour: this._showTour });
+    return wizardScreens({
+      showUsage: this._showUsage,
+      usage: this._usage,
+      showExistingServer,
+      showTour: this._showTour,
+    });
   }
 
   /** Offer the orientation step only off the HA add-on, and only when another
@@ -179,6 +213,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     switch (this._screen) {
       case "welcome":
         return true;
+      case "usage":
+        return this._usage !== null;
       case "existing_server":
         return true;
       case "experience":
@@ -271,6 +307,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     switch (this._screen) {
       case "welcome":
         return this._renderWelcome();
+      case "usage":
+        return this._renderUsage();
       case "existing_server":
         return this._renderExistingServer();
       case "experience":
@@ -289,6 +327,76 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
           alt=""
         />
         <p class="intro">${this._localize("onboarding.wizard.welcome.intro")}</p>
+      </div>
+    `;
+  }
+
+  /** Usage options in display order with their card icons. */
+  private static readonly USAGE_OPTIONS: ReadonlyArray<[UsageChoice, string, string]> = [
+    ["standalone", "monitor-dashboard", "standalone"],
+    ["remote_builder", "server-network", "remote"],
+  ];
+
+  private _renderUsage() {
+    return html`
+      <p class="intro">${this._localize("onboarding.wizard.usage.intro")}</p>
+      <div
+        class="choices"
+        role="radiogroup"
+        aria-label=${this._localize("onboarding.wizard.usage.title")}
+        @keydown=${onChoiceGroupKeydown}
+      >
+        ${ESPHomeOnboardingWizardDialog.USAGE_OPTIONS.map(
+          ([choice, icon, keyPrefix], index) =>
+            renderChoiceCard({
+              icon,
+              title: this._localize(`onboarding.wizard.usage.${keyPrefix}_title`),
+              description: this._localize(`onboarding.wizard.usage.${keyPrefix}_desc`),
+              selected: this._usage === choice,
+              tabbable: rovingTabbable(
+                this._usage === choice,
+                this._usage !== null,
+                index
+              ),
+              badge:
+                choice === this._usageRecommended
+                  ? this._localize("onboarding.wizard.recommended")
+                  : undefined,
+              disabled: this._saving,
+              onSelect: () => {
+                this._usage = choice;
+              },
+            })
+        )}
+      </div>
+      ${this._renderUsageWarning()}
+    `;
+  }
+
+  /** Caution note under the cards when the user insists on a standalone
+   *  setup even though another Device Builder was discovered. Reads the
+   *  live host map on purpose: a host that appears mid-screen should still
+   *  raise the flag even though the badge/preselection stay pinned. */
+  private _renderUsageWarning() {
+    if (this._usage !== "standalone" || !this._discoveredHosts?.size) return nothing;
+    const names = [
+      ...new Set([...this._discoveredHosts.values()].map(remoteBuildPeerName)),
+    ].filter(Boolean);
+    const joined = new Intl.ListFormat(activeLocale(), { type: "conjunction" }).format(
+      names.slice(0, 3)
+    );
+    return html`
+      <div class="usage-warning" role="status">
+        <wa-icon library="mdi" name="alert-outline" aria-hidden="true"></wa-icon>
+        <span>
+          ${
+            joined
+              ? this._localize("onboarding.wizard.usage.existing_warning", {
+                  name: joined,
+                })
+              : this._localize("onboarding.wizard.usage.existing_warning_unnamed")
+          }
+        </span>
       </div>
     `;
   }
@@ -425,12 +533,31 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._error = null;
     switch (this._screen) {
       case "welcome":
+        if (this._showUsage && this._usage === null) {
+          // Pin the detection-based default the moment the question is
+          // asked: existing install found ⇒ remote builder, else standalone.
+          this._usageRecommended = this._discoveredHosts?.size
+            ? "remote_builder"
+            : "standalone";
+          this._usage = this._usageRecommended;
+        }
+        this._index += 1;
+        return;
+      case "usage":
+        if (this._usage === "remote_builder") {
+          // Onboarding ends here; the dashboard flips to remote-build mode
+          // (pairing onboarding first) as soon as the preference lands.
+          await this._completeSetup();
+          return;
+        }
         this._index += 1;
         return;
       case "experience":
         // Freeze whether the orientation step follows, now that mDNS has had
-        // Welcome + this screen to report.
-        this._existingServerPinned = this._computeShowExistingServer();
+        // Welcome + this screen to report. The usage screen subsumes the
+        // orientation step, so it never pins on desktop.
+        this._existingServerPinned =
+          !this._showUsage && this._computeShowExistingServer();
         if (this._existingServerPinned) {
           this._index += 1;
           return;
@@ -458,7 +585,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._emitAcknowledged();
     this._saving = false;
 
-    if (this._showTour) {
+    // A remote builder never gets the tour offer — the remote-build pairing
+    // onboarding takes over the dashboard the moment the preference lands.
+    if (this._showTour && this._usage !== "remote_builder") {
       this._index += 1;
     } else {
       this._open = false;
@@ -466,10 +595,16 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   }
 
   private async _persistChoices(): Promise<boolean> {
+    const remoteBuilder = this._usage === "remote_builder";
     try {
       await this._api.updatePreferences({
         experience_level: this._experience,
-        remote_compute_only: this._remoteCompute,
+        remote_compute_only: remoteBuilder || this._remoteCompute,
+        // Only the desktop usage question decides this: a remote builder
+        // hides the Device builder entirely (the dashboard shows just the
+        // remote-build screens), and a standalone pick resets it so a
+        // re-run of onboarding can back out of a previous remote setup.
+        ...(this._showUsage ? { hide_device_builder: remoteBuilder } : {}),
       });
       return true;
     } catch (err) {
