@@ -48,7 +48,7 @@ import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js"
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { navigate, setLeaveGuard } from "../util/navigation.js";
+import { goBackOrHome, navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { isTypingTarget } from "../util/typing-target.js";
@@ -572,10 +572,13 @@ export class ESPHomePageDevice extends LitElement {
       this._drawerOpen = false;
       return;
     }
-    /* Otherwise leave the editor — same path as the back button, so
-       the unsaved-changes guard runs via popstate. */
+    /* Otherwise leave the editor via the header back arrow's guarded
+       path. A raw history.back() here loses the dirty buffer: the
+       router's popstate listener commits the leave before this page's
+       ``_onPopState`` can veto it, so the unsaved-changes prompt must
+       run before the navigation, not after. */
     e.preventDefault();
-    window.history.back();
+    void goBackOrHome();
   };
 
   updated(changedProperties: Map<string, unknown>) {

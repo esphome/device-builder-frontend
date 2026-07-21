@@ -15,7 +15,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
 import { stripBase, withBase } from "../util/base-path.js";
 import { deviceBuilderChannel } from "../util/device-builder-channel.js";
-import { navigate, runLeaveGuard } from "../util/navigation.js";
+import { goBackOrHome } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   desktopDocsUrl,
@@ -343,24 +343,7 @@ export class ESPHomeLayout extends LitElement {
   ];
 
   private async _goHome() {
-    // Prefer popping the history stack so the previous URL — and
-    // therefore the dashboard's filter / search state encoded in
-    // its query string — is restored verbatim. ``history.state`` is
-    // set to ``{}`` by our own ``navigate()`` helper on every
-    // pushState; ``null`` means we landed on this route via a fresh
-    // page load (deep link / refresh) so there's nothing useful to
-    // pop and we fall back to ``navigate("/")`` to stay inside the
-    // SPA instead of exiting to the previous site.
-    if (window.history.state !== null && typeof window.history.state === "object") {
-      // history.back() fires a raw popstate the router commits (unmounting the
-      // page) before the device editor's popstate guard can veto it, so honour
-      // the leave guard here — same gate navigate() applies. navigate("/") runs
-      // the guard itself, so the fallback isn't double-prompted.
-      if (!(await runLeaveGuard())) return;
-      window.history.back();
-      return;
-    }
-    navigate("/");
+    await goBackOrHome();
   }
 
   protected render() {

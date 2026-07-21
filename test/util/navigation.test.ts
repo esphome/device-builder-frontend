@@ -31,7 +31,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { navigate, runLeaveGuard, setLeaveGuard } from "../../src/util/navigation.js";
+import {
+  goBackOrHome,
+  navigate,
+  runLeaveGuard,
+  setLeaveGuard,
+} from "../../src/util/navigation.js";
 
 /* The vitest config runs in the ``node`` environment, which has
  * no ``window``. ``navigation.ts`` reaches for ``window.history``
@@ -242,5 +247,97 @@ describe("runLeaveGuard", () => {
     setLeaveGuard(null);
     await expect(runLeaveGuard()).resolves.toBe(true);
     expect(stale).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ``goBackOrHome`` is the shared header-back-arrow / Escape-key leave path.
+ * It must run the guard BEFORE ``history.back()`` — issue
+ * esphome/device-builder#2259 was Escape calling raw ``history.back()`` and
+ * losing the dirty buffer to the router's popstate listener.
+ */
+describe("goBackOrHome", () => {
+  let pushStateSpy: ReturnType<typeof vi.fn>;
+  let backSpy: ReturnType<typeof vi.fn>;
+  let historyState: unknown;
+
+  const stubWindow = () => {
+    (globalThis as Record<string, unknown>).window = {
+      history: {
+        pushState: pushStateSpy,
+        back: backSpy,
+        get state() {
+          return historyState;
+        },
+      },
+      dispatchEvent: vi.fn(),
+    };
+    (globalThis as Record<string, unknown>).PopStateEvent = Event;
+  };
+
+  beforeEach(() => {
+    pushStateSpy = vi.fn();
+    backSpy = vi.fn();
+    historyState = {};
+    stubWindow();
+  });
+
+  afterEach(() => {
+    setLeaveGuard(null);
+    delete (globalThis as Record<string, unknown>).window;
+    delete (globalThis as Record<string, unknown>).PopStateEvent;
+    vi.restoreAllMocks();
+  });
+
+  it("runs the guard before popping history", async () => {
+    const guard = vi.fn(() => Promise.resolve(true));
+    setLeaveGuard(guard);
+
+    await goBackOrHome();
+
+    expect(guard).toHaveBeenCalledTimes(1);
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    expect(guard.mock.invocationCallOrder[0]).toBeLessThan(
+      backSpy.mock.invocationCallOrder[0]
+    );
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
+
+  it("blocks the back-pop when the guard resolves false", async () => {
+    const guard = vi.fn(() => Promise.resolve(false));
+    setLeaveGuard(guard);
+
+    await goBackOrHome();
+
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
+
+  it("pops history unconditionally when no guard is registered", async () => {
+    await goBackOrHome();
+    expect(backSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to navigate('/') on a fresh page load (null history.state)", async () => {
+    historyState = null;
+    const guard = vi.fn(() => Promise.resolve(true));
+    setLeaveGuard(guard);
+
+    await goBackOrHome();
+
+    expect(backSpy).not.toHaveBeenCalled();
+    // navigate() owns the guard on this branch — exactly one prompt.
+    expect(guard).toHaveBeenCalledTimes(1);
+    expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/");
+  });
+
+  it("fallback navigation honours a blocking guard", async () => {
+    historyState = null;
+    setLeaveGuard(vi.fn(() => Promise.resolve(false)));
+
+    await goBackOrHome();
+
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
   });
 });
