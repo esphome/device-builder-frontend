@@ -123,6 +123,28 @@ describe("mandatory onboarding flow", () => {
     expect(state._open).toBe(false);
   });
 
+  it("still closes when a host arrives while choices are persisting", async () => {
+    const wizard = new ESPHomeOnboardingWizardDialog();
+    wizard.open();
+    const state = internals(wizard);
+    state._showTour = false; // phone-sized viewport
+    state._isHaAddon = false;
+    state._discoveredHosts = null;
+    state._index = 1; // experience, nothing detected — pin lands false
+    state._api = {
+      // mDNS lands mid-save; the close decision must honor the pin, not
+      // recompute the screen list from the freshly-arrived host.
+      updatePreferences: vi.fn().mockImplementation(async () => {
+        state._discoveredHosts = new Map([["h", { friendly_name: "", name: "late" }]]);
+      }),
+      markOnboardingAcknowledged: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await state._onContinue();
+
+    expect(state._open).toBe(false);
+  });
+
   it("starts the guided tour only after the final dialog has closed", () => {
     const wizard = new ESPHomeOnboardingWizardDialog();
     wizard.open();

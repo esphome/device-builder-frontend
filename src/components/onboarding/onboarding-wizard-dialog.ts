@@ -457,7 +457,8 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     }
     this._emitAcknowledged();
     this._saving = false;
-    if (this._index + 1 < this._screens.length) {
+
+    if (this._showTour) {
       this._index += 1;
     } else {
       this._open = false;
