@@ -1730,7 +1730,7 @@
       "status": "Unsupported",
       "heading": "Web Serial unavailable",
       "insecure": "ESPHome Web needs a secure connection. Reopen this page over https (or on localhost) to connect to a device.",
-      "browser": "ESPHome Web requires a browser that supports Web Serial. Open this site on a desktop using Google Chrome, Microsoft Edge, or another Chromium-based browser."
+      "browser": "ESPHome Web requires a browser that supports Web Serial. Open this site on a desktop using Google Chrome, Microsoft Edge, another Chromium-based browser, or Firefox 151 or newer. Safari does not support Web Serial, and Firefox managed by an organization may have it disabled by policy."
     },
     "logs": {
       "title_named": "{name} logs",
