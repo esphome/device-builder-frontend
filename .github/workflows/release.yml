@@ -256,7 +256,7 @@ jobs:
 
       - name: Package translations
         # Bundle the locale files the build shipped into a single release
-        # asset. `translations:download -- --source release` reads this zip
+        # asset. `translations:download --source release` reads this zip
         # to reproduce a release's locales without a Lokalise token.
         run: |
           set -euo pipefail

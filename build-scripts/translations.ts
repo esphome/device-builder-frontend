@@ -11,7 +11,7 @@
 // `orphans` is a reviewable alternative to `upload --cleanup`: instead of
 // letting Lokalise blindly delete every key absent from en.json, it writes
 // the orphan list to translation-orphans.json so a human can prune the ones
-// to keep, then `orphans:delete -- --yes` deletes whatever's left.
+// to keep, then `orphans:delete --yes` deletes whatever's left.
 //
 // The base language (en.json) is the in-repo source of truth: `upload`
 // pushes its keys to Lokalise, adding new keys and updating the English
@@ -452,7 +452,7 @@ interface OrphanFile {
 const ORPHAN_README =
   "Keys present in Lokalise but absent from src/translations/en.json. " +
   "Remove any entry you want to KEEP — every entry left in `orphans` is " +
-  "DELETED from Lokalise by `ppnpm run translations:orphans:delete --yes`. " +
+  "DELETED from Lokalise by `pnpm run translations:orphans:delete --yes`. " +
   "This is a throwaway working copy and is gitignored.";
 
 // The base-language key set as Lokalise names it: en.json flattened with the
@@ -485,7 +485,7 @@ async function runOrphans(client: LokaliseClient, outPath: string): Promise<numb
   if (orphans.length > 0) {
     console.log(
       "Review it (delete any entry you want to keep), then run " +
-        "`ppnpm run translations:orphans:delete --yes`."
+        "`pnpm run translations:orphans:delete --yes`."
     );
   }
   return 0;
@@ -580,13 +580,13 @@ function usage(): void {
   console.log(
     [
       "Usage:",
-      "  ppnpm run translations:upload [--cleanup]   Push en.json keys to Lokalise",
+      "  pnpm run translations:upload [--cleanup]   Push en.json keys to Lokalise",
       "  pnpm run translations:download                Pull translated locales from Lokalise",
-      "  ppnpm run translations:download --source release",
+      "  pnpm run translations:download --source release",
       "                                               Pull locales from the latest GitHub release",
-      "  ppnpm run translations:orphans [--out <file>]",
+      "  pnpm run translations:orphans [--out <file>]",
       "                                               Export keys on Lokalise but not in en.json",
-      "  ppnpm run translations:orphans:delete [--yes] [--file <file>]",
+      "  pnpm run translations:orphans:delete [--yes] [--file <file>]",
       "                                               Delete the reviewed orphan keys from Lokalise",
       "",
       "Environment:",
