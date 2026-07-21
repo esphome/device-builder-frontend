@@ -13,7 +13,7 @@ import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { formatPinValue, parseBoardGpio, parsePinGpio } from "../../util/pin-gpio.js";
 import { expandPinModeShorthand } from "../../util/pin-mode.js";
-import { looksLikeSubstitution } from "../../util/substitutions.js";
+import { isSubstitutionString, looksLikeSubstitution } from "../../util/substitutions.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 import {
   effectiveDisabled,
@@ -238,11 +238,7 @@ export function renderPinField(
   // ``number`` as text with the resolves-to hint, mirroring the scalar
   // ${var} gate in ``config-entry-form``. Checked before the boardless
   // fallback, which would bail an object value to the YAML-only shell.
-  if (
-    isPlainObject(rawValue) &&
-    typeof rawValue.number === "string" &&
-    looksLikeSubstitution(rawValue.number)
-  ) {
+  if (isPlainObject(rawValue) && isSubstitutionString(rawValue.number)) {
     return renderSubstitutionPin(entry, path, ctx, rawValue, rawValue.number);
   }
   if (!ctx.board || ctx.board.pins.length === 0) {

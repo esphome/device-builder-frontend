@@ -64,6 +64,15 @@ export function looksLikeSubstitution(text: string): boolean {
   return SUBSTITUTION_LIKE_RE.test(text);
 }
 
+/**
+ * True when *value* is a string that is (or is becoming) a ``${var}``
+ * reference. The one predicate behind the coupled pair "the form edits it
+ * as text" / "the validator skips typed checks", so the two can't drift.
+ */
+export function isSubstitutionString(value: unknown): value is string {
+  return typeof value === "string" && looksLikeSubstitution(value);
+}
+
 /** Expand ``${name}`` / ``$name`` in *text* against *subs*, leaving
  *  unknown refs literal. Iterates (capped) so chained substitutions
  *  resolve without looping on cycles. */

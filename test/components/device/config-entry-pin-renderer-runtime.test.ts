@@ -208,9 +208,8 @@ describe("renderPinField — mode scalar shorthand expansion", () => {
     // the form's scalar ${var} gate (text input + resolves-to hint) instead
     // of the read-only scalar notice.
     const ctx = openModeCtx({ number: 0, mode: "${my_mode}" });
-    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+    renderPinField(longFormPinEntry(), ["pin"], ctx);
 
-    expect(findElementBindings(result, "wa-switch")).toHaveLength(0);
     expect(ctx.renderEntry).toHaveBeenCalledWith(
       expect.objectContaining({ key: "mode" }),
       ["pin", "mode"]

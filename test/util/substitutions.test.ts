@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   hasSubstitutionReference,
+  isSubstitutionString,
   looksLikeSubstitution,
   parseSubstitutions,
   resolveSubstitutions,
@@ -127,5 +128,16 @@ describe("looksLikeSubstitution", () => {
     expect(looksLikeSubstitution("5$")).toBe(false);
     expect(looksLikeSubstitution("$5.00")).toBe(false);
     expect(looksLikeSubstitution("0.05")).toBe(false);
+  });
+});
+
+describe("isSubstitutionString", () => {
+  it("narrows to substitution-looking strings only", () => {
+    expect(isSubstitutionString("${var}")).toBe(true);
+    expect(isSubstitutionString("${mid-edit")).toBe(true);
+    expect(isSubstitutionString("GPIO5")).toBe(false);
+    expect(isSubstitutionString(5)).toBe(false);
+    expect(isSubstitutionString(undefined)).toBe(false);
+    expect(isSubstitutionString({ number: "${var}" })).toBe(false);
   });
 });

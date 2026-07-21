@@ -52,7 +52,7 @@ import {
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { nearestScrollContainer } from "../../util/scroll-container.js";
 import { SessionBlobCacheController } from "../../util/session-blob-cache-controller.js";
-import { looksLikeSubstitution, parseSubstitutions } from "../../util/substitutions.js";
+import { isSubstitutionString, parseSubstitutions } from "../../util/substitutions.js";
 import {
   _isStructuralType,
   filterRenderable,
@@ -906,7 +906,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // text so the token round-trips and stays editable mid-keystroke;
     // SECURE_STRING stays masked (#1391).
     const raw = ctx.getAt(path);
-    if (typeof raw === "string" && looksLikeSubstitution(raw)) {
+    if (isSubstitutionString(raw)) {
       const inputType =
         entry.type === ConfigEntryType.SECURE_STRING ? "password" : "text";
       return renderStringField(entry, inputType, path, ctx);
