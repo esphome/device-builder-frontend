@@ -8,7 +8,11 @@ vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
 
 import type { LocalizeFunc } from "../../../src/common/localize.js";
-import { ESPHomeOnboardingWizardDialog } from "../../../src/components/onboarding/onboarding-wizard-dialog.js";
+import {
+  DESKTOP_ONBOARDING_PARAM,
+  ESPHomeOnboardingWizardDialog,
+  RESET_ONBOARDING_PARAM,
+} from "../../../src/components/onboarding/onboarding-wizard-dialog.js";
 import type { UsageChoice } from "../../../src/components/onboarding/wizard-screens.js";
 
 interface WizardInternals {
@@ -55,6 +59,8 @@ const openDesktopWizard = () => {
 
 afterEach(() => {
   document.body.replaceChildren();
+  window.history.replaceState(null, "", "/");
+  delete (globalThis as { __DEV__?: boolean }).__DEV__;
 });
 
 describe("desktop usage question", () => {
@@ -166,6 +172,24 @@ describe("desktop usage question", () => {
     const warning = wizard.shadowRoot?.querySelector(".usage-warning");
     expect(warning).not.toBeNull();
     expect(warning?.textContent).toContain("living-room");
+  });
+
+  it("previews the usage screen via the dev reset query on a non-desktop backend", async () => {
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+    window.history.replaceState(
+      null,
+      "",
+      `/?${RESET_ONBOARDING_PARAM}=1&${DESKTOP_ONBOARDING_PARAM}=1`
+    );
+    const wizard = new ESPHomeOnboardingWizardDialog();
+    document.body.appendChild(wizard);
+    await wizard.updateComplete;
+
+    const state = internals(wizard);
+    expect(state._open).toBe(true);
+    expect(state._showUsage).toBe(true);
+    expect(state._screens).toContain("usage");
+    expect(window.location.search).toBe("");
   });
 
   it("shows no warning for standalone when nothing was detected", async () => {

@@ -46,6 +46,9 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 export const RESET_ONBOARDING_PARAM = "resetOnboarding";
+/** Companion to ``resetOnboarding``: ``&desktop=1`` previews the desktop-only
+ *  usage screen on a dev backend that isn't the desktop wrapper. */
+export const DESKTOP_ONBOARDING_PARAM = "desktop";
 
 function viewportSupportsTour(): boolean {
   return !(
@@ -86,7 +89,8 @@ registerMdiIcons({
  *
  * ``?resetOnboarding=1`` reopens a clean default run for frontend development.
  * It does not reset data before opening; completing the choices writes them
- * through the same API path as first-run onboarding.
+ * through the same API path as first-run onboarding. Add ``&desktop=1`` to
+ * preview the desktop-only usage screen on a non-desktop dev backend.
  */
 @customElement("esphome-onboarding-wizard-dialog")
 export class ESPHomeOnboardingWizardDialog extends LitElement {
@@ -652,12 +656,19 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     const params = new URLSearchParams(window.location.search);
     if (params.get(RESET_ONBOARDING_PARAM) !== "1") return;
 
+    const forceDesktop = params.get(DESKTOP_ONBOARDING_PARAM) === "1";
     params.delete(RESET_ONBOARDING_PARAM);
+    params.delete(DESKTOP_ONBOARDING_PARAM);
     const query = params.toString();
     const cleaned =
       window.location.pathname + (query ? `?${query}` : "") + window.location.hash;
     window.history.replaceState(window.history.state, "", cleaned);
     this.open();
+    // The dev backend is never the desktop wrapper, so ``&desktop=1``
+    // previews the desktop-only usage screen anyway. Applied after open()
+    // (which derives the flag from the handshake) rather than by faking
+    // _desktopVersion, which the context provider would overwrite.
+    if (forceDesktop) this._showUsage = true;
   }
 }
 
