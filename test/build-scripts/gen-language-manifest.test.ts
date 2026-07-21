@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 // The generator is a CommonJS script that requires the ESM module
 // translations-lib.ts through Node's native type stripping. Vitest's
 // transform pipeline would paper over that seam if the script were imported
-// here, so run it in a plain Node child process, exactly like `npm run lint`
+// here, so run it in a plain Node child process, exactly like `pnpm run lint`
 // and test/global-setup.mjs do. The script's optional output-path argument
 // points the write at a temp directory so the test never touches (or races
 // other tooling on) the real src/generated file.

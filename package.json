@@ -4,12 +4,12 @@
   "description": "Frontend for ESPHome Dashboard",
   "private": true,
   "type": "module",
-  "packageManager": "npm@11.13.0",
+  "packageManager": "pnpm@10.33.4",
   "engines": {
     "node": ">=22.18"
   },
   "scripts": {
-    "preinstall": "node build-scripts/only-npm.cjs",
+    "preinstall": "node build-scripts/only-pnpm.cjs",
     "dev": "node build-scripts/dev-server.cjs",
     "dev:web": "node build-scripts/dev-web-server.cjs",
     "build": "node build-scripts/build.cjs",
@@ -27,9 +27,18 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.1",
+    "@codemirror/commands": "^6.10.2",
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-yaml": "^6.1.3",
+    "@codemirror/language": "^6.12.2",
+    "@codemirror/lint": "^6.9.5",
+    "@codemirror/state": "^6.5.4",
+    "@codemirror/view": "^6.39.16",
     "@home-assistant/webawesome": "3.7.0",
+    "@lezer/common": "^1.5.1",
+    "@lezer/highlight": "^1.2.3",
+    "@lezer/yaml": "^1.0.4",
     "@lit-labs/router": "0.1.4",
     "@lit/context": "1.1.6",
     "@lit/reactive-element": "2.1.2",

@@ -76,9 +76,9 @@ jobs:
     runs-on: ubuntu-latest
     # The Lokalise credentials live in the `lokalise` environment, so the
     # API token is only ever exposed to this small job — not to the build
-    # job, which runs `npm ci` and the full bundler. If the environment
-    # isn't configured the download is skipped and the wheel ships
-    # English-only (see the secrets guard below).
+    # job, which runs `pnpm install --frozen-lockfile` and the full
+    # bundler. If the environment isn't configured the download is skipped
+    # and the wheel ships English-only (see the secrets guard below).
     environment: lokalise
     permissions:
       contents: read    # actions/checkout uses the implicit GITHUB_TOKEN
@@ -88,13 +88,16 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Download from Lokalise
         # Non-English locales are gitignored, so pull them before bundling to
@@ -118,7 +121,7 @@ jobs:
             echo "::warning::Lokalise secrets unset; building English-only (fork)."
             exit 0
           fi
-          npm run translations:download
+          pnpm run translations:download
 
       - name: Upload translations artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -148,14 +151,17 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
         run: |
-          npm ci
+          pnpm install --frozen-lockfile
           python3 -m pip install build tomli tomli-w
 
       - name: Stamp version into pyproject.toml and package.json
@@ -191,7 +197,7 @@ jobs:
           path: src/translations/
 
       - name: Build frontend bundle
-        run: npm run build
+        run: pnpm run build
 
       - name: Build wheel and sdist
         run: |

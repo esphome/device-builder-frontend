@@ -28,6 +28,6 @@ next release notes.
 ## Checklist
 
 - [ ] The code change is tested and works locally.
-- [ ] `npm run lint` passes.
-- [ ] `npm run test` passes.
+- [ ] `pnpm run lint` passes.
+- [ ] `pnpm run test` passes.
 - [ ] Tests have been added to verify that the new code works (where applicable).

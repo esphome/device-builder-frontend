@@ -159,7 +159,7 @@ on failure assign the previous value back and surface a
 
 Non-English locales live in [Lokalise](https://lokalise.com/),
 **not in the repo** — they're gitignored and pulled at build time
-(`npm run translations:download`). See [README → "Translations"](README.md#translations)
+(`pnpm run translations:download`). See [README → "Translations"](README.md#translations)
 for the full flow. The load-bearing rules:
 
 - `src/translations/en.json` is the source-of-truth English copy
@@ -252,7 +252,7 @@ for the full flow. The load-bearing rules:
 ## ESPHome Web (standalone site)
 
 `src/web/` is a **second, backend-free build target** — the browser-only Web
-Serial tool published to web.esphome.io (`npm run dev:web` / `npm run
+Serial tool published to web.esphome.io (`pnpm run dev:web` / `pnpm run
 build:web` → `esphome_web/`, deployed by
 `.github/workflows/deploy-web.yml`). It reuses this repo's design system,
 `src/util/web-serial.ts` (esptool-js flash engine), `process-terminal` /

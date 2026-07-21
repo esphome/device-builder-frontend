@@ -65,8 +65,8 @@ side has landed.
 - **Imperative-mood subject line** — "Add X", not "Added X".
 - **No `Co-Authored-By: Claude` trailer.** Project preference
   (matches the backend repo).
-- One logical change per commit. Run `npm run lint` and
-  `npm run test` locally before pushing.
+- One logical change per commit. Run `pnpm run lint` and
+  `pnpm run test` locally before pushing.
 
 ## 6. Push and create the PR
 

@@ -23,26 +23,31 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      # Installs the pnpm version pinned by package.json's packageManager
+      # field, so the workflow can never drift from the repo's pin.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Prettier format check
-        run: npm run format:check
+        run: pnpm run format:check
 
       - name: Lint (TypeScript type check)
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Tests
-        run: npm test
+        run: pnpm test
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Build ESPHome Web
-        run: npm run build:web
+        run: pnpm run build:web

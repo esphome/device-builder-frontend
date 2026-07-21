@@ -44,19 +44,19 @@ The rest of this README is for developers working on the frontend itself. If you
 
 ### Prerequisites
 
-- Node.js 22+ (with npm)
+- Node.js 22+ and [pnpm](https://pnpm.io/) (`corepack enable` provides the version pinned in `package.json`)
 - A running ESPHome Device builder backend on `localhost:6052` — clone and run [device-builder](https://github.com/esphome/device-builder) in dev mode in a separate terminal
 
 ### Install
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### Dev server
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Starts an HMR dev server at `http://localhost:5173`. WebSocket and REST traffic are proxied to the backend at `localhost:6052`.
@@ -64,7 +64,7 @@ Starts an HMR dev server at `http://localhost:5173`. WebSocket and REST traffic 
 ### Production build
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Outputs the bundled assets into `esphome_device_builder_frontend/` — that directory doubles as the Python package source for the wheel that ships with the backend release. The `__init__.py` exposing the asset path is sourced from `public/__init__.py` and copied into place by the bundler.
@@ -72,7 +72,7 @@ Outputs the bundled assets into `esphome_device_builder_frontend/` — that dire
 To produce the wheel locally (matches what CI builds on release):
 
 ```bash
-npm run build
+pnpm run build
 python3 -m build --wheel
 # wheel ends up in dist/
 ```
@@ -81,23 +81,23 @@ python3 -m build --wheel
 
 | Script               | Description                            |
 | -------------------- | -------------------------------------- |
-| `npm run lint`       | TypeScript type-check (`tsc --noEmit`) |
-| `npm test`           | Run the Vitest suite once              |
-| `npm run test:watch` | Run tests in watch mode                |
-| `npm run format`     | Format `src/` with Prettier            |
-| `npm run dev:web`    | ESPHome Web dev server (port 5174)     |
-| `npm run build:web`  | Build the standalone ESPHome Web site  |
+| `pnpm run lint`       | TypeScript type-check (`tsc --noEmit`) |
+| `pnpm test`           | Run the Vitest suite once              |
+| `pnpm run test:watch` | Run tests in watch mode                |
+| `pnpm run format`     | Format `src/` with Prettier            |
+| `pnpm run dev:web`    | ESPHome Web dev server (port 5174)     |
+| `pnpm run build:web`  | Build the standalone ESPHome Web site  |
 
 ## ESPHome Web
 
 This repo also builds **[ESPHome Web](https://web.esphome.io)** — the standalone, backend-free Web Serial tool (connect an ESP or Raspberry Pi Pico W over USB to install firmware, view logs, and provision Wi-Fi via Improv). It's a second build target that shares this repo's `src/` tree — the design system, the esptool-js flash engine (`src/util/web-serial.ts`), and localization — and adds only the app under `src/web/`.
 
 ```bash
-npm run dev:web    # HMR dev server on http://localhost:5174 (no backend needed)
-npm run build:web  # static site → esphome_web/ (gitignored)
+pnpm run dev:web    # HMR dev server on http://localhost:5174 (no backend needed)
+pnpm run build:web  # static site → esphome_web/ (gitignored)
 ```
 
-Unlike the wheel build (`npm run build` → `esphome_device_builder_frontend/`), ESPHome Web has no WebSocket, no auth, and no server: everything runs in the browser. Its output (`esphome_web/`) is **never** part of the wheel; `.github/workflows/deploy-web.yml` publishes it to GitHub Pages at web.esphome.io. New copy goes in `en.json` under the `web.*` namespace like the rest of the app.
+Unlike the wheel build (`pnpm run build` → `esphome_device_builder_frontend/`), ESPHome Web has no WebSocket, no auth, and no server: everything runs in the browser. Its output (`esphome_web/`) is **never** part of the wheel; `.github/workflows/deploy-web.yml` publishes it to GitHub Pages at web.esphome.io. New copy goes in `en.json` under the `web.*` namespace like the rest of the app.
 
 ## Translations
 
@@ -111,33 +111,33 @@ Translations are crowd-sourced through Lokalise — **no coding or GitHub accoun
 
 ```bash
 # Push new/changed English keys up to Lokalise as the base language.
-npm run translations:upload
+pnpm run translations:upload
 
 # Pull the latest translations into src/translations/ (for local dev).
-npm run translations:download
+pnpm run translations:download
 
 # Pull the locales from the latest GitHub release instead of Lokalise
 # (no Lokalise token needed — reads the release's translations.zip asset).
-npm run translations:download -- --source release
+ppnpm run translations:download --source release
 
 # Export the keys that exist on Lokalise but not in en.json to a
 # reviewable working file (translation-orphans.json), then delete them.
-npm run translations:orphans
-npm run translations:orphans:delete -- --yes
+pnpm run translations:orphans
+ppnpm run translations:orphans:delete --yes
 ```
 
-The Lokalise commands (`upload`, `download`, `orphans`, `orphans:delete`) read `LOKALISE_API_TOKEN` and `LOKALISE_PROJECT_ID` from the environment; the sole exception is `download -- --source release`, which reads the locale bundle from a GitHub release and needs no Lokalise token. `upload` only adds keys — it never overwrites translator edits; pass `npm run translations:upload -- --cleanup` to also delete Lokalise keys that no longer exist in `en.json`.
+The Lokalise commands (`upload`, `download`, `orphans`, `orphans:delete`) read `LOKALISE_API_TOKEN` and `LOKALISE_PROJECT_ID` from the environment; the sole exception is `download -- --source release`, which reads the locale bundle from a GitHub release and needs no Lokalise token. `upload` only adds keys — it never overwrites translator edits; pass `ppnpm run translations:upload --cleanup` to also delete Lokalise keys that no longer exist in `en.json`.
 
-`--cleanup` deletes orphaned keys blindly in one shot. When you'd rather review first, use the orphan flow instead: `npm run translations:orphans` lists every key Lokalise has that `en.json` no longer defines (matching Lokalise's `::`-flattened key names against the nested `en.json`) and writes them to a gitignored `translation-orphans.json`. Delete any entry from that file's `orphans` array to keep it, then `npm run translations:orphans:delete` removes whatever's left — but only with `-- --yes`; without it the command is a dry run that just prints what it would delete. Point either command at a different path with `-- --out <file>` / `-- --file <file>`. `download` pulls every language the project has, writes each one except English (canonicalizing Lokalise's underscore ISO codes to the repo's BCP 47 filenames, e.g. `zh_CN` → `zh-CN.json`), and omits untranslated keys so the runtime English fallback in `localize.ts` stays in effect. A Lokalise download that returns no locales is treated as an error rather than silently shipping English-only. The `--source release` variant needs no Lokalise token (optionally `GITHUB_TOKEN` / `GITHUB_REPOSITORY` to raise rate limits or point at a fork) and reproduces exactly the locales the latest release shipped.
+`--cleanup` deletes orphaned keys blindly in one shot. When you'd rather review first, use the orphan flow instead: `pnpm run translations:orphans` lists every key Lokalise has that `en.json` no longer defines (matching Lokalise's `::`-flattened key names against the nested `en.json`) and writes them to a gitignored `translation-orphans.json`. Delete any entry from that file's `orphans` array to keep it, then `pnpm run translations:orphans:delete` removes whatever's left — but only with `-- --yes`; without it the command is a dry run that just prints what it would delete. Point either command at a different path with `-- --out <file>` / `-- --file <file>`. `download` pulls every language the project has, writes each one except English (canonicalizing Lokalise's underscore ISO codes to the repo's BCP 47 filenames, e.g. `zh_CN` → `zh-CN.json`), and omits untranslated keys so the runtime English fallback in `localize.ts` stays in effect. A Lokalise download that returns no locales is treated as an error rather than silently shipping English-only. The `--source release` variant needs no Lokalise token (optionally `GITHUB_TOKEN` / `GITHUB_REPOSITORY` to raise rate limits or point at a fork) and reproduces exactly the locales the latest release shipped.
 
-The frontend loader (`src/common/localize.ts`) is data-driven with no hardcoded locale list. The full message bodies load **lazily**: `import.meta.webpackContext(..., { mode: "lazy" })` makes rspack emit one async chunk per locale, fetched only when that locale is selected, so English-only users download no other locale's strings (the English base is statically bundled as the always-present fallback). The language **picker**, however, needs each locale's autonym + flag synchronously up front — so a tiny `src/generated/language-manifest.json` (only those two keys per locale) is generated from `src/translations/*.json` at build time by `build-scripts/gen-language-manifest.cjs` and statically imported. That manifest is gitignored and regenerated automatically by `build` / `dev` / `lint` / the test global-setup; run `npm run gen:languages` to refresh it by hand. A checkout with no download (or a build before the secrets are set) simply ships English-only; the missing files are not an error. Locale codes are matched separator- and case-insensitively, so Lokalise's `fr` / `zh_CN` filenames resolve against the browser's BCP 47 `fr-FR` / `zh-CN` tags without any per-locale mapping.
+The frontend loader (`src/common/localize.ts`) is data-driven with no hardcoded locale list. The full message bodies load **lazily**: `import.meta.webpackContext(..., { mode: "lazy" })` makes rspack emit one async chunk per locale, fetched only when that locale is selected, so English-only users download no other locale's strings (the English base is statically bundled as the always-present fallback). The language **picker**, however, needs each locale's autonym + flag synchronously up front — so a tiny `src/generated/language-manifest.json` (only those two keys per locale) is generated from `src/translations/*.json` at build time by `build-scripts/gen-language-manifest.cjs` and statically imported. That manifest is gitignored and regenerated automatically by `build` / `dev` / `lint` / the test global-setup; run `pnpm run gen:languages` to refresh it by hand. A checkout with no download (or a build before the secrets are set) simply ships English-only; the missing files are not an error. Locale codes are matched separator- and case-insensitively, so Lokalise's `fr` / `zh_CN` filenames resolve against the browser's BCP 47 `fr-FR` / `zh-CN` tags without any per-locale mapping.
 
 In CI this is automated by:
 
 - `translations-upload.yml` — pushes to Lokalise whenever `en.json` lands on `main`. Automated pushes never prune; run it manually from the Actions tab with the `cleanup` input checked to delete keys no longer in `en.json`.
 - `release.yml` — downloads translations before bundling so the released wheel ships every locale.
 
-There's no scheduled download workflow: because the locale files are gitignored, there's nothing to commit back to `main`. The translations only need to exist at build time, and `release.yml` pulls them fresh for the wheel; locally, run `npm run translations:download` whenever you want to work against the latest copy.
+There's no scheduled download workflow: because the locale files are gitignored, there's nothing to commit back to `main`. The translations only need to exist at build time, and `release.yml` pulls them fresh for the wheel; locally, run `pnpm run translations:download` whenever you want to work against the latest copy.
 
 The workflows need the `LOKALISE_API_TOKEN` and `LOKALISE_PROJECT_ID` repository secrets. **Adding a new locale is just a Lokalise change** — translate it there and the next download picks it up automatically. The language picker is fully data-driven: each translation file carries its own display name and flag in the top-level `language` (autonym, e.g. `Français`) and `flag` (emoji, e.g. `🇫🇷`) keys, so a new locale shows up named and flagged with no code change. If those keys are missing for a locale, the picker falls back to the raw code and a placeholder flag.
 
@@ -229,7 +229,7 @@ Releases are produced by GitHub Actions:
 
 - `release.yml` — manual trigger (or called from `auto-release.yml`). Tags the version, drafts release notes from PR labels, builds the Python wheel, attaches it to the GitHub release, then opens or updates a single bump PR on the backend repo so it can pick up the new wheel URL.
 - `auto-release.yml` — nightly cron that auto-releases when ≥ 2 commits have landed since the last release.
-- `dependabot.yml` + `auto-approve-dependabot.yml` — weekly npm + Actions bumps with auto-approve.
+- `dependabot.yml` + `auto-approve-dependabot.yml` — weekly dependency (npm ecosystem, which also covers the pnpm lockfile) + Actions bumps with auto-approve.
 
 The backend's `pyproject.toml` references the wheel by GitHub release URL (no PyPI), so a release here is everything needed to ship a new dashboard build.
 

@@ -1,11 +1,11 @@
 // Sync frontend translations with Lokalise.
 //
-//   npm run translations:upload [-- --cleanup]   push en.json to Lokalise
-//   npm run translations:download                pull translated locales from Lokalise
-//   npm run translations:download -- --source release
+//   ppnpm run translations:upload [--cleanup]   push en.json to Lokalise
+//   pnpm run translations:download                pull translated locales from Lokalise
+//   ppnpm run translations:download --source release
 //                                                pull locales from the latest GitHub release
-//   npm run translations:orphans                 export keys on Lokalise but not in en.json
-//   npm run translations:orphans:delete [-- --yes]
+//   pnpm run translations:orphans                 export keys on Lokalise but not in en.json
+//   ppnpm run translations:orphans:delete [--yes]
 //                                                delete the reviewed orphan keys from Lokalise
 //
 // `orphans` is a reviewable alternative to `upload --cleanup`: instead of
@@ -452,7 +452,7 @@ interface OrphanFile {
 const ORPHAN_README =
   "Keys present in Lokalise but absent from src/translations/en.json. " +
   "Remove any entry you want to KEEP — every entry left in `orphans` is " +
-  "DELETED from Lokalise by `npm run translations:orphans:delete -- --yes`. " +
+  "DELETED from Lokalise by `ppnpm run translations:orphans:delete --yes`. " +
   "This is a throwaway working copy and is gitignored.";
 
 // The base-language key set as Lokalise names it: en.json flattened with the
@@ -485,7 +485,7 @@ async function runOrphans(client: LokaliseClient, outPath: string): Promise<numb
   if (orphans.length > 0) {
     console.log(
       "Review it (delete any entry you want to keep), then run " +
-        "`npm run translations:orphans:delete -- --yes`."
+        "`ppnpm run translations:orphans:delete --yes`."
     );
   }
   return 0;
@@ -500,7 +500,7 @@ function readOrphanFile(inPath: string, currentProjectId: string): OrphanKey[] {
     raw = readFileSync(inPath, "utf-8");
   } catch {
     throw new LokaliseError(
-      `Orphans file not found: ${inPath}. Run \`npm run translations:orphans\` first.`
+      `Orphans file not found: ${inPath}. Run \`pnpm run translations:orphans\` first.`
     );
   }
   let parsed: { project_id?: unknown; orphans?: unknown };
@@ -516,7 +516,7 @@ function readOrphanFile(inPath: string, currentProjectId: string): OrphanKey[] {
     throw new LokaliseError(
       `Orphans file ${inPath} was generated for Lokalise project ${mismatch}, but ` +
         `LOKALISE_PROJECT_ID is ${currentProjectId}. Refusing to delete keys by id in a ` +
-        `different project — regenerate it with \`npm run translations:orphans\`.`
+        `different project — regenerate it with \`pnpm run translations:orphans\`.`
     );
   }
   if (!Array.isArray(parsed.orphans)) {
@@ -580,13 +580,13 @@ function usage(): void {
   console.log(
     [
       "Usage:",
-      "  npm run translations:upload [-- --cleanup]   Push en.json keys to Lokalise",
-      "  npm run translations:download                Pull translated locales from Lokalise",
-      "  npm run translations:download -- --source release",
+      "  ppnpm run translations:upload [--cleanup]   Push en.json keys to Lokalise",
+      "  pnpm run translations:download                Pull translated locales from Lokalise",
+      "  ppnpm run translations:download --source release",
       "                                               Pull locales from the latest GitHub release",
-      "  npm run translations:orphans [-- --out <file>]",
+      "  ppnpm run translations:orphans [--out <file>]",
       "                                               Export keys on Lokalise but not in en.json",
-      "  npm run translations:orphans:delete [-- --yes] [-- --file <file>]",
+      "  ppnpm run translations:orphans:delete [--yes] [--file <file>]",
       "                                               Delete the reviewed orphan keys from Lokalise",
       "",
       "Environment:",

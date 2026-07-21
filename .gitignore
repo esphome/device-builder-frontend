@@ -46,6 +46,7 @@ build/
 /*.yaml
 /*.yml
 !/.pre-commit-config.yaml
+!/pnpm-lock.yaml
 
 # Local puppeteer/debug eyeballing scripts — never commit
 scratch-*
