@@ -118,7 +118,7 @@ pnpm run translations:download
 
 # Pull the locales from the latest GitHub release instead of Lokalise
 # (no Lokalise token needed — reads the release's translations.zip asset).
-ppnpm run translations:download --source release
+pnpm run translations:download --source release
 
 # Export the keys that exist on Lokalise but not in en.json to a
 # reviewable working file (translation-orphans.json), then delete them.
