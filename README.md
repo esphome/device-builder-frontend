@@ -123,7 +123,7 @@ pnpm run translations:download --source release
 # Export the keys that exist on Lokalise but not in en.json to a
 # reviewable working file (translation-orphans.json), then delete them.
 pnpm run translations:orphans
-ppnpm run translations:orphans:delete --yes
+pnpm run translations:orphans:delete --yes
 ```
 
 The Lokalise commands (`upload`, `download`, `orphans`, `orphans:delete`) read `LOKALISE_API_TOKEN` and `LOKALISE_PROJECT_ID` from the environment; the sole exception is `download -- --source release`, which reads the locale bundle from a GitHub release and needs no Lokalise token. `upload` only adds keys — it never overwrites translator edits; pass `ppnpm run translations:upload --cleanup` to also delete Lokalise keys that no longer exist in `en.json`.
