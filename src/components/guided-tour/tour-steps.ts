@@ -49,7 +49,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     anchors: ["board-featured"],
     route: "dashboard",
-    side: "top",
+    side: "right",
     kind: "action",
     titleKey: "tour.steps.board.title",
     bodyKey: "tour.steps.board.body",
@@ -59,7 +59,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     anchors: ["name-finish"],
     highlightAnchors: ["name-field"],
     route: "dashboard",
-    side: "top",
+    side: "right",
     kind: "action",
     titleKey: "tour.steps.name.title",
     bodyKey: "tour.steps.name.body",
@@ -74,7 +74,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // keeps the bubble (and the dim) off them on small viewports.
     highlightAnchors: ["wifi-fields"],
     route: "dashboard",
-    side: "top",
+    side: "right",
     kind: "action",
     titleKey: "tour.steps.wifi.title",
     bodyKey: "tour.steps.wifi.body",
