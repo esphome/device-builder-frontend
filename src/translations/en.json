@@ -1190,6 +1190,8 @@
     "bug_builder_desc": "A problem with Device Builder itself (UI, backend, or install).",
     "bug_status": "Device status looks wrong",
     "bug_status_desc": "Online/offline, sync, or detection state doesn't match reality.",
+    "bug_remote_build": "Remote build pairing problem",
+    "bug_remote_build_desc": "Two dashboards can't discover each other, pair, stay connected, or run builds for each other.",
     "bug_esphome": "ESPHome firmware or compile issue",
     "bug_esphome_desc": "Compile errors, firmware crashes, boot loops, or component bugs in ESPHome itself; these belong in the core repo, not Device Builder.",
     "browse_features": "Browse feature requests",

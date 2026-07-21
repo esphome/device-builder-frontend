@@ -10,6 +10,7 @@ import {
   mdiLightbulbOutline,
   mdiMagnify,
   mdiOpenInNew,
+  mdiServerNetwork,
 } from "@mdi/js";
 import { LitElement, css, html, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -38,6 +39,7 @@ registerMdiIcons({
   "lightbulb-outline": mdiLightbulbOutline,
   magnify: mdiMagnify,
   "open-in-new": mdiOpenInNew,
+  "server-network": mdiServerNetwork,
 });
 
 const SURVEY_LINK = {
@@ -92,6 +94,13 @@ const BUG_LINKS: ReadonlyArray<FeedbackLink> = [
     labelKey: "feedback.bug_status",
     descKey: "feedback.bug_status_desc",
     href: "https://github.com/esphome/device-builder/issues/new?template=device_status.yml",
+    versionSource: "dashboard",
+  },
+  {
+    icon: "server-network",
+    labelKey: "feedback.bug_remote_build",
+    descKey: "feedback.bug_remote_build_desc",
+    href: "https://github.com/esphome/device-builder/issues/new?template=remote_build.yml",
     versionSource: "dashboard",
   },
   {
