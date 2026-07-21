@@ -11,8 +11,12 @@ export const onboardingWizardStyles = css`
     white-space: normal;
   }
 
-  esphome-base-dialog.mandatory::part(close-button) {
+  esphome-base-dialog::part(close-button) {
     display: none;
+  }
+
+  esphome-base-dialog::part(body) {
+    padding-top: var(--wa-space-s);
   }
 
   .body {
@@ -20,7 +24,7 @@ export const onboardingWizardStyles = css`
     flex-direction: column;
     gap: var(--wa-space-m);
     box-sizing: border-box;
-    height: 380px;
+    min-height: 260px;
     overflow-y: auto;
   }
 
@@ -45,9 +49,13 @@ export const onboardingWizardStyles = css`
     color: var(--esphome-primary);
   }
 
+  .choices {
+    margin-top: var(--wa-space-xs);
+  }
+
   .welcome-logo {
-    width: 64px;
-    height: 64px;
+    width: 88px;
+    height: 88px;
   }
 
   .welcome-screen,
@@ -128,7 +136,12 @@ export const onboardingWizardStyles = css`
   }
 
   .welcome-screen {
-    gap: var(--wa-space-xl);
+    gap: var(--wa-space-l);
+  }
+
+  .welcome-screen .intro {
+    font-size: var(--wa-font-size-m);
+    max-width: 36ch;
   }
 
   .tour-offer-icon {
@@ -143,12 +156,13 @@ export const onboardingWizardStyles = css`
     color: var(--wa-color-text-normal);
   }
 
-  /* Step dots show progress through the wizard without numbering, which
-     would be wrong when the step count varies by environment / use-case. */
   .steps {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
     gap: var(--wa-space-2xs);
-    justify-content: center;
   }
 
   .step-dot {
@@ -163,6 +177,8 @@ export const onboardingWizardStyles = css`
   }
 
   .actions {
+    position: relative;
+    width: 100%;
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
@@ -174,12 +190,19 @@ export const onboardingWizardStyles = css`
     flex: 1;
   }
 
-  /* On phones the dialog goes full-screen (fullscreenMobileDialog), so the
-     body fills the sheet instead of a fixed height — the switch and its
-     description then have room without scrolling. */
+  .actions .btn {
+    border: var(--wa-border-width-s) solid transparent;
+  }
+
+  .actions .btn--cancel {
+    border-color: var(--wa-color-surface-border);
+  }
+
   @media (max-width: 600px) {
-    .body {
+    .body,
+    .body:has(.existing-server) {
       height: 100%;
+      min-height: 0;
     }
   }
 `;

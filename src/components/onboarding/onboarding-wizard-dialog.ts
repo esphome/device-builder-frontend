@@ -3,9 +3,9 @@ import {
   mdiCodeBraces,
   mdiCompassOutline,
   mdiHandshake,
+  mdiMemory,
   mdiServerNetwork,
   mdiSprout,
-  mdiMemory,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -19,6 +19,7 @@ import {
   isHaAddonContext,
   localizeContext,
 } from "../../context/index.js";
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -28,20 +29,27 @@ import { EXPERIENCE_OPTIONS } from "../../util/experience.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { notifyWarning } from "../../util/notify.js";
-import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { remoteBuildPeerName } from "../../util/remote-build-peer-name.js";
 import { closeOpenDialogs } from "../base-dialog.js";
-import { REMOTE_COMPUTE_FEATURES, renderFeatureList } from "../shared/feature-list.js";
 import { featureListStyles } from "../shared/feature-list-styles.js";
+import { REMOTE_COMPUTE_FEATURES, renderFeatureList } from "../shared/feature-list.js";
 import { choiceCardStyles } from "./choice-card-styles.js";
 import { onChoiceGroupKeydown, renderChoiceCard, rovingTabbable } from "./choice-card.js";
 import { onboardingWizardStyles } from "./onboarding-wizard-styles.js";
-import { type WizardScreen, wizardScreens } from "./wizard-screens.js";
+import { wizardScreens, type WizardScreen } from "./wizard-screens.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 export const RESET_ONBOARDING_PARAM = "resetOnboarding";
+
+function viewportSupportsTour(): boolean {
+  return !(
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+  );
+}
 
 registerMdiIcons({
   "code-braces": mdiCodeBraces,
@@ -59,8 +67,10 @@ registerMdiIcons({
  * Builder is on the network (non-add-on installs), an orientation step follows
  * with an opt-in "remote compute only" switch. The choices are persisted before
  * the final tour offer appears, so "Maybe later" only skips the optional tour.
- * Wi-Fi is intentionally absent: the first Wi-Fi device that needs shared
- * credentials collects them.
+ * On phone-sized viewports there is no tour offer at all — completing the
+ * choices closes the wizard straight onto the dashboard. Wi-Fi is
+ * intentionally absent: the first Wi-Fi device that needs shared credentials
+ * collects them.
  *
  * ``?resetOnboarding=1`` reopens a clean default run for frontend development.
  * It does not reset data before opening; completing the choices writes them
@@ -93,6 +103,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   // Frozen when leaving Welcome so mDNS hosts arriving mid-flow can't
   // insert/remove the existing-server screen under the user.
   @state() private _existingServerPinned = false;
+  @state() private _showTour = viewportSupportsTour();
 
   private _startTourAfterClose = false;
   private _enter = new EnterController(this, () => {
@@ -119,6 +130,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     this._remoteCompute = false;
     this._experience = ExperienceLevel.BEGINNER;
     this._existingServerPinned = false;
+    this._showTour = viewportSupportsTour();
     this._startTourAfterClose = false;
     this._enter.set(true);
   }
@@ -139,7 +151,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     // once they advance past experience so a late host can't shift the flow.
     const showExistingServer =
       this._index <= 1 ? this._computeShowExistingServer() : this._existingServerPinned;
-    return wizardScreens({ showExistingServer });
+    return wizardScreens({ showExistingServer, showTour: this._showTour });
   }
 
   /** Offer the orientation step only off the HA add-on, and only when another
@@ -179,7 +191,6 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   protected render() {
     return html`
       <esphome-base-dialog
-        class=${this._isTourOffer ? "" : "mandatory"}
         ?open=${this._open}
         ?busy=${this._saving}
         .label=${this._localize(this._titleKey)}
@@ -187,10 +198,12 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         @after-hide=${this._onAfterHide}
       >
         <div class="body">
-          ${this._renderSteps()} ${this._renderScreen()}
+          ${this._renderScreen()}
           ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
         </div>
-        <div slot="footer" class="actions">${this._renderActions()}</div>
+        <div slot="footer" class="actions">
+          ${this._renderSteps()} ${this._renderActions()}
+        </div>
       </esphome-base-dialog>
     `;
   }
@@ -444,7 +457,11 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     }
     this._emitAcknowledged();
     this._saving = false;
-    this._index += 1;
+    if (this._index + 1 < this._screens.length) {
+      this._index += 1;
+    } else {
+      this._open = false;
+    }
   }
 
   private async _persistChoices(): Promise<boolean> {
@@ -475,7 +492,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   };
 
   private _onRequestClose = (event: Event): void => {
-    if (!this._isTourOffer) {
+    if (this._open && !this._isTourOffer) {
       event.preventDefault();
       return;
     }

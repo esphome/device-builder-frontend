@@ -38,7 +38,7 @@ export interface TourFrame {
   dock?: Dock;
 }
 
-export const SPOTLIGHT_PADDING = 6;
+export const SPOTLIGHT_PADDING = 10;
 export const BUBBLE_WIDTH = 300;
 export const BUBBLE_GAP = 16;
 const EDGE_MARGIN = 16;

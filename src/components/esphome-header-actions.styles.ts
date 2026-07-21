@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "../styles/breakpoints.js";
+
 export const headerActionsStyles = css`
   :host {
     display: inline-flex;
@@ -106,6 +108,12 @@ export const headerActionsStyles = css`
   /* Touch-primary viewports have no hardware keyboard to teach. */
   @media (hover: none) {
     .menu-item-shortcut {
+      display: none;
+    }
+  }
+
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    .menu-item--tour {
       display: none;
     }
   }

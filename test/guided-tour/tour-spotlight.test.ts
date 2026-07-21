@@ -21,4 +21,10 @@ describe("renderTourSpotlightBackdrop", () => {
 
     expect(findTemplatesByAnchor(result, 'class="tour-dim"')).toHaveLength(4);
   });
+
+  it("renders the rounded hole that paints the backdrop", () => {
+    const result = renderTourSpotlightBackdrop(FRAME);
+
+    expect(findTemplatesByAnchor(result, 'class="tour-hole"')).toHaveLength(1);
+  });
 });

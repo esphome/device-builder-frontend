@@ -337,7 +337,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   <kbd class="menu-item-shortcut">${searchShortcut}</kbd>
                 </div>
                 <div
-                  class="menu-item"
+                  class="menu-item menu-item--tour"
                   role="menuitem"
                   tabindex="0"
                   @click=${this._openGuidedTour}

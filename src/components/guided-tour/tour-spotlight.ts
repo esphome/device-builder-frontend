@@ -14,8 +14,16 @@ function boxStyle(box: Box): Record<string, string> {
 export const tourSpotlightStyles = css`
   .tour-dim {
     position: absolute;
-    background: rgb(0 0 0 / 55%);
     pointer-events: auto;
+  }
+
+  .tour-hole {
+    position: absolute;
+    pointer-events: none;
+    border-radius: var(--wa-border-radius-m);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 35%),
+      0 0 0 200vmax rgb(0 0 0 / 55%);
   }
 `;
 
@@ -29,5 +37,10 @@ export function renderTourSpotlightBackdrop(frame: TourFrame): TemplateResult {
           aria-hidden="true"
         ></div>`
     )}
+    <div
+      class="tour-hole"
+      style=${styleMap(boxStyle(frame.hole))}
+      aria-hidden="true"
+    ></div>
   `;
 }
