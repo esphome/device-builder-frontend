@@ -1,8 +1,12 @@
 import { type TemplateResult, html, nothing } from "lit";
 
 export interface ChoiceCardProps {
-  /** mdi icon name; the caller is responsible for registering it. */
-  icon: string;
+  /** mdi icon name; the caller is responsible for registering it.
+   *  Ignored when ``imageSrc`` is set. */
+  icon?: string;
+  /** Image URL rendered instead of the mdi icon (e.g. a brand logo that
+   *  has no mdi glyph). */
+  imageSrc?: string;
   title: string;
   description: string;
   selected: boolean;
@@ -35,7 +39,15 @@ export function renderChoiceCard(props: ChoiceCardProps): TemplateResult {
       ?disabled=${props.disabled ?? false}
       @click=${props.onSelect}
     >
-      <wa-icon library="mdi" name=${props.icon} class="choice-icon"></wa-icon>
+      ${
+        props.imageSrc
+          ? html`<img class="choice-icon choice-image" src=${props.imageSrc} alt="" />`
+          : html`<wa-icon
+              library="mdi"
+              name=${props.icon ?? ""}
+              class="choice-icon"
+            ></wa-icon>`
+      }
       <span class="choice-text">
         <span class="choice-title">${props.title}</span>
         <span class="choice-desc">${props.description}</span>

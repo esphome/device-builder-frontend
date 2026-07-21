@@ -28,6 +28,13 @@ export const onboardingWizardStyles = css`
     overflow-y: auto;
   }
 
+  /* The desktop flow's tallest screen is the usage question (two cards
+     with multi-line copy), so every step of that flow shares its height.
+     Non-desktop flows never show it and keep the shorter base above. */
+  .body--usage-flow {
+    min-height: 320px;
+  }
+
   /* The existing-server step carries the toggle plus the always-visible
      explainer; give it enough height that the explainer isn't below the
      fold on desktop (viewport-capped so short screens still fit). */
@@ -53,13 +60,12 @@ export const onboardingWizardStyles = css`
     margin-top: var(--wa-space-xs);
   }
 
-  /* Caution note on the usage screen when the user picks a standalone
+  /* Banner atop the experience screen when the user picked a standalone
      setup while another Device Builder was discovered on the network. */
-  .usage-warning {
+  .existing-notice {
     display: flex;
     align-items: flex-start;
     gap: var(--wa-space-s);
-    margin-top: var(--wa-space-s);
     padding: var(--wa-space-s) var(--wa-space-m);
     background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 90%);
     border: 1px solid color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 65%);
@@ -70,11 +76,27 @@ export const onboardingWizardStyles = css`
     text-align: left;
   }
 
-  .usage-warning wa-icon {
+  .existing-notice wa-icon {
     flex-shrink: 0;
     margin-top: 2px;
     font-size: 18px;
     color: var(--esphome-warning, #f59e0b);
+  }
+
+  /* In-sentence action; a bare styled button keeps the banner one
+     paragraph instead of adding a second action row to the dialog. */
+  .notice-link {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: var(--esphome-primary);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .notice-link:hover {
+    color: var(--esphome-primary-hover, var(--esphome-primary));
   }
 
   .welcome-logo {

@@ -77,6 +77,12 @@ export const choiceCardStyles = css`
     flex-shrink: 0;
   }
 
+  /* Image variant (brand logo) sized to match the mdi glyph box. */
+  .choice-image {
+    width: 24px;
+    height: 24px;
+  }
+
   .choice-text {
     display: flex;
     flex-direction: column;

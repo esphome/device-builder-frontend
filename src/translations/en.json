@@ -1047,14 +1047,12 @@
         "intro": "We’ll help you tailor your ESPHome experience in a few quick steps."
       },
       "usage": {
-        "title": "How do you want to use this installation?",
-        "intro": "You can change this any time in Settings.",
-        "standalone_title": "Standalone installation",
-        "standalone_desc": "A full ESPHome Device Builder on this machine — recommended if you don't already have an ESPHome installation.",
-        "remote_title": "Use as remote builder",
-        "remote_desc": "Pair with your existing ESPHome Device Builder and lend this machine's compute power to build device firmware.",
-        "existing_warning": "We found an existing installation on your network: {name}. A standalone setup here creates a second, separate Device Builder — continue only if that's what you want.",
-        "existing_warning_unnamed": "We found an existing installation on your network. A standalone setup here creates a second, separate Device Builder — continue only if that's what you want."
+        "title": "How will you use the ESPHome Desktop app?",
+        "intro": "Please tell us how you intend to use the ESPHome Desktop app. This helps tailor the dashboard to what you need.",
+        "standalone_title": "Installation of the ESPHome Device Builder",
+        "standalone_desc": "I want to create, configure, build, flash and manage ESPHome devices, from this device/computer.",
+        "remote_title": "Remote build",
+        "remote_desc": "Recommended for existing users of ESPHome Device Builder to use this app for compute power to build your device firmware."
       },
       "existing_server": {
         "title": "You already have ESPHome Device Builder",
@@ -1065,8 +1063,10 @@
         "remote_only_desc": "Lead with pairing and the build queue when you open this dashboard. Device creation stays available; the builder section just starts collapsed."
       },
       "experience": {
-        "title": "Choose your experience level",
+        "title": "Choose your experience",
         "intro": "You can change this any time in Settings.",
+        "existing_notice": "We have detected an existing instance of ESPHome Device Builder on your network.",
+        "existing_notice_link": "Would you like to change to remote build mode?",
         "beginner_title": "New to ESPHome",
         "beginner_desc": "Start with a simple, guided interface.",
         "expert_title": "Expert",

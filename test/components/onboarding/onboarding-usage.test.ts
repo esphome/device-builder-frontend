@@ -157,21 +157,38 @@ describe("desktop usage question", () => {
     expect("hide_device_builder" in prefs).toBe(false);
   });
 
-  it("warns when standalone is picked despite a detected install", async () => {
+  it("banners the experience screen when standalone won over a detected install", async () => {
     const { wizard, state } = openDesktopWizard();
     document.body.appendChild(wizard);
-    state._localize = ((key, values) =>
-      values?.name !== undefined ? String(values.name) : key) as LocalizeFunc;
     state._discoveredHosts = hosts("living-room");
     await state._onContinue(); // welcome -> usage, remote preselected
     await wizard.updateComplete;
-    expect(wizard.shadowRoot?.querySelector(".usage-warning")).toBeNull();
+    expect(wizard.shadowRoot?.querySelector(".existing-notice")).toBeNull();
 
     state._usage = "standalone";
+    await state._onContinue(); // usage -> experience
     await wizard.updateComplete;
-    const warning = wizard.shadowRoot?.querySelector(".usage-warning");
-    expect(warning).not.toBeNull();
-    expect(warning?.textContent).toContain("living-room");
+
+    expect(state._screen).toBe("experience");
+    expect(wizard.shadowRoot?.querySelector(".existing-notice")).not.toBeNull();
+  });
+
+  it("returns to the usage screen with remote preselected via the banner link", async () => {
+    const { wizard, state } = openDesktopWizard();
+    document.body.appendChild(wizard);
+    state._discoveredHosts = hosts("living-room");
+    await state._onContinue(); // welcome -> usage
+    state._usage = "standalone";
+    await state._onContinue(); // usage -> experience
+    await wizard.updateComplete;
+
+    wizard.shadowRoot
+      ?.querySelector<HTMLButtonElement>(".existing-notice .notice-link")
+      ?.click();
+    await wizard.updateComplete;
+
+    expect(state._screen).toBe("usage");
+    expect(state._usage).toBe("remote_builder");
   });
 
   it("previews the usage screen via the dev reset query on a non-desktop backend", async () => {
@@ -192,13 +209,24 @@ describe("desktop usage question", () => {
     expect(window.location.search).toBe("");
   });
 
-  it("shows no warning for standalone when nothing was detected", async () => {
+  it("shows no banner when nothing was detected or off the desktop app", async () => {
     const { wizard, state } = openDesktopWizard();
     document.body.appendChild(wizard);
     state._discoveredHosts = null;
     await state._onContinue(); // welcome -> usage, standalone preselected
+    await state._onContinue(); // usage -> experience
     await wizard.updateComplete;
+    expect(wizard.shadowRoot?.querySelector(".existing-notice")).toBeNull();
 
-    expect(wizard.shadowRoot?.querySelector(".usage-warning")).toBeNull();
+    // Non-desktop installs keep the orientation-step flow instead.
+    const web = new ESPHomeOnboardingWizardDialog();
+    document.body.appendChild(web);
+    web.open();
+    const webState = internals(web);
+    webState._discoveredHosts = hosts("living-room");
+    await webState._onContinue(); // welcome -> experience
+    await web.updateComplete;
+    expect(webState._screen).toBe("experience");
+    expect(web.shadowRoot?.querySelector(".existing-notice")).toBeNull();
   });
 });

@@ -2,10 +2,10 @@ import { consume } from "@lit/context";
 import {
   mdiAlertOutline,
   mdiCodeBraces,
+  mdiCogTransferOutline,
   mdiCompassOutline,
   mdiHandshake,
   mdiMemory,
-  mdiMonitorDashboard,
   mdiServerNetwork,
   mdiSprout,
 } from "@mdi/js";
@@ -60,9 +60,9 @@ function viewportSupportsTour(): boolean {
 registerMdiIcons({
   "alert-outline": mdiAlertOutline,
   "code-braces": mdiCodeBraces,
+  "cog-transfer-outline": mdiCogTransferOutline,
   "compass-outline": mdiCompassOutline,
   handshake: mdiHandshake,
-  "monitor-dashboard": mdiMonitorDashboard,
   "server-network": mdiServerNetwork,
   sprout: mdiSprout,
   memory: mdiMemory,
@@ -237,7 +237,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         @request-close=${this._onRequestClose}
         @after-hide=${this._onAfterHide}
       >
-        <div class="body">
+        <div class="body${this._showUsage ? " body--usage-flow" : ""}">
           ${this._renderScreen()}
           ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
         </div>
@@ -335,10 +335,18 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
     `;
   }
 
-  /** Usage options in display order with their card icons. */
-  private static readonly USAGE_OPTIONS: ReadonlyArray<[UsageChoice, string, string]> = [
-    ["standalone", "monitor-dashboard", "standalone"],
-    ["remote_builder", "server-network", "remote"],
+  /** Usage options in display order. The standalone card carries the blue
+   *  ESPHome logo (no mdi glyph exists for it); remote build keeps an mdi
+   *  icon. */
+  private static readonly USAGE_OPTIONS: ReadonlyArray<
+    [UsageChoice, { icon?: string; imageSrc?: string }, string]
+  > = [
+    [
+      "standalone",
+      { imageSrc: withBase("/assets/logo/esphome-favicon.svg") },
+      "standalone",
+    ],
+    ["remote_builder", { icon: "cog-transfer-outline" }, "remote"],
   ];
 
   private _renderUsage() {
@@ -351,9 +359,9 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
         @keydown=${onChoiceGroupKeydown}
       >
         ${ESPHomeOnboardingWizardDialog.USAGE_OPTIONS.map(
-          ([choice, icon, keyPrefix], index) =>
+          ([choice, visual, keyPrefix], index) =>
             renderChoiceCard({
-              icon,
+              ...visual,
               title: this._localize(`onboarding.wizard.usage.${keyPrefix}_title`),
               description: this._localize(`onboarding.wizard.usage.${keyPrefix}_desc`),
               selected: this._usage === choice,
@@ -373,37 +381,35 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
             })
         )}
       </div>
-      ${this._renderUsageWarning()}
     `;
   }
 
-  /** Caution note under the cards when the user insists on a standalone
+  /** Banner atop the experience screen when the user picked a standalone
    *  setup even though another Device Builder was discovered. Reads the
-   *  live host map on purpose: a host that appears mid-screen should still
-   *  raise the flag even though the badge/preselection stay pinned. */
-  private _renderUsageWarning() {
-    if (this._usage !== "standalone" || !this._discoveredHosts?.size) return nothing;
-    const names = [
-      ...new Set([...this._discoveredHosts.values()].map(remoteBuildPeerName)),
-    ].filter(Boolean);
-    const joined = new Intl.ListFormat(activeLocale(), { type: "conjunction" }).format(
-      names.slice(0, 3)
-    );
+   *  live host map on purpose: a host that appears mid-flow should still
+   *  raise the flag even though the badge/preselection stay pinned. The
+   *  link takes the user back to the usage screen with remote build
+   *  preselected, so Continue there completes the switch. */
+  private _renderExistingNotice() {
+    if (!this._showUsage || this._usage !== "standalone") return nothing;
+    if (!this._discoveredHosts?.size) return nothing;
     return html`
-      <div class="usage-warning" role="status">
+      <div class="existing-notice" role="status">
         <wa-icon library="mdi" name="alert-outline" aria-hidden="true"></wa-icon>
         <span>
-          ${
-            joined
-              ? this._localize("onboarding.wizard.usage.existing_warning", {
-                  name: joined,
-                })
-              : this._localize("onboarding.wizard.usage.existing_warning_unnamed")
-          }
+          ${this._localize("onboarding.wizard.experience.existing_notice")}
+          <button type="button" class="notice-link" @click=${this._switchToRemoteBuild}>
+            ${this._localize("onboarding.wizard.experience.existing_notice_link")}
+          </button>
         </span>
       </div>
     `;
   }
+
+  private _switchToRemoteBuild = () => {
+    this._usage = "remote_builder";
+    this._index = this._screens.indexOf("usage");
+  };
 
   private _renderExistingServer() {
     const names = this._discoveredHosts
@@ -495,6 +501,7 @@ export class ESPHomeOnboardingWizardDialog extends LitElement {
   private _renderExperience() {
     return html`
       <p class="intro">${this._localize("onboarding.wizard.experience.intro")}</p>
+      ${this._renderExistingNotice()}
       <div
         class="choices"
         role="radiogroup"
