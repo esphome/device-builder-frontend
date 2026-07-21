@@ -13,6 +13,7 @@ import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { formatPinValue, parseBoardGpio, parsePinGpio } from "../../util/pin-gpio.js";
 import { expandPinModeShorthand } from "../../util/pin-mode.js";
+import { looksLikeSubstitution } from "../../util/substitutions.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 import {
   effectiveDisabled,
@@ -20,6 +21,7 @@ import {
   renderFieldError,
   renderLabel,
   renderStringField,
+  renderSubstitutionHint,
   type RenderCtx,
 } from "./config-entry-renderers-shared.js";
 import { renderNestedField } from "./config-entry-renderers/nested.js";
@@ -229,6 +231,20 @@ export function renderPinField(
   path: string[],
   ctx: RenderCtx
 ): TemplateResult {
+  const rawValue = ctx.getAt(path);
+  // A long-form pin whose ``number`` is a ``${var}`` reference can't drive
+  // the board-GPIO picker — no option matches, so the select rendered blank
+  // (#2268) — and a pick would clobber the reference with a literal. Edit
+  // ``number`` as text with the resolves-to hint, mirroring the scalar
+  // ${var} gate in ``config-entry-form``. Checked before the boardless
+  // fallback, which would bail an object value to the YAML-only shell.
+  if (
+    isPlainObject(rawValue) &&
+    typeof rawValue.number === "string" &&
+    looksLikeSubstitution(rawValue.number)
+  ) {
+    return renderSubstitutionPin(entry, path, ctx, rawValue);
+  }
   if (!ctx.board || ctx.board.pins.length === 0) {
     return renderStringField(entry, "text", path, ctx);
   }
@@ -238,7 +254,6 @@ export function renderPinField(
   // The wa-option values are the platform's value form (`GPIOn`, or `P0.x`
   // for nRF52), so normalise before comparing or the disabled select renders
   // blank.
-  const rawValue = ctx.getAt(path);
   const identity = parsePinGpio(rawValue);
   if (typeof identity === "string") {
     // An I/O-expander pin is a `provider:hub:channel` channel, never a board
@@ -372,6 +387,38 @@ export function renderPinField(
       </wa-select>
       ${renderFieldError(path, ctx)}
       ${renderPinAdvanced(entry, path, ctx, rawValue, isLongForm, fieldDisabled)}
+    </div>
+  `;
+}
+
+/** Long-form pin with a ``${var}`` ``number``: a text input for the
+ *  reference (edits route to ``path.number``, so mode / inverted are
+ *  preserved) plus the Advanced disclosure the normal path renders. */
+function renderSubstitutionPin(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  rawValue: Record<string, unknown>
+): TemplateResult {
+  const number = rawValue.number as string;
+  const numberPath = [...path, "number"];
+  const invalid = ctx.errorAt(numberPath) !== null;
+  const fieldDisabled = effectiveDisabled(entry, ctx);
+  return html`
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
+      ${renderLabel(entry, ctx)}
+      <input
+        type="text"
+        autocomplete="off"
+        class=${invalid ? "invalid" : ""}
+        .value=${number}
+        ?disabled=${fieldDisabled}
+        @input=${(e: Event) =>
+          ctx.emitChange(numberPath, (e.target as HTMLInputElement).value)}
+      />
+      ${renderSubstitutionHint(number, ctx.substitutions, ctx.localize)}
+      ${renderFieldError(numberPath, ctx)}
+      ${renderPinAdvanced(entry, path, ctx, rawValue, true, fieldDisabled)}
     </div>
   `;
 }

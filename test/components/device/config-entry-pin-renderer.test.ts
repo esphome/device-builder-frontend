@@ -841,3 +841,53 @@ describe("renderPinField on an I/O-expander pin", () => {
     expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(0);
   });
 });
+
+describe("renderPinField long-form substitution number", () => {
+  // esphome/device-builder#2268: `pin: { number: ${testpin1}, inverted: true }`
+  // rendered a blank board picker — no option matches a ${var}, and a pick
+  // would clobber the reference. The number edits as text instead, like the
+  // scalar ${var} gate in config-entry-form.
+  const subEntry = () =>
+    makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] });
+
+  it("renders a text input for the reference instead of the picker", () => {
+    const ctx = makeRenderCtx({ pin: { number: "${testpin1}", inverted: true } });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(0);
+    const input = findElementBindings(result, "input")[0];
+    expect(input[".value"]).toBe("${testpin1}");
+  });
+
+  it("routes edits to path.number, preserving the other long-form keys", () => {
+    const ctx = makeRenderCtx({ pin: { number: "${testpin1}", inverted: true } });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    const input = findTemplatesByAnchor(result, "<input")[0];
+    const onInput = extractAttributeBindings(input)["@input"] as (e: Event) => void;
+    onInput({ target: { value: "${testpin2}" } } as never);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "number"], "${testpin2}");
+  });
+
+  it("previews the resolved value from the file's substitutions", () => {
+    const yaml = "substitutions:\n  testpin1: GPIO10\n";
+    const ctx = makeRenderCtx(
+      { pin: { number: "${testpin1}", inverted: true } },
+      { overrides: { yaml } }
+    );
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    const hint = findTemplatesByAnchor(result, "substitution-note")[0];
+    expect(hint).toBeDefined();
+    expect(hint.values).toContain("GPIO10");
+  });
+
+  it("marks an unresolvable reference as external", () => {
+    const ctx = makeRenderCtx({ pin: { number: "${from_package}" } });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    expect(findTemplatesByAnchor(result, "substitution-note--external").length).toBe(1);
+  });
+
+  it("still renders the board picker for a literal long-form number", () => {
+    const ctx = makeRenderCtx({ pin: { number: "GPIO5", inverted: true } });
+    const result = renderPinField(subEntry(), ["pin"], ctx);
+    expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(1);
+  });
+});
