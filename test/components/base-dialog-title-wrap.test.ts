@@ -1,10 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vitest";
 
-// Stub the real wa-dialog (happy-dom can't run its form-associated close
-// button); this test only exercises the wrapper's own header markup.
-import { vi } from "vitest";
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+import "../_mock-webawesome.js";
 
 import { ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 import { mount } from "../_dom.js";

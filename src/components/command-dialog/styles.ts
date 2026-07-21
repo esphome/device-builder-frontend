@@ -28,6 +28,13 @@ export const commandDialogStyles = css`
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
   }
+  /* The band height is fixed, so a wrapped title would clip against it;
+     keep the title single-line (base-dialog wraps by default). */
+  esphome-base-dialog::part(title-text) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   esphome-base-dialog::part(body) {
     padding: 0;
     background: var(--term-bg);
