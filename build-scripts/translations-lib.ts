@@ -262,7 +262,7 @@ export type DownloadSource = "lokalise" | "release";
 
 // Resolve the `download --source`. Absent flag defaults to "lokalise", but
 // a present-but-valueless or unknown `--source` is an error rather than a
-// silent fallback — so `download -- --source` (no value) or a typo fails
+// silent fallback — so `download --source` (no value) or a typo fails
 // fast instead of quietly running against Lokalise.
 export function resolveDownloadSource(args: string[]): DownloadSource {
   const present = args.some((a) => a === "--source" || a.startsWith("--source="));
