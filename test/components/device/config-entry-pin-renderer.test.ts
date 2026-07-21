@@ -875,7 +875,6 @@ describe("renderPinField long-form substitution number", () => {
     );
     const result = renderPinField(subEntry(), ["pin"], ctx);
     const hint = findTemplatesByAnchor(result, "substitution-note")[0];
-    expect(hint).toBeDefined();
     expect(hint.values).toContain("GPIO10");
   });
 

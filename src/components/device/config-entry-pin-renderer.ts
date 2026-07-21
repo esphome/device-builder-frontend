@@ -243,7 +243,7 @@ export function renderPinField(
     typeof rawValue.number === "string" &&
     looksLikeSubstitution(rawValue.number)
   ) {
-    return renderSubstitutionPin(entry, path, ctx, rawValue);
+    return renderSubstitutionPin(entry, path, ctx, rawValue, rawValue.number);
   }
   if (!ctx.board || ctx.board.pins.length === 0) {
     return renderStringField(entry, "text", path, ctx);
@@ -398,9 +398,9 @@ function renderSubstitutionPin(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx,
-  rawValue: Record<string, unknown>
+  rawValue: Record<string, unknown>,
+  number: string
 ): TemplateResult {
-  const number = rawValue.number as string;
   const numberPath = [...path, "number"];
   const invalid = ctx.errorAt(numberPath) !== null;
   const fieldDisabled = effectiveDisabled(entry, ctx);
