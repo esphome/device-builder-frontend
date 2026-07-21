@@ -201,6 +201,21 @@ describe("renderPinField — mode scalar shorthand expansion", () => {
     // No flag switches; the value falls through to the scalar notice.
     expect(findElementBindings(result, "wa-switch")).toHaveLength(0);
   });
+
+  it("delegates a ${var} mode to renderEntry so the substitution gate edits it", () => {
+    // esphome/device-builder-frontend#1343: the shorthand wrapper can't
+    // expand a substitution reference; routing it through renderEntry gives
+    // the form's scalar ${var} gate (text input + resolves-to hint) instead
+    // of the read-only scalar notice.
+    const ctx = openModeCtx({ number: 0, mode: "${my_mode}" });
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(findElementBindings(result, "wa-switch")).toHaveLength(0);
+    expect(ctx.renderEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "mode" }),
+      ["pin", "mode"]
+    );
+  });
 });
 
 describe("renderPinField — mode flags scoped to the pin registry", () => {

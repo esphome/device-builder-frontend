@@ -576,9 +576,11 @@ function renderLongFormChild(
   const scoped = allowed
     ? scopeModeChildren(child, allowed, presentModeFlags(modeValue))
     : child;
-  // A scalar shorthand (``mode: OUTPUT``) needs the display-expansion wrapper;
+  // A scalar shorthand (``mode: OUTPUT``) needs the display-expansion
+  // wrapper; a ``${var}`` scalar goes through renderEntry so the form's
+  // substitution gate edits it as text with the resolves-to hint (#1343);
   // the object form goes through the normal nested dispatch.
-  return typeof modeValue === "string"
+  return typeof modeValue === "string" && !looksLikeSubstitution(modeValue)
     ? renderPinModeField(scoped, modePath, ctx)
     : ctx.renderEntry(scoped, modePath);
 }
