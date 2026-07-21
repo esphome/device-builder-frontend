@@ -913,6 +913,18 @@ export class ESPHomePageDashboard extends LitElement {
     this._highlightFreshDevice(`${e.detail.name}.yaml`);
   };
 
+  /** Post-clone reveal (#2246): the search that matched the source would
+   *  hide the fresh clone, so clear it (no refocus — attention belongs on
+   *  the new card; facets stay, adopt parity). The rescan's ADDED push can
+   *  beat the command reply, so try the scroll now; otherwise
+   *  _pendingAdoptScroll stays armed for updated(). */
+  _onCloned = (configuration: string) => {
+    this._search = "";
+    this._syncYamlSearch();
+    this._highlightFreshDevice(configuration);
+    this._tryConsumePendingScroll();
+  };
+
   private _tryConsumePendingScroll(): void {
     if (this._pendingAdoptScroll === null) return;
     const target = this._pendingAdoptScroll;

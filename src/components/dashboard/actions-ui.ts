@@ -60,9 +60,10 @@ export async function executeClone(
   const device = host._actionDevice;
   if (!device) return;
   const { newName, newFriendlyName } = e.detail;
+  let result: Awaited<ReturnType<ESPHomeAPI["cloneDevice"]>>;
   try {
     const friendly = newFriendlyName.length > 0 ? newFriendlyName : undefined;
-    await host._api.cloneDevice(device.configuration, newName, friendly);
+    result = await host._api.cloneDevice(device.configuration, newName, friendly);
   } catch (err) {
     const reason = getErrorMessage(err);
     notifyError(
@@ -74,6 +75,7 @@ export async function executeClone(
     return;
   }
   notifySuccess(host._localize("dashboard.action_clone_success", { name: newName }));
+  host._onCloned(result.configuration);
 }
 
 export async function executeRename(

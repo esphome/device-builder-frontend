@@ -4,6 +4,7 @@ import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import { DeviceState } from "../../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../../src/common/localize.js";
 import {
+  executeClone,
   executeRename,
   openLogsWithMethod,
 } from "../../../src/components/dashboard/actions-ui.js";
@@ -154,6 +155,78 @@ describe("executeRename", () => {
 
     expect(toastError).toHaveBeenCalledTimes(1);
     expect(toastError.mock.calls[0][0]).toContain(reason);
+  });
+});
+
+describe("executeClone", () => {
+  beforeEach(() => {
+    toastError.mockClear();
+    toastSuccess.mockClear();
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  function makeCloneHost(cloneDevice: ESPHomeAPI["cloneDevice"]): {
+    host: ESPHomePageDashboard;
+    onCloned: ReturnType<typeof vi.fn>;
+  } {
+    const onCloned = vi.fn();
+    const host = makeDashboardHost({
+      _actionDevice: makeConfiguredDevice({
+        name: "kitchen",
+        configuration: "kitchen.yaml",
+      }),
+      _api: { cloneDevice } as unknown as ESPHomeAPI,
+      _localize: localize,
+      _onCloned: onCloned,
+    });
+    return { host, onCloned };
+  }
+
+  function cloneEvent(
+    newName: string,
+    newFriendlyName = ""
+  ): CustomEvent<{ newName: string; newFriendlyName: string }> {
+    return new CustomEvent("clone-confirm", { detail: { newName, newFriendlyName } });
+  }
+
+  it("reveals the fresh clone on success (empty friendly name maps to undefined)", async () => {
+    const cloneDevice = vi.fn(async () => ({ configuration: "bedroom-bulb.yaml" }));
+    const { host, onCloned } = makeCloneHost(
+      cloneDevice as unknown as ESPHomeAPI["cloneDevice"]
+    );
+
+    await executeClone(host, cloneEvent("bedroom-bulb"));
+
+    expect(cloneDevice).toHaveBeenCalledWith("kitchen.yaml", "bedroom-bulb", undefined);
+    expect(toastSuccess).toHaveBeenCalledTimes(1);
+    expect(onCloned).toHaveBeenCalledExactlyOnceWith("bedroom-bulb.yaml");
+  });
+
+  it("forwards a non-empty friendly name", async () => {
+    const cloneDevice = vi.fn(async () => ({ configuration: "bedroom-bulb.yaml" }));
+    const { host } = makeCloneHost(cloneDevice as unknown as ESPHomeAPI["cloneDevice"]);
+
+    await executeClone(host, cloneEvent("bedroom-bulb", "Bedroom Bulb"));
+
+    expect(cloneDevice).toHaveBeenCalledWith(
+      "kitchen.yaml",
+      "bedroom-bulb",
+      "Bedroom Bulb"
+    );
+  });
+
+  it("keeps the list untouched on failure and surfaces the reason", async () => {
+    const reason = "A device named bedroom-bulb.yaml already exists";
+    const cloneDevice = vi.fn(async () => {
+      throw new Error(`invalid_args: ${reason}`);
+    }) as unknown as ESPHomeAPI["cloneDevice"];
+    const { host, onCloned } = makeCloneHost(cloneDevice);
+
+    await executeClone(host, cloneEvent("bedroom-bulb"));
+
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError.mock.calls[0][0]).toContain(reason);
+    expect(onCloned).not.toHaveBeenCalled();
   });
 });
 
