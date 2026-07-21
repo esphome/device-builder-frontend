@@ -1,8 +1,8 @@
 // Sync frontend translations with Lokalise.
 //
-//   ppnpm run translations:upload [--cleanup]   push en.json to Lokalise
+//   pnpm run translations:upload [--cleanup]   push en.json to Lokalise
 //   pnpm run translations:download                pull translated locales from Lokalise
-//   ppnpm run translations:download --source release
+//   pnpm run translations:download --source release
 //                                                pull locales from the latest GitHub release
 //   pnpm run translations:orphans                 export keys on Lokalise but not in en.json
 //   pnpm run translations:orphans:delete [--yes]
