@@ -1645,7 +1645,9 @@
       "title": "ESPHome Web",
       "subtitle": "Install and manage your devices from the browser",
       "switch_to_pico": "Raspberry Pi",
-      "switch_to_esp": "ESP device"
+      "switch_to_esp": "ESP device",
+      "more_options": "More options",
+      "report_issue": "Report an issue"
     },
     "footer": {
       "tagline": "Runs 100% in your browser — no data leaves your computer."

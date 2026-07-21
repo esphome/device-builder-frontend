@@ -11,6 +11,7 @@ import { isWebSerialSupported } from "../../util/web-serial.js";
 import { modeUrl, type WebMode } from "../web-mode.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./esphome-web-header-actions.js";
 
 registerMdiIcons({ "swap-horizontal": mdiSwapHorizontal });
 
@@ -18,7 +19,8 @@ registerMdiIcons({ "swap-horizontal": mdiSwapHorizontal });
  * ESPHome Web top bar, replicating the main builder's ``.app-header`` chrome
  * (``esphome-layout.ts``): the brand-primary bar, the 44px logo box, and the
  * bold on-primary title + subtitle. On the right sits the ESP ⇄ Raspberry Pi
- * device-family switch, hidden entirely on browsers without Web Serial.
+ * device-family switch (hidden entirely on browsers without Web Serial) and
+ * the overflow kebab.
  */
 @customElement("esphome-web-header")
 export class ESPHomeWebHeader extends LitElement {
@@ -72,6 +74,7 @@ export class ESPHomeWebHeader extends LitElement {
               `
             : nothing
         }
+        <esphome-web-header-actions></esphome-web-header-actions>
       </div>
     `;
   }
