@@ -2775,3 +2775,140 @@ describe("numeric list items parse as numbers (#1353)", () => {
     expect(after).not.toContain('position: "0"');
   });
 });
+
+describe("bare child keys — hand-typed `key:` with no value", () => {
+  // The device-builder#2271 repro shape: the user types a bare
+  // `rotation:` under a platform item, then fills the field in the
+  // structured editor. The parser must surface the key (as null, with
+  // a span) or the splice writer appends a second `rotation:` while
+  // the original line, outside every span, survives the splice.
+  const before =
+    "display:\n" +
+    "  - platform: mipi_rgb\n" +
+    "    model: GUITION-4848S040\n" +
+    "    rotation:\n";
+  const from = firstListItemLine(before, "display");
+
+  it("parses a bare trailing child key as null", () => {
+    expect(parseYamlSectionValues(before, "display", from)).toEqual({
+      platform: "mipi_rgb",
+      model: "GUITION-4848S040",
+      rotation: null,
+    });
+  });
+
+  it("fills the bare key in place instead of appending a duplicate", () => {
+    const values = parseYamlSectionValues(before, "display", from);
+    values.rotation = 90;
+    const after = updateSectionInYaml(before, "display", values, from);
+    expect(after.match(/rotation:/g)).toHaveLength(1);
+    expect(after).toContain("rotation: 90");
+  });
+
+  it("keeps the bare key line verbatim when a sibling field changes", () => {
+    const values = parseYamlSectionValues(before, "display", from);
+    values.model = "OTHER";
+    const after = updateSectionInYaml(before, "display", values, from);
+    expect(after).toContain("model: OTHER");
+    expect(after.match(/rotation:/g)).toHaveLength(1);
+    expect(after).toContain("\n    rotation:\n");
+  });
+
+  it("parses a bare key followed by a sibling key as null", () => {
+    const yaml = "wifi:\n  ssid:\n  password: x\n";
+    expect(parseYamlSectionValues(yaml, "wifi")).toEqual({
+      ssid: null,
+      password: "x",
+    });
+  });
+
+  it("keeps a comment under a bare key when a sibling changes", () => {
+    // The comment is not a nested block (the peek skips it), so the
+    // bare key parses through the no-block arm; the comment folds into
+    // the next key's lead run and must ride through the splice.
+    const yaml = "wifi:\n  ssid:\n    # fill me in later\n  password: x\n";
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values).toEqual({ ssid: null, password: "x" });
+    values.password = "y";
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after).toContain("  ssid:\n    # fill me in later\n");
+    expect(after).toContain("password: y");
+  });
+
+  it("keeps a comment under a bare key when the key itself is filled", () => {
+    // The deeper comment is not part of the bare key's span (the
+    // nested-block peek skips comment lines), so filling the key
+    // rewrites only the key line and the note survives.
+    const yaml = "wifi:\n  ssid:\n    # note\n  password: x\n";
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values).toEqual({ ssid: null, password: "x" });
+    values.ssid = 1;
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after.match(/ssid:/g)).toHaveLength(1);
+    expect(after).toContain("ssid: 1");
+    expect(after).toContain("# note");
+  });
+
+  it("keeps a trailing comment under a bare key filled at section end", () => {
+    const yaml = "wifi:\n  ssid:\n    # note\n";
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values).toEqual({ ssid: null });
+    values.ssid = 1;
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after.match(/ssid:/g)).toHaveLength(1);
+    expect(after).toContain("ssid: 1");
+    expect(after).toContain("# note");
+  });
+
+  it("parses a bare key over an unreadable deeper block as null", () => {
+    // A deeper line the child regex can't read (quoted key) parses to a
+    // zero-key nested block; the key records null with a span over the
+    // run, so an unrelated edit keeps both lines byte-for-byte.
+    const yaml = 'mysect:\n  wrapper:\n    "quoted key": x\n  other: y\n';
+    const values = parseYamlSectionValues(yaml, "mysect");
+    expect(values).toEqual({ wrapper: null, other: "y" });
+    values.other = "z";
+    const after = updateSectionInYaml(yaml, "mysect", values);
+    expect(after).toContain('  wrapper:\n    "quoted key": x\n');
+    expect(after).toContain("other: z");
+  });
+
+  it("fills a bare sole inline key through the dash rewrite", () => {
+    // A bare key riding the dash line (`- rotation:`) deliberately does
+    // NOT get the null-with-span treatment: the dash line has no span
+    // by design and the form is authoritative there, so the writer
+    // rewrites the dash in place (a null form value would instead
+    // collapse the dash and drop the key on a no-op save).
+    const yaml = "display:\n  - rotation:\n";
+    const from = firstListItemLine(yaml, "display");
+    expect(parseYamlSectionValues(yaml, "display", from)).toEqual({});
+    const after = updateSectionInYaml(yaml, "display", { rotation: 90 }, from);
+    expect(after.match(/rotation:/g)).toHaveLength(1);
+    expect(after).toContain("- rotation: 90");
+  });
+
+  it("keeps a bare sole inline key verbatim on an untouched save", () => {
+    const yaml = "display:\n  - rotation:\n";
+    const from = firstListItemLine(yaml, "display");
+    const values = parseYamlSectionValues(yaml, "display", from);
+    const after = updateSectionInYaml(yaml, "display", values, from);
+    expect(after).toContain("- rotation:");
+  });
+
+  it("fills a bare key that a sibling list item follows", () => {
+    const yaml =
+      "display:\n" +
+      "  - platform: mipi_rgb\n" +
+      "    rotation:\n" +
+      "  - platform: ili9xxx\n";
+    const from = firstListItemLine(yaml, "display");
+    const values = parseYamlSectionValues(yaml, "display", from);
+    expect(values).toEqual({ platform: "mipi_rgb", rotation: null });
+    values.rotation = 180;
+    const after = updateSectionInYaml(yaml, "display", values, from);
+    expect(after.match(/rotation:/g)).toHaveLength(1);
+    expect(after).toContain("rotation: 180");
+    // The second platform item is untouched and still follows the first.
+    expect(after.indexOf("rotation: 180")).toBeLessThan(after.indexOf("ili9xxx"));
+  });
+});

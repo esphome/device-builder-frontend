@@ -213,10 +213,7 @@ export function parseSectionCore(
 
     if (raw === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
-      if (peek >= lines.length) continue;
-      const peekLine = lines[peek];
-
-      if (isChildListItemLine(peekLine, childIndent)) {
+      if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {
         const { value, endIdx, isEmptyScalarList } = parseListBlock(
           lines,
           i + 1,
@@ -231,15 +228,18 @@ export function parseSectionCore(
       }
 
       // Nested mapping under ``key:`` (deeper indent read from the block
-      // itself so a user-typed 4-space file recurses correctly).
+      // itself so a user-typed 4-space file recurses correctly). No block
+      // — or a comment-only one — parses to null but is still recorded
+      // WITH a span. If the bare key were dropped instead, its source
+      // line would be invisible to the splice writer, which would then
+      // append a second ``key:`` when the form supplies the value while
+      // the original line — outside every span — survives the splice.
       const result = readNestedMappingAfter(i + 1);
-      if (result) {
-        if (Object.keys(result.values).length > 0) {
-          values[key] = result.values;
-          recordSpan(key, i, result.endIdx);
-        }
-        i = result.endIdx - 1;
-      }
+      const endIdx = result?.endIdx ?? i + 1;
+      values[key] =
+        result && Object.keys(result.values).length > 0 ? result.values : null;
+      recordSpan(key, i, endIdx);
+      i = endIdx - 1;
       continue;
     }
 
