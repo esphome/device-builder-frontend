@@ -69,3 +69,36 @@ describe("renderMultiValueField numeric coercion", () => {
     expect(inputs[0].type).toBe("text");
   });
 });
+
+describe("renderMultiValueField numeric substitution rows", () => {
+  // esphome/device-builder-frontend#1346: a ${var} item can't drive a number
+  // input (the browser blanks it) and Number() on edit clobbered the
+  // reference. The row edits as text and round-trips the string.
+  it("renders the ${var} row as text while sibling literals stay numeric", () => {
+    const ctx = makeRenderCtx({ field: ["${ch}", 5] });
+    const tpl = renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["field"], ctx);
+    const inputs = findElementBindings(tpl, "input");
+
+    expect(inputs[0].type).toBe("text");
+    expect(inputs[0][".value"]).toBe("${ch}");
+    expect(inputs[1].type).toBe("number");
+  });
+
+  it("round-trips the reference string on edit, no Number coercion", () => {
+    const ctx = makeRenderCtx({ field: ["${ch}", 5] });
+    const tpl = renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["field"], ctx);
+    const inputs = findElementBindings(tpl, "input");
+
+    fireInput(inputs[0], "${chan}");
+    expect(ctx.emitChange).toHaveBeenCalledWith(["field"], ["${chan}", 5]);
+  });
+
+  it("sibling literal edits still coerce to numbers", () => {
+    const ctx = makeRenderCtx({ field: ["${ch}", 5] });
+    const tpl = renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["field"], ctx);
+    const inputs = findElementBindings(tpl, "input");
+
+    fireInput(inputs[1], "7");
+    expect(ctx.emitChange).toHaveBeenCalledWith(["field"], ["${ch}", 7]);
+  });
+});

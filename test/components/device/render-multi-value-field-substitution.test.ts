@@ -66,3 +66,18 @@ describe("renderMultiValueField — substitution preview", () => {
     expect(json).toContain("substitution-warn");
   });
 });
+
+describe("renderMultiValueField — numeric list substitution preview", () => {
+  it("previews the resolved value for a ${var} row in an INTEGER list", () => {
+    const yaml = 'substitutions:\n  ch: "3"\n';
+    const ctx = makeRenderCtx(
+      { codes: ["${ch}", 5] },
+      { overrides: { sectionKey: "remote_receiver", yaml } }
+    );
+    const json = serialize(
+      renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["codes"], ctx)
+    );
+    expect(json).toContain("substitution-note");
+    expect(json).toContain('"3"');
+  });
+});

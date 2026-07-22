@@ -3,6 +3,7 @@ import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
+import { isSubstitutionString } from "../../../util/substitutions.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
@@ -120,34 +121,48 @@ export function renderMultiValueField(
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => "");
-  const updateAt = (idx: number, value: string) => {
+  const updateAt = (idx: number, value: string, rowNumeric: boolean) => {
     const current = [...readArrayAt(ctx, path)];
     // Empty stays "" so a half-typed or cleared row round-trips instead of
-    // becoming NaN, matching the single-value number renderer.
-    current[idx] = numeric
+    // becoming NaN, matching the single-value number renderer. A ${var} row
+    // in a numeric list round-trips the string verbatim — no coercion — so
+    // an edit can't clobber the reference with a number (#1346); dropping
+    // the $ flips the row numeric on the next render, same transient
+    // string-typed number the single-value ${var} gates write.
+    current[idx] = rowNumeric
       ? value === ""
         ? ""
         : Number(value)
-      : unescapeForInput(value);
+      : numeric
+        ? value
+        : unescapeForInput(value);
     ctx.emitChange(path, current);
   };
 
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
-      ${items.map(
-        (item, i) => html`
+      ${items.map((item, i) => {
+        // A ${var} item can't drive a number input (the browser blanks a
+        // non-numeric value); edit it as text so the reference round-trips.
+        const rowNumeric = numeric && !isSubstitutionString(raw[i]);
+        return html`
           <div class="multi-row">
             <div class="multi-value-cell">
               <input
-                type=${numeric ? "number" : "text"}
+                type=${rowNumeric ? "number" : "text"}
                 step=${
-                  numeric ? (entry.type === ConfigEntryType.FLOAT ? "any" : "1") : nothing
+                  rowNumeric
+                    ? entry.type === ConfigEntryType.FLOAT
+                      ? "any"
+                      : "1"
+                    : nothing
                 }
                 class="multi-input ${invalid ? "invalid" : ""}"
                 .value=${item}
                 ?disabled=${disabled}
-                @input=${(e: Event) => updateAt(i, (e.target as HTMLInputElement).value)}
+                @input=${(e: Event) =>
+                  updateAt(i, (e.target as HTMLInputElement).value, rowNumeric)}
               />
               ${
                 // Resolve against the stored value, not the escaped display
@@ -161,8 +176,8 @@ export function renderMultiValueField(
             </div>
             ${renderListRemoveButton(ctx, disabled, () => removeAt(i))}
           </div>
-        `
-      )}
+        `;
+      })}
       ${renderListAddButton(ctx, disabled, addItem)} ${renderFieldError(path, ctx)}
     </div>
   `;
