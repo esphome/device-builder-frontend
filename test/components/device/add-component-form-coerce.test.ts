@@ -135,6 +135,12 @@ describe("FLOAT coercion", () => {
 
   test("ships non-finite input verbatim instead of a JSON-null Infinity", () => {
     expect(coerceFields([gain], { gain: "Infinity" })).toEqual({ gain: "Infinity" });
+    // A number input accepts 1e309, so the stored value can be a numeric
+    // Infinity/NaN — those must stringify too, not JSON-serialize to null.
+    expect(coerceFields([gain], { gain: Number.POSITIVE_INFINITY })).toEqual({
+      gain: "Infinity",
+    });
+    expect(coerceFields([gain], { gain: Number.NaN })).toEqual({ gain: "NaN" });
   });
 
   test("coerces a 0x literal through strict Number, not parseFloat's 0", () => {

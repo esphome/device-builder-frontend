@@ -55,9 +55,13 @@ export function coerceFields(
       // Strict coercion: unparseable input (a ${var} reference, junk like
       // "50Hz") ships verbatim so the backend flags it — parseFloat's
       // prefix parsing silently rewrote "50Hz" to 50, and the NaN branch
-      // silently dropped the field from the payload (#1350).
+      // silently dropped the field from the payload (#1350). Non-finite
+      // numbers (a typed 1e309 becomes Infinity) stringify too: JSON has
+      // no Infinity/NaN and they'd ship as null.
       out[entry.key] =
-        typeof raw === "number" ? raw : coerceValueToEntryType(entry, String(raw));
+        typeof raw === "number" && Number.isFinite(raw)
+          ? raw
+          : coerceValueToEntryType(entry, String(raw));
     } else if (entry.type === ConfigEntryType.BOOLEAN) {
       out[entry.key] = parseYamlBoolean(raw) === true;
     } else {
