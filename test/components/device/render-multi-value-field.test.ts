@@ -39,6 +39,15 @@ describe("renderMultiValueField numeric coercion", () => {
     expect(inputs[0][".value"]).toBe("0x10");
     fireInput(inputs[0], "0x20");
     expect(ctx.emitChange).toHaveBeenCalledWith(["field"], ["0x20", "9007199254740993"]);
+
+    // Editing the 64-bit row itself commits the string, never a rounded
+    // double (the Number.isSafeInteger guard in coerceIntFieldValue).
+    expect(inputs[1][".value"]).toBe("9007199254740993");
+    fireInput(inputs[1], "18446744073709551615");
+    expect(ctx.emitChange).toHaveBeenCalledWith(
+      ["field"],
+      ["0x10", "18446744073709551615"]
+    );
   });
 
   it("routes INTEGER row edits through the editing buffer", () => {
