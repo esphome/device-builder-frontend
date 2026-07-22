@@ -168,4 +168,8 @@ describe("BOOLEAN coercion", () => {
       enabled: "maybe",
     });
   });
+
+  test("ships a non-string primitive verbatim without stringifying", () => {
+    expect(coerceFields([enabled], { enabled: 1 })).toEqual({ enabled: 1 });
+  });
 });

@@ -64,8 +64,9 @@ export function coerceFields(
     } else if (entry.type === ConfigEntryType.BOOLEAN) {
       // Junk and ${var} references ship verbatim so the backend resolves
       // or rejects the real value — `=== true` flattened it to false (#1356).
-      out[entry.key] =
-        typeof raw === "boolean" ? raw : coerceValueToEntryType(entry, String(raw));
+      // Non-string primitives (a stored `1`) also ship verbatim; String()
+      // would change their YAML type.
+      out[entry.key] = typeof raw === "string" ? coerceValueToEntryType(entry, raw) : raw;
     } else {
       out[entry.key] = raw;
     }
