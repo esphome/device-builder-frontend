@@ -25,9 +25,9 @@ import { gutterLineClass, GutterMarker, type EditorView } from "@codemirror/view
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { EditorValidateResponse } from "../api/types/editor.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { formRelativePath } from "./backend-field-errors.js";
+import { mappedFormPath } from "./backend-field-errors.js";
 import { splitTextLinks } from "./markdown.js";
-import { getKeyPathWithListIndices } from "./yaml-ast.js";
+import { getKeyPathWithListIndices, isScalarListItemAt } from "./yaml-ast.js";
 import {
   describeValueTypeCause,
   describeYamlError,
@@ -49,8 +49,12 @@ export interface MappedValidationError {
    *  errors resolve to the right instance. */
   line: number;
   /** Key chain from the top-level section key down to the errored field;
-   *  block-sequence items contribute their numeric index. */
+   *  sequence items contribute their numeric index. */
   keyPath: (string | number)[];
+  /** Set when a numeric-tailed ``keyPath`` ends at a scalar list item —
+   *  the one index tail that maps to a renderable form row (#1354);
+   *  mapping-item tails stay banner material. */
+  scalarItemTail?: boolean;
 }
 
 /** A banner-bound error, optionally carrying a line so the banner can jump to it. */
@@ -447,14 +451,22 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         ) {
           keyPath = keyPath.slice(0, -1);
         }
+        const scalarItemTail =
+          typeof keyPath[keyPath.length - 1] === "number" &&
+          isScalarListItemAt(view.state, Math.min(anchor.from + 1, anchor.to));
         if (keyPath.length > 0) {
-          mapped.push({ message, line: anchorLine.number, keyPath });
+          mapped.push({
+            message,
+            line: anchorLine.number,
+            keyPath,
+            ...(scalarItemTail ? { scalarItemTail } : {}),
+          });
         }
         // No form field to carry the message (a bare section header, or the
         // AST couldn't place it) — keep it in the banner; a section-level
         // error still badges the navigator through the mapped entry. The
         // anchor line gives the banner its "Go to line" jump.
-        if (formRelativePath(keyPath).length === 0) {
+        if (mappedFormPath({ keyPath, scalarItemTail }).length === 0) {
           bannerErrors.push({
             message,
             line: squiggleLineNum,

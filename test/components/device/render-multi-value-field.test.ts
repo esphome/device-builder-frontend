@@ -204,14 +204,17 @@ describe("renderMultiValueField per-row errors", () => {
     expect(JSON.stringify(rows[0].values)).toContain("validation.not_a_number");
   });
 
-  it("a field-level error still paints every row", () => {
+  it("a field-level error shows once below without painting the rows", () => {
+    // #1354: with rows present a field-keyed error is a list-level backend
+    // message; painting every row misattributed it.
     const ctx = makeRenderCtx({ field: [1, 2] });
     ctx.errorAt = (path: string[]) =>
-      path.join(".") === "field" ? { key: "field", code: "validation.required" } : null;
+      path.join(".") === "field" ? { key: "field", code: "validation.backend" } : null;
     const tpl = renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["field"], ctx);
     const rows = rowsOf(tpl);
 
-    expect(rows[0].values).toContain("invalid");
-    expect(rows[1].values).toContain("invalid");
+    expect(rows[0].values).not.toContain("invalid");
+    expect(rows[1].values).not.toContain("invalid");
+    expect(JSON.stringify(tpl)).toContain("validation.backend");
   });
 });

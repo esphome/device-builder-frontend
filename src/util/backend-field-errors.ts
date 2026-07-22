@@ -41,6 +41,21 @@ export function formRelativePath<T extends string | number>(full: readonly T[]):
 }
 
 /**
+ * A mapped error's section-relative form path. A scalar list item's
+ * trailing index maps to a renderable row (``field.0``, the per-item
+ * keys the list renderer reads, #1354), so it survives the reduction;
+ * mapping-item tails still reduce to [] (banner material).
+ */
+export function mappedFormPath(
+  err: Pick<MappedValidationError, "keyPath" | "scalarItemTail">
+): (string | number)[] {
+  const rel = formRelativePath(err.keyPath);
+  if (rel.length > 0 || !err.scalarItemTail) return rel;
+  const parent = formRelativePath(err.keyPath.slice(0, -1));
+  return parent.length > 0 ? [...parent, err.keyPath[err.keyPath.length - 1]] : [];
+}
+
+/**
  * Pin each mapped error on a section instance in the current buffer.
  *
  * The result is the deduped set of user-visible errors: one per field
@@ -58,7 +73,7 @@ export function resolveBackendErrors(
   for (const err of mapped) {
     const section = sectionForCursor(yaml, err.line, err.keyPath);
     if (!section) continue;
-    let rel = formRelativePath(err.keyPath);
+    let rel = mappedFormPath(err);
     // An expanded list instance (- platform: dht) IS the form's root: the
     // navigator already picked the item by fromLine, so the domain-list
     // index the key path carries is redundant — drop it. Nested list

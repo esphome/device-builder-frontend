@@ -4,6 +4,7 @@ import {
   backendErrorsForInstance,
   formRelativePath,
   instanceKey,
+  mappedFormPath,
   resolveBackendErrors,
   type BackendFieldError,
 } from "../../src/util/backend-field-errors.js";
@@ -215,5 +216,27 @@ describe("backendErrorsForInstance", () => {
     expect(miss.fields.size).toBe(0);
     expect(miss.fieldMessages).toEqual([]);
     expect(miss.sectionMessages).toEqual([]);
+  });
+});
+
+describe("mappedFormPath", () => {
+  it("keeps a scalar item's trailing index (#1354)", () => {
+    expect(
+      mappedFormPath({
+        keyPath: ["display", 0, "user_characters", 0, "data", 1],
+        scalarItemTail: true,
+      })
+    ).toEqual([0, "user_characters", 0, "data", 1]);
+  });
+
+  it("still reduces a mapping-item tail to the banner", () => {
+    expect(mappedFormPath({ keyPath: ["sensor", 1] })).toEqual([]);
+    expect(mappedFormPath({ keyPath: ["esphome", "areas", 0] })).toEqual([]);
+  });
+
+  it("reduces when the parent path itself has no form field", () => {
+    // A scalar item directly under a section list has no parent field to
+    // anchor a row on.
+    expect(mappedFormPath({ keyPath: ["sensor", 1], scalarItemTail: true })).toEqual([]);
   });
 });
