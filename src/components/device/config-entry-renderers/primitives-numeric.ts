@@ -10,10 +10,12 @@ import {
   serializeFloatWithUnit,
   visibleUnitOptions,
 } from "../../../util/float-with-unit.js";
-import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
+import {
+  coerceFloatFieldValue,
+  coerceValueToEntryType,
+} from "../../../util/coerce-entry-value.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
-import { looksLikeSubstitution } from "../../../util/substitutions.js";
 import {
   parseTimePeriodScalar,
   serializeTimePeriod,
@@ -27,8 +29,8 @@ import {
   renderFieldShell,
   renderLabel,
   renderStringField,
+  renderUnparseableScalarField,
   renderYamlOnlyFallbackIfNonPrimitive,
-  renderYamlOnlyField,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
@@ -50,13 +52,9 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
     return renderIntField(entry, path, ctx);
   }
   // An unparseable primitive blanks inside <input type="number"> and reads
-  // as unset. A string (a ${substitution}, junk, a stored "1e309") stays
-  // editable as text with its validation error in place; only a non-string
-  // primitive gets the read-only YAML-only shell.
+  // as unset; bail to the shared junk-scalar fallback.
   if (raw != null && !Number.isFinite(Number(String(raw)))) {
-    return typeof raw === "string"
-      ? renderStringField(entry, "text", path, ctx)
-      : renderYamlOnlyField(entry, path, ctx);
+    return renderUnparseableScalarField(entry, path, ctx, raw);
   }
   // FLOAT keeps the native number spinner — floats don't take 0x… literals.
   const value = String(raw ?? "");
@@ -277,18 +275,16 @@ export function renderFloatWithUnitField(
   // the parser turns into null/"". Cleared on blur and on entries change.
   const editingText = ctx.getEditingMagnitude(path);
   // A present value the parser can't split ("21C", "inf") would render as an
-  // empty magnitude + unit picker and read as unset. Bail visibly unless the
-  // user is mid-edit — the buffer legitimately holds partial input — with the
-  // same editable-text carve-out for a ${substitution} value (#2056).
+  // empty magnitude + unit picker and read as unset. Bail to the shared
+  // junk-scalar fallback unless the user is mid-edit — the buffer
+  // legitimately holds partial input.
   if (
     parsed.value === null &&
     editingText == null &&
     rawValue != null &&
     String(rawValue).trim() !== ""
   ) {
-    return looksLikeSubstitution(String(rawValue))
-      ? renderStringField(entry, "text", path, ctx)
-      : renderYamlOnlyField(entry, path, ctx);
+    return renderUnparseableScalarField(entry, path, ctx, rawValue);
   }
   const numberValue = editingText ?? (parsed.value === null ? "" : String(parsed.value));
   const unit = chooseDisplayUnit(
@@ -331,8 +327,14 @@ export function renderFloatWithUnitField(
             // Clearing magnitude drops the unit (`{null, kHz}` serializes to "");
             // stash the unit so the next render's fallback doesn't snap back to canonical.
             if (raw === "") ctx.setPendingUnit(path, unit);
-            const next = raw === "" ? null : Number(raw);
-            emit({ value: Number.isFinite(next) ? next : null, unit });
+            const next = coerceFloatFieldValue(raw);
+            if (typeof next === "string" && next !== "") {
+              // Non-finite input ships verbatim so the validator flags it
+              // instead of the serializer silently clearing the value (#1365).
+              ctx.emitChange(path, next);
+            } else {
+              emit({ value: next === "" ? null : next, unit });
+            }
           }}
           @blur=${() => ctx.clearEditingMagnitude(path)}
         />

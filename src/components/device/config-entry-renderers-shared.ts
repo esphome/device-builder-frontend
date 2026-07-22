@@ -296,6 +296,20 @@ export function renderYamlOnlyFallbackIfNonPrimitive(
   return renderYamlOnlyField(entry, path, ctx);
 }
 
+/** Fallback for a primitive a numeric widget can't represent: a string (a
+ *  ${substitution}, junk, a stored "1e309") stays editable as text with its
+ *  validation error in place; any other primitive gets the YAML-only shell. */
+export function renderUnparseableScalarField(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  raw: unknown
+) {
+  return typeof raw === "string"
+    ? renderStringField(entry, "text", path, ctx)
+    : renderYamlOnlyField(entry, path, ctx);
+}
+
 /** The "this value can only be edited in YAML" field shell — shown when a
  *  value's shape (a mapping, or a list whose items are mappings) can't be
  *  driven by the scalar/multi-value inputs. */

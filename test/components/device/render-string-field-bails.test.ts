@@ -270,8 +270,32 @@ describe("renderNumberField / renderFloatWithUnitField — bail on unparseable p
     expect(rendersEditableBranch(json)).toBe(true);
   });
 
-  it("bails on a malformed unit string under a float-with-unit field", () => {
+  it("renders editable text for a malformed unit string under a float-with-unit field", () => {
     const { ctx } = makeCtx({ default_target_temperature: "21X" });
+    const tpl = renderFloatWithUnitField(
+      withUnitEntry(),
+      ["default_target_temperature"],
+      ctx
+    );
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(json).toContain("21X");
+  });
+
+  it("renders editable text for a stored non-finite string under a float-with-unit field", () => {
+    const { ctx } = makeCtx({ default_target_temperature: "1e309" });
+    const tpl = renderFloatWithUnitField(
+      withUnitEntry(),
+      ["default_target_temperature"],
+      ctx
+    );
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(json).toContain("1e309");
+  });
+
+  it("bails on a boolean under a float-with-unit field", () => {
+    const { ctx } = makeCtx({ default_target_temperature: true });
     const tpl = renderFloatWithUnitField(
       withUnitEntry(),
       ["default_target_temperature"],
