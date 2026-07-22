@@ -124,6 +124,9 @@ export const coerceListScalar = (
     const n = Number(text);
     return Number.isSafeInteger(n) ? n : text;
   }
+  // Floats trade text fidelity for the loader's value: ``1.50`` re-emits
+  // as ``1.5`` and extra precision truncates to the same double PyYAML
+  // hands the backend anyway.
   if (PLAIN_FLOAT_RE.test(text)) return Number(text);
   return text;
 };
