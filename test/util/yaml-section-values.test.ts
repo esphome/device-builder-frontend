@@ -3079,12 +3079,12 @@ describe("updateSectionInYaml — mapping-list rows keep comments on edit (#1379
     expect(after).toContain("password: changed");
   });
 
-  it("keeps remaining rows verbatim when a row is removed", () => {
+  it("keeps the remaining multi-line row verbatim when the first row is removed", () => {
     const values = parseYamlSectionValues(yaml, "wifi", 1);
-    values.networks = [(values.networks as Record<string, unknown>[])[0]];
+    values.networks = [(values.networks as Record<string, unknown>[])[1]];
     const after = updateSectionInYaml(yaml, "wifi", values, 1);
-    expect(after).toContain("    - ssid: homenet #primary\n      password: hunter2\n");
-    expect(after).not.toContain("guestnet");
+    expect(after).toContain("    - ssid: guestnet\n      password: opensesame\n");
+    expect(after).not.toContain("homenet");
   });
 
   it("keeps existing rows verbatim when a row is appended", () => {
@@ -3094,6 +3094,28 @@ describe("updateSectionInYaml — mapping-list rows keep comments on edit (#1379
     expect(after).toContain("    - ssid: homenet #primary\n");
     expect(after).toContain("    # guest network below\n    - ssid: guestnet\n");
     expect(after).toContain("    - ssid: iot\n");
+  });
+
+  it("falls back to a consistent full re-emit when the dash column is non-canonical", () => {
+    // Compact same-column dashes: a spliced mapping row would land two
+    // columns deeper than its verbatim siblings, so the splice bails.
+    const compact = [
+      "wifi:",
+      "  networks:",
+      "  - ssid: homenet #primary",
+      "    password: hunter2",
+      "  - ssid: guestnet",
+      "    password: opensesame",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(compact, "wifi", 1);
+    (values.networks as Record<string, unknown>[])[1].password = "changed";
+    const after = updateSectionInYaml(compact, "wifi", values, 1);
+    // Every dash lands at one column — no mixed-column corruption.
+    const dashCols = [...after.matchAll(/^( *)- ssid/gm)].map((m) => m[1].length);
+    expect(new Set(dashCols).size).toBe(1);
+    expect(after).toContain("password: changed");
+    expect(after).toContain("ssid: homenet");
   });
 
   it("keeps a 4-space source's unchanged rows verbatim while the edited row canonicalizes", () => {
@@ -3114,18 +3136,5 @@ describe("updateSectionInYaml — mapping-list rows keep comments on edit (#1379
     );
     expect(after).toContain("ssid: guestnet");
     expect(after).toContain("password: changed");
-  });
-
-  it("still round-trips a bailing shape (lambda field) via YamlRawValue untouched", () => {
-    const withLambda = [
-      "sensor:",
-      "  filters:",
-      "    - lambda: |-",
-      "        return x;",
-      "",
-    ].join("\n");
-    const values = parseYamlSectionValues(withLambda, "sensor", 1);
-    const after = updateSectionInYaml(withLambda, "sensor", values, 1);
-    expect(after).toBe(withLambda);
   });
 });

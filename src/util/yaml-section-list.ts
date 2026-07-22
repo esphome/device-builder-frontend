@@ -31,7 +31,8 @@ import {
  *  (#1363/#1379). */
 export interface ListItemSource {
   itemRanges: [number, number][];
-  inlineComments: string[];
+  // Scalar rows only; mapping-list sources omit it.
+  inlineComments?: string[];
   dashIndent: string;
 }
 

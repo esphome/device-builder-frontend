@@ -104,11 +104,7 @@ const parseListBlock = (
         isEmptyScalarList: false,
         listSource:
           mapping.items.length > 0
-            ? {
-                itemRanges: mapping.itemRanges,
-                inlineComments: mapping.items.map(() => ""),
-                dashIndent,
-              }
+            ? { itemRanges: mapping.itemRanges, dashIndent }
             : undefined,
       };
     }

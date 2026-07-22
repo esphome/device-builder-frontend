@@ -8,6 +8,7 @@
  * with this concern.
  */
 
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject, isPrimitiveOrNullish } from "./nested-values.js";
 import type { ListItemSource } from "./yaml-section-list.js";
 import {
@@ -123,22 +124,8 @@ export function buildSplicedBody(
       bodyLines.push(...lines.slice(span.leadStart, span.end));
       continue;
     }
-<<<<<<< HEAD
-    const spliced = meta && spliceScalarList(lines, meta, old, val);
-=======
     const spliced =
-      span &&
-      meta &&
-      spliceListItems(
-        lines,
-        span,
-        meta,
-        parsed.values[key],
-        val,
-        childIndent,
-        serializeOptions
-      );
->>>>>>> 7b0f32f9 (Splice mapping lists per item so row comments survive edits)
+      meta && spliceListItems(lines, meta, old, val, childIndent, serializeOptions);
     if (spliced) {
       bodyLines.push(...spliced);
       continue;
@@ -175,9 +162,7 @@ function flowListLine(
 const isScalarItem = (v: unknown): v is string | number | boolean =>
   isPrimitiveOrNullish(v) && v != null;
 
-// The item shapes the per-item splice can re-emit: scalars via the dash
-// line below, plain mappings via ``serializeListItem``. Anything else
-// (nulls, nested arrays) falls through to the full re-emit.
+// Scalars and plain mappings; anything else falls through to the full re-emit.
 const isSpliceableItem = (v: unknown): boolean => isScalarItem(v) || isPlainObject(v);
 
 /**
@@ -206,7 +191,6 @@ function spliceListItems(
     !Array.isArray(old) ||
     !Array.isArray(val) ||
     val.length === 0 ||
-    !old.every(isSpliceableItem) ||
     !val.every(isSpliceableItem)
   ) {
     return null;
@@ -227,7 +211,18 @@ function spliceListItems(
   ) {
     suffix++;
   }
-  const { itemRanges: ranges, inlineComments, dashIndent } = src;
+  const { itemRanges: ranges, dashIndent } = src;
+  // ``serializeListItem`` derives its dash column as indent + step; when the
+  // authored column differs (compact same-column dashes), a re-emitted
+  // mapping row would land misaligned beside verbatim siblings — bail to
+  // the full re-emit, which is consistently canonical.
+  const canonicalDash = `${childIndent}${options.indentStep ?? ESPHOME_YAML_INDENT}`;
+  if (
+    dashIndent !== canonicalDash &&
+    val.some((v, i) => !isScalarItem(v) && !yamlValueEqual(old[i], v))
+  ) {
+    return null;
+  }
   // Each row's group runs from just past the previous row's last line (the
   // key line for the first row), carrying the whole-line comments above it.
   const groupStart = (i: number): number => (i === 0 ? span.start + 1 : ranges[i - 1][1]);
@@ -250,12 +245,11 @@ function spliceListItems(
     }
     if (inPlace) out.push(...lines.slice(groupStart(k), ranges[k][0]));
     if (isScalarItem(val[k])) {
-      out.push(
-        `${dashIndent}- ${formatYamlScalar(val[k])}${inPlace ? inlineComments[k] : ""}`
-      );
+      const comment = inPlace ? (src.inlineComments?.[k] ?? "") : "";
+      out.push(`${dashIndent}- ${formatYamlScalar(val[k])}${comment}`);
     } else {
       // A changed mapping row re-emits canonically; its own comments are
-      // unknowable per field. The unchanged rows' bytes are the win.
+      // unknowable per field.
       out.push(...serializeListItem(val[k], childIndent, options));
     }
   }
