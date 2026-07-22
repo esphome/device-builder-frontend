@@ -103,6 +103,10 @@ export interface RenderCtx {
   getEditingMagnitude: (path: string[]) => string | undefined;
   setEditingMagnitude: (path: string[], text: string) => void;
   clearEditingMagnitude: (path: string[]) => void;
+  /** Drop every edit buffer at or under *path*. List-row buffers embed the
+   *  row index, so removing a row must invalidate them — the indices shift
+   *  and an un-blurred buffer would paint (and commit) over the wrong row. */
+  clearEditingMagnitudesUnder: (path: string[]) => void;
   /**
    * Either/or constraint cluster (radio chooser) UI state, off-config like
    * the unit/magnitude stashes above. ``ClusterChoice`` is the selected

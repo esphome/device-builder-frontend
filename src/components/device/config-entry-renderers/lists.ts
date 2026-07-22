@@ -32,11 +32,16 @@ function arrayItemHandlers(
   path: string[],
   makeNewItem: () => unknown
 ): { addItem: () => void; removeAt: (idx: number) => void } {
-  const removeAt = (idx: number) =>
+  const removeAt = (idx: number) => {
+    // Row edit buffers are keyed by index; a removal shifts the indices,
+    // so an un-blurred buffer would paint (and commit) over the row that
+    // slides into its slot.
+    ctx.clearEditingMagnitudesUnder(path);
     ctx.emitChange(
       path,
       readArrayAt(ctx, path).filter((_, i) => i !== idx)
     );
+  };
   const addItem = () => ctx.emitChange(path, [...readArrayAt(ctx, path), makeNewItem()]);
   return { addItem, removeAt };
 }
@@ -114,6 +119,8 @@ export function renderMultiValueField(
   const numeric =
     (entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT) &&
     entry.display_format !== "hex";
+  const intList = numeric && entry.type === ConfigEntryType.INTEGER;
+  const floatList = numeric && entry.type === ConfigEntryType.FLOAT;
   const items: string[] = numeric
     ? raw.map((v) => String(v ?? ""))
     : raw.map((v) => escapeForInput(String(v)));
@@ -138,27 +145,22 @@ export function renderMultiValueField(
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
       ${items.map((item, i) => {
-        // Row widget mirrors the single-value renderers (#1349): INTEGER
+        // Row widgets match the single-value renderers (#1349): INTEGER
         // rows are text — a number input can't show the 0x literals,
         // >2^53 decimals, or ${var} references cv.int_ accepts, and
         // blanks-then-clobbers them. FLOAT rows keep the native spinner
         // except when the stored value is a non-finite string (junk or a
         // ${var} reference), which edits as text with its per-item error.
         const rowNumeric =
-          numeric &&
-          entry.type === ConfigEntryType.FLOAT &&
-          (raw[i] == null || Number.isFinite(Number(String(raw[i]))));
-        const intRow = numeric && entry.type === ConfigEntryType.INTEGER;
+          floatList && (raw[i] == null || Number.isFinite(Number(String(raw[i]))));
         // Errors land per item (``field.0``, #1348); flag and explain only
         // the offending row. The field-level ``invalid`` stays for errors
         // keyed at the field itself (required-empty).
         const rowPath = [...path, String(i)];
         const rowInvalid = invalid || ctx.errorAt(rowPath) !== null;
-        // INTEGER rows keep raw keystrokes on screen while typing so the
-        // committed value's reformatting (``0042`` → ``42``) doesn't
-        // fight the cursor; the buffer clears on blur (renderIntField's
-        // discipline).
-        const display = intRow ? (ctx.getEditingMagnitude(rowPath) ?? item) : item;
+        // Edit buffer keeps raw keystrokes on screen while typing;
+        // clears on blur.
+        const display = intList ? (ctx.getEditingMagnitude(rowPath) ?? item) : item;
         return html`
           <div class="multi-row">
             <div class="multi-value-cell">
@@ -172,11 +174,11 @@ export function renderMultiValueField(
                 ?disabled=${disabled}
                 @input=${(e: Event) => {
                   const value = (e.target as HTMLInputElement).value;
-                  if (intRow) ctx.setEditingMagnitude(rowPath, value);
+                  if (intList) ctx.setEditingMagnitude(rowPath, value);
                   updateAt(i, value);
                 }}
                 @blur=${() => {
-                  if (intRow) ctx.clearEditingMagnitude(rowPath);
+                  if (intList) ctx.clearEditingMagnitude(rowPath);
                 }}
               />
               ${

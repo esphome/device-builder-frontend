@@ -1066,6 +1066,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
       clearEditingMagnitude: (path) => {
         this._editingMagnitudes.delete(path.join("."));
       },
+      clearEditingMagnitudesUnder: (path) => {
+        const key = path.join(".");
+        const prefix = `${key}.`;
+        for (const k of [...this._editingMagnitudes.keys()]) {
+          if (k === key || k.startsWith(prefix)) this._editingMagnitudes.delete(k);
+        }
+      },
       getClusterChoice: (clusterId) => this._constraintClusters.getChoice(clusterId),
       setClusterChoice: (clusterId, altId) =>
         this._constraintClusters.setChoice(clusterId, altId),
