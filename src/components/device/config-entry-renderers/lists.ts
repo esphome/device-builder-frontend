@@ -124,11 +124,12 @@ export function renderMultiValueField(
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => "");
   const updateAt = (idx: number, value: string) => {
     const current = [...readArrayAt(ctx, path)];
-    // Numeric rows coerce through the shared helper: decimals become
-    // numbers; "" and unparseable input — a ${var} reference (#1346), a
-    // 0x literal, a >2^53 decimal — pass through verbatim, so an edit
-    // can't clobber a reference and 64-bit precision survives, matching
-    // the single-value number renderers.
+    // Numeric rows coerce through the shared helper: parseable input
+    // becomes a number; "" and unparseable input — notably a ${var}
+    // reference (#1346) — pass through verbatim so an edit can't clobber
+    // it. INTEGER rows additionally keep 0x literals and >2^53 decimals
+    // as strings (coerceIntFieldValue), matching the single-value
+    // renderers; FLOAT coercion is plain Number().
     current[idx] = numeric
       ? coerceValueToEntryType(entry, value)
       : unescapeForInput(value);
