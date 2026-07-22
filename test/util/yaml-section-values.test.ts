@@ -3079,6 +3079,15 @@ describe("updateSectionInYaml — mapping-list rows keep comments on edit (#1379
     expect(after).toContain("password: changed");
   });
 
+  it("keeps an inter-row comment when the row ABOVE it is edited", () => {
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    (values.networks as Record<string, unknown>[])[0].password = "changed";
+    const after = updateSectionInYaml(yaml, "wifi", values, 1);
+    expect(after).toContain("    # guest network below\n    - ssid: guestnet\n");
+    expect(after).toContain("password: changed");
+    expect(after).toContain("password: opensesame");
+  });
+
   it("keeps the remaining multi-line row verbatim when the first row is removed", () => {
     const values = parseYamlSectionValues(yaml, "wifi", 1);
     values.networks = [(values.networks as Record<string, unknown>[])[1]];

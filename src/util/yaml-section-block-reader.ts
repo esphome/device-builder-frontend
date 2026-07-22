@@ -344,7 +344,15 @@ const collectBlockListMappings = (
     const parsed = parseItem(j);
     if (!parsed) return null;
     items.push(parsed.item);
-    itemRanges.push([j, parsed.endIdx]);
+    // The sub-key walk resumes past trailing blank/comment lines; trim the
+    // recorded range back to the last content line so an inter-row comment
+    // belongs to the FOLLOWING row's group (scalar-path semantics) and
+    // survives an edit of the row above it.
+    let contentEnd = parsed.endIdx;
+    while (contentEnd > j + 1 && isBlankOrCommentLine(lines[contentEnd - 1])) {
+      contentEnd--;
+    }
+    itemRanges.push([j, contentEnd]);
     j = parsed.endIdx;
   }
   return { items, endIdx: j, itemRanges };
