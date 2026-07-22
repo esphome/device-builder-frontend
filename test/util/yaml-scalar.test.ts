@@ -49,6 +49,15 @@ describe("stripQuotes", () => {
 });
 
 describe("splitInlineComment", () => {
+  it("treats a string-opening # as a comment with an empty value (#1385)", () => {
+    expect(splitInlineComment("# note", true)).toEqual({ value: "", comment: " # note" });
+    expect(splitInlineComment("# note")).toEqual({ value: "# note", comment: "" });
+  });
+
+  it("keeps a mid-word # in the value", () => {
+    expect(splitInlineComment("Bedroom#2")).toEqual({ value: "Bedroom#2", comment: "" });
+  });
+
   it("splits a whitespace-preceded # into value and comment", () => {
     expect(splitInlineComment("true #hides")).toEqual({
       value: "true",

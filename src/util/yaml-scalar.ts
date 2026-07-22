@@ -27,10 +27,19 @@ export const stripQuotes = (s: string): string => {
  * comment (``true #hides`` → ``{ value: "true", comment: " #hides" }``).
  * A ``#`` only starts a comment when it's whitespace-preceded and
  * outside quotes — ``Bedroom#2`` and ``"a # b"`` keep the ``#`` in the
- * value. ``comment`` retains its leading whitespace (``""`` when none)
- * so the serializer can re-append it verbatim.
+ * value. *openingIsComment* additionally treats a ``#`` that opens the
+ * string as a comment: trimmed callers lost the separating whitespace to
+ * their regex, so ``name: # note`` reaches them as ``# note`` and is an
+ * empty value to the loader (#1385) — while the untrimmed dash-line
+ * caller keeps the default, where a position-0 ``#`` means the source
+ * had no separator (``file:#fragment``) and the ``#`` is value text.
+ * ``comment`` retains its leading whitespace (a string-opening comment
+ * gets a canonical single space) so the serializer can re-append it.
  */
-export const splitInlineComment = (raw: string): { value: string; comment: string } => {
+export const splitInlineComment = (
+  raw: string,
+  openingIsComment = false
+): { value: string; comment: string } => {
   let inSingle = false;
   let inDouble = false;
   for (let i = 0; i < raw.length; i++) {
@@ -48,11 +57,14 @@ export const splitInlineComment = (raw: string): { value: string; comment: strin
       c === "#" &&
       !inSingle &&
       !inDouble &&
-      (raw[i - 1] === " " || raw[i - 1] === "\t")
+      ((i === 0 && openingIsComment) || raw[i - 1] === " " || raw[i - 1] === "\t")
     ) {
       let ws = i;
       while (ws > 0 && (raw[ws - 1] === " " || raw[ws - 1] === "\t")) ws--;
-      return { value: raw.slice(0, ws), comment: raw.slice(ws) };
+      // A string-opening comment lost its separator to the caller's trim;
+      // give it a canonical single space so a re-append stays valid YAML.
+      const comment = i === 0 ? ` ${raw}` : raw.slice(ws);
+      return { value: raw.slice(0, ws), comment };
     }
   }
   return { value: raw, comment: "" };

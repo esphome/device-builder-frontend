@@ -3290,3 +3290,75 @@ describe("updateSectionInYaml — mapping-list rows keep comments on edit (#1379
     expect(after).toContain("password: changed");
   });
 });
+
+describe("updateSectionInYaml — comment-only values are empty (#1385)", () => {
+  it("parses a comment-only scalar as null, not the literal string", () => {
+    const yaml = ["wifi:", "  domain: # note", "  ssid: home", ""].join("\n");
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.domain).toBeNull();
+    expect(values.ssid).toBe("home");
+  });
+
+  it("re-appends the comment when the empty field gains a value", () => {
+    const yaml = ["wifi:", "  domain: # note", "  ssid: home", ""].join("\n");
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    values.domain = ".local";
+    const after = updateSectionInYaml(yaml, "wifi", values, 1);
+    expect(after).toContain("  domain: .local # note\n");
+  });
+
+  it("still parses a nested mapping under a commented key line", () => {
+    const yaml = [
+      "wifi:",
+      "  manual_ip: # static below",
+      "    static_ip: 10.0.0.2",
+      "    gateway: 10.0.0.1",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.manual_ip).toEqual({ static_ip: "10.0.0.2", gateway: "10.0.0.1" });
+  });
+
+  it("still parses a list under a commented key line", () => {
+    const yaml = [
+      "wifi:",
+      "  networks: # known nets",
+      "    - homenet",
+      "    - guestnet",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.networks).toEqual(["homenet", "guestnet"]);
+  });
+
+  it("parses a comment-only mapping-item field as null", () => {
+    const yaml = [
+      "wifi:",
+      "  networks:",
+      "    - ssid: # pick later",
+      "      password: hunter2",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.networks).toEqual([{ ssid: null, password: "hunter2" }]);
+  });
+
+  it("coerces a pathological comment-only list item to the empty string", () => {
+    const yaml = [
+      "wifi:",
+      "  networks:",
+      "    - # placeholder",
+      "    - homenet",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.networks).toEqual(["", "homenet"]);
+  });
+
+  it("keeps a value merely starting with # when quoted, and Bedroom#2 unquoted", () => {
+    const yaml = ["wifi:", '  ssid: "#lounge"', "  ap_name: Bedroom#2", ""].join("\n");
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.ssid).toBe("#lounge");
+    expect(values.ap_name).toBe("Bedroom#2");
+  });
+});

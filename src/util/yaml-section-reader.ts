@@ -214,7 +214,12 @@ export function parseSectionCore(
       continue;
     }
 
-    if (raw === "") {
+    // Split a trailing inline comment off before the empty test (a
+    // comment-only value ``key: # note`` is an empty value to the loader,
+    // #1385), the flow-list test (`[a, b] # c` doesn't end with `]`), and
+    // scalar parsing — and record it so an edit can re-append it (#1235).
+    const { value: scalar, comment } = splitInlineComment(raw, true);
+    if (scalar === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
       if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {
         const { value, endIdx, isEmptyScalarList, listSource } = parseListBlock(
@@ -226,6 +231,7 @@ export function parseSectionCore(
           values[key] = value;
           const meta = recordKey(key, i, endIdx);
           if (listSource) meta.listSource = listSource;
+          if (comment) meta.comment = comment;
           i = endIdx - 1;
         }
         continue;
@@ -242,15 +248,12 @@ export function parseSectionCore(
       const endIdx = result?.endIdx ?? i + 1;
       values[key] =
         result && Object.keys(result.values).length > 0 ? result.values : null;
-      recordKey(key, i, endIdx);
+      const meta = recordKey(key, i, endIdx);
+      if (comment) meta.comment = comment;
       i = endIdx - 1;
       continue;
     }
 
-    // Split a trailing inline comment off before the flow-list test
-    // (`[a, b] # c` doesn't end with `]`) and before scalar parsing,
-    // and record it so an edit can re-append it (#1235).
-    const { value: scalar, comment } = splitInlineComment(raw);
     if (scalar.startsWith("[") && scalar.endsWith("]")) {
       values[key] = parseFlowList(scalar);
       const meta = recordKey(key, i, i + 1);
