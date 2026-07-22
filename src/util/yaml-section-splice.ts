@@ -49,7 +49,9 @@ export interface KeyMeta {
   // splices per item instead of re-emitting every row (#1363).
   listSource?: ListItemSource;
   // Authored as a flow list (``key: [a, b]``) — an edit re-emits the same
-  // single-line style (#1378). Never coexists with ``listSource``.
+  // single-line style (#1378). Never coexists with ``listSource``. The
+  // nested-depth counterpart is the value-carried ``YamlFlowList``, which
+  // deliberately does NOT survive list edits — don't unify the two.
   flowList?: boolean;
 }
 
