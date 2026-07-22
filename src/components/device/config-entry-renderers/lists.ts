@@ -3,7 +3,6 @@ import { isLambdaValue } from "../../../api/types/automations.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
-import { isSubstitutionString } from "../../../util/substitutions.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
@@ -106,13 +105,12 @@ export function renderMultiValueField(
   // must stay unconditional too — a freshly added row is empty, so a typed
   // ``\U…`` has to decode without a prior escape-worthy value to gate on.
   // INTEGER / FLOAT lists (lcd user-characters data, microphone channels,
-  // ...) get number inputs and coerce each item back to a number on edit, so
-  // the YAML serializer emits them unquoted; numeric items are plain
-  // stringified numbers and skip the glyph escaping above. Hex-display
-  // integers (modbus custom_command, sync_value) stay text: <input
-  // type="number"> rejects 0x.. literals and Number("0x76") would both lose
-  // the canonical hex form and overflow 64-bit values, same reason the
-  // single-value number renderer hands hex off to its own text parser.
+  // ...) coerce each item back to a number on edit, so the YAML serializer
+  // emits them unquoted; numeric items are plain stringified numbers and
+  // skip the glyph escaping above. Hex-display integers (modbus
+  // custom_command, sync_value) stay on the text path with hex kept
+  // verbatim, same reason the single-value number renderer hands hex off
+  // to its own text parser.
   const numeric =
     (entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT) &&
     entry.display_format !== "hex";
@@ -140,30 +138,46 @@ export function renderMultiValueField(
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
       ${items.map((item, i) => {
-        // A ${var} item can't drive a number input (the browser blanks a
-        // non-numeric value); edit it as text so the reference round-trips.
-        const rowNumeric = numeric && !isSubstitutionString(raw[i]);
+        // Row widget mirrors the single-value renderers (#1349): INTEGER
+        // rows are text — a number input can't show the 0x literals,
+        // >2^53 decimals, or ${var} references cv.int_ accepts, and
+        // blanks-then-clobbers them. FLOAT rows keep the native spinner
+        // except when the stored value is a non-finite string (junk or a
+        // ${var} reference), which edits as text with its per-item error.
+        const rowNumeric =
+          numeric &&
+          entry.type === ConfigEntryType.FLOAT &&
+          (raw[i] == null || Number.isFinite(Number(String(raw[i]))));
+        const intRow = numeric && entry.type === ConfigEntryType.INTEGER;
         // Errors land per item (``field.0``, #1348); flag and explain only
         // the offending row. The field-level ``invalid`` stays for errors
         // keyed at the field itself (required-empty).
         const rowPath = [...path, String(i)];
         const rowInvalid = invalid || ctx.errorAt(rowPath) !== null;
+        // INTEGER rows keep raw keystrokes on screen while typing so the
+        // committed value's reformatting (``0042`` → ``42``) doesn't
+        // fight the cursor; the buffer clears on blur (renderIntField's
+        // discipline).
+        const display = intRow ? (ctx.getEditingMagnitude(rowPath) ?? item) : item;
         return html`
           <div class="multi-row">
             <div class="multi-value-cell">
               <input
                 type=${rowNumeric ? "number" : "text"}
-                step=${
-                  rowNumeric
-                    ? entry.type === ConfigEntryType.FLOAT
-                      ? "any"
-                      : "1"
-                    : nothing
-                }
+                autocomplete="off"
+                spellcheck="false"
+                step=${rowNumeric ? "any" : nothing}
                 class="multi-input ${rowInvalid ? "invalid" : ""}"
-                .value=${item}
+                .value=${display}
                 ?disabled=${disabled}
-                @input=${(e: Event) => updateAt(i, (e.target as HTMLInputElement).value)}
+                @input=${(e: Event) => {
+                  const value = (e.target as HTMLInputElement).value;
+                  if (intRow) ctx.setEditingMagnitude(rowPath, value);
+                  updateAt(i, value);
+                }}
+                @blur=${() => {
+                  if (intRow) ctx.clearEditingMagnitude(rowPath);
+                }}
               />
               ${
                 // Resolve against the stored value, not the escaped display
