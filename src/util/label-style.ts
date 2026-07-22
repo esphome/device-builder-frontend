@@ -27,8 +27,11 @@ const NEUTRAL_STYLE: LabelChipStyle = {
 /** ``#rrggbb`` validator. The backend lower-cases on save, but a
  *  hand-edited sidecar could still surface uppercase or a malformed
  *  string — fall back to the neutral palette in that case rather
- *  than throwing. */
+ *  than throwing. Shared with the COLOR field renderer, whose
+ *  ``<input type="color">`` can represent exactly this form. */
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+export const isHexColor = (value: string): boolean => HEX_RE.test(value);
 
 /** Pick the contrasting foreground for a hex color using a
  *  relative-luminance heuristic. The cutoff is biased toward

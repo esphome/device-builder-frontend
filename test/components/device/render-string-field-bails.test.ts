@@ -492,9 +492,6 @@ describe("renderBooleanField — bail branches", () => {
   });
 });
 
-// <input type="color"> silently normalizes anything but #rrggbb to
-// #000000, so a named color or substitution would render as a black
-// swatch and the first pick would clobber it. Pin all three branches.
 describe("renderColorField — bail on values a color input can't show", () => {
   const entry = (): ConfigEntry =>
     makeConfigEntry({ key: "color", type: ConfigEntryType.COLOR, label: "Color" });
@@ -505,7 +502,7 @@ describe("renderColorField — bail on values a color input can't show", () => {
       const tpl = renderColorField(entry(), ["color"], ctx);
       const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
       expect(rendersBailBranch(json)).toBe(false);
-      expect(json).not.toContain('"color"');
+      expect(findElementBindings(tpl, "input")[0].type).toBe("text");
       expect(json).toContain(value);
     }
   });
@@ -516,7 +513,7 @@ describe("renderColorField — bail on values a color input can't show", () => {
       const tpl = renderColorField(entry(), ["color"], ctx);
       const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
       expect(rendersBailBranch(json)).toBe(false);
-      expect(json).toContain('"color"');
+      expect(findElementBindings(tpl, "input")[0].type).toBe("color");
     }
   });
 

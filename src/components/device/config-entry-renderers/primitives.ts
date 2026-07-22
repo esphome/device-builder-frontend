@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { chipNameToVariant } from "../../../util/chip-variant.js";
 import { isValuePresent, nearCanonicalOption } from "../../../util/config-validation.js";
+import { isHexColor } from "../../../util/label-style.js";
 import { renderOptionStack } from "../../../util/option-stack.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
@@ -132,11 +133,9 @@ function boardDerivedVariantDefault(
 // <input type="color"> represents only #rrggbb; the browser normalizes any
 // other value to #000000, so a named color or ${substitution} would render
 // as a plausible black swatch and the first pick would clobber it (#1371).
-const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
-
 export function renderColorField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
-  if (isValuePresent(raw) && !HEX_COLOR_RE.test(String(raw))) {
+  if (isValuePresent(raw) && !isHexColor(String(raw))) {
     return renderUnparseableScalarField(entry, path, ctx, raw);
   }
   return renderStringField(entry, "color", path, ctx);
