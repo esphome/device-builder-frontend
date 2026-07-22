@@ -14,7 +14,7 @@ import { parseIntInput } from "./int-input.js";
 import { asMappingList, asRecord, isPrimitiveOrNullish } from "./nested-values.js";
 import { isSecretRef } from "./secret-ref.js";
 import { isSubstitutionString, looksLikeSubstitution } from "./substitutions.js";
-import { YamlRawValue } from "./yaml-serialize.js";
+import { parseYamlBoolean, YamlRawValue } from "./yaml-serialize.js";
 
 /**
  * Whether an entry restricted to ``supportedPlatforms`` is allowed on the
@@ -321,6 +321,10 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
       if (num > max) {
         return { key: entry.key, code: "validation.max", params: { max } };
       }
+    }
+  } else if (entry.type === ConfigEntryType.BOOLEAN) {
+    if (parseYamlBoolean(raw) === null) {
+      return { key: entry.key, code: "validation.not_a_boolean" };
     }
   }
 

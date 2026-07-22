@@ -13,6 +13,7 @@ import {
   renderFieldError,
   renderHelpLink,
   renderLabel,
+  renderUnparseableScalarField,
   renderYamlOnlyFallbackIfNonPrimitive,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
@@ -59,6 +60,11 @@ export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: Rend
   // Bail to the YAML-only notice instead.
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
+  // A primitive parseYamlBoolean can't read (a ${substitution}, junk, a
+  // stray number) renders unchecked and the first toggle clobbers it (#1368).
+  if (raw != null && String(raw).trim() !== "" && parseYamlBoolean(raw) === null) {
+    return renderUnparseableScalarField(entry, path, ctx, raw);
+  }
   const effective = raw === undefined || raw === null ? entry.default_value : raw;
   const checked = parseYamlBoolean(effective) === true;
   return html`

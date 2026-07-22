@@ -279,6 +279,17 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, 3.5)).toBeNull();
   });
 
+  it("flags values parseYamlBoolean can't read on BOOLEAN fields", () => {
+    const entry = makeEntry({ type: ConfigEntryType.BOOLEAN });
+    expect(validateEntry(entry, "maybe")?.code).toBe("validation.not_a_boolean");
+    expect(validateEntry(entry, 1)?.code).toBe("validation.not_a_boolean");
+    expect(validateEntry(entry, true)).toBeNull();
+    expect(validateEntry(entry, "yes")).toBeNull();
+    expect(validateEntry(entry, "OFF")).toBeNull();
+    expect(validateEntry(entry, "${use_dhcp}")).toBeNull();
+    expect(validateEntry(entry, "")).toBeNull();
+  });
+
   it("flags non-finite text on FLOAT fields", () => {
     const entry = makeEntry({ type: ConfigEntryType.FLOAT });
     expect(validateEntry(entry, "1e309")?.code).toBe("validation.not_a_number");

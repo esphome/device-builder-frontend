@@ -1008,6 +1008,7 @@
     "max_length": "Must be at most {max} characters",
     "not_a_number": "Must be a number",
     "not_an_integer": "Must be a whole number",
+    "not_a_boolean": "Must be true or false",
     "invalid_option": "Not a valid option",
     "invalid_encryption_key": "Must be a 32-byte base64 key",
     "backend": "{message}",

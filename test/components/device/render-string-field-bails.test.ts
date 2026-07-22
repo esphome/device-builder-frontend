@@ -24,7 +24,7 @@ import {
 } from "../../../src/components/device/config-entry-renderers/primitives.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
-import { makeEmitCtx, makeRenderCtx } from "./_renderer-fixtures.js";
+import { findElementBindings, makeEmitCtx, makeRenderCtx } from "./_renderer-fixtures.js";
 
 function makeStringEntry(): ConfigEntry {
   return makeConfigEntry({
@@ -436,5 +436,45 @@ describe("renderBooleanField — bail on non-primitive", () => {
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
     expect(rendersBailBranch(json)).toBe(false);
     expect(json).toContain("wa-switch");
+  });
+
+  it("renders editable text for a substitution or junk string (no switch to clobber it)", () => {
+    for (const value of ["${my_mode}", "maybe"]) {
+      const { ctx } = makeCtx({ enabled: value });
+      const tpl = renderBooleanField(entry(), ["enabled"], ctx);
+      const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+      expect(rendersBailBranch(json)).toBe(false);
+      expect(json).not.toContain("wa-switch");
+      expect(json).toContain(value);
+    }
+  });
+
+  it("bails on a stray number under a boolean field", () => {
+    const { ctx } = makeCtx({ enabled: 1 });
+    const tpl = renderBooleanField(entry(), ["enabled"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+    expect(json).not.toContain("wa-switch");
+  });
+
+  it("coerces a corrected boolean spelling back to a real boolean on emit", () => {
+    const { ctx, emitChange } = makeCtx({ enabled: "${my_mode}" });
+    const tpl = renderBooleanField(entry(), ["enabled"], ctx);
+    const handler = findElementBindings(tpl, "input")[0]["@input"] as (
+      e: unknown
+    ) => void;
+    handler({ target: { value: "false" } });
+    expect(emitChange).toHaveBeenCalledWith(["enabled"], false);
+    handler({ target: { value: "maybe" } });
+    expect(emitChange).toHaveBeenCalledWith(["enabled"], "maybe");
+  });
+
+  it("keeps the switch for quoted boolean spellings and empty placeholder", () => {
+    for (const value of ["off", "Yes", ""]) {
+      const { ctx } = makeCtx({ enabled: value });
+      const tpl = renderBooleanField(entry(), ["enabled"], ctx);
+      const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+      expect(json).toContain("wa-switch");
+    }
   });
 });

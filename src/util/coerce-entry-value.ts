@@ -1,6 +1,7 @@
 import type { ConfigEntry } from "../api/types/config-entries.js";
 import { ConfigEntryType } from "../api/types/config-entries.js";
 import { coerceIntFieldValue } from "./int-input.js";
+import { parseYamlBoolean } from "./yaml-serialize.js";
 
 /**
  * Coerce a control's string value back to the entry's declared numeric
@@ -9,12 +10,19 @@ import { coerceIntFieldValue } from "./int-input.js";
  * validation (and the backend's locked-value compare) rejects it. INTEGER
  * goes through ``coerceIntFieldValue`` so a >2^53 decimal stays a string
  * (64-bit precision, #378/#944) and a ``0x…`` literal isn't truncated.
- * Non-numeric entries, an empty string, and unparseable input pass through
- * unchanged so the inline validator can flag them.
+ * BOOLEAN spellings coerce through ``parseYamlBoolean``. Other entries,
+ * an empty string, and unparseable input pass through unchanged so the
+ * inline validator can flag them.
  */
-export function coerceValueToEntryType(entry: ConfigEntry, raw: string): string | number {
+export function coerceValueToEntryType(
+  entry: ConfigEntry,
+  raw: string
+): string | number | boolean {
   if (entry.type === ConfigEntryType.INTEGER) return coerceIntFieldValue(raw);
   if (entry.type === ConfigEntryType.FLOAT) return coerceFloatFieldValue(raw);
+  // Boolean spellings emit as booleans so a corrected value serializes
+  // bare (`false`, not `"false"`); junk/substitutions ship verbatim.
+  if (entry.type === ConfigEntryType.BOOLEAN) return parseYamlBoolean(raw) ?? raw;
   return raw;
 }
 
