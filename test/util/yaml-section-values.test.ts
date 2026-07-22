@@ -2775,3 +2775,69 @@ describe("numeric list items parse as numbers (#1353)", () => {
     expect(after).not.toContain('position: "0"');
   });
 });
+
+describe("bare child keys — hand-typed `key:` with no value", () => {
+  // The device-builder#2271 repro shape: the user types a bare
+  // `rotation:` under a platform item, then fills the field in the
+  // structured editor. The parser must surface the key (as null, with
+  // a span) or the splice writer appends a second `rotation:` while
+  // the original line, outside every span, survives the splice.
+  const before =
+    "display:\n" +
+    "  - platform: mipi_rgb\n" +
+    "    model: GUITION-4848S040\n" +
+    "    rotation:\n";
+
+  it("parses a bare trailing child key as null", () => {
+    const from = firstListItemLine(before, "display");
+    expect(parseYamlSectionValues(before, "display", from)).toEqual({
+      platform: "mipi_rgb",
+      model: "GUITION-4848S040",
+      rotation: null,
+    });
+  });
+
+  it("fills the bare key in place instead of appending a duplicate", () => {
+    const from = firstListItemLine(before, "display");
+    const values = parseYamlSectionValues(before, "display", from);
+    values.rotation = 90;
+    const after = updateSectionInYaml(before, "display", values, from);
+    expect(after.match(/rotation:/g)).toHaveLength(1);
+    expect(after).toContain("rotation: 90");
+  });
+
+  it("keeps the bare key line verbatim when a sibling field changes", () => {
+    const from = firstListItemLine(before, "display");
+    const values = parseYamlSectionValues(before, "display", from);
+    values.model = "OTHER";
+    const after = updateSectionInYaml(before, "display", values, from);
+    expect(after).toContain("model: OTHER");
+    expect(after.match(/rotation:/g)).toHaveLength(1);
+    expect(after).toContain("\n    rotation:\n");
+  });
+
+  it("parses a bare key followed by a sibling key as null", () => {
+    const yaml = "wifi:\n  ssid:\n  password: x\n";
+    expect(parseYamlSectionValues(yaml, "wifi")).toEqual({
+      ssid: null,
+      password: "x",
+    });
+  });
+
+  it("fills a bare key that a sibling list item follows", () => {
+    const yaml =
+      "display:\n" +
+      "  - platform: mipi_rgb\n" +
+      "    rotation:\n" +
+      "  - platform: ili9xxx\n";
+    const from = firstListItemLine(yaml, "display");
+    const values = parseYamlSectionValues(yaml, "display", from);
+    expect(values).toEqual({ platform: "mipi_rgb", rotation: null });
+    values.rotation = 180;
+    const after = updateSectionInYaml(yaml, "display", values, from);
+    expect(after.match(/rotation:/g)).toHaveLength(1);
+    expect(after).toContain("rotation: 180");
+    // The second platform item is untouched and still follows the first.
+    expect(after.indexOf("rotation: 180")).toBeLessThan(after.indexOf("ili9xxx"));
+  });
+});
