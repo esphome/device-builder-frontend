@@ -23,13 +23,14 @@ import {
   parseBlockScalarHeader,
 } from "./yaml-section-lexer.js";
 
-/** Source fidelity for a block scalar list: each item's 0-indexed source
- *  line (into the same array the splice writer receives), its trailing
- *  inline comment (leading whitespace kept, "" when none), and the dash
- *  column the parse detected — so a per-item splice keeps unchanged rows
- *  verbatim and re-emits edited rows without re-deriving anything (#1363). */
+/** Source fidelity for a block list: each item's half-open 0-indexed
+ *  source-line range (into the same array the splice writer receives),
+ *  its trailing inline comment (scalar rows only; "" otherwise), and the
+ *  dash column the parse detected — so a per-item splice keeps unchanged
+ *  rows verbatim and re-emits edited rows without re-deriving anything
+ *  (#1363/#1379). */
 export interface ListItemSource {
-  itemLineIdxs: number[];
+  itemRanges: [number, number][];
   inlineComments: string[];
   dashIndent: string;
 }
@@ -42,11 +43,11 @@ export const collectBlockListItems = (
 ): {
   items: (string | number | boolean)[];
   endIdx: number;
-  itemLineIdxs: number[];
+  itemRanges: [number, number][];
   inlineComments: string[];
 } => {
   const items: (string | number | boolean)[] = [];
-  const itemLineIdxs: number[] = [];
+  const itemRanges: [number, number][] = [];
   const inlineComments: string[] = [];
   let j = startIdx;
   for (; j < lines.length; j++) {
@@ -59,10 +60,10 @@ export const collectBlockListItems = (
     // same rule as parseScalar (#1235).
     const { value: raw, comment } = splitInlineComment(m[1].trim());
     items.push(coerceYamlScalar(stripQuotes(raw), isQuotedScalar(raw)));
-    itemLineIdxs.push(j);
+    itemRanges.push([j, j + 1]);
     inlineComments.push(comment);
   }
-  return { items, endIdx: j, itemLineIdxs, inlineComments };
+  return { items, endIdx: j, itemRanges, inlineComments };
 };
 
 /**

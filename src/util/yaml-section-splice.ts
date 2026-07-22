@@ -13,6 +13,7 @@ import type { ListItemSource } from "./yaml-section-list.js";
 import {
   formatYamlFlowList,
   formatYamlScalar,
+  serializeListItem,
   serializeYamlValues,
   YamlRawValue,
   type SerializeYamlOptions,
@@ -122,7 +123,22 @@ export function buildSplicedBody(
       bodyLines.push(...lines.slice(span.leadStart, span.end));
       continue;
     }
+<<<<<<< HEAD
     const spliced = meta && spliceScalarList(lines, meta, old, val);
+=======
+    const spliced =
+      span &&
+      meta &&
+      spliceListItems(
+        lines,
+        span,
+        meta,
+        parsed.values[key],
+        val,
+        childIndent,
+        serializeOptions
+      );
+>>>>>>> 7b0f32f9 (Splice mapping lists per item so row comments survive edits)
     if (spliced) {
       bodyLines.push(...spliced);
       continue;
@@ -159,21 +175,29 @@ function flowListLine(
 const isScalarItem = (v: unknown): v is string | number | boolean =>
   isPrimitiveOrNullish(v) && v != null;
 
+// The item shapes the per-item splice can re-emit: scalars via the dash
+// line below, plain mappings via ``serializeListItem``. Anything else
+// (nulls, nested arrays) falls through to the full re-emit.
+const isSpliceableItem = (v: unknown): boolean => isScalarItem(v) || isPlainObject(v);
+
 /**
- * Per-item splice for a changed block scalar list (#1363): rows unchanged
+ * Per-item splice for a changed block list (#1363/#1379): rows unchanged
  * at the same position (longest common prefix + suffix) keep their source
  * lines — inline comments, preceding whole-line comments, exact quoting —
- * and only the middle re-emits. An in-place edit (equal lengths) also
- * re-attaches each edited row's own inline comment. Returns ``null`` when
- * the key isn't a block scalar list on both sides (caller falls through to
+ * and only the middle re-emits. An in-place edit (equal lengths) keeps each
+ * edited row's preceding whole-line comments, and a scalar row also
+ * re-attaches its own inline comment. Returns ``null`` when the key isn't
+ * a block list of spliceable items on both sides (caller falls through to
  * the full re-emit), or when the new list is empty (the re-emit path owns
  * the drop-the-key semantic).
  */
-function spliceScalarList(
+function spliceListItems(
   lines: string[],
   meta: KeyMeta,
   old: unknown,
-  val: unknown
+  val: unknown,
+  childIndent: string,
+  options: SerializeYamlOptions
 ): string[] | null {
   const { span, listSource: src } = meta;
   if (
@@ -182,27 +206,31 @@ function spliceScalarList(
     !Array.isArray(old) ||
     !Array.isArray(val) ||
     val.length === 0 ||
-    !old.every(isScalarItem) ||
-    !val.every(isScalarItem)
+    !old.every(isSpliceableItem) ||
+    !val.every(isSpliceableItem)
   ) {
     return null;
   }
   let prefix = 0;
-  while (prefix < old.length && prefix < val.length && old[prefix] === val[prefix]) {
+  while (
+    prefix < old.length &&
+    prefix < val.length &&
+    yamlValueEqual(old[prefix], val[prefix])
+  ) {
     prefix++;
   }
   let suffix = 0;
   while (
     suffix < old.length - prefix &&
     suffix < val.length - prefix &&
-    old[old.length - 1 - suffix] === val[val.length - 1 - suffix]
+    yamlValueEqual(old[old.length - 1 - suffix], val[val.length - 1 - suffix])
   ) {
     suffix++;
   }
-  const { itemLineIdxs: idxs, inlineComments, dashIndent } = src;
-  // Each row's group runs from just past the previous row's line (the key
-  // line for the first row), carrying the whole-line comments above it.
-  const groupStart = (i: number): number => (i === 0 ? span.start + 1 : idxs[i - 1] + 1);
+  const { itemRanges: ranges, inlineComments, dashIndent } = src;
+  // Each row's group runs from just past the previous row's last line (the
+  // key line for the first row), carrying the whole-line comments above it.
+  const groupStart = (i: number): number => (i === 0 ? span.start + 1 : ranges[i - 1][1]);
   const inPlace = old.length === val.length;
   const out: string[] = [];
   // Groups tile contiguously, so the lead + key line + prefix rows are one
@@ -211,19 +239,25 @@ function spliceScalarList(
   out.push(...lines.slice(span.leadStart, groupStart(prefix)));
   for (let k = prefix; k < val.length - suffix; k++) {
     // A row unchanged between two edits keeps its bytes; an in-place edit
-    // keeps the row's preceding comments and re-attaches its inline
-    // comment — deliberately, even when the comment described the old
-    // value: row comments label the row's role far more often than its
-    // literal value. With add/remove the middle alignment is ambiguous,
-    // so new middle rows emit plain.
-    if (inPlace && old[k] === val[k]) {
-      out.push(...lines.slice(groupStart(k), idxs[k] + 1));
+    // keeps the row's preceding comments and re-attaches a scalar row's
+    // inline comment — deliberately, even when the comment described the
+    // old value: row comments label the row's role far more often than
+    // its literal value. With add/remove the middle alignment is
+    // ambiguous, so new middle rows emit plain.
+    if (inPlace && yamlValueEqual(old[k], val[k])) {
+      out.push(...lines.slice(groupStart(k), ranges[k][1]));
       continue;
     }
-    if (inPlace) out.push(...lines.slice(groupStart(k), idxs[k]));
-    out.push(
-      `${dashIndent}- ${formatYamlScalar(val[k])}${inPlace ? inlineComments[k] : ""}`
-    );
+    if (inPlace) out.push(...lines.slice(groupStart(k), ranges[k][0]));
+    if (isScalarItem(val[k])) {
+      out.push(
+        `${dashIndent}- ${formatYamlScalar(val[k])}${inPlace ? inlineComments[k] : ""}`
+      );
+    } else {
+      // A changed mapping row re-emits canonically; its own comments are
+      // unknowable per field. The unchanged rows' bytes are the win.
+      out.push(...serializeListItem(val[k], childIndent, options));
+    }
   }
   out.push(...lines.slice(groupStart(old.length - suffix), span.end));
   return out;
