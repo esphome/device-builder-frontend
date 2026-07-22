@@ -11,7 +11,7 @@ import {
 import { parseFloatWithUnit } from "./float-with-unit.js";
 import { parseHexInt } from "./hex-int.js";
 import { parseIntInput } from "./int-input.js";
-import { asMappingList, asRecord } from "./nested-values.js";
+import { asMappingList, asRecord, isPrimitiveOrNullish } from "./nested-values.js";
 import { isSecretRef } from "./secret-ref.js";
 import { isSubstitutionString, looksLikeSubstitution } from "./substitutions.js";
 import { YamlRawValue } from "./yaml-serialize.js";
@@ -483,27 +483,27 @@ function _validateEntriesRecursive(
     // parsing, ranges, options, the ${var} skip) with an array-index
     // path segment, so one bad row doesn't paint its siblings. The whole
     // array must never reach validateEntry — it stringifies to "3,5" and
-    // every multi-item numeric list flags not_a_number (#1348). An empty
-    // or blank row is mid-edit, not an error. Non-array values (a bare
-    // scalar cv.ensure_list accepts, an unset field, a YamlRawValue
-    // block) keep the generic field-level path below.
-    if (entry.multi_value && Array.isArray(values[entry.key])) {
-      const items = values[entry.key] as readonly unknown[];
-      if (items.length === 0) {
-        if (entry.required) {
-          const fullPath = [...pathPrefix, entry.key].join(".");
-          errors.set(fullPath, { key: fullPath, code: "validation.required" });
-        }
-        continue;
+    // every multi-item numeric list flags not_a_number (#1348). A blank
+    // row is mid-edit, not an error. An empty list and non-array values
+    // (a bare scalar cv.ensure_list accepts, an unset field, a
+    // YamlRawValue block) keep the generic field-level path below, so
+    // required-empty and the hidden-field rule stay validateEntry's.
+    const list: unknown = values[entry.key];
+    if (entry.multi_value && Array.isArray(list) && list.length > 0) {
+      // A list-of-dicts the schema bundle couldn't type as nested renders
+      // YAML-only (the renderer's whole-field bail); per-item scalar
+      // checks would flag rows the form never shows. ESPHome's own
+      // validate_yaml owns those, same as MAP values.
+      if (list.every(isPrimitiveOrNullish)) {
+        list.forEach((item, idx) => {
+          if (!isValuePresent(item)) return;
+          const err = validateEntry(entry, item);
+          if (err) {
+            const fullPath = [...pathPrefix, entry.key, String(idx)].join(".");
+            errors.set(fullPath, { ...err, key: fullPath });
+          }
+        });
       }
-      items.forEach((item, idx) => {
-        if (!isValuePresent(item)) return;
-        const err = validateEntry(entry, item);
-        if (err) {
-          const fullPath = [...pathPrefix, entry.key, String(idx)].join(".");
-          errors.set(fullPath, { ...err, key: fullPath });
-        }
-      });
       continue;
     }
 

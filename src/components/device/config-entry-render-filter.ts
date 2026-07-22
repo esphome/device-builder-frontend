@@ -303,6 +303,14 @@ export function collectRenderablePaths(
       out.add([...pathPrefix, entry.key].join("."));
       continue;
     }
+    // Scalar multi_value errors are keyed per item (``codes.0``, #1348);
+    // emit the index paths of the rendered rows so those errors count as
+    // visible too.
+    if (entry.multi_value && Array.isArray(values[entry.key])) {
+      (values[entry.key] as unknown[]).forEach((_item, idx) => {
+        out.add([...pathPrefix, entry.key, String(idx)].join("."));
+      });
+    }
     out.add([...pathPrefix, entry.key].join("."));
   }
   return out;

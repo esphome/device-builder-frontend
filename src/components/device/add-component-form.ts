@@ -461,15 +461,21 @@ export class ESPHomeAddComponentForm extends LitElement {
   private _onValueChange(e: CustomEvent<ConfigEntryValueChange>) {
     const { path, value } = e.detail;
     this._values = setIn(this._values, path, value);
-    // Clear any error on the path the user just edited so the
-    // red ring disappears as they type. Same for the
+    // Clear any error on the path the user just edited — including
+    // per-item keys under it (``codes.0``, #1348): a multi_value edit
+    // emits the whole array at the field path, so the offending row's
+    // error would otherwise stick until the next submit. Same for the
     // hidden-validation block message: any user input is a fresh
     // signal that supersedes the previous bail; the next submit
     // attempt re-evaluates from scratch.
     const errKey = path.join(".");
-    if (this._errors.has(errKey)) {
+    const itemPrefix = `${errKey}.`;
+    const stale = [...this._errors.keys()].filter(
+      (k) => k === errKey || k.startsWith(itemPrefix)
+    );
+    if (stale.length > 0) {
       const next = new Map(this._errors);
-      next.delete(errKey);
+      for (const k of stale) next.delete(k);
       this._errors = next;
     }
     if (this._localBlockMessage) this._localBlockMessage = "";

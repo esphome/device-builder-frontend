@@ -858,3 +858,26 @@ describe("validateEntries — scalar multi_value lists (#1348)", () => {
     expect(validateEntries([required], { codes: [3, ""] }).size).toBe(0);
   });
 });
+
+describe("validateEntries — multi_value lists the form can't itemize", () => {
+  it("skips per-item checks for a list of mappings (YAML-only shape)", () => {
+    const entry = makeEntry({
+      key: "segments",
+      type: ConfigEntryType.INTEGER,
+      multi_value: true,
+    });
+    const errors = validateEntries([entry], { segments: [{ from: 1 }, { from: 2 }] });
+    expect(errors.size).toBe(0);
+  });
+
+  it("honours the hidden-field rule for an empty required list", () => {
+    const entry = makeEntry({
+      key: "codes",
+      type: ConfigEntryType.INTEGER,
+      multi_value: true,
+      required: true,
+      hidden: true,
+    });
+    expect(validateEntries([entry], { codes: [] }).size).toBe(0);
+  });
+});

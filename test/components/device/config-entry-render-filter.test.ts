@@ -944,3 +944,17 @@ describe("renderFilterOptions board-implied variant seeding", () => {
     expect(sramVisible(source({ board: null, values: { variant: "ESP32" } }))).toBe(true);
   });
 });
+
+describe("collectRenderablePaths — scalar multi_value index paths (#1348)", () => {
+  it("emits an index path per rendered row so per-item errors count as visible", () => {
+    const entries = [
+      makeEntry({ key: "codes", type: ConfigEntryType.INTEGER, multi_value: true }),
+    ];
+    const paths = collectRenderablePaths(
+      entries,
+      { codes: [3, "abc"] },
+      { requiredOnly: false, showAdvanced: false }
+    );
+    expect([...paths].sort()).toEqual(["codes", "codes.0", "codes.1"]);
+  });
+});
