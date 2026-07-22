@@ -33,4 +33,12 @@ describe("renderNestedField — scalar value", () => {
     expect(findTemplatesByAnchor(tpl, "nested-toggle")).not.toHaveLength(0);
     expect(findTemplatesByAnchor(tpl, "field-description")).toHaveLength(0);
   });
+
+  it("renders the flag group for a cleared (empty-string) value, not the notice", () => {
+    // Clearing the shorthand text field leaves "" in the form values; the
+    // notice would strand the group read-only until reload (#1373).
+    const tpl = renderNestedField(modeEntry(), ["mode"], makeRenderCtx({ mode: "" }));
+    expect(findTemplatesByAnchor(tpl, "nested-toggle")).not.toHaveLength(0);
+    expect(findTemplatesByAnchor(tpl, "field-description")).toHaveLength(0);
+  });
 });
