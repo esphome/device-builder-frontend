@@ -88,6 +88,31 @@ function emitYamlRawValueLines(key: string, indent: string, raw: YamlRawValue): 
  * reference through ``{...obj}`` spread, so the class identity
  * survives form mutations.
  */
+/**
+ * A flow-authored scalar list inside a nested mapping or list-item field
+ * (``data: [1, 2] # note``), so a sibling-field edit re-emits the same
+ * single flow line with its trailing comment (#1381). An ``Array``
+ * subclass so every array consumer works unchanged; a form edit of the
+ * list itself writes a plain array back, which re-emits canonically.
+ */
+export class YamlFlowList extends Array<string | number | boolean> {
+  // Non-enumerable (set in ``wrap``) so deep-equality, JSON, and spreads
+  // see a plain array of items; only the serializer reads it.
+  declare comment: string | undefined;
+
+  /** ``new Array(n)`` semantics make the constructor a trap; build via
+   *  push instead. */
+  static wrap(
+    items: readonly (string | number | boolean)[],
+    comment: string
+  ): YamlFlowList {
+    const list = new YamlFlowList();
+    list.push(...items);
+    Object.defineProperty(list, "comment", { value: comment, enumerable: false });
+    return list;
+  }
+}
+
 export class YamlRawValue {
   constructor(
     public readonly lines: readonly string[],
@@ -274,7 +299,8 @@ export function serializeListItem(
           (it) => !isPlainObject(it) && !Array.isArray(it) && !isLambdaValue(it)
         );
         if (scalarItems) {
-          lines.push(`${prefix}${k}: ${formatYamlFlowList(v)}`);
+          const comment = v instanceof YamlFlowList ? (v.comment ?? "") : "";
+          lines.push(`${prefix}${k}: ${formatYamlFlowList(v)}${comment}`);
           return;
         }
         lines.push(`${prefix}${k}:`);
@@ -358,6 +384,10 @@ export function serializeYamlValues(
     }
     if (Array.isArray(val)) {
       if (val.length === 0) continue;
+      if (val instanceof YamlFlowList) {
+        lines.push(`${indent}${key}: ${formatYamlFlowList(val)}${val.comment ?? ""}`);
+        continue;
+      }
       lines.push(`${indent}${key}:`);
       for (const item of val) {
         const itemLines = serializeListItem(item, indent, options);

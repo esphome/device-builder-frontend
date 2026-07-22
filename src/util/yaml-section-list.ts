@@ -22,6 +22,7 @@ import {
   LIST_ITEM_DICT_KEY_RE,
   parseBlockScalarHeader,
 } from "./yaml-section-lexer.js";
+import { YamlFlowList } from "./yaml-serialize.js";
 
 /** Source fidelity for a block list: each item's half-open 0-indexed
  *  source-line range (into the same array the splice writer receives),
@@ -122,10 +123,10 @@ export const parseFlatMappingField = (
   // section editor instead of falling back to YamlRawValue. #941. The
   // comment is also stripped before the ``[...]`` test so a flow list
   // with a trailing comment still reads as an array (device-builder#1232).
-  const { value: scalar } = splitTrimmedInlineComment(raw);
+  const { value: scalar, comment } = splitTrimmedInlineComment(raw);
   if (scalar === "") return { key, value: null };
   if (scalar.startsWith("[") && scalar.endsWith("]")) {
-    return { key, value: parseFlowList(scalar) };
+    return { key, value: YamlFlowList.wrap(parseFlowList(scalar), comment) };
   }
   return { key, value: parseScalar(scalar) };
 };

@@ -38,7 +38,7 @@ import {
   type ListItemSource,
   parseFlatMappingField,
 } from "./yaml-section-list.js";
-import { YamlRawValue } from "./yaml-serialize.js";
+import { YamlFlowList, YamlRawValue } from "./yaml-serialize.js";
 
 /**
  * Dispatch a YAML list block (``key:\n  - …``) into the right
@@ -406,7 +406,7 @@ function parseNestedBlock(
     // ``key: # note`` is an empty value, #1385) and the bracket test —
     // without the latter ``key: [1, 2] # note`` misses the flow branch
     // and degrades to the literal string "[1, 2]".
-    const { value: scalar } = splitTrimmedInlineComment(raw);
+    const { value: scalar, comment } = splitTrimmedInlineComment(raw);
     if (scalar === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
       // ``key:`` followed by a block list. Accept both the standard
@@ -437,7 +437,7 @@ function parseNestedBlock(
     }
 
     if (scalar.startsWith("[") && scalar.endsWith("]")) {
-      values[key] = parseFlowList(scalar);
+      values[key] = YamlFlowList.wrap(parseFlowList(scalar), comment);
     } else {
       values[key] = parseScalar(scalar);
     }
