@@ -42,9 +42,20 @@ describe("renderFloatWithUnitField — magnitude commit", () => {
     expect(emitChange).toHaveBeenLastCalledWith(["frequency"], "");
   });
 
-  it("ships non-finite input verbatim instead of clearing", () => {
+  it("ships non-finite input verbatim with the picked unit instead of clearing", () => {
     const { ctx, emitChange } = makeEmitCtx({ frequency: "50kHz" });
     fireInput(renderFloatWithUnitField(withUnitEntry(), ["frequency"], ctx), "1e309");
-    expect(emitChange).toHaveBeenCalledWith(["frequency"], "1e309");
+    expect(emitChange).toHaveBeenCalledWith(["frequency"], "1e309kHz");
+  });
+
+  it("keeps the unit across a junk intermediate and its correction", () => {
+    // "50kHz" → mid-edit "1e" stores "1ekHz"; the corrective keystroke
+    // must serialize back to kHz, not snap to the canonical Hz.
+    const { ctx, emitChange } = makeEmitCtx(
+      { frequency: "1ekHz" },
+      { getEditingMagnitude: () => "1e" }
+    );
+    fireInput(renderFloatWithUnitField(withUnitEntry(), ["frequency"], ctx), "75");
+    expect(emitChange).toHaveBeenCalledWith(["frequency"], "75kHz");
   });
 });

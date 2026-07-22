@@ -336,7 +336,10 @@ export function renderFloatWithUnitField(
             } else {
               // Non-finite input ships verbatim so the validator flags it
               // instead of the serializer silently clearing the value (#1365).
-              ctx.emitChange(path, next);
+              // The picked unit rides along: parseFloatWithUnit falls back to
+              // the canonical unit on junk, so a bare "1e" would snap a kHz
+              // field to Hz for the corrective keystroke that follows.
+              ctx.emitChange(path, next + unit);
             }
           }}
           @blur=${() => ctx.clearEditingMagnitude(path)}
