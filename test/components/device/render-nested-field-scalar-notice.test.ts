@@ -1,7 +1,8 @@
 /**
- * A scalar at a NESTED key (a shorthand the visual editor can't model
- * with its flag group, e.g. a pin ``mode: OUTPUT``) renders as a
- * read-only notice showing the value, not an empty collapsible group.
+ * A non-empty scalar at a NESTED key (a shorthand the visual editor
+ * can't model with its flag group, e.g. a pin ``mode: OUTPUT``) renders
+ * as a read-only notice showing the value, not an empty collapsible
+ * group; a cleared "" falls through to the group.
  */
 import { describe, expect, it } from "vitest";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
@@ -35,8 +36,6 @@ describe("renderNestedField — scalar value", () => {
   });
 
   it("renders the flag group for a cleared (empty-string) value, not the notice", () => {
-    // Clearing the shorthand text field leaves "" in the form values; the
-    // notice would strand the group read-only until reload (#1373).
     const tpl = renderNestedField(modeEntry(), ["mode"], makeRenderCtx({ mode: "" }));
     expect(findTemplatesByAnchor(tpl, "nested-toggle")).not.toHaveLength(0);
     expect(findTemplatesByAnchor(tpl, "field-description")).toHaveLength(0);
