@@ -3105,6 +3105,129 @@ describe("updateSectionInYaml — mapping-list rows keep comments on edit (#1379
     expect(after).toContain("    - ssid: iot\n");
   });
 
+  it("keeps a sandwiched unchanged mapping row byte-identical between two edited rows", () => {
+    const three = [
+      "wifi:",
+      "  networks:",
+      "    - ssid: alpha",
+      "      password: aaa",
+      "    # beta stays",
+      "    - ssid: beta #vip",
+      "      password: bbb",
+      "    - ssid: gamma",
+      "      password: ccc",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(three, "wifi", 1);
+    const nets = values.networks as Record<string, unknown>[];
+    nets[0].password = "aaa2";
+    nets[2].password = "ccc2";
+    const after = updateSectionInYaml(three, "wifi", values, 1);
+    expect(after).toContain(
+      "    # beta stays\n    - ssid: beta #vip\n      password: bbb\n"
+    );
+    expect(after).toContain("password: aaa2");
+    expect(after).toContain("password: ccc2");
+  });
+
+  it("keeps a comment between the key line and the first row through a first-row edit", () => {
+    const led = [
+      "wifi:",
+      "  networks:",
+      "    # primary first",
+      "    - ssid: homenet",
+      "      password: hunter2",
+      "    - ssid: guestnet",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(led, "wifi", 1);
+    (values.networks as Record<string, unknown>[])[0].password = "changed";
+    const after = updateSectionInYaml(led, "wifi", values, 1);
+    expect(after).toContain("  networks:\n    # primary first\n");
+    expect(after).toContain("password: changed");
+    expect(after).toContain("- ssid: guestnet");
+  });
+
+  it("keeps a trailing comment after the last row through a last-row edit", () => {
+    const trail = [
+      "wifi:",
+      "  networks:",
+      "    - ssid: homenet",
+      "      password: hunter2",
+      "    - ssid: guestnet",
+      "      password: opensesame",
+      "    # end of networks",
+      "  domain: .local",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(trail, "wifi", 1);
+    (values.networks as Record<string, unknown>[])[1].password = "changed";
+    const after = updateSectionInYaml(trail, "wifi", values, 1);
+    expect(after).toContain("password: changed");
+    expect(after).toContain("    # end of networks\n  domain: .local");
+    expect(after).toContain("- ssid: homenet\n      password: hunter2");
+  });
+
+  it("keeps a blank line between rows through a sibling edit", () => {
+    const blanky = [
+      "wifi:",
+      "  networks:",
+      "    - ssid: homenet",
+      "",
+      "    - ssid: guestnet #open",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(blanky, "wifi", 1);
+    (values.networks as Record<string, unknown>[])[0].ssid = "homenet2";
+    const after = updateSectionInYaml(blanky, "wifi", values, 1);
+    expect(after).toContain("- ssid: homenet2\n\n    - ssid: guestnet #open\n");
+  });
+
+  it("keeps an unchanged row with a lambda field verbatim through a sibling edit", () => {
+    const lam = [
+      "sensor:",
+      "  filters:",
+      "    - offset: 1.5 #cal",
+      "    - lambda: !lambda |-",
+      "        return x * 2;",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(lam, "sensor", 1);
+    (values.filters as Record<string, unknown>[])[0].offset = 2.5;
+    const after = updateSectionInYaml(lam, "sensor", values, 1);
+    expect(after).toContain("offset: 2.5");
+    expect(after).toContain("    - lambda: !lambda |-\n        return x * 2;\n");
+  });
+
+  it("keeps outer rows verbatim when the middle row of three is removed", () => {
+    const three = [
+      "wifi:",
+      "  networks:",
+      "    - ssid: alpha #one",
+      "      password: aaa",
+      "    - ssid: beta",
+      "      password: bbb",
+      "    - ssid: gamma #three",
+      "      password: ccc",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(three, "wifi", 1);
+    const nets = values.networks as Record<string, unknown>[];
+    values.networks = [nets[0], nets[2]];
+    const after = updateSectionInYaml(three, "wifi", values, 1);
+    expect(after).toContain("    - ssid: alpha #one\n      password: aaa\n");
+    expect(after).toContain("    - ssid: gamma #three\n      password: ccc\n");
+    expect(after).not.toContain("beta");
+  });
+
+  it("re-emits a row replaced in place by a scalar without touching siblings", () => {
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    (values.networks as unknown[])[1] = "guest-preset";
+    const after = updateSectionInYaml(yaml, "wifi", values, 1);
+    expect(after).toContain("    - ssid: homenet #primary\n      password: hunter2\n");
+    expect(after).toContain("- guest-preset");
+  });
+
   it("falls back to a consistent full re-emit when the dash column is non-canonical", () => {
     // Compact same-column dashes: a spliced mapping row would land two
     // columns deeper than its verbatim siblings, so the splice bails.
