@@ -60,4 +60,12 @@ describe("esphome-web-header switch target", () => {
 
     expect(el.shadowRoot!.querySelector(".switch-btn")).toBeNull();
   });
+
+  // The kebab stays in minimal mode on purpose: a flash failure in the
+  // receiver popup is exactly when a user needs the report-issue link.
+  it("keeps the kebab in minimal (flash-receiver) mode", async () => {
+    const el = await mount("esp", true);
+
+    expect(el.shadowRoot!.querySelector("esphome-web-header-actions")).not.toBeNull();
+  });
 });
