@@ -107,19 +107,20 @@ export const isQuotedScalar = (s: string): boolean =>
 
 /**
  * A list item's parsed value: unquoted plain decimals become numbers and
- * bare ``true``/``false`` become booleans, so the serializer re-emits
+ * truthy/falsy spellings become booleans (``parseYamlBoolean``, the same
+ * rule ``parseScalar`` applies to fields), so the serializer re-emits
  * them bare — string-typed ``10`` would re-quote every sibling when the
- * list re-serializes (#1353). A >2^53 decimal stays a string (Number()
- * would silently rewrite the digits, #378/#944); other YAML truthy
- * spellings (``on``/``yes``) stay strings so the authored form survives.
+ * list re-serializes (#1353), and a string ``on`` would re-emit quoted
+ * where the loader had read a boolean. A >2^53 decimal stays a string
+ * (Number() would silently rewrite the digits, #378/#944).
  */
 export const coerceListScalar = (
   text: string,
   wasQuoted: boolean
 ): string | number | boolean => {
   if (wasQuoted) return text;
-  if (text === "true") return true;
-  if (text === "false") return false;
+  const bool = parseYamlBoolean(text);
+  if (bool !== null) return bool;
   if (PLAIN_INT_RE.test(text)) {
     const n = Number(text);
     return Number.isSafeInteger(n) ? n : text;

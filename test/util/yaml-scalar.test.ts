@@ -219,12 +219,15 @@ describe("coerceListScalar via parseFlowList (#1353)", () => {
     ]);
   });
 
-  it("coerces bare true/false but keeps other truthy spellings", () => {
-    expect(parseFlowList("[true, false, on, yes, 'true']")).toEqual([
+  it("coerces every YAML boolean spelling; quotes keep strings", () => {
+    // Same rule parseScalar applies to fields: a bare ``on`` is a boolean
+    // to the loader, so keeping it a string re-emits it quoted and
+    // changes the loaded type.
+    expect(parseFlowList("[true, FALSE, on, yes, 'true']")).toEqual([
       true,
       false,
-      "on",
-      "yes",
+      true,
+      true,
       "true",
     ]);
   });
