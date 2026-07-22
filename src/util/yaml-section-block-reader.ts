@@ -14,7 +14,7 @@ import {
   isEditableLambdaBlock,
   lambdaValueFromBlock,
 } from "./yaml-block-scalar-value.js";
-import { parseFlowList, parseScalar } from "./yaml-scalar.js";
+import { parseFlowList, parseScalar, splitInlineComment } from "./yaml-scalar.js";
 import {
   _detectListItemChildIndent,
   _leadingIndent,
@@ -401,8 +401,12 @@ function parseNestedBlock(
       continue;
     }
 
-    if (raw.startsWith("[") && raw.endsWith("]")) {
-      values[key] = parseFlowList(raw);
+    // Strip a trailing line comment before the bracket test — the other
+    // flow-list sites do, and without it ``key: [1, 2] # note`` misses
+    // the flow branch and degrades to the literal string "[1, 2]".
+    const { value: scalar } = splitInlineComment(raw);
+    if (scalar.startsWith("[") && scalar.endsWith("]")) {
+      values[key] = parseFlowList(scalar);
     } else {
       values[key] = parseScalar(raw);
     }

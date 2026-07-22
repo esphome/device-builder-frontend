@@ -2740,6 +2740,16 @@ describe("numeric list items parse as numbers (#1353)", () => {
     - "6" # quoted
 `;
     expect(parseYamlSectionValues(commented, "wifi").channels).toEqual([10, "6"]);
+
+    // Nested-block flow lists strip the trailing line comment before the
+    // bracket test — without it the value degraded to the string "[1, 2]".
+    const nestedFlow = `mysect:
+  sub:
+    vals: [1, 2] # note
+`;
+    expect(parseYamlSectionValues(nestedFlow, "mysect").sub).toEqual({
+      vals: [1, 2],
+    });
   });
 
   it("re-emits sibling numerics bare when one flow-list item changes", () => {
