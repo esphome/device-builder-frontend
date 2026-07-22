@@ -2835,6 +2835,31 @@ describe("bare child keys — hand-typed `key:` with no value", () => {
     expect(after).toContain("password: y");
   });
 
+  it("keeps a comment under a bare key when the key itself is filled", () => {
+    // The deeper comment is not part of the bare key's span (the
+    // nested-block peek skips comment lines), so filling the key
+    // rewrites only the key line and the note survives.
+    const yaml = "wifi:\n  ssid:\n    # note\n  password: x\n";
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values).toEqual({ ssid: null, password: "x" });
+    values.ssid = 1;
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after.match(/ssid:/g)).toHaveLength(1);
+    expect(after).toContain("ssid: 1");
+    expect(after).toContain("# note");
+  });
+
+  it("keeps a trailing comment under a bare key filled at section end", () => {
+    const yaml = "wifi:\n  ssid:\n    # note\n";
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values).toEqual({ ssid: null });
+    values.ssid = 1;
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after.match(/ssid:/g)).toHaveLength(1);
+    expect(after).toContain("ssid: 1");
+    expect(after).toContain("# note");
+  });
+
   it("parses a bare key over an unreadable deeper block as null", () => {
     // A deeper line the child regex can't read (quoted key) parses to a
     // zero-key nested block; the key records null with a span over the
