@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderMultiValueField } from "../../../src/components/device/config-entry-renderers.js";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 function fireInput(binding: Record<string, unknown>, value: string): void {
@@ -100,5 +101,39 @@ describe("renderMultiValueField numeric substitution rows", () => {
 
     fireInput(inputs[1], "7");
     expect(ctx.emitChange).toHaveBeenCalledWith(["field"], ["${ch}", 7]);
+  });
+});
+
+describe("renderMultiValueField per-row errors", () => {
+  // #1348: item errors land at ``field.<idx>``; only the offending row is
+  // flagged and explained, siblings stay clean. The class binding is
+  // mid-attribute (walker skips it by name), so assert on each row
+  // template's expression values.
+  const rowsOf = (tpl: unknown) => findTemplatesByAnchor(tpl, "multi-row");
+
+  it("flags and explains only the row whose path carries the error", () => {
+    const ctx = makeRenderCtx({ field: ["abc", 5] });
+    ctx.errorAt = (path: string[]) =>
+      path.join(".") === "field.0"
+        ? { key: "field.0", code: "validation.not_a_number" }
+        : null;
+    const tpl = renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["field"], ctx);
+    const rows = rowsOf(tpl);
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0].values).toContain("invalid");
+    expect(rows[1].values).not.toContain("invalid");
+    expect(JSON.stringify(rows[0].values)).toContain("validation.not_a_number");
+  });
+
+  it("a field-level error still paints every row", () => {
+    const ctx = makeRenderCtx({ field: [1, 2] });
+    ctx.errorAt = (path: string[]) =>
+      path.join(".") === "field" ? { key: "field", code: "validation.required" } : null;
+    const tpl = renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["field"], ctx);
+    const rows = rowsOf(tpl);
+
+    expect(rows[0].values).toContain("invalid");
+    expect(rows[1].values).toContain("invalid");
   });
 });

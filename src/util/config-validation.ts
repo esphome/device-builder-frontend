@@ -478,6 +478,35 @@ function _validateEntriesRecursive(
       continue;
     }
 
+    // A scalar multi_value list validates per item, mirroring the NESTED
+    // item walk above: each item gets the full scalar rulebook (numeric
+    // parsing, ranges, options, the ${var} skip) with an array-index
+    // path segment, so one bad row doesn't paint its siblings. The whole
+    // array must never reach validateEntry — it stringifies to "3,5" and
+    // every multi-item numeric list flags not_a_number (#1348). An empty
+    // or blank row is mid-edit, not an error. Non-array values (a bare
+    // scalar cv.ensure_list accepts, an unset field, a YamlRawValue
+    // block) keep the generic field-level path below.
+    if (entry.multi_value && Array.isArray(values[entry.key])) {
+      const items = values[entry.key] as readonly unknown[];
+      if (items.length === 0) {
+        if (entry.required) {
+          const fullPath = [...pathPrefix, entry.key].join(".");
+          errors.set(fullPath, { key: fullPath, code: "validation.required" });
+        }
+        continue;
+      }
+      items.forEach((item, idx) => {
+        if (!isValuePresent(item)) return;
+        const err = validateEntry(entry, item);
+        if (err) {
+          const fullPath = [...pathPrefix, entry.key, String(idx)].join(".");
+          errors.set(fullPath, { ...err, key: fullPath });
+        }
+      });
+      continue;
+    }
+
     // Optional defaults aren't sent to the backend (``_coerceFields``
     // strips empties from the API payload), so validating against
     // them is wrong by design — only fall back to ``default_value``

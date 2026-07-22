@@ -143,6 +143,11 @@ export function renderMultiValueField(
         // A ${var} item can't drive a number input (the browser blanks a
         // non-numeric value); edit it as text so the reference round-trips.
         const rowNumeric = numeric && !isSubstitutionString(raw[i]);
+        // Errors land per item (``field.0``, #1348); flag and explain only
+        // the offending row. The field-level ``invalid`` stays for errors
+        // keyed at the field itself (required-empty).
+        const rowPath = [...path, String(i)];
+        const rowInvalid = invalid || ctx.errorAt(rowPath) !== null;
         return html`
           <div class="multi-row">
             <div class="multi-value-cell">
@@ -155,7 +160,7 @@ export function renderMultiValueField(
                       : "1"
                     : nothing
                 }
-                class="multi-input ${invalid ? "invalid" : ""}"
+                class="multi-input ${rowInvalid ? "invalid" : ""}"
                 .value=${item}
                 ?disabled=${disabled}
                 @input=${(e: Event) => updateAt(i, (e.target as HTMLInputElement).value)}
@@ -169,6 +174,7 @@ export function renderMultiValueField(
                   ctx.localize
                 )
               }
+              ${renderFieldError(rowPath, ctx)}
             </div>
             ${renderListRemoveButton(ctx, disabled, () => removeAt(i))}
           </div>

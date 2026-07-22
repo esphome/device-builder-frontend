@@ -815,3 +815,46 @@ describe("platformSupported", () => {
     expect(platformSupported(["esp32", "esp8266"], "esp8266")).toBe(true);
   });
 });
+
+describe("validateEntries — scalar multi_value lists (#1348)", () => {
+  const intList = (extra: Record<string, unknown> = {}) =>
+    makeEntry({
+      key: "codes",
+      type: ConfigEntryType.INTEGER,
+      multi_value: true,
+      ...extra,
+    });
+
+  it("passes a list of valid integers", () => {
+    expect(validateEntries([intList()], { codes: [3, 5] }).size).toBe(0);
+  });
+
+  it("flags only the offending item, keyed by index", () => {
+    const errors = validateEntries([intList()], { codes: ["abc", 5] });
+    expect(errors.size).toBe(1);
+    expect(errors.get("codes.0")?.code).toBe("validation.not_a_number");
+  });
+
+  it("skips a ${var} item (resolves at build time)", () => {
+    expect(validateEntries([intList()], { codes: ["${ch}", 5] }).size).toBe(0);
+  });
+
+  it("range-checks per item", () => {
+    const errors = validateEntries([intList({ range: [0, 31] })], { codes: [10, 300] });
+    expect(errors.get("codes.1")?.code).toBe("validation.max");
+    expect(errors.has("codes.0")).toBe(false);
+  });
+
+  it("flags a bad single-item list (String([v]) no longer masks the walk)", () => {
+    const errors = validateEntries([intList()], { codes: ["abc"] });
+    expect(errors.get("codes.0")?.code).toBe("validation.not_a_number");
+  });
+
+  it("keeps required-empty at the field path and skips blank rows", () => {
+    const required = intList({ required: true });
+    expect(validateEntries([required], { codes: [] }).get("codes")?.code).toBe(
+      "validation.required"
+    );
+    expect(validateEntries([required], { codes: [3, ""] }).size).toBe(0);
+  });
+});
