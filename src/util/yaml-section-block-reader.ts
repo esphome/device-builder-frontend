@@ -43,8 +43,8 @@ import { YamlRawValue } from "./yaml-serialize.js";
  * Dispatch a YAML list block (``key:\n  - …``) into the right
  * value shape: structured array of mappings for editor-friendly
  * lists (``esphome.devices`` / ``esphome.areas``), ``YamlRawValue``
- * for complex automation triggers, or scalar items (numbers /
- * strings) for scalar lists. Shared between the top-level and nested-block parsers
+ * for complex automation triggers, or scalar items (numbers,
+ * booleans, strings) for scalar lists. Shared between the top-level and nested-block parsers
  * so both surfaces agree on the dispatch.
  *
  * ``parentIndent`` is the indent of the parent KEY (the one whose
