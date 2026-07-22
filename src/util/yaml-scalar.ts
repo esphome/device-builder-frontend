@@ -100,8 +100,8 @@ export const parseScalar = (raw: string): unknown => {
 // quoting, so must match every form the loader re-types) and int-input's
 // DECIMAL_INT_RE (form input, leading zeros fine): coerce only what
 // Number() provably reads the same as the loader.
-const PLAIN_INT_RE = /^-?(?:0|[1-9]\d*)$/;
-const PLAIN_FLOAT_RE = /^-?(?:(?:0|[1-9]\d*)\.\d+|\.\d+)$/;
+const PLAIN_INT_RE = /^[-+]?(?:0|[1-9]\d*)$/;
+const PLAIN_FLOAT_RE = /^[-+]?(?:(?:0|[1-9]\d*)\.\d*|\.\d+)$/;
 
 /** Quoting in YAML is the explicit "treat me as a string" signal; the
  *  scalar and list-item readers share one definition of "quoted". */
