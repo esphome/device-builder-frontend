@@ -5,12 +5,6 @@ export const onboardingWizardStyles = css`
     --width: min(520px, calc(100vw - 24px));
   }
 
-  /* Let the longer step titles wrap instead of truncating (the base dialog
-     ellipsizes by default), so nothing is chopped on a narrow / mobile sheet. */
-  esphome-base-dialog::part(title-text) {
-    white-space: normal;
-  }
-
   esphome-base-dialog::part(close-button) {
     display: none;
   }
