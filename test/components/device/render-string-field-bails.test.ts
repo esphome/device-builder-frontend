@@ -17,6 +17,7 @@ import { renderStringField } from "../../../src/components/device/config-entry-r
 import { renderMultiValueField } from "../../../src/components/device/config-entry-renderers/lists.js";
 import {
   renderBooleanField,
+  renderColorField,
   renderFloatWithUnitField,
   renderNumberField,
   renderTextareaField,
@@ -488,5 +489,38 @@ describe("renderBooleanField — bail branches", () => {
       const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
       expect(json).toContain("wa-switch");
     }
+  });
+});
+
+describe("renderColorField — bail on values a color input can't show", () => {
+  const entry = (): ConfigEntry =>
+    makeConfigEntry({ key: "color", type: ConfigEntryType.COLOR, label: "Color" });
+
+  it("renders editable text for named colors and substitutions", () => {
+    for (const value of ["red", "${accent}"]) {
+      const { ctx } = makeCtx({ color: value });
+      const tpl = renderColorField(entry(), ["color"], ctx);
+      const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+      expect(rendersBailBranch(json)).toBe(false);
+      expect(findElementBindings(tpl, "input")[0].type).toBe("text");
+      expect(json).toContain(value);
+    }
+  });
+
+  it("keeps the color input for #rrggbb and for unset/empty", () => {
+    for (const values of [{ color: "#ff0000" }, { color: "" }, {}]) {
+      const { ctx } = makeCtx(values);
+      const tpl = renderColorField(entry(), ["color"], ctx);
+      const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+      expect(rendersBailBranch(json)).toBe(false);
+      expect(findElementBindings(tpl, "input")[0].type).toBe("color");
+    }
+  });
+
+  it("bails to the YAML-only shell for a non-string value", () => {
+    const { ctx } = makeCtx({ color: [255, 0, 0] });
+    const tpl = renderColorField(entry(), ["color"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
   });
 });
