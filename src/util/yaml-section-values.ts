@@ -189,8 +189,8 @@ export function updateSectionInYaml(
   // mapping deeper than the final value). Use it so the splice boundary
   // and the parse extent agree on every block body.
   let lastContentEnd = -1;
-  for (const span of parsed.spans.values()) {
-    if (span.end > lastContentEnd) lastContentEnd = span.end;
+  for (const { span } of parsed.keys.values()) {
+    if (span && span.end > lastContentEnd) lastContentEnd = span.end;
   }
   if (lastContentEnd >= 0) spliceEnd = lastContentEnd;
 
@@ -261,7 +261,7 @@ export function updateSectionInYaml(
             // that invariant local.
             const dashPrefixMatch = dashLine.match(/^(\s*)-(\s+)/)!;
             const dashPrefix = `${dashPrefixMatch[1]}-${dashPrefixMatch[2]}`;
-            const comment = parsed.comments.get(inlineKey) ?? "";
+            const comment = parsed.keys.get(inlineKey)?.comment ?? "";
             dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(values[inlineKey])}${comment}`;
           }
         } else {

@@ -31,24 +31,30 @@ export interface KeySpan {
   leadStart: number;
 }
 
+/**
+ * Everything the parser records about one top-level key. One record per
+ * key keeps duplicate-key semantics trivial: re-recording a key replaces
+ * the whole record, so stale side state can't survive a re-assignment.
+ */
+export interface KeyMeta {
+  // Absent only for the inline-on-dash key (list items), whose line the
+  // section header owns — it carries at most a ``comment``.
+  span?: KeySpan;
+  // Trailing inline comment (with its leading whitespace, e.g. ` #hides`)
+  // for a scalar key, re-appended on a single-line re-emit (#1235).
+  comment?: string;
+  // Per-item source fidelity for a block scalar list, so an edited list
+  // splices per item instead of re-emitting every row (#1363).
+  listSource?: ListItemSource;
+  // Authored as a flow list (``key: [a, b]``) — an edit re-emits the same
+  // single-line style (#1378). Never coexists with ``listSource``.
+  flowList?: boolean;
+}
+
 export interface ParsedSection {
   values: Record<string, unknown>;
-  // One span per top-level key, in file order. The inline-on-dash key
-  // (list items) is intentionally absent — it lives on the section
-  // header line, which `updateSectionInYaml` owns directly.
-  spans: Map<string, KeySpan>;
-  // Trailing inline comment (with its leading whitespace, e.g.
-  // ` #hides`) per scalar key that had one, so a re-serialized edit can
-  // re-append it instead of dropping it (#1235).
-  comments: Map<string, string>;
-  // Per-item source fidelity for block scalar list keys, so an edited
-  // list splices per item instead of re-emitting every row (#1363).
-  listSources: Map<string, ListItemSource>;
-  // Keys whose value was authored as a flow list (``key: [a, b]``), so an
-  // edit re-emits the same single-line style — which also lets the
-  // trailing-comment re-append below fire (#1378). Never overlaps
-  // ``listSources``: the two are set in disjoint parse branches.
-  flowListKeys: Set<string>;
+  // One meta per top-level key, in file order.
+  keys: Map<string, KeyMeta>;
   childIndent: string;
   isListItem: boolean;
   // 0-indexed section header / leading-dash line.
@@ -109,12 +115,14 @@ export function buildSplicedBody(
   const bodyLines: string[] = [];
   for (const [key, val] of Object.entries(values)) {
     if (inlineKeys.has(key)) continue;
-    const span = parsed.spans.get(key);
+    const meta = parsed.keys.get(key);
+    const span = meta?.span;
     if (span && yamlValueEqual(val, parsed.values[key])) {
       bodyLines.push(...lines.slice(span.leadStart, span.end));
       continue;
     }
-    const spliced = span && spliceScalarList(lines, span, parsed, key, val);
+    const spliced =
+      span && meta && spliceScalarList(lines, span, meta, parsed.values[key], val);
     if (spliced) {
       bodyLines.push(...spliced);
       continue;
@@ -123,12 +131,11 @@ export function buildSplicedBody(
     // original key — the value line below reformats, the comment stays.
     if (span) bodyLines.push(...lines.slice(span.leadStart, span.start));
     const fresh =
-      flowListLine(parsed, key, val, childIndent) ??
+      flowListLine(meta, key, val, childIndent) ??
       serializeYamlValues({ [key]: val }, childIndent, serializeOptions);
     // Re-append the field's trailing inline comment when it still
     // serializes to a single scalar line, so an edit keeps it (#1235).
-    const comment = parsed.comments.get(key);
-    if (comment && fresh.length === 1) fresh[0] += comment;
+    if (meta?.comment && fresh.length === 1) fresh[0] += meta.comment;
     bodyLines.push(...fresh);
   }
   return bodyLines;
@@ -137,12 +144,12 @@ export function buildSplicedBody(
 /** A flow-authored key re-emits as the same single flow line (an emptied
  *  or non-scalar value falls through to the normal re-emit). */
 function flowListLine(
-  parsed: ParsedSection,
+  meta: KeyMeta | undefined,
   key: string,
   val: unknown,
   childIndent: string
 ): string[] | null {
-  if (!parsed.flowListKeys.has(key)) return null;
+  if (!meta?.flowList) return null;
   if (!Array.isArray(val) || val.length === 0 || !val.every(isScalarItem)) return null;
   return [`${childIndent}${key}: ${formatYamlFlowList(val)}`];
 }
@@ -165,12 +172,11 @@ const isScalarItem = (v: unknown): v is string | number | boolean =>
 function spliceScalarList(
   lines: string[],
   span: KeySpan,
-  parsed: ParsedSection,
-  key: string,
+  meta: KeyMeta,
+  old: unknown,
   val: unknown
 ): string[] | null {
-  const src = parsed.listSources.get(key);
-  const old = parsed.values[key];
+  const src = meta.listSource;
   if (
     !src ||
     !Array.isArray(old) ||

@@ -11,7 +11,6 @@ import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { blockScalarValue } from "./yaml-block-scalar-value.js";
 import { parseFlowList, parseScalar, splitInlineComment } from "./yaml-scalar.js";
 import { parseListBlock, parseNestedBlock } from "./yaml-section-block-reader.js";
-import type { ListItemSource } from "./yaml-section-list.js";
 import {
   _detectSectionChildIndent,
   _leadingIndent,
@@ -26,7 +25,7 @@ import {
   TOP_LEVEL_KEY_START_RE,
 } from "./yaml-section-lexer.js";
 import { _blockScalarBodyEnd } from "./yaml-section-list.js";
-import { type KeySpan, type ParsedSection } from "./yaml-section-splice.js";
+import { type KeyMeta, type ParsedSection } from "./yaml-section-splice.js";
 
 /**
  * Find the 0-indexed line where the named section begins.
@@ -90,30 +89,18 @@ export function parseSectionCore(
   // would now throw. Use `Object.prototype.hasOwnProperty.call` if
   // you need that check on a downstream consumer.
   const values: Record<string, unknown> = Object.create(null);
-  const spans = new Map<string, KeySpan>();
-  const comments = new Map<string, string>();
-  const listSources = new Map<string, ListItemSource>();
-  const flowListKeys = new Set<string>();
-  // leadStart is finalised by the post-loop pass below.
-  const recordSpan = (key: string, start: number, end: number): void => {
-    spans.set(key, { start, end, leadStart: start });
-    // A duplicate key re-assigns the value; stale list metadata pointing
-    // at the first occurrence must not survive it.
-    listSources.delete(key);
-    flowListKeys.delete(key);
+  const keys = new Map<string, KeyMeta>();
+  // leadStart is finalised by the post-loop pass below. A fresh record per
+  // occurrence: a duplicate key re-assigns the value, and stale comment /
+  // list / flow metadata must not survive it.
+  const recordSpan = (key: string, start: number, end: number): KeyMeta => {
+    const meta: KeyMeta = { span: { start, end, leadStart: start } };
+    keys.set(key, meta);
+    return meta;
   };
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) {
-    return {
-      values,
-      spans,
-      comments,
-      listSources,
-      flowListKeys,
-      childIndent: "",
-      isListItem: false,
-      startIdx,
-    };
+    return { values, keys, childIndent: "", isListItem: false, startIdx };
   }
 
   const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
@@ -153,10 +140,7 @@ export function parseSectionCore(
       // list through its dedicated LIST_SECTIONS branch.
       return {
         values,
-        spans,
-        comments,
-        listSources,
-        flowListKeys,
+        keys,
         childIndent,
         isListItem,
         startIdx,
@@ -179,7 +163,7 @@ export function parseSectionCore(
       const { value: rawValue, comment } = splitInlineComment(afterColon);
       const scalar = rawValue.trim();
       if (scalar !== "") {
-        if (comment) comments.set(firstMatch[1], comment);
+        if (comment) keys.set(firstMatch[1], { comment });
         values[firstMatch[1]] = parseScalar(scalar);
       } else {
         // No scalar: the key's value is the nested mapping below. It rides on
@@ -246,8 +230,8 @@ export function parseSectionCore(
         );
         if (!isEmptyScalarList) {
           values[key] = value;
-          recordSpan(key, i, endIdx);
-          if (listSource) listSources.set(key, listSource);
+          const meta = recordSpan(key, i, endIdx);
+          if (listSource) meta.listSource = listSource;
           i = endIdx - 1;
         }
         continue;
@@ -273,15 +257,16 @@ export function parseSectionCore(
     // (`[a, b] # c` doesn't end with `]`) and before scalar parsing,
     // and record it so an edit can re-append it (#1235).
     const { value: scalar, comment } = splitInlineComment(raw);
-    if (comment) comments.set(key, comment);
     if (scalar.startsWith("[") && scalar.endsWith("]")) {
       values[key] = parseFlowList(scalar);
-      recordSpan(key, i, i + 1);
-      flowListKeys.add(key);
+      const meta = recordSpan(key, i, i + 1);
+      meta.flowList = true;
+      if (comment) meta.comment = comment;
       continue;
     }
     values[key] = parseScalar(scalar);
-    recordSpan(key, i, i + 1);
+    const meta = recordSpan(key, i, i + 1);
+    if (comment) meta.comment = comment;
   }
 
   // A multi-line value's scanners skip trailing blank / sibling-level
@@ -293,7 +278,8 @@ export function parseSectionCore(
   // with the value so byte-identical no-op saves don't lose it. The
   // indent guard keeps deeper block-scalar literal text in the value
   // (#1227).
-  for (const span of spans.values()) {
+  for (const { span } of keys.values()) {
+    if (!span) continue;
     const low = span.start + 1;
     let runStart = span.end;
     let hasComment = false;
@@ -313,21 +299,13 @@ export function parseSectionCore(
   // partition the body — a verbatim copy then neither drops nor
   // double-counts an inter-key comment.
   let prevEnd = startIdx + 1;
-  for (const span of spans.values()) {
+  for (const { span } of keys.values()) {
+    if (!span) continue;
     let lead = span.start;
     while (lead > prevEnd && isBlankOrCommentLine(lines[lead - 1])) lead--;
     span.leadStart = lead;
     prevEnd = span.end;
   }
 
-  return {
-    values,
-    spans,
-    comments,
-    listSources,
-    flowListKeys,
-    childIndent,
-    isListItem,
-    startIdx,
-  };
+  return { values, keys, childIndent, isListItem, startIdx };
 }

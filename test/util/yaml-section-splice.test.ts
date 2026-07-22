@@ -87,16 +87,18 @@ const LINES = [
 ];
 
 function makeParsed(comments: Map<string, string> = new Map()): ParsedSection {
+  const keys = new Map([
+    ["name", { span: { leadStart: 0, start: 0, end: 1 } }],
+    ["brightness", { span: { leadStart: 1, start: 2, end: 3 } }],
+    ["color", { span: { leadStart: 3, start: 3, end: 4 } }],
+  ]);
+  for (const [key, comment] of comments) {
+    const meta = keys.get(key);
+    if (meta) (meta as { comment?: string }).comment = comment;
+  }
   return {
     values: { name: "Living Room", brightness: 50, color: "red" },
-    spans: new Map([
-      ["name", { leadStart: 0, start: 0, end: 1 }],
-      ["brightness", { leadStart: 1, start: 2, end: 3 }],
-      ["color", { leadStart: 3, start: 3, end: 4 }],
-    ]),
-    comments,
-    listSources: new Map(),
-    flowListKeys: new Set(),
+    keys,
     childIndent: "  ",
     isListItem: false,
     startIdx: 0,
