@@ -219,10 +219,7 @@ export function getKeyPathWithListIndices(
     if (node.name === "Pair") {
       const k = getPairKey(state, node);
       if (k) segs.push(k);
-    } else if (
-      node.name === "Item" &&
-      (node.parent?.name === "BlockSequence" || node.parent?.name === "FlowSequence")
-    ) {
+    } else if (isSequenceItem(node)) {
       let idx = 0;
       for (let s = node.prevSibling; s; s = s.prevSibling) {
         if (s.name === "Item") idx++;
@@ -231,6 +228,19 @@ export function getKeyPathWithListIndices(
     }
   }
   return segs.reverse();
+}
+
+// The one definition of "a sequence item" — the index-contributing check in
+// ``getKeyPathWithListIndices`` and the scalar-item probe below must agree,
+// or a keyPath's trailing index and its scalarItemTail flag drift apart.
+function isSequenceItem(node: {
+  name: string;
+  parent: { name: string } | null;
+}): boolean {
+  return (
+    node.name === "Item" &&
+    (node.parent?.name === "BlockSequence" || node.parent?.name === "FlowSequence")
+  );
 }
 
 /**
@@ -243,11 +253,7 @@ export function isScalarListItemAt(state: EditorState, pos: number): boolean {
   if (!node || (node.name !== "Literal" && node.name !== "QuotedLiteral")) {
     return false;
   }
-  const item = node.parent;
-  return (
-    item?.name === "Item" &&
-    (item.parent?.name === "BlockSequence" || item.parent?.name === "FlowSequence")
-  );
+  return node.parent !== null && isSequenceItem(node.parent);
 }
 
 /**

@@ -100,6 +100,18 @@ describe("getKeyPathWithListIndices", () => {
     expect(indexedPathAt(doc, "id: $$")).toEqual(["esphome", "areas", 1, "id"]);
   });
 
+  it("indexes flow-sequence items (#1354)", () => {
+    const doc = "display:\n  - platform: lcd\n    data: [42, 10, 31]\n";
+    expect(indexedPathAt(doc, "42")).toEqual(["display", 0, "data", 0]);
+    expect(indexedPathAt(doc, "10")).toEqual(["display", 0, "data", 1]);
+    expect(indexedPathAt(doc, "31")).toEqual(["display", 0, "data", 2]);
+  });
+
+  it("indexes block-style scalar items", () => {
+    const doc = "display:\n  - platform: lcd\n    data:\n      - 42\n      - 10\n";
+    expect(indexedPathAt(doc, "10")).toEqual(["display", 0, "data", 1]);
+  });
+
   it("indexes top-level platform list items too", () => {
     const doc =
       "sensor:\n  - platform: gpio\n    name: a\n  - platform: dht\n    pin: GPIO4\n";
@@ -136,30 +148,14 @@ describe("isInsideBlockScalar", () => {
   });
 });
 
-describe("flow-sequence items (#1354)", () => {
+describe("isScalarListItemAt", () => {
   const stateFor = (doc: string) => {
     const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
     ensureSyntaxTree(state, state.doc.length);
     return state;
   };
-  const indexedPathAt = (doc: string, token: string): (string | number)[] => {
-    const state = stateFor(doc);
-    return getKeyPathWithListIndices(state, doc.indexOf(token) + 1);
-  };
 
-  it("indexes flow-sequence items", () => {
-    const doc = "display:\n  - platform: lcd\n    data: [42, 10, 31]\n";
-    expect(indexedPathAt(doc, "42")).toEqual(["display", 0, "data", 0]);
-    expect(indexedPathAt(doc, "10")).toEqual(["display", 0, "data", 1]);
-    expect(indexedPathAt(doc, "31")).toEqual(["display", 0, "data", 2]);
-  });
-
-  it("indexes block-style scalar items", () => {
-    const doc = "display:\n  - platform: lcd\n    data:\n      - 42\n      - 10\n";
-    expect(indexedPathAt(doc, "10")).toEqual(["display", 0, "data", 1]);
-  });
-
-  it("isScalarListItemAt is true only for scalar items", () => {
+  it("is true only for scalar items", () => {
     const flow = "display:\n  - platform: lcd\n    data: [42, 10]\n";
     const state = stateFor(flow);
     expect(isScalarListItemAt(state, flow.indexOf("42") + 1)).toBe(true);

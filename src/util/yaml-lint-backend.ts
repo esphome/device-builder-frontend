@@ -435,10 +435,8 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // item; the enclosing key covers them all). Anchor inside the
         // first token — side -1 at the exact start would resolve to the
         // preceding node.
-        let keyPath = getKeyPathWithListIndices(
-          view.state,
-          Math.min(anchor.from + 1, anchor.to)
-        );
+        const anchorPos = Math.min(anchor.from + 1, anchor.to);
+        let keyPath = getKeyPathWithListIndices(view.state, anchorPos);
         // A multi-line range anchored on a key token is a container-level
         // error: esphome marked a whole mapping, whose range starts at its
         // first key. That key is incidental — attribute the error to the
@@ -451,22 +449,22 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         ) {
           keyPath = keyPath.slice(0, -1);
         }
-        const scalarItemTail =
-          typeof keyPath[keyPath.length - 1] === "number" &&
-          isScalarListItemAt(view.state, Math.min(anchor.from + 1, anchor.to));
+        const entry: MappedValidationError = {
+          message,
+          line: anchorLine.number,
+          keyPath,
+          scalarItemTail:
+            typeof keyPath[keyPath.length - 1] === "number" &&
+            isScalarListItemAt(view.state, anchorPos),
+        };
         if (keyPath.length > 0) {
-          mapped.push({
-            message,
-            line: anchorLine.number,
-            keyPath,
-            ...(scalarItemTail ? { scalarItemTail } : {}),
-          });
+          mapped.push(entry);
         }
         // No form field to carry the message (a bare section header, or the
         // AST couldn't place it) — keep it in the banner; a section-level
         // error still badges the navigator through the mapped entry. The
         // anchor line gives the banner its "Go to line" jump.
-        if (mappedFormPath({ keyPath, scalarItemTail }).length === 0) {
+        if (mappedFormPath(entry).length === 0) {
           bannerErrors.push({
             message,
             line: squiggleLineNum,

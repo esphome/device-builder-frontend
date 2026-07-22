@@ -103,6 +103,24 @@ describe("device-section-config — backend field errors", () => {
     expect(inner._clearedBackendPaths.size).toBe(0);
   });
 
+  it("suppresses per-item backend errors when the list field is edited", () => {
+    // #1354: a list edit emits at the field path while the backend error
+    // keys the offending row (``data.1``); the row's ring must clear
+    // optimistically too.
+    const inner = makeHost(instanceErrors({ "data.1": "value must be at most 31." }));
+    onValueChange(
+      inner,
+      new CustomEvent("value-change", { detail: { path: ["data"], value: [10, 20] } })
+    );
+    expect(inner._clearedBackendPaths.has("data.1")).toBe(true);
+    const merged = inner._mergeErrors(
+      inner.backendErrors.fields,
+      inner._clearedBackendPaths,
+      inner._fieldErrors
+    );
+    expect(merged.has("data.1")).toBe(false);
+  });
+
   it("reveals hidden advanced settings when a backend error lands there", () => {
     const inner = makeHost(instanceErrors({ pin: "pin broken" }));
     expect(inner._showAdvanced).toBe(false);

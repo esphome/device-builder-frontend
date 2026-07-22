@@ -157,10 +157,9 @@ export function renderMultiValueField(
           raw[i] != null &&
           raw[i] !== "" &&
           Number.isFinite(Number(String(raw[i])));
-        // Errors land per item (``field.0``, #1348); flag and explain only
-        // the offending row. A field-keyed error with rows present is a
-        // list-level message — rendered once below, not painted onto
-        // every row (#1354); required-empty renders zero rows anyway.
+        // Errors land per item (``field.0``); flag only the offending row.
+        // A field-keyed error is list-level — rendered once below, not on
+        // every row (#1354).
         const rowPath = [...path, String(i)];
         const rowInvalid = ctx.errorAt(rowPath) !== null;
         // Edit buffer keeps raw keystrokes on screen while typing;
