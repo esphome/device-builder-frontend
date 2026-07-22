@@ -144,6 +144,12 @@ describe("renderNumberField — float fields", () => {
     expect(emitChange).toHaveBeenCalledWith(["gain"], "");
   });
 
+  it("treats whitespace-only input as blank, not 0", () => {
+    const { ctx, emitChange } = makeCtx({ gain: "" });
+    fireInput(renderNumberField(floatEntry(), ["gain"], ctx), "   ");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], "");
+  });
+
   it("coerces a corrected value from the junk-value text field back to a number", () => {
     const { ctx, emitChange } = makeCtx({ gain: "1e309" });
     const tpl = renderNumberField(floatEntry(), ["gain"], ctx);

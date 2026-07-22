@@ -18,13 +18,15 @@ export function coerceValueToEntryType(entry: ConfigEntry, raw: string): string 
   return raw;
 }
 
-/** Finite input becomes a number; empty and non-finite input (a typed
- *  ``1e309``) ship verbatim so the validator flags them instead of the
- *  serializer writing a bare ``Infinity`` (#1361). */
+/** Finite input becomes a number; blank and non-finite input (a typed
+ *  ``1e309``) ship as ""/verbatim so the validator flags them instead of
+ *  the serializer writing a bare ``Infinity`` (#1361). Trims like
+ *  ``coerceIntFieldValue`` so whitespace-only input stays blank, not 0. */
 export function coerceFloatFieldValue(raw: string): string | number {
-  if (raw === "") return "";
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : raw;
+  const v = raw.trim();
+  if (v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? n : v;
 }
 
 /** Script-parameter variant keyed on the param's type token; ints never

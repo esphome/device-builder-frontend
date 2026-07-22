@@ -26,6 +26,7 @@ describe("coerceParamValue", () => {
   it("passes empty input and non-numeric param types through", () => {
     expect(coerceParamValue("int", "")).toBe("");
     expect(coerceParamValue("float", "")).toBe("");
+    expect(coerceParamValue("float", "  ")).toBe("");
     expect(coerceParamValue("string", "abc")).toBe("abc");
   });
 });
