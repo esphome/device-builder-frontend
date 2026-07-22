@@ -575,7 +575,9 @@ function renderLongFormChild(
   // A scalar shorthand (``mode: OUTPUT``) needs the display-expansion
   // wrapper; a ``${var}`` scalar goes through renderEntry so the form's
   // substitution gate edits it as text with the resolves-to hint (#1343);
-  // the object form goes through the normal nested dispatch.
+  // the object form goes through the normal nested dispatch. Deliberately
+  // ``looksLikeSubstitution``, not ``isSubstitutionString`` — the typeof
+  // guard is load-bearing (an object mode must not hit the wrapper).
   return typeof modeValue === "string" && !looksLikeSubstitution(modeValue)
     ? renderPinModeField(scoped, modePath, ctx)
     : ctx.renderEntry(scoped, modePath);

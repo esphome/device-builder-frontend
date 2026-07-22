@@ -7,6 +7,7 @@ import { isSubstitutionString } from "../../../util/substitutions.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
+  coerceValueToEntryType,
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,
@@ -121,21 +122,16 @@ export function renderMultiValueField(
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => "");
-  const updateAt = (idx: number, value: string, rowNumeric: boolean) => {
+  const updateAt = (idx: number, value: string) => {
     const current = [...readArrayAt(ctx, path)];
-    // Empty stays "" so a half-typed or cleared row round-trips instead of
-    // becoming NaN, matching the single-value number renderer. A ${var} row
-    // in a numeric list round-trips the string verbatim — no coercion — so
-    // an edit can't clobber the reference with a number (#1346); dropping
-    // the $ flips the row numeric on the next render, same transient
-    // string-typed number the single-value ${var} gates write.
-    current[idx] = rowNumeric
-      ? value === ""
-        ? ""
-        : Number(value)
-      : numeric
-        ? value
-        : unescapeForInput(value);
+    // Numeric rows coerce through the shared helper: decimals become
+    // numbers; "" and unparseable input — a ${var} reference (#1346), a
+    // 0x literal, a >2^53 decimal — pass through verbatim, so an edit
+    // can't clobber a reference and 64-bit precision survives, matching
+    // the single-value number renderers.
+    current[idx] = numeric
+      ? coerceValueToEntryType(entry, value)
+      : unescapeForInput(value);
     ctx.emitChange(path, current);
   };
 
@@ -161,8 +157,7 @@ export function renderMultiValueField(
                 class="multi-input ${invalid ? "invalid" : ""}"
                 .value=${item}
                 ?disabled=${disabled}
-                @input=${(e: Event) =>
-                  updateAt(i, (e.target as HTMLInputElement).value, rowNumeric)}
+                @input=${(e: Event) => updateAt(i, (e.target as HTMLInputElement).value)}
               />
               ${
                 // Resolve against the stored value, not the escaped display
