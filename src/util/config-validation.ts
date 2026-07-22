@@ -504,7 +504,12 @@ function _validateEntriesRecursive(
     // row beside a real value is mid-edit, not an error. Non-array values
     // (a bare scalar cv.ensure_list accepts, an unset field, a
     // YamlRawValue block) keep the generic field-level path below.
-    const list: unknown = values[entry.key];
+    // Same required-default fallback as the generic path below, so a
+    // required list falling back to an array default is still walked per
+    // item instead of stringifying in validateEntry.
+    const list: unknown = entry.required
+      ? (values[entry.key] ?? entry.default_value)
+      : values[entry.key];
     if (entry.multi_value && Array.isArray(list)) {
       if (!list.some(isValuePresent)) {
         // Empty, or only blank rows: required-and-unsatisfied either way.

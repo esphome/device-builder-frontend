@@ -859,6 +859,11 @@ describe("validateEntries — scalar multi_value lists (#1348)", () => {
     expect(validateEntries([required], { codes: [3, ""] }).size).toBe(0);
   });
 
+  it("walks a required entry's array default per item, not stringified", () => {
+    const entry = intList({ required: true, default_value: [3, 5] as never });
+    expect(validateEntries([entry], {}).size).toBe(0);
+  });
+
   it("flags a required list holding only blank rows", () => {
     const required = intList({ required: true });
     expect(validateEntries([required], { codes: ["", ""] }).get("codes")?.code).toBe(
