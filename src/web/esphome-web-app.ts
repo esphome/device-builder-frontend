@@ -57,7 +57,8 @@ export class ESPHomeWebApp extends LitElement {
   private async _init(): Promise<void> {
     toast.config({
       toastOptions: {
-        position: "bottom-left",
+        // Mirrors the dashboard's toaster position (app-shell.ts).
+        position: "bottom-right",
         richColors: true,
         duration: 4000,
         closeButton: true,

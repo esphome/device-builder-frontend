@@ -421,9 +421,11 @@ export class ESPHomeApp extends LitElement {
   private async _init() {
     toast.config({
       toastOptions: {
-        // bottom-left keeps toasts clear of the editor's bottom-right
-        // Install/Validate/Save FAB cluster (#921, prior fix #171).
-        position: "bottom-left",
+        // bottom-right by maintainer preference. Known trade-off: a toast
+        // can briefly cover the editor's bottom-right Install/Validate/Save
+        // cluster (#921 moved it left for that reason) — toasts auto-dismiss
+        // and carry a close button, so the overlap is transient.
+        position: "bottom-right",
         richColors: true,
         duration: 4000,
         closeButton: true,
