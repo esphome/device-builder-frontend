@@ -3367,6 +3367,17 @@ describe("updateSectionInYaml — comment-only values are empty (#1385)", () => 
     expect(values.manual_ip).toEqual({ static_ip: null, gateway: "10.0.0.1" });
   });
 
+  it("parses an all-value-less nested block as an object of nulls", () => {
+    // Deliberate #1385 delta: previously such a block collapsed to null;
+    // per-key nulls match parseFlatMappingField's #941 treatment and the
+    // serializer's null filter keeps re-emits unchanged.
+    const yaml = ["wifi:", "  manual_ip:", "    static_ip:", "    gateway:", ""].join(
+      "\n"
+    );
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.manual_ip).toEqual({ static_ip: null, gateway: null });
+  });
+
   it("parses the deeper block under a commented nested key instead of dropping it", () => {
     const yaml = ["wifi:", "  manual_ip:", "    dns1: # note", "      x: 1", ""].join(
       "\n"
