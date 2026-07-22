@@ -68,6 +68,15 @@ export const splitTrimmedInlineComment = (
 ): { value: string; comment: string } =>
   raw.startsWith("#") ? { value: "", comment: ` ${raw}` } : splitInlineComment(raw);
 
+/** The #1385/#1388 rule in one place: a string-opening ``#`` is a comment
+ *  only when the source had separator whitespace after the colon; with no
+ *  separator it stays value text. */
+export const splitValueComment = (
+  raw: string,
+  hadSeparator: boolean
+): { value: string; comment: string } =>
+  hadSeparator ? splitTrimmedInlineComment(raw) : splitInlineComment(raw);
+
 // Inline lambda scalar: ``!lambda return x;`` (and the quoted
 // ``!lambda 'return x;'`` form). Recognised as a ``LambdaValue``
 // so a templatable field shows the lambda editor instead of a

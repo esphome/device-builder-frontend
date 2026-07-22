@@ -14,12 +14,7 @@ import {
   isEditableLambdaBlock,
   lambdaValueFromBlock,
 } from "./yaml-block-scalar-value.js";
-import {
-  parseFlowList,
-  parseScalar,
-  splitInlineComment,
-  splitTrimmedInlineComment,
-} from "./yaml-scalar.js";
+import { parseFlowList, parseScalar, splitValueComment } from "./yaml-scalar.js";
 import {
   _detectListItemChildIndent,
   _leadingIndent,
@@ -269,12 +264,11 @@ const collectBlockListMappings = (
       const headerKey = headerMatch[1];
       const headerHadSep = headerMatch[2].length > 0;
       const headerRaw = headerMatch[3].trim();
-      // A non-empty header without a post-colon separator is a scalar
-      // item to the loader (``- ssid:#odd``), not a mapping field —
-      // bail to the whole-list ``YamlRawValue`` fallback rather than
-      // coercing it into an object (matches ``LIST_ITEM_DICT_KEY_RE``'s
-      // ``:(?:\s|$)`` mapping signal). A bare ``- key:`` stays a valid
-      // single-null-key item.
+      // ``- ssid:#odd`` is a VALID scalar item to the loader (no
+      // ``:(?:\s|$)`` mapping signal, cf. LIST_ITEM_DICT_KEY_RE), so
+      // coercing it to a mapping would rewrite a valid doc — bail. Child
+      // lines stay lenient: separator-less there is invalid YAML, so
+      // repair can't misread a valid doc.
       if (!headerHadSep && headerRaw !== "") return null;
       // ``- multiply: !lambda |-``: the body sits on the following
       // deeper-indented lines, so capture it here rather than letting
@@ -420,9 +414,7 @@ function parseNestedBlock(
     // ``key: # note`` is an empty value, #1385) and the bracket test —
     // without the latter ``key: [1, 2] # note`` misses the flow branch
     // and degrades to the literal string "[1, 2]".
-    const { value: scalar, comment } = hadSeparator
-      ? splitTrimmedInlineComment(raw)
-      : splitInlineComment(raw);
+    const { value: scalar, comment } = splitValueComment(raw, hadSeparator);
     if (scalar === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
       // ``key:`` followed by a block list. Accept both the standard
