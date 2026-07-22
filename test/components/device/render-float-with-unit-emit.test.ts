@@ -34,10 +34,12 @@ describe("renderFloatWithUnitField — magnitude commit", () => {
     expect(emitChange).toHaveBeenCalledWith(["frequency"], "75kHz");
   });
 
-  it("still clears on empty input", () => {
+  it("still clears on empty and whitespace-only input", () => {
     const { ctx, emitChange } = makeEmitCtx({ frequency: "50kHz" });
     fireInput(renderFloatWithUnitField(withUnitEntry(), ["frequency"], ctx), "");
     expect(emitChange).toHaveBeenCalledWith(["frequency"], "");
+    fireInput(renderFloatWithUnitField(withUnitEntry(), ["frequency"], ctx), "  ");
+    expect(emitChange).toHaveBeenLastCalledWith(["frequency"], "");
   });
 
   it("ships non-finite input verbatim instead of clearing", () => {

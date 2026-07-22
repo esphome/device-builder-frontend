@@ -135,7 +135,7 @@ describe("renderNumberField — float fields", () => {
   });
 
   it("treats whitespace-only input as blank, not 0", () => {
-    const { ctx, emitChange } = makeCtx({ gain: "" });
+    const { ctx, emitChange } = makeEmitCtx({ gain: "" });
     fireInput(renderNumberField(floatEntry(), ["gain"], ctx), "   ");
     expect(emitChange).toHaveBeenCalledWith(["gain"], "");
   });

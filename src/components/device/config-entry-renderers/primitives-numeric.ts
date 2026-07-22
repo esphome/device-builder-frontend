@@ -325,15 +325,13 @@ export function renderFloatWithUnitField(
           @input=${(e: Event) => {
             const raw = (e.target as HTMLInputElement).value;
             ctx.setEditingMagnitude(path, raw);
-            if (raw === "") {
+            const next = coerceFloatFieldValue(raw);
+            if (next === "") {
               // Clearing magnitude drops the unit (`{null, kHz}` serializes to "");
               // stash the unit so the next render's fallback doesn't snap back to canonical.
               ctx.setPendingUnit(path, unit);
               emit({ value: null, unit });
-              return;
-            }
-            const next = coerceFloatFieldValue(raw);
-            if (typeof next === "number") {
+            } else if (typeof next === "number") {
               emit({ value: next, unit });
             } else {
               // Non-finite input ships verbatim so the validator flags it
