@@ -117,12 +117,12 @@ export function buildSplicedBody(
     if (inlineKeys.has(key)) continue;
     const meta = parsed.keys.get(key);
     const span = meta?.span;
-    if (span && yamlValueEqual(val, parsed.values[key])) {
+    const old = parsed.values[key];
+    if (span && yamlValueEqual(val, old)) {
       bodyLines.push(...lines.slice(span.leadStart, span.end));
       continue;
     }
-    const spliced =
-      span && meta && spliceScalarList(lines, span, meta, parsed.values[key], val);
+    const spliced = meta && spliceScalarList(lines, meta, old, val);
     if (spliced) {
       bodyLines.push(...spliced);
       continue;
@@ -171,13 +171,13 @@ const isScalarItem = (v: unknown): v is string | number | boolean =>
  */
 function spliceScalarList(
   lines: string[],
-  span: KeySpan,
   meta: KeyMeta,
   old: unknown,
   val: unknown
 ): string[] | null {
-  const src = meta.listSource;
+  const { span, listSource: src } = meta;
   if (
+    !span ||
     !src ||
     !Array.isArray(old) ||
     !Array.isArray(val) ||

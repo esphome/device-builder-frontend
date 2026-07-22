@@ -93,7 +93,7 @@ export function parseSectionCore(
   // leadStart is finalised by the post-loop pass below. A fresh record per
   // occurrence: a duplicate key re-assigns the value, and stale comment /
   // list / flow metadata must not survive it.
-  const recordSpan = (key: string, start: number, end: number): KeyMeta => {
+  const recordKey = (key: string, start: number, end: number): KeyMeta => {
     const meta: KeyMeta = { span: { start, end, leadStart: start } };
     keys.set(key, meta);
     return meta;
@@ -138,13 +138,7 @@ export function parseSectionCore(
       values[sectionKey] = parseListBlock(lines, startIdx + 1, headerIndent).value;
       // No per-key spans — `updateSectionInYaml` re-emits this whole
       // list through its dedicated LIST_SECTIONS branch.
-      return {
-        values,
-        keys,
-        childIndent,
-        isListItem,
-        startIdx,
-      };
+      return { values, keys, childIndent, isListItem, startIdx };
     }
   }
 
@@ -214,7 +208,7 @@ export function parseSectionCore(
     if (blockHeader) {
       const endIdx = _blockScalarBodyEnd(lines, i + 1, childIndent.length);
       values[key] = blockScalarValue(blockHeader, raw, lines.slice(i + 1, endIdx));
-      recordSpan(key, i, endIdx);
+      recordKey(key, i, endIdx);
       // Auto-increment ``for`` loop: resume so the next ``i++`` lands on endIdx.
       i = endIdx - 1;
       continue;
@@ -230,7 +224,7 @@ export function parseSectionCore(
         );
         if (!isEmptyScalarList) {
           values[key] = value;
-          const meta = recordSpan(key, i, endIdx);
+          const meta = recordKey(key, i, endIdx);
           if (listSource) meta.listSource = listSource;
           i = endIdx - 1;
         }
@@ -248,7 +242,7 @@ export function parseSectionCore(
       const endIdx = result?.endIdx ?? i + 1;
       values[key] =
         result && Object.keys(result.values).length > 0 ? result.values : null;
-      recordSpan(key, i, endIdx);
+      recordKey(key, i, endIdx);
       i = endIdx - 1;
       continue;
     }
@@ -259,13 +253,13 @@ export function parseSectionCore(
     const { value: scalar, comment } = splitInlineComment(raw);
     if (scalar.startsWith("[") && scalar.endsWith("]")) {
       values[key] = parseFlowList(scalar);
-      const meta = recordSpan(key, i, i + 1);
+      const meta = recordKey(key, i, i + 1);
       meta.flowList = true;
       if (comment) meta.comment = comment;
       continue;
     }
     values[key] = parseScalar(scalar);
-    const meta = recordSpan(key, i, i + 1);
+    const meta = recordKey(key, i, i + 1);
     if (comment) meta.comment = comment;
   }
 
