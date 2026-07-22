@@ -1,14 +1,9 @@
-/**
- * Pins that both wa-select emit paths (suggestions and strict select)
- * commit through ``coerceValueToEntryType``, so a typed entry modeled
- * as options emits its declared type and the YAML stays bare (#1372).
- */
-import { describe, expect, it, vi } from "vitest";
+/** Pins that both wa-select emit paths coerce through coerceValueToEntryType (#1372). */
+import { describe, expect, it } from "vitest";
 import type { ConfigValueOption } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderSelectField } from "../../../src/components/device/config-entry-renderers/primitives.js";
-import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
-import { findElementBindings } from "./_renderer-fixtures.js";
+import { findElementBindings, makeEmitCtx, makeEntry } from "./_renderer-fixtures.js";
 
 const asOptions = (values: string[]): ConfigValueOption[] =>
   values.map((v) => ({ value: v, label: v }));
@@ -25,9 +20,8 @@ function emitFor(
   extra: Record<string, unknown>,
   picked: string
 ): unknown {
-  const emitChange = vi.fn();
   const entry = makeEntry(type, extra);
-  const ctx = makeRenderCtx({ field: "" }, { board: null, overrides: { emitChange } });
+  const { ctx, emitChange } = makeEmitCtx({ field: "" });
   fireChange(renderSelectField(entry, ["field"], ctx), picked);
   return emitChange.mock.calls[0][1];
 }

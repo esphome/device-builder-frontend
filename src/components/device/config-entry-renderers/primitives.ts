@@ -13,6 +13,7 @@ import {
   renderFieldError,
   renderHelpLink,
   renderLabel,
+  renderSuggestionSelect,
   renderUnparseableScalarField,
   renderYamlOnlyFallbackIfNonPrimitive,
   type RenderCtx,
@@ -132,38 +133,17 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
   const value = String(raw ?? "");
+  const onSelectChange = (e: Event) =>
+    ctx.emitChange(
+      path,
+      coerceValueToEntryType(entry, (e.target as unknown as { value: string }).value)
+    );
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   // Featured suggestions override options — board author narrowed the choice.
   // Always strict select; suggestions are a closed set.
   if (entry.suggestions && entry.suggestions.length > 0) {
-    const valueLower = value.toLowerCase();
-    return html`
-      <div class="field" data-field-key=${fieldKeyAttr(path)}>
-        ${renderLabel(entry, ctx)}
-        <wa-select
-          class=${invalid ? "invalid" : ""}
-          ?disabled=${disabled}
-          placeholder=${String(entry.default_value ?? "")}
-          @change=${(e: Event) =>
-            ctx.emitChange(
-              path,
-              coerceValueToEntryType(
-                entry,
-                (e.target as unknown as { value: string }).value
-              )
-            )}
-        >
-          ${entry.suggestions.map((s) => {
-            const v = String(s);
-            return html`<wa-option value=${v} ?selected=${v.toLowerCase() === valueLower}
-              >${v}</wa-option
-            >`;
-          })}
-        </wa-select>
-        ${renderFieldError(path, ctx)}
-      </div>
-    `;
+    return renderSuggestionSelect(entry, path, value, invalid, disabled, ctx);
   }
   // The device's ESP32 variant, used to filter per-variant options (and derive
   // the esp32 variant default below); resolved once per render.
@@ -225,14 +205,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         ?disabled=${disabled}
         .withClear=${clearable}
         placeholder=${placeholder}
-        @change=${(e: Event) =>
-          ctx.emitChange(
-            path,
-            coerceValueToEntryType(
-              entry,
-              (e.target as unknown as { value: string }).value
-            )
-          )}
+        @change=${onSelectChange}
       >
         ${
           clearable

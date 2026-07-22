@@ -470,12 +470,11 @@ export function renderStringField(
 
 /**
  * Render a closed `<wa-select>` for entries carrying a `suggestions`
- * list (featured components only). Mirrors the strict-select branch of
- * `renderSelectField` in `config-entry-renderers.ts` but lives in the
- * shared module so the simple-field renderer can reuse it without
+ * list (featured components only). Lives in the shared module so the
+ * simple-field renderer and `renderSelectField` can both use it without
  * importing the barrel.
  */
-function renderSuggestionSelect(
+export function renderSuggestionSelect(
   entry: ConfigEntry,
   path: string[],
   value: string,
