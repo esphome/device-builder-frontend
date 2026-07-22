@@ -35,6 +35,7 @@ import {
   _matchFlatMappingField,
   _scanValueBlock,
   collectBlockListItems,
+  type ListItemSource,
   parseFlatMappingField,
 } from "./yaml-section-list.js";
 import { YamlRawValue } from "./yaml-serialize.js";
@@ -67,6 +68,7 @@ const parseListBlock = (
   value: YamlRawValue | Record<string, unknown>[] | (string | number | boolean)[];
   endIdx: number;
   isEmptyScalarList: boolean;
+  listSource?: ListItemSource;
 } => {
   const canonicalDashIndent = `${parentIndent}${ESPHOME_YAML_INDENT}`;
   const { dashIndent, firstDashIdx } = _detectFirstDashIndent(
@@ -114,7 +116,11 @@ const parseListBlock = (
   // ``dashIndent`` so 4-space user YAMLs round-trip — the older
   // ``listItemRegexFor(parentIndent)`` hardcoded the canonical
   // 2-space step and silently dropped scalar lists otherwise.
-  const { items, endIdx: scalarEndIdx } = collectBlockListItems(
+  const {
+    items,
+    endIdx: scalarEndIdx,
+    source,
+  } = collectBlockListItems(
     lines,
     startIdx,
     `${dashIndent}- `,
@@ -124,6 +130,7 @@ const parseListBlock = (
     value: items,
     endIdx: scalarEndIdx,
     isEmptyScalarList: items.length === 0,
+    listSource: items.length > 0 ? source : undefined,
   };
 };
 

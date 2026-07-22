@@ -11,6 +11,7 @@ import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { blockScalarValue } from "./yaml-block-scalar-value.js";
 import { parseFlowList, parseScalar, splitInlineComment } from "./yaml-scalar.js";
 import { parseListBlock, parseNestedBlock } from "./yaml-section-block-reader.js";
+import type { ListItemSource } from "./yaml-section-list.js";
 import {
   _detectSectionChildIndent,
   _leadingIndent,
@@ -91,6 +92,7 @@ export function parseSectionCore(
   const values: Record<string, unknown> = Object.create(null);
   const spans = new Map<string, KeySpan>();
   const comments = new Map<string, string>();
+  const listSources = new Map<string, ListItemSource>();
   // leadStart is finalised by the post-loop pass below.
   const recordSpan = (key: string, start: number, end: number): void => {
     spans.set(key, { start, end, leadStart: start });
@@ -214,7 +216,7 @@ export function parseSectionCore(
     if (raw === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
       if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {
-        const { value, endIdx, isEmptyScalarList } = parseListBlock(
+        const { value, endIdx, isEmptyScalarList, listSource } = parseListBlock(
           lines,
           i + 1,
           childIndent
@@ -222,6 +224,7 @@ export function parseSectionCore(
         if (!isEmptyScalarList) {
           values[key] = value;
           recordSpan(key, i, endIdx);
+          if (listSource) listSources.set(key, listSource);
           i = endIdx - 1;
         }
         continue;
@@ -293,5 +296,5 @@ export function parseSectionCore(
     prevEnd = span.end;
   }
 
-  return { values, spans, comments, childIndent, isListItem, startIdx };
+  return { values, spans, comments, listSources, childIndent, isListItem, startIdx };
 }

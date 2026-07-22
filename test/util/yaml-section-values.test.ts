@@ -1326,6 +1326,103 @@ describe("updateSectionInYaml — preserves untouched field byte layout (#1227)"
     expect(after).toContain("ssid: office");
   });
 
+  it("keeps other items' comments when one list row is edited in place (#1363)", () => {
+    const before = [
+      "wifi:",
+      "  networks:",
+      "    - homenet #primary",
+      "    # fallback network",
+      "    - guestnet #open",
+      "    - iot",
+      "  ssid: home",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    (values.networks as unknown[])[2] = "iot2";
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain(
+      "  networks:\n    - homenet #primary\n    # fallback network\n    - guestnet #open\n    - iot2\n"
+    );
+  });
+
+  it("re-attaches the edited row's own inline comment on an in-place edit", () => {
+    const before = ["display:", "  glyphs:", "    - 10 #ten", "    - 12", ""].join("\n");
+    const values = parseYamlSectionValues(before, "display", 1);
+    (values.glyphs as unknown[])[0] = 11;
+    const after = updateSectionInYaml(before, "display", values, 1);
+    expect(after).toContain("  glyphs:\n    - 11 #ten\n    - 12\n");
+  });
+
+  it("keeps remaining rows' comments when a middle row is removed", () => {
+    const before = [
+      "wifi:",
+      "  networks:",
+      "    - homenet #primary",
+      "    - dead",
+      "    - guestnet #open",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.networks = ["homenet", "guestnet"];
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain(
+      "  networks:\n    - homenet #primary\n    - guestnet #open\n"
+    );
+    expect(after).not.toContain("- dead");
+  });
+
+  it("keeps existing rows verbatim when a row is appended", () => {
+    const before = ["wifi:", "  networks:", "    - homenet #primary", ""].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.networks = ["homenet", "extra"];
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain("  networks:\n    - homenet #primary\n    - extra\n");
+  });
+
+  it("keeps a trailing comment after the last row through an edit", () => {
+    const before = [
+      "wifi:",
+      "  networks:",
+      "    - homenet",
+      "    - guestnet #open",
+      "    # end of networks",
+      "  ssid: home",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    (values.networks as unknown[])[0] = "homenet2";
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain(
+      "  networks:\n    - homenet2\n    - guestnet #open\n    # end of networks\n  ssid: home"
+    );
+  });
+
+  it("re-emits plain on a wholesale list replacement (no stale comments)", () => {
+    const before = ["wifi:", "  networks:", "    - a #one", "    - b #two", ""].join(
+      "\n"
+    );
+    const values = parseYamlSectionValues(before, "wifi", 1);
+    values.networks = ["x", "y", "z"];
+    const after = updateSectionInYaml(before, "wifi", values, 1);
+    expect(after).toContain("  networks:\n    - x\n    - y\n    - z\n");
+    expect(after).not.toContain("#one");
+    expect(after).not.toContain("#two");
+  });
+
+  it("keeps protective quoting on an untouched substitution row through a sibling edit", () => {
+    const before = [
+      "display:",
+      "  glyphs:",
+      '    - "${glyph_row}" #from subst',
+      "    - 10",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "display", 1);
+    (values.glyphs as unknown[])[1] = 12;
+    const after = updateSectionInYaml(before, "display", values, 1);
+    expect(after).toContain('    - "${glyph_row}" #from subst\n    - 12\n');
+  });
+
   it("keeps an inter-key comment when editing the multi-line value above it", () => {
     // Copilot review: a block scalar's span absorbs the trailing
     // sibling-level comment the scanner skipped, so editing that key

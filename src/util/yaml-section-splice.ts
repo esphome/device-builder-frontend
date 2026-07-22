@@ -9,7 +9,9 @@
  */
 
 import { isPlainObject } from "./nested-values.js";
+import type { ListItemSource } from "./yaml-section-list.js";
 import {
+  formatYamlScalar,
   serializeYamlValues,
   YamlRawValue,
   type SerializeYamlOptions,
@@ -38,6 +40,10 @@ export interface ParsedSection {
   // ` #hides`) per scalar key that had one, so a re-serialized edit can
   // re-append it instead of dropping it (#1235).
   comments: Map<string, string>;
+  // Per-item source fidelity for block scalar list keys, so an edited
+  // list splices per item instead of re-emitting every row (#1363).
+  // Absent when the section carried no such list.
+  listSources?: Map<string, ListItemSource>;
   childIndent: string;
   isListItem: boolean;
   // 0-indexed section header / leading-dash line.
@@ -103,6 +109,12 @@ export function buildSplicedBody(
       bodyLines.push(...lines.slice(span.leadStart, span.end));
       continue;
     }
+    const spliced =
+      span && spliceScalarList(lines, span, parsed, key, val, serializeOptions);
+    if (spliced) {
+      bodyLines.push(...spliced);
+      continue;
+    }
     // Changed / added key. Keep any standalone-comment run that led the
     // original key — the value line below reformats, the comment stays.
     if (span) bodyLines.push(...lines.slice(span.leadStart, span.start));
@@ -114,4 +126,79 @@ export function buildSplicedBody(
     bodyLines.push(...fresh);
   }
   return bodyLines;
+}
+
+const isScalarItem = (v: unknown): v is string | number | boolean =>
+  typeof v === "string" || typeof v === "number" || typeof v === "boolean";
+
+/**
+ * Per-item splice for a changed block scalar list (#1363): rows unchanged
+ * at the same position (longest common prefix + suffix) keep their source
+ * lines — inline comments, preceding whole-line comments, exact quoting —
+ * and only the middle re-emits. An in-place edit (equal lengths) also
+ * re-attaches each edited row's own inline comment. Returns ``null`` when
+ * the key isn't a block scalar list on both sides (caller falls through to
+ * the full re-emit), or when the new list is empty (the re-emit path owns
+ * the drop-the-key semantic).
+ */
+function spliceScalarList(
+  lines: string[],
+  span: KeySpan,
+  parsed: ParsedSection,
+  key: string,
+  val: unknown,
+  options: SerializeYamlOptions
+): string[] | null {
+  const src = parsed.listSources?.get(key);
+  const old = parsed.values[key];
+  if (
+    !src ||
+    src.itemLineIdxs.length === 0 ||
+    !Array.isArray(old) ||
+    !Array.isArray(val) ||
+    val.length === 0 ||
+    !old.every(isScalarItem) ||
+    !val.every(isScalarItem)
+  ) {
+    return null;
+  }
+  let prefix = 0;
+  while (prefix < old.length && prefix < val.length && old[prefix] === val[prefix]) {
+    prefix++;
+  }
+  let suffix = 0;
+  while (
+    suffix < old.length - prefix &&
+    suffix < val.length - prefix &&
+    old[old.length - 1 - suffix] === val[val.length - 1 - suffix]
+  ) {
+    suffix++;
+  }
+  const idxs = src.itemLineIdxs;
+  // Each row's group runs from just past the previous row's line (the key
+  // line for the first row), carrying the whole-line comments above it.
+  const groupStart = (i: number): number => (i === 0 ? span.start + 1 : idxs[i - 1] + 1);
+  const dashIndent = /^( *)-/.exec(lines[idxs[0]])?.[1] ?? "";
+  const inPlace = old.length === val.length;
+  const out: string[] = [];
+  out.push(...lines.slice(span.leadStart, span.start + 1));
+  for (let i = 0; i < prefix; i++) {
+    out.push(...lines.slice(groupStart(i), idxs[i] + 1));
+  }
+  for (let k = prefix; k < val.length - suffix; k++) {
+    // An in-place edit keeps the row's own preceding comments and inline
+    // comment; with add/remove the middle alignment is ambiguous, so new
+    // middle rows emit plain.
+    if (inPlace) out.push(...lines.slice(groupStart(k), idxs[k]));
+    out.push(
+      `${dashIndent}- ${formatYamlScalar(val[k])}${inPlace ? src.inlineComments[k] : ""}`
+    );
+  }
+  for (let i = old.length - suffix; i < old.length; i++) {
+    out.push(...lines.slice(groupStart(i), idxs[i] + 1));
+  }
+  // Whatever the span still owns past the last row (trailing comment
+  // lines the lead-repartition left with this key) rides along verbatim.
+  out.push(...lines.slice(idxs[old.length - 1] + 1, span.end));
+  return out;
 }
