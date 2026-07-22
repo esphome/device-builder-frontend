@@ -2787,9 +2787,9 @@ describe("bare child keys — hand-typed `key:` with no value", () => {
     "  - platform: mipi_rgb\n" +
     "    model: GUITION-4848S040\n" +
     "    rotation:\n";
+  const from = firstListItemLine(before, "display");
 
   it("parses a bare trailing child key as null", () => {
-    const from = firstListItemLine(before, "display");
     expect(parseYamlSectionValues(before, "display", from)).toEqual({
       platform: "mipi_rgb",
       model: "GUITION-4848S040",
@@ -2798,7 +2798,6 @@ describe("bare child keys — hand-typed `key:` with no value", () => {
   });
 
   it("fills the bare key in place instead of appending a duplicate", () => {
-    const from = firstListItemLine(before, "display");
     const values = parseYamlSectionValues(before, "display", from);
     values.rotation = 90;
     const after = updateSectionInYaml(before, "display", values, from);
@@ -2807,7 +2806,6 @@ describe("bare child keys — hand-typed `key:` with no value", () => {
   });
 
   it("keeps the bare key line verbatim when a sibling field changes", () => {
-    const from = firstListItemLine(before, "display");
     const values = parseYamlSectionValues(before, "display", from);
     values.model = "OTHER";
     const after = updateSectionInYaml(before, "display", values, from);

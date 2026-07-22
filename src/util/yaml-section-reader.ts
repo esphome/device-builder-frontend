@@ -213,44 +213,33 @@ export function parseSectionCore(
 
     if (raw === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
-      if (peek < lines.length) {
-        const peekLine = lines[peek];
-
-        if (isChildListItemLine(peekLine, childIndent)) {
-          const { value, endIdx, isEmptyScalarList } = parseListBlock(
-            lines,
-            i + 1,
-            childIndent
-          );
-          if (!isEmptyScalarList) {
-            values[key] = value;
-            recordSpan(key, i, endIdx);
-            i = endIdx - 1;
-          }
-          continue;
+      if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {
+        const { value, endIdx, isEmptyScalarList } = parseListBlock(
+          lines,
+          i + 1,
+          childIndent
+        );
+        if (!isEmptyScalarList) {
+          values[key] = value;
+          recordSpan(key, i, endIdx);
+          i = endIdx - 1;
         }
-
-        // Nested mapping under ``key:`` (deeper indent read from the block
-        // itself so a user-typed 4-space file recurses correctly). A
-        // comment-only block parses to zero keys; treat it like the bare
-        // key below, spanning the whole run so the comments ride along.
-        const result = readNestedMappingAfter(i + 1);
-        if (result) {
-          const hasKeys = Object.keys(result.values).length > 0;
-          values[key] = hasKeys ? result.values : null;
-          recordSpan(key, i, result.endIdx);
-          i = result.endIdx - 1;
-          continue;
-        }
+        continue;
       }
 
-      // Bare ``key:`` with nothing under it (a hand-typed key the user is
-      // about to fill in). Record it as null WITH a span: dropped, the
-      // source line is invisible to the splice writer, which then appends
-      // a second ``key:`` when the form supplies the value while the
-      // original line — outside every span — survives the splice.
-      values[key] = null;
-      recordSpan(key, i, i + 1);
+      // Nested mapping under ``key:`` (deeper indent read from the block
+      // itself so a user-typed 4-space file recurses correctly). No block
+      // — or a comment-only one — parses to null, recorded WITH a span:
+      // dropped instead, a hand-typed bare ``key:`` is invisible to the
+      // splice writer, which then appends a second ``key:`` when the form
+      // supplies the value while the original line — outside every span —
+      // survives the splice.
+      const result = readNestedMappingAfter(i + 1);
+      const endIdx = result?.endIdx ?? i + 1;
+      values[key] =
+        result && Object.keys(result.values).length > 0 ? result.values : null;
+      recordSpan(key, i, endIdx);
+      i = endIdx - 1;
       continue;
     }
 
