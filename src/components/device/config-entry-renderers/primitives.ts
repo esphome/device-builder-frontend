@@ -4,9 +4,9 @@ import { chipNameToVariant } from "../../../util/chip-variant.js";
 import { nearCanonicalOption } from "../../../util/config-validation.js";
 import { renderOptionStack } from "../../../util/option-stack.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
+import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
 import {
-  coerceValueToEntryType,
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,

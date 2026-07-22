@@ -5,8 +5,8 @@ import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { escapeForInput, unescapeForInput } from "../../../util/yaml-escape.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
+import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import {
-  coerceValueToEntryType,
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,

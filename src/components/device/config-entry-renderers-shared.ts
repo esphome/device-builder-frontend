@@ -97,11 +97,6 @@ export function effectiveDisabled(entry: ConfigEntry, ctx: RenderCtx): boolean {
   return ctx.disabled || entry.locked;
 }
 
-// ``coerceValueToEntryType`` moved to ``util/coerce-entry-value.ts`` so
-// Lit-free modules (the add-component payload coercer) can share it;
-// re-exported to keep this module's long-standing import surface.
-export { coerceValueToEntryType };
-
 /** Serialize a field path into the ``data-field-key`` attribute. JSON
  *  (not ``path.join(".")``) so a user-supplied map key that itself
  *  contains a dot (a ``logger.logs`` row keyed ``i2c.idf``) survives

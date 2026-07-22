@@ -132,4 +132,12 @@ describe("FLOAT coercion", () => {
     // and flag the real value.
     expect(coerceFields([gain], { gain: "50Hz" })).toEqual({ gain: "50Hz" });
   });
+
+  test("ships non-finite input verbatim instead of a JSON-null Infinity", () => {
+    expect(coerceFields([gain], { gain: "Infinity" })).toEqual({ gain: "Infinity" });
+  });
+
+  test("coerces a 0x literal through strict Number, not parseFloat's 0", () => {
+    expect(coerceFields([gain], { gain: "0x10" })).toEqual({ gain: 16 });
+  });
 });
