@@ -1,12 +1,10 @@
 /**
- * @vitest-environment happy-dom
- *
  * Pins the script-parameter commit coercion: ints never prefix-parse
  * (the old ``parseInt`` read ``1e309`` as 1) and floats never commit
  * Infinity, which JSON-serializes to null on the WS wire (#1361).
  */
 import { describe, expect, it } from "vitest";
-import { coerceParamValue } from "../../../../src/components/device/automation-editor/automation-action-node.js";
+import { coerceParamValue } from "../../src/util/coerce-entry-value.js";
 
 describe("coerceParamValue", () => {
   it("commits decimal int input as a number", () => {

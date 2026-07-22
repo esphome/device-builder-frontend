@@ -38,8 +38,8 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { coerceParamValue } from "../../../util/coerce-entry-value.js";
 import { fireEvent } from "../../../util/fire-event.js";
-import { coerceIntFieldValue } from "../../../util/int-input.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import "../config-entry-form.js";
@@ -69,19 +69,6 @@ import type {
   CatalogPickedDetail,
   ESPHomeCatalogPickerDialog,
 } from "./catalog-picker-dialog.js";
-
-/** Script-parameter commit coercion: ints via ``coerceIntFieldValue`` (no
- *  prefix parsing; hex / 64-bit decimals stay verbatim), floats
- *  finite-or-verbatim so Infinity can't reach the JSON wire as null. */
-export function coerceParamValue(type: string, raw: string): string | number {
-  if (raw === "") return "";
-  if (type === "int") return coerceIntFieldValue(raw);
-  if (type === "float") {
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : raw;
-  }
-  return raw;
-}
 import { applyParamChange } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -366,10 +353,6 @@ export class ESPHomeAutomationActionNode extends LitElement {
               .value=${String(this.value.params[p.name] ?? "")}
               @input=${(e: Event) => {
                 const raw = (e.target as HTMLInputElement).value;
-                // Strict coercion (#1361): parseInt prefix-parsed junk
-                // ("1e309" became 1) and an unguarded Number() could put
-                // Infinity into params, which JSON-serializes to null on
-                // the wire. Unparseable input ships verbatim instead.
                 this._patchParams({ [p.name]: coerceParamValue(p.type, raw) });
               }}
             />`

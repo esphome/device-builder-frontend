@@ -49,14 +49,10 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   if (entry.type === ConfigEntryType.INTEGER) {
     return renderIntField(entry, path, ctx);
   }
-  // An unparseable primitive ("250 steps/s", a stray boolean) blanks inside
-  // <input type="number"> and reads as unset — and an edit would write a bare
-  // number over the original value. Bail visibly instead. A string (a
-  // ${substitution}, junk, a stored "1e309") edits as text with its
-  // validation error in place — a read-only shell would strand the user,
-  // the call #1352 settled for list rows; only a non-string primitive
-  // keeps the YAML-only shell. Number(String(raw)) mirrors validateEntry's
-  // coercion; Infinity also blanks in a number input, so it bails too.
+  // An unparseable primitive blanks inside <input type="number"> and reads
+  // as unset. A string (a ${substitution}, junk, a stored "1e309") stays
+  // editable as text with its validation error in place; only a non-string
+  // primitive gets the read-only YAML-only shell.
   if (raw != null && !Number.isFinite(Number(String(raw)))) {
     return typeof raw === "string"
       ? renderStringField(entry, "text", path, ctx)
@@ -83,9 +79,6 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
       placeholder=${String(entry.default_value ?? "")}
       @input=${(e: Event) => {
         const raw = (e.target as HTMLInputElement).value;
-        // Non-finite input (a typed 1e309) ships verbatim, not Infinity —
-        // the serializer would write a bare ``Infinity`` the loader reads
-        // as a string (#1361).
         ctx.emitChange(path, coerceValueToEntryType(entry, raw));
       }}
     />`
