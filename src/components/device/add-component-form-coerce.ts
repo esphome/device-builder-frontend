@@ -63,7 +63,9 @@ export function coerceFields(
           ? raw
           : coerceValueToEntryType(entry, String(raw));
     } else if (entry.type === ConfigEntryType.BOOLEAN) {
-      out[entry.key] = parseYamlBoolean(raw) === true;
+      // parseYamlBoolean's null (junk, a ${var} reference) ships verbatim
+      // so the backend flags it — `=== true` flattened it to false (#1356).
+      out[entry.key] = parseYamlBoolean(raw) ?? raw;
     } else {
       out[entry.key] = raw;
     }

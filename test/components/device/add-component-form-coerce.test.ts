@@ -147,3 +147,25 @@ describe("FLOAT coercion", () => {
     expect(coerceFields([gain], { gain: "0x10" })).toEqual({ gain: 16 });
   });
 });
+
+describe("BOOLEAN coercion", () => {
+  const enabled = makeConfigEntry({ key: "enabled", type: ConfigEntryType.BOOLEAN });
+
+  test("passes booleans through and coerces YAML spellings", () => {
+    expect(coerceFields([enabled], { enabled: true })).toEqual({ enabled: true });
+    expect(coerceFields([enabled], { enabled: "yes" })).toEqual({ enabled: true });
+    expect(coerceFields([enabled], { enabled: "off" })).toEqual({ enabled: false });
+  });
+
+  test("ships a ${var} reference verbatim instead of false", () => {
+    expect(coerceFields([enabled], { enabled: "${enable_foo}" })).toEqual({
+      enabled: "${enable_foo}",
+    });
+  });
+
+  test("ships junk verbatim instead of false", () => {
+    expect(coerceFields([enabled], { enabled: "maybe" })).toEqual({
+      enabled: "maybe",
+    });
+  });
+});
