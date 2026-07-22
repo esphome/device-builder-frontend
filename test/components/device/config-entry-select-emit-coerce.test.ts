@@ -26,7 +26,7 @@ function emitFor(
   return emitChange.mock.calls[0][1];
 }
 
-describe("renderSelectField — emits coerce to the entry's type", () => {
+describe("renderSelectField — emits values coerced to the entry's type", () => {
   it("strict select: integer options emit numbers, booleans emit booleans", () => {
     expect(
       emitFor(ConfigEntryType.INTEGER, { options: asOptions(["0", "90"]) }, "90")
@@ -44,9 +44,15 @@ describe("renderSelectField — emits coerce to the entry's type", () => {
         "energy"
       )
     ).toBe("energy");
-    expect(
-      emitFor(ConfigEntryType.INTEGER, { options: asOptions(["0", "90"]) }, "")
-    ).toBe("");
+    // An empty-value option is what makes the select clearable; prove the
+    // clear path is live before firing it.
+    const clearable = [...asOptions(["0", "90"]), { value: "", label: "(none)" }];
+    const entry = makeEntry(ConfigEntryType.INTEGER, { options: clearable });
+    const { ctx, emitChange } = makeEmitCtx({ field: "90" });
+    const tpl = renderSelectField(entry, ["field"], ctx);
+    expect(findElementBindings(tpl, "wa-select")[0][".withClear"]).toBe(true);
+    fireChange(tpl, "");
+    expect(emitChange).toHaveBeenCalledWith(["field"], "");
   });
 
   it("suggestions select: integer suggestions emit numbers", () => {
