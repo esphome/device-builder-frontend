@@ -468,6 +468,17 @@ describe("renderBooleanField — bail branches", () => {
     expect(emitChange).toHaveBeenCalledWith(["enabled"], false);
     handler({ target: { value: "maybe" } });
     expect(emitChange).toHaveBeenCalledWith(["enabled"], "maybe");
+    handler({ target: { value: " off " } });
+    expect(emitChange).toHaveBeenCalledWith(["enabled"], false);
+    handler({ target: { value: "  " } });
+    expect(emitChange).toHaveBeenCalledWith(["enabled"], "");
+  });
+
+  it("renders the switch for a whitespace-padded spelling", () => {
+    const { ctx } = makeCtx({ enabled: " yes " });
+    const tpl = renderBooleanField(entry(), ["enabled"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(json).toContain("wa-switch");
   });
 
   it("keeps the switch for quoted boolean spellings and empty placeholder", () => {

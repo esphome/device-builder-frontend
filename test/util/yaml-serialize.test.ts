@@ -77,6 +77,12 @@ describe("parseYamlBoolean", () => {
     }
   });
 
+  it("trims surrounding whitespace before matching", () => {
+    expect(parseYamlBoolean(" true ")).toBe(true);
+    expect(parseYamlBoolean("off\n")).toBe(false);
+    expect(parseYamlBoolean("  ")).toBeNull();
+  });
+
   it("returns null for non-boolean strings and non-strings", () => {
     expect(parseYamlBoolean("maybe")).toBeNull();
     expect(parseYamlBoolean(1)).toBeNull();

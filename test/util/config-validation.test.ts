@@ -286,6 +286,7 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, true)).toBeNull();
     expect(validateEntry(entry, "yes")).toBeNull();
     expect(validateEntry(entry, "OFF")).toBeNull();
+    expect(validateEntry(entry, " true ")).toBeNull();
     expect(validateEntry(entry, "${use_dhcp}")).toBeNull();
     expect(validateEntry(entry, "")).toBeNull();
   });

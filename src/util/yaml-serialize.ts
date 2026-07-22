@@ -547,7 +547,9 @@ const YAML_FALSE_VALUES = new Set(["false", "no", "off", "disable"]);
 export function parseYamlBoolean(v: unknown): boolean | null {
   if (typeof v === "boolean") return v;
   if (typeof v === "string") {
-    const lower = v.toLowerCase();
+    // Trim like the int/float coercers: YAML plain scalars never carry
+    // surrounding whitespace, but form input can.
+    const lower = v.trim().toLowerCase();
     if (YAML_TRUE_VALUES.has(lower)) return true;
     if (YAML_FALSE_VALUES.has(lower)) return false;
   }

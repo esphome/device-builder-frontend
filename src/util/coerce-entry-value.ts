@@ -21,8 +21,12 @@ export function coerceValueToEntryType(
   if (entry.type === ConfigEntryType.INTEGER) return coerceIntFieldValue(raw);
   if (entry.type === ConfigEntryType.FLOAT) return coerceFloatFieldValue(raw);
   // Spellings emit as booleans so a corrected value serializes bare
-  // (`false`, not `"false"`).
-  if (entry.type === ConfigEntryType.BOOLEAN) return parseYamlBoolean(raw) ?? raw;
+  // (`false`, not `"false"`); blank stays blank and junk ships trimmed,
+  // mirroring the int/float coercers.
+  if (entry.type === ConfigEntryType.BOOLEAN) {
+    const v = raw.trim();
+    return v === "" ? "" : (parseYamlBoolean(v) ?? v);
+  }
   return raw;
 }
 
