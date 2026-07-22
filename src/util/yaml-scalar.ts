@@ -131,8 +131,13 @@ export const coerceListScalar = (
   }
   // Floats trade text fidelity for the loader's value: ``1.50`` re-emits
   // as ``1.5`` and extra precision truncates to the same double PyYAML
-  // hands the backend anyway.
-  if (PLAIN_FLOAT_RE.test(text)) return Number(text);
+  // hands the backend anyway. An overflowing mantissa stays a string —
+  // the serializer would emit a bare ``Infinity``, which YAML reads as
+  // a plain string anyway.
+  if (PLAIN_FLOAT_RE.test(text)) {
+    const n = Number(text);
+    return Number.isFinite(n) ? n : text;
+  }
   return text;
 };
 

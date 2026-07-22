@@ -235,4 +235,9 @@ describe("coerceListScalar via parseFlowList (#1353)", () => {
   it("coerces a leading-dot float and negative floats", () => {
     expect(parseFlowList("[.5, -1.5]")).toEqual([0.5, -1.5]);
   });
+
+  it("keeps an overflowing float mantissa as a string", () => {
+    const huge = `${"9".repeat(400)}.5`;
+    expect(parseFlowList(`[${huge}]`)).toEqual([huge]);
+  });
 });
