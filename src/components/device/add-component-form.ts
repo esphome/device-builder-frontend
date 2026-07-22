@@ -14,7 +14,11 @@ import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js"
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
-import { validateEntries, type ValidationError } from "../../util/config-validation.js";
+import {
+  clearPathErrors,
+  validateEntries,
+  type ValidationError,
+} from "../../util/config-validation.js";
 import { resolveFeaturedComponentId } from "../../util/featured-id.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -462,22 +466,12 @@ export class ESPHomeAddComponentForm extends LitElement {
     const { path, value } = e.detail;
     this._values = setIn(this._values, path, value);
     // Clear any error on the path the user just edited — including
-    // per-item keys under it (``codes.0``, #1348): a multi_value edit
-    // emits the whole array at the field path, so the offending row's
-    // error would otherwise stick until the next submit. Same for the
-    // hidden-validation block message: any user input is a fresh
-    // signal that supersedes the previous bail; the next submit
-    // attempt re-evaluates from scratch.
-    const errKey = path.join(".");
-    const itemPrefix = `${errKey}.`;
-    const stale = [...this._errors.keys()].filter(
-      (k) => k === errKey || k.startsWith(itemPrefix)
-    );
-    if (stale.length > 0) {
-      const next = new Map(this._errors);
-      for (const k of stale) next.delete(k);
-      this._errors = next;
-    }
+    // per-item keys under it, or the offending row's error sticks until
+    // the next submit. Same for the hidden-validation block message: any
+    // user input is a fresh signal that supersedes the previous bail;
+    // the next submit attempt re-evaluates from scratch.
+    const cleared = clearPathErrors(this._errors, path.join("."));
+    if (cleared) this._errors = cleared;
     if (this._localBlockMessage) this._localBlockMessage = "";
   }
 

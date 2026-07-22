@@ -125,6 +125,23 @@ export interface ValidationError {
   params?: Record<string, string | number>;
 }
 
+/**
+ * *errors* without *pathKey* and its per-item descendants (``codes`` also
+ * clears ``codes.0`` — a multi_value edit emits at the field path, #1348),
+ * or ``null`` when nothing matched so callers can skip the state write.
+ */
+export function clearPathErrors(
+  errors: ReadonlyMap<string, ValidationError>,
+  pathKey: string
+): Map<string, ValidationError> | null {
+  const prefix = `${pathKey}.`;
+  const stale = [...errors.keys()].filter((k) => k === pathKey || k.startsWith(prefix));
+  if (stale.length === 0) return null;
+  const next = new Map(errors);
+  for (const k of stale) next.delete(k);
+  return next;
+}
+
 /* Mirrors esphome's ``ALLOWED_NAME_CHARS`` (const.py) — what
    ``esphome rename`` and the YAML ``name:`` validator both accept.
    Underscore is included because plenty of existing configs already

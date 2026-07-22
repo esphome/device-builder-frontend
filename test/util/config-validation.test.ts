@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ConfigValueOption } from "../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import {
+  clearPathErrors,
   getDeviceNameWarning,
   isEntryVisible,
   nearCanonicalOption,
@@ -887,5 +888,24 @@ describe("validateEntries — multi_value lists the form can't itemize", () => {
       hidden: true,
     });
     expect(validateEntries([entry], { codes: [] }).size).toBe(0);
+  });
+});
+
+describe("clearPathErrors", () => {
+  const errs = () =>
+    new Map([
+      ["codes", { key: "codes", code: "validation.required" }],
+      ["codes.0", { key: "codes.0", code: "validation.not_a_number" }],
+      ["codes_extra", { key: "codes_extra", code: "validation.required" }],
+    ]);
+
+  it("clears the key and its per-item descendants, not prefix-string siblings", () => {
+    const next = clearPathErrors(errs(), "codes");
+    expect(next).not.toBeNull();
+    expect([...next!.keys()]).toEqual(["codes_extra"]);
+  });
+
+  it("returns null when nothing matches", () => {
+    expect(clearPathErrors(errs(), "other")).toBeNull();
   });
 });

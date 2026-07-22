@@ -1,4 +1,4 @@
-import { validateEntries } from "../../../util/config-validation.js";
+import { clearPathErrors, validateEntries } from "../../../util/config-validation.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { formatApiError } from "../../../util/format-api-error.js";
 import { setIn } from "../../../util/nested-values.js";
@@ -69,11 +69,8 @@ export function onValueChange(
   host._values = setIn(host._values, path, value);
   host._setDirty(true);
   const errKey = path.join(".");
-  if (host._fieldErrors.has(errKey)) {
-    const next = new Map(host._fieldErrors);
-    next.delete(errKey);
-    host._fieldErrors = next;
-  }
+  const cleared = clearPathErrors(host._fieldErrors, errKey);
+  if (cleared) host._fieldErrors = cleared;
   // Same optimistic clear for the backend error on the edited path — it
   // reappears on the next lint pass if the value is still invalid.
   if (host.backendErrors.fields.has(errKey) && !host._clearedBackendPaths.has(errKey)) {
