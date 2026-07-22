@@ -76,14 +76,14 @@ export function onValueChange(
   // backend error keys ``field.1``, #1354). They reappear on the next lint
   // pass if the value is still invalid.
   const itemPrefix = `${errKey}.`;
-  const staleBackend = [...host.backendErrors.fields.keys()].filter(
-    (k) => (k === errKey || k.startsWith(itemPrefix)) && !host._clearedBackendPaths.has(k)
-  );
-  if (staleBackend.length > 0) {
-    const next = new Set(host._clearedBackendPaths);
-    for (const k of staleBackend) next.add(k);
-    host._clearedBackendPaths = next;
+  let nextCleared: Set<string> | null = null;
+  for (const k of host.backendErrors.fields.keys()) {
+    if ((k === errKey || k.startsWith(itemPrefix)) && !host._clearedBackendPaths.has(k)) {
+      nextCleared ??= new Set(host._clearedBackendPaths);
+      nextCleared.add(k);
+    }
   }
+  if (nextCleared) host._clearedBackendPaths = nextCleared;
   host._scheduleDraftFlush();
 }
 
