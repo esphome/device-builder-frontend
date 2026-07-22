@@ -126,9 +126,10 @@ export interface ValidationError {
 }
 
 /**
- * *errors* without *pathKey* and its per-item descendants (``codes`` also
- * clears ``codes.0`` — a multi_value edit emits at the field path, #1348),
- * or ``null`` when nothing matched so callers can skip the state write.
+ * Return a copy of *errors* without *pathKey* and its per-item descendants
+ * (``codes`` also clears ``codes.0`` — a multi_value edit emits at the field
+ * path, #1348), or ``null`` when nothing matched so callers can skip the
+ * state write.
  */
 export function clearPathErrors(
   errors: ReadonlyMap<string, ValidationError>,
