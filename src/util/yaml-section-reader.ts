@@ -229,11 +229,11 @@ export function parseSectionCore(
 
       // Nested mapping under ``key:`` (deeper indent read from the block
       // itself so a user-typed 4-space file recurses correctly). No block
-      // — or a comment-only one — parses to null, recorded WITH a span:
-      // dropped instead, a hand-typed bare ``key:`` is invisible to the
-      // splice writer, which then appends a second ``key:`` when the form
-      // supplies the value while the original line — outside every span —
-      // survives the splice.
+      // — or a comment-only one — parses to null but is still recorded
+      // WITH a span. If the bare key were dropped instead, its source
+      // line would be invisible to the splice writer, which would then
+      // append a second ``key:`` when the form supplies the value while
+      // the original line — outside every span — survives the splice.
       const result = readNestedMappingAfter(i + 1);
       const endIdx = result?.endIdx ?? i + 1;
       values[key] =

@@ -2873,6 +2873,28 @@ describe("bare child keys — hand-typed `key:` with no value", () => {
     expect(after).toContain("other: z");
   });
 
+  it("fills a bare sole inline key through the dash rewrite", () => {
+    // A bare key riding the dash line (`- rotation:`) deliberately does
+    // NOT get the null-with-span treatment: the dash line has no span
+    // by design and the form is authoritative there, so the writer
+    // rewrites the dash in place (a null form value would instead
+    // collapse the dash and drop the key on a no-op save).
+    const yaml = "display:\n  - rotation:\n";
+    const from = firstListItemLine(yaml, "display");
+    expect(parseYamlSectionValues(yaml, "display", from)).toEqual({});
+    const after = updateSectionInYaml(yaml, "display", { rotation: 90 }, from);
+    expect(after.match(/rotation:/g)).toHaveLength(1);
+    expect(after).toContain("- rotation: 90");
+  });
+
+  it("keeps a bare sole inline key verbatim on an untouched save", () => {
+    const yaml = "display:\n  - rotation:\n";
+    const from = firstListItemLine(yaml, "display");
+    const values = parseYamlSectionValues(yaml, "display", from);
+    const after = updateSectionInYaml(yaml, "display", values, from);
+    expect(after).toContain("- rotation:");
+  });
+
   it("fills a bare key that a sibling list item follows", () => {
     const yaml =
       "display:\n" +
