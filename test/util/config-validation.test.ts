@@ -860,7 +860,7 @@ describe("validateEntries — scalar multi_value lists (#1348)", () => {
   });
 
   it("walks a required entry's array default per item, not stringified", () => {
-    const entry = intList({ required: true, default_value: [3, 5] as never });
+    const entry = intList({ required: true, default_value: [3, 5] });
     expect(validateEntries([entry], {}).size).toBe(0);
   });
 
