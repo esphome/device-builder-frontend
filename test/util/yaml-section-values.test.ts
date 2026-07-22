@@ -2705,3 +2705,45 @@ describe("parseYamlSectionValues — flow list with comma-containing items", () 
     expect(values.items).toEqual(["a", "b"]);
   });
 });
+
+describe("numeric list items parse as numbers (#1353)", () => {
+  it("parses unquoted plain decimals in flow and block lists as numbers", () => {
+    const flow = `display:
+  data: [10, 1.5, 0x76, "3", \${glyph_row}]
+`;
+    expect(parseYamlSectionValues(flow, "display").data).toEqual([
+      10,
+      1.5,
+      "0x76",
+      "3",
+      "${glyph_row}",
+    ]);
+
+    const block = `wifi:
+  channels:
+    - 1
+    - "6"
+    - 11
+`;
+    expect(parseYamlSectionValues(block, "wifi").channels).toEqual([1, "6", 11]);
+  });
+
+  it("re-emits sibling numerics bare when one flow-list item changes", () => {
+    // The #1353 repro shape: a flow list inside a list-item mapping
+    // (lcd_pcf8574 user_characters.data). Numeric siblings must come back
+    // bare; only the substitution keeps the protective quoting.
+    const yaml = `display:
+  - platform: lcd_pcf8574
+    user_characters:
+      - position: 0
+        data: [\${glyph_row}, 10, 10]
+`;
+    const from = firstListItemLine(yaml, "display");
+    const values = parseYamlSectionValues(yaml, "display", from);
+    const chars = values.user_characters as { data: (string | number)[] }[];
+    expect(chars[0].data).toEqual(["${glyph_row}", 10, 10]);
+    chars[0].data[1] = 11;
+    const after = updateSectionInYaml(yaml, "display", values, from);
+    expect(after).toContain('data: ["${glyph_row}", 11, 10]');
+  });
+});

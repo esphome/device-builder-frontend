@@ -9,6 +9,7 @@ import {
   parseFlowList,
   parseScalar,
   splitInlineComment,
+  coerceListScalar,
   stripQuotes,
 } from "./yaml-scalar.js";
 import {
@@ -26,15 +27,19 @@ export const collectBlockListItems = (
   startIdx: number,
   prefix: string,
   itemRegex: RegExp
-): { items: string[]; endIdx: number } => {
-  const items: string[] = [];
+): { items: (string | number)[]; endIdx: number } => {
+  const items: (string | number)[] = [];
   let j = startIdx;
   for (; j < lines.length; j++) {
     if (isBlankOrCommentLine(lines[j])) continue;
     if (!lines[j].startsWith(prefix)) break;
     const m = lines[j].match(itemRegex);
     if (!m) break;
-    items.push(stripQuotes(m[1].trim()));
+    const raw = m[1].trim();
+    const wasQuoted =
+      (raw.startsWith('"') && raw.endsWith('"')) ||
+      (raw.startsWith("'") && raw.endsWith("'"));
+    items.push(coerceListScalar(stripQuotes(raw), wasQuoted));
   }
   return { items, endIdx: j };
 };

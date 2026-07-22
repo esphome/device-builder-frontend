@@ -191,3 +191,24 @@ describe("parseFlowList", () => {
     expect(parseFlowList('["\\U000F058F", plain]')).toEqual([MDI, "plain"]);
   });
 });
+
+describe("coerceListScalar via parseFlowList (#1353)", () => {
+  it("coerces unquoted plain decimals and floats to numbers", () => {
+    expect(parseFlowList("[10, -3, 1.5, 0]")).toEqual([10, -3, 1.5, 0]);
+  });
+
+  it("keeps quoted numerics as strings", () => {
+    expect(parseFlowList("['10', \"3\"]")).toEqual(["10", "3"]);
+  });
+
+  it("keeps hex, exponent, and leading-zero forms as strings", () => {
+    // 0x76 round-trips bare through the serializer's hex carve-out; 010 is
+    // octal 8 in YAML 1.1 so Number() would silently rewrite it; 1e3 keeps
+    // the authored form.
+    expect(parseFlowList("[0x76, 1e3, 010, .5]")).toEqual(["0x76", "1e3", "010", ".5"]);
+  });
+
+  it("leaves substitution references and words alone", () => {
+    expect(parseFlowList("[${ch}, abc]")).toEqual(["${ch}", "abc"]);
+  });
+});

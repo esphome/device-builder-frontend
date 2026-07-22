@@ -94,7 +94,26 @@ export const parseScalar = (raw: string): unknown => {
   return v;
 };
 
-export const parseFlowList = (raw: string): string[] => {
+// Plain-decimal forms only: unambiguous across YAML versions. Hex stays a
+// string (the i2c-address round-trip keeps ``0x76`` verbatim), and a leading
+// zero (``010``) or exponent stays a string too — YAML 1.1 reads ``010`` as
+// octal 8, so Number() would silently rewrite it.
+const PLAIN_INT_RE = /^-?(?:0|[1-9]\d*)$/;
+const PLAIN_FLOAT_RE = /^-?(?:0|[1-9]\d*)\.\d+$/;
+
+/**
+ * A list item's parsed value: unquoted plain decimals become numbers so
+ * the serializer re-emits them bare — string-typed ``10`` would re-quote
+ * every sibling when the list re-serializes (#1353). Quotes are the
+ * explicit "treat me as a string" signal, same rule as ``parseScalar``.
+ */
+export const coerceListScalar = (text: string, wasQuoted: boolean): string | number => {
+  if (wasQuoted) return text;
+  if (PLAIN_INT_RE.test(text) || PLAIN_FLOAT_RE.test(text)) return Number(text);
+  return text;
+};
+
+export const parseFlowList = (raw: string): (string | number)[] => {
   const inner = raw.slice(1, -1).trim();
   if (inner === "") return [];
   // Quote-aware split: a quoted element may itself contain a comma (the
@@ -104,8 +123,10 @@ export const parseFlowList = (raw: string): string[] => {
   // literal backslash text (device-builder#1232).
   return splitTopLevelCommas(inner).map((p) => {
     const t = p.trim();
-    return t.length >= 2 && t.startsWith('"') && t.endsWith('"')
-      ? unescapeYamlDoubleQuoted(t.slice(1, -1))
-      : stripQuotes(t);
+    if (t.length >= 2 && t.startsWith('"') && t.endsWith('"')) {
+      return unescapeYamlDoubleQuoted(t.slice(1, -1));
+    }
+    const wasQuoted = t.length >= 2 && t.startsWith("'") && t.endsWith("'");
+    return coerceListScalar(stripQuotes(t), wasQuoted);
   });
 };
