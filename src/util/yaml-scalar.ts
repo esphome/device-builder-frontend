@@ -95,7 +95,11 @@ export const parseScalar = (raw: string): unknown => {
 // Plain-decimal forms only: unambiguous across YAML versions. Hex stays a
 // string (the i2c-address round-trip keeps ``0x76`` verbatim), and a leading
 // zero (``010``) or exponent stays a string too — YAML 1.1 reads ``010`` as
-// octal 8, so Number() would silently rewrite it.
+// octal 8, so Number() would silently rewrite it. Deliberately narrower
+// than yaml-serialize's YAML_INT/YAML_FLOAT recognition sets (which decide
+// quoting, so must match every form the loader re-types) and int-input's
+// DECIMAL_INT_RE (form input, leading zeros fine): coerce only what
+// Number() provably reads the same as the loader.
 const PLAIN_INT_RE = /^-?(?:0|[1-9]\d*)$/;
 const PLAIN_FLOAT_RE = /^-?(?:(?:0|[1-9]\d*)\.\d+|\.\d+)$/;
 
