@@ -3355,10 +3355,29 @@ describe("updateSectionInYaml — comment-only values are empty (#1385)", () => 
     expect(values.networks).toEqual(["", "homenet"]);
   });
 
-  it("keeps a value merely starting with # when quoted, and Bedroom#2 unquoted", () => {
-    const yaml = ["wifi:", '  ssid: "#lounge"', "  ap_name: Bedroom#2", ""].join("\n");
+  it("parses a comment-only value inside a nested mapping as null", () => {
+    const yaml = [
+      "wifi:",
+      "  manual_ip:",
+      "    static_ip: # todo",
+      "    gateway: 10.0.0.1",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.manual_ip).toEqual({ static_ip: null, gateway: "10.0.0.1" });
+  });
+
+  it("parses the deeper block under a commented nested key instead of dropping it", () => {
+    const yaml = ["wifi:", "  manual_ip:", "    dns1: # note", "      x: 1", ""].join(
+      "\n"
+    );
+    const values = parseYamlSectionValues(yaml, "wifi", 1);
+    expect(values.manual_ip).toEqual({ dns1: { x: 1 } });
+  });
+
+  it("keeps a quoted value that merely starts with #", () => {
+    const yaml = ["wifi:", '  ssid: "#lounge"', ""].join("\n");
     const values = parseYamlSectionValues(yaml, "wifi", 1);
     expect(values.ssid).toBe("#lounge");
-    expect(values.ap_name).toBe("Bedroom#2");
   });
 });

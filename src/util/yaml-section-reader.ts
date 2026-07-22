@@ -9,7 +9,12 @@
 
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { blockScalarValue } from "./yaml-block-scalar-value.js";
-import { parseFlowList, parseScalar, splitInlineComment } from "./yaml-scalar.js";
+import {
+  parseFlowList,
+  parseScalar,
+  splitInlineComment,
+  splitTrimmedInlineComment,
+} from "./yaml-scalar.js";
 import { parseListBlock, parseNestedBlock } from "./yaml-section-block-reader.js";
 import {
   _detectSectionChildIndent,
@@ -218,7 +223,7 @@ export function parseSectionCore(
     // comment-only value ``key: # note`` is an empty value to the loader,
     // #1385), the flow-list test (`[a, b] # c` doesn't end with `]`), and
     // scalar parsing — and record it so an edit can re-append it (#1235).
-    const { value: scalar, comment } = splitInlineComment(raw, true);
+    const { value: scalar, comment } = splitTrimmedInlineComment(raw);
     if (scalar === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
       if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {

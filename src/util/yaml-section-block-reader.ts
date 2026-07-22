@@ -14,7 +14,7 @@ import {
   isEditableLambdaBlock,
   lambdaValueFromBlock,
 } from "./yaml-block-scalar-value.js";
-import { parseFlowList, parseScalar, splitInlineComment } from "./yaml-scalar.js";
+import { parseFlowList, parseScalar, splitTrimmedInlineComment } from "./yaml-scalar.js";
 import {
   _detectListItemChildIndent,
   _leadingIndent,
@@ -402,7 +402,12 @@ function parseNestedBlock(
       continue;
     }
 
-    if (raw === "") {
+    // Strip a trailing line comment before the empty test (a comment-only
+    // ``key: # note`` is an empty value, #1385) and the bracket test —
+    // without the latter ``key: [1, 2] # note`` misses the flow branch
+    // and degrades to the literal string "[1, 2]".
+    const { value: scalar } = splitTrimmedInlineComment(raw);
+    if (scalar === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
       // ``key:`` followed by a block list. Accept both the standard
       // (deeper-indent) and compact (same-indent) forms; the compact
@@ -423,18 +428,18 @@ function parseNestedBlock(
           continue;
         }
       }
+      // Value-less key: structurally ``{key: null}``, same as the
+      // top-level reader; the serializer's null filter keeps it out of
+      // re-emits either way.
+      values[key] = null;
       i++;
       continue;
     }
 
-    // Strip a trailing line comment before the bracket test — the other
-    // flow-list sites do, and without it ``key: [1, 2] # note`` misses
-    // the flow branch and degrades to the literal string "[1, 2]".
-    const { value: scalar } = splitInlineComment(raw);
     if (scalar.startsWith("[") && scalar.endsWith("]")) {
       values[key] = parseFlowList(scalar);
     } else {
-      values[key] = parseScalar(raw);
+      values[key] = parseScalar(scalar);
     }
     i++;
   }

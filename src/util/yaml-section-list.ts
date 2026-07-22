@@ -10,7 +10,7 @@ import {
   isQuotedScalar,
   parseFlowList,
   parseScalar,
-  splitInlineComment,
+  splitTrimmedInlineComment,
   stripQuotes,
 } from "./yaml-scalar.js";
 import {
@@ -59,7 +59,7 @@ export const collectBlockListItems = (
     // Strip a trailing inline comment (``- 10 # note``) so the item
     // coerces and the form value isn't polluted with ``# ...`` text —
     // same rule as parseScalar (#1235).
-    const { value: raw, comment } = splitInlineComment(m[1].trim(), true);
+    const { value: raw, comment } = splitTrimmedInlineComment(m[1].trim());
     items.push(coerceYamlScalar(stripQuotes(raw), isQuotedScalar(raw)));
     itemRanges.push([j, j + 1]);
     inlineComments.push(comment);
@@ -122,12 +122,12 @@ export const parseFlatMappingField = (
   // section editor instead of falling back to YamlRawValue. #941. The
   // comment is also stripped before the ``[...]`` test so a flow list
   // with a trailing comment still reads as an array (device-builder#1232).
-  const { value: scalar } = splitInlineComment(raw, true);
+  const { value: scalar } = splitTrimmedInlineComment(raw);
   if (scalar === "") return { key, value: null };
   if (scalar.startsWith("[") && scalar.endsWith("]")) {
     return { key, value: parseFlowList(scalar) };
   }
-  return { key, value: parseScalar(raw) };
+  return { key, value: parseScalar(scalar) };
 };
 
 /**
