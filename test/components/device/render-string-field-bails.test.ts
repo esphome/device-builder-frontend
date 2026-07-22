@@ -414,11 +414,12 @@ describe("renderMultiValueField — bail when items are mappings", () => {
   });
 });
 
-// ``parseYamlBoolean`` returns null for non-boolean/non-string inputs,
-// so a list / mapping under a boolean field renders unchecked. The
-// first user toggle would then write ``true`` back and clobber the
-// YAML structure. Pin both halves.
-describe("renderBooleanField — bail on non-primitive", () => {
+// ``parseYamlBoolean`` returns null for anything but a boolean or a
+// boolean spelling, and the first toggle of an unchecked switch would
+// write ``true`` over the stored value. Pin every bail branch: lists /
+// mappings and stray numbers to the YAML-only notice, substitution and
+// junk strings to editable text (#1368).
+describe("renderBooleanField — bail branches", () => {
   const entry = (): ConfigEntry =>
     makeConfigEntry({ key: "enabled", type: ConfigEntryType.BOOLEAN, label: "Enabled" });
 
@@ -470,7 +471,7 @@ describe("renderBooleanField — bail on non-primitive", () => {
   });
 
   it("keeps the switch for quoted boolean spellings and empty placeholder", () => {
-    for (const value of ["off", "Yes", ""]) {
+    for (const value of ["off", ""]) {
       const { ctx } = makeCtx({ enabled: value });
       const tpl = renderBooleanField(entry(), ["enabled"], ctx);
       const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));

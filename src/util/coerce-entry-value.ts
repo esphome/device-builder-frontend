@@ -20,8 +20,8 @@ export function coerceValueToEntryType(
 ): string | number | boolean {
   if (entry.type === ConfigEntryType.INTEGER) return coerceIntFieldValue(raw);
   if (entry.type === ConfigEntryType.FLOAT) return coerceFloatFieldValue(raw);
-  // Boolean spellings emit as booleans so a corrected value serializes
-  // bare (`false`, not `"false"`); junk/substitutions ship verbatim.
+  // Spellings emit as booleans so a corrected value serializes bare
+  // (`false`, not `"false"`).
   if (entry.type === ConfigEntryType.BOOLEAN) return parseYamlBoolean(raw) ?? raw;
   return raw;
 }

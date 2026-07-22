@@ -3,7 +3,6 @@ import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { coerceValueToEntryType } from "../../util/coerce-entry-value.js";
 import { coerceIntFieldValue } from "../../util/int-input.js";
 import { asMappingList, asRecord } from "../../util/nested-values.js";
-import { parseYamlBoolean } from "../../util/yaml-serialize.js";
 
 /**
  * Coerce raw form values for the WS payload: numbers / booleans to
@@ -63,10 +62,10 @@ export function coerceFields(
           ? raw
           : coerceValueToEntryType(entry, String(raw));
     } else if (entry.type === ConfigEntryType.BOOLEAN) {
-      // parseYamlBoolean's null (junk, a ${var} reference) ships verbatim
-      // so the backend resolves or rejects the real value — `=== true`
-      // flattened it to false (#1356).
-      out[entry.key] = parseYamlBoolean(raw) ?? raw;
+      // Junk and ${var} references ship verbatim so the backend resolves
+      // or rejects the real value — `=== true` flattened it to false (#1356).
+      out[entry.key] =
+        typeof raw === "boolean" ? raw : coerceValueToEntryType(entry, String(raw));
     } else {
       out[entry.key] = raw;
     }

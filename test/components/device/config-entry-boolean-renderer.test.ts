@@ -52,11 +52,12 @@ describe("renderBooleanField default-value fallback", () => {
     // that lands the catalog default into a single intermediate
     // (commonly named ``effective``) before the boolean coercion.
     //
-    // Accept either of the two shapes likely to be used:
+    // Accept the shapes likely to be used:
     //
     //   const <name> = raw === undefined || raw === null
     //     ? entry.default_value : raw;
     //   const <name> = raw ?? entry.default_value;
+    //   ... (raw == null ? parseYamlBoolean(entry.default_value) : parsed) ...
     //
     // The ``checked`` line below must then derive from that
     // intermediate (or from ``entry.default_value`` directly), so
@@ -65,7 +66,9 @@ describe("renderBooleanField default-value fallback", () => {
     const fallbackShape =
       /=\s*raw\s*===\s*undefined\s*\|\|\s*raw\s*===\s*null\s*\?\s*entry\.default_value\s*:\s*raw/.test(
         fnSrc
-      ) || /=\s*raw\s*\?\?\s*entry\.default_value/.test(fnSrc);
+      ) ||
+      /=\s*raw\s*\?\?\s*entry\.default_value/.test(fnSrc) ||
+      /raw\s*==\s*null\s*\?\s*parseYamlBoolean\(entry\.default_value\)/.test(fnSrc);
     expect(
       fallbackShape,
       "renderBooleanField must compute an intermediate that falls " +
