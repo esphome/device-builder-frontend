@@ -205,10 +205,31 @@ describe("coerceListScalar via parseFlowList (#1353)", () => {
     // 0x76 round-trips bare through the serializer's hex carve-out; 010 is
     // octal 8 in YAML 1.1 so Number() would silently rewrite it; 1e3 keeps
     // the authored form.
-    expect(parseFlowList("[0x76, 1e3, 010, .5]")).toEqual(["0x76", "1e3", "010", ".5"]);
+    expect(parseFlowList("[0x76, 1e3, 010]")).toEqual(["0x76", "1e3", "010"]);
   });
 
   it("leaves substitution references and words alone", () => {
     expect(parseFlowList("[${ch}, abc]")).toEqual(["${ch}", "abc"]);
+  });
+
+  it("keeps a >2^53 decimal as a string (no silent digit rewrite)", () => {
+    expect(parseFlowList("[18446744073709551615, 1]")).toEqual([
+      "18446744073709551615",
+      1,
+    ]);
+  });
+
+  it("coerces bare true/false but keeps other truthy spellings", () => {
+    expect(parseFlowList("[true, false, on, yes, 'true']")).toEqual([
+      true,
+      false,
+      "on",
+      "yes",
+      "true",
+    ]);
+  });
+
+  it("coerces a leading-dot float and negative floats", () => {
+    expect(parseFlowList("[.5, -1.5]")).toEqual([0.5, -1.5]);
   });
 });

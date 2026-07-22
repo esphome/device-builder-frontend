@@ -64,7 +64,7 @@ const parseListBlock = (
   startIdx: number,
   parentIndent: string
 ): {
-  value: YamlRawValue | Record<string, unknown>[] | (string | number)[];
+  value: YamlRawValue | Record<string, unknown>[] | (string | number | boolean)[];
   endIdx: number;
   isEmptyScalarList: boolean;
 } => {

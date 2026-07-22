@@ -6,10 +6,11 @@
  */
 
 import {
+  coerceListScalar,
+  isQuotedScalar,
   parseFlowList,
   parseScalar,
   splitInlineComment,
-  coerceListScalar,
   stripQuotes,
 } from "./yaml-scalar.js";
 import {
@@ -27,8 +28,8 @@ export const collectBlockListItems = (
   startIdx: number,
   prefix: string,
   itemRegex: RegExp
-): { items: (string | number)[]; endIdx: number } => {
-  const items: (string | number)[] = [];
+): { items: (string | number | boolean)[]; endIdx: number } => {
+  const items: (string | number | boolean)[] = [];
   let j = startIdx;
   for (; j < lines.length; j++) {
     if (isBlankOrCommentLine(lines[j])) continue;
@@ -36,10 +37,7 @@ export const collectBlockListItems = (
     const m = lines[j].match(itemRegex);
     if (!m) break;
     const raw = m[1].trim();
-    const wasQuoted =
-      (raw.startsWith('"') && raw.endsWith('"')) ||
-      (raw.startsWith("'") && raw.endsWith("'"));
-    items.push(coerceListScalar(stripQuotes(raw), wasQuoted));
+    items.push(coerceListScalar(stripQuotes(raw), isQuotedScalar(raw)));
   }
   return { items, endIdx: j };
 };

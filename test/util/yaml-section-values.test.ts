@@ -2726,6 +2726,13 @@ describe("numeric list items parse as numbers (#1353)", () => {
     - 11
 `;
     expect(parseYamlSectionValues(block, "wifi").channels).toEqual([1, "6", 11]);
+
+    const single = `wifi:
+  channels:
+    - '10'
+    - 11
+`;
+    expect(parseYamlSectionValues(single, "wifi").channels).toEqual(["10", 11]);
   });
 
   it("re-emits sibling numerics bare when one flow-list item changes", () => {
