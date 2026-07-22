@@ -193,10 +193,11 @@ export function renderTimePeriodField(
   const parsed = parseTimePeriodScalar(raw);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
-  // Compound / unparseable strings fall through to a plain text
-  // input so the user can keep editing the raw form they pasted.
+  // Compound / unparseable values fall through to the shared fallback: a
+  // string (a pasted "1h30m") stays editable as text; a non-string
+  // primitive gets the YAML-only shell instead of a type-clobbering input.
   if (!parsed.parseable) {
-    return renderStringField(entry, "text", path, ctx);
+    return renderUnparseableScalarField(entry, path, ctx, raw);
   }
   // Split the catalog's default ("5s") into its numeric prefix
   // for the placeholder — the magnitude input shows only the
@@ -324,16 +325,20 @@ export function renderFloatWithUnitField(
           @input=${(e: Event) => {
             const raw = (e.target as HTMLInputElement).value;
             ctx.setEditingMagnitude(path, raw);
-            // Clearing magnitude drops the unit (`{null, kHz}` serializes to "");
-            // stash the unit so the next render's fallback doesn't snap back to canonical.
-            if (raw === "") ctx.setPendingUnit(path, unit);
+            if (raw === "") {
+              // Clearing magnitude drops the unit (`{null, kHz}` serializes to "");
+              // stash the unit so the next render's fallback doesn't snap back to canonical.
+              ctx.setPendingUnit(path, unit);
+              emit({ value: null, unit });
+              return;
+            }
             const next = coerceFloatFieldValue(raw);
-            if (typeof next === "string" && next !== "") {
+            if (typeof next === "number") {
+              emit({ value: next, unit });
+            } else {
               // Non-finite input ships verbatim so the validator flags it
               // instead of the serializer silently clearing the value (#1365).
               ctx.emitChange(path, next);
-            } else {
-              emit({ value: next === "" ? null : next, unit });
             }
           }}
           @blur=${() => ctx.clearEditingMagnitude(path)}

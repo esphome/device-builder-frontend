@@ -296,7 +296,7 @@ export function renderYamlOnlyFallbackIfNonPrimitive(
   return renderYamlOnlyField(entry, path, ctx);
 }
 
-/** Fallback for a primitive a numeric widget can't represent: a string (a
+/** Fallback for a primitive a typed widget can't represent: a string (a
  *  ${substitution}, junk, a stored "1e309") stays editable as text with its
  *  validation error in place; any other primitive gets the YAML-only shell. */
 export function renderUnparseableScalarField(

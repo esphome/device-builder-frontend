@@ -174,3 +174,24 @@ export function findElementBindings(
 ): Record<string, unknown>[] {
   return findTemplatesByAnchor(template, `<${tag}`).map(extractAttributeBindings);
 }
+
+/** Fire the first rendered ``<input>``'s ``@input`` handler with *value*. */
+export function fireInput(template: unknown, value: string): void {
+  const handler = findElementBindings(template, "input")[0]["@input"] as (
+    e: unknown
+  ) => void;
+  handler({ target: { value } });
+}
+
+/** A boardless RenderCtx plus its ``emitChange`` spy, for commit tests. */
+export function makeEmitCtx(
+  values: unknown,
+  overrides: Partial<RenderCtx> = {}
+): { ctx: RenderCtx; emitChange: ReturnType<typeof vi.fn> } {
+  const emitChange = vi.fn();
+  const ctx = makeRenderCtx(values, {
+    board: null,
+    overrides: { emitChange, ...overrides },
+  });
+  return { ctx, emitChange };
+}
