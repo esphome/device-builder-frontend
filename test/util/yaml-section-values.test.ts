@@ -1415,32 +1415,6 @@ describe("updateSectionInYaml — preserves untouched field byte layout (#1227)"
     );
   });
 
-  it("keeps flow style and the trailing comment when a flow list is edited (#1378)", () => {
-    const before = ["display:", "  data: [10, 12] # note", "  size: 20", ""].join("\n");
-    const values = parseYamlSectionValues(before, "display", 1);
-    (values.data as unknown[])[1] = 13;
-    const after = updateSectionInYaml(before, "display", values, 1);
-    expect(after).toContain("  data: [10, 13] # note\n");
-    expect(after).not.toContain("- 10");
-  });
-
-  it("keeps flow-indicator quoting on substitution items through a flow edit", () => {
-    const before = ["display:", '  data: ["${glyph_row}", 10] # glyphs', ""].join("\n");
-    const values = parseYamlSectionValues(before, "display", 1);
-    (values.data as unknown[])[1] = 11;
-    const after = updateSectionInYaml(before, "display", values, 1);
-    expect(after).toContain('  data: ["${glyph_row}", 11] # glyphs\n');
-  });
-
-  it("drops the key when a flow list is emptied", () => {
-    const before = ["display:", "  data: [10, 12] # note", "  size: 20", ""].join("\n");
-    const values = parseYamlSectionValues(before, "display", 1);
-    values.data = [];
-    const after = updateSectionInYaml(before, "display", values, 1);
-    expect(after).not.toContain("data:");
-    expect(after).toContain("size: 20");
-  });
-
   it("re-emits plain on a wholesale list replacement (no stale comments)", () => {
     const before = ["wifi:", "  networks:", "    - a #one", "    - b #two", ""].join(
       "\n"
@@ -3051,5 +3025,33 @@ describe("bare child keys — hand-typed `key:` with no value", () => {
     expect(after).toContain("rotation: 180");
     // The second platform item is untouched and still follows the first.
     expect(after.indexOf("rotation: 180")).toBeLessThan(after.indexOf("ili9xxx"));
+  });
+});
+
+describe("updateSectionInYaml — flow list edits keep flow style (#1378)", () => {
+  it("keeps flow style and the trailing comment when a flow list is edited (#1378)", () => {
+    const before = ["display:", "  data: [10, 12] # note", "  size: 20", ""].join("\n");
+    const values = parseYamlSectionValues(before, "display", 1);
+    (values.data as unknown[])[1] = 13;
+    const after = updateSectionInYaml(before, "display", values, 1);
+    expect(after).toContain("  data: [10, 13] # note\n");
+    expect(after).not.toContain("- 10");
+  });
+
+  it("keeps flow-indicator quoting on substitution items through a flow edit", () => {
+    const before = ["display:", '  data: ["${glyph_row}", 10] # glyphs', ""].join("\n");
+    const values = parseYamlSectionValues(before, "display", 1);
+    (values.data as unknown[])[1] = 11;
+    const after = updateSectionInYaml(before, "display", values, 1);
+    expect(after).toContain('  data: ["${glyph_row}", 11] # glyphs\n');
+  });
+
+  it("drops the key when a flow list is emptied", () => {
+    const before = ["display:", "  data: [10, 12] # note", "  size: 20", ""].join("\n");
+    const values = parseYamlSectionValues(before, "display", 1);
+    values.data = [];
+    const after = updateSectionInYaml(before, "display", values, 1);
+    expect(after).not.toContain("data:");
+    expect(after).toContain("size: 20");
   });
 });

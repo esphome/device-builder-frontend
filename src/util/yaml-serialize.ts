@@ -274,7 +274,7 @@ function serializeListItem(
           (it) => !isPlainObject(it) && !Array.isArray(it) && !isLambdaValue(it)
         );
         if (scalarItems) {
-          lines.push(`${prefix}${k}: [${v.map(formatYamlFlowScalar).join(", ")}]`);
+          lines.push(`${prefix}${k}: ${formatYamlFlowList(v)}`);
           return;
         }
         lines.push(`${prefix}${k}:`);
@@ -523,9 +523,14 @@ export function formatYamlScalar(v: unknown): string {
  * (``,`` ``[`` ``]`` ``{`` ``}``) must be quoted on top of
  * ``formatYamlScalar``'s rules, or the list mis-splits.
  */
-export function formatYamlFlowScalar(v: unknown): string {
+function formatYamlFlowScalar(v: unknown): string {
   if (typeof v === "string" && /[,[\]{}]/.test(v)) return yamlDoubleQuote(v);
   return formatYamlScalar(v);
+}
+
+/** The ``[a, b]`` body of a flow list — the one owner of flow-list grammar. */
+export function formatYamlFlowList(items: readonly unknown[]): string {
+  return `[${items.map(formatYamlFlowScalar).join(", ")}]`;
 }
 
 // ESPHome's YAML loader accepts the YAML 1.1 truthy/falsy spellings
