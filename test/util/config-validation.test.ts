@@ -857,6 +857,14 @@ describe("validateEntries — scalar multi_value lists (#1348)", () => {
     );
     expect(validateEntries([required], { codes: [3, ""] }).size).toBe(0);
   });
+
+  it("flags a required list holding only blank rows", () => {
+    const required = intList({ required: true });
+    expect(validateEntries([required], { codes: ["", ""] }).get("codes")?.code).toBe(
+      "validation.required"
+    );
+    expect(validateEntries([intList()], { codes: ["", ""] }).size).toBe(0);
+  });
 });
 
 describe("validateEntries — multi_value lists the form can't itemize", () => {

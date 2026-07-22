@@ -484,12 +484,21 @@ function _validateEntriesRecursive(
     // path segment, so one bad row doesn't paint its siblings. The whole
     // array must never reach validateEntry — it stringifies to "3,5" and
     // every multi-item numeric list flags not_a_number (#1348). A blank
-    // row is mid-edit, not an error. An empty list and non-array values
+    // row beside a real value is mid-edit, not an error. Non-array values
     // (a bare scalar cv.ensure_list accepts, an unset field, a
-    // YamlRawValue block) keep the generic field-level path below, so
-    // required-empty and the hidden-field rule stay validateEntry's.
+    // YamlRawValue block) keep the generic field-level path below.
     const list: unknown = values[entry.key];
-    if (entry.multi_value && Array.isArray(list) && list.length > 0) {
+    if (entry.multi_value && Array.isArray(list)) {
+      if (!list.some(isValuePresent)) {
+        // Empty, or only blank rows: required-and-unsatisfied either way.
+        // An unset hidden field isn't rendered, so never block on it
+        // (validateEntry's rule).
+        if (entry.required && !entry.hidden) {
+          const fullPath = [...pathPrefix, entry.key].join(".");
+          errors.set(fullPath, { key: fullPath, code: "validation.required" });
+        }
+        continue;
+      }
       // A list-of-dicts the schema bundle couldn't type as nested renders
       // YAML-only (the renderer's whole-field bail); per-item scalar
       // checks would flag rows the form never shows. ESPHome's own
