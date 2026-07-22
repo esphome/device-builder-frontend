@@ -1397,6 +1397,24 @@ describe("updateSectionInYaml — preserves untouched field byte layout (#1227)"
     );
   });
 
+  it("keeps a sandwiched unchanged row byte-identical between two edited rows", () => {
+    const before = [
+      "display:",
+      "  glyphs:",
+      "    - 1 #a",
+      '    - "${glyph_row}" #keep',
+      "    - 3 #c",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(before, "display", 1);
+    (values.glyphs as unknown[])[0] = 10;
+    (values.glyphs as unknown[])[2] = 30;
+    const after = updateSectionInYaml(before, "display", values, 1);
+    expect(after).toContain(
+      '  glyphs:\n    - 10 #a\n    - "${glyph_row}" #keep\n    - 30 #c\n'
+    );
+  });
+
   it("re-emits plain on a wholesale list replacement (no stale comments)", () => {
     const before = ["wifi:", "  networks:", "    - a #one", "    - b #two", ""].join(
       "\n"

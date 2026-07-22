@@ -8,7 +8,7 @@
  * with this concern.
  */
 
-import { isPlainObject } from "./nested-values.js";
+import { isPlainObject, isPrimitiveOrNullish } from "./nested-values.js";
 import type { ListItemSource } from "./yaml-section-list.js";
 import {
   formatYamlScalar,
@@ -42,8 +42,7 @@ export interface ParsedSection {
   comments: Map<string, string>;
   // Per-item source fidelity for block scalar list keys, so an edited
   // list splices per item instead of re-emitting every row (#1363).
-  // Absent when the section carried no such list.
-  listSources?: Map<string, ListItemSource>;
+  listSources: Map<string, ListItemSource>;
   childIndent: string;
   isListItem: boolean;
   // 0-indexed section header / leading-dash line.
@@ -109,8 +108,7 @@ export function buildSplicedBody(
       bodyLines.push(...lines.slice(span.leadStart, span.end));
       continue;
     }
-    const spliced =
-      span && spliceScalarList(lines, span, parsed, key, val, serializeOptions);
+    const spliced = span && spliceScalarList(lines, span, parsed, key, val);
     if (spliced) {
       bodyLines.push(...spliced);
       continue;
@@ -128,8 +126,10 @@ export function buildSplicedBody(
   return bodyLines;
 }
 
+// Deliberately stricter than ``isPrimitiveOrNullish``: a nullish item must
+// fall through to the full re-emit, not reach ``formatYamlScalar``.
 const isScalarItem = (v: unknown): v is string | number | boolean =>
-  typeof v === "string" || typeof v === "number" || typeof v === "boolean";
+  isPrimitiveOrNullish(v) && v != null;
 
 /**
  * Per-item splice for a changed block scalar list (#1363): rows unchanged
@@ -146,14 +146,12 @@ function spliceScalarList(
   span: KeySpan,
   parsed: ParsedSection,
   key: string,
-  val: unknown,
-  options: SerializeYamlOptions
+  val: unknown
 ): string[] | null {
-  const src = parsed.listSources?.get(key);
+  const src = parsed.listSources.get(key);
   const old = parsed.values[key];
   if (
     !src ||
-    src.itemLineIdxs.length === 0 ||
     !Array.isArray(old) ||
     !Array.isArray(val) ||
     val.length === 0 ||
@@ -174,31 +172,30 @@ function spliceScalarList(
   ) {
     suffix++;
   }
-  const idxs = src.itemLineIdxs;
+  const { itemLineIdxs: idxs, inlineComments, dashIndent } = src;
   // Each row's group runs from just past the previous row's line (the key
   // line for the first row), carrying the whole-line comments above it.
   const groupStart = (i: number): number => (i === 0 ? span.start + 1 : idxs[i - 1] + 1);
-  const dashIndent = /^( *)-/.exec(lines[idxs[0]])?.[1] ?? "";
   const inPlace = old.length === val.length;
   const out: string[] = [];
-  out.push(...lines.slice(span.leadStart, span.start + 1));
-  for (let i = 0; i < prefix; i++) {
-    out.push(...lines.slice(groupStart(i), idxs[i] + 1));
-  }
+  // Groups tile contiguously, so the lead + key line + prefix rows are one
+  // slice, and the suffix rows + whatever the span still owns past the
+  // last row (trailing comments) are another.
+  out.push(...lines.slice(span.leadStart, groupStart(prefix)));
   for (let k = prefix; k < val.length - suffix; k++) {
-    // An in-place edit keeps the row's own preceding comments and inline
-    // comment; with add/remove the middle alignment is ambiguous, so new
+    // A row unchanged between two edits keeps its bytes; an in-place edit
+    // keeps the row's preceding comments and re-attaches its inline
+    // comment. With add/remove the middle alignment is ambiguous, so new
     // middle rows emit plain.
+    if (inPlace && old[k] === val[k]) {
+      out.push(...lines.slice(groupStart(k), idxs[k] + 1));
+      continue;
+    }
     if (inPlace) out.push(...lines.slice(groupStart(k), idxs[k]));
     out.push(
-      `${dashIndent}- ${formatYamlScalar(val[k])}${inPlace ? src.inlineComments[k] : ""}`
+      `${dashIndent}- ${formatYamlScalar(val[k])}${inPlace ? inlineComments[k] : ""}`
     );
   }
-  for (let i = old.length - suffix; i < old.length; i++) {
-    out.push(...lines.slice(groupStart(i), idxs[i] + 1));
-  }
-  // Whatever the span still owns past the last row (trailing comment
-  // lines the lead-repartition left with this key) rides along verbatim.
-  out.push(...lines.slice(idxs[old.length - 1] + 1, span.end));
+  out.push(...lines.slice(groupStart(old.length - suffix), span.end));
   return out;
 }

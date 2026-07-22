@@ -95,6 +95,7 @@ function makeParsed(comments: Map<string, string> = new Map()): ParsedSection {
       ["color", { leadStart: 3, start: 3, end: 4 }],
     ]),
     comments,
+    listSources: new Map(),
     childIndent: "  ",
     isListItem: false,
     startIdx: 0,

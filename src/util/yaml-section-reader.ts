@@ -96,10 +96,21 @@ export function parseSectionCore(
   // leadStart is finalised by the post-loop pass below.
   const recordSpan = (key: string, start: number, end: number): void => {
     spans.set(key, { start, end, leadStart: start });
+    // A duplicate key re-assigns the value; a stale list source pointing
+    // at the first occurrence's lines must not survive it.
+    listSources.delete(key);
   };
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) {
-    return { values, spans, comments, childIndent: "", isListItem: false, startIdx };
+    return {
+      values,
+      spans,
+      comments,
+      listSources,
+      childIndent: "",
+      isListItem: false,
+      startIdx,
+    };
   }
 
   const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
@@ -137,7 +148,7 @@ export function parseSectionCore(
       values[sectionKey] = parseListBlock(lines, startIdx + 1, headerIndent).value;
       // No per-key spans — `updateSectionInYaml` re-emits this whole
       // list through its dedicated LIST_SECTIONS branch.
-      return { values, spans, comments, childIndent, isListItem, startIdx };
+      return { values, spans, comments, listSources, childIndent, isListItem, startIdx };
     }
   }
 

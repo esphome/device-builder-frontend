@@ -119,7 +119,8 @@ const parseListBlock = (
   const {
     items,
     endIdx: scalarEndIdx,
-    source,
+    itemLineIdxs,
+    inlineComments,
   } = collectBlockListItems(
     lines,
     startIdx,
@@ -130,7 +131,7 @@ const parseListBlock = (
     value: items,
     endIdx: scalarEndIdx,
     isEmptyScalarList: items.length === 0,
-    listSource: items.length > 0 ? source : undefined,
+    listSource: { itemLineIdxs, inlineComments, dashIndent },
   };
 };
 
