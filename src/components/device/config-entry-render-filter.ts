@@ -305,7 +305,10 @@ export function collectRenderablePaths(
     }
     // Scalar multi_value errors are keyed per item (``codes.0``, #1348);
     // emit the index paths of the rendered rows so those errors count as
-    // visible too.
+    // visible too. Deliberately ``values`` only — the list renderer never
+    // renders a required entry's array default as rows, so per-item errors
+    // from an invalid catalog default are correctly treated as hidden and
+    // routed to the block message.
     if (entry.multi_value && Array.isArray(values[entry.key])) {
       (values[entry.key] as unknown[]).forEach((_item, idx) => {
         out.add([...pathPrefix, entry.key, String(idx)].join("."));
