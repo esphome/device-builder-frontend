@@ -185,8 +185,10 @@ function spliceScalarList(
   for (let k = prefix; k < val.length - suffix; k++) {
     // A row unchanged between two edits keeps its bytes; an in-place edit
     // keeps the row's preceding comments and re-attaches its inline
-    // comment. With add/remove the middle alignment is ambiguous, so new
-    // middle rows emit plain.
+    // comment — deliberately, even when the comment described the old
+    // value: row comments label the row's role far more often than its
+    // literal value. With add/remove the middle alignment is ambiguous,
+    // so new middle rows emit plain.
     if (inPlace && old[k] === val[k]) {
       out.push(...lines.slice(groupStart(k), idxs[k] + 1));
       continue;
