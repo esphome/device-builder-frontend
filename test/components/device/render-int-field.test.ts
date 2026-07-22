@@ -112,24 +112,50 @@ describe("renderNumberField — integer fields accept decimal or hex", () => {
     expect(emitChange).toHaveBeenCalledWith(["address"], "18446744073709551615");
   });
 
-  it("keeps the native number input for float fields", () => {
-    const { ctx, emitChange } = makeCtx({ gain: "1.5" });
-    const entry = makeConfigEntry({
-      key: "gain",
-      type: ConfigEntryType.FLOAT,
-      label: "Gain",
-    });
-    const tpl = renderNumberField(entry, ["gain"], ctx);
-    expect(inputHtml(tpl)).toContain('type="number"');
-    // The float path coerces to a number rather than preserving a string.
-    fireInput(tpl, "2.5");
-    expect(emitChange).toHaveBeenCalledWith(["gain"], 2.5);
-  });
-
   it("leaves the display_format:hex path canonicalizing", () => {
     const { ctx, emitChange } = makeCtx({ rom: "" });
     const entry = intEntry({ key: "rom", display_format: "hex" });
     fireInput(renderNumberField(entry, ["rom"], ctx), "118");
     expect(emitChange).toHaveBeenCalledWith(["rom"], "0x76");
+  });
+});
+
+describe("renderNumberField — float fields", () => {
+  const floatEntry = (): ConfigEntry =>
+    makeConfigEntry({
+      key: "gain",
+      type: ConfigEntryType.FLOAT,
+      label: "Gain",
+    });
+
+  it("keeps the native number input and coerces to a number", () => {
+    const { ctx, emitChange } = makeCtx({ gain: "1.5" });
+    const tpl = renderNumberField(floatEntry(), ["gain"], ctx);
+    expect(inputHtml(tpl)).toContain('type="number"');
+    fireInput(tpl, "2.5");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], 2.5);
+  });
+
+  it("keeps non-finite input verbatim (never Infinity)", () => {
+    const { ctx, emitChange } = makeCtx({ gain: "" });
+    fireInput(renderNumberField(floatEntry(), ["gain"], ctx), "1e309");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], "1e309");
+    fireInput(renderNumberField(floatEntry(), ["gain"], ctx), "");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], "");
+  });
+
+  it("treats whitespace-only input as blank, not 0", () => {
+    const { ctx, emitChange } = makeCtx({ gain: "" });
+    fireInput(renderNumberField(floatEntry(), ["gain"], ctx), "   ");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], "");
+  });
+
+  it("coerces a corrected value from the junk-value text field back to a number", () => {
+    const { ctx, emitChange } = makeCtx({ gain: "1e309" });
+    const tpl = renderNumberField(floatEntry(), ["gain"], ctx);
+    fireInput(tpl, "50");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], 50);
+    fireInput(tpl, "${speed}");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], "${speed}");
   });
 });

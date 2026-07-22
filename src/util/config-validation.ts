@@ -308,7 +308,9 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
     }
   } else if (entry.type === ConfigEntryType.FLOAT) {
     const num = typeof raw === "number" ? raw : Number(String(raw));
-    if (Number.isNaN(num)) {
+    // isFinite, not just NaN: a stored "1e309"/"Infinity" is no float the
+    // backend accepts, and the text field it renders in needs the error.
+    if (!Number.isFinite(num)) {
       return { key: entry.key, code: "validation.not_a_number" };
     }
     if (entry.range) {

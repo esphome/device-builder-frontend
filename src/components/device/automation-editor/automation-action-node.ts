@@ -38,6 +38,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { coerceParamValue } from "../../../util/coerce-entry-value.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
@@ -352,17 +353,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
               .value=${String(this.value.params[p.name] ?? "")}
               @input=${(e: Event) => {
                 const raw = (e.target as HTMLInputElement).value;
-                const next =
-                  p.type === "int"
-                    ? raw === ""
-                      ? ""
-                      : parseInt(raw, 10)
-                    : p.type === "float"
-                      ? raw === ""
-                        ? ""
-                        : Number(raw)
-                      : raw;
-                this._patchParams({ [p.name]: next });
+                this._patchParams({ [p.name]: coerceParamValue(p.type, raw) });
               }}
             />`
       )}

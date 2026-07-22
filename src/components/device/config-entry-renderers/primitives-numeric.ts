@@ -10,6 +10,7 @@ import {
   serializeFloatWithUnit,
   visibleUnitOptions,
 } from "../../../util/float-with-unit.js";
+import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
 import { looksLikeSubstitution } from "../../../util/substitutions.js";
@@ -48,14 +49,12 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   if (entry.type === ConfigEntryType.INTEGER) {
     return renderIntField(entry, path, ctx);
   }
-  // An unparseable primitive ("250 steps/s", a stray boolean) blanks inside
-  // <input type="number"> and reads as unset — and an edit would write a bare
-  // number over the original value. Bail visibly instead; a ${substitution}
-  // stays editable as text, matching the validator's carve-out (#2056).
-  // Number(String(raw)) mirrors validateEntry's coercion, tightened to
-  // isFinite: Infinity also blanks in a number input, so it bails too.
+  // An unparseable primitive blanks inside <input type="number"> and reads
+  // as unset. A string (a ${substitution}, junk, a stored "1e309") stays
+  // editable as text with its validation error in place; only a non-string
+  // primitive gets the read-only YAML-only shell.
   if (raw != null && !Number.isFinite(Number(String(raw)))) {
-    return looksLikeSubstitution(String(raw))
+    return typeof raw === "string"
       ? renderStringField(entry, "text", path, ctx)
       : renderYamlOnlyField(entry, path, ctx);
   }
@@ -80,7 +79,7 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
       placeholder=${String(entry.default_value ?? "")}
       @input=${(e: Event) => {
         const raw = (e.target as HTMLInputElement).value;
-        ctx.emitChange(path, raw === "" ? "" : Number(raw));
+        ctx.emitChange(path, coerceValueToEntryType(entry, raw));
       }}
     />`
   );

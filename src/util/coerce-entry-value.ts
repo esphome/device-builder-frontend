@@ -14,7 +14,26 @@ import { coerceIntFieldValue } from "./int-input.js";
  */
 export function coerceValueToEntryType(entry: ConfigEntry, raw: string): string | number {
   if (entry.type === ConfigEntryType.INTEGER) return coerceIntFieldValue(raw);
-  if (entry.type !== ConfigEntryType.FLOAT || raw === "") return raw;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : raw;
+  if (entry.type === ConfigEntryType.FLOAT) return coerceFloatFieldValue(raw);
+  return raw;
+}
+
+/** Finite input becomes a number; blank and non-finite input (a typed
+ *  ``1e309``) ship as ""/verbatim so the validator flags them instead of
+ *  the serializer writing a bare ``Infinity`` (#1361). Trims like
+ *  ``coerceIntFieldValue`` so whitespace-only input stays blank, not 0. */
+export function coerceFloatFieldValue(raw: string): string | number {
+  const v = raw.trim();
+  if (v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? n : v;
+}
+
+/** Script-parameter variant keyed on the param's type token; ints never
+ *  prefix-parse (``parseInt`` read ``1e309`` as 1) and floats never
+ *  commit Infinity, which JSON-serializes to null on the WS wire. */
+export function coerceParamValue(type: string, raw: string): string | number {
+  if (type === "int") return coerceIntFieldValue(raw);
+  if (type === "float") return coerceFloatFieldValue(raw);
+  return raw;
 }
