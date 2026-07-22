@@ -36,7 +36,12 @@ export const collectBlockListItems = (
     if (!lines[j].startsWith(prefix)) break;
     const m = lines[j].match(itemRegex);
     if (!m) break;
-    const raw = m[1].trim();
+    // Strip a trailing inline comment (``- 10 # note``) so the item
+    // coerces and the form value isn't polluted with ``# ...`` text —
+    // same rule as parseScalar (#1235). An edited list re-emits without
+    // the comment; keeping it in the value corrupted it into the string
+    // ``"10 # note"`` instead.
+    const { value: raw } = splitInlineComment(m[1].trim());
     items.push(coerceListScalar(stripQuotes(raw), isQuotedScalar(raw)));
   }
   return { items, endIdx: j };
