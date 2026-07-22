@@ -2822,6 +2822,32 @@ describe("bare child keys — hand-typed `key:` with no value", () => {
     });
   });
 
+  it("keeps a comment under a bare key when a sibling changes", () => {
+    // The comment is not a nested block (the peek skips it), so the
+    // bare key parses through the no-block arm; the comment folds into
+    // the next key's lead run and must ride through the splice.
+    const yaml = "wifi:\n  ssid:\n    # fill me in later\n  password: x\n";
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values).toEqual({ ssid: null, password: "x" });
+    values.password = "y";
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after).toContain("  ssid:\n    # fill me in later\n");
+    expect(after).toContain("password: y");
+  });
+
+  it("parses a bare key over an unreadable deeper block as null", () => {
+    // A deeper line the child regex can't read (quoted key) parses to a
+    // zero-key nested block; the key records null with a span over the
+    // run, so an unrelated edit keeps both lines byte-for-byte.
+    const yaml = 'mysect:\n  wrapper:\n    "quoted key": x\n  other: y\n';
+    const values = parseYamlSectionValues(yaml, "mysect");
+    expect(values).toEqual({ wrapper: null, other: "y" });
+    values.other = "z";
+    const after = updateSectionInYaml(yaml, "mysect", values);
+    expect(after).toContain('  wrapper:\n    "quoted key": x\n');
+    expect(after).toContain("other: z");
+  });
+
   it("fills a bare key that a sibling list item follows", () => {
     const yaml =
       "display:\n" +
