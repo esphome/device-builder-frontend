@@ -149,10 +149,15 @@ export function renderMultiValueField(
         // rows are text — a number input can't show the 0x literals,
         // >2^53 decimals, or ${var} references cv.int_ accepts, and
         // blanks-then-clobbers them. FLOAT rows keep the native spinner
-        // except when the stored value is a non-finite string (junk or a
-        // ${var} reference), which edits as text with its per-item error.
+        // for stored finite numbers; empty rows and non-finite strings
+        // (junk or a ${var} reference) edit as text, so a reference is
+        // typeable into a fresh row and the row turns numeric once a
+        // finite value is committed.
         const rowNumeric =
-          floatList && (raw[i] == null || Number.isFinite(Number(String(raw[i]))));
+          floatList &&
+          raw[i] != null &&
+          raw[i] !== "" &&
+          Number.isFinite(Number(String(raw[i])));
         // Errors land per item (``field.0``, #1348); flag and explain only
         // the offending row. The field-level ``invalid`` stays for errors
         // keyed at the field itself (required-empty).

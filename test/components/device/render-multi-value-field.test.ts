@@ -88,6 +88,16 @@ describe("renderMultiValueField numeric coercion", () => {
     expect(ctx.emitChange).toHaveBeenCalledWith(["field"], [1.5, "xyz"]);
   });
 
+  it("renders a fresh empty FLOAT row as text so a reference is typeable", () => {
+    const ctx = makeRenderCtx({ field: [""] });
+    const tpl = renderMultiValueField(makeEntry(ConfigEntryType.FLOAT), ["field"], ctx);
+    const inputs = findElementBindings(tpl, "input");
+
+    expect(inputs[0].type).toBe("text");
+    fireInput(inputs[0], "${gain}");
+    expect(ctx.emitChange).toHaveBeenCalledWith(["field"], ["${gain}"]);
+  });
+
   it("uses step=any for a FLOAT list", () => {
     const ctx = makeRenderCtx({ field: [1.5] });
     const tpl = renderMultiValueField(makeEntry(ConfigEntryType.FLOAT), ["field"], ctx);
