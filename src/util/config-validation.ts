@@ -496,23 +496,25 @@ function _validateEntriesRecursive(
       continue;
     }
 
-    // A scalar multi_value list validates per item, mirroring the NESTED
-    // item walk above: each item gets the full scalar rulebook (numeric
-    // parsing, ranges, options, the ${var} skip) with an array-index
-    // path segment, so one bad row doesn't paint its siblings. The whole
-    // array must never reach validateEntry — it stringifies to "3,5" and
-    // every multi-item numeric list flags not_a_number (#1348). A blank
-    // row beside a real value is mid-edit, not an error. Non-array values
-    // (a bare scalar cv.ensure_list accepts, an unset field, a
-    // YamlRawValue block) keep the generic field-level path below.
-    // Same required-default fallback as the generic path below, so a
-    // required list falling back to an array default is still walked per
-    // item instead of stringifying in validateEntry.
-    const list: unknown = entry.required
+    // Optional defaults aren't sent to the backend (``_coerceFields``
+    // strips empties from the API payload), so validating against
+    // them is wrong by design — only fall back to ``default_value``
+    // for required entries, where an unset value would otherwise
+    // surface as ``validation.required`` even though the catalog
+    // pre-supplies a valid value.
+    const raw = entry.required
       ? (values[entry.key] ?? entry.default_value)
       : values[entry.key];
-    if (entry.multi_value && Array.isArray(list)) {
-      if (!list.some(isValuePresent)) {
+
+    // A scalar multi_value list validates per item with array-index path
+    // segments, so one bad row doesn't paint its siblings — the whole array
+    // must never reach validateEntry, where it stringifies ("3,5" →
+    // not_a_number on every multi-item numeric list, #1348). A blank row
+    // beside a real value is mid-edit, not an error. Non-array values (a
+    // bare scalar cv.ensure_list accepts, an unset field, a YamlRawValue
+    // block) keep the generic field-level path below.
+    if (entry.multi_value && Array.isArray(raw)) {
+      if (!raw.some(isValuePresent)) {
         // Empty, or only blank rows: required-and-unsatisfied either way.
         // An unset hidden field isn't rendered, so never block on it
         // (validateEntry's rule).
@@ -526,8 +528,8 @@ function _validateEntriesRecursive(
       // YAML-only (the renderer's whole-field bail); per-item scalar
       // checks would flag rows the form never shows. ESPHome's own
       // validate_yaml owns those, same as MAP values.
-      if (list.every(isPrimitiveOrNullish)) {
-        list.forEach((item, idx) => {
+      if (raw.every(isPrimitiveOrNullish)) {
+        raw.forEach((item, idx) => {
           if (!isValuePresent(item)) return;
           const err = validateEntry(entry, item);
           if (err) {
@@ -539,15 +541,6 @@ function _validateEntriesRecursive(
       continue;
     }
 
-    // Optional defaults aren't sent to the backend (``_coerceFields``
-    // strips empties from the API payload), so validating against
-    // them is wrong by design — only fall back to ``default_value``
-    // for required entries, where an unset value would otherwise
-    // surface as ``validation.required`` even though the catalog
-    // pre-supplies a valid value.
-    const raw = entry.required
-      ? (values[entry.key] ?? entry.default_value)
-      : values[entry.key];
     const err = validateEntry(entry, raw);
     if (err) {
       const fullPath = [...pathPrefix, entry.key].join(".");

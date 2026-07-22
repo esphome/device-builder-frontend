@@ -846,7 +846,7 @@ describe("validateEntries — scalar multi_value lists (#1348)", () => {
     expect(errors.has("codes.0")).toBe(false);
   });
 
-  it("flags a bad single-item list (String([v]) no longer masks the walk)", () => {
+  it("keys a single-item list's error at index 0", () => {
     const errors = validateEntries([intList()], { codes: ["abc"] });
     expect(errors.get("codes.0")?.code).toBe("validation.not_a_number");
   });
@@ -871,6 +871,11 @@ describe("validateEntries — scalar multi_value lists (#1348)", () => {
     );
     expect(validateEntries([intList()], { codes: ["", ""] }).size).toBe(0);
   });
+
+  it("never blocks on a hidden list of blank rows", () => {
+    const entry = intList({ required: true, hidden: true });
+    expect(validateEntries([entry], { codes: ["", ""] }).size).toBe(0);
+  });
 });
 
 describe("validateEntries — multi_value lists the form can't itemize", () => {
@@ -882,17 +887,6 @@ describe("validateEntries — multi_value lists the form can't itemize", () => {
     });
     const errors = validateEntries([entry], { segments: [{ from: 1 }, { from: 2 }] });
     expect(errors.size).toBe(0);
-  });
-
-  it("honours the hidden-field rule for an empty required list", () => {
-    const entry = makeEntry({
-      key: "codes",
-      type: ConfigEntryType.INTEGER,
-      multi_value: true,
-      required: true,
-      hidden: true,
-    });
-    expect(validateEntries([entry], { codes: [] }).size).toBe(0);
   });
 });
 

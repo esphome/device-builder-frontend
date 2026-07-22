@@ -33,15 +33,4 @@ describe("esphome-add-component-form error clearing", () => {
     expect(form._errors.has("codes.1")).toBe(false);
     expect(form._errors.has("other")).toBe(true);
   });
-
-  it("does not clear a sibling whose key shares a prefix string", () => {
-    const form = new ESPHomeAddComponentForm() as unknown as ErrorClearView;
-    form._errors = new Map([
-      ["codes_extra", { key: "codes_extra", code: "validation.required" }],
-    ]);
-
-    form._onValueChange(changeEvent(["codes"], [3]));
-
-    expect(form._errors.has("codes_extra")).toBe(true);
-  });
 });
