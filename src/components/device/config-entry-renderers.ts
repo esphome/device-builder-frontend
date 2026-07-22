@@ -21,6 +21,7 @@ export { renderPinField } from "./config-entry-pin-renderer.js";
 export {
   renderBooleanField,
   renderFloatWithUnitField,
+  renderColorField,
   renderIconField,
   renderNumberField,
   renderSelectField,

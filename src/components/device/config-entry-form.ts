@@ -94,6 +94,7 @@ import {
   renderMultiValueField,
   renderNestedField,
   renderNestedListField,
+  renderColorField,
   renderNumberField,
   renderPinField,
   renderRegistryListField,
@@ -966,7 +967,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       case ConfigEntryType.PIN:
         return renderPinField(entry, path, ctx);
       case ConfigEntryType.COLOR:
-        return renderStringField(entry, "color", path, ctx);
+        return renderColorField(entry, path, ctx);
       case ConfigEntryType.MAC_ADDRESS:
         return renderStringField(entry, "text", path, ctx);
       case ConfigEntryType.LAMBDA:

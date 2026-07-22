@@ -13,6 +13,7 @@ import {
   renderFieldError,
   renderHelpLink,
   renderLabel,
+  renderStringField,
   renderSuggestionSelect,
   renderUnparseableScalarField,
   renderYamlOnlyFallbackIfNonPrimitive,
@@ -126,6 +127,19 @@ function boardDerivedVariantDefault(
   return entry.options?.some((o) => o.value.toLowerCase() === variant)
     ? variant
     : undefined;
+}
+
+// <input type="color"> represents only #rrggbb; the browser normalizes any
+// other value to #000000, so a named color or ${substitution} would render
+// as a plausible black swatch and the first pick would clobber it (#1371).
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+export function renderColorField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
+  const raw = ctx.getAt(path);
+  if (isValuePresent(raw) && !HEX_COLOR_RE.test(String(raw))) {
+    return renderUnparseableScalarField(entry, path, ctx, raw);
+  }
+  return renderStringField(entry, "color", path, ctx);
 }
 
 export function renderSelectField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
