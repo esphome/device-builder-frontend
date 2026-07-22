@@ -1,5 +1,6 @@
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
+import { coerceValueToEntryType } from "../../util/coerce-entry-value.js";
 import { coerceIntFieldValue } from "../../util/int-input.js";
 import { asMappingList, asRecord } from "../../util/nested-values.js";
 import { parseYamlBoolean } from "../../util/yaml-serialize.js";
@@ -51,8 +52,12 @@ export function coerceFields(
     if (entry.type === ConfigEntryType.INTEGER && entry.display_format !== "hex") {
       out[entry.key] = coerceIntFieldValue(raw);
     } else if (entry.type === ConfigEntryType.FLOAT) {
-      const n = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
-      if (!Number.isNaN(n)) out[entry.key] = n;
+      // Strict coercion: unparseable input (a ${var} reference, junk like
+      // "50Hz") ships verbatim so the backend flags it — parseFloat's
+      // prefix parsing silently rewrote "50Hz" to 50, and the NaN branch
+      // silently dropped the field from the payload (#1350).
+      out[entry.key] =
+        typeof raw === "number" ? raw : coerceValueToEntryType(entry, String(raw));
     } else if (entry.type === ConfigEntryType.BOOLEAN) {
       out[entry.key] = parseYamlBoolean(raw) === true;
     } else {

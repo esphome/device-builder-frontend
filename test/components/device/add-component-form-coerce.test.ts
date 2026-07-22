@@ -112,3 +112,24 @@ describe("coerceFields multi_value nested list (usb_uart channels)", () => {
     expect(coerceFields([channels], { channels: [{}] })).toEqual({});
   });
 });
+
+describe("FLOAT coercion", () => {
+  const gain = makeConfigEntry({ key: "gain", type: ConfigEntryType.FLOAT });
+
+  test("coerces a finite string to a number and passes numbers through", () => {
+    expect(coerceFields([gain], { gain: "1.5" })).toEqual({ gain: 1.5 });
+    expect(coerceFields([gain], { gain: 2.5 })).toEqual({ gain: 2.5 });
+  });
+
+  test("ships a ${var} reference verbatim instead of dropping the field", () => {
+    expect(coerceFields([gain], { gain: "${mic_gain}" })).toEqual({
+      gain: "${mic_gain}",
+    });
+  });
+
+  test("ships junk verbatim instead of prefix-parsing it", () => {
+    // parseFloat("50Hz") is 50 — a silent rewrite; the backend should see
+    // and flag the real value.
+    expect(coerceFields([gain], { gain: "50Hz" })).toEqual({ gain: "50Hz" });
+  });
+});

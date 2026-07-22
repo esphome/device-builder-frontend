@@ -27,7 +27,7 @@ import {
 } from "../../util/api-encryption-key.js";
 import { stripConstraintProse } from "../../util/constraint-groups.js";
 import { resolveEntryLabel } from "../../util/entry-label.js";
-import { coerceIntFieldValue } from "../../util/int-input.js";
+import { coerceValueToEntryType } from "../../util/coerce-entry-value.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -97,22 +97,10 @@ export function effectiveDisabled(entry: ConfigEntry, ctx: RenderCtx): boolean {
   return ctx.disabled || entry.locked;
 }
 
-/**
- * Coerce a control's string value back to the entry's declared numeric
- * type before emitting. A wa-select / combo box always hands back a
- * string, but an INTEGER/FLOAT field's YAML must be a number or downstream
- * validation (and the backend's locked-value compare) rejects it. INTEGER
- * goes through ``coerceIntFieldValue`` so a >2^53 decimal stays a string
- * (64-bit precision, #378/#944) and a ``0x…`` literal isn't truncated.
- * Non-numeric entries, an empty string, and unparseable input pass through
- * unchanged so the inline validator can flag them.
- */
-export function coerceValueToEntryType(entry: ConfigEntry, raw: string): string | number {
-  if (entry.type === ConfigEntryType.INTEGER) return coerceIntFieldValue(raw);
-  if (entry.type !== ConfigEntryType.FLOAT || raw === "") return raw;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : raw;
-}
+// ``coerceValueToEntryType`` moved to ``util/coerce-entry-value.ts`` so
+// Lit-free modules (the add-component payload coercer) can share it;
+// re-exported to keep this module's long-standing import surface.
+export { coerceValueToEntryType };
 
 /** Serialize a field path into the ``data-field-key`` attribute. JSON
  *  (not ``path.join(".")``) so a user-supplied map key that itself
