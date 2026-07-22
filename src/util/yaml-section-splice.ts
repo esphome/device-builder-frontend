@@ -217,16 +217,16 @@ function spliceListItems(
   // mapping row would land misaligned beside verbatim siblings — bail to
   // the full re-emit, which is consistently canonical.
   const canonicalDash = `${childIndent}${options.indentStep ?? ESPHOME_YAML_INDENT}`;
-  if (
-    dashIndent !== canonicalDash &&
-    val.some((v, i) => !isScalarItem(v) && !yamlValueEqual(old[i], v))
-  ) {
-    return null;
-  }
   // Each row's group runs from just past the previous row's last line (the
   // key line for the first row), carrying the whole-line comments above it.
   const groupStart = (i: number): number => (i === 0 ? span.start + 1 : ranges[i - 1][1]);
   const inPlace = old.length === val.length;
+  if (dashIndent !== canonicalDash) {
+    for (let k = prefix; k < val.length - suffix; k++) {
+      const verbatim = inPlace && yamlValueEqual(old[k], val[k]);
+      if (!verbatim && !isScalarItem(val[k])) return null;
+    }
+  }
   const out: string[] = [];
   // Groups tile contiguously, so the lead + key line + prefix rows are one
   // slice, and the suffix rows + whatever the span still owns past the

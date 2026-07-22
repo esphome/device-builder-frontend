@@ -3118,6 +3118,26 @@ describe("updateSectionInYaml — mapping-list rows keep comments on edit (#1379
     expect(after).toContain("ssid: homenet");
   });
 
+  it("still splices a non-canonical dash list when no mapping row re-emits", () => {
+    // A pure removal re-emits nothing: the remaining rows are verbatim
+    // copies, so the compact dash column can't be corrupted and the bail
+    // must not fire (it would needlessly drop the surviving comments).
+    const compact = [
+      "wifi:",
+      "  networks:",
+      "  - ssid: homenet #primary",
+      "    password: hunter2",
+      "  - ssid: guestnet",
+      "    password: opensesame",
+      "",
+    ].join("\n");
+    const values = parseYamlSectionValues(compact, "wifi", 1);
+    values.networks = [(values.networks as Record<string, unknown>[])[1]];
+    const after = updateSectionInYaml(compact, "wifi", values, 1);
+    expect(after).toContain("  - ssid: guestnet\n    password: opensesame\n");
+    expect(after).not.toContain("homenet");
+  });
+
   it("keeps a 4-space source's unchanged rows verbatim while the edited row canonicalizes", () => {
     const wide = [
       "wifi:",
