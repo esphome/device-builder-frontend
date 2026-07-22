@@ -523,7 +523,7 @@ export function formatYamlScalar(v: unknown): string {
  * (``,`` ``[`` ``]`` ``{`` ``}``) must be quoted on top of
  * ``formatYamlScalar``'s rules, or the list mis-splits.
  */
-function formatYamlFlowScalar(v: unknown): string {
+export function formatYamlFlowScalar(v: unknown): string {
   if (typeof v === "string" && /[,[\]{}]/.test(v)) return yamlDoubleQuote(v);
   return formatYamlScalar(v);
 }

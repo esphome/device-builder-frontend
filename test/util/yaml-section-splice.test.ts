@@ -96,6 +96,7 @@ function makeParsed(comments: Map<string, string> = new Map()): ParsedSection {
     ]),
     comments,
     listSources: new Map(),
+    flowListKeys: new Set(),
     childIndent: "  ",
     isListItem: false,
     startIdx: 0,

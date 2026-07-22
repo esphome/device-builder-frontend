@@ -11,6 +11,7 @@
 import { isPlainObject, isPrimitiveOrNullish } from "./nested-values.js";
 import type { ListItemSource } from "./yaml-section-list.js";
 import {
+  formatYamlFlowScalar,
   formatYamlScalar,
   serializeYamlValues,
   YamlRawValue,
@@ -43,6 +44,10 @@ export interface ParsedSection {
   // Per-item source fidelity for block scalar list keys, so an edited
   // list splices per item instead of re-emitting every row (#1363).
   listSources: Map<string, ListItemSource>;
+  // Keys whose value was authored as a flow list (``key: [a, b]``), so an
+  // edit re-emits the same single-line style — which also lets the
+  // trailing-comment re-append below fire (#1378).
+  flowListKeys: Set<string>;
   childIndent: string;
   isListItem: boolean;
   // 0-indexed section header / leading-dash line.
@@ -116,7 +121,13 @@ export function buildSplicedBody(
     // Changed / added key. Keep any standalone-comment run that led the
     // original key — the value line below reformats, the comment stays.
     if (span) bodyLines.push(...lines.slice(span.leadStart, span.start));
-    const fresh = serializeYamlValues({ [key]: val }, childIndent, serializeOptions);
+    const fresh =
+      parsed.flowListKeys.has(key) &&
+      Array.isArray(val) &&
+      val.length > 0 &&
+      val.every(isScalarItem)
+        ? [`${childIndent}${key}: [${val.map(formatYamlFlowScalar).join(", ")}]`]
+        : serializeYamlValues({ [key]: val }, childIndent, serializeOptions);
     // Re-append the field's trailing inline comment when it still
     // serializes to a single scalar line, so an edit keeps it (#1235).
     const comment = parsed.comments.get(key);
