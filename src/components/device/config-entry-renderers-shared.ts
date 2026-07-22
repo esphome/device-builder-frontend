@@ -439,7 +439,11 @@ export function renderStringField(
     placeholder=${placeholder}
     @input=${(e: Event) => {
       const raw = (e.target as HTMLInputElement).value;
-      ctx.emitChange(path, escapeMode ? unescapeControlForInput(raw) : raw);
+      // Numeric entries land here when the stored value is a substitution
+      // or junk (the FLOAT bail); a corrected plain number must go back
+      // as a number or the YAML re-emits it quoted (#1361).
+      const text = escapeMode ? unescapeControlForInput(raw) : raw;
+      ctx.emitChange(path, coerceValueToEntryType(entry, text));
     }}
   />`;
   return html`

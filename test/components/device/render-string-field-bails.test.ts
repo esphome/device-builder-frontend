@@ -227,11 +227,22 @@ describe("renderNumberField / renderFloatWithUnitField — bail on unparseable p
       unit_options: ["°C", "°F", "K"],
     });
 
-  it("bails on a unit-suffixed string under a FLOAT field", () => {
+  it("renders editable text for a unit-suffixed string under a FLOAT field", () => {
+    // A junk string edits in place with its validation error rather than
+    // locking behind the YAML-only shell (#1352's call for list rows).
     const { ctx } = makeCtx({ max_speed: "250 steps/s" });
     const tpl = renderNumberField(floatEntry(), ["max_speed"], ctx);
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
-    expect(rendersBailBranch(json)).toBe(true);
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(json).toContain("250 steps/s");
+  });
+
+  it("renders editable text for a stored non-finite string under a FLOAT field", () => {
+    const { ctx } = makeCtx({ max_speed: "1e309" });
+    const tpl = renderNumberField(floatEntry(), ["max_speed"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(json).toContain("1e309");
   });
 
   it("bails on a boolean under a FLOAT field", () => {

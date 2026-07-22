@@ -279,6 +279,13 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, 3.5)).toBeNull();
   });
 
+  it("flags non-finite text on FLOAT fields", () => {
+    const entry = makeEntry({ type: ConfigEntryType.FLOAT });
+    expect(validateEntry(entry, "1e309")?.code).toBe("validation.not_a_number");
+    expect(validateEntry(entry, "Infinity")?.code).toBe("validation.not_a_number");
+    expect(validateEntry(entry, "1e308")).toBeNull();
+  });
+
   it("validates the numeric portion of FLOAT_WITH_UNIT entries", () => {
     const entry = makeEntry({
       type: ConfigEntryType.FLOAT_WITH_UNIT,

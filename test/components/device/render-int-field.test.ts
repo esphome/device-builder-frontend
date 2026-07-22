@@ -126,6 +126,33 @@ describe("renderNumberField — integer fields accept decimal or hex", () => {
     expect(emitChange).toHaveBeenCalledWith(["gain"], 2.5);
   });
 
+  it("keeps non-finite float input verbatim (never Infinity)", () => {
+    const { ctx, emitChange } = makeCtx({ gain: "" });
+    const entry = makeConfigEntry({
+      key: "gain",
+      type: ConfigEntryType.FLOAT,
+      label: "Gain",
+    });
+    fireInput(renderNumberField(entry, ["gain"], ctx), "1e309");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], "1e309");
+    fireInput(renderNumberField(entry, ["gain"], ctx), "");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], "");
+  });
+
+  it("coerces a corrected value from the junk-float text field back to a number", () => {
+    const { ctx, emitChange } = makeCtx({ gain: "1e309" });
+    const entry = makeConfigEntry({
+      key: "gain",
+      type: ConfigEntryType.FLOAT,
+      label: "Gain",
+    });
+    const tpl = renderNumberField(entry, ["gain"], ctx);
+    fireInput(tpl, "50");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], 50);
+    fireInput(tpl, "${speed}");
+    expect(emitChange).toHaveBeenCalledWith(["gain"], "${speed}");
+  });
+
   it("leaves the display_format:hex path canonicalizing", () => {
     const { ctx, emitChange } = makeCtx({ rom: "" });
     const entry = intEntry({ key: "rom", display_format: "hex" });
