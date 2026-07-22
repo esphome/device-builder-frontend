@@ -160,7 +160,8 @@ export function normalizeHexValues(
       // depends on us not allocating a copy here.
       if (CANONICAL_HEX_RE.test(v)) continue;
       // The `parseYamlSectionValues` parser hands hex literals back
-      // as strings (`parseScalar` only special-cases true/false), so
+      // as strings (`parseScalar` coerces only plain decimals and
+      // booleans; hex is deliberately excluded, #1360), so
       // this is the live path for fresh YAML loads. Canonicalising
       // here is what makes `address: 0xBE030C9794184728` (uppercase)
       // round-trip losslessly through the visual editor — without

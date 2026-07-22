@@ -71,12 +71,8 @@ const parseInlineLambda = (scalar: string): LambdaValue | null => {
   return m ? { _lambda: stripQuotes(m[1].trim()), _tag: "!lambda" } : null;
 };
 
-// Quoting in YAML is the explicit "treat me as a string" signal —
-// ``key: "on"`` must stay the literal ``"on"`` even though ``on`` is
-// a truthy spelling. Detect the quotes BEFORE stripping so we only
-// run the boolean coercion on plain scalars; otherwise a string
-// field that happens to hold ``"on"`` / ``"yes"`` would silently
-// flip to boolean ``true`` on round-trip.
+// ``isQuotedScalar`` must see the scalar BEFORE ``stripQuotes`` — the
+// quotes are the signal that suppresses coercion.
 export const parseScalar = (raw: string): unknown => {
   // Strip a trailing inline comment so plain scalars coerce and no field
   // value is polluted with `# ...` text (#1235).
