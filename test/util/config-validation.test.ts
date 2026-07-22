@@ -426,6 +426,9 @@ describe("validateEntries", () => {
     expect(isEntryVisible(any, { mode: 3 })).toBe(true);
     expect(isEntryVisible(any, { mode: 2 })).toBe(false);
     expect(isEntryVisible(any, {})).toBe(false);
+    // A non-primitive never matches — String(["1"]) is "1" but an array
+    // depValue must not stringify into a spurious gate hit.
+    expect(isEntryVisible(eq, { mode: ["1"] })).toBe(false);
   });
 
   it("skips required entries gated out by depends_on_value_any", () => {

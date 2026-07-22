@@ -107,13 +107,18 @@ export function isEntryVisible(
     ? values[entry.depends_on]
     : rootValues?.[entry.depends_on];
   depValue ??= siblings?.find((s) => s.key === entry.depends_on)?.default_value;
-  // Type-insensitive: the parser hands back numbers/booleans for plain
-  // scalars (#1360) while catalog gate values may be strings. Nullish
-  // depValue never matches, so `value` hides and `value_not` shows. The
-  // compare is canonical-form, not lexical — a string gate "1.0" misses a
-  // numeric 1 (fails closed; gate values are integer or token shaped).
+  // Type-insensitive across primitives: the parser hands back numbers /
+  // booleans for plain scalars (#1360) while catalog gate values may be
+  // strings. A non-primitive (or nullish) depValue never matches — so
+  // `value` hides and `value_not` shows, and an array can't stringify
+  // into a spurious match. The compare is canonical-form, not lexical —
+  // a string gate "1.0" misses a numeric 1 (fails closed; gate values
+  // are integer or token shaped).
   const gateMatches = (gate: ConfigPrimitive): boolean =>
-    depValue != null && String(depValue) === String(gate);
+    (typeof depValue === "string" ||
+      typeof depValue === "number" ||
+      typeof depValue === "boolean") &&
+    String(depValue) === String(gate);
   if (entry.depends_on_value !== null && entry.depends_on_value !== undefined) {
     return gateMatches(entry.depends_on_value);
   }
