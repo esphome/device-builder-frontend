@@ -199,7 +199,8 @@ export function parseSectionCore(
     const match = line.match(childRegex);
     if (!match) continue;
     const key = match[1];
-    const raw = match[2].trim();
+    const hadSeparator = match[2].length > 0;
+    const raw = match[3].trim();
 
     // Direct block scalar: `key: |-` (or `|`, `>`, `>-`, `|+`,
     // `>+`), optionally tagged (`key: !lambda |-`). The header sits
@@ -223,7 +224,9 @@ export function parseSectionCore(
     // comment-only value ``key: # note`` is an empty value to the loader,
     // #1385), the flow-list test (`[a, b] # c` doesn't end with `]`), and
     // scalar parsing — and record it so an edit can re-append it (#1235).
-    const { value: scalar, comment } = splitTrimmedInlineComment(raw);
+    const { value: scalar, comment } = hadSeparator
+      ? splitTrimmedInlineComment(raw)
+      : splitInlineComment(raw);
     if (scalar === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
       if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {

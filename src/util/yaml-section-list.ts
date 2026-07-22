@@ -10,6 +10,7 @@ import {
   isQuotedScalar,
   parseFlowList,
   parseScalar,
+  splitInlineComment,
   splitTrimmedInlineComment,
   stripQuotes,
 } from "./yaml-scalar.js";
@@ -103,7 +104,8 @@ export const _detectFirstDashIndent = (
  */
 export const parseFlatMappingField = (
   key: string,
-  raw: string
+  raw: string,
+  hadSeparator = true
 ): { key: string; value: unknown } | null => {
   // Dotted keys (``logger.log:``, ``switch.turn_on:``) are
   // automation-action shorthand — not flat-mapping fields. Bail
@@ -123,7 +125,9 @@ export const parseFlatMappingField = (
   // section editor instead of falling back to YamlRawValue. #941. The
   // comment is also stripped before the ``[...]`` test so a flow list
   // with a trailing comment still reads as an array (device-builder#1232).
-  const { value: scalar, comment } = splitTrimmedInlineComment(raw);
+  const { value: scalar, comment } = hadSeparator
+    ? splitTrimmedInlineComment(raw)
+    : splitInlineComment(raw);
   if (scalar === "") return { key, value: null };
   if (scalar.startsWith("[") && scalar.endsWith("]")) {
     return { key, value: YamlFlowList.wrap(parseFlowList(scalar), comment) };
@@ -146,7 +150,7 @@ export const _matchFlatMappingField = (
   re: RegExp
 ): { key: string; value: unknown } | null => {
   const m = line.match(re);
-  return m ? parseFlatMappingField(m[1], m[2].trim()) : null;
+  return m ? parseFlatMappingField(m[1], m[3].trim(), m[2].length > 0) : null;
 };
 
 /**

@@ -169,7 +169,10 @@ export const LIST_ITEM_INLINE_KEY_PREFIX_RE = /^(\s*-\s*)\S/;
 export const LIST_ITEM_DICT_KEY_RE = /^\s*-\s+[a-zA-Z_][\w.]*:(?:\s|$)/;
 
 export const childRegexFor = (indent: string) =>
-  new RegExp(`^${indent}(${KEY_PATTERN}):\\s*(.*)$`);
+  // Group 2 captures the post-colon separator: ``key:#fragment`` (no
+  // whitespace) keeps the ``#`` as value text, matching the dash-line
+  // leniency, while ``key: # note`` is a comment-only empty value (#1388).
+  new RegExp(`^${indent}(${KEY_PATTERN}):(\\s*)(.*)$`);
 
 // Intentionally permissive — the body after `- ` can be any
 // scalar (string with spaces, number, !secret reference) and we
