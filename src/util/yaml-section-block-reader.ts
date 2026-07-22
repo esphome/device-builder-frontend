@@ -269,6 +269,13 @@ const collectBlockListMappings = (
       const headerKey = headerMatch[1];
       const headerHadSep = headerMatch[2].length > 0;
       const headerRaw = headerMatch[3].trim();
+      // A non-empty header without a post-colon separator is a scalar
+      // item to the loader (``- ssid:#odd``), not a mapping field —
+      // bail to the whole-list ``YamlRawValue`` fallback rather than
+      // coercing it into an object (matches ``LIST_ITEM_DICT_KEY_RE``'s
+      // ``:(?:\s|$)`` mapping signal). A bare ``- key:`` stays a valid
+      // single-null-key item.
+      if (!headerHadSep && headerRaw !== "") return null;
       // ``- multiply: !lambda |-``: the body sits on the following
       // deeper-indented lines, so capture it here rather than letting
       // ``parseFlatMappingField`` mis-read the lone header as a scalar
