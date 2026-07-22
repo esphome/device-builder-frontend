@@ -78,8 +78,8 @@ const parseInlineLambda = (scalar: string): LambdaValue | null => {
 // field that happens to hold ``"on"`` / ``"yes"`` would silently
 // flip to boolean ``true`` on round-trip.
 export const parseScalar = (raw: string): unknown => {
-  // Strip a trailing inline comment so a boolean/number field coerces
-  // and the form value isn't polluted with `# ...` text (#1235).
+  // Strip a trailing inline comment so a boolean coerces and no field
+  // value is polluted with `# ...` text (#1235).
   const { value: scalar } = splitInlineComment(raw);
   const lambda = parseInlineLambda(scalar);
   if (lambda !== null) return lambda;
