@@ -100,8 +100,9 @@ export const parseScalar = (raw: string): unknown => {
 // quoting, so must match every form the loader re-types) and int-input's
 // DECIMAL_INT_RE (form input, leading zeros fine): coerce only what
 // Number() provably reads the same as the loader.
-const PLAIN_INT_RE = /^[-+]?(?:0|[1-9]\d*)$/;
-const PLAIN_FLOAT_RE = /^[-+]?(?:(?:0|[1-9]\d*)\.\d*|\.\d+)$/;
+const PLAIN_INT_RE = /^[-+]?(?:0|[1-9]\d*(?:_\d+)*)$/;
+const PLAIN_FLOAT_RE =
+  /^[-+]?(?:(?:0|[1-9]\d*(?:_\d+)*)\.(?:\d+(?:_\d+)*)?|\.\d+(?:_\d+)*)$/;
 
 /** Quoting in YAML is the explicit "treat me as a string" signal; the
  *  scalar and list-item readers share one definition of "quoted". */
@@ -125,8 +126,11 @@ export const coerceListScalar = (
   if (wasQuoted) return text;
   const bool = parseYamlBoolean(text);
   if (bool !== null) return bool;
+  // Underscore digit separators (``1_000``) are loader numerics; strip
+  // them for Number() once the shape matched (between digits only, a
+  // strict subset of the resolver's grammar).
   if (PLAIN_INT_RE.test(text)) {
-    const n = Number(text);
+    const n = Number(text.replace(/_/g, ""));
     return Number.isSafeInteger(n) ? n : text;
   }
   // Floats trade text fidelity for the loader's value: ``1.50`` re-emits
@@ -135,7 +139,7 @@ export const coerceListScalar = (
   // the serializer would emit a bare ``Infinity``, which YAML reads as
   // a plain string anyway.
   if (PLAIN_FLOAT_RE.test(text)) {
-    const n = Number(text);
+    const n = Number(text.replace(/_/g, ""));
     return Number.isFinite(n) ? n : text;
   }
   return text;

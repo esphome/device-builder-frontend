@@ -240,6 +240,15 @@ describe("coerceListScalar via parseFlowList (#1353)", () => {
     expect(parseFlowList("[+1, 1., +2.5]")).toEqual([1, 1, 2.5]);
   });
 
+  it("coerces underscore-separated numerics; words with underscores stay strings", () => {
+    expect(parseFlowList("[1_000, 1_0.5, foo_bar, 1_]")).toEqual([
+      1000,
+      10.5,
+      "foo_bar",
+      "1_",
+    ]);
+  });
+
   it("keeps an overflowing float mantissa as a string", () => {
     const huge = `${"9".repeat(400)}.5`;
     expect(parseFlowList(`[${huge}]`)).toEqual([huge]);
