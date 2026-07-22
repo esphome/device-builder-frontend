@@ -159,6 +159,8 @@ describe("isScalarListItemAt", () => {
     const flow = "display:\n  - platform: lcd\n    data: [42, 10]\n";
     const state = stateFor(flow);
     expect(isScalarListItemAt(state, flow.indexOf("42") + 1)).toBe(true);
+    const block = "display:\n  - platform: lcd\n    data:\n      - 42\n";
+    expect(isScalarListItemAt(stateFor(block), block.indexOf("42") + 1)).toBe(true);
     // A mapping item (the platform entry) is not a scalar item.
     expect(isScalarListItemAt(state, flow.indexOf("platform") + 1)).toBe(false);
     // A plain mapping value is not a list item at all.
