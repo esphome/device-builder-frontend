@@ -405,6 +405,29 @@ describe("validateEntries", () => {
     expect(errors.size).toBe(0);
   });
 
+  it("matches depends_on gates across value types (#1360)", () => {
+    // The parser hands back numbers for plain scalars while catalog gate
+    // values may be strings; the compare is type-insensitive either way.
+    const eq = makeEntry({ key: "a", depends_on: "mode", depends_on_value: "1" });
+    expect(isEntryVisible(eq, { mode: 1 })).toBe(true);
+    expect(isEntryVisible(eq, { mode: 2 })).toBe(false);
+    expect(isEntryVisible(eq, {})).toBe(false);
+
+    const ne = makeEntry({ key: "b", depends_on: "mode", depends_on_value_not: 1 });
+    expect(isEntryVisible(ne, { mode: "1" })).toBe(false);
+    expect(isEntryVisible(ne, { mode: "2" })).toBe(true);
+    expect(isEntryVisible(ne, {})).toBe(true);
+
+    const any = makeEntry({
+      key: "c",
+      depends_on: "mode",
+      depends_on_value_any: ["1", "3"],
+    });
+    expect(isEntryVisible(any, { mode: 3 })).toBe(true);
+    expect(isEntryVisible(any, { mode: 2 })).toBe(false);
+    expect(isEntryVisible(any, {})).toBe(false);
+  });
+
   it("skips required entries gated out by depends_on_value_any", () => {
     const entries = [
       makeEntry({ key: "type", required: true }),

@@ -1621,7 +1621,7 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
       {
         to_ntc_resistance: {
           calibration: ["10.0kOhm -> 25°C", "27.219kOhm -> 0°C"],
-          b_constant: "3950",
+          b_constant: 3950,
         },
       },
     ]);
@@ -1755,7 +1755,7 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
           delta: 0.5
 `;
     const values = parseYamlSectionValues(yaml, "sensor.template", 2);
-    expect(values.triggers).toEqual([{ id: "my_trigger", filters: { delta: "0.5" } }]);
+    expect(values.triggers).toEqual([{ id: "my_trigger", filters: { delta: 0.5 } }]);
     expect(updateSectionInYaml(yaml, "sensor.template", values, 2)).toBe(yaml);
   });
 
@@ -1818,7 +1818,7 @@ sensor:
     const sensorLine =
       yaml.split("\n").findIndex((l) => l.startsWith("  - platform: template")) + 1;
     const sensorValues = parseYamlSectionValues(yaml, "sensor.template", sensorLine);
-    expect(sensorValues.filters).toEqual([{ delta: "0.1" }, { multiply: "2.0" }]);
+    expect(sensorValues.filters).toEqual([{ delta: 0.1 }, { multiply: 2 }]);
   });
 
   it("parses light effects (single-key empty mappings) as an array (#941)", () => {
@@ -2769,5 +2769,9 @@ describe("numeric list items parse as numbers (#1353)", () => {
     chars[0].data[1] = 11;
     const after = updateSectionInYaml(yaml, "display", values, from);
     expect(after).toContain('data: ["${glyph_row}", 11, 10]');
+    // The sibling scalar field re-emits bare too (#1360) — it parsed as a
+    // number, so the re-serialized item can't re-quote it.
+    expect(after).toContain("position: 0");
+    expect(after).not.toContain('position: "0"');
   });
 });

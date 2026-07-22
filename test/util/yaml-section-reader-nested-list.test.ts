@@ -22,8 +22,8 @@ describe("parseYamlSectionValues — list item whose first field is a nested map
 `;
     const v = parseYamlSectionValues(yaml, "font", 2);
     expect(v.id).toBe("my_font");
-    expect(v.size).toBe("20");
-    expect(v.file).toEqual({ type: "gfonts", family: "Roboto", weight: "300" });
+    expect(v.size).toBe(20);
+    expect(v.file).toEqual({ type: "gfonts", family: "Roboto", weight: 300 });
   });
 
   it("captures a local nested mapping (path)", () => {
@@ -49,7 +49,7 @@ describe("parseYamlSectionValues — list item whose first field is a nested map
     const v = parseYamlSectionValues(yaml, "font", 2);
     expect(v.file).toEqual({ type: "web", url: "https://example.com/x.ttf" });
     expect(v.id).toBe("f");
-    expect(v.size).toBe("12");
+    expect(v.size).toBe(12);
   });
 
   it("handles 4-space user indentation", () => {
@@ -74,7 +74,7 @@ describe("parseYamlSectionValues — list item whose first field is a nested map
 `;
     const v = parseYamlSectionValues(yaml, "font", 2);
     expect(v.id).toBe("my_font");
-    expect(v.size).toBe("20");
+    expect(v.size).toBe(20);
     expect(v.file).toEqual({ type: "gfonts", family: "Roboto" });
   });
 
@@ -90,7 +90,7 @@ describe("parseYamlSectionValues — list item whose first field is a nested map
     expect(v).toEqual({
       id: "f",
       file: { type: "gfonts", family: "Roboto" },
-      size: "18",
+      size: 18,
     });
   });
 });
@@ -107,12 +107,12 @@ describe("updateSectionInYaml — list item whose first field is a nested mappin
 
   it("preserves the nested block when a sibling field is edited", () => {
     const values = parseYamlSectionValues(START, "font", 2);
-    values.size = "24";
+    values.size = 24;
     const after = updateSectionInYaml(START, "font", values, 2);
     const v = parseYamlSectionValues(after, "font", 2);
-    expect(v.size).toBe("24");
+    expect(v.size).toBe(24);
     expect(v.id).toBe("my_font");
-    expect(v.file).toEqual({ type: "gfonts", family: "Roboto", weight: "300" });
+    expect(v.file).toEqual({ type: "gfonts", family: "Roboto", weight: 300 });
   });
 
   it("round-trips an unchanged save without dropping or duplicating keys", () => {
@@ -126,10 +126,10 @@ describe("updateSectionInYaml — list item whose first field is a nested mappin
 
   it("writes an edited nested field back into the block", () => {
     const values = parseYamlSectionValues(START, "font", 2);
-    (values.file as Record<string, unknown>).weight = "700";
+    (values.file as Record<string, unknown>).weight = 700;
     const after = updateSectionInYaml(START, "font", values, 2);
     const v = parseYamlSectionValues(after, "font", 2);
-    expect((v.file as Record<string, unknown>).weight).toBe("700");
+    expect((v.file as Record<string, unknown>).weight).toBe(700);
     expect((v.file as Record<string, unknown>).family).toBe("Roboto");
     expect(v.id).toBe("my_font");
   });
@@ -183,7 +183,7 @@ describe("parseYamlSectionValues — nested-under-a-key list item with a txt map
       {
         service: "aioesphome._tcp.local.",
         protocol: "_tcp",
-        port: "0",
+        port: 0,
         txt: { new_1: "fdfd" },
       },
     ]);

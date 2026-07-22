@@ -141,8 +141,14 @@ describe("parseScalar", () => {
     expect(parseScalar("hello")).toBe("hello");
   });
 
-  it("does not coerce a numeric scalar (boolean-only coercion)", () => {
-    expect(parseScalar("42")).toBe("42");
+  it("coerces plain numeric scalars; quotes and ambiguous forms stay strings", () => {
+    // Same bounds as list items (#1360): plain decimals coerce, hex /
+    // octal-looking / exponent forms keep the authored text.
+    expect(parseScalar("42")).toBe(42);
+    expect(parseScalar('"42"')).toBe("42");
+    expect(parseScalar("0x76")).toBe("0x76");
+    expect(parseScalar("010")).toBe("010");
+    expect(parseScalar("1e3")).toBe("1e3");
   });
 
   it("parses an inline lambda into a LambdaValue", () => {

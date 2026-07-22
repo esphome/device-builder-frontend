@@ -6,7 +6,7 @@
  */
 
 import {
-  coerceListScalar,
+  coerceYamlScalar,
   isQuotedScalar,
   parseFlowList,
   parseScalar,
@@ -42,7 +42,7 @@ export const collectBlockListItems = (
     // the comment; keeping it in the value corrupted it into the string
     // ``"10 # note"`` instead.
     const { value: raw } = splitInlineComment(m[1].trim());
-    items.push(coerceListScalar(stripQuotes(raw), isQuotedScalar(raw)));
+    items.push(coerceYamlScalar(stripQuotes(raw), isQuotedScalar(raw)));
   }
   return { items, endIdx: j };
 };
