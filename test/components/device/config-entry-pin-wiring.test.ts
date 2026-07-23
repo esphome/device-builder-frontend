@@ -172,6 +172,15 @@ describe("pin wiring preset cards", () => {
       )
     );
     expect(cards(result)).toHaveLength(0);
+
+    // The exclusion is structural: it must hold while the provider mode
+    // registry hasn't been fetched yet.
+    const unfetched = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx({ pca9554: "hub", number: 0, mode: "OUTPUT" })
+    );
+    expect(cards(unfetched)).toHaveLength(0);
   });
 
   it("falls back to the raw disclosure when a wiring value is unreadable", () => {

@@ -65,6 +65,11 @@ export function renderCustomEditor(
           ? "input"
           : "";
   const pull = flags.pullup ? "pullup" : flags.pulldown ? "pulldown" : "none";
+  // On an input-only pin (no output driver, no internal pulls) the
+  // unsupported options disable — except the currently-set one, so an
+  // invalid legacy config can still be repaired by moving off it.
+  const optionDisabled = (value: string, current: string) =>
+    inputOnly && value !== current && value !== "input" && value !== "none";
   const writeMode = (mutate: (f: Record<string, boolean>) => void) => {
     // Same belt-and-braces as the other mutating handlers: the rendered
     // ``disabled`` attribute alone can't stop a synthetic event.
@@ -103,11 +108,6 @@ export function renderCustomEditor(
   };
 
   const uid = `pin-wiring-${path.join("-")}`;
-  // On an input-only pin (no output driver, no internal pulls) the
-  // unsupported options disable — except the currently-set one, so an
-  // invalid legacy config can still be repaired by moving off it.
-  const optionDisabled = (value: string, current: string) =>
-    inputOnly && value !== current && value !== "input" && value !== "none";
   const radios = (
     labelId: string,
     value: string,

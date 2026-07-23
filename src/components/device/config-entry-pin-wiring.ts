@@ -13,6 +13,7 @@ import type { BoardPin } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType, PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { isPlainObject } from "../../util/nested-values.js";
+import { isExpanderPinValue } from "../../util/pin-gpio.js";
 import { isSubstitutionString } from "../../util/substitutions.js";
 import {
   applyPresetToPin,
@@ -31,7 +32,6 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { onChoiceGroupKeydown, rovingTabStopIndex } from "../shared/choice-group.js";
 import { renderDisclosure } from "../shared/disclosure.js";
 import {
-  providerAllowedModes,
   renderCustomEditor,
   renderLongFormChild,
   wiringDiagram,
@@ -109,6 +109,8 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   // Preset cards only on generic-GPIO platforms: on a bus or data-line
   // pin (uart, an addressable LED strip) the wiring is the protocol's,
   // not the user's circuit, so cards like "active low output" mislead.
+  // Expander channels are excluded structurally (never via the provider
+  // mode registry, which may still be fetching).
   // And only when every stored wiring value is readable — a ``${var}``
   // mode or inverted must fall through to the raw disclosure, where the
   // substitution gate owns it (a preset pick would clobber the
@@ -117,7 +119,7 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
   const presets =
     modeChild &&
     ctx.sectionKey.endsWith(".gpio") &&
-    providerAllowedModes(rawValue, ctx.pinRegistryModes) === null &&
+    !isExpanderPinValue(rawValue) &&
     wiringValuesReadable(modeValue, invertedValue) &&
     !(isLongForm && isSubstitutionString((rawValue as Record<string, unknown>).number))
       ? presetsForPinMode(entry.pin_mode)
