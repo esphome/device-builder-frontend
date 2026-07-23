@@ -22,6 +22,7 @@ import {
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
 } from "../../context/index.js";
+import { linkButtonStyles } from "../../styles/link-button.js";
 import { pairingAddressStyles } from "../../styles/pairing-address.js";
 import { peerRowStyles } from "../../styles/peer-rows.js";
 import { pinHexStyles } from "../../styles/pin-hex.js";
@@ -101,6 +102,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     peerRowStyles,
     buildServerCardStyles,
     cleanupTtlStyles,
+    linkButtonStyles,
   ];
 
   protected updated(changed: Map<string, unknown>) {
@@ -282,18 +284,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
           <button class="build-server-copy" type="button" @click=${this._onCopyPin}>
             ${this._localize("settings.remote_build_pin_copy")}
           </button>
-          <span
-            class=${`build-server-listener-badge build-server-listener-${
-              identity.listener_bound ? "up" : "down"
-            }`}
-            role="status"
-          >
-            ${
-              identity.listener_bound
-                ? this._localize("settings.remote_build_listener_up")
-                : this._localize("settings.remote_build_listener_down")
-            }
-          </span>
+          ${this._renderListenerBadge(identity.listener_bound)}
         </div>
         <div class="build-server-row">
           <span class="build-server-label">
@@ -346,6 +337,39 @@ export class ESPHomeSettingsBuildServer extends LitElement {
         confirm-label=${this._localize("settings.remote_build_rotate_confirm_confirm")}
         @confirm=${this._onRotateConfirm}
       ></esphome-confirm-dialog>
+    `;
+  }
+
+  // Disabled is intentional state, not a fault: it reads neutral with a
+  // direct turn-on action, so the red "offline" only ever means an enabled
+  // listener that failed to bind.
+  private _renderListenerBadge(listenerBound: boolean) {
+    if (!this._remoteBuildEnabled) {
+      return html`
+        <span
+          class="build-server-listener-badge build-server-listener-disabled"
+          role="status"
+        >
+          ${this._localize("settings.remote_build_listener_disabled")}
+          <button class="link-button" type="button" @click=${this._onToggleEnabled}>
+            ${this._localize("settings.remote_build_listener_turn_on")}
+          </button>
+        </span>
+      `;
+    }
+    return html`
+      <span
+        class=${`build-server-listener-badge build-server-listener-${
+          listenerBound ? "up" : "down"
+        }`}
+        role="status"
+      >
+        ${
+          listenerBound
+            ? this._localize("settings.remote_build_listener_up")
+            : this._localize("settings.remote_build_listener_down")
+        }
+      </span>
     `;
   }
 
@@ -428,7 +452,9 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     this._rotateInFlight = true;
     try {
       this._identityCtrl.set(await this._api.rotateRemoteBuildIdentity());
-      if (this._identityCtrl.identity?.listener_bound) {
+      // An unbound listener is expected while remote build is disabled;
+      // only warn when it should have been up.
+      if (this._identityCtrl.identity?.listener_bound || !this._remoteBuildEnabled) {
         this._toast("success", "settings.remote_build_rotate_success");
       } else {
         this._toast("warning", "settings.remote_build_rotate_listener_down");

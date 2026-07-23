@@ -116,6 +116,12 @@ export const buildServerCardStyles = css`
     background: var(--wa-color-warning-quiet, #fff3cd);
     color: var(--wa-color-warning-on-quiet, #8a6d3b);
   }
+
+  .build-server-listener-disabled {
+    gap: var(--wa-space-2xs);
+    background: color-mix(in srgb, var(--wa-color-neutral-500, #6b7280), transparent 80%);
+    color: var(--wa-color-neutral-500, #6b7280);
+  }
 `;
 
 export const cleanupTtlStyles = css`
