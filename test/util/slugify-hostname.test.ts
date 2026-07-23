@@ -19,6 +19,16 @@ describe("slugifyHostname", () => {
     expect(slugifyHostname("hello_world")).toBe("hello-world");
   });
 
+  it("collapses separator runs to a single dash", () => {
+    expect(slugifyHostname("Office - Desk")).toBe("office-desk");
+    expect(slugifyHostname("a -- _ b")).toBe("a-b");
+  });
+
+  it("never emits a leading or trailing dash", () => {
+    expect(slugifyHostname("- Plug -")).toBe("plug");
+    expect(slugifyHostname("€-plug")).toBe("plug");
+  });
+
   it("trims surrounding whitespace", () => {
     expect(slugifyHostname("  Kitchen  ")).toBe("kitchen");
   });
