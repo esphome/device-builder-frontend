@@ -351,7 +351,12 @@ export class ESPHomeSettingsBuildServer extends LitElement {
           role="status"
         >
           ${this._localize("settings.remote_build_listener_disabled")}
-          <button class="link-button" type="button" @click=${this._onToggleEnabled}>
+          <button
+            class="link-button"
+            type="button"
+            aria-label=${this._localize("settings.remote_build_listener_turn_on_aria")}
+            @click=${this._onToggleEnabled}
+          >
             ${this._localize("settings.remote_build_listener_turn_on")}
           </button>
         </span>

@@ -1508,6 +1508,7 @@
     "remote_build_listener_down": "Listener offline",
     "remote_build_listener_disabled": "Disabled",
     "remote_build_listener_turn_on": "Turn on",
+    "remote_build_listener_turn_on_aria": "Turn on remote build",
     "remote_build_identity_loading": "Loading identity…",
     "remote_build_identity_load_failed": "Could not load this dashboard's identity. Please reopen Settings to retry.",
     "remote_build_rotate": "Rotate identity",

@@ -10,9 +10,17 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 // wa-dialog registers form-associated internals happy-dom can't run.
 vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+vi.mock("../../../src/util/notify.js", () => ({
+  notify: {
+    success: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 import { ESPHomeSettingsBuildServer } from "../../../src/components/settings-dialog/build-server-section.js";
 import type { IdentityView } from "../../../src/api/types/remote-build.js";
+import { notify } from "../../../src/util/notify.js";
 
 const IDENTITY: IdentityView = {
   dashboard_id: "dash-1234",
@@ -87,5 +95,39 @@ describe("build-server listener badge", () => {
 
     expect(listener).toHaveBeenCalledTimes(1);
     expect((listener.mock.calls[0][0] as CustomEvent<boolean>).detail).toBe(true);
+  });
+
+  it("rotate while disabled reports success, not a listener-down warning", async () => {
+    const el = await mount(false, false);
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    (el as any)._api.rotateRemoteBuildIdentity = async () => ({
+      ...IDENTITY,
+      listener_bound: false,
+    });
+    vi.mocked(notify.success).mockClear();
+    vi.mocked(notify.warning).mockClear();
+
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    await (el as any)._onRotateConfirm();
+
+    expect(notify.success).toHaveBeenCalledTimes(1);
+    expect(notify.warning).not.toHaveBeenCalled();
+  });
+
+  it("rotate while enabled but unbound still warns", async () => {
+    const el = await mount(true, false);
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    (el as any)._api.rotateRemoteBuildIdentity = async () => ({
+      ...IDENTITY,
+      listener_bound: false,
+    });
+    vi.mocked(notify.success).mockClear();
+    vi.mocked(notify.warning).mockClear();
+
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    await (el as any)._onRotateConfirm();
+
+    expect(notify.warning).toHaveBeenCalledTimes(1);
+    expect(notify.success).not.toHaveBeenCalled();
   });
 });
