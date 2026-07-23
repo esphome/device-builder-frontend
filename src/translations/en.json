@@ -833,6 +833,7 @@
     "pin_wiring_unavailable_input_only": "Not possible on {pin}",
     "pin_wiring_input_only_banner": "{pin} can't hold a steady level on its own, so a bare button or switch won't work here. Pick a different pin, or add an external resistor and use Custom.",
     "pin_wiring_direction": "Direction",
+    "pin_wiring_direction_description": "Input listens to the pin, for buttons and sensors. Output drives the pin, for relays and LEDs. Both is rare; it's for lines that take turns doing each.",
     "pin_wiring_direction_input": "Input",
     "pin_wiring_direction_output": "Output",
     "pin_wiring_direction_both": "Input and output",

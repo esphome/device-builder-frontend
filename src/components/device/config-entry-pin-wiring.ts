@@ -277,11 +277,11 @@ function renderWiringPanel(
   `;
 }
 
-/** Decorative micro-schematic for a preset card, from the bundled
- *  ``assets/pin-wiring/<id>.svg`` files. Applied as a CSS mask so the
- *  drawing takes the theme's text color in both light and dark mode. */
-function wiringDiagram(presetId: string): TemplateResult {
-  const url = withBase(`/assets/pin-wiring/${presetId}.svg`);
+/** Decorative micro-schematic for a preset card or custom-editor row,
+ *  from the bundled ``assets/pin-wiring/<name>.svg`` files. Applied as a
+ *  CSS mask so the drawing takes the theme's text color in both modes. */
+function wiringDiagram(name: string): TemplateResult {
+  const url = withBase(`/assets/pin-wiring/${name}.svg`);
   return html`<span
     class="pin-wiring-diagram pin-wiring-diagram--mask"
     style="-webkit-mask-image: url('${url}'); mask-image: url('${url}')"
@@ -415,6 +415,10 @@ function renderCustomEditor(
         <span class="field-label" id="${uid}-direction">
           ${ctx.localize("device.pin_wiring_direction")}
         </span>
+        <p class="field-description">
+          ${ctx.localize("device.pin_wiring_direction_description")}
+        </p>
+        ${wiringDiagram("direction")}
         ${radios(`${uid}-direction`, direction, onDirection, [
           ["input", "device.pin_wiring_direction_input"],
           ["output", "device.pin_wiring_direction_output"],
@@ -428,6 +432,7 @@ function renderCustomEditor(
         <p class="field-description">
           ${ctx.localize("device.pin_wiring_pull_description")}
         </p>
+        ${wiringDiagram("pull_resistor")}
         ${radios(`${uid}-pull`, pull, onPull, [
           ["none", "device.pin_wiring_pull_none"],
           ["pullup", "device.pin_wiring_pull_up"],
