@@ -63,6 +63,24 @@ describe("wizard-step-empty-config ENTER", () => {
     expect(onCreate).not.toHaveBeenCalled();
   });
 
+  it("a taken-hostnames push while open re-gates the Finish button", async () => {
+    // A devices/discovery push can land mid-dialog; the collision must
+    // disable submit without waiting for another keystroke.
+    const el = await mount();
+    await typeFriendlyName(el, "Kitchen Plug");
+    const next = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-next")!;
+    expect(next.disabled).toBe(false);
+    el.takenHostnames = new Set(["kitchen-plug"]);
+    await el.updateComplete;
+    const inputs = el.shadowRoot!.querySelector("esphome-device-name-inputs")!;
+    await inputs.updateComplete;
+    await el.updateComplete;
+    expect(inputs.canSubmit).toBe(false);
+    expect(el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-next")!.disabled).toBe(
+      true
+    );
+  });
+
   it("Cancel returns to the method chooser, not the board picker", async () => {
     // This step is reached directly from the method chooser (no board is
     // picked), so Cancel must go back there, matching the dialog's header

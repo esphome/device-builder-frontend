@@ -167,10 +167,13 @@ describe("device-name-inputs disclosure + validity", () => {
     expect(el.shadowRoot!.activeElement).toBe(friendlyInput(el));
   });
 
-  it("a hard validation error force-opens the panel", async () => {
+  it("a hard validation error force-opens the panel and disables the toggle", async () => {
     const el = await mountInputs();
     await typeHostname(el, "UPPER CASE");
     const toggle = el.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!;
+    // The toggle would be a no-op while the error owns the panel; it must
+    // advertise that instead of swallowing activations.
+    expect(toggle.disabled).toBe(true);
     toggle.click(); // try to collapse while invalid
     await el.updateComplete;
     expect(el.canSubmit).toBe(false);

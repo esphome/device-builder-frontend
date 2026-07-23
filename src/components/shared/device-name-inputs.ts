@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiHelpCircleOutline } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -197,6 +197,15 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     this._open = false;
   }
 
+  protected updated(changed: PropertyValues): void {
+    // Validity depends on host-owned props: a devices/discovery push can
+    // change takenHostnames while the dialog is open, flipping canSubmit
+    // with no keystroke to re-gate the host's submit button.
+    if (changed.has("takenHostnames") || changed.has("forbiddenHostname")) {
+      this._notify();
+    }
+  }
+
   override focus(): void {
     const input = this.shadowRoot?.querySelector<HTMLInputElement>(
       "#device-friendly-name"
@@ -235,6 +244,9 @@ export class ESPHomeDeviceNameInputs extends LitElement {
       <div class="hostname-row">
         ${renderDisclosure({
           open,
+          // A hard error owns the panel; the toggle would be a no-op, so
+          // mark it disabled rather than swallowing activations silently.
+          disabled: validity.err !== null,
           onToggle: () => {
             this._open = !open;
           },
