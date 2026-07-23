@@ -42,6 +42,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
   // hidden, so the Enter listener follows this rather than connectedCallback.
   @property({ type: Boolean }) active = false;
 
+  /** Hostnames of every configured device; a collision warns (overwrite flow). */
+  @property({ attribute: false })
+  takenHostnames: ReadonlySet<string> = new Set();
+
   // Set by the parent dialog while createDevice is in flight; a big board
   // (128-relay full setup) takes seconds, so the button must show progress.
   @property({ type: Boolean }) submitting = false;
@@ -435,6 +439,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
                   })
                 : ""
             }
+            .takenHostnames=${this.takenHostnames}
             @device-name-changed=${() => this.requestUpdate()}
           ></esphome-device-name-inputs>
         </div>

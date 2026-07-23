@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { apiErrorDetails } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SlimBoard } from "../../api/types/boards.js";
@@ -63,6 +63,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
+
+  /** Hostnames of every configured device, for collision warnings in the steps. */
+  @property({ attribute: false })
+  takenHostnames: ReadonlySet<string> = new Set();
 
   @state()
   private _step: WizardStep = "method";
@@ -323,11 +327,13 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       case "setup":
         return html`<esphome-wizard-step-setup
           .board=${this._selectedBoard}
+          .takenHostnames=${this.takenHostnames}
           ?active=${this._dialog.open}
           ?submitting=${this._submitting}
         ></esphome-wizard-step-setup>`;
       case "empty-config":
         return html`<esphome-wizard-step-empty-config
+          .takenHostnames=${this.takenHostnames}
           ?active=${this._dialog.open}
         ></esphome-wizard-step-empty-config>`;
       case "resolve-conflicts":

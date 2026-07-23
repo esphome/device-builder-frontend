@@ -6,6 +6,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
 import { computeLabelUsage } from "../../util/label-usage.js";
+import { takenHostnameSet } from "../../util/taken-hostnames.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
 import { performRename } from "./actions-ui.js";
 import {
@@ -196,6 +197,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       @cancel=${() => (host._pendingConfirm = null)}
     ></esphome-confirm-dialog>
     <esphome-clone-device-dialog
+      .takenHostnames=${takenHostnameSet(host._devices)}
       @clone-confirm=${host._executeClone}
     ></esphome-clone-device-dialog>
     <esphome-friendly-name-dialog
@@ -229,7 +231,9 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
     ></esphome-label-dialog>
     <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
-    <esphome-create-config-dialog></esphome-create-config-dialog>
+    <esphome-create-config-dialog
+      .takenHostnames=${takenHostnameSet(host._devices)}
+    ></esphome-create-config-dialog>
     <esphome-command-dialog
       @request-show-logs-after-install=${host._onPostInstallShowLogs}
       @request-open-editor=${host._onRequestOpenEditor}

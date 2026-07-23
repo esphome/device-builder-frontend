@@ -65,6 +65,14 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   @property({ attribute: false })
   forbiddenErrorKey = "";
 
+  /** Hostnames already in use; a collision errors or warns per `takenIsError`. */
+  @property({ attribute: false })
+  takenHostnames: ReadonlySet<string> = new Set();
+
+  /** Error blocks submit (clone); false warns only (wizard's overwrite flow). */
+  @property({ attribute: false })
+  takenIsError = false;
+
   /** Focus the friendly-name input on connect (default true). */
   @property({ attribute: false })
   autofocusFriendly = true;
@@ -159,7 +167,18 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     ) {
       return { err: { code: this.forbiddenErrorKey }, warning: null };
     }
-    return deviceNameValidity(hostname, showsValidation);
+    const base = deviceNameValidity(hostname, showsValidation);
+    if (showsValidation && !base.err && this.takenHostnames.has(hostname)) {
+      // Hostnames must be unique on the network; surface a collision with a
+      // configured device before submit instead of at the server round-trip.
+      return this.takenIsError
+        ? { err: { code: "naming.hostname_taken", params: { hostname } }, warning: null }
+        : {
+            err: null,
+            warning: { code: "naming.hostname_taken_overwrite", params: { hostname } },
+          };
+    }
+    return base;
   }
 
   get canSubmit(): boolean {
@@ -176,8 +195,12 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   protected render() {
     const validity = this.validity;
     // An error holds the panel open; collapsing would hide the one thing
-    // blocking submit.
-    const open = this._open || validity.err !== null;
+    // blocking submit. The collision warning opens it too — an invisible
+    // "this will overwrite" defeats its purpose.
+    const open =
+      this._open ||
+      validity.err !== null ||
+      validity.warning?.code === "naming.hostname_taken_overwrite";
     return html`
       <div class="field">
         <label for="device-friendly-name">${this._localize(this.friendlyLabelKey)}</label>

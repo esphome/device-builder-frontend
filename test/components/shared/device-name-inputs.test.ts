@@ -180,6 +180,39 @@ describe("device-name-inputs disclosure + validity", () => {
     expect(el.canSubmit).toBe(true);
   });
 
+  it("blocks a taken hostname when takenIsError", async () => {
+    const el = await mountInputs({
+      takenHostnames: new Set(["kitchen-plug"]),
+      takenIsError: true,
+    });
+    await typeFriendly(el, "Kitchen Plug");
+    expect(el.validity.err?.code).toBe("naming.hostname_taken");
+    expect(el.canSubmit).toBe(false);
+    await typeFriendly(el, "Kitchen Plug 2");
+    expect(el.canSubmit).toBe(true);
+  });
+
+  it("warns on a taken hostname without blocking when takenIsError is false", async () => {
+    const el = await mountInputs({ takenHostnames: new Set(["kitchen-plug"]) });
+    await typeFriendly(el, "Kitchen Plug");
+    expect(el.validity.err).toBeNull();
+    expect(el.validity.warning?.code).toBe("naming.hostname_taken_overwrite");
+    expect(el.canSubmit).toBe(true);
+    // The warning force-opens the panel so the overwrite notice is visible.
+    expect(el.shadowRoot!.querySelector("#device-hostname")).not.toBeNull();
+  });
+
+  it("the same-as-source error outranks the taken-hostname error", async () => {
+    const el = await mountInputs({
+      forbiddenHostname: "kitchen-plug",
+      forbiddenErrorKey: "dashboard.action_clone_same_name",
+      takenHostnames: new Set(["kitchen-plug"]),
+      takenIsError: true,
+    });
+    await typeFriendly(el, "Kitchen Plug");
+    expect(el.validity.err?.code).toBe("dashboard.action_clone_same_name");
+  });
+
   it("rejects the forbidden hostname with the configured error", async () => {
     const el = await mountInputs({
       forbiddenHostname: "source",

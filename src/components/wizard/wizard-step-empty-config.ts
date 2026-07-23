@@ -21,6 +21,10 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   // hidden, so the Enter listener follows this rather than connectedCallback.
   @property({ type: Boolean }) active = false;
 
+  /** Hostnames of every configured device; a collision warns (overwrite flow). */
+  @property({ attribute: false })
+  takenHostnames: ReadonlySet<string> = new Set();
+
   @query("esphome-device-name-inputs")
   private _nameInputs?: ESPHomeDeviceNameInputs;
 
@@ -102,6 +106,7 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
       <esphome-device-name-inputs
         .friendlyLabelKey=${"wizard.device_name"}
         .friendlyPlaceholderKey=${"wizard.device_name_placeholder"}
+        .takenHostnames=${this.takenHostnames}
         @device-name-changed=${() => this.requestUpdate()}
       ></esphome-device-name-inputs>
 

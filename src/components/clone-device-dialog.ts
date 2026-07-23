@@ -34,6 +34,10 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
   @property()
   sourceName = "";
 
+  /** Hostnames of every configured device; collisions block the clone. */
+  @property({ attribute: false })
+  takenHostnames: ReadonlySet<string> = new Set();
+
   @query("esphome-device-name-inputs")
   private _nameInputs?: ESPHomeDeviceNameInputs;
 
@@ -89,6 +93,8 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
           .hostnamePlaceholder=${this.sourceName}
           .forbiddenHostname=${this.sourceName}
           .forbiddenErrorKey=${"dashboard.action_clone_same_name"}
+          .takenHostnames=${this.takenHostnames}
+          .takenIsError=${true}
           @device-name-changed=${() => this.requestUpdate()}
         ></esphome-device-name-inputs>
         <div class="actions">
