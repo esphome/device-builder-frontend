@@ -570,6 +570,26 @@ describe("pin wiring board-preset guard", () => {
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
   });
 
+  it("locks children of a hard-locked pin carrying wiring values", () => {
+    // A hard-locked pin with a flag set no preset names seeds the
+    // disclosure open; its children must render read-only too, with the
+    // plain board-lock tooltip (no unlock exists for a hard lock).
+    const ctx = openCtx(
+      { number: "GPIO2", mode: { input: true, pullup: true, pulldown: true } },
+      {
+        sectionKey: "light.esp32_rmt_led_strip",
+        scopeValues: () => ({ mode: { input: true, pullup: true, pulldown: true } }),
+      }
+    );
+    renderPinField(wiringPinEntry(PinMode.OUTPUT, { locked: true }), ["pin"], ctx);
+
+    const modeCall = (ctx.renderEntry as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c) => (c[0] as ConfigEntry | undefined)?.key === "mode"
+    );
+    expect(modeCall?.[0]).toMatchObject({ key: "mode", locked: true });
+    expect("locked_reason_key" in (modeCall?.[0] as object)).toBe(false);
+  });
+
   it("locks children routed through the form dispatch while guarded", () => {
     // ``ctx.renderEntry`` closes over the form's original ctx, so the
     // guard must lock the entries themselves; a disabled ctx copy alone

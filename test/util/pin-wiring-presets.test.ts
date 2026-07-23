@@ -49,6 +49,16 @@ describe("modeFlagsOf", () => {
     expect(modeFlagsOf("BOGUS")).toBeNull();
   });
 
+  it("refuses a flag holding a substitution instead of dropping it", () => {
+    // Silently dropping ``pullup: ${use_pullup}`` would misclassify the
+    // pin and the next guided edit would delete the substitution line.
+    expect(modeFlagsOf({ input: true, pullup: "${use_pullup}" })).toBeNull();
+    expect(
+      wiringStateOf(inputPresets, { input: true, pullup: "${use_pullup}" }, undefined)
+        .kind
+    ).toBe("custom");
+  });
+
   it("treats an absent mode as no flags", () => {
     expect(modeFlagsOf(undefined)).toEqual({});
     expect(modeFlagsOf(null)).toEqual({});

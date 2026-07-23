@@ -96,14 +96,18 @@ export type WiringState =
   | { kind: "custom" };
 
 /** The set flags of a ``mode`` value (object form, or a known scalar
- *  shorthand); ``null`` when the value can't be read as flags. */
+ *  shorthand); ``null`` when the value can't be read as flags — including
+ *  a flag holding a ``${var}`` reference, which must fall through to the
+ *  raw editor rather than be silently dropped and overwritten. */
 export function modeFlagsOf(modeValue: unknown): Record<string, boolean> | null {
   if (modeValue === undefined || modeValue === null) return {};
   if (typeof modeValue === "string") return expandPinModeShorthand(modeValue);
   if (!isPlainObject(modeValue)) return null;
   const out: Record<string, boolean> = {};
   for (const [key, value] of Object.entries(modeValue)) {
-    if (parseYamlBoolean(value) === true) out[key] = true;
+    const parsed = parseYamlBoolean(value);
+    if (parsed === null && value !== undefined && value !== null) return null;
+    if (parsed === true) out[key] = true;
   }
   return out;
 }

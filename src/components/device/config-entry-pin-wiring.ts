@@ -212,20 +212,22 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
           </wa-switch>
         </div>`
       : nothing;
-  // While guarded, everything inside the panel renders read-only. The
-  // ``disabled`` copy alone is not enough: ``ctx.renderEntry`` closes
-  // over the form's original ctx, so children routed through the
-  // dispatch would still see ``disabled: false``. Lock the entries
-  // themselves at every depth — ``effectiveDisabled`` honors
-  // ``entry.locked`` in every renderer.
-  const panelCtx: RenderCtx = guarded
-    ? {
-        ...ctx,
-        disabled: true,
-        renderEntry: (child, childPath) =>
-          ctx.renderEntry(lockEntryDeep(child), childPath),
-      }
-    : ctx;
+  // While guarded or hard-locked, everything inside the panel renders
+  // read-only. The ``disabled`` copy alone is not enough:
+  // ``ctx.renderEntry`` closes over the form's original ctx, so children
+  // routed through the dispatch would still see ``disabled: false``.
+  // Lock the entries themselves at every depth — ``effectiveDisabled``
+  // honors ``entry.locked`` in every renderer. The guard's unlock hint
+  // only applies while the guard (not a hard lock) is what's blocking.
+  const panelCtx: RenderCtx =
+    guarded || fieldDisabled
+      ? {
+          ...ctx,
+          disabled: true,
+          renderEntry: (child, childPath) =>
+            ctx.renderEntry(lockEntryDeep(child, guarded), childPath),
+        }
+      : ctx;
   const editDisabled = fieldDisabled || guarded;
 
   return html`
@@ -432,15 +434,17 @@ function stripAdvancedDeep(entry: ConfigEntry): ConfigEntry {
 
 /** *entry* with itself and every descendant marked locked, so children
  *  routed through the form's dispatch render read-only via
- *  ``effectiveDisabled`` at every depth. The lock icons explain the
- *  guard's unlock instead of claiming the board set the field. */
-function lockEntryDeep(entry: ConfigEntry): ConfigEntry {
+ *  ``effectiveDisabled`` at every depth. While *guarded*, the lock icons
+ *  explain the guard's unlock instead of claiming the board set the
+ *  field. */
+function lockEntryDeep(entry: ConfigEntry, guarded: boolean): ConfigEntry {
   const locked: ConfigEntry & LockedReasonCarrier = {
     ...entry,
     locked: true,
-    locked_reason_key: "device.pin_wiring_guard_tooltip",
-    config_entries: entry.config_entries?.map(lockEntryDeep) ?? entry.config_entries,
+    config_entries:
+      entry.config_entries?.map((c) => lockEntryDeep(c, guarded)) ?? entry.config_entries,
   };
+  if (guarded) locked.locked_reason_key = "device.pin_wiring_guard_tooltip";
   return locked;
 }
 
@@ -455,11 +459,7 @@ function renderPresetCard(
   onPick: () => void,
   ctx: RenderCtx
 ): TemplateResult {
-  const classes = [
-    "pin-wiring-card",
-    selected ? "pin-wiring-card--selected" : "",
-    reasonText ? "pin-wiring-card--unavailable" : "",
-  ]
+  const classes = ["pin-wiring-card", selected ? "pin-wiring-card--selected" : ""]
     .filter(Boolean)
     .join(" ");
   const unavailable = editDisabled || !!reasonText;
