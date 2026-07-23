@@ -289,6 +289,14 @@ describe("wizard-step-setup", () => {
     );
   });
 
+  it("falls back to the generic example for a generic board", async () => {
+    // "e.g. Generic ESP32 Board" is not a name anyone should copy.
+    const el = await mount(board({ requires_wifi: true, is_generic: true }));
+    const inputs = await deviceNameInputsOf(el);
+    const friendly = inputs.shadowRoot!.querySelector("#device-friendly-name");
+    expect(friendly?.getAttribute("placeholder")).toBe("wizard.device_name_placeholder");
+  });
+
   // A complete onboard config with recommended components → offer "set up with
   // everything", pre-checked.
   const fullConfigBoard = () =>

@@ -416,7 +416,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
             .friendlyLabelKey=${"wizard.device_name"}
             .friendlyPlaceholderKey=${"wizard.device_name_placeholder"}
             .friendlyPlaceholder=${
-              this.board?.name
+              this.board?.name && !this.board.is_generic
                 ? this._localize("wizard.device_name_placeholder_board", {
                     board: this.board.name,
                   })
