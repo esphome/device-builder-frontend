@@ -415,6 +415,13 @@ export class ESPHomeWizardStepSetup extends LitElement {
           <esphome-device-name-inputs
             .friendlyLabelKey=${"wizard.device_name"}
             .friendlyPlaceholderKey=${"wizard.device_name_placeholder"}
+            .friendlyPlaceholder=${
+              this.board?.name
+                ? this._localize("wizard.device_name_placeholder_board", {
+                    board: this.board.name,
+                  })
+                : ""
+            }
             @device-name-changed=${() => this.requestUpdate()}
           ></esphome-device-name-inputs>
         </div>

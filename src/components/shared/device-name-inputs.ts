@@ -1,14 +1,17 @@
 import { consume } from "@lit/context";
+import { mdiHelpCircleOutline } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { dialogFieldStyles } from "../../styles/dialog-fields.js";
 import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { slugifyHostname } from "../../util/slugify-hostname.js";
 import {
   deviceNameValidity,
@@ -16,6 +19,8 @@ import {
   type DeviceNameValidity,
 } from "./device-name-field.js";
 import { renderDisclosure } from "./disclosure.js";
+
+registerMdiIcons({ "help-circle-outline": mdiHelpCircleOutline });
 
 /**
  * The shared friendly-name-first naming pair: a friendly-name input that
@@ -41,6 +46,10 @@ export class ESPHomeDeviceNameInputs extends LitElement {
 
   @property({ attribute: false })
   friendlyPlaceholderKey = "";
+
+  /** Literal placeholder (already localized); wins over the key when set. */
+  @property({ attribute: false })
+  friendlyPlaceholder = "";
 
   /** Optional helper line under the friendly-name input. */
   @property({ attribute: false })
@@ -80,8 +89,39 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     dialogFieldStyles,
     disclosureStyles,
     css`
-      .disclosure-toggle {
+      .hostname-row {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-2xs);
+        flex-wrap: wrap;
         margin-top: var(--wa-space-2xs);
+      }
+
+      /* DOM order is toggle, panel, help (the panel is welded to the toggle
+         by renderDisclosure); visual order puts the help chip on the toggle
+         row and the panel below both. */
+      .hostname-row .help {
+        order: 1;
+      }
+
+      .hostname-row .disclosure-panel {
+        order: 2;
+        flex-basis: 100%;
+        margin-top: var(--wa-space-xs);
+      }
+
+      .help {
+        display: inline-flex;
+        padding: 0;
+        background: none;
+        border: none;
+        cursor: help;
+        color: var(--wa-color-text-quiet);
+        font-size: 15px;
+      }
+
+      .help:hover {
+        color: var(--wa-color-text-normal);
       }
     `,
   ];
@@ -132,7 +172,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
           autocomplete="off"
           ?autofocus=${this.autofocusFriendly}
           .value=${this._friendly}
-          placeholder=${this._localize(this.friendlyPlaceholderKey)}
+          placeholder=${this.friendlyPlaceholder || this._localize(this.friendlyPlaceholderKey)}
           @input=${this._onFriendlyInput}
         />
         ${
@@ -141,34 +181,47 @@ export class ESPHomeDeviceNameInputs extends LitElement {
             : nothing
         }
       </div>
-      ${renderDisclosure({
-        open,
-        onToggle: () => {
-          this._open = !open;
-        },
-        localize: this._localize,
-        labelKey: "naming.hostname_disclosure",
-        labelParams: { hostname: this.hostname || "…" },
-        variant: "quiet",
-        panelId: "hostname-panel",
-        body: () => html`
-          ${renderDeviceNameField({
-            localize: this._localize,
-            labelKey: "naming.hostname_label",
-            value: this._hostname,
-            validity,
-            onInput: (value) => {
-              this._hostname = value;
-              this._hostnameEdited = value.trim().length > 0;
-              this._notify();
-            },
-            id: "device-hostname",
-            placeholder: this.hostnamePlaceholder,
-            autofocus: false,
-          })}
-          <span class="helper">${this._localize("naming.hostname_helper")}</span>
-        `,
-      })}
+      <div class="hostname-row">
+        ${renderDisclosure({
+          open,
+          onToggle: () => {
+            this._open = !open;
+          },
+          localize: this._localize,
+          labelKey: "naming.hostname_disclosure",
+          labelParams: { hostname: this.hostname || "…" },
+          variant: "quiet",
+          panelId: "hostname-panel",
+          body: () => html`
+            ${renderDeviceNameField({
+              localize: this._localize,
+              labelKey: "naming.hostname_label",
+              value: this._hostname,
+              validity,
+              onInput: (value) => {
+                this._hostname = value;
+                this._hostnameEdited = value.trim().length > 0;
+                this._notify();
+              },
+              id: "device-hostname",
+              placeholder: this.hostnamePlaceholder,
+              autofocus: false,
+            })}
+            <span class="helper">${this._localize("naming.hostname_helper")}</span>
+          `,
+        })}
+        <button
+          type="button"
+          class="help"
+          id="hostname-help"
+          aria-label=${this._localize("naming.hostname_help_label")}
+        >
+          <wa-icon library="mdi" name="help-circle-outline" aria-hidden="true"></wa-icon>
+        </button>
+        <wa-tooltip for="hostname-help">
+          ${this._localize("naming.hostname_help")}
+        </wa-tooltip>
+      </div>
     `;
   }
 

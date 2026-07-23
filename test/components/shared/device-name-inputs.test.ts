@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { ESPHomeDeviceNameInputs } from "../../../src/components/shared/device-name-inputs.js";
 import { mount } from "../../_dom.js";
@@ -141,6 +142,20 @@ describe("device-name-inputs disclosure + validity", () => {
     await el.updateComplete;
     expect(el.canSubmit).toBe(false);
     expect(el.shadowRoot!.querySelector("#device-hostname")).not.toBeNull();
+  });
+
+  it("offers the hostname help tooltip beside the disclosure", async () => {
+    const el = await mountInputs();
+    const help = el.shadowRoot!.querySelector("#hostname-help");
+    expect(help).not.toBeNull();
+    expect(help!.getAttribute("aria-label")).toBe("naming.hostname_help_label");
+    const tooltip = el.shadowRoot!.querySelector('wa-tooltip[for="hostname-help"]');
+    expect(tooltip!.textContent).toContain("naming.hostname_help");
+  });
+
+  it("a literal friendlyPlaceholder wins over the key", async () => {
+    const el = await mountInputs({ friendlyPlaceholder: "e.g. Some Board" });
+    expect(friendlyInput(el).getAttribute("placeholder")).toBe("e.g. Some Board");
   });
 
   it("rejects the forbidden hostname with the configured error", async () => {

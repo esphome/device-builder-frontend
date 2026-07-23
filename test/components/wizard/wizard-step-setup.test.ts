@@ -24,6 +24,7 @@ import { pressEnter } from "../../_press-enter.js";
 vi.mock("@home-assistant/webawesome/dist/components/checkbox/checkbox.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 // connectedCallback reads the shared (session-cached) secret-keys list to
 // decide whether Wi-Fi is already configured; mock it per-test (no cache bleed).
@@ -275,6 +276,17 @@ describe("wizard-step-setup", () => {
     const inputs = await deviceNameInputsOf(el);
     const friendly = inputs.shadowRoot!.querySelector("#device-friendly-name");
     expect(friendly?.getAttribute("autocomplete")).toBe("off");
+  });
+
+  it("uses a board-derived example as the name placeholder", async () => {
+    // The context-less localize stub is identity-on-key, so the board-aware
+    // placeholder surfaces as its key; the board name reaches it as a param.
+    const el = await mount(wifiBoard());
+    const inputs = await deviceNameInputsOf(el);
+    const friendly = inputs.shadowRoot!.querySelector("#device-friendly-name");
+    expect(friendly?.getAttribute("placeholder")).toBe(
+      "wizard.device_name_placeholder_board"
+    );
   });
 
   // A complete onboard config with recommended components → offer "set up with
