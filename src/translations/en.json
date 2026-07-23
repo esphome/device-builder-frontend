@@ -141,7 +141,6 @@
     "action_rename_offline_desc": "\"{name}\" can't be reached right now, so it can't be reflashed. Rename the config anyway? The device keeps its current name until you reinstall, and since it won't answer to the new name yet, you may need to reinstall using Advanced options and enter its IP address.",
     "action_rename_offline_confirm": "Rename config",
     "action_clone_title": "Duplicate {name}",
-    "action_clone_name_label": "New hostname",
     "action_clone_friendly_name_label": "New friendly name",
     "action_clone_friendly_name_placeholder": "e.g. Smart Plug",
     "action_clone_friendly_name_helper": "Shown in Home Assistant. The hostname below is derived from it as you type.",

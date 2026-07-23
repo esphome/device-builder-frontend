@@ -200,6 +200,11 @@ export class ESPHomeWizardStepSetup extends LitElement {
         gap: var(--wa-space-m);
       }
 
+      /* display: flex above outweighs the UA [hidden] rule. */
+      .section[hidden] {
+        display: none;
+      }
+
       .section-title {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
@@ -350,7 +355,13 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
       <hr class="divider" />
 
-      ${this._stage === "name" ? this._renderNameSection() : this._renderWifiSection()}
+      ${
+        // The name section stays mounted (hidden) on the Wi-Fi stage: the
+        // name inputs component owns the typed values, so unmounting it
+        // would blank the finish payload and lose the name on Back.
+        this._renderNameSection()
+      }
+      ${this._stage === "wifi" ? this._renderWifiSection() : nothing}
 
       <div class="actions">
         <button
@@ -403,7 +414,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _renderNameSection() {
     return html`
-      <section class="section">
+      <section class="section" ?hidden=${this._stage !== "name"}>
         <div>
           <h3 class="section-title">${this._localize("wizard.section_name_device")}</h3>
           <p class="section-subtitle">

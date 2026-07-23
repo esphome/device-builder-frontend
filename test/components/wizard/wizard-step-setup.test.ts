@@ -258,6 +258,35 @@ describe("wizard-step-setup", () => {
     expect(stage(el)).toBe("wifi");
   });
 
+  it("finishing from the Wi-Fi stage carries the typed name and friendly name", async () => {
+    // The name section stays mounted (hidden) on the Wi-Fi stage; if it
+    // unmounted, the finish payload would blank both values.
+    const el = await mount(wifiBoard());
+    await setName(el, "Kitchen Plug");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    await setSsid(el, "home");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter();
+    const detail = (onFinish.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.name).toBe("kitchen-plug");
+    expect(detail.friendlyName).toBe("Kitchen Plug");
+  });
+
+  it("going Back from the Wi-Fi stage keeps the typed name", async () => {
+    const el = await mount(wifiBoard());
+    await setName(el, "Kitchen Plug");
+    pressEnter(); // advance to wifi
+    await el.updateComplete;
+    (el.shadowRoot!.querySelector(".btn-secondary") as HTMLButtonElement).click();
+    await el.updateComplete;
+    expect(stage(el)).toBe("name");
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe("Kitchen Plug");
+    expect(inputs.hostname).toBe("kitchen-plug");
+  });
+
   it("a fresh Enter on the Wi-Fi stage finishes once an SSID is set", async () => {
     const el = await mount(wifiBoard());
     await setName(el, "kitchen");
