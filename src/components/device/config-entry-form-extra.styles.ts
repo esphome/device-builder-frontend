@@ -170,7 +170,7 @@ export const configEntryFormExtraStyles = css`
     color: var(--wa-color-text-normal);
   }
 
-  .pin-wiring-card:hover:not([disabled]) {
+  .pin-wiring-card:hover:not([aria-disabled="true"]) {
     border-color: var(--wa-color-brand-border-loud);
   }
 
