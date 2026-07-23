@@ -113,6 +113,27 @@ describe("pin wiring preset cards", () => {
     expect(cards(result)).toHaveLength(0);
   });
 
+  it("reveals the mode flags without the global Show-advanced toggle", () => {
+    // The wiring disclosure is itself the advanced gate; without the
+    // strip, the raw-path Mode group rendered as an empty box while the
+    // global toggle was off (the flag children are catalog-advanced).
+    const ctx = openCtx(
+      { number: "GPIO2", mode: {} },
+      { sectionKey: "light.esp32_rmt_led_strip", showAdvanced: false }
+    );
+    renderPinField(wiringPinEntry(PinMode.OUTPUT), ["pin"], ctx);
+
+    expect(ctx.renderEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: "mode",
+        config_entries: expect.arrayContaining([
+          expect.objectContaining({ key: "pullup", advanced: false }),
+        ]),
+      }),
+      ["pin", "mode"]
+    );
+  });
+
   it("keeps the raw disclosure for an expander-provided pin", () => {
     const result = renderPinField(
       wiringPinEntry(PinMode.INPUT),

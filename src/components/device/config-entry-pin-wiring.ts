@@ -581,6 +581,16 @@ function renderLongFormChild(
   const scoped = allowed
     ? scopeModeChildren(child, allowed, presentModeFlags(modeValue))
     : child;
+  // The wiring disclosure is itself the advanced gate: the flag children
+  // are catalog-marked ``advanced``, and the generic nested renderer
+  // would drop them while the global Show-advanced toggle is off,
+  // leaving an empty Mode box. Strip the mark so they always render here.
+  const revealed: ConfigEntry = {
+    ...scoped,
+    config_entries: (scoped.config_entries ?? []).map((c) =>
+      c.advanced ? { ...c, advanced: false } : c
+    ),
+  };
   // A scalar shorthand (``mode: OUTPUT``) needs the display-expansion
   // wrapper; a ``${var}`` scalar goes through renderEntry so the form's
   // substitution gate edits it as text with the resolves-to hint (#1343);
@@ -588,8 +598,8 @@ function renderLongFormChild(
   // ``looksLikeSubstitution``, not ``isSubstitutionString`` — the typeof
   // guard is load-bearing (an object mode must not hit the wrapper).
   return typeof modeValue === "string" && !looksLikeSubstitution(modeValue)
-    ? renderPinModeField(scoped, modePath, ctx)
-    : ctx.renderEntry(scoped, modePath);
+    ? renderPinModeField(revealed, modePath, ctx)
+    : ctx.renderEntry(revealed, modePath);
 }
 
 /** Allowed mode flags for *pinValue*'s provider, or ``null`` (native pin,
