@@ -74,11 +74,15 @@ async function mount(api: Partial<ESPHomeAPI>): Promise<ESPHomeCreateConfigDialo
 
 // The parent listens for create-empty-config on its esphome-base-dialog; emit
 // it the way a wizard step would (bubbling, composed).
-function emitCreate(el: ESPHomeCreateConfigDialog, name: string): void {
+function emitCreate(
+  el: ESPHomeCreateConfigDialog,
+  name: string,
+  friendlyName = ""
+): void {
   const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
   wd.dispatchEvent(
     new CustomEvent("create-empty-config", {
-      detail: { name },
+      detail: { name, friendlyName },
       bubbles: true,
       composed: true,
     })
@@ -86,11 +90,21 @@ function emitCreate(el: ESPHomeCreateConfigDialog, name: string): void {
 }
 
 // Same shape for the basic-setup flow (board + WiFi + name).
-function emitFinish(el: ESPHomeCreateConfigDialog, name: string): void {
+function emitFinish(
+  el: ESPHomeCreateConfigDialog,
+  name: string,
+  friendlyName = ""
+): void {
   const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
   wd.dispatchEvent(
     new CustomEvent("finish-setup", {
-      detail: { board: { id: "esp32dev" }, name, wifiSsid: "net", wifiPassword: "pw" },
+      detail: {
+        board: { id: "esp32dev" },
+        name,
+        friendlyName,
+        wifiSsid: "net",
+        wifiPassword: "pw",
+      },
       bubbles: true,
       composed: true,
     })
@@ -215,37 +229,36 @@ describe("create-config-dialog create de-dupe + retry", () => {
     expect((el as any)._createError).toBeTruthy();
   });
 
-  it("forwards the raw display name so the backend keeps it as friendly_name", async () => {
-    // The wizard must NOT slugify here; the backend derives the
-    // hostname slug and preserves the descriptive name as
-    // esphome.friendly_name (issue #1070).
+  it("forwards the hostname and friendly name from the empty-config flow", async () => {
     const createDevice = vi
       .fn()
       .mockResolvedValue({ configuration: "living-room-2.yaml" });
     const el = await mount({ createDevice });
 
-    emitCreate(el, "Living Room #2");
-    await flush();
-
-    expect(createDevice).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Living Room #2" })
-    );
-  });
-
-  it("forwards the raw display name from the basic-setup flow too", async () => {
-    // Same slugify→raw change as the empty-config flow; the backend
-    // derives the hostname and keeps the descriptive friendly_name.
-    const createDevice = vi
-      .fn()
-      .mockResolvedValue({ configuration: "living-room-2.yaml" });
-    const el = await mount({ createDevice });
-
-    emitFinish(el, "Living Room #2");
+    emitCreate(el, "living-room-2", "Living Room #2");
     await flush();
 
     expect(createDevice).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: "Living Room #2",
+        name: "living-room-2",
+        friendly_name: "Living Room #2",
+      })
+    );
+  });
+
+  it("forwards the hostname and friendly name from the basic-setup flow too", async () => {
+    const createDevice = vi
+      .fn()
+      .mockResolvedValue({ configuration: "living-room-2.yaml" });
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "living-room-2", "Living Room #2");
+    await flush();
+
+    expect(createDevice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "living-room-2",
+        friendly_name: "Living Room #2",
         board_id: "esp32dev",
         config_type: "basic",
       })

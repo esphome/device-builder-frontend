@@ -1,4 +1,4 @@
-export const STARTER_DEVICE_NAME = "esphome-starter";
+export const STARTER_DEVICE_NAME = "ESPHome Starter";
 
 export type TourStepKind = "action" | "info";
 export type TourSide = "top" | "bottom" | "left" | "right";

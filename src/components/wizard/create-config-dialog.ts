@@ -473,15 +473,17 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     window.dispatchEvent(new PopStateEvent("popstate"));
   }
 
-  private async _onCreateEmptyConfig(e: CustomEvent<{ name: string }>) {
-    const { name } = e.detail;
+  private async _onCreateEmptyConfig(
+    e: CustomEvent<{ name: string; friendlyName: string }>
+  ) {
+    const { name, friendlyName } = e.detail;
     await this._runCreate(
       {
-        // Send the raw display name: the backend slugifies it for the
-        // hostname and keeps the cleaned original as
-        // esphome.friendly_name. Slugifying here would strip the
-        // friendly name down to the slug (issue #1070).
+        // The step's name inputs derive the hostname from the friendly name
+        // (or carry the user's override); both go over as-is and the backend
+        // only sanitises.
         name,
+        friendly_name: friendlyName,
         board_id: this._selectedBoard?.id ?? "",
         config_type: "empty",
       },
@@ -493,19 +495,18 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     e: CustomEvent<{
       board: BoardCatalogEntry | null;
       name: string;
+      friendlyName: string;
       wifiSsid: string;
       wifiPassword: string;
       fullSetup?: boolean;
     }>
   ) {
-    const { board, name, wifiSsid, wifiPassword, fullSetup } = e.detail;
+    const { board, name, friendlyName, wifiSsid, wifiPassword, fullSetup } = e.detail;
     if (!board) return;
     await this._runCreate(
       {
-        // Raw display name; backend slugifies for the hostname and
-        // preserves the cleaned original as esphome.friendly_name
-        // (issue #1070).
         name,
+        friendly_name: friendlyName,
         board_id: board.id,
         config_type: "basic",
         // Typed credentials are persisted to secrets.yaml by the backend and
@@ -533,6 +534,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   private async _runCreate(
     args: {
       name: string;
+      friendly_name?: string;
       board_id?: string;
       config_type?: string;
       ssid?: string;

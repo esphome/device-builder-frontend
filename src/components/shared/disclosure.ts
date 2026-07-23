@@ -19,6 +19,8 @@ export interface DisclosureOptions {
   localize: LocalizeFunc;
   /** Translation key for the toggle label. */
   labelKey: string;
+  /** Substitution values for the toggle label. */
+  labelParams?: Record<string, string | number>;
   /** Panel content; called (and built) only while `open`, so a collapsed
    *  disclosure never constructs its body or runs its render side effects. */
   body: () => TemplateResult;
@@ -43,7 +45,7 @@ export interface DisclosureOptions {
 export function renderDisclosure(opts: DisclosureOptions): TemplateResult {
   const { open, variant = "link", iconBefore = false, panelId } = opts;
   const label = html`<span class="disclosure-toggle__label">
-    ${opts.localize(opts.labelKey)}
+    ${opts.localize(opts.labelKey, opts.labelParams)}
   </span>`;
   const chevron = html`<wa-icon
     class="disclosure-toggle__chevron"

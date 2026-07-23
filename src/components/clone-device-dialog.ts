@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import {
@@ -8,31 +8,17 @@ import {
   dialogActionsRowStyles,
 } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles, quietCloseButtonStyles } from "../styles/dialog-chrome.js";
-import { dialogFieldStyles } from "../styles/dialog-fields.js";
-import { inputStyles } from "../styles/inputs.js";
-import { espHomeStyles } from "../styles/shared.js";
-import { validateDeviceName } from "../util/config-validation.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
-import {
-  deviceNameValidity,
-  renderDeviceNameField,
-  type DeviceNameValidity,
-} from "./shared/device-name-field.js";
+import type { ESPHomeDeviceNameInputs } from "./shared/device-name-inputs.js";
 
 import "./base-dialog.js";
+import "./shared/device-name-inputs.js";
 
 /**
- * Clone-device dialog. Two inputs:
- *
- * - **Hostname** (``new_name``) — the cloned config's
- *   ``esphome.name``. Validated through the same
- *   ``validateDeviceName`` / ``getDeviceNameWarning`` pipeline as
- *   rename, so warnings about underscores / hyphens / etc. surface
- *   here too.
- * - **Friendly name** — the cloned config's ``esphome.friendly_name``.
- *   Optional; the backend defaults to ``friendly_name_slugify(new_name)``
- *   when omitted, so leaving the field blank still produces a
- *   distinct label.
+ * Clone-device dialog. One ``esphome-device-name-inputs`` pair: the new
+ * friendly name is the primary input and the hostname (``new_name``)
+ * derives from it behind the disclosure, with the source name forbidden
+ * as the new hostname.
  *
  * Emits ``clone-confirm`` on submit with
  * ``{newName, newFriendlyName}`` (the friendly name is ``""`` when
@@ -48,23 +34,17 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
   @property()
   sourceName = "";
 
-  @state()
-  private _name = "";
-
-  @state()
-  private _friendlyName = "";
+  @query("esphome-device-name-inputs")
+  private _nameInputs?: ESPHomeDeviceNameInputs;
 
   private readonly _dialog = new DialogOpenController(this);
 
   static styles = [
-    espHomeStyles,
-    inputStyles,
     // Neutral header + title + quiet close button (shared) — dialog-chrome.ts.
     dialogChromeStyles,
     quietCloseButtonStyles,
     dialogActionsRowStyles,
     dialogActionButtonStyles,
-    dialogFieldStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
@@ -83,9 +63,8 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
 
   open(sourceName: string) {
     this.sourceName = sourceName;
-    this._name = "";
-    this._friendlyName = "";
     this._resolved = false;
+    this._nameInputs?.reset();
     this._dialog.open = true;
   }
 
@@ -94,19 +73,6 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
   }
 
   protected render() {
-    const trimmedName = this._name.trim();
-    const sameAsSource = trimmedName === this.sourceName;
-    const showsValidation = trimmedName.length > 0;
-    // Same gate the rename dialog uses, plus a sameness check —
-    // the backend rejects ``new_name == source`` anyway, but
-    // catching it client-side keeps the submit button disabled
-    // instead of letting the user fire and see an error toast.
-    const validity: DeviceNameValidity =
-      sameAsSource && showsValidation
-        ? { err: { code: "dashboard.action_clone_same_name" }, warning: null }
-        : deviceNameValidity(trimmedName, showsValidation);
-    const canSubmit = trimmedName.length > 0 && !validity.err;
-
     return html`
       <esphome-base-dialog
         ?open=${this._dialog.open}
@@ -116,43 +82,22 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
         .confirmOnEnter=${this._confirm}
         @request-close=${this._dialog.onRequestClose}
       >
-        ${renderDeviceNameField({
-          localize: this._localize,
-          labelKey: "dashboard.action_clone_name_label",
-          value: this._name,
-          validity,
-          onInput: (value) => {
-            this._name = value;
-          },
-          id: "clone-new-name",
-          placeholder: this.sourceName,
-        })}
-        <div class="field">
-          <label for="clone-friendly-name"
-            >${this._localize("dashboard.action_clone_friendly_name_label")}</label
-          >
-          <input
-            id="clone-friendly-name"
-            type="text"
-            .value=${this._friendlyName}
-            placeholder=${this._localize(
-              "dashboard.action_clone_friendly_name_placeholder"
-            )}
-            @input=${(e: Event) => {
-              this._friendlyName = (e.target as HTMLInputElement).value;
-            }}
-          />
-          <span class="helper"
-            >${this._localize("dashboard.action_clone_friendly_name_helper")}</span
-          >
-        </div>
+        <esphome-device-name-inputs
+          .friendlyLabelKey=${"dashboard.action_clone_friendly_name_label"}
+          .friendlyPlaceholderKey=${"dashboard.action_clone_friendly_name_placeholder"}
+          .friendlyHelperKey=${"dashboard.action_clone_friendly_name_helper"}
+          .hostnamePlaceholder=${this.sourceName}
+          .forbiddenHostname=${this.sourceName}
+          .forbiddenErrorKey=${"dashboard.action_clone_same_name"}
+          @device-name-changed=${() => this.requestUpdate()}
+        ></esphome-device-name-inputs>
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
           <button
             class="btn btn--primary"
-            ?disabled=${!canSubmit}
+            ?disabled=${!(this._nameInputs?.canSubmit ?? false)}
             @click=${this._confirm}
           >
             ${this._localize("dashboard.action_clone_confirm")}
@@ -166,14 +111,13 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
   // Self-guards on empty / same / invalid, as that contract requires.
   private _confirm = () => {
     if (this._resolved) return;
-    const newName = this._name.trim();
-    if (!newName || newName === this.sourceName) return;
-    if (validateDeviceName(newName)) return;
+    const inputs = this._nameInputs;
+    if (!inputs?.canSubmit) return;
     this._resolved = true;
     this.close();
     this.dispatchEvent(
       new CustomEvent<{ newName: string; newFriendlyName: string }>("clone-confirm", {
-        detail: { newName, newFriendlyName: this._friendlyName.trim() },
+        detail: { newName: inputs.hostname, newFriendlyName: inputs.friendlyName },
         bubbles: true,
         composed: true,
       })

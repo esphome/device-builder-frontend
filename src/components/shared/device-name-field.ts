@@ -40,6 +40,8 @@ export interface DeviceNameFieldOptions {
   /** Input id (and the label's ``for``); omit for an unassociated label. */
   id?: string;
   placeholder?: string;
+  /** Focus this input on open (default true); pass false when another field leads. */
+  autofocus?: boolean;
 }
 
 /** The labelled device-name input plus its inline error / warning slot
@@ -52,7 +54,7 @@ export function renderDeviceNameField(o: DeviceNameFieldOptions): TemplateResult
       <input
         id=${o.id ?? nothing}
         type="text"
-        autofocus
+        ?autofocus=${o.autofocus ?? true}
         class=${err ? "invalid" : ""}
         .value=${o.value}
         placeholder=${o.placeholder ?? nothing}

@@ -2,14 +2,19 @@
  * @vitest-environment happy-dom
  *
  * Pins that the clone dialog confirms a valid new name on Enter via
- * base-dialog's confirmOnEnter.
+ * base-dialog's confirmOnEnter, reading the shared name-inputs pair.
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+import "../_mock-webawesome.js";
 
 import { ESPHomeCloneDeviceDialog } from "../../src/components/clone-device-dialog.js";
-import { baseDialogSettled, mount } from "../_dom.js";
+import {
+  baseDialogSettled,
+  deviceNameInputsOf,
+  mount,
+  typeFriendlyName,
+} from "../_dom.js";
 import { pressEnter } from "../_press-enter.js";
 
 describe("clone-device-dialog ENTER", () => {
@@ -19,13 +24,12 @@ describe("clone-device-dialog ENTER", () => {
     await el.updateComplete;
     const onConfirm = vi.fn();
     el.addEventListener("clone-confirm", onConfirm as EventListener);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#clone-new-name")!;
-    input.value = "kitchen";
-    input.dispatchEvent(new Event("input"));
-    await el.updateComplete;
+    await typeFriendlyName(el, "Kitchen");
     pressEnter();
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect((onConfirm.mock.calls[0][0] as CustomEvent).detail.newName).toBe("kitchen");
+    const detail = (onConfirm.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.newName).toBe("kitchen");
+    expect(detail.newFriendlyName).toBe("Kitchen");
   });
 
   it("fires clone-confirm only once on a repeated Enter", async () => {
@@ -34,10 +38,7 @@ describe("clone-device-dialog ENTER", () => {
     await el.updateComplete;
     const onConfirm = vi.fn();
     el.addEventListener("clone-confirm", onConfirm as EventListener);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#clone-new-name")!;
-    input.value = "kitchen";
-    input.dispatchEvent(new Event("input"));
-    await el.updateComplete;
+    await typeFriendlyName(el, "Kitchen");
     pressEnter();
     pressEnter();
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -54,10 +55,7 @@ describe("clone-device-dialog ENTER", () => {
     await baseDialogSettled(el);
     const onConfirm = vi.fn();
     el.addEventListener("clone-confirm", onConfirm as EventListener);
-    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#clone-new-name")!;
-    input.value = "kitchen";
-    input.dispatchEvent(new Event("input"));
-    await el.updateComplete;
+    await typeFriendlyName(el, "Kitchen");
     pressEnter(); // confirms and runs close(); the detaching update is queued
     expect((el as unknown as { _dialog: { open: boolean } })._dialog.open).toBe(false);
     pressEnter(); // same task: listener still bound; stopped only by the latch
@@ -75,6 +73,33 @@ describe("clone-device-dialog ENTER", () => {
     el.addEventListener("clone-confirm", onConfirm as EventListener);
     pressEnter();
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("ignores Enter while the derived hostname equals the source", async () => {
+    const el = await mount(new ESPHomeCloneDeviceDialog());
+    el.open("kitchen");
+    await el.updateComplete;
+    const onConfirm = vi.fn();
+    el.addEventListener("clone-confirm", onConfirm as EventListener);
+    await typeFriendlyName(el, "Kitchen");
+    pressEnter();
+    expect(onConfirm).not.toHaveBeenCalled();
+    await typeFriendlyName(el, "Kitchen 2");
+    pressEnter();
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("open() resets the name inputs from a previous use", async () => {
+    const el = await mount(new ESPHomeCloneDeviceDialog());
+    el.open("source");
+    await el.updateComplete;
+    await typeFriendlyName(el, "Kitchen");
+    el.close();
+    el.open("source");
+    await el.updateComplete;
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe("");
+    expect(inputs.hostname).toBe("");
   });
 });
 

@@ -15,6 +15,7 @@ import {
 } from "../../../src/components/guided-tour/tour-session.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
+import { deviceNameInputsOf, typeFriendlyName } from "../../_dom.js";
 import { pressEnter } from "../../_press-enter.js";
 
 // The real wa-checkbox is a form-associated element that crashes under happy-dom
@@ -22,6 +23,7 @@ import { pressEnter } from "../../_press-enter.js";
 // render it as a plain unknown element.
 vi.mock("@home-assistant/webawesome/dist/components/checkbox/checkbox.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 // connectedCallback reads the shared (session-cached) secret-keys list to
 // decide whether Wi-Fi is already configured; mock it per-test (no cache bleed).
@@ -72,10 +74,7 @@ async function mount(
 }
 
 function setName(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
-  const input = el.shadowRoot!.querySelector<HTMLInputElement>("#device-name")!;
-  input.value = value;
-  input.dispatchEvent(new Event("input"));
-  return el.updateComplete;
+  return typeFriendlyName(el, value);
 }
 
 function setSsid(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
@@ -273,8 +272,9 @@ describe("wizard-step-setup", () => {
 
   it("disables browser autofill on the name input", async () => {
     const el = await mount(wifiBoard());
-    const deviceName = el.shadowRoot!.querySelector<HTMLInputElement>("#device-name");
-    expect(deviceName?.getAttribute("autocomplete")).toBe("off");
+    const inputs = await deviceNameInputsOf(el);
+    const friendly = inputs.shadowRoot!.querySelector("#device-friendly-name");
+    expect(friendly?.getAttribute("autocomplete")).toBe("off");
   });
 
   // A complete onboard config with recommended components → offer "set up with

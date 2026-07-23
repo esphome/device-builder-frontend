@@ -4,7 +4,11 @@
  * Pins that Enter finishes the empty-config wizard step once a name is set.
  */
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+
 import { ESPHomeWizardStepEmptyConfig } from "../../../src/components/wizard/wizard-step-empty-config.js";
+import { typeFriendlyName } from "../../_dom.js";
 import { pressEnter } from "../../_press-enter.js";
 
 async function mount(): Promise<ESPHomeWizardStepEmptyConfig> {
@@ -20,23 +24,19 @@ describe("wizard-step-empty-config ENTER", () => {
     const el = await mount();
     const onCreate = vi.fn();
     el.addEventListener("create-empty-config", onCreate as EventListener);
-    const input = el.shadowRoot!.querySelector("input")!;
-    input.value = "kitchen";
-    input.dispatchEvent(new Event("input"));
-    await el.updateComplete;
+    await typeFriendlyName(el, "Kitchen");
     pressEnter();
     expect(onCreate).toHaveBeenCalledTimes(1);
-    expect((onCreate.mock.calls[0][0] as CustomEvent).detail.name).toBe("kitchen");
+    const detail = (onCreate.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.name).toBe("kitchen");
+    expect(detail.friendlyName).toBe("Kitchen");
   });
 
   it("re-dispatches on a second Enter (no permanent latch — parent de-dupes / allows retry)", async () => {
     const el = await mount();
     const onCreate = vi.fn();
     el.addEventListener("create-empty-config", onCreate as EventListener);
-    const input = el.shadowRoot!.querySelector("input")!;
-    input.value = "kitchen";
-    input.dispatchEvent(new Event("input"));
-    await el.updateComplete;
+    await typeFriendlyName(el, "kitchen");
     pressEnter();
     pressEnter();
     // The step must not latch; create de-dupe / retry lives in the parent.
@@ -45,9 +45,7 @@ describe("wizard-step-empty-config ENTER", () => {
 
   it("ignores Enter once the dialog is no longer active (hidden but still mounted)", async () => {
     const el = await mount();
-    const input = el.shadowRoot!.querySelector("input")!;
-    input.value = "kitchen";
-    input.dispatchEvent(new Event("input"));
+    await typeFriendlyName(el, "kitchen");
     el.active = false; // dialog hidden via light-dismiss / Escape / close
     await el.updateComplete;
     const onCreate = vi.fn();

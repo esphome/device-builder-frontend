@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -20,9 +20,11 @@ import {
 } from "../guided-tour/tour-session.js";
 import { wifiFieldsStyles } from "../onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "../onboarding/wifi-fields.js";
+import type { ESPHomeDeviceNameInputs } from "../shared/device-name-inputs.js";
 
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../shared/device-name-inputs.js";
 
 @customElement("esphome-wizard-step-setup")
 export class ESPHomeWizardStepSetup extends LitElement {
@@ -60,8 +62,8 @@ export class ESPHomeWizardStepSetup extends LitElement {
     );
   }
 
-  @state()
-  private _deviceName = "";
+  @query("esphome-device-name-inputs")
+  private _nameInputs?: ESPHomeDeviceNameInputs;
 
   // Pre-checked: a complete onboard device is almost always wanted whole, not
   // assembled component by component. Only shown for full-config boards.
@@ -97,7 +99,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
   });
 
   private _canAdvance(): boolean {
-    if (this._stage === "name") return !!this._deviceName.trim();
+    if (this._stage === "name") return this._nameInputs?.canSubmit ?? false;
     if (this._wifiConfigured) return true;
     // The Wi-Fi stage only appears when Wi-Fi is required, so an SSID is
     // mandatory; a too-short WPA passphrase is also rejected.
@@ -111,14 +113,19 @@ export class ESPHomeWizardStepSetup extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
 
-    if (!this._deviceName) {
-      const suggested = getTourSuggestedName();
-      if (suggested) this._deviceName = suggested;
-    }
-    clearTourSuggestedName();
     // Already configured ⇒ skip the Wi-Fi stage and reuse !secret. Read via the
     // shared, secrets-saved-refreshed key cache (caches [] on failure).
     this._wifiConfigured = hasSharedWifiSecret(await fetchSecretKeys(this._api));
+  }
+
+  protected firstUpdated(): void {
+    // The name inputs exist only after the first render, so the tour seed
+    // can't land in connectedCallback.
+    const suggested = getTourSuggestedName();
+    if (suggested && this._nameInputs && !this._nameInputs.friendlyName) {
+      this._nameInputs.reset(suggested);
+    }
+    clearTourSuggestedName();
   }
 
   static styles = [
@@ -404,18 +411,12 @@ export class ESPHomeWizardStepSetup extends LitElement {
           </p>
         </div>
 
-        <div class="field" ${tourAnchor("name-field")}>
-          <label for="device-name">${this._localize("wizard.device_name")}</label>
-          <input
-            id="device-name"
-            type="text"
-            autocomplete="off"
-            .value=${this._deviceName}
-            placeholder=${this._localize("wizard.device_name_placeholder")}
-            @input=${(e: InputEvent) => {
-              this._deviceName = (e.target as HTMLInputElement).value;
-            }}
-          />
+        <div ${tourAnchor("name-field")}>
+          <esphome-device-name-inputs
+            .friendlyLabelKey=${"wizard.device_name"}
+            .friendlyPlaceholderKey=${"wizard.device_name_placeholder"}
+            @device-name-changed=${() => this.requestUpdate()}
+          ></esphome-device-name-inputs>
         </div>
 
         ${
@@ -531,7 +532,8 @@ export class ESPHomeWizardStepSetup extends LitElement {
   private _finish(wifiSsid: string, wifiPassword: string) {
     fireEvent(this, "finish-setup", {
       board: this.board,
-      name: this._deviceName,
+      name: this._nameInputs?.hostname ?? "",
+      friendlyName: this._nameInputs?.friendlyName ?? "",
       wifiSsid,
       wifiPassword,
       fullSetup: this._offersFullSetup && this._fullSetup,

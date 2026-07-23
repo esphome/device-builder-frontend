@@ -788,11 +788,14 @@ export class ESPHomeAPI {
 
   /** Create a new device configuration.
    *
+   * With `friendly_name`, `name` is the hostname; without it, `name`
+   * is the raw display label and the backend derives both values.
    * A filename collision rejects with `already_exists`; pass
    * `overwrite: true` to replace the config in place, keeping the
    * existing device's labels / comment / board. */
   async createDevice(args: {
     name: string;
+    friendly_name?: string;
     board_id?: string;
     config_type?: string;
     ssid?: string;
