@@ -31,8 +31,11 @@ export function rovingTabStopIndex(selectedIndex: number, enabled: boolean[]): n
 
 /**
  * Arrow-key handler for a ``role="radiogroup"`` of choice cards: Up/Left and
- * Down/Right move focus and selection across the enabled cards, wrapping at the
- * ends, per the ARIA radio pattern. Attach to the group's ``@keydown``.
+ * Down/Right move focus across the cards and select the enabled ones,
+ * wrapping at the ends, per the ARIA radio pattern. An ``aria-disabled``
+ * card still receives focus — it stays discoverable, with its state and
+ * tooltip announced — but is never selected; a natively ``disabled`` card
+ * is skipped entirely. Attach to the group's ``@keydown``.
  */
 export function onChoiceGroupKeydown(e: KeyboardEvent): void {
   const forward = e.key === "ArrowDown" || e.key === "ArrowRight";
@@ -49,5 +52,5 @@ export function onChoiceGroupKeydown(e: KeyboardEvent): void {
     cards[(Math.max(current, 0) + (forward ? 1 : -1) + cards.length) % cards.length];
   e.preventDefault();
   next.focus();
-  next.click();
+  if (next.getAttribute("aria-disabled") !== "true") next.click();
 }

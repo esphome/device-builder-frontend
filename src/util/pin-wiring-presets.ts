@@ -130,7 +130,9 @@ export function wiringStateOf(
   // classified — don't claim a preset over it.
   if (invertedSet && inverted === null) return { kind: "custom" };
   if (Object.keys(flags).length === 0) {
-    if (invertedSet) return { kind: "custom" };
+    // An explicit ``inverted: false`` is what the toggle writes when
+    // switched back off — semantically unset, not a custom choice.
+    if (inverted === true) return { kind: "custom" };
     const implied: Record<string, boolean> | null =
       pinMode === PinMode.INPUT
         ? { input: true }

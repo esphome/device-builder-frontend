@@ -60,6 +60,16 @@ describe("wiringStateOf", () => {
     expect(wiringStateOf(inputPresets, undefined, undefined).kind).toBe("default");
   });
 
+  it("treats an explicit inverted false with no flags as untouched", () => {
+    // The boolean toggle writes false when switched back off; that must
+    // not read as Custom (or auto-seed the section open).
+    expect(wiringStateOf(outputPresets, undefined, false, PinMode.OUTPUT)).toMatchObject({
+      kind: "preset",
+      implicit: true,
+    });
+    expect(wiringStateOf(outputPresets, undefined, false).kind).toBe("default");
+  });
+
   it("maps an untouched pin to the direction's implied preset", () => {
     const output = wiringStateOf(outputPresets, undefined, undefined, PinMode.OUTPUT);
     expect(output).toMatchObject({
