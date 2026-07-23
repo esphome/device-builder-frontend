@@ -487,8 +487,8 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       {
         // The step's name inputs derive the hostname from the friendly name
         // (or carry the user's override); both go over as-is and the backend
-        // only sanitises. An empty friendly name is omitted so the backend's
-        // derive-from-name path decides the label.
+        // validates, never rewrites. An empty friendly name is omitted so
+        // the backend's derive-from-name path decides the label.
         name,
         friendly_name: friendlyName || undefined,
         board_id: this._selectedBoard?.id ?? "",

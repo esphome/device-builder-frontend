@@ -28,7 +28,8 @@ registerMdiIcons({ "help-circle-outline": mdiHelpCircleOutline });
  * hostname behind a chevron disclosure for overrides.
  *
  * Typing in the friendly field keeps the hostname in sync until the user
- * edits the hostname directly; clearing the hostname re-enables derivation.
+ * edits the hostname directly; clearing the hostname re-enables derivation
+ * from the next friendly-name edit.
  * A hard validation error force-opens the disclosure so the reason for a
  * disabled submit is never hidden. Hosts read ``friendlyName`` /
  * ``hostname`` / ``canSubmit`` off the element and re-render their submit

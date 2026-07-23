@@ -14,7 +14,6 @@ import {
   setTourPending,
   setTourSuggestedName,
 } from "../../../src/components/guided-tour/tour-session.js";
-import { STARTER_DEVICE_NAME } from "../../../src/components/guided-tour/tour-steps.js";
 import { slugifyHostname } from "../../../src/util/slugify-hostname.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
@@ -90,6 +89,10 @@ function setSsid(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const stage = (el: ESPHomeWizardStepSetup) => (el as any)._stage;
+
+// The production seed comes from the tour.suggested_name translation; tests
+// seed their own value, so any display-shaped string works.
+const TOUR_SEED = "ESPHome Starter";
 
 describe("wizard-step-setup", () => {
   it("advances to the Wi-Fi stage for a Wi-Fi-only board with no secret", async () => {
@@ -327,30 +330,30 @@ describe("wizard-step-setup", () => {
   });
 
   it("a tour-seeded name fills the inputs and enables Next", async () => {
-    setTourSuggestedName(STARTER_DEVICE_NAME);
+    setTourSuggestedName(TOUR_SEED);
     const el = await mount(noWifiBoard());
     const inputs = await deviceNameInputsOf(el);
-    expect(inputs.friendlyName).toBe(STARTER_DEVICE_NAME);
-    expect(inputs.hostname).toBe(slugifyHostname(STARTER_DEVICE_NAME));
+    expect(inputs.friendlyName).toBe(TOUR_SEED);
+    expect(inputs.hostname).toBe(slugifyHostname(TOUR_SEED));
     const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
     expect(primary.disabled).toBe(false);
   });
 
   it("a re-run tour seed skips past its first run's device", async () => {
-    setTourSuggestedName(STARTER_DEVICE_NAME);
+    setTourSuggestedName(TOUR_SEED);
     const el = new ESPHomeWizardStepSetup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._api = {};
     el.board = noWifiBoard();
     el.active = true;
-    el.takenHostnames = new Set([slugifyHostname(STARTER_DEVICE_NAME)]);
+    el.takenHostnames = new Set([slugifyHostname(TOUR_SEED)]);
     document.body.appendChild(el);
     await el.updateComplete;
     await Promise.resolve();
     await Promise.resolve();
     await el.updateComplete;
     const inputs = await deviceNameInputsOf(el);
-    expect(inputs.friendlyName).toBe(`${STARTER_DEVICE_NAME} 2`);
+    expect(inputs.friendlyName).toBe(`${TOUR_SEED} 2`);
     expect(inputs.canSubmit).toBe(true);
     const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
     expect(primary.disabled).toBe(false);

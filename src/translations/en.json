@@ -1156,7 +1156,8 @@
         "title": "Your device is ready",
         "body": "Your device has been added to the dashboard. From here you can monitor its status, edit its configuration, install updates, and return to it whenever you need."
       }
-    }
+    },
+    "suggested_name": "ESPHome Starter"
   },
   "layout": {
     "release_notes": "View release notes",
