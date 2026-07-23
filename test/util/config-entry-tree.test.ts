@@ -59,4 +59,25 @@ describe("pathIsAdvanced", () => {
     expect(pathIsAdvanced(entries, ["bogus"])).toBe(false);
     expect(pathIsAdvanced(entries, [])).toBe(false);
   });
+
+  it("ignores the catalog-advanced marks under a pin's wiring fields", () => {
+    // The wiring section renders mode/inverted regardless of the global
+    // toggle, so a caret there must not flip Show advanced on.
+    const pin = {
+      key: "pin",
+      type: ConfigEntryType.PIN,
+      label: "Pin",
+      advanced: false,
+      config_entries: [
+        nested("mode", true, [entry("input", true), entry("pullup", true)]),
+        entry("inverted", true),
+      ],
+    } as ConfigEntry;
+    expect(pathIsAdvanced([pin], ["pin", "mode", "input"])).toBe(false);
+    expect(pathIsAdvanced([pin], ["pin", "mode"])).toBe(false);
+    expect(pathIsAdvanced([pin], ["pin", "inverted"])).toBe(false);
+    // An advanced pin entry itself still gates its wiring fields.
+    const advancedPin = { ...pin, advanced: true } as ConfigEntry;
+    expect(pathIsAdvanced([advancedPin], ["pin", "mode", "input"])).toBe(true);
+  });
 });
