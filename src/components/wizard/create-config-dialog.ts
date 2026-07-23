@@ -64,7 +64,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
-  /** Hostnames of every configured device, for collision warnings in the steps. */
+  /** Hostnames of every configured device; the steps block on a collision. */
   @property({ attribute: false })
   takenHostnames: ReadonlySet<string> = new Set();
 

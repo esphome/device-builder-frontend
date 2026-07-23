@@ -94,7 +94,6 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
           .forbiddenHostname=${this.sourceName}
           .forbiddenErrorKey=${"dashboard.action_clone_same_name"}
           .takenHostnames=${this.takenHostnames}
-          .takenIsError=${true}
           @device-name-changed=${() => this.requestUpdate()}
         ></esphome-device-name-inputs>
         <div class="actions">

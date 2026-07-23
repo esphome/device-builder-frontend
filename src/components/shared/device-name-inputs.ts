@@ -65,13 +65,9 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   @property({ attribute: false })
   forbiddenErrorKey = "";
 
-  /** Hostnames already in use; a collision errors or warns per `takenIsError`. */
+  /** Hostnames already in use; a collision blocks submit. */
   @property({ attribute: false })
   takenHostnames: ReadonlySet<string> = new Set();
-
-  /** Error blocks submit (clone); false warns only (wizard's overwrite flow). */
-  @property({ attribute: false })
-  takenIsError = false;
 
   /** Focus the friendly-name input on connect (default true). */
   @property({ attribute: false })
@@ -171,12 +167,10 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     if (showsValidation && !base.err && this.takenHostnames.has(hostname)) {
       // Hostnames must be unique on the network; surface a collision with a
       // configured device before submit instead of at the server round-trip.
-      return this.takenIsError
-        ? { err: { code: "naming.hostname_taken", params: { hostname } }, warning: null }
-        : {
-            err: null,
-            warning: { code: "naming.hostname_taken_overwrite", params: { hostname } },
-          };
+      return {
+        err: { code: "naming.hostname_taken", params: { hostname } },
+        warning: null,
+      };
     }
     return base;
   }
@@ -195,12 +189,8 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   protected render() {
     const validity = this.validity;
     // An error holds the panel open; collapsing would hide the one thing
-    // blocking submit. The collision warning opens it too — an invisible
-    // "this will overwrite" defeats its purpose.
-    const open =
-      this._open ||
-      validity.err !== null ||
-      validity.warning?.code === "naming.hostname_taken_overwrite";
+    // blocking submit.
+    const open = this._open || validity.err !== null;
     return html`
       <div class="field">
         <label for="device-friendly-name">${this._localize(this.friendlyLabelKey)}</label>

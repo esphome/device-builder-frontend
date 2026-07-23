@@ -21,7 +21,7 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   // hidden, so the Enter listener follows this rather than connectedCallback.
   @property({ type: Boolean }) active = false;
 
-  /** Hostnames of every configured device; a collision warns (overwrite flow). */
+  /** Hostnames of every configured device; a collision blocks submit. */
   @property({ attribute: false })
   takenHostnames: ReadonlySet<string> = new Set();
 
