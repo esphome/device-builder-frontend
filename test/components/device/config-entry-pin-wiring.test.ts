@@ -290,9 +290,9 @@ describe("pin wiring input-only guardrail", () => {
       )
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-banner").length).toBeGreaterThan(0);
-    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(true);
-    expect(cardById(result, "vcc_switch")?.["?disabled"]).toBe(true);
-    expect(cardById(result, "driven_signal")?.["?disabled"]).toBe(false);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
+    expect(cardById(result, "vcc_switch")?.["aria-disabled"]).toBe("true");
+    expect(cardById(result, "driven_signal")?.["aria-disabled"]).toBe("false");
   });
 
   it("moves the tab stop off a disabled selected card", () => {
@@ -497,8 +497,8 @@ describe("pin wiring board-preset guard", () => {
       guardedCtx("GPIO2")
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
-    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(true);
-    expect(cardById(result, "custom")?.["?disabled"]).toBe(true);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
+    expect(cardById(result, "custom")?.["aria-disabled"]).toBe("true");
     // Hovering the greyed cards explains the unlock.
     expect(cardById(result, "ground_switch")?.title).toBe(
       "device.pin_wiring_guard_tooltip"
@@ -524,7 +524,7 @@ describe("pin wiring board-preset guard", () => {
       )
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
-    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(true);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
   });
 
   it("guards a field carrying board suggestions the same way", () => {
@@ -534,7 +534,7 @@ describe("pin wiring board-preset guard", () => {
       openCtx("GPIO2")
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
-    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(true);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
   });
 
   it("does not guard an ordinary pin", () => {
@@ -544,7 +544,7 @@ describe("pin wiring board-preset guard", () => {
       openCtx("GPIO2")
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-guard")).toHaveLength(0);
-    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(false);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
   });
 
   it("opening a guarded short-form pin does not promote it", () => {
@@ -564,7 +564,7 @@ describe("pin wiring board-preset guard", () => {
       openCtx("GPIO33")
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-guard")).toHaveLength(0);
-    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(false);
+    expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("false");
   });
 
   it("locks children routed through the form dispatch while guarded", () => {
@@ -637,6 +637,6 @@ describe("pin wiring board-preset guard", () => {
         getClusterChoice: (key) => (key === "pin:pin-guard" ? "unlocked" : undefined),
       })
     );
-    expect(cardById(unlocked, "ground_switch")?.["?disabled"]).toBe(false);
+    expect(cardById(unlocked, "ground_switch")?.["aria-disabled"]).toBe("false");
   });
 });

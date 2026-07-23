@@ -179,7 +179,9 @@ export const configEntryFormExtraStyles = css`
     box-shadow: inset 0 0 0 1px var(--wa-color-brand-border-loud);
   }
 
-  .pin-wiring-card[disabled] {
+  /* aria-disabled, not native disabled: the card stays hoverable (the
+     guard tooltip must show) and reachable by keyboard/AT. */
+  .pin-wiring-card[aria-disabled="true"] {
     opacity: 0.6;
     cursor: default;
   }

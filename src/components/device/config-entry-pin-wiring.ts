@@ -374,8 +374,8 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
         aria-checked=${showCustom ? "true" : "false"}
         tabindex=${tabStopIndex === presets.length ? "0" : "-1"}
         title=${opts.guardTooltip || nothing}
-        ?disabled=${editDisabled}
-        @click=${pickCustom}
+        aria-disabled=${editDisabled ? "true" : "false"}
+        @click=${editDisabled ? nothing : pickCustom}
       >
         <span class="pin-wiring-diagram pin-wiring-diagram--icon" aria-hidden="true">
           <wa-icon library="mdi" name="tune"></wa-icon>
@@ -448,6 +448,7 @@ function renderPresetCard(
   ]
     .filter(Boolean)
     .join(" ");
+  const unavailable = editDisabled || !!reasonText;
   return html`<button
     type="button"
     class=${classes}
@@ -456,8 +457,8 @@ function renderPresetCard(
     aria-checked=${selected ? "true" : "false"}
     tabindex=${tabbable ? "0" : "-1"}
     title=${guardTooltip || nothing}
-    ?disabled=${editDisabled || !!reasonText}
-    @click=${onPick}
+    aria-disabled=${unavailable ? "true" : "false"}
+    @click=${unavailable ? nothing : onPick}
   >
     ${wiringDiagram(preset.id)}
     <span class="pin-wiring-card-title">
