@@ -582,9 +582,18 @@ describe("renderPinField long-form Advanced disclosure", () => {
     // ``mode`` and ``inverted`` both rendered, each at its nested
     // path under the pin field. Order-sensitive — ``mode`` first
     // matches the catalog's emission order, which the form's
-    // tab-order convention follows.
-    expect(ctx.renderEntry).toHaveBeenNthCalledWith(1, children[0], ["pin", "mode"]);
-    expect(ctx.renderEntry).toHaveBeenNthCalledWith(2, children[1], ["pin", "inverted"]);
+    // tab-order convention follows. Matched by key, not identity: the
+    // wiring section renders advanced-stripped copies.
+    expect(ctx.renderEntry).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ key: "mode" }),
+      ["pin", "mode"]
+    );
+    expect(ctx.renderEntry).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ key: "inverted" }),
+      ["pin", "inverted"]
+    );
   });
 
   it("promotes the pin value to long form when the user opens Advanced", () => {
@@ -757,9 +766,19 @@ describe("renderPinField long-form Advanced disclosure", () => {
 
   it("omits the disclosure in required-only mode", () => {
     // The add-component quick dialog runs requiredOnly; the optional
-    // long-form extras all drop through the shared filter, so no
+    // long-form extras all drop through the form's filter, so no
     // empty toggle renders inviting the user to expand into nothing.
-    const ctx = makeRenderCtx({ pin: 0 }, { overrides: { requiredOnly: true } });
+    // The fixture's filterRenderable is an identity stub, so model the
+    // required-only drop explicitly.
+    const ctx = makeRenderCtx(
+      { pin: 0 },
+      {
+        overrides: {
+          requiredOnly: true,
+          filterRenderable: (entries) => entries.filter((c) => c.required),
+        },
+      }
+    );
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
         key: "pin",

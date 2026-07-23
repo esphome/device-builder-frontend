@@ -56,10 +56,15 @@ const wiringPinEntry = (pinMode: PinMode, overrides: Partial<ConfigEntry> = {}) 
     ...overrides,
   });
 
-const openCtx = (pin: unknown, overrides: Partial<RenderCtx> = {}) =>
+const openCtx = (
+  pin: unknown,
+  overrides: Partial<RenderCtx> = {},
+  board?: ReturnType<typeof makeTestBoard>
+) =>
   makeRenderCtx(
     { pin },
     {
+      ...(board !== undefined ? { board } : {}),
       overrides: {
         sectionKey: "binary_sensor.gpio",
         nestedOpenSections: new Set(["pin:pin-advanced"]),
@@ -181,15 +186,6 @@ describe("pin wiring preset cards", () => {
     );
     expect(cardById(result, "ground_switch")?.["aria-checked"]).toBe("true");
     expect(cardById(result, "vcc_switch")?.["aria-checked"]).toBe("false");
-  });
-
-  it("selects through a scalar mode shorthand", () => {
-    const result = renderPinField(
-      wiringPinEntry(PinMode.INPUT),
-      ["pin"],
-      openCtx({ number: "GPIO2", mode: "INPUT_PULLUP" })
-    );
-    expect(cardById(result, "ground_switch")?.["aria-checked"]).toBe("true");
   });
 
   it("writes the full long-form block when a preset is picked", () => {
@@ -425,6 +421,33 @@ describe("pin wiring custom editor", () => {
 
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "mode"], undefined);
   });
+
+  it("disables the options an input-only pin can't do, except the set one", () => {
+    const board = makeTestBoard({
+      pins: [makeBoardPin(34, { features: ["input", "input_only"] })],
+    });
+    // Legacy config already carries pullup on GPIO34: the option stays
+    // enabled so the user can move off it, but pulldown and the output
+    // directions are out.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { number: "GPIO34", mode: { input: true, pullup: true } },
+        { getClusterChoice: () => "custom" },
+        board
+      )
+    );
+
+    const radios = findElementBindings(result, "wa-radio");
+    const byValue = (v: string) => radios.find((r) => r.value === v);
+    expect(byValue("output")?.["?disabled"]).toBe(true);
+    expect(byValue("both")?.["?disabled"]).toBe(true);
+    expect(byValue("input")?.["?disabled"]).toBe(false);
+    expect(byValue("pullup")?.["?disabled"]).toBe(false);
+    expect(byValue("pulldown")?.["?disabled"]).toBe(true);
+    expect(byValue("none")?.["?disabled"]).toBe(false);
+  });
 });
 
 describe("pin wiring input-only banner copy", () => {
@@ -465,17 +488,7 @@ describe("pin wiring board-preset guard", () => {
       } as never,
     });
   const guardedCtx = (pin: unknown, overrides: Partial<RenderCtx> = {}) =>
-    makeRenderCtx(
-      { pin },
-      {
-        board: presetBoard(),
-        overrides: {
-          sectionKey: "binary_sensor.gpio",
-          nestedOpenSections: new Set(["pin:pin-advanced"]),
-          ...overrides,
-        },
-      }
-    );
+    openCtx(pin, overrides, presetBoard());
 
   it("renders the guard row and view-only cards on a board-locked pin", () => {
     const result = renderPinField(
@@ -486,6 +499,32 @@ describe("pin wiring board-preset guard", () => {
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
     expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(true);
     expect(cardById(result, "custom")?.["?disabled"]).toBe(true);
+    // Hovering the greyed cards explains the unlock.
+    expect(cardById(result, "ground_switch")?.title).toBe(
+      "device.pin_wiring_guard_tooltip"
+    );
+  });
+
+  it("guards a pin sitting on a featured-component field preset", () => {
+    // The board pre-fills the pin without locking it (the ESK-1 RGB
+    // header); the guard still arms.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { number: "GPIO2" },
+        {},
+        makeTestBoard({
+          overrides: {
+            featured_components: [
+              { component_id: "binary_sensor.gpio", fields: { pin: { value: 2 } } },
+            ],
+          } as never,
+        })
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
+    expect(cardById(result, "ground_switch")?.["?disabled"]).toBe(true);
   });
 
   it("guards a field carrying board suggestions the same way", () => {

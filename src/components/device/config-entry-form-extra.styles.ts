@@ -179,10 +179,6 @@ export const configEntryFormExtraStyles = css`
     box-shadow: inset 0 0 0 1px var(--wa-color-brand-border-loud);
   }
 
-  .pin-wiring-card--unavailable {
-    cursor: not-allowed;
-  }
-
   .pin-wiring-card[disabled] {
     opacity: 0.6;
     cursor: default;
@@ -294,6 +290,14 @@ export const configEntryFormExtraStyles = css`
 
   .pin-wiring-guard-text .field-description {
     margin: 0;
+  }
+
+  /* The switch's slotted label renders at body size by default and
+     overpowers the row; keep it compact and unwrapped. */
+  .pin-wiring-guard-switch {
+    flex-shrink: 0;
+    font-size: var(--wa-font-size-s);
+    white-space: nowrap;
   }
 
   /* ─── ID reference picker option layout ──────────────────── */

@@ -86,6 +86,22 @@ function lockedGpiosForSection(ctx: RenderCtx): Set<number> {
   return gpios;
 }
 
+/** GPIOs the board designates for this section's pin field: locked pins
+ *  plus featured-component field presets keyed by *entryKey* (the RGB
+ *  header pin a board pre-fills without locking). A current value on one
+ *  of these means the wiring is the board's, so the wiring UI guards its
+ *  edits behind an unlock. */
+function boardDefinedGpiosForSection(ctx: RenderCtx, entryKey: string): Set<number> {
+  const gpios = lockedGpiosForSection(ctx);
+  for (const fc of ctx.board?.featured_components ?? []) {
+    if (fc.component_id !== ctx.sectionKey) continue;
+    const preset = fc.fields?.[entryKey]?.value;
+    const gpio = preset != null ? parseBoardGpio(preset) : null;
+    if (gpio !== null) gpios.add(gpio);
+  }
+  return gpios;
+}
+
 function buildPinOption(
   pin: BoardPin,
   entry: ConfigEntry,
@@ -337,13 +353,15 @@ export function renderPinField(
     sectionEndLine(ctx.yaml, ctx.fromLine)
   );
   const ownLockedGpios = lockedGpiosForSection(ctx);
-  // The current pin sitting on a board-locked or board-suggested GPIO for
-  // this section means the wiring is the board's, not the user's — the
-  // wiring UI guards its edits behind an unlock. Value-dependent on
-  // purpose: a pin moved off the board's suggestion is the user's own.
+  // The current pin sitting on a board-defined GPIO for this section
+  // (locked, field preset, or suggestion) means the wiring is the
+  // board's, not the user's — the wiring UI guards its edits behind an
+  // unlock. Value-dependent on purpose: a pin moved off the board's
+  // designation is the user's own.
   const boardPresetPin =
     valueGpio !== null &&
-    (ownLockedGpios.has(valueGpio) || suggestionGpios.has(valueGpio));
+    (boardDefinedGpiosForSection(ctx, entry.key).has(valueGpio) ||
+      suggestionGpios.has(valueGpio));
   // The field's current value must stay pickable even on a reserved pin the
   // board didn't lock to this section (a hand-edited YAML, or a manifest
   // preset missing its lock) — a disabled selected option blanks the

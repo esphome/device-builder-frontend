@@ -198,6 +198,17 @@ export function renderHelpLink(entry: ConfigEntry, ctx: RenderCtx) {
   </a>`;
 }
 
+/** UI-only marker a wrapper may stamp on a locked entry copy to retarget
+ *  the lock icon's tooltip (e.g. the pin wiring guard's "Allow changes"
+ *  hint instead of "Set by the board"). */
+export interface LockedReasonCarrier {
+  locked_reason_key?: string;
+}
+
+const lockedReasonKey = (entry: ConfigEntry): string =>
+  (entry as ConfigEntry & LockedReasonCarrier).locked_reason_key ??
+  "device.field_locked_by_board";
+
 export interface RenderLabelOptions {
   includeHelpLink?: boolean;
 }
@@ -218,7 +229,7 @@ export function renderLabel(
               class="lock-icon"
               library="mdi"
               name="lock-outline"
-              title=${ctx.localize("device.field_locked_by_board")}
+              title=${ctx.localize(lockedReasonKey(entry))}
             ></wa-icon>`
           : nothing
       }
@@ -509,29 +520,9 @@ export function renderSuggestionSelect(
   `;
 }
 
-/** The renderable subset of *entries* for a nested scope.
- *
- * ``includeAdvanced`` forces advanced children visible while keeping the
- * platform / depends_on gating — used where there is no per-member
- * advanced toggle (a picked exclusive-group member, the pin wiring
- * section). */
-export function filterChildEntries(
-  entries: ConfigEntry[],
-  values: Record<string, unknown>,
-  ctx: RenderCtx,
-  opts: { includeAdvanced?: boolean } = {}
-): ConfigEntry[] {
-  return opts.includeAdvanced
-    ? filterRenderable(
-        entries,
-        values,
-        renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
-      )
-    : ctx.filterRenderable(entries, values);
-}
-
 // Shared child rendering for the nested renderer and the exclusive-group
-// dropdown.
+// dropdown. ``includeAdvanced`` forces advanced children visible — a picked
+// exclusive member's fields must all show, as it has no per-member toggle.
 export function renderChildEntries(
   entry: ConfigEntry,
   path: string[],
@@ -539,6 +530,12 @@ export function renderChildEntries(
   opts: { includeAdvanced?: boolean } = {}
 ) {
   const values = ctx.scopeValues(path);
-  const children = filterChildEntries(entry.config_entries ?? [], values, ctx, opts);
+  const children = opts.includeAdvanced
+    ? filterRenderable(
+        entry.config_entries ?? [],
+        values,
+        renderFilterOptions(ctx, { showAdvanced: true, rootValues: ctx.scopeValues([]) })
+      )
+    : ctx.filterRenderable(entry.config_entries ?? [], values);
   return children.map((child) => ctx.renderEntry(child, [...path, child.key]));
 }

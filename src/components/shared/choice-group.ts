@@ -18,6 +18,18 @@ export function rovingTabbable(
 }
 
 /**
+ * Disabled-aware roving tab stop for a ``role="radiogroup"``: the selected
+ * card when it is enabled, else the first enabled card (a disabled selected
+ * card would otherwise leave the group unreachable by keyboard). ``-1``
+ * when every card is disabled.
+ */
+export function rovingTabStopIndex(selectedIndex: number, enabled: boolean[]): number {
+  return selectedIndex >= 0 && enabled[selectedIndex]
+    ? selectedIndex
+    : enabled.indexOf(true);
+}
+
+/**
  * Arrow-key handler for a ``role="radiogroup"`` of choice cards: Up/Left and
  * Down/Right move focus and selection across the enabled cards, wrapping at the
  * ends, per the ARIA radio pattern. Attach to the group's ``@keydown``.
