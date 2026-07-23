@@ -69,10 +69,6 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   @property({ attribute: false })
   takenHostnames: ReadonlySet<string> = new Set();
 
-  /** Focus the friendly-name input on connect (default true). */
-  @property({ attribute: false })
-  autofocusFriendly = true;
-
   @state()
   private _friendly = "";
 
@@ -188,9 +184,10 @@ export class ESPHomeDeviceNameInputs extends LitElement {
 
   protected render() {
     const validity = this.validity;
-    // An error holds the panel open; collapsing would hide the one thing
-    // blocking submit.
-    const open = this._open || validity.err !== null;
+    // Any error or warning holds the panel open: both render inside the
+    // panel body, so collapsing would hide the one message explaining a
+    // disabled submit or a problematic hostname.
+    const open = this._open || validity.err !== null || validity.warning !== null;
     return html`
       <div class="field">
         <label for="device-friendly-name">${this._localize(this.friendlyLabelKey)}</label>
@@ -198,7 +195,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
           id="device-friendly-name"
           type="text"
           autocomplete="off"
-          ?autofocus=${this.autofocusFriendly}
+          autofocus
           .value=${this._friendly}
           placeholder=${this.friendlyPlaceholder || this._localize(this.friendlyPlaceholderKey)}
           @input=${this._onFriendlyInput}

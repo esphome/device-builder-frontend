@@ -145,6 +145,18 @@ describe("device-name-inputs disclosure + validity", () => {
     expect(el.canSubmit).toBe(true);
   });
 
+  it("a soft warning holds the panel open too", async () => {
+    // Warnings render inside the panel body; a collapsed edge-hyphen or
+    // underscore hostname would otherwise look fine on the toggle row.
+    const el = await mountInputs();
+    await typeHostname(el, "under_score");
+    expect(el.validity.err).toBeNull();
+    expect(el.validity.warning).not.toBeNull();
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!.click();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector("#device-hostname")).not.toBeNull();
+  });
+
   it("a hard validation error force-opens the panel", async () => {
     const el = await mountInputs();
     await typeHostname(el, "UPPER CASE");
