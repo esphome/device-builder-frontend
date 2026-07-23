@@ -282,6 +282,23 @@ describe("pin wiring summary line", () => {
     });
   });
 
+  it("keeps the selected card's tech line consistent with the summary", () => {
+    // ground_switch matches inverted-agnostically; with ``inverted:
+    // false`` stored, the checked card must describe the pin as it is,
+    // not the ``inverted: true`` a fresh pick would write.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx({ number: "GPIO2", mode: { input: true, pullup: true }, inverted: false })
+    );
+    const cardTpls = findTemplatesByAnchor(result, "pin-wiring-card-tech");
+    const ground = cardTpls.find((t) =>
+      (t as { values: unknown[] }).values.includes("ground_switch")
+    ) as { values: unknown[] };
+    expect(ground.values).toContain("input + pullup");
+    expect(ground.values).not.toContain("input + pullup · inverted");
+  });
+
   it("reports custom flags with their tech clause", () => {
     const localize = summarize({
       number: "GPIO2",
@@ -626,6 +643,30 @@ describe("pin wiring board-preset guard", () => {
     );
     expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
+  });
+
+  it("guards a board-locked expander channel (fail closed)", () => {
+    // locked_pins carries expander tokens too; the guard must not fail
+    // open just because the token isn't a board GPIO.
+    const result = renderPinField(
+      wiringPinEntry(PinMode.INPUT),
+      ["pin"],
+      openCtx(
+        { pca9554: "hub", number: 0, mode: "OUTPUT" },
+        { pinRegistryModes: { pca9554: ["input", "output"] } },
+        makeTestBoard({
+          overrides: {
+            featured_components: [
+              {
+                component_id: "binary_sensor.gpio",
+                locked_pins: { pin: "pca9554:hub:0" },
+              },
+            ],
+          } as never,
+        })
+      )
+    );
+    expect(findTemplatesByAnchor(result, "pin-wiring-guard").length).toBeGreaterThan(0);
   });
 
   it("guards a field carrying board suggestions the same way", () => {

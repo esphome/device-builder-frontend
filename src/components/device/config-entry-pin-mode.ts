@@ -77,9 +77,11 @@ export function renderCustomEditor(
     ctx.emitChange([...path, "mode"], Object.keys(next).length ? next : undefined);
   };
   // An unexpected radio value (a component shape change) must no-op, not
-  // strip the flags it would have replaced.
+  // strip the flags it would have replaced — and a rendered-disabled
+  // option (input-only pin) must not write through a synthetic event.
   const onDirection = (value: string) => {
     if (value !== "input" && value !== "output" && value !== "both") return;
+    if (optionDisabled(value, direction)) return;
     writeMode((f) => {
       delete f.input;
       delete f.output;
@@ -89,6 +91,7 @@ export function renderCustomEditor(
   };
   const onPull = (value: string) => {
     if (value !== "none" && value !== "pullup" && value !== "pulldown") return;
+    if (optionDisabled(value, pull)) return;
     writeMode((f) => {
       delete f.pullup;
       delete f.pulldown;

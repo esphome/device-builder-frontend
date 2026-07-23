@@ -102,6 +102,24 @@ function boardDefinedGpiosForSection(ctx: RenderCtx, entryKey: string): Set<numb
   return gpios;
 }
 
+/** Expander-channel tokens (``provider:hub:channel``) the board designates
+ *  for this section's pin field — the non-GPIO half of the board-preset
+ *  guard, so a locked expander channel doesn't fail open. */
+function boardDefinedTokensForSection(ctx: RenderCtx, entryKey: string): Set<string> {
+  const tokens = new Set<string>();
+  for (const fc of ctx.board?.featured_components ?? []) {
+    if (fc.component_id !== ctx.sectionKey) continue;
+    for (const pin of Object.values(fc.locked_pins ?? {})) {
+      if (typeof pin === "string") tokens.add(pin);
+    }
+    const preset = fc.fields?.[entryKey]?.value;
+    if (typeof preset === "string" && parseBoardGpio(preset) === null) {
+      tokens.add(preset);
+    }
+  }
+  return tokens;
+}
+
 function buildPinOption(
   pin: BoardPin,
   entry: ConfigEntry,
@@ -272,7 +290,14 @@ export function renderPinField(
     // writes a board GPIO into `pin.number` and clobbers the channel. The
     // Advanced mode-flag disclosure still renders below (the channel's mode is
     // editable, scoped to the provider), just not the board-GPIO selector.
-    return renderExpanderPin(entry, path, ctx, identity, rawValue);
+    return renderExpanderPin(
+      entry,
+      path,
+      ctx,
+      identity,
+      rawValue,
+      boardDefinedTokensForSection(ctx, entry.key).has(identity)
+    );
   }
   // Fall back to alias resolution (`RX` → GPIO3) when the value isn't a
   // `GPIOn` form; this drives both the selected option and the re-add of a
@@ -467,7 +492,8 @@ function renderExpanderPin(
   path: string[],
   ctx: RenderCtx,
   identity: string,
-  rawValue: unknown
+  rawValue: unknown,
+  boardPreset: boolean
 ): TemplateResult {
   const [provider, hub, channel] = identity.split(":");
   return html`
@@ -487,7 +513,7 @@ function renderExpanderPin(
         isLongForm: isPlainObject(rawValue),
         fieldDisabled: effectiveDisabled(entry, ctx),
         boardPin: null,
-        boardPreset: false,
+        boardPreset,
       })}
     </div>
   `;

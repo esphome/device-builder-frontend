@@ -313,7 +313,9 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
     ctx.getClusterChoice(choiceKey) === "custom" || state.kind === "custom";
 
   const pickPreset = (preset: WiringPreset) => {
-    if (editDisabled) return;
+    // Same belt-and-braces as every other mutating handler: the missing
+    // click binding alone must not be the guardrail.
+    if (editDisabled || presetUnavailableReason(preset, boardPin) !== null) return;
     // Clear a prior Custom pick; the preset itself round-trips from the
     // written flags, so no id needs storing.
     ctx.setClusterChoice(choiceKey, "");
@@ -379,9 +381,12 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
           i === selectedIndex,
           i === tabStopIndex,
           reasons[i] ? unavailableText : "",
-          // A pick preserves the stored inverted when the preset doesn't
-          // care, so the tech line must reflect it for those cards.
-          preset.invertedWrite ?? currentInverted,
+          // The selected card describes the pin as it IS (matching the
+          // summary line); unselected cards advertise what a pick would
+          // write, preserving the stored inverted when they don't care.
+          i === selectedIndex
+            ? currentInverted
+            : (preset.invertedWrite ?? currentInverted),
           opts.guardTooltip,
           editDisabled,
           () => pickPreset(preset),
