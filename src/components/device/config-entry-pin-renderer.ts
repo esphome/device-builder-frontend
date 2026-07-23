@@ -8,13 +8,12 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { BoardPin } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { ConfigEntryType, PinFeature, PinMode } from "../../api/types/config-entries.js";
+import { PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { formatPinValue, parseBoardGpio, parsePinGpio } from "../../util/pin-gpio.js";
-import { expandPinModeShorthand } from "../../util/pin-mode.js";
-import { isSubstitutionString, looksLikeSubstitution } from "../../util/substitutions.js";
-import { renderDisclosure } from "../shared/disclosure.js";
+import { isSubstitutionString } from "../../util/substitutions.js";
+import { renderPinWiring } from "./config-entry-pin-wiring.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -24,8 +23,6 @@ import {
   renderSubstitutionHint,
   type RenderCtx,
 } from "./config-entry-renderers-shared.js";
-import { renderNestedField } from "./config-entry-renderers/nested.js";
-import { renderBooleanField } from "./config-entry-renderers/primitives.js";
 
 // `parsePinGpio` / `formatPinValue` moved to `util/pin-gpio.ts` so the YAML
 // used-pin scanner shares the same platform pin-format rules. Re-exported
@@ -352,6 +349,10 @@ export function renderPinField(
   }
   const fieldDisabled = effectiveDisabled(entry, ctx);
   const isLongForm = isPlainObject(rawValue);
+  const boardPin =
+    valueGpio !== null
+      ? (ctx.board.pins.find((p) => p.gpio === valueGpio) ?? null)
+      : null;
 
   // Pin-select onChange routes to ``path.number`` when the field is
   // already in long form (the user expanded Advanced and set a flag,
@@ -382,7 +383,7 @@ export function renderPinField(
         ${renderPinOptions(visible, entry, usedPins, ownLockedGpios, value, ctx)}
       </wa-select>
       ${renderFieldError(path, ctx)}
-      ${renderPinAdvanced(entry, path, ctx, rawValue, isLongForm, fieldDisabled)}
+      ${renderPinWiring(entry, path, ctx, rawValue, isLongForm, fieldDisabled, boardPin)}
     </div>
   `;
 }
@@ -414,7 +415,7 @@ function renderSubstitutionPin(
       />
       ${renderSubstitutionHint(number, ctx.substitutions, ctx.localize)}
       ${renderFieldError(numberPath, ctx)}
-      ${renderPinAdvanced(entry, path, ctx, rawValue, true, fieldDisabled)}
+      ${renderPinWiring(entry, path, ctx, rawValue, true, fieldDisabled, null)}
     </div>
   `;
 }
@@ -442,244 +443,15 @@ function renderExpanderPin(
         .value=${ctx.localize("device.pin_on_expander", { provider, hub, channel })}
       />
       ${renderFieldError(path, ctx)}
-      ${renderPinAdvanced(
+      ${renderPinWiring(
         entry,
         path,
         ctx,
         rawValue,
         isPlainObject(rawValue),
-        effectiveDisabled(entry, ctx)
+        effectiveDisabled(entry, ctx),
+        null
       )}
     </div>
   `;
-}
-
-/**
- * Render the "Advanced" disclosure carrying the long-form pin
- * fields (``mode`` flag group + ``inverted``) attached by
- * ``script/sync_components.py``'s ``_pin_long_form_extras``
- * (esphome/device-builder#430). ESPHome accepts both forms:
- *
- *     pin: GPIO5          # short form — what the picker writes
- *     pin:                # long form — what flipping any flag promotes to
- *       number: GPIO5
- *       mode:
- *         pullup: true
- *       inverted: false
- *
- * Without this disclosure the visual editor only ever writes the
- * short form, and configurations that need a pull-up (issue #420)
- * have no path through the editor.
- *
- * Returns ``nothing`` when the entry has no nested config_entries —
- * pre-#430 catalogs (or future entries that opt out by clearing
- * ``config_entries``) keep the simple short-form picker.
- */
-function renderPinAdvanced(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-  rawValue: unknown,
-  isLongForm: boolean,
-  fieldDisabled: boolean
-): TemplateResult | typeof nothing {
-  // Apply the same visibility filter every other nested renderer
-  // uses so requiredOnly / showAdvanced / platform-gating rules
-  // hide long-form sub-fields the user shouldn't see (e.g. an
-  // analog-mode flag on a platform that lacks it). Skipping
-  // ``filterRenderable`` would let the long-form disclosure leak
-  // sub-fields the rest of the form has hidden.
-  const longFormFields = ctx.filterRenderable(
-    entry.config_entries ?? [],
-    ctx.scopeValues(path)
-  );
-  if (longFormFields.length === 0) return nothing;
-
-  const advancedKey = `${path.join(".")}:pin-advanced`;
-  // Reuse the form's ``nestedOpenSections`` machinery so the open/closed
-  // state survives a re-render. Default closed (opt-in disclosure), but
-  // seed open when the pin already carries long-form values (``mode`` /
-  // ``inverted`` / …) so a field set in YAML isn't hidden — seeded, not
-  // forced, so reading ``isOpen`` from the set honors a later user collapse.
-  const pinValues = ctx.scopeValues(path);
-  const hasAdvancedValue =
-    isLongForm &&
-    Object.keys(pinValues).some((k) => k !== "number" && pinValues[k] !== undefined);
-  if (hasAdvancedValue) ctx.seedNestedOpen(advancedKey);
-  const isOpen = ctx.nestedOpenSections.has(advancedKey);
-
-  const onAdvancedToggle = () => {
-    // Locked / disabled fields (board-preset pins, parent-disabled
-    // groups) must not mutate via Advanced — without this guard,
-    // opening the disclosure on a short-form locked pin would fire
-    // the promotion ``emitChange`` and rewrite the locked value to
-    // the long form. The toggle is also rendered ``disabled`` below,
-    // but defending in both places means a synthetic click event
-    // (test code, accessibility tooling) can't bypass the guard.
-    if (fieldDisabled) return;
-    ctx.toggleNested(advancedKey);
-    // When opening for the first time on a short-form pin value,
-    // promote ``pin: GPIO5`` → ``pin: { number: GPIO5 }`` so a
-    // subsequent flag flip can write to ``pin.mode.pullup``
-    // without ``setIn`` clobbering the GPIO. The form's
-    // value-change handler picks this up before the children
-    // render, so the nested fields read off the freshly-promoted
-    // mapping. Skip when already long-form (preserves the
-    // user's existing flags) or when the pin has no value yet
-    // (no GPIO to preserve; the picker will write to bare path
-    // on first selection).
-    if (!isOpen && !isLongForm && rawValue != null && rawValue !== "") {
-      ctx.emitChange(path, { number: rawValue });
-    }
-  };
-
-  return html`
-    <div
-      class="pin-advanced"
-      data-field-key="${advancedKey}"
-      data-reveal-for="${fieldKeyAttr(path)}"
-    >
-      ${renderDisclosure({
-        open: isOpen,
-        onToggle: onAdvancedToggle,
-        localize: ctx.localize,
-        labelKey: "device.pin_advanced",
-        variant: "quiet",
-        iconBefore: true,
-        disabled: fieldDisabled,
-        body: () =>
-          html`${longFormFields.map((child) => renderLongFormChild(child, path, ctx))}`,
-      })}
-    </div>
-  `;
-}
-
-/** Render one long-form pin field; the ``mode`` group is scoped to the flags
- *  the pin's external provider allows (a native / unknown provider keeps all). */
-function renderLongFormChild(
-  child: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx
-): unknown {
-  if (child.key !== "mode" || child.type !== ConfigEntryType.NESTED) {
-    return ctx.renderEntry(child, [...path, child.key]);
-  }
-  const modePath = [...path, child.key];
-  const modeValue = ctx.getAt(modePath);
-  const allowed = providerAllowedModes(ctx.getAt(path), ctx.pinRegistryModes);
-  // Keep any flag the value already sets visible even if the provider now
-  // disallows it, so a legacy/invalid config can be repaired from the editor.
-  const scoped = allowed
-    ? scopeModeChildren(child, allowed, presentModeFlags(modeValue))
-    : child;
-  // A scalar shorthand (``mode: OUTPUT``) needs the display-expansion
-  // wrapper; a ``${var}`` scalar goes through renderEntry so the form's
-  // substitution gate edits it as text with the resolves-to hint (#1343);
-  // the object form goes through the normal nested dispatch. Deliberately
-  // ``looksLikeSubstitution``, not ``isSubstitutionString`` — the typeof
-  // guard is load-bearing (an object mode must not hit the wrapper).
-  return typeof modeValue === "string" && !looksLikeSubstitution(modeValue)
-    ? renderPinModeField(scoped, modePath, ctx)
-    : ctx.renderEntry(scoped, modePath);
-}
-
-/** Allowed mode flags for *pinValue*'s provider, or ``null`` (native pin,
- *  short form, unknown provider, or empty list) to keep the full flag set. */
-function providerAllowedModes(
-  pinValue: unknown,
-  modesMap: Record<string, string[]> | undefined
-): string[] | null {
-  if (!modesMap || !isPlainObject(pinValue)) return null;
-  for (const key of Object.keys(pinValue)) {
-    // Own-property check, not ``in``, so a key like ``toString`` can't match
-    // an inherited member. An empty list means no scoping (show every flag).
-    if (Object.prototype.hasOwnProperty.call(modesMap, key)) {
-      const allowed = modesMap[key];
-      return allowed.length > 0 ? allowed : null;
-    }
-  }
-  return null;
-}
-
-/** Flag keys the current ``mode`` value sets (object keys, or a scalar
- *  shorthand's expansion) — kept visible so a legacy flag stays editable. */
-function presentModeFlags(modeValue: unknown): string[] {
-  if (typeof modeValue === "string") {
-    return Object.keys(expandPinModeShorthand(modeValue) ?? {});
-  }
-  return isPlainObject(modeValue) ? Object.keys(modeValue) : [];
-}
-
-/** *modeEntry* with its flag children narrowed to *allowed* plus any flag
- *  *present* already sets, so a disallowed-but-set flag stays editable. */
-function scopeModeChildren(
-  modeEntry: ConfigEntry,
-  allowed: string[],
-  present: string[]
-): ConfigEntry {
-  const keep = new Set([...allowed, ...present]);
-  const children = (modeEntry.config_entries ?? []).filter((c) => keep.has(c.key));
-  return { ...modeEntry, config_entries: children };
-}
-
-/**
- * Render the pin ``mode`` group. A scalar shorthand (``mode: OUTPUT``)
- * is expanded to its flag dict for display so the existing checkboxes
- * reflect it; the YAML scalar is kept until the user toggles a flag,
- * which writes the flag-object form. Object form and unrecognised
- * shorthands fall through to the normal nested renderer.
- */
-function renderPinModeField(
-  entry: ConfigEntry,
-  modePath: string[],
-  ctx: RenderCtx
-): unknown {
-  const raw = ctx.getAt(modePath);
-  const expanded = typeof raw === "string" ? expandPinModeShorthand(raw) : null;
-  if (!expanded) return renderNestedField(entry, modePath, ctx);
-  return renderNestedField(entry, modePath, pinModeDisplayCtx(ctx, modePath, expanded));
-}
-
-/** Wrap *ctx* so reads under *modePath* see *expanded* (a flag dict from a
- *  scalar shorthand) and a flag-child write promotes the mode to the
- *  flag-object form, replacing the scalar only on edit. */
-function pinModeDisplayCtx(
-  ctx: RenderCtx,
-  modePath: string[],
-  expanded: Record<string, boolean>
-): RenderCtx {
-  const modeKey = modePath.join(".");
-  const flagOf = (path: string[]): string | null =>
-    path.length === modePath.length + 1 &&
-    path.slice(0, modePath.length).join(".") === modeKey
-      ? path[modePath.length]
-      : null;
-  const wrapped: RenderCtx = {
-    ...ctx,
-    getAt: (path) => {
-      if (path.join(".") === modeKey) return expanded;
-      const flag = flagOf(path);
-      return flag !== null ? expanded[flag] : ctx.getAt(path);
-    },
-    scopeValues: (path) =>
-      path.join(".") === modeKey ? { ...expanded } : ctx.scopeValues(path),
-    emitChange: (path, value) => {
-      const flag = flagOf(path);
-      if (flag === null) {
-        ctx.emitChange(path, value);
-        return;
-      }
-      const next = { ...expanded };
-      if (value) next[flag] = true;
-      else delete next[flag];
-      ctx.emitChange(modePath, next);
-    },
-  };
-  // The mode children are booleans; render them through the wrapper so the
-  // checkboxes read/write the expanded flags.
-  wrapped.renderEntry = (child, path) =>
-    child.type === ConfigEntryType.BOOLEAN
-      ? renderBooleanField(child, path, wrapped)
-      : ctx.renderEntry(child, path);
-  return wrapped;
 }

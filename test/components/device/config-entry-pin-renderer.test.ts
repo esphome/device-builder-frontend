@@ -736,25 +736,14 @@ describe("renderPinField long-form Advanced disclosure", () => {
     expect(ctx.emitChange).not.toHaveBeenCalled();
   });
 
-  it("filters long-form children through ctx.filterRenderable", () => {
-    // Every other nested renderer applies ``filterRenderable`` so
-    // requiredOnly / showAdvanced / platform-visibility rules hide
-    // sub-fields the rest of the form has hidden. Skipping the
-    // filter here would let the long-form disclosure leak fields
-    // the catalog has marked advanced or gated by platform.
-    const openSet = new Set<string>(["pin:pin-advanced"]);
-    const filterMock = vi.fn((entries: ConfigEntry[]) => entries.slice(0, 1));
-    const ctx = makeRenderCtx(
-      { pin: { number: "GPIO5" } },
-      {
-        overrides: {
-          nestedOpenSections: openSet,
-          filterRenderable: filterMock as never,
-        },
-      }
-    );
-    const children = makeLongFormChildren();
-    renderPinField(
+  it("shows the disclosure without the global Show-advanced toggle", () => {
+    // The long-form extras are catalog-marked ``advanced``, but wiring
+    // is how a button or relay works at all — the disclosure must render
+    // with the global toggle off (it used to be hidden until the user
+    // flipped Show advanced settings, then expanded two disclosures).
+    const children = makeLongFormChildren().map((c) => ({ ...c, advanced: true }));
+    const ctx = makeRenderCtx({ pin: 0 }, { overrides: { showAdvanced: false } });
+    const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
         key: "pin",
         required: true,
@@ -763,26 +752,14 @@ describe("renderPinField long-form Advanced disclosure", () => {
       ["pin"],
       ctx
     );
-    // Filter received the full children list; only the survivor
-    // (the first child) gets handed to renderEntry. A regression
-    // that bypassed ``filterRenderable`` would render both
-    // children and the assertion below would catch the second
-    // one.
-    expect(filterMock).toHaveBeenCalledWith(children, expect.anything());
-    expect(ctx.renderEntry).toHaveBeenCalledTimes(1);
-    expect(ctx.renderEntry).toHaveBeenCalledWith(children[0], ["pin", "mode"]);
+    expect(findTemplatesByAnchor(result, "<button").length).toBe(1);
   });
 
-  it("omits the Advanced disclosure when filterRenderable hides every child", () => {
-    // requiredOnly mode (the add-component dialog) hides everything
-    // marked advanced. The pin extras are all advanced, so the
-    // whole disclosure should disappear — rendering an empty
-    // toggle would invite the user to expand into nothing.
-    const filterMock = vi.fn(() => [] as ConfigEntry[]);
-    const ctx = makeRenderCtx(
-      { pin: 0 },
-      { overrides: { filterRenderable: filterMock as never } }
-    );
+  it("omits the disclosure in required-only mode", () => {
+    // The add-component quick dialog runs requiredOnly; the optional
+    // long-form extras all drop through the shared filter, so no
+    // empty toggle renders inviting the user to expand into nothing.
+    const ctx = makeRenderCtx({ pin: 0 }, { overrides: { requiredOnly: true } });
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
         key: "pin",

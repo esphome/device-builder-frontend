@@ -21,6 +21,9 @@ export interface DisclosureOptions {
   labelKey: string;
   /** Substitution values for the toggle label. */
   labelParams?: Record<string, string | number>;
+  /** Pre-localized label overriding *labelKey* — for toggles whose text
+   *  carries dynamic state (the pin wiring summary). */
+  labelText?: string;
   /** Panel content; called (and built) only while `open`, so a collapsed
    *  disclosure never constructs its body or runs its render side effects. */
   body: () => TemplateResult;
@@ -45,7 +48,7 @@ export interface DisclosureOptions {
 export function renderDisclosure(opts: DisclosureOptions): TemplateResult {
   const { open, variant = "link", iconBefore = false, panelId } = opts;
   const label = html`<span class="disclosure-toggle__label">
-    ${opts.localize(opts.labelKey, opts.labelParams)}
+    ${opts.labelText ?? opts.localize(opts.labelKey, opts.labelParams)}
   </span>`;
   const chevron = html`<wa-icon
     class="disclosure-toggle__chevron"
