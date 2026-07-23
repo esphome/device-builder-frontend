@@ -837,7 +837,7 @@
     "pin_wiring_direction_output": "Output",
     "pin_wiring_direction_both": "Input and output",
     "pin_wiring_pull": "Pull resistor",
-    "pin_wiring_pull_description": "A tiny built-in resistor that gently holds the pin at a known level when nothing is driving it. Without one, an unconnected pin reads random noise.",
+    "pin_wiring_pull_description": "With nothing connected, a pin reads random noise. A pull resistor gives it a steady resting level until something drives it: pull-up rests at 3.3V, pull-down rests at ground. Pick the opposite of what your wiring connects the pin to, so a switch to ground needs a pull-up and a switch to 3.3V needs a pull-down. A module that always drives its signal wire needs none.",
     "pin_wiring_pull_none": "None",
     "pin_wiring_pull_up": "Pull-up (rests at 3.3V)",
     "pin_wiring_pull_down": "Pull-down (rests at ground)",
