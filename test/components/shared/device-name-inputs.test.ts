@@ -169,6 +169,17 @@ describe("device-name-inputs disclosure + validity", () => {
     expect(friendlyInput(el).getAttribute("placeholder")).toBe("e.g. Some Board");
   });
 
+  it("caps a manual hostname override at 31 chars", async () => {
+    // The backend clamps to esphome's 31-char hostname cap; a longer
+    // override passing client validation would be silently rewritten.
+    const el = await mountInputs();
+    await typeHostname(el, "x".repeat(32));
+    expect(el.validity.err?.code).toBe("validation.max_length");
+    expect(el.canSubmit).toBe(false);
+    await typeHostname(el, "x".repeat(31));
+    expect(el.canSubmit).toBe(true);
+  });
+
   it("rejects the forbidden hostname with the configured error", async () => {
     const el = await mountInputs({
       forbiddenHostname: "source",

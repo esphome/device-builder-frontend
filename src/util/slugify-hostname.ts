@@ -2,7 +2,7 @@
 // esphome's friendly_name_slugify clamped to the 31-char hostname cap from
 // esphome's validate_hostname. Keep the steps in sync with both, in order --
 // the derived value is sent verbatim as the clone's esphome.name.
-const HOSTNAME_MAX_LEN = 31;
+export const HOSTNAME_MAX_LEN = 31;
 
 /** Derive a valid esphome.name (mDNS hostname) slug from a display name. */
 export function slugifyHostname(value: string): string {

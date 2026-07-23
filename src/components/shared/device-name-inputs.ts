@@ -12,7 +12,7 @@ import { dialogFieldStyles } from "../../styles/dialog-fields.js";
 import { disclosureStyles } from "../../styles/disclosure.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { slugifyHostname } from "../../util/slugify-hostname.js";
+import { HOSTNAME_MAX_LEN, slugifyHostname } from "../../util/slugify-hostname.js";
 import {
   deviceNameValidity,
   renderDeviceNameField,
@@ -141,6 +141,15 @@ export class ESPHomeDeviceNameInputs extends LitElement {
       // A name that slugs to nothing (all emoji / punctuation) would
       // otherwise disable submit with no visible reason.
       return { err: { code: "naming.hostname_required" }, warning: null };
+    }
+    if (hostname.length > HOSTNAME_MAX_LEN) {
+      // The shared 63-char device-name validation is too loose here: the
+      // backend clamps this value to esphome's 31-char hostname cap, so a
+      // longer manual override would be silently rewritten.
+      return {
+        err: { code: "validation.max_length", params: { max: HOSTNAME_MAX_LEN } },
+        warning: null,
+      };
     }
     if (
       showsValidation &&
