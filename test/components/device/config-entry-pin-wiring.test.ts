@@ -503,6 +503,9 @@ describe("pin wiring board-preset guard", () => {
     expect(cardById(result, "ground_switch")?.title).toBe(
       "device.pin_wiring_guard_tooltip"
     );
+    // The group stays Tab-reachable while everything is guarded: the
+    // selected (implied-default) card keeps the tab stop.
+    expect(cardById(result, "driven_signal")?.tabindex).toBe("0");
   });
 
   it("guards a pin sitting on a featured-component field preset", () => {

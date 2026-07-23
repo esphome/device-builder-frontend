@@ -351,7 +351,12 @@ function renderWiringPanel(opts: WiringPanelOptions): TemplateResult {
     ...presets.map((_, i) => !editDisabled && reasons[i] === null),
     !editDisabled,
   ];
-  const tabStopIndex = rovingTabStopIndex(selectedIndex, cardEnabled);
+  const enabledTabStop = rovingTabStopIndex(selectedIndex, cardEnabled);
+  // With every card unavailable (the board-preset guard armed), keep one
+  // aria-disabled card in the tab order — the group must stay reachable
+  // so its state and tooltip are discoverable by keyboard.
+  const tabStopIndex =
+    enabledTabStop !== -1 ? enabledTabStop : selectedIndex >= 0 ? selectedIndex : 0;
   return html`
     ${banner}
     <div
