@@ -83,7 +83,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
 
   // Latched once the user types in the hostname field directly; stops the
   // friendly-name input from clobbering their edit. Clearing the hostname
-  // unlatches, so a bad manual edit is recoverable by emptying the field.
+  // unlatches; derivation resumes on the next friendly-name edit.
   @state()
   private _hostnameEdited = false;
 

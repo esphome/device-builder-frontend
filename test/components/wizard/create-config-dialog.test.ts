@@ -246,6 +246,20 @@ describe("create-config-dialog create de-dupe + retry", () => {
     );
   });
 
+  it("a blank friendly name falls back to the hostname so it lands verbatim", async () => {
+    // The backend's explicit path uses the hostname as-is; its derive path
+    // would re-slug a legal-but-warned override like an underscore name.
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "my_plug.yaml" });
+    const el = await mount({ createDevice });
+
+    emitCreate(el, "my_plug", "");
+    await flush();
+
+    expect(createDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "my_plug", friendly_name: "my_plug" })
+    );
+  });
+
   it("forwards the hostname and friendly name from the basic-setup flow too", async () => {
     const createDevice = vi
       .fn()

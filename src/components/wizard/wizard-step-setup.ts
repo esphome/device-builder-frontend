@@ -127,8 +127,15 @@ export class ESPHomeWizardStepSetup extends LitElement {
     // The name inputs exist only after the first render, so the tour seed
     // can't land in connectedCallback. The seed changes _canAdvance, which
     // only the host's own render reads — re-render or Next stays disabled.
+    // A translated seed with no ASCII alphanumerics would slug to an empty
+    // hostname and open the tour with Next hard-blocked — skip seeding then.
     const suggested = getTourSuggestedName();
-    if (suggested && this._nameInputs && !this._nameInputs.friendlyName) {
+    if (
+      suggested &&
+      slugifyHostname(suggested) &&
+      this._nameInputs &&
+      !this._nameInputs.friendlyName
+    ) {
       this._nameInputs.reset(this._untakenSeed(suggested));
       this.requestUpdate();
     }

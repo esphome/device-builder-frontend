@@ -359,6 +359,16 @@ describe("wizard-step-setup", () => {
     expect(primary.disabled).toBe(false);
   });
 
+  it("skips a tour seed that derives no hostname", async () => {
+    // A translated seed with no ASCII alphanumerics would open the tour
+    // hard-blocked on the empty-hostname error.
+    setTourSuggestedName("我的设备");
+    const el = await mount(noWifiBoard());
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe("");
+    expect(inputs.hostname).toBe("");
+  });
+
   it("falls back to the generic example for a generic board", async () => {
     // "e.g. Generic ESP32 Board" is not a name anyone should copy.
     const el = await mount(board({ requires_wifi: true, is_generic: true }));
