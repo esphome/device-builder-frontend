@@ -481,9 +481,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
       {
         // The step's name inputs derive the hostname from the friendly name
         // (or carry the user's override); both go over as-is and the backend
-        // only sanitises.
+        // only sanitises. An empty friendly name is omitted so the backend's
+        // derive-from-name path decides the label.
         name,
-        friendly_name: friendlyName,
+        friendly_name: friendlyName || undefined,
         board_id: this._selectedBoard?.id ?? "",
         config_type: "empty",
       },
@@ -506,7 +507,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
     await this._runCreate(
       {
         name,
-        friendly_name: friendlyName,
+        friendly_name: friendlyName || undefined,
         board_id: board.id,
         config_type: "basic",
         // Typed credentials are persisted to secrets.yaml by the backend and

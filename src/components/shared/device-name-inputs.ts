@@ -140,6 +140,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
     if (
       showsValidation &&
       this.forbiddenHostname &&
+      this.forbiddenErrorKey &&
       hostname === this.forbiddenHostname
     ) {
       return { err: { code: this.forbiddenErrorKey }, warning: null };
