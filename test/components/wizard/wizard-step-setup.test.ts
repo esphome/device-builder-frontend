@@ -12,6 +12,7 @@ import {
   clearTourPending,
   setTourActive,
   setTourPending,
+  setTourSuggestedName,
 } from "../../../src/components/guided-tour/tour-session.js";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
@@ -316,6 +317,16 @@ describe("wizard-step-setup", () => {
     expect(friendly?.getAttribute("placeholder")).toBe(
       "wizard.device_name_placeholder_board"
     );
+  });
+
+  it("a tour-seeded name fills the inputs and enables Next", async () => {
+    setTourSuggestedName("ESPHome Starter");
+    const el = await mount(noWifiBoard());
+    const inputs = await deviceNameInputsOf(el);
+    expect(inputs.friendlyName).toBe("ESPHome Starter");
+    expect(inputs.hostname).toBe("esphome-starter");
+    const primary = el.shadowRoot!.querySelector<HTMLButtonElement>(".btn-primary")!;
+    expect(primary.disabled).toBe(false);
   });
 
   it("falls back to the generic example for a generic board", async () => {

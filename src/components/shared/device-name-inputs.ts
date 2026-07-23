@@ -137,6 +137,11 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   get validity(): DeviceNameValidity {
     const hostname = this.hostname;
     const showsValidation = hostname.length > 0;
+    if (!hostname && this.friendlyName) {
+      // A name that slugs to nothing (all emoji / punctuation) would
+      // otherwise disable submit with no visible reason.
+      return { err: { code: "naming.hostname_required" }, warning: null };
+    }
     if (
       showsValidation &&
       this.forbiddenHostname &&

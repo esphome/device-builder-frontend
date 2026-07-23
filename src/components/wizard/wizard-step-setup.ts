@@ -120,10 +120,12 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   protected firstUpdated(): void {
     // The name inputs exist only after the first render, so the tour seed
-    // can't land in connectedCallback.
+    // can't land in connectedCallback. The seed changes _canAdvance, which
+    // only the host's own render reads — re-render or Next stays disabled.
     const suggested = getTourSuggestedName();
     if (suggested && this._nameInputs && !this._nameInputs.friendlyName) {
       this._nameInputs.reset(suggested);
+      this.requestUpdate();
     }
     clearTourSuggestedName();
   }

@@ -134,6 +134,17 @@ describe("device-name-inputs disclosure + validity", () => {
     expect(el.canSubmit).toBe(false);
   });
 
+  it("a name that slugs to nothing surfaces an error instead of a silent disable", async () => {
+    const el = await mountInputs();
+    await typeFriendly(el, "!!!");
+    expect(el.validity.err?.code).toBe("naming.hostname_required");
+    // The error force-opens the panel so the empty hostname field is visible.
+    expect(el.shadowRoot!.querySelector("#device-hostname")).not.toBeNull();
+    await typeFriendly(el, "Plug");
+    expect(el.validity.err).toBeNull();
+    expect(el.canSubmit).toBe(true);
+  });
+
   it("a hard validation error force-opens the panel", async () => {
     const el = await mountInputs();
     await typeHostname(el, "UPPER CASE");
