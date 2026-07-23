@@ -346,11 +346,10 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   private _renderListenerBadge(listenerBound: boolean) {
     if (!this._remoteBuildEnabled) {
       return html`
-        <span
-          class="build-server-listener-badge build-server-listener-disabled"
-          role="status"
-        >
-          ${this._localize("settings.remote_build_listener_disabled")}
+        <span class="build-server-listener-badge build-server-listener-disabled">
+          <span role="status">
+            ${this._localize("settings.remote_build_listener_disabled")}
+          </span>
           <button
             class="link-button"
             type="button"

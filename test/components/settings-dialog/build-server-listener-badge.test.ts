@@ -84,6 +84,10 @@ describe("build-server listener badge", () => {
     expect(badge(el)!.textContent).toContain("settings.remote_build_listener_disabled");
     expect(badge(el)!.textContent).not.toContain("settings.remote_build_listener_down");
     expect(turnOn(el)).not.toBeNull();
+    // The turn-on action must sit outside the live region.
+    const status = badge(el)!.querySelector('[role="status"]')!;
+    expect(status).not.toBeNull();
+    expect(status.querySelector("button")).toBeNull();
   });
 
   it("fires set-remote-build-enabled(true) from the turn-on action", async () => {
