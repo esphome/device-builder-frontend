@@ -51,7 +51,7 @@ function renderRowGlyph(domain: string): TemplateResult {
   if (domain === "esphome") {
     return html`<wa-icon
       class="nav-item-icon"
-      src=${withBase("/assets/logo/esphome-mono.svg")}
+      src=${withBase("/assets/logo/esphome-mono-black.svg")}
       title="ESPHome"
     ></wa-icon>`;
   }

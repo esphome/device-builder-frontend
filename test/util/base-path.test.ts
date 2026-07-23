@@ -118,8 +118,8 @@ describe("withBase", () => {
     const { withBase } = await loadModule();
     expect(withBase("/")).toBe("/api/hassio_ingress/T/");
     expect(withBase("/dashboard")).toBe("/api/hassio_ingress/T/dashboard");
-    expect(withBase("/assets/logo/esphome.svg")).toBe(
-      "/api/hassio_ingress/T/assets/logo/esphome.svg"
+    expect(withBase("/assets/logo/esphome-mono-white.svg")).toBe(
+      "/api/hassio_ingress/T/assets/logo/esphome-mono-white.svg"
     );
   });
 
